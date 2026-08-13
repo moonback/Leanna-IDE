@@ -1,4 +1,4 @@
-# 🧠 Jarvis-OS — L'IDE universel piloté par l'IA
+# 🧠 Jarvis-OS ORIGINAL — L'IDE universel piloté par l'IA
 
 <img src="assets/images/header.png" alt="Jarvis-OS" />
 
