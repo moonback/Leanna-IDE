@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark light" />
+  <title>Jarvis OS · Core</title>
+
+  <script>
+    (function() {
+      var theme;
+      try { theme = localStorage.getItem("theme"); } catch (_) {}
+      if (theme !== "dark" && theme !== "light") {
+        theme = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      }
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+
+  <style>
+    /* ===== RESET & VARIABLES ===== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+      --bg-base: #0a0c11;
+      --bg-panel: rgba(14, 16, 22, 0.86);
+      --bg-glass: rgba(255, 255, 255, 0.025);
+      --border-soft: rgba(255, 255, 255, 0.045);
+
+      --text-primary: #eef0f4;
+      --text-secondary: #99a2b8;
+      --text-muted: #62697d;
+      --text-dimmed: #3a3f4d;
+
+      --accent-primary: #6c8cff;
+      --accent-secondary: #4a63d6;
+      --accent-glow: rgba(108, 140, 255, 0.18);
+      --accent-subtle: rgba(108, 140, 255, 0.05);
+      --success: #34c98e;
+      --warning: #e0a83e;
+      --danger: #e0616b;
+
+      --shadow-panel: 0 24px 48px -20px rgba(0, 0, 0, 0.55);
+      --radius-panel: 18px;
+      --transition-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    :root[data-theme="light"] {
+      --bg-base: #eef1f6;
+      --bg-panel: rgb(255, 255, 255);
+      --bg-glass: rgba(0, 0, 0, 0.02);
+      --border-soft: rgba(15, 23, 42, 0.06);
+
+      --text-primary: #10162a;
+      --text-secondary: #3d4658;
+      --text-muted: #6b7385;
+      --text-dimmed: #a2a9b8;
+
+      --accent-primary: #3651c9;
+      --accent-secondary: #4a63d6;
+      --accent-glow: rgba(54, 81, 201, 0.14);
+      --accent-subtle: rgba(54, 81, 201, 0.05);
+      --success: #1f9d6d;
+      --warning: #b5790c;
+      --danger: #c23f4c;
+
+      --shadow-panel: 0 24px 48px -20px rgba(15, 23, 42, 0.14);
+    }
+
+    /* ===== BODY ===== */
+    body {
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: var(--mono);
+      color: var(--text-primary);
+      user-select: none;
+      -webkit-app-region: drag;
+      /* background: var(--bg-base); */
+      transition: background-color 0.6s var(--transition-smooth);
+    }
+
+    /* Fond avec grille et particules */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 20%, var(--accent-subtle) 0%, transparent 55%),
+        radial-gradient(circle at 82% 78%, var(--accent-subtle) 0%, transparent 55%),
+        repeating-linear-gradient(0deg, transparent, transparent 43px, rgba(255,255,255,0.01) 43px, rgba(255,255,255,0.01) 44px),
+        repeating-linear-gradient(90deg, transparent, transparent 43px, rgba(255,255,255,0.01) 43px, rgba(255,255,255,0.01) 44px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Effet de grain léger, très discret */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(1.5px 1.5px at 12% 22%, rgba(255,255,255,0.08), transparent),
+                        radial-gradient(1.5px 1.5px at 32% 72%, rgba(255,255,255,0.05), transparent),
+                        radial-gradient(1.5px 1.5px at 52% 12%, rgba(255,255,255,0.06), transparent),
+                        radial-gradient(1.5px 1.5px at 72% 82%, rgba(255,255,255,0.04), transparent),
+                        radial-gradient(1.5px 1.5px at 90% 42%, rgba(255,255,255,0.07), transparent);
+      background-size: 200% 200%;
+      animation: floatParticles 28s infinite alternate ease-in-out;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.3;
+    }
+    @keyframes floatParticles {
+      0% { background-position: 0% 0%; }
+      100% { background-position: 100% 100%; }
+    }
+
+    /* ===== PANEL PRINCIPAL - SANS CONTOUR ===== */
+    .panel {
+      position: relative;
+      width: 720px;
+      max-width: 94vw;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      padding: 32px 38px 28px;
+      background: var(--bg-panel);
+      backdrop-filter: blur(24px) saturate(1.15);
+      -webkit-backdrop-filter: blur(24px) saturate(1.15);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-panel);
+      box-shadow: var(--shadow-panel);
+      z-index: 1;
+      transition: all 0.4s var(--transition-smooth);
+    }
+
+    /* Effet de lumière subtil en arrière-plan */
+    .panel::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: var(--radius-panel);
+      background:
+        radial-gradient(circle at 15% 25%, rgba(108, 140, 255, 0.025) 0%, transparent 50%),
+        radial-gradient(circle at 85% 75%, rgba(74, 99, 214, 0.025) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .panel>* {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== HEADER ===== */
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .wordmark-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-logo {
+      width: 100px;
+      /* height: 48px; */
+      object-fit: contain;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+      padding: 6px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+
+    .wordmark {
+      font-size: 21px;
+      font-weight: 650;
+      letter-spacing: 3px;
+      color: var(--text-primary);
+      font-family: var(--sans);
+    }
+
+    .cursor {
+      width: 8px;
+      height: 19px;
+      background: var(--accent-primary);
+      border-radius: 2px;
+      animation: blink 0.5s steps(1) infinite;
+      box-shadow: 0 0 10px var(--accent-glow);
+      transition: opacity 0.3s;
+    }
+    .cursor.idle {
+      animation: none;
+      opacity: 1;
+      box-shadow: 0 0 14px var(--accent-glow);
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    .subtitle {
+      font-size: 9px;
+      letter-spacing: 2.5px;
+      color: var(--text-muted);
+      font-weight: 400;
+      text-transform: uppercase;
+    }
+
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px 6px 12px;
+      background: var(--bg-glass);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 40px;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      font-family: var(--mono);
+      backdrop-filter: blur(4px);
+      transition: all 0.3s;
+    }
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-primary);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--accent-glow);
+      animation: pulse-dot 1s infinite ease-in-out;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 0.2; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border-soft);
+      border: none;
+      margin: 0;
+    }
+
+    /* ===== LOG ===== */
+    .log {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 195px;
+      max-height: 195px;
+      overflow-y: hidden;
+      padding-right: 4px;
+    }
+
+    .log-row {
+      display: flex;
+      align-items: center;
+      font-size: 11.5px;
+      color: var(--text-dimmed);
+      opacity: 0;
+      animation: reveal 0.22s var(--transition-smooth) forwards;
+      padding: 2px 0;
+      border-bottom: 1px solid transparent;
+      transition: color 0.15s;
+    }
+    .log-row.active {
+      color: var(--text-primary);
+      font-weight: 450;
+    }
+    .log-row.done {
+      color: var(--text-secondary);
+    }
+
+    .log-icon {
+      width: 18px;
+      display: inline-flex;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      transition: color 0.3s;
+    }
+    .log-row.done .log-icon {
+      color: var(--success);
+    }
+
+    .log-label {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin: 0 10px 0 4px;
+    }
+
+    .log-fill {
+      flex: 0 0 30px;
+      color: var(--text-dimmed);
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-align: center;
+    }
+
+    .log-status {
+      width: 44px;
+      text-align: right;
+      font-size: 9px;
+      letter-spacing: 0.8px;
+      font-weight: 500;
+      color: var(--text-dimmed);
+    }
+    .log-status.ok {
+      color: var(--success);
+    }
+    .log-status.running {
+      color: var(--accent-primary);
+      animation: pulse-text 0.6s infinite alternate;
+    }
+    @keyframes pulse-text {
+      0% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+
+    @keyframes reveal {
+      from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.97);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* ===== PROGRESSION ===== */
+    .progress-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 400;
+    }
+    .status-text {
+      color: var(--text-secondary);
+      font-family: var(--sans);
+      font-weight: 400;
+      letter-spacing: 0.2px;
+    }
+    .status-text .accent {
+      color: var(--accent-primary);
+      font-weight: 500;
+    }
+    .progress-percent {
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .progress-bar {
+      height: 5px;
+      background: var(--border-soft);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));
+      box-shadow: 0 0 10px var(--accent-glow);
+      transition: width 0.5s var(--transition-smooth);
+      border-radius: 8px;
+      position: relative;
+    }
+    /* Effet de balayage discret */
+    .progress-fill::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+      animation: shimmer 1.3s linear infinite;
+      border-radius: 8px;
+    }
+    @keyframes shimmer {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(100%); }
+    }
+
+    /* ===== MÉTRIQUES SYSTÈME (ajout) ===== */
+    .metrics {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      font-size: 9px;
+      color: var(--text-dimmed);
+      font-family: var(--mono);
+      letter-spacing: 0.5px;
+      padding: 6px 0 0;
+      border-top: 1px solid var(--border-soft);
+    }
+    .metric-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .metric-item .value {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .metric-bar {
+      width: 60px;
+      height: 3px;
+      background: var(--border-soft);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .metric-bar .fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent-primary);
+      border-radius: 4px;
+      transition: width 1s var(--transition-smooth);
+    }
+
+    /* ===== FOOTER SYSTÈME ===== */
+    .system-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+      font-size: 9.5px;
+      letter-spacing: 0.6px;
+      color: var(--text-dimmed);
+      padding-top: 8px;
+      border-top: 1px solid var(--border-soft);
+      font-family: var(--mono);
+    }
+    .system-footer span span {
+      color: var(--text-secondary);
+      font-weight: 450;
+    }
+    .footer-tag {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .footer-tag .dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--success);
+      display: inline-block;
+      animation: pulse-dot 1.2s infinite ease-in-out;
+    }
+
+    /* ===== VERSION ===== */
+    .version-tag {
+      position: fixed;
+      bottom: 20px;
+      right: 28px;
+      font-size: 9px;
+      color: var(--text-dimmed);
+      letter-spacing: 1.5px;
+      font-family: var(--mono);
+      opacity: 0.4;
+      transition: opacity 0.3s;
+      z-index: 2;
+    }
+    .version-tag:hover {
+      opacity: 1;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 640px) {
+      .panel {
+        padding: 22px 18px 20px;
+        gap: 16px;
+        border-radius: 20px;
+        width: 96vw;
+      }
+      .wordmark {
+        font-size: 18px;
+        letter-spacing: 6px;
+      }
+      .badge {
+        font-size: 8px;
+        padding: 4px 10px 4px 8px;
+      }
+      .log {
+        min-height: 150px;
+        max-height: 150px;
+      }
+      .log-row {
+        font-size: 10px;
+      }
+      .log-label {
+        margin: 0 4px;
+      }
+      .metrics {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .metric-bar {
+        width: 40px;
+      }
+      .system-footer {
+        font-size: 8px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      .version-tag {
+        bottom: 12px;
+        right: 16px;
+        font-size: 8px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      .log-row {
+        opacity: 1;
+        transform: none;
+      }
+      .cursor {
+        animation: none;
+        opacity: 1;
+      }
+      .badge-dot {
+        animation: none;
+        opacity: 1;
+      }
+      .progress-fill::after {
+        animation: none;
+      }
+      .log-status.running {
+        animation: none;
+      }
+      .footer-tag .dot {
+        animation: none;
+      }
+      body::after {
+        animation: none;
+        opacity: 0.3;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="panel" id="splash">
+
+    <!-- HEADER -->
+    <div class="header-row">
+      <div class="brand-container">
+        <div class="wordmark-row">
+          <img id="brandLogo" class="brand-logo" src="../assets/images/icon-sombre.png" alt="Jarvis OS" />
+          <span class="wordmark">JARVIS OS</span>
+          <span class="cursor" id="cursor"></span>
+        </div>
+        <div class="subtitle">CORE · INTELLIGENCE UNIT</div>
+      </div>
+      <div class="badge">
+        <div class="badge-dot"></div>
+        <span id="badgeText">SECURE BOOT</span>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- LOG -->
+    <div class="log" id="log" role="log" aria-live="polite" aria-label="Journal de démarrage système"></div>
+
+    <!-- PROGRESS -->
+    <div class="progress-container">
+      <div class="progress-meta">
+        <div class="status-text" id="statusText" role="status" aria-live="polite">Initialisation des sous‑systèmes…</div>
+        <div class="progress-percent" id="progressPercent">0%</div>
+      </div>
+      <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <!-- MÉTRIQUES SYSTÈME (ajoutées) -->
+    <div class="metrics" id="metrics">
+      <div class="metric-item">
+        <span>CPU</span>
+        <div class="metric-bar"><div class="fill" id="cpuFill" style="width:0%"></div></div>
+        <span class="value" id="cpuValue">0%</span>
+      </div>
+      <div class="metric-item">
+        <span>RAM</span>
+        <div class="metric-bar"><div class="fill" id="ramFill" style="width:0%"></div></div>
+        <span class="value" id="ramValue">0%</span>
+      </div>
+      <div class="metric-item">
+        <span>UPTIME</span>
+        <span class="value" id="uptimeValue">0.0s</span>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="system-footer">
+      <span class="footer-tag"><span class="dot"></span> ENV: <span>PRODUCTION</span></span>
+      <span>ENCRYPTION: <span>AES‑256‑GCM</span></span>
+      <span>NODE: <span>FR‑PAR‑01</span></span>
+    </div>
+
+  </div>
+
+  <div class="version-tag">JARVIS OS // v0.4.0‑PROD</div>
+
+  <script>
+    (function() {
+      "use strict";
+
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      // Gestion du thème
+      try {
+        const brandLogo = document.getElementById('brandLogo');
+        const savedTheme = localStorage.getItem("theme");
+        const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
+        const theme = savedTheme === "dark" || savedTheme === "light"
+          ? savedTheme
+          : prefersLight ? "light" : "dark";
+
+        document.documentElement.setAttribute("data-theme", theme);
+
+        if (brandLogo) {
+          brandLogo.src = theme === 'light'
+            ? '../assets/images/icon-light.png'
+            : '../assets/images/icon-sombre.png';
+        }
+
+        if (!savedTheme) {
+          window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", (e) => {
+            const nextTheme = e.matches ? "light" : "dark";
+            document.documentElement.setAttribute("data-theme", nextTheme);
+            if (brandLogo) {
+              brandLogo.src = nextTheme === 'light'
+                ? '../assets/images/icon-light.png'
+                : '../assets/images/icon-sombre.png';
+            }
+          });
+        }
+      } catch (_) {}
+
+      // ===== ÉTAPES DE DÉMARRAGE =====
+      const steps = [
+        { label: "Chargement du noyau système", duration: 160 },
+        { label: "Initialisation des services principaux", duration: 180 },
+        { label: "Activation des modules d'orchestration", duration: 150 },
+        { label: "Établissement de la connexion sécurisée", duration: 130 },
+        { label: "Vérification de l'intégrité des composants", duration: 110 },
+        { label: "Synchronisation des services", duration: 100 },
+        { label: "Système opérationnel", duration: 90 },
+      ];
+
+      // Références DOM
+      const log = document.getElementById("log");
+      const progressFill = document.getElementById("progressFill");
+      const progressBar = document.getElementById("progressBar");
+      const progressPercent = document.getElementById("progressPercent");
+      const statusText = document.getElementById("statusText");
+      const cursor = document.getElementById("cursor");
+      const badgeText = document.getElementById("badgeText");
+      const cpuFill = document.getElementById("cpuFill");
+      const cpuValue = document.getElementById("cpuValue");
+      const ramFill = document.getElementById("ramFill");
+      const ramValue = document.getElementById("ramValue");
+      const uptimeValue = document.getElementById("uptimeValue");
+
+      // Fonction pour les points
+      function dots(label) {
+        const count = Math.max(3, 30 - label.length);
+        return "·".repeat(count);
+      }
+
+      // Ajoute une ligne dans le log
+      function addRow(step, index) {
+        const row = document.createElement("div");
+        row.className = "log-row active";
+        if (!reduceMotion) row.style.animationDelay = (index * 0.035) + "s";
+        row.innerHTML = `
+          <span class="log-icon">›</span>
+          <span class="log-label">${step.label}</span>
+          <span class="log-fill">${dots(step.label)}</span>
+          <span class="log-status running">RUN</span>
+        `;
+        log.appendChild(row);
+        return row;
+      }
+
+      // Simulation des métriques
+      function updateMetrics(elapsed, total) {
+        const progress = Math.min(1, elapsed / total);
+        // CPU : varie entre 10 et 80% selon la progression
+        const cpu = 10 + 70 * Math.sin(progress * Math.PI * 2 + 0.5) * 0.5 + 20 * progress;
+        const cpuClamped = Math.min(95, Math.max(5, Math.round(cpu)));
+        cpuFill.style.width = cpuClamped + "%";
+        cpuValue.textContent = cpuClamped + "%";
+
+        // RAM : augmente progressivement jusqu'à ~60%
+        const ram = Math.min(65, 15 + 50 * progress);
+        const ramClamped = Math.round(ram);
+        ramFill.style.width = ramClamped + "%";
+        ramValue.textContent = ramClamped + "%";
+
+        // Uptime
+        const seconds = (elapsed / 1000).toFixed(1);
+        uptimeValue.textContent = seconds + "s";
+      }
+
+      // Fonction principale de boot
+      async function boot() {
+        const total = steps.reduce((a, b) => a + b.duration, 0);
+        let elapsed = 0;
+        const startTime = performance.now();
+
+        for (let i = 0; i < steps.length; i++) {
+          const step = steps[i];
+          const row = addRow(step, i);
+
+          statusText.innerHTML = `Exécution : <span class="accent">${step.label}</span>`;
+
+          await new Promise((r) => setTimeout(r, reduceMotion ? 0 : step.duration));
+          elapsed += step.duration;
+
+          // Mise à jour des métriques
+          updateMetrics(elapsed, total);
+
+          // Marquer comme terminé
+          row.classList.remove("active");
+          row.classList.add("done");
+
+          const statusEl = row.querySelector(".log-status");
+          statusEl.textContent = "OK";
+          statusEl.className = "log-status ok";
+
+          const icon = row.querySelector(".log-icon");
+          icon.textContent = "✓";
+
+          // Mise à jour de la barre
+          const pct = Math.min(100, Math.round((elapsed / total) * 100));
+          progressFill.style.width = pct + "%";
+          progressPercent.textContent = pct + "%";
+          progressBar.setAttribute("aria-valuenow", String(pct));
+        }
+
+        // Fin du boot
+        statusText.innerHTML = `<span class="accent">Système opérationnel</span>`;
+        progressPercent.textContent = "100%";
+        cursor.classList.add("idle");
+        badgeText.textContent = "SYSTEM ONLINE";
+
+        // Dernière ligne
+        const finalRow = document.createElement("div");
+        finalRow.className = "log-row done";
+        finalRow.style.animationDelay = "0.05s";
+        finalRow.innerHTML = `
+          <span class="log-icon">⏣</span>
+          <span class="log-label">Jarvis OS v0.4.0 — Tous les systèmes sont opérationnels</span>
+          <span class="log-fill">——</span>
+          <span class="log-status ok">ON</span>
+        `;
+        log.appendChild(finalRow);
+        log.scrollTop = log.scrollHeight;
+
+        // Métriques finales
+        cpuFill.style.width = "12%";
+        cpuValue.textContent = "12%";
+        ramFill.style.width = "42%";
+        ramValue.textContent = "42%";
+        // uptime continue
+        let uptimeSeconds = elapsed / 1000;
+        setInterval(() => {
+          uptimeSeconds += 0.1;
+          uptimeValue.textContent = uptimeSeconds.toFixed(1) + "s";
+        }, 100);
+      }
+
+      // Lancement
+      boot();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.gemini-keys.json
+release/
+.jarvis/
+.kiro/
+.vscode/
+.jarvis-audit.log
+.jarvis-profile.json
+# task.md
+jarvis-prompt.md 
+
+# Fichiers de persistance Knowledge System (générés automatiquement au démarrage)
+# Ne jamais commiter ces fichiers — ils sont recréés par l'indexeur
+server/knowledge/ProjectKnowledge.json
+server/knowledge/ProjectMemory.json

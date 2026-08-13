@@ -1,0 +1,282 @@
+const { app, BrowserWindow, systemPreferences, Notification, ipcMain, shell, dialog, desktopCapturer, nativeTheme } = require('electron');
+const fs = require('fs');
+const path = require('path');
+
+const DEBUG = process.env.ELECTRON_DEBUG === '1';
+const isPackaged = app.isPackaged;
+
+function getWindowIcon() {
+  const iconName = nativeTheme.shouldUseDarkColors ? 'icon-sombre.png' : 'icon-light.png';
+  return path.join(__dirname, '../assets/images', iconName);
+}
+
+// --- Logging vers fichier, visible même sans terminal ---
+const logPath = path.join(app.getPath('userData'), 'jarvis-debug.log');
+function log(...args) {
+  const line = `[${new Date().toISOString()}] ${args.join(' ')}`;
+  console.log(line);
+  try { fs.appendFileSync(logPath, line + '\n'); } catch (_) {}
+}
+
+process.on('uncaughtException', (err) => {
+  log('UNCAUGHT EXCEPTION:', err.stack || err.message);
+  dialog.showErrorBox('Erreur Jarvis OS', String(err.stack || err));
+});
+
+process.on('unhandledRejection', (err) => {
+  log('UNHANDLED REJECTION:', err && err.stack ? err.stack : String(err));
+});
+
+log('App starting. isPackaged =', isPackaged, 'appPath =', app.getAppPath());
+
+function startBackendServer() {
+  try {
+    process.env.NODE_ENV = 'production';
+    process.env.ELECTRON_APP_PATH = app.getAppPath();
+    // Dossier persistant pour les fichiers de config (.env, .gemini-keys.json, etc.)
+    const configDir = app.getPath('userData');
+    process.env.JARVIS_CONFIG_PATH = configDir;
+    log('Config directory:', configDir);
+
+    // Copier les fichiers de config depuis l'app packagée vers userData si absents
+    const configFiles = ['.env', '.env.local', '.gemini-keys.json'];
+    for (const file of configFiles) {
+      const destPath = path.join(configDir, file);
+      const srcPath = path.join(app.getAppPath(), file);
+      if (!fs.existsSync(destPath) && fs.existsSync(srcPath)) {
+        try {
+          fs.copyFileSync(srcPath, destPath);
+          log(`Copied ${file} to userData`);
+        } catch (e) {
+          log(`Failed to copy ${file}:`, e.message);
+        }
+      }
+    }
+
+    const serverPath = path.join(app.getAppPath(), 'dist', 'server.cjs');
+    log('Loading server from:', serverPath, 'exists:', fs.existsSync(serverPath));
+    require(serverPath);
+    log('Server module required successfully');
+  } catch (err) {
+    log('SERVER START FAILED:', err.stack || err.message);
+    dialog.showErrorBox('Erreur démarrage serveur', String(err.stack || err));
+  }
+}
+
+// ── Splash Screen ───────────────────────────────────────────────────────────
+
+function createSplashWindow() {
+  const splash = new BrowserWindow({
+    width: 480,
+    // height: 420,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: true,
+    center: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    icon: getWindowIcon(),
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  splash.loadFile(path.join(__dirname, 'splash.html'));
+  return splash;
+}
+
+// ── Main Window ─────────────────────────────────────────────────────────────
+
+function createWindow(splash, splashMinEnd) {
+  const win = new BrowserWindow({
+    width: DEBUG ? 1600 : 1200,
+    height: 900,
+    show: false, // Caché jusqu'à ce que le contenu soit prêt
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.cjs'),
+    },
+    autoHideMenuBar: !DEBUG,
+    titleBarStyle: 'hiddenInset',
+    backgroundColor: '#09090b',
+    icon: getWindowIcon(),
+  });
+
+  const port = process.env.VITE_SERVER_PORT || 5000;
+  const startUrl = process.env.ELECTRON_START_URL || `http://localhost:${port}`;
+  log('Loading URL:', startUrl);
+  win.loadURL(startUrl);
+
+  // Afficher la fenêtre principale une fois le contenu chargé
+  win.webContents.on('did-finish-load', () => {
+    // Attendre que le splash ait duré au moins 5 secondes
+    const remaining = Math.max(0, (splashMinEnd || 0) - Date.now());
+    setTimeout(() => {
+      if (splash && !splash.isDestroyed()) {
+        splash.close();
+      }
+      win.show();
+      win.focus();
+    }, remaining);
+  });
+
+  // Ouvrir les DevTools automatiquement en mode debug
+  if (DEBUG) {
+    win.webContents.openDevTools({ mode: 'right' });
+    console.log('[Electron] Mode debug activé — DevTools ouverts');
+  }
+
+  win.webContents.on('did-fail-load', (_e, errorCode, errorDescription) => {
+    log('FAILED TO LOAD:', errorCode, errorDescription);
+    // Réessayer après 2s si le serveur n'est pas encore prêt
+    if (errorCode === -102 || errorCode === -6) {
+      setTimeout(() => {
+        log('Retrying load...');
+        win.loadURL(startUrl);
+      }, 2000);
+    }
+  });
+
+  win.webContents.on('render-process-gone', (_e, details) => {
+    log('RENDER PROCESS GONE:', JSON.stringify(details));
+  });
+
+  if (process.platform === 'darwin') {
+    systemPreferences.askForMediaAccess('microphone');
+    systemPreferences.askForMediaAccess('camera');
+  }
+
+  return win;
+}
+
+app.whenReady().then(() => {
+  const splash = createSplashWindow();
+  const splashMinEnd = Date.now() + 5000; // splash visible au moins 5 secondes
+
+  // Démarrer le serveur backend en mode packagé
+  if (isPackaged) {
+    startBackendServer();
+  }
+
+  createWindow(splash, splashMinEnd);
+
+  // --- IPC Handlers (inchangé) ---
+
+  ipcMain.handle('electron/folder-contents', async function (_event, folderPath) {
+    const entries = await fs.promises.readdir(folderPath, { withFileTypes: true });
+    return entries.map(function (entry) {
+      return {
+        name: entry.name,
+        isDirectory: entry.isDirectory(),
+        path: path.join(folderPath, entry.name),
+      };
+    });
+  });
+
+  ipcMain.handle('electron/create-file', async function (_event, folderPath, fileName) {
+    const targetPath = path.join(folderPath, fileName);
+    await fs.promises.writeFile(targetPath, '', { flag: 'wx' });
+    return targetPath;
+  });
+
+  ipcMain.handle('electron/create-folder', async function (_event, folderPath, folderName) {
+    const targetPath = path.join(folderPath, folderName);
+    await fs.promises.mkdir(targetPath, { recursive: false });
+    return targetPath;
+  });
+
+  ipcMain.handle('electron/delete-path', async function (_event, targetPath) {
+    await fs.promises.rm(targetPath, { recursive: true, force: true });
+    return true;
+  });
+
+  ipcMain.handle('electron/open-path', async function (_event, targetPath) {
+    await shell.openPath(targetPath);
+    return true;
+  });
+
+  ipcMain.handle('electron/open-external', async function (_event, url) {
+    await shell.openExternal(url);
+    return true;
+  });
+
+  ipcMain.handle('electron/get-project-root', async function () {
+    // IDE auto-référentiel : retourne toujours le dossier de l'app elle-même
+    return process.env.ELECTRON_APP_PATH || app.getAppPath();
+  });
+
+  ipcMain.handle('electron/select-folder', async function () {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: 'Choisir le workspace',
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    return result.filePaths[0];
+  });
+
+  ipcMain.handle('electron/quit', function () {
+    app.quit();
+  });
+
+  ipcMain.handle('electron/get-screen-sources', async function () {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen', 'window'],
+      thumbnailSize: { width: 320, height: 180 },
+    });
+    return sources.map(function (source) {
+      return {
+        id: source.id,
+        name: source.name,
+        thumbnail: source.thumbnail.toDataURL(),
+      };
+    });
+  });
+
+  app.on('activate', function () {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow(null, 0);
+    }
+  });
+
+  if (Notification.isSupported()) {
+    new Notification({ title: 'Jarvis OS', body: 'Système local connecté et prêt.' }).show();
+  }
+});
+
+app.on('window-all-closed', function () {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+// ── Graceful shutdown ────────────────────────────────────────────────────────
+// Le serveur Express est chargé dans le même process (require(serverPath)).
+// On utilise process.__jarvisShutdown (exposé par server.ts) pour déclencher
+// l'arrêt propre des timers, sessions Gemini et WebSocket avant de quitter.
+// Cela évite les MaxListenersExceededWarning et sessions zombies après
+// plusieurs redémarrages en développement.
+app.on('before-quit', function (event) {
+  const shutdown = process.__jarvisShutdown;
+  if (typeof shutdown !== 'function') return; // dev mode : server.ts non chargé ici
+
+  event.preventDefault();
+  log('[Lifecycle] before-quit : déclenchement du graceful shutdown...');
+
+  const done = shutdown('before-quit').then(function () {
+    log('[Lifecycle] Shutdown complet, fermeture Electron.');
+    app.exit(0);
+  }).catch(function (err) {
+    log('[Lifecycle] Erreur shutdown:', err && err.message ? err.message : String(err));
+    app.exit(1);
+  });
+
+  // Sécurité : forcer la fermeture après 3s si le shutdown n'aboutit pas
+  setTimeout(function () {
+    log('[Lifecycle] Timeout shutdown (3s), forçage fermeture.');
+    app.exit(0);
+  }, 3000);
+});
+
