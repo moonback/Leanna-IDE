@@ -43,6 +43,7 @@ import { SelfEditBanner } from '../components/ide/SelfEditBanner';
 import { CheckpointPanel } from '../components/ide/CheckpointPanel';
 import { SandboxDiffViewer } from '../components/sandbox/SandboxDiffViewer';
 import { AgentPanel } from '../components/panels/AgentPanel';
+import { initActivityStore } from '../stores/agentActivityStore';
 import { MissionPanel } from '../components/panels/MissionPanel';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard';
 import { AgentFleetPanel } from '../components/panels/AgentFleetPanel';
@@ -54,6 +55,9 @@ export default function IdeView() {
   const { profile } = useProfile();
   const { activity, clearActivity, connected, disconnect, connect, muted, toggleMute, isBusy, reasoning, sendVideoFrame } = useLiveAPIContext();
   const { isSharing: screenShareEnabled, toggleScreenShare } = useScreenShare();
+
+  // Initialize the global activity store (listens to events even when panel is closed)
+  useEffect(() => { initActivityStore(); }, []);
 
   // Check if assistant is currently working
   const assistantWorking = activity.some(step => step.status === 'running') || isBusy;
@@ -277,6 +281,34 @@ export default function IdeView() {
     window.addEventListener('jarvis-open-sandbox-diff', handleOpenSandboxDiff);
     return () => window.removeEventListener('jarvis-open-sandbox-diff', handleOpenSandboxDiff);
   }, []);
+
+  // Auto-open Agents panel when an agent starts working or tools are used
+  useEffect(() => {
+    const handleOpenAgents = () => setShowAgents(true);
+    // Direct open event (from overlay etc.)
+    window.addEventListener('jarvis-open-agents-panel', handleOpenAgents);
+
+    // Auto-open when a tool starts (assistant is working)
+    const handleToolStart = () => {
+      if (!showAgents) setShowAgents(true);
+    };
+    window.addEventListener('jarvis-tool-start', handleToolStart);
+
+    // Auto-open when an agent task begins
+    const handleAgentEvent = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && (detail.status === 'running' || detail.event === 'task_started')) {
+        setShowAgents(true);
+      }
+    };
+    window.addEventListener('jarvis-agent-event', handleAgentEvent);
+
+    return () => {
+      window.removeEventListener('jarvis-open-agents-panel', handleOpenAgents);
+      window.removeEventListener('jarvis-tool-start', handleToolStart);
+      window.removeEventListener('jarvis-agent-event', handleAgentEvent);
+    };
+  }, [showAgents]);
 
   const saveActiveFile = useCallback(async () => {
     if (!fileSystem.activePath) return;
