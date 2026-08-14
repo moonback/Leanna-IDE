@@ -147,7 +147,7 @@
   --shadow-glow: 0 0 16px rgba(99,102,241,0.08), 0 0 48px rgba(99,102,241,0.03);
 
   /* Surfaces — clean whites with warmth */
-  --bg-base:       #f4f5f9;
+  --bg-base:       #ffffff;
   --bg-secondary:  #ecedf4;
   --bg-panel:      rgba(255, 255, 255, 0.92);
   --bg-ctrl:       rgba(255, 255, 255, 0.98);

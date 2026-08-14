@@ -970,15 +970,7 @@ export default function IdeView() {
 
             {/* Agents Panel — now rendered as modal overlay below */}
 
-            {/* Agent Fleet Panel */}
-            {showFleet && (
-              <div
-                className="border-l flex flex-col min-h-0"
-                style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
-              >
-                <AgentFleetPanel inline />
-              </div>
-            )}
+            {/* Agent Fleet Panel — rendered as modal overlay below */}
 
             {/* Missions Panel */}
             {showMissions && (
@@ -1081,6 +1073,7 @@ export default function IdeView() {
           onToggleSandbox={() => setShowSandbox(v => !v)}
           onToggleMcp={() => setShowMcp(v => !v)}
           onToggleAgents={() => setShowAgents(v => !v)}
+          onToggleFleet={() => setShowFleet(v => !v)}
         />
       </div>
 
@@ -1147,6 +1140,11 @@ export default function IdeView() {
       {/* Agents Panel — modal overlay */}
       {showAgents && (
         <AgentPanel inline onClose={() => setShowAgents(false)} />
+      )}
+
+      {/* Fleet Panel — modal overlay */}
+      {showFleet && (
+        <AgentFleetPanel inline onClose={() => setShowFleet(false)} />
       )}
     </div>
   );

@@ -366,8 +366,6 @@ function FooterSection({
   context,
   currentPath,
   navigate,
-  showSettings,
-  onToggleSettings,
   showHelp,
   onToggleHelp,
 }: {
@@ -381,14 +379,12 @@ function FooterSection({
 }) {
   return (
     <div className="w-full flex flex-col items-center" role="navigation" aria-label="Aide et paramètres">
-      {/* {context === 'ide' && (
-        <SidebarItem
-          icon={SlidersHorizontal}
-          active={showSettings}
-          onClick={onToggleSettings}
-          title="Réglages éditeur"
-        />
-      )} */}
+      <SidebarItem
+        icon={Settings}
+        active={currentPath === '/settings'}
+        onClick={() => navigate('/settings')}
+        title="Paramètres du profil"
+      />
       <SidebarItem
         icon={HelpCircle}
         active={context === 'ide' ? showHelp : currentPath === '/help'}

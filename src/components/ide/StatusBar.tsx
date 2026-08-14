@@ -9,6 +9,7 @@ import {
   RefreshCcw,
   X,
   Users,
+  Radio,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext';
 import { useProfile } from '../../context/UserProfileContext';
@@ -29,6 +30,7 @@ interface StatusBarProps {
   onToggleMcp?: () => void;
   onToggleSandbox?: () => void;
   onToggleAgents?: () => void;
+  onToggleFleet?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -49,6 +51,7 @@ export const StatusBar = memo(function StatusBar({
   onToggleMcp,
   onToggleSandbox,
   onToggleAgents,
+  onToggleFleet,
 }: StatusBarProps) {
   const { tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
@@ -398,6 +401,17 @@ export const StatusBar = memo(function StatusBar({
           >
             <Users size={12} style={{ color: 'var(--accent-primary)' }} />
             <span style={{ color: 'var(--text-muted)' }} className="font-medium">Agents</span>
+          </button>
+
+          {/* Fleet */}
+          <button
+            type="button"
+            onClick={onToggleFleet}
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover,rgba(128,128,128,0.12))]"
+            title="Ouvrir la flotte d'agents"
+          >
+            <Radio size={12} style={{ color: '#a78bfa' }} />
+            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Flotte</span>
           </button>
         </div>
 
