@@ -6,12 +6,15 @@ import { triggerRestartIfNeeded } from "../utils/serverRestart";
 import { scheduleValidation } from "../utils/postEditValidator";
 import { appendAuditEvent, generateDiffSummary } from "../audit";
 import { isSandboxActive, markFileModified } from "../utils/sandbox";
+import { createLogger } from "../utils/logger";
 import {
   getProjectRoot,
   resolveWritePath,
   resolveSandboxWriteTarget,
   checkWorkspace
 } from "./codebaseHelpers";
+
+const log = createLogger("CodebaseWriter");
 
 // ── Rate limiting pour les opérations d'écriture ────────────────────────────
 const WRITE_RATE_LIMIT = 30; // max 30 écritures par minute
@@ -150,11 +153,29 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
   if (!checkWriteRateLimit()) return { error: "Rate limit atteint : trop d'écritures par minute." };
   if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
   const requestedPath = String(args.path || "").trim();
-  const searchText = String(args.searchText || "");
-  const replaceText = String(args.replaceText || "");
+  let searchText = String(args.searchText || "");
+  const replaceText = String(args.replaceText ?? "");
   const replaceAll = args.replaceAll === true;
-  if (!requestedPath) return { error: "Le chemin de fichier est requis." };
-  if (!searchText) return { error: "searchText est requis." };
+  const startMarker = args.startMarker ? String(args.startMarker).trim() : null;
+  const endMarker = args.endMarker ? String(args.endMarker).trim() : null;
+
+  if (!requestedPath) return { error: "Le chemin de fichier est requis. Exemple: modify_project_file({ path: 'src/file.ts', searchText: 'texte exact', replaceText: 'nouveau texte' })" };
+
+  // Mode startMarker/endMarker : le backend construit searchText depuis le fichier
+  if (!searchText && startMarker && endMarker) {
+    const target = resolveSandboxWriteTarget(requestedPath);
+    if (!target) return { error: "Chemin invalide ou en dehors du workspace." };
+    if (!fs.existsSync(target.sandboxPath)) return { error: "Fichier introuvable." };
+    const content = await fs.promises.readFile(target.sandboxPath, "utf-8");
+    const startIdx = content.indexOf(startMarker);
+    const endIdx = startIdx >= 0 ? content.indexOf(endMarker, startIdx) : -1;
+    if (startIdx === -1) return { error: `startMarker introuvable dans le fichier: "${startMarker.slice(0, 80)}"` };
+    if (endIdx === -1) return { error: `endMarker introuvable après startMarker: "${endMarker.slice(0, 80)}"` };
+    searchText = content.slice(startIdx, endIdx + endMarker.length);
+    log.info(`[modify_project_file] Mode marker: searchText construit (${searchText.length} chars) depuis startMarker/endMarker`);
+  }
+
+  if (!searchText) return { error: "searchText est OBLIGATOIRE et ne peut pas être vide. Tu DOIS d'abord lire le fichier avec read_project_file({ path, full: true }) puis copier le texte EXACT à remplacer dans searchText. Alternative: utilise startMarker et endMarker pour délimiter le bloc à remplacer." };
   const target = resolveSandboxWriteTarget(requestedPath);
   if (!target) return { error: "Chemin invalide ou en dehors du workspace." };
   const normalized = target.sandboxPath;
@@ -163,7 +184,13 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
 
   const content = await fs.promises.readFile(normalized, "utf-8");
   if (!content.includes(searchText)) {
-    return { error: "searchText introuvable dans le fichier. Utilise read_project_file pour verifier le contenu exact." };
+    // Donner un contexte utile à l'agent pour qu'il corrige
+    const firstLines = content.split("\n").slice(0, 5).join("\n");
+    return {
+      error: `searchText introuvable dans le fichier "${requestedPath}". Le texte fourni ne correspond à aucun passage du fichier. Relis le fichier avec read_project_file({ path: "${requestedPath}", full: true }) et copie le texte EXACT (espaces, indentation, retours à la ligne) que tu veux remplacer.`,
+      hint: `Début du fichier:\n${firstLines}`,
+      totalLines: content.split("\n").length,
+    };
   }
 
   const occurrences = content.split(searchText).length - 1;

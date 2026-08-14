@@ -167,9 +167,10 @@ export async function handleReadProjectFile(args: any) {
   const selectedLines = lines.slice(startLine - 1, endLine);
   const content = selectedLines.join("\n");
 
+  const forceFullContent = args.full === true || args.forceFullContent === true;
   const SMART_LIMIT = 8000;
   const noRangeSpecified = typeof args.startLine !== "number" && typeof args.endLine !== "number";
-  if (noRangeSpecified && content.length > SMART_LIMIT) {
+  if (!forceFullContent && noRangeSpecified && content.length > SMART_LIMIT) {
     const preview = lines.slice(0, 50).join("\n");
     return {
       status: "partial",
@@ -177,22 +178,31 @@ export async function handleReadProjectFile(args: any) {
       totalLines: lines.length,
       sizeBytes: stats.size,
       content: preview,
-      warning: `Fichier volumineux (${lines.length} lignes, ${stats.size} octets). Seules les 50 premières lignes sont affichées. Utilise startLine/endLine pour lire une section spécifique, ou read_file_outline pour voir la structure.`,
-      hint: "Pour modifier ce fichier, utilise read_file_outline d'abord pour identifier les lignes, puis read_project_file avec startLine/endLine, puis modify_project_file ou patch_project_file.",
+      warning: `Fichier volumineux (${lines.length} lignes, ${stats.size} octets). Seules les 50 premières lignes sont affichées. Utilise startLine/endLine pour lire une section spécifique, ou read_project_file avec full=true pour le fichier complet.`,
+      hint: "Pour lire le fichier en entier, rappelle read_project_file avec full: true.",
     };
   }
 
   const maxLength = 200_000;
   const truncated = content.length > maxLength;
+
+  // Si lecture complète (full: true), ajouter les numéros de ligne pour faciliter patch_project_file
+  const addLineNumbers = (args.full === true || args.forceFullContent === true) && !truncated && lines.length > 30;
+  const formattedContent = addLineNumbers
+    ? selectedLines.map((line, i) => `${(startLine + i).toString().padStart(4, ' ')}| ${line}`).join("\n")
+    : (truncated ? content.slice(0, maxLength) + "\n... [tronque]" : content);
+
   return {
     status: "success",
     path: requestedPath,
     totalLines: lines.length,
     startLine,
     endLine,
-    content: truncated ? content.slice(0, maxLength) + "\n... [tronque]" : content,
+    content: formattedContent,
+    lineNumbered: addLineNumbers,
     truncated,
     sizeBytes: stats.size,
+    hint: addLineNumbers ? "Les numéros de ligne sont inclus (format: '  42| code'). Utilise patch_project_file avec startLine/endLine pour modifier." : undefined,
   };
 }
 
@@ -230,7 +240,15 @@ export async function handleSearchInFiles(args: any) {
   const caseSensitive = args.caseSensitive === true;
   const maxResults = typeof args.maxResults === "number" ? args.maxResults : 20;
   const allFiles: string[] = [];
-  await walkDirectory(normalized, searchPath === "." ? "." : searchPath, allFiles);
+
+  // Si le path pointe vers un fichier, chercher uniquement dedans
+  const pathStats = await fs.promises.stat(normalized).catch(() => null);
+  if (pathStats && pathStats.isFile()) {
+    allFiles.push(searchPath);
+  } else {
+    await walkDirectory(normalized, searchPath === "." ? "." : searchPath, allFiles);
+  }
+
   const results: Array<{ file: string; line: number; content: string }> = [];
   const regex = new RegExp(query, caseSensitive ? "g" : "gi");
   for (const filePath of allFiles) {

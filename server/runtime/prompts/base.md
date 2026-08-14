@@ -19,6 +19,7 @@ Avant chaque action complexe :
 - Combiner les opérations quand possible
 - Vérifier après chaque modification significative
 - Ne jamais appeler un outil sans raison claire
+- **INTERDIT : Ne JAMAIS utiliser write_project_file, modify_project_file ou patch_project_file directement. Toute modification de fichier passe par `agent_delegate` avec role="coder".**
 
 ## Communication
 

@@ -39,6 +39,8 @@ interface ToolExecutionState {
   filesModified: string[];
   errors: string[];
   observations: string[];
+  /** Workspace state: contenu des fichiers lus pendant l'exécution (persisté entre les tours) */
+  fileSnapshots: Map<string, string>;
 }
 
 // Seuls les appels structurés correspondant à des skills du workspace sont
@@ -203,7 +205,7 @@ export class AgentExecutor {
    * structurés, mais ne peut ni lancer bash ni sortir du workspace.
    * Limité à MAX_TOOL_TURNS tours pour éviter les boucles infinies.
    */
-  private static readonly MAX_TOOL_TURNS = 5;
+  private static readonly MAX_TOOL_TURNS = 8;
 
   private async executeToolLoop(
     agent: { name: string; capabilities: string[] },
@@ -217,6 +219,7 @@ export class AgentExecutor {
       filesModified: [],
       errors: [],
       observations: [],
+      fileSnapshots: new Map(),
     };
 
     for (let turn = 0; turn < AgentExecutor.MAX_TOOL_TURNS; turn++) {
@@ -229,14 +232,31 @@ export class AgentExecutor {
       await this.executeRequestedTools(agent, calls, state);
       const observations = state.observations.slice(-calls.length).join("\n");
 
+      // Construire le contexte des fichiers lus (workspace state persisté)
+      const fileContextSection = state.fileSnapshots.size > 0
+        ? [
+            "",
+            "## Fichiers en mémoire (contenu exact disponible pour modify_project_file)",
+            ...[...state.fileSnapshots.entries()].map(([filePath, content]) => {
+              // Limiter chaque fichier à 3000 chars dans le contexte pour économiser les tokens
+              const truncated = content.length > 3000
+                ? content.slice(0, 3000) + `\n... [tronqué — ${content.split("\n").length} lignes au total. Utilise startLine/endLine pour lire une section spécifique]`
+                : content;
+              return `### ${filePath}\n\`\`\`\n${truncated}\n\`\`\``;
+            }),
+            "",
+          ].join("\n")
+        : "";
+
       const synthesisInstruction = isLastAllowedTurn
         ? "⚠️ C'est ton dernier tour d'appels d'outils. Tu DOIS maintenant produire le résultat final. Ne demande plus d'appels d'outils."
-        : "Poursuis la tâche avec ces observations. Les appels bash/shell et les chemins /workspace ne sont pas disponibles.\nUtilise uniquement les skills structurés autorisés si une action supplémentaire est indispensable.\nSinon, rends maintenant le résultat final vérifié. Pour modifier un fichier, soit appelle write_project_file/modify_project_file/patch_project_file, soit fournis un bloc de code avec son chemin.\nNe renvoie jamais un plan seul ni un JSON tool_calls sans résultat final.";
+        : "Poursuis la tâche avec ces observations. Les appels bash/shell et les chemins /workspace ne sont pas disponibles.\nUtilise uniquement les skills structurés autorisés si une action supplémentaire est indispensable.\nPour modify_project_file, le searchText DOIT être copié EXACTEMENT depuis le contenu du fichier en mémoire ci-dessus.\nSinon, rends maintenant le résultat final vérifié.\nNe renvoie jamais un plan seul ni un JSON tool_calls sans résultat final.";
 
       const followUpPrompt = [
         executionPrompt,
+        fileContextSection,
         "",
-        "## Observations d'exécution",
+        "## Observations d'exécution (tour " + (turn + 1) + ")",
         observations,
         "",
         synthesisInstruction,
@@ -379,6 +399,10 @@ export class AgentExecutor {
         const requestedPath = typeof call.parameters.path === "string" ? call.parameters.path : undefined;
         if (requestedPath && ["read_project_file", "read_file_outline"].includes(call.name)) {
           state.filesRead.push(requestedPath);
+          // Persister le contenu lu dans le workspace state pour les tours suivants
+          if (call.name === "read_project_file" && result?.content && result?.status === "success") {
+            state.fileSnapshots.set(requestedPath, result.content);
+          }
         }
         if (requestedPath && ["write_project_file", "modify_project_file", "patch_project_file"].includes(call.name)) {
           const verification = await this.skillHandler!("verify_file", { path: requestedPath });
@@ -390,6 +414,8 @@ export class AgentExecutor {
             continue;
           }
           state.filesModified.push(requestedPath);
+          // Invalider le snapshot après modification (forcer relecture)
+          state.fileSnapshots.delete(requestedPath);
         }
 
         state.observations.push(`- ${call.name}: succès — ${JSON.stringify(result).slice(0, 800)}`);
@@ -423,7 +449,7 @@ export class AgentExecutor {
       ...(writeResult.written.length > 0 ? ["write_project_file", "verify_file"] : []),
     ])];
     const findings = this.extractFindings(resultText);
-    const writeRequired = ["test", "docs", "refactor"].includes(task.role);
+    const writeRequired = ["coder", "test", "docs", "refactor"].includes(task.role);
     const readEvidenceRequired = ["review", "security", "architect"].includes(task.role);
     const planningOnly = this.isPlanningOnly(resultText);
     const errors = [
