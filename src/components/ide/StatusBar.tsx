@@ -8,6 +8,7 @@ import {
   FileText,
   RefreshCcw,
   X,
+  Users,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext';
 import { useProfile } from '../../context/UserProfileContext';
@@ -27,6 +28,7 @@ interface StatusBarProps {
   assistantBusy?: boolean;
   onToggleMcp?: () => void;
   onToggleSandbox?: () => void;
+  onToggleAgents?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -46,6 +48,7 @@ export const StatusBar = memo(function StatusBar({
   assistantBusy,
   onToggleMcp,
   onToggleSandbox,
+  onToggleAgents,
 }: StatusBarProps) {
   const { tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
@@ -384,6 +387,17 @@ export const StatusBar = memo(function StatusBar({
               mcpStatus === 'error' ? 'bg-red-500' : 'bg-gray-400'
             }`} />
             <span style={{ color: 'var(--text-muted)' }} className="font-medium">MCP</span>
+          </button>
+
+          {/* Agents */}
+          <button
+            type="button"
+            onClick={onToggleAgents}
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover,rgba(128,128,128,0.12))]"
+            title="Ouvrir le panneau Agents"
+          >
+            <Users size={12} style={{ color: 'var(--accent-primary)' }} />
+            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Agents</span>
           </button>
         </div>
 

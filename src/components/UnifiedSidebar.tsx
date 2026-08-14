@@ -29,6 +29,8 @@ import {
   Settings,
   SlidersHorizontal,
   BrainCircuit,
+  ChevronUp,
+  LayoutList,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -53,19 +55,7 @@ export type { UnifiedSidebarProps } from './sidebar/types';
 
 const noop = () => {};
 
-interface NavItem {
-  path: string;
-  icon: LucideIcon;
-  label: string;
-  match: (p: string) => boolean;
-}
-
-const GLOBAL_NAV_ITEMS: NavItem[] = [
-  { path: '/history', icon: History, label: 'Historique', match: (p) => p === '/history' },
-  { path: '/memories', icon: BrainCircuit, label: 'Mémoires', match: (p) => p === '/memories' },
-  { path: '/automation', icon: Zap, label: 'Tâches', match: (p) => p === '/automation' },
-  { path: '/settings', icon: Settings, label: 'Paramètres', match: (p) => p === '/settings' },
-];
+// (Navigation items are now grouped in the GlobalNavSection submenu)
 
 // ─── Composant Principal ───────────────────────────────────────────────────────
 
@@ -300,30 +290,74 @@ function GlobalNavSection({
   showMemory: boolean;
   onToggleMemory: () => void;
 }) {
-  // Map path → IDE panel toggle (pour éviter navigation hors contexte IDE)
-  const ideOverrides: Record<string, { active: boolean; onClick: () => void }> = {
-    '/history': { active: showHistory, onClick: onToggleHistory },
-    '/automation': { active: showAutomation, onClick: onToggleAutomation },
-    '/memories': { active: showMemory, onClick: onToggleMemory },
-  };
+  const [submenuOpen, setSubmenuOpen] = useState(false);
+  const submenuRef = useRef<HTMLDivElement>(null);
+
+  // Close submenu on outside click
+  useEffect(() => {
+    if (!submenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (submenuRef.current && !submenuRef.current.contains(e.target as Node)) {
+        setSubmenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [submenuOpen]);
+
+  const subItems = [
+    { id: 'history', path: '/history', icon: History, label: 'Historique', active: showHistory, onClick: onToggleHistory },
+    { id: 'memories', path: '/memories', icon: BrainCircuit, label: 'Mémoires', active: showMemory, onClick: onToggleMemory },
+    { id: 'automation', path: '/automation', icon: Zap, label: 'Tâches', active: showAutomation, onClick: onToggleAutomation },
+  ];
+
+  const anyActive = subItems.some(item =>
+    context === 'ide' ? item.active : item.path === currentPath
+  );
 
   return (
-    <div className="w-full flex flex-col items-center" role="navigation" aria-label="Navigation globale">
-      {GLOBAL_NAV_ITEMS.map(({ path, icon, label, match }) => {
-        const override = context === 'ide' ? ideOverrides[path] : undefined;
-        const active = override ? override.active : match(currentPath);
-        const onClick = override ? override.onClick : () => navigate(path);
+    <div className="w-full flex flex-col items-center relative" role="navigation" aria-label="Navigation globale" ref={submenuRef}>
+      <SidebarItem
+        icon={LayoutList}
+        active={anyActive || submenuOpen}
+        onClick={() => setSubmenuOpen(prev => !prev)}
+        title="Historique · Mémoires · Tâches"
+      />
 
-        return (
-          <SidebarItem
-            key={path}
-            icon={icon}
-            active={active}
-            onClick={onClick}
-            title={label}
-          />
-        );
-      })}
+      {submenuOpen && (
+        <div
+          className="absolute left-[52px] bottom-0 z-50 py-1.5 rounded-lg border shadow-lg"
+          style={{
+            backgroundColor: 'var(--bg-panel)',
+            borderColor: 'var(--border-base)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            minWidth: '160px',
+          }}
+        >
+          {subItems.map(({ id, path, icon: Icon, label, active, onClick }) => {
+            const isActive = context === 'ide' ? active : path === currentPath;
+            const handleClick = context === 'ide' ? onClick : () => navigate(path);
+
+            return (
+              <button
+                key={id}
+                onClick={() => {
+                  handleClick();
+                  setSubmenuOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] font-medium transition-colors hover:bg-white/8"
+                style={{
+                  color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)',
+                  backgroundColor: isActive ? 'var(--accent-subtle)' : undefined,
+                }}
+              >
+                <Icon size={13} />
+                <span>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -282,33 +282,15 @@ export default function IdeView() {
     return () => window.removeEventListener('jarvis-open-sandbox-diff', handleOpenSandboxDiff);
   }, []);
 
-  // Auto-open Agents panel when an agent starts working or tools are used
+  // Open Agents panel only on explicit user action (button click, overlay)
   useEffect(() => {
     const handleOpenAgents = () => setShowAgents(true);
-    // Direct open event (from overlay etc.)
     window.addEventListener('jarvis-open-agents-panel', handleOpenAgents);
-
-    // Auto-open when a tool starts (assistant is working)
-    const handleToolStart = () => {
-      if (!showAgents) setShowAgents(true);
-    };
-    window.addEventListener('jarvis-tool-start', handleToolStart);
-
-    // Auto-open when an agent task begins
-    const handleAgentEvent = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail && (detail.status === 'running' || detail.event === 'task_started')) {
-        setShowAgents(true);
-      }
-    };
-    window.addEventListener('jarvis-agent-event', handleAgentEvent);
 
     return () => {
       window.removeEventListener('jarvis-open-agents-panel', handleOpenAgents);
-      window.removeEventListener('jarvis-tool-start', handleToolStart);
-      window.removeEventListener('jarvis-agent-event', handleAgentEvent);
     };
-  }, [showAgents]);
+  }, []);
 
   const saveActiveFile = useCallback(async () => {
     if (!fileSystem.activePath) return;
@@ -984,23 +966,9 @@ export default function IdeView() {
               </div>
             )}
 
-            {/* Chat/Agent Panel */}
-            {showChat && !showSkillsMonitor && (
-              <ChatPanel
-                pendingMessage={pendingChatMessage}
-                onPendingMessageConsumed={() => setPendingChatMessage(null)}
-              />
-            )}
+            {/* Chat/Agent Panel — moved to overlay below */}
 
-            {/* Agents Panel */}
-            {showAgents && (
-              <div
-                className="border-l flex flex-col min-h-0"
-                style={{ width: 320, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
-              >
-                <AgentPanel inline />
-              </div>
-            )}
+            {/* Agents Panel — now rendered as modal overlay below */}
 
             {/* Agent Fleet Panel */}
             {showFleet && (
@@ -1112,6 +1080,7 @@ export default function IdeView() {
           assistantBusy={assistantWorking}
           onToggleSandbox={() => setShowSandbox(v => !v)}
           onToggleMcp={() => setShowMcp(v => !v)}
+          onToggleAgents={() => setShowAgents(v => !v)}
         />
       </div>
 
@@ -1165,6 +1134,19 @@ export default function IdeView() {
       {/* Sandbox Diff Viewer — opened from StatusBar sandbox badge */}
       {showSandboxDiffOverlay && (
         <SandboxDiffViewer onClose={() => setShowSandboxDiffOverlay(false)} />
+      )}
+
+      {/* Chat Panel — floating overlay above everything */}
+      {showChat && !showSkillsMonitor && (
+        <ChatPanel
+          pendingMessage={pendingChatMessage}
+          onPendingMessageConsumed={() => setPendingChatMessage(null)}
+        />
+      )}
+
+      {/* Agents Panel — modal overlay */}
+      {showAgents && (
+        <AgentPanel inline onClose={() => setShowAgents(false)} />
       )}
     </div>
   );

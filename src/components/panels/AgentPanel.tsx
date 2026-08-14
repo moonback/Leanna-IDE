@@ -111,9 +111,10 @@ function formatArgs(args: any): string {
 
 interface AgentPanelProps {
   inline?: boolean;
+  onClose?: () => void;
 }
 
-export function AgentPanel({ inline = false }: AgentPanelProps) {
+export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
   // Subscribe to the global store — re-renders on every change
   const toolActivities = useSyncExternalStore(subscribe, getToolActivities);
   const delegatedTasks = useSyncExternalStore(subscribe, getAgentTasks);
@@ -187,7 +188,60 @@ export function AgentPanel({ inline = false }: AgentPanelProps) {
     </div>
   );
 
-  if (inline) return content;
+  if (inline) {
+    return (
+      <motion.div
+        className="fixed inset-0 z-[9995] flex items-center justify-center"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+        <motion.div
+          className="relative flex flex-col w-full max-w-lg overflow-hidden"
+          style={{
+            maxHeight: '75vh',
+            background: 'var(--bg-panel)',
+            border: '1px solid var(--border-base)',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.4)',
+          }}
+          initial={{ scale: 0.95, y: 12, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          exit={{ scale: 0.95, y: 12, opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Modal header */}
+          <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)' }}>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-md flex items-center justify-center" style={{ backgroundColor: 'var(--accent-subtle)' }}>
+                <Users size={14} style={{ color: 'var(--accent-primary)' }} />
+              </div>
+              <div>
+                <h2 className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>Agents</h2>
+                <span className="text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                  {liveRunning + delegatedRunning} actifs
+                </span>
+              </div>
+            </div>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
+                style={{ color: 'var(--text-muted)' }}
+                aria-label="Fermer"
+              >
+                <XCircle size={16} />
+              </button>
+            )}
+          </div>
+          {content}
+        </motion.div>
+      </motion.div>
+    );
+  }
 
   return (
     <Panel title="Agents" icon={<Users className="w-4 h-4" />}

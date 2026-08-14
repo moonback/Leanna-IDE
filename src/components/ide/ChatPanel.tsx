@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, mem
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, Mic, MicOff, Loader2, User, Bot,
-  Trash2, ChevronDown, Power, Zap,
+  Trash2, ChevronDown, Power, Zap, GripVertical, Minus, PanelRight,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext';
 import { useProfile, type UserProfile } from '../../context/UserProfileContext';
@@ -329,6 +329,49 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed }: InputAreaP
   );
 }
 
+// ─── Hook pour rendre un élément déplaçable ───────────────────────────────
+function useDraggable() {
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const posStart = useRef({ x: 0, y: 0 });
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Ignore si on clique sur un bouton
+    if ((e.target as HTMLElement).closest('button')) return;
+    setIsDragging(true);
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    posStart.current = { ...position };
+    e.preventDefault();
+  }, [position]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      setPosition({
+        x: posStart.current.x + dx,
+        y: posStart.current.y + dy,
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
+  return { position, isDragging, handleMouseDown };
+}
+
 // ─── Composant principal ──────────────────────────────────────────────────
 interface ChatPanelProps {
   pendingMessage?: PendingChatMessage | null;
@@ -338,14 +381,19 @@ interface ChatPanelProps {
 export function ChatPanel({ pendingMessage, onPendingMessageConsumed }: ChatPanelProps = {}) {
   const {
     connected, connecting, connect, disconnect,
-    sendTextMessage, sendRawMessage, transcript, clearTranscript, transcriptRestored,
+    sendTextMessage, sendRawMessage, transcript, clearTranscript,
     activity, isBusy, muted, toggleMute,
   } = useLiveAPIContext();
   const { profile } = useProfile();
   const [showActivity, setShowActivity] = useState(true);
+  const [minimized, setMinimized] = useState(false);
+  const [docked, setDocked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
+
+  // Draggable
+  const { position, isDragging: isDraggingPanel, handleMouseDown: handleDragMouseDown } = useDraggable();
 
   // File d'attente
   const { queue, enqueue } = useMessageQueue(isBusy, connected, sendTextMessage);
@@ -431,22 +479,41 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed }: ChatPane
 
   return (
     <div
-      className="flex flex-col h-full border-l overflow-hidden relative"
+      className="fixed flex flex-col overflow-hidden"
       style={{
-        width: '380px',
-        minWidth: '320px',
-        borderColor: 'var(--border-base)',
+        top: docked ? '0' : '80px',
+        right: docked ? '0' : '24px',
+        width: minimized ? '300px' : docked ? '420px' : '420px',
+        height: minimized ? 'auto' : docked ? '100vh' : 'calc(100vh - 120px)',
+        maxHeight: minimized ? undefined : docked ? '100vh' : '800px',
+        minWidth: minimized ? '200px' : '320px',
+        zIndex: 9990,
         backgroundColor: 'var(--bg-panel)',
+        border: docked ? 'none' : '1px solid var(--border-base)',
+        borderLeft: docked ? '1px solid var(--border-base)' : undefined,
+        borderRadius: docked ? '0' : '16px',
+        transform: docked ? 'none' : `translate(${position.x}px, ${position.y}px)`,
+        cursor: isDraggingPanel && !docked ? 'grabbing' : undefined,
+        userSelect: isDraggingPanel ? 'none' : undefined,
+        boxShadow: docked
+          ? '-4px 0 20px rgba(0,0,0,0.2)'
+          : isDraggingPanel
+            ? '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)'
+            : '0 8px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05)',
+        transition: isDraggingPanel ? 'box-shadow 0.15s' : 'all 0.25s ease',
+        backdropFilter: 'blur(12px)',
       }}
       {...dropHandlers}
     >
       <DropZoneOverlay isDragging={isDragging} />
 
-      {/* ─── Header ─── */}
+      {/* ─── Header (draggable) ─── */}
       <div
+        onMouseDown={docked ? undefined : handleDragMouseDown}
         className="flex items-center gap-2.5 px-4 py-2.5 flex-shrink-0"
-        style={{ borderBottom: '1px solid var(--border-base)' }}
+        style={{ borderBottom: '1px solid var(--border-base)', cursor: docked ? 'default' : 'grab' }}
       >
+        {!docked && <GripVertical size={12} style={{ color: 'var(--text-dimmed)', flexShrink: 0 }} />}
         <div className="relative">
           <Bot size={16} style={{ color: connected ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
           <div
@@ -495,6 +562,22 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed }: ChatPane
             </button>
           )}
           <button
+            onClick={() => setDocked(d => !d)}
+            className="p-1.5 rounded-lg hover:bg-white/10 transition"
+            title={docked ? 'Détacher du bord' : 'Ancrer à droite'}
+            aria-label={docked ? 'Détacher du bord' : 'Ancrer à droite'}
+          >
+            <PanelRight size={14} style={{ color: docked ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
+          </button>
+          <button
+            onClick={() => setMinimized(m => !m)}
+            className="p-1.5 rounded-lg hover:bg-white/10 transition"
+            title={minimized ? 'Agrandir' : 'Réduire'}
+            aria-label={minimized ? 'Agrandir le panneau' : 'Réduire le panneau'}
+          >
+            <Minus size={14} style={{ color: 'var(--text-muted)' }} />
+          </button>
+          <button
             onClick={handleToggleConnect}
             className="p-1.5 rounded-lg hover:bg-white/10 transition"
             title={connected ? 'Déconnecter' : 'Connecter'}
@@ -505,24 +588,15 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed }: ChatPane
         </div>
       </div>
 
-      {/* ─── Messages Area ─── */}
-      <div
-        ref={messagesRef}
-        onScroll={handleMessagesScroll}
-        className="flex-1 overflow-y-auto px-3 py-3 space-y-3 custom-scrollbar"
-      >
-        {transcriptRestored && transcript.length > 0 && (
+      {!minimized && (
+        <>
+          {/* ─── Messages Area ─── */}
           <div
-            className="flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-[10px] font-medium"
-            style={{
-              backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent)',
-              color: 'var(--accent-primary)',
-            }}
+            ref={messagesRef}
+            onScroll={handleMessagesScroll}
+            className="flex-1 overflow-y-auto px-3 py-3 space-y-3 custom-scrollbar"
           >
-            Conversation restaurée
-          </div>
-        )}
+        
 
         {connecting && (
           <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--bg-secondary)' }}>
@@ -550,54 +624,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed }: ChatPane
                 }
               </p>
             </div>
-            {connected && (
-              <div className="flex flex-col gap-1.5 w-full px-2">
-                {[
-                  'Refactore ce fichier pour améliorer la lisibilité',
-                  'Explique-moi cette fonction',
-                  'Ajoute des tests unitaires',
-                  'Corrige les erreurs dans ce fichier',
-                ].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => handleSend(suggestion)}
-                    className="text-left px-3 py-2 text-[11px] transition-all hover:bg-white/5"
-                    style={{
-                      color: 'var(--text-secondary)',
-                      border: '1px solid var(--border-base)',
-                      borderRadius: 'var(--radius-md)',
-                    }}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-
-                <div className="flex items-center gap-2 pt-1">
-                  <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
-                  <span className="text-[9px] uppercase font-bold tracking-widest" style={{ color: 'var(--text-dimmed)' }}>Workflows</span>
-                  <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
-                </div>
-                {[
-                  'Crée un workflow de rappel quotidien',
-                  'Crée un workflow d\'audit périodique du codebase',
-                ].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => handleSend(suggestion)}
-                    className="text-left px-3 py-2 text-[11px] transition-all hover:bg-white/5 flex items-center gap-2"
-                    style={{
-                      color: 'var(--accent-primary)',
-                      border: '1px solid rgba(14,165,233,0.2)',
-                      borderRadius: 'var(--radius-md)',
-                      background: 'rgba(14,165,233,0.04)',
-                    }}
-                  >
-                    <span style={{ fontSize: 10 }}>✦</span>
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            )}
+            
           </div>
         )}
 
@@ -707,6 +734,8 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed }: ChatPane
         onSend={handleSend}
         onDocumentAnalyzed={handleDocumentAnalyzed}
       />
+        </>
+      )}
     </div>
   );
 }
