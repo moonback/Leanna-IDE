@@ -2,7 +2,7 @@
 
 <img src="assets/images/header.png" alt="Jarvis-OS" />
 
-[![Version](https://img.shields.io/badge/version-0.4.0-blue)](https://github.com/yourusername/Jarvis-os-beta/releases)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue)](https://github.com/yourusername/Jarvis-os-original/releases)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.12.0-brightgreen)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
@@ -247,8 +247,8 @@ Démarrage serveur
 
 ```bash
 # 1. Cloner le dépôt
-git clone https://github.com/yourusername/Jarvis-os-beta.git
-cd Jarvis-os-beta
+git clone https://github.com/yourusername/Jarvis-os-original.git
+cd Jarvis-os-original
 
 # 2. Installer les dépendances
 npm install
@@ -376,7 +376,7 @@ Jarvis charge le projet, initialise le sandbox et indexe le code.
 ## 📁 Structure du projet
 
 ```
-Jarvis-os-beta/
+Jarvis-os-original/
 ├── electron/                # Code Electron (main, preload, splash)
 ├── server/                  # Backend Node.js/Express
 │   ├── agents/              # Orchestration multi-agents, délégation, exécution
