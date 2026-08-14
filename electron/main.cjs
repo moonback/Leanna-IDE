@@ -38,18 +38,15 @@ function startBackendServer() {
     process.env.JARVIS_CONFIG_PATH = configDir;
     log('Config directory:', configDir);
 
-    // Copier les fichiers de config depuis l'app packagée vers userData si absents
-    const configFiles = ['.env', '.env.local', '.gemini-keys.json'];
-    for (const file of configFiles) {
-      const destPath = path.join(configDir, file);
-      const srcPath = path.join(app.getAppPath(), file);
-      if (!fs.existsSync(destPath) && fs.existsSync(srcPath)) {
-        try {
-          fs.copyFileSync(srcPath, destPath);
-          log(`Copied ${file} to userData`);
-        } catch (e) {
-          log(`Failed to copy ${file}:`, e.message);
-        }
+    // Initialiser le fichier .env utilisateur dans userData à partir du template .env.example si absent
+    const destEnv = path.join(configDir, '.env');
+    const exampleEnv = path.join(app.getAppPath(), '.env.example');
+    if (!fs.existsSync(destEnv) && fs.existsSync(exampleEnv)) {
+      try {
+        fs.copyFileSync(exampleEnv, destEnv);
+        log('Initialized user .env from .env.example in userData');
+      } catch (e) {
+        log('Failed to initialize .env from .env.example:', e.message);
       }
     }
 

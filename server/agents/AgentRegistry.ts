@@ -53,6 +53,7 @@ export class AgentRegistry {
 
     // Config de boucle autonome par rôle (les agents read-only itèrent moins)
     const loopConfigByRole: Record<string, { maxIterations: number; minConfidenceScore: number }> = {
+      coder:     { maxIterations: 3, minConfidenceScore: 0.70 }, // agent principal d'écriture — vérifie les fichiers
       architect: { maxIterations: 2, minConfidenceScore: 0.65 },
       refactor:  { maxIterations: 3, minConfidenceScore: 0.70 }, // haute exigence — vérifie les fichiers
       test:      { maxIterations: 3, minConfidenceScore: 0.65 },

@@ -5,7 +5,7 @@ import { z } from "zod";
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** Rôles d'agents spécialisés disponibles */
-export const AGENT_ROLES = ["test", "docs", "refactor", "security", "review", "architect"] as const;
+export const AGENT_ROLES = ["coder", "test", "docs", "refactor", "security", "review", "architect"] as const;
 export type AgentRole = (typeof AGENT_ROLES)[number];
 
 /** Alias contrôlés acceptés aux frontières LLM. Aucun rôle n'est inventé. */
@@ -16,6 +16,9 @@ const AGENT_ROLE_ALIASES: Readonly<Record<string, AgentRole>> = {
   audit: "review",
   investigation: "review",
   diagnostic: "review",
+  code: "coder",
+  edit: "coder",
+  modify: "coder",
 };
 
 /** Normalise seulement les alias approuvés, puis laisse le schéma strict rejeter le reste. */
@@ -134,12 +137,12 @@ export interface OrchestrationPlan {
 // ─── Zod Schemas pour validation ──────────────────────────────────────────────
 
 const strictAgentRoleSchema = z.enum(
-  ["test", "docs", "refactor", "security", "review", "architect"],
+  ["coder", "test", "docs", "refactor", "security", "review", "architect"],
   {
     errorMap: (_issue, ctx) => ({
       message:
         `Rôle invalide : "${ctx.data}". ` +
-        `Un seul rôle autorisé par tâche, parmi : test, docs, refactor, security, review, architect.`,
+        `Un seul rôle autorisé par tâche, parmi : coder, test, docs, refactor, security, review, architect.`,
     }),
   }
 );
@@ -148,7 +151,7 @@ const strictAgentRoleSchema = z.enum(
 export const agentRoleSchema = z
   .union([
     strictAgentRoleSchema,
-    z.enum(["analyse", "analyze", "analysis", "audit", "investigation", "diagnostic"]),
+    z.enum(["analyse", "analyze", "analysis", "audit", "investigation", "diagnostic", "code", "edit", "modify"]),
   ])
   .transform((value): AgentRole => normalizeAgentRole(value) as AgentRole);
 

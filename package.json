@@ -29,9 +29,7 @@
       "assets/**/*",
       "node_modules/**/*",
       "package.json",
-      ".env",
-      ".env.local",
-      ".gemini-keys.json"
+      ".env.example"
     ],
     "asar": true,
     "asarUnpack": [

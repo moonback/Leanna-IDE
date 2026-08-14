@@ -445,7 +445,7 @@ export class AgentOrchestrator {
       pending: 0, running: 0, completed: 0, failed: 0, cancelled: 0,
     };
     const byRole: Record<AgentRole, number> = {
-      test: 0, docs: 0, refactor: 0, security: 0, review: 0, architect: 0,
+      coder: 0, test: 0, docs: 0, refactor: 0, security: 0, review: 0, architect: 0,
     };
 
     for (const task of allTasks) {

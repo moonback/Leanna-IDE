@@ -185,6 +185,7 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
     res.json({
       description: "Configuration de la boucle Observe → Decide → Act par rôle",
       roles: {
+        coder:     { maxIterations: 3, minConfidenceScore: 0.70, verifyFiles: true },
         architect: { maxIterations: 2, minConfidenceScore: 0.65, verifyFiles: true },
         refactor:  { maxIterations: 3, minConfidenceScore: 0.70, verifyFiles: true },
         test:      { maxIterations: 3, minConfidenceScore: 0.65, verifyFiles: true },

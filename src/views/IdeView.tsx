@@ -330,11 +330,9 @@ export default function IdeView() {
         break;
       case 'send-to-ai':
         if (target.kind === 'file') {
-          const openFile = fileSystem.openFiles.find(file => file.path === target.path);
-          const content = openFile?.content ?? await ideApi.readFile(target.path);
           queueMessageToAI(
-            `Fichier: ${target.path}\n\n\`\`\`\n${content}\n\`\`\``,
-            `Fichier envoyé à l'IA : ${target.name}`
+            `[Fichier sélectionné] ${target.path}`,
+            `📄 ${target.name}`
           );
         }
         break;

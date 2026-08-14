@@ -61,14 +61,15 @@ export const agentsSkill: Skill = {
     {
       name: "agent_delegate",
       description:
-        "Délègue une tâche à UN agent spécialisé (test, docs, refactor, security, review, architect). " +
+        "Délègue une tâche à UN agent spécialisé (coder, test, docs, refactor, security, review, architect). " +
         "La tâche s'exécute en arrière-plan. Utilise \`agent_status\` avec le taskId retourné pour suivre la progression. " +
         "Pour plusieurs rôles simultanés, utilise agent_orchestrate. " +
-        "Délégations automatiques recommandées : refactor terminé → test ; nouveau module → docs ; changement sensible → security.",
+        "L'agent 'coder' est le défaut pour toute modification de fichier demandée par l'utilisateur. " +
+        "Délégations automatiques recommandées : modification de fichier → coder ; refactor terminé → test ; nouveau module → docs ; changement sensible → security.",
       parameters: {
         type: "OBJECT",
         properties: {
-          role:        { type: "STRING", description: "Rôle UNIQUE parmi : test, docs, refactor, security, review, architect. Une seule valeur, jamais une liste." },
+          role:        { type: "STRING", description: "Rôle UNIQUE parmi : coder, test, docs, refactor, security, review, architect. Une seule valeur, jamais une liste." },
           title:       { type: "STRING", description: "Titre court de la tâche" },
           description: { type: "STRING", description: "Description détaillée" },
           files:       { type: "ARRAY", items: { type: "STRING" }, description: "Fichiers pertinents (optionnel)" },
@@ -95,7 +96,7 @@ export const agentsSkill: Skill = {
             items: {
               type: "OBJECT",
               properties: {
-                role:         { type: "STRING", description: "Rôle : test, docs, refactor, security, review ou architect. Alias contrôlés : analyse, analyze, audit, investigation, diagnostic → review." },
+                role:         { type: "STRING", description: "Rôle : coder, test, docs, refactor, security, review ou architect. Alias contrôlés : analyse, analyze, audit, investigation, diagnostic → review ; code, edit, modify → coder." },
                 title:        { type: "STRING", description: "Titre de la sous-tâche" },
                 description:  { type: "STRING", description: "Description détaillée" },
                 files:        { type: "ARRAY", items: { type: "STRING" }, description: "Fichiers pertinents" },

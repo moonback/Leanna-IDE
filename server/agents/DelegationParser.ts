@@ -15,7 +15,7 @@ import { createLogger } from "../utils/logger";
 
 const log = createLogger("DelegationParser");
 
-const VALID_ROLES = new Set<AgentRole>(["test", "docs", "refactor", "security", "review", "architect"]);
+const VALID_ROLES = new Set<AgentRole>(["coder", "test", "docs", "refactor", "security", "review", "architect"]);
 const VALID_PRIORITIES = new Set<TaskPriority>(["low", "medium", "high", "critical"]);
 
 // ═══════════════════════════════════════════════════════════════════════════════

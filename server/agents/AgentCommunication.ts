@@ -155,7 +155,13 @@ export interface DelegationCapability {
 
 /** Matrice de délégation : quels agents peuvent déléguer à qui */
 export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {
+  coder: [
+    { targetRole: "test", taskTypes: ["unit-test", "regression-test"], reason: "Tests après modification de code" },
+    { targetRole: "docs", taskTypes: ["code-documentation"], reason: "Documentation du code modifié" },
+    { targetRole: "review", taskTypes: ["code-quality-check"], reason: "Revue qualité après modification" },
+  ],
   architect: [
+    { targetRole: "coder", taskTypes: ["implement-design", "code-change"], reason: "Implémentation de changements selon le design" },
     { targetRole: "refactor", taskTypes: ["code-restructure", "split-module"], reason: "Implémentation de changements architecturaux" },
     { targetRole: "docs", taskTypes: ["architecture-doc", "design-doc"], reason: "Documentation des décisions architecturales" },
     { targetRole: "security", taskTypes: ["security-review"], reason: "Validation sécurité des choix d'architecture" },
@@ -173,10 +179,12 @@ export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {
     { targetRole: "review", taskTypes: ["doc-review"], reason: "Revue de la qualité de la documentation" },
   ],
   security: [
+    { targetRole: "coder", taskTypes: ["security-fix"], reason: "Implémentation des corrections de sécurité" },
     { targetRole: "refactor", taskTypes: ["security-fix"], reason: "Implémentation des corrections de sécurité" },
     { targetRole: "test", taskTypes: ["security-test"], reason: "Tests de validation des correctifs de sécurité" },
   ],
   review: [
+    { targetRole: "coder", taskTypes: ["code-fix", "quality-improvement"], reason: "Implémentation des corrections et améliorations" },
     { targetRole: "refactor", taskTypes: ["quality-improvement"], reason: "Implémentation des améliorations de qualité" },
     { targetRole: "test", taskTypes: ["coverage-improvement"], reason: "Amélioration de la couverture de test" },
     { targetRole: "docs", taskTypes: ["doc-improvement"], reason: "Amélioration de la documentation" },
@@ -250,9 +258,9 @@ export const agentMessageSchema = z.object({
     "event",
     "broadcast",
   ]),
-  from: z.enum(["test", "docs", "refactor", "security", "review", "architect"]),
+  from: z.enum(["coder", "test", "docs", "refactor", "security", "review", "architect"]),
   to: z.union([
-    z.enum(["test", "docs", "refactor", "security", "review", "architect"]),
+    z.enum(["coder", "test", "docs", "refactor", "security", "review", "architect"]),
     z.literal("broadcast"),
   ]),
   priority: z.enum(["low", "medium", "high", "critical"]),

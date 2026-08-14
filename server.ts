@@ -2427,8 +2427,6 @@ async function startServer() {
                    { role: 'user', parts: [{ text: msg.text }] }
                  ]
              });
-             // Send user text to client for transcript display
-             clientWs.send(JSON.stringify({ user_text: msg.text }));
              // Persist user message to conversation history
              (async () => {
                if (conversationReady) await conversationReady;

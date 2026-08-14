@@ -1,9 +1,10 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, Mic, MicOff, Loader2, User, Bot,
-  Trash2, Power, GripVertical, Minus, PanelRight,
+  Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2,
 } from 'lucide-react';
+import { marked } from 'marked';
 import { useLiveAPIContext } from '../../context/LiveAPIContext';
 import { useProfile, type UserProfile } from '../../context/UserProfileContext';
 import { ActivityFeed } from './ActivityFeed';
@@ -68,6 +69,26 @@ const BUBBLE_STYLES = {
   },
 } as const;
 
+// ─── Rendu Markdown pour les messages assistant ───────────────────────────
+const ChatMarkdown = memo(function ChatMarkdown({ text }: { text: string }) {
+  const html = useMemo(() => {
+    try {
+      const result = marked.parse(text, { gfm: true, breaks: true });
+      return typeof result === 'string' ? result : '';
+    } catch {
+      return text;
+    }
+  }, [text]);
+
+  return (
+    <div
+      className="chat-markdown"
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: controlled HTML from markdown parser
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+});
+
 // ─── Composants memoïsés ──────────────────────────────────────────────────
 const ChatMessage = memo(function ChatMessage({
   entry,
@@ -107,7 +128,7 @@ const ChatMessage = memo(function ChatMessage({
             color: 'var(--text-primary)',
           }}
         >
-          {entry.text}
+          {isAssistant ? <ChatMarkdown text={entry.text} /> : entry.text}
         </div>
         <span className="text-[9px] font-mono px-1 mt-0.5 block" style={{ color: 'var(--text-dimmed)' }}>
           {entry.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
@@ -368,6 +389,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
   const { profile } = useProfile();
   const [minimized, setMinimized] = useState(false);
   const [docked, setDocked] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
@@ -461,27 +483,31 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
     <div
       className="fixed flex flex-col overflow-hidden"
       style={{
-        top: docked ? '0' : '80px',
-        right: docked ? '0' : '24px',
-        width: minimized ? '300px' : docked ? '420px' : '420px',
-        height: minimized ? 'auto' : docked ? '100vh' : 'calc(100vh - 120px)',
-        maxHeight: minimized ? undefined : docked ? '100vh' : '800px',
-        minWidth: minimized ? '200px' : '320px',
-        zIndex: 9990,
+        top: fullscreen ? '0' : docked ? '0' : '80px',
+        right: fullscreen ? '0' : docked ? '0' : '24px',
+        left: fullscreen ? '0' : undefined,
+        bottom: fullscreen ? '0' : undefined,
+        width: fullscreen ? '100vw' : minimized ? '300px' : docked ? '420px' : '420px',
+        height: fullscreen ? '100vh' : minimized ? 'auto' : docked ? '100vh' : 'calc(100vh - 120px)',
+        maxHeight: fullscreen ? '100vh' : minimized ? undefined : docked ? '100vh' : '800px',
+        minWidth: fullscreen ? undefined : minimized ? '200px' : '320px',
+        zIndex: fullscreen ? 99999 : 9990,
         backgroundColor: 'var(--bg-panel)',
-        border: docked ? 'none' : '1px solid var(--border-base)',
-        borderLeft: docked ? '1px solid var(--border-base)' : undefined,
-        borderRadius: docked ? '0' : '16px',
-        transform: docked ? 'none' : `translate(${position.x}px, ${position.y}px)`,
-        cursor: isDraggingPanel && !docked ? 'grabbing' : undefined,
+        border: fullscreen || docked ? 'none' : '1px solid var(--border-base)',
+        borderLeft: !fullscreen && docked ? '1px solid var(--border-base)' : undefined,
+        borderRadius: fullscreen ? '0' : docked ? '0' : '16px',
+        transform: fullscreen || docked ? 'none' : `translate(${position.x}px, ${position.y}px)`,
+        cursor: isDraggingPanel && !docked && !fullscreen ? 'grabbing' : undefined,
         userSelect: isDraggingPanel ? 'none' : undefined,
-        boxShadow: docked
-          ? '-4px 0 20px rgba(0,0,0,0.2)'
-          : isDraggingPanel
-            ? '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)'
-            : '0 8px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05)',
+        boxShadow: fullscreen
+          ? 'none'
+          : docked
+            ? '-4px 0 20px rgba(0,0,0,0.2)'
+            : isDraggingPanel
+              ? '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)'
+              : '0 8px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05)',
         transition: isDraggingPanel ? 'box-shadow 0.15s' : 'all 0.25s ease',
-        backdropFilter: 'blur(12px)',
+        backdropFilter: fullscreen ? undefined : 'blur(12px)',
       }}
       {...dropHandlers}
     >
@@ -489,11 +515,11 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
 
       {/* ─── Header (draggable) ─── */}
       <div
-        onMouseDown={docked ? undefined : handleDragMouseDown}
+        onMouseDown={docked || fullscreen ? undefined : handleDragMouseDown}
         className="flex items-center gap-2.5 px-4 py-2.5 flex-shrink-0"
-        style={{ borderBottom: '1px solid var(--border-base)', cursor: docked ? 'default' : 'grab' }}
+        style={{ borderBottom: '1px solid var(--border-base)', cursor: docked || fullscreen ? 'default' : 'grab' }}
       >
-        {!docked && <GripVertical size={12} style={{ color: 'var(--text-dimmed)', flexShrink: 0 }} />}
+        {!docked && !fullscreen && <GripVertical size={12} style={{ color: 'var(--text-dimmed)', flexShrink: 0 }} />}
         <div className="relative">
           <Bot size={16} style={{ color: connected ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
           <div
@@ -542,6 +568,22 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
             </button>
           )}
           <button
+            onClick={() => {
+              setFullscreen(f => {
+                if (!f) { setDocked(false); setMinimized(false); }
+                return !f;
+              });
+            }}
+            className="p-1.5 rounded-lg hover:bg-white/10 transition"
+            title={fullscreen ? 'Quitter le plein écran' : 'Plein écran'}
+            aria-label={fullscreen ? 'Quitter le plein écran' : 'Plein écran'}
+          >
+            {fullscreen
+              ? <Minimize2 size={14} style={{ color: 'var(--accent-primary)' }} />
+              : <Maximize2 size={14} style={{ color: 'var(--text-muted)' }} />
+            }
+          </button>
+          <button
             onClick={() => setDocked(d => !d)}
             className="p-1.5 rounded-lg hover:bg-white/10 transition"
             title={docked ? 'Détacher du bord' : 'Ancrer à droite'}
@@ -575,6 +617,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
             ref={messagesRef}
             onScroll={handleMessagesScroll}
             className="flex-1 overflow-y-auto px-3 py-3 space-y-3 custom-scrollbar"
+            style={{ maxWidth: fullscreen ? '800px' : undefined, margin: fullscreen ? '0 auto' : undefined, width: fullscreen ? '100%' : undefined }}
           >
         
 

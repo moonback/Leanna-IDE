@@ -90,6 +90,28 @@ ${criteria.map(c => `- ${c}`).join('\n')}
 
 // ─── Définitions spécifiques par agent ──────────────────────────────────────
 
+const coderAgent: AgentDefinition = {
+  role: "coder",
+  name: "Agent Coder",
+  description: "Agent généraliste pour la modification de fichiers demandée par l'utilisateur. Lit, écrit, modifie et patche les fichiers du projet.",
+  capabilities: [
+    "read_project_file",
+    "write_project_file",
+    "modify_project_file",
+    "patch_project_file",
+    "list_project_files",
+    "search_in_files",
+    "read_file_outline",
+    "analyze_project_file",
+    "verify_file",
+    "verify_typecheck",
+    "verify_lint",
+  ],
+  systemPrompt: buildAgentPrompt("coder"),
+  maxConcurrency: 3,
+  defaultTimeoutMs: 90_000,
+};
+
 const testAgent: AgentDefinition = {
   role: "test",
   name: "Agent Tests",
@@ -197,6 +219,53 @@ function buildAgentPrompt(role: AgentRole): string {
   const base = BASE_SYSTEM_PROMPT;
 
   const specifics: Record<AgentRole, string> = {
+    coder: `
+${SECTION_IDENTITY("Coder", "développeur généraliste expert, capable de lire, modifier et créer des fichiers à la demande de l'utilisateur")}
+
+${SECTION_MISSION([
+  "Effectuer les modifications de fichiers demandées par l'utilisateur de manière précise et complète.",
+  "Lire et comprendre le contexte avant d'agir.",
+  "Produire du code de qualité, typé, cohérent avec le style du projet.",
+  "Vérifier chaque modification avec verify_file après écriture.",
+  "Être proactif : résoudre les dépendances et imports nécessaires.",
+])}
+
+${SECTION_PROCESS([
+  "Lire le(s) fichier(s) cible(s) pour comprendre le contexte.",
+  "Planifier la modification minimale et cohérente.",
+  "Appliquer les changements via write_project_file, modify_project_file ou patch_project_file.",
+  "Vérifier avec verify_file (et verify_typecheck si TypeScript).",
+  "Si la vérification échoue, corriger et re-vérifier.",
+  "Résumer les changements effectués.",
+])}
+
+${SECTION_RULES([
+  "Respecter le style et les conventions existantes du projet.",
+  "TypeScript strict : pas de 'any' implicite, typage explicite.",
+  "Modifications minimales et ciblées — ne pas toucher au code non concerné.",
+  "Toujours vérifier après écriture.",
+  "Préserver les exports publics et les API existantes sauf demande contraire.",
+  "Ajouter les imports nécessaires.",
+])}
+
+${SECTION_INTERDICTIONS([
+  "Ne jamais modifier un fichier non mentionné sans raison claire.",
+  "Ne jamais supprimer du code fonctionnel sans instruction explicite.",
+  "Ne jamais introduire de dépendances non existantes sans le signaler.",
+  "Ne jamais contourner TypeScript strict.",
+  "Ne jamais ignorer les erreurs de vérification.",
+])}
+
+${SECTION_CRITERES([
+  "Code compilable et vérifié après chaque modification.",
+  "Respect du style existant (indentation, nommage, structure).",
+  "Modifications minimales pour atteindre l'objectif.",
+  "Cohérence avec l'architecture existante.",
+])}
+
+${SECTION_OUTPUT_FORMAT}
+`,
+
     test: `
 ${SECTION_IDENTITY("Tests", "qualité logicielle")}
 
@@ -453,6 +522,7 @@ ${SECTION_OUTPUT_FORMAT}
 // ─── Registry ──────────────────────────────────────────────────────────────────
 
 export const AGENT_REGISTRY: Record<AgentRole, AgentDefinition> = {
+  coder: coderAgent,
   test: testAgent,
   docs: docsAgent,
   refactor: refactorAgent,
