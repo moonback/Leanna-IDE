@@ -205,6 +205,11 @@ const ParticleField = React.memo(function ParticleField({
     let time = 0;
     let rafId: number;
 
+    // Cursor glow — position lissée avec inertie
+    let smoothMouseX = -9999;
+    let smoothMouseY = -9999;
+    let cursorGlowAlpha = 0; // fade in/out progressif
+
     // Smooth color interpolation: [r, g, b]
     let smoothR = 56, smoothG = 189, smoothB = 248;
 
@@ -325,6 +330,136 @@ const ParticleField = React.memo(function ParticleField({
 
       const mouse = mouseRef.current;
       const mouseRadius = 90;
+
+      // ── Cursor Glow volumétrique avec inertie ──
+      if (mouse.active) {
+        // Inertie : la lumière glisse derrière le curseur
+        const lerpMouse = 0.08;
+        if (smoothMouseX < -9000) {
+          // Premier frame où la souris est active : pas de lerp, snap direct
+          smoothMouseX = mouse.x;
+          smoothMouseY = mouse.y;
+        } else {
+          smoothMouseX += (mouse.x - smoothMouseX) * lerpMouse;
+          smoothMouseY += (mouse.y - smoothMouseY) * lerpMouse;
+        }
+        // Fade-in progressif
+        cursorGlowAlpha += (1 - cursorGlowAlpha) * 0.12;
+      } else {
+        // Fade-out quand la souris quitte le canvas
+        cursorGlowAlpha += (0 - cursorGlowAlpha) * 0.06;
+      }
+
+      if (cursorGlowAlpha > 0.005 && smoothMouseX > -9000) {
+        // Intensité et rayon de base selon le mode
+        let glowIntensity = 0.22;
+        let glowRadius = 520;
+        switch (mode) {
+          case 'disconnected':
+            glowIntensity = 0.10;
+            glowRadius = 350;
+            break;
+          case 'idle':
+            glowIntensity = 0.22;
+            glowRadius = 520;
+            break;
+          case 'listening':
+            glowIntensity = 0.30 + smoothAudio * 0.20;
+            glowRadius = 560 + smoothAudio * 180;
+            break;
+          case 'speaking':
+            glowIntensity = 0.26 + smoothAudio * 0.18;
+            glowRadius = 550 + smoothAudio * 150;
+            break;
+          case 'working':
+            glowIntensity = 0.28;
+            glowRadius = 560;
+            break;
+        }
+
+        const baseAlpha = glowIntensity * cursorGlowAlpha;
+
+        // ── Grande nappe de fond : couvre une large zone, très douce ──
+        const bgNappeR = glowRadius * 1.8;
+        const bgNappe = ctx.createRadialGradient(
+          smoothMouseX, smoothMouseY, 0,
+          smoothMouseX, smoothMouseY, bgNappeR,
+        );
+        bgNappe.addColorStop(0, `rgba(${primaryColor}, ${baseAlpha * 0.5})`);
+        bgNappe.addColorStop(0.3, `rgba(${primaryColor}, ${baseAlpha * 0.25})`);
+        bgNappe.addColorStop(0.6, `rgba(${primaryColor}, ${baseAlpha * 0.08})`);
+        bgNappe.addColorStop(1, `rgba(${primaryColor}, 0)`);
+        ctx.fillStyle = bgNappe;
+        ctx.fillRect(0, 0, w, h);
+
+        // ── Lobes nuageux : 7 volumes qui ondulent indépendamment ──
+        const lobes = [
+          { ox: 0,    oy: 0,     rMul: 1.0,  aMul: 0.85, phase: 0,   spd: 0.5 },
+          { ox: 0.55, oy: -0.35, rMul: 0.78, aMul: 0.6,  phase: 1.1, spd: 0.65 },
+          { ox: -0.5, oy: 0.4,   rMul: 0.72, aMul: 0.55, phase: 2.3, spd: 0.55 },
+          { ox: 0.3,  oy: 0.55,  rMul: 0.68, aMul: 0.5,  phase: 3.7, spd: 0.7 },
+          { ox: -0.4, oy: -0.45, rMul: 0.74, aMul: 0.55, phase: 4.9, spd: 0.6 },
+          { ox: 0.6,  oy: 0.15,  rMul: 0.60, aMul: 0.45, phase: 6.1, spd: 0.75 },
+          { ox: -0.2, oy: 0.6,   rMul: 0.55, aMul: 0.4,  phase: 7.4, spd: 0.5 },
+        ];
+
+        for (const lobe of lobes) {
+          // Chaque lobe dérive avec sa propre fréquence
+          const breathe = 1 + 0.22 * Math.sin(time * lobe.spd * 1.4 + lobe.phase);
+          const wobble = 0.45; // amplitude relative du déplacement
+          const driftX = Math.sin(time * lobe.spd + lobe.phase) * glowRadius * wobble * lobe.ox
+                       + Math.cos(time * lobe.spd * 0.7 + lobe.phase * 1.3) * glowRadius * 0.12;
+          const driftY = Math.cos(time * lobe.spd * 0.85 + lobe.phase + 1.0) * glowRadius * wobble * lobe.oy
+                       + Math.sin(time * lobe.spd * 0.6 + lobe.phase * 0.8) * glowRadius * 0.10;
+
+          const lx = smoothMouseX + driftX;
+          const ly = smoothMouseY + driftY;
+          const lr = glowRadius * lobe.rMul * breathe;
+          const la = baseAlpha * lobe.aMul;
+
+          const lobeGrad = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr);
+          lobeGrad.addColorStop(0, `rgba(${primaryColor}, ${la * 0.85})`);
+          lobeGrad.addColorStop(0.12, `rgba(${primaryColor}, ${la * 0.6})`);
+          lobeGrad.addColorStop(0.35, `rgba(${primaryColor}, ${la * 0.3})`);
+          lobeGrad.addColorStop(0.6, `rgba(${primaryColor}, ${la * 0.10})`);
+          lobeGrad.addColorStop(0.85, `rgba(${primaryColor}, ${la * 0.03})`);
+          lobeGrad.addColorStop(1, `rgba(${primaryColor}, 0)`);
+          ctx.fillStyle = lobeGrad;
+          ctx.fillRect(0, 0, w, h);
+        }
+
+        // ── Filaments secondaires : petits éclats qui tournent autour ──
+        const filamentCount = 4;
+        for (let i = 0; i < filamentCount; i++) {
+          const angle = (Math.PI * 2 / filamentCount) * i + time * 0.3;
+          const dist = glowRadius * (0.35 + 0.15 * Math.sin(time * 0.9 + i * 2.1));
+          const fx = smoothMouseX + Math.cos(angle) * dist;
+          const fy = smoothMouseY + Math.sin(angle) * dist;
+          const fr = glowRadius * (0.3 + 0.08 * Math.sin(time * 1.2 + i));
+          const fa = baseAlpha * 0.3;
+
+          const filGrad = ctx.createRadialGradient(fx, fy, 0, fx, fy, fr);
+          filGrad.addColorStop(0, `rgba(${primaryColor}, ${fa})`);
+          filGrad.addColorStop(0.4, `rgba(${primaryColor}, ${fa * 0.3})`);
+          filGrad.addColorStop(1, `rgba(${primaryColor}, 0)`);
+          ctx.fillStyle = filGrad;
+          ctx.fillRect(0, 0, w, h);
+        }
+
+        // ── Noyau chaud : source lumineuse visible au centre ──
+        const coreR = glowRadius * 0.22;
+        const coreAlpha = baseAlpha * 1.6;
+        const coreGrad = ctx.createRadialGradient(
+          smoothMouseX, smoothMouseY, 0,
+          smoothMouseX, smoothMouseY, coreR,
+        );
+        coreGrad.addColorStop(0, `rgba(255, 255, 255, ${Math.min(coreAlpha * 0.4, 0.25)})`);
+        coreGrad.addColorStop(0.2, `rgba(${primaryColor}, ${Math.min(coreAlpha, 0.45)})`);
+        coreGrad.addColorStop(0.6, `rgba(${primaryColor}, ${coreAlpha * 0.25})`);
+        coreGrad.addColorStop(1, `rgba(${primaryColor}, 0)`);
+        ctx.fillStyle = coreGrad;
+        ctx.fillRect(0, 0, w, h);
+      }
 
       // Déplacement des particules
       for (const p of particles) {

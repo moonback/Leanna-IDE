@@ -129,6 +129,7 @@ export default function IdeView() {
   const [showMcp, setShowMcp] = useState(false);
   const [showSkillsMonitor, setShowSkillsMonitor] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [chatDocked, setChatDocked] = useState(false);
   const [pendingChatMessage, setPendingChatMessage] = useState<{ text: string; displayText?: string } | null>(null);
   const [showAgents, setShowAgents] = useState(false);
   const [showFleet, setShowFleet] = useState(false);
@@ -149,6 +150,7 @@ export default function IdeView() {
   useEffect(() => {
     if (!connected) {
       setShowChat(false);
+      setChatDocked(false);
       setShowAgents(false);
       setShowFleet(false);
       setShowSkillsMonitor(false);
@@ -640,7 +642,7 @@ export default function IdeView() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full" style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}>
+    <div className="flex h-full" style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', width: showChat && chatDocked ? 'calc(100% - 420px)' : '100%', transition: 'width 0.25s ease' }}>
 
       {/* Sidebar Unifiée */}
       <UnifiedSidebar
@@ -1134,6 +1136,7 @@ export default function IdeView() {
         <ChatPanel
           pendingMessage={pendingChatMessage}
           onPendingMessageConsumed={() => setPendingChatMessage(null)}
+          onDockedChange={setChatDocked}
         />
       )}
 

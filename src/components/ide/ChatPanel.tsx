@@ -356,9 +356,10 @@ function useDraggable() {
 interface ChatPanelProps {
   pendingMessage?: PendingChatMessage | null;
   onPendingMessageConsumed?: () => void;
+  onDockedChange?: (docked: boolean) => void;
 }
 
-export function ChatPanel({ pendingMessage, onPendingMessageConsumed }: ChatPanelProps = {}) {
+export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedChange }: ChatPanelProps = {}) {
   const {
     connected, connecting, connect, disconnect,
     sendTextMessage, sendRawMessage, transcript, clearTranscript,
@@ -370,6 +371,11 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed }: ChatPane
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
+
+  // Notify parent when docked state changes
+  useEffect(() => {
+    onDockedChange?.(docked);
+  }, [docked, onDockedChange]);
 
   // Draggable
   const { position, isDragging: isDraggingPanel, handleMouseDown: handleDragMouseDown } = useDraggable();

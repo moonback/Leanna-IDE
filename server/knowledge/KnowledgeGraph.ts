@@ -48,6 +48,9 @@ export class KnowledgeGraph {
 
   constructor() {
     this.state = this.createEmptyState();
+    // Charger immédiatement les données persistées pour éviter un état vide
+    // entre le démarrage du serveur et la fin du premier scanAll().
+    this.load();
   }
 
   onUpdate(listener: () => void): () => void {
