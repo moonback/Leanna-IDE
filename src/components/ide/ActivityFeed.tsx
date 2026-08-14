@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Activity, FileText, GitBranch, Terminal, MessageSquare,
-  Zap, CheckCircle2, Clock, ChevronDown,
+  Activity, FileText, GitBranch, Terminal,
+  Zap, CheckCircle2, ChevronDown, Loader2,
+  Search, Globe, Database, Brain,
 } from 'lucide-react';
 import type { ActivityStep } from '../../hooks/useLiveAPI';
 
@@ -10,11 +11,11 @@ import type { ActivityStep } from '../../hooks/useLiveAPI';
 
 interface FeedEntry {
   id: string;
-  type: 'file' | 'git' | 'terminal' | 'chat' | 'agent' | 'system';
+  type: 'file' | 'git' | 'terminal' | 'search' | 'web' | 'memory' | 'reasoning' | 'agent';
   title: string;
-  description?: string;
+  count: number;
   timestamp: Date;
-  status: 'success' | 'running' | 'error';
+  status: 'success' | 'running';
 }
 
 interface ActivityFeedProps {
@@ -33,9 +34,11 @@ function getIcon(type: FeedEntry['type']) {
     case 'file': return FileText;
     case 'git': return GitBranch;
     case 'terminal': return Terminal;
-    case 'chat': return MessageSquare;
-    case 'agent': return Zap;
-    default: return Activity;
+    case 'search': return Search;
+    case 'web': return Globe;
+    case 'memory': return Database;
+    case 'reasoning': return Brain;
+    default: return Zap;
   }
 }
 
@@ -44,26 +47,87 @@ function getColor(type: FeedEntry['type']) {
     case 'file': return '#60a5fa';
     case 'git': return '#f472b6';
     case 'terminal': return '#fbbf24';
-    case 'chat': return 'var(--accent-primary)';
-    case 'agent': return '#a855f7';
-    default: return 'var(--text-muted)';
+    case 'search': return '#34d399';
+    case 'web': return '#38bdf8';
+    case 'memory': return '#a855f7';
+    case 'reasoning': return '#f97316';
+    default: return 'var(--accent-primary)';
   }
 }
 
-function stepToFeedEntry(step: ActivityStep): FeedEntry {
-  const tool = step.tool;
-  let type: FeedEntry['type'] = 'agent';
-  if (tool.includes('file') || tool.includes('project') || tool.includes('codebase')) type = 'file';
-  else if (tool.includes('git')) type = 'git';
-  else if (tool.includes('system_execute') || tool.includes('terminal')) type = 'terminal';
+function classifyTool(tool: string): FeedEntry['type'] {
+  if (/file|project|codebase|write|read|modify|create|delete|patch/.test(tool)) return 'file';
+  if (/git|commit|branch|push/.test(tool)) return 'git';
+  if (/system_execute|terminal|shell/.test(tool)) return 'terminal';
+  if (/search|find|grep/.test(tool)) return 'search';
+  if (/web|fetch|browse/.test(tool)) return 'web';
+  if (/memory|knowledge|remember/.test(tool)) return 'memory';
+  if (/reason|think|plan/.test(tool)) return 'reasoning';
+  return 'agent';
+}
 
-  return {
-    id: step.id,
-    type,
-    title: step.label,
-    timestamp: step.timestamp,
-    status: step.status === 'running' ? 'running' : 'success',
-  };
+/**
+ * Déduplique les étapes consécutives du même type en une seule entrée
+ * avec un compteur. Affiche le dernier label du groupe.
+ */
+function deduplicateSteps(steps: ActivityStep[]): FeedEntry[] {
+  if (steps.length === 0) return [];
+
+  const entries: FeedEntry[] = [];
+  let current: { type: FeedEntry['type']; steps: ActivityStep[] } | null = null;
+
+  for (const step of steps) {
+    const type = classifyTool(step.tool);
+
+    if (current && current.type === type && step.status !== 'running') {
+      current.steps.push(step);
+    } else {
+      if (current) {
+        const last = current.steps[current.steps.length - 1];
+        entries.push({
+          id: last.id,
+          type: current.type,
+          title: current.steps.length > 1
+            ? `${current.steps.length}× ${getTypeLabel(current.type)}`
+            : last.label,
+          count: current.steps.length,
+          timestamp: last.timestamp,
+          status: 'success',
+        });
+      }
+      current = { type, steps: [step] };
+    }
+  }
+
+  // Flush remaining
+  if (current) {
+    const last = current.steps[current.steps.length - 1];
+    entries.push({
+      id: last.id,
+      type: current.type,
+      title: current.steps.length > 1
+        ? `${current.steps.length}× ${getTypeLabel(current.type)}`
+        : last.label,
+      count: current.steps.length,
+      timestamp: last.timestamp,
+      status: last.status === 'running' ? 'running' : 'success',
+    });
+  }
+
+  return entries;
+}
+
+function getTypeLabel(type: FeedEntry['type']): string {
+  switch (type) {
+    case 'file': return 'Fichiers';
+    case 'git': return 'Git';
+    case 'terminal': return 'Commandes';
+    case 'search': return 'Recherches';
+    case 'web': return 'Web';
+    case 'memory': return 'Mémoire';
+    case 'reasoning': return 'Réflexion';
+    default: return 'Actions';
+  }
 }
 
 // ── Activity Feed Component ────────────────────────────────────────────────
@@ -71,48 +135,49 @@ function stepToFeedEntry(step: ActivityStep): FeedEntry {
 export function ActivityFeed({ steps, connected }: ActivityFeedProps) {
   const [expanded, setExpanded] = useState(true);
 
-  const entries: FeedEntry[] = steps.map(stepToFeedEntry);
-  const grouped = groupByTime(entries);
+  const entries = useMemo(() => deduplicateSteps(steps), [steps]);
+  const runningCount = steps.filter(s => s.status === 'running').length;
+  const doneCount = steps.filter(s => s.status === 'done').length;
 
-  if (!connected || entries.length === 0) return null;
+  if (!connected || steps.length === 0) return null;
 
   return (
-    <div className="flex flex-col overflow-hidden" style={{ borderTop: '1px solid var(--border-base)' }}>
+    <div className="flex flex-col overflow-hidden flex-shrink-0" style={{ borderTop: '1px solid var(--border-base)' }}>
       {/* Header */}
-      <div
-        className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none flex-shrink-0"
+      <button
+        className="flex items-center gap-2 px-3 py-2 w-full text-left select-none hover:bg-white/5 transition"
         onClick={() => setExpanded(v => !v)}
+        aria-expanded={expanded}
+        aria-label={expanded ? 'Masquer l\'activité' : 'Afficher l\'activité'}
       >
-        <Activity size={12} style={{ color: 'var(--accent-primary)' }} />
-        <span className="text-[10px] font-bold uppercase tracking-wider flex-1" style={{ color: 'var(--text-muted)' }}>
-          Activité
+        {runningCount > 0 ? (
+          <Loader2 size={11} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
+        ) : (
+          <Activity size={11} style={{ color: '#34d399' }} />
+        )}
+        <span className="text-[10px] font-semibold flex-1" style={{ color: 'var(--text-muted)' }}>
+          {runningCount > 0 ? `${runningCount} en cours` : `${doneCount} terminée${doneCount > 1 ? 's' : ''}`}
         </span>
-        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded"
-          style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-dimmed)' }}>
-          {entries.length}
-        </span>
-        <ChevronDown size={11} className={`transition-transform ${expanded ? '' : '-rotate-90'}`} style={{ color: 'var(--text-dimmed)' }} />
-      </div>
+        <ChevronDown
+          size={10}
+          className={`transition-transform duration-200 ${expanded ? '' : '-rotate-90'}`}
+          style={{ color: 'var(--text-dimmed)' }}
+        />
+      </button>
 
       {/* Feed entries */}
       <AnimatePresence>
         {expanded && (
           <motion.div
-            initial={{ height: 0 }}
-            animate={{ height: 'auto' }}
-            exit={{ height: 0 }}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
             className="overflow-hidden"
           >
-            <div className="overflow-y-auto max-h-48 px-2 pb-2 space-y-0.5 custom-scrollbar">
-              {grouped.map(({ label, items }) => (
-                <div key={label}>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider px-2 py-1" style={{ color: 'var(--text-dimmed)' }}>
-                    {label}
-                  </div>
-                  {items.map((entry) => (
-                    <FeedRow key={entry.id} entry={entry} />
-                  ))}
-                </div>
+            <div className="overflow-y-auto max-h-40 px-2 pb-2 space-y-0.5 custom-scrollbar">
+              {entries.slice(-8).reverse().map((entry) => (
+                <FeedRow key={entry.id} entry={entry} />
               ))}
             </div>
           </motion.div>
@@ -130,44 +195,43 @@ function FeedRow({ entry }: { entry: FeedEntry }) {
   const isRunning = entry.status === 'running';
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/5 transition">
+    <motion.div
+      initial={{ opacity: 0, x: -4 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/5 transition group"
+    >
       <div
-        className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: `${color}12` }}
+        className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+        style={{ backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)` }}
       >
-        <Icon size={10} style={{ color }} />
+        {isRunning ? (
+          <Loader2 size={10} className="animate-spin" style={{ color }} />
+        ) : (
+          <Icon size={10} style={{ color }} />
+        )}
       </div>
-      <span className="text-[10px] flex-1 truncate" style={{ color: isRunning ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+      <span
+        className="text-[10px] flex-1 truncate"
+        style={{ color: isRunning ? 'var(--text-primary)' : 'var(--text-muted)' }}
+      >
         {entry.title}
       </span>
+      {entry.count > 1 && (
+        <span
+          className="text-[8px] font-bold px-1 py-0.5 rounded"
+          style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}
+        >
+          {entry.count}
+        </span>
+      )}
       <span className="text-[9px] font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
         {timeLabel(entry.timestamp)}
       </span>
       {isRunning ? (
         <div className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0" style={{ backgroundColor: color }} />
       ) : (
-        <CheckCircle2 size={9} className="flex-shrink-0" style={{ color: 'var(--text-dimmed)', opacity: 0.4 }} />
+        <CheckCircle2 size={8} className="flex-shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" style={{ color: '#34d399' }} />
       )}
-    </div>
+    </motion.div>
   );
-}
-
-// ── Group entries by time period ───────────────────────────────────────────
-
-function groupByTime(entries: FeedEntry[]): { label: string; items: FeedEntry[] }[] {
-  const now = Date.now();
-  const groups: { label: string; items: FeedEntry[] }[] = [];
-  const recent: FeedEntry[] = [];
-  const earlier: FeedEntry[] = [];
-
-  for (const e of [...entries].reverse()) {
-    const age = now - e.timestamp.getTime();
-    if (age < 5 * 60 * 1000) recent.push(e);
-    else earlier.push(e);
-  }
-
-  if (recent.length > 0) groups.push({ label: 'Maintenant', items: recent });
-  if (earlier.length > 0) groups.push({ label: 'Plus tôt', items: earlier });
-
-  return groups;
 }

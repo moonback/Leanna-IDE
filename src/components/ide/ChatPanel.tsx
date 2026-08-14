@@ -1,12 +1,11 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, Mic, MicOff, Loader2, User, Bot,
-  Trash2, ChevronDown, Power, Zap, GripVertical, Minus, PanelRight,
+  Trash2, Power, GripVertical, Minus, PanelRight,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext';
 import { useProfile, type UserProfile } from '../../context/UserProfileContext';
-import { FileCard, CommandCard } from './ChatCards';
 import { ActivityFeed } from './ActivityFeed';
 import { MultiAgentIndicator } from './MultiAgentIndicator';
 import { MentionDropdown } from './MentionDropdown';
@@ -14,7 +13,7 @@ import { SlashCommandDropdown } from './SlashCommandDropdown';
 import { useFileMention } from '../../hooks/useFileMention';
 import { useSlashCommand } from '../../hooks/useSlashCommand';
 import { DocumentUpload, DropZoneOverlay, useDocumentDrop, type DocumentResult } from './DocumentUpload';
-import type { TranscriptEntry, ActivityStep } from '../../hooks/useLiveAPI';
+import type { TranscriptEntry } from '../../hooks/useLiveAPI';
 
 // ─── Hook pour gérer la file d'attente des messages ──────────────────────
 interface PendingChatMessage {
@@ -115,25 +114,6 @@ const ChatMessage = memo(function ChatMessage({
         </span>
       </div>
     </motion.div>
-  );
-});
-
-const AgentStep = memo(function AgentStep({ step }: { step: ActivityStep }) {
-  const isRunning = step.status === 'running';
-  return (
-    <div className="flex items-center gap-2 py-0.5 pl-2">
-      {isRunning ? (
-        <Loader2 size={10} className="animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-      ) : (
-        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#34d399' }} />
-      )}
-      <span
-        className="text-[10px] truncate"
-        style={{ color: isRunning ? 'var(--text-primary)' : 'var(--text-muted)' }}
-      >
-        {step.label}
-      </span>
-    </div>
   );
 });
 
@@ -385,7 +365,6 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed }: ChatPane
     activity, isBusy, muted, toggleMute,
   } = useLiveAPIContext();
   const { profile } = useProfile();
-  const [showActivity, setShowActivity] = useState(true);
   const [minimized, setMinimized] = useState(false);
   const [docked, setDocked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -397,11 +376,6 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed }: ChatPane
 
   // File d'attente
   const { queue, enqueue } = useMessageQueue(isBusy, connected, sendTextMessage);
-
-  // Mémorisation des valeurs dérivées
-  const runningSteps = useMemo(() => activity.filter(s => s.status === 'running'), [activity]);
-  const doneSteps = useMemo(() => activity.filter(s => s.status === 'done'), [activity]);
-  const recentActivity = useMemo(() => activity.slice(-12), [activity]);
 
   const handleMessagesScroll = useCallback(() => {
     const container = messagesRef.current;
@@ -633,61 +607,6 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed }: ChatPane
             <ChatMessage key={entry.id} entry={entry} profile={profile!} />
           ))}
         </AnimatePresence>
-
-        {activity.length > 0 && (
-          <div className="mt-2 space-y-2">
-            {activity
-              .filter(s => s.status === 'done' && (s.tool.includes('write') || s.tool.includes('modify') || s.tool.includes('patch') || s.tool.includes('create') || s.tool.includes('delete')))
-              .slice(-5)
-              .map(step => {
-                const action = step.tool.includes('delete') ? 'deleted' as const
-                  : step.tool.includes('create') ? 'created' as const
-                  : 'modified' as const;
-                const path = step.label.replace(/^(Écrire|Modifier|Patcher|Créer|Supprimer|Renommer)\s*/i, '');
-                return <FileCard key={step.id} path={path} action={action} />;
-              })}
-
-            {activity
-              .filter(s => s.status === 'done' && s.tool === 'system_execute_command')
-              .slice(-3)
-              .map(step => (
-                <CommandCard key={step.id} command={step.label.replace('Shell: ', '')} exitCode={0} />
-              ))}
-
-            <button
-              onClick={() => setShowActivity(v => !v)}
-              className="flex items-center gap-1.5 text-[10px] font-medium mb-1.5 transition hover:opacity-80"
-              style={{ color: 'var(--text-muted)' }}
-              aria-expanded={showActivity}
-              aria-label={showActivity ? 'Masquer les étapes' : 'Afficher les étapes'}
-            >
-              <Zap size={10} style={{ color: runningSteps.length > 0 ? 'var(--accent-primary)' : '#34d399' }} />
-              <span>{doneSteps.length} étape{doneSteps.length > 1 ? 's' : ''}</span>
-              {runningSteps.length > 0 && (
-                <span style={{ color: 'var(--accent-primary)' }}>• {runningSteps.length} en cours</span>
-              )}
-              <ChevronDown size={10} className={`transition-transform ${showActivity ? 'rotate-180' : ''}`} />
-            </button>
-
-            <AnimatePresence>
-              {showActivity && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="overflow-hidden"
-                >
-                  <div className="space-y-0.5 pl-1 border-l-2 ml-1" style={{ borderColor: 'var(--border-base)' }}>
-                    {recentActivity.map((step) => (
-                      <AgentStep key={step.id} step={step} />
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
 
         {isBusy && (
           <div className="flex items-center gap-2 px-3 py-2">
