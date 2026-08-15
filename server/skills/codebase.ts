@@ -119,7 +119,7 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "write_project_file",
-      description: "⚠️ RÉSERVÉ AUX AGENTS — Ne PAS appeler directement. Utilise agent_delegate(role='coder') pour toute modification de fichier. Cet outil crée ou écrase un fichier. Il est appelé automatiquement par l'agent coder.",
+      description: "Crée ou écrase un fichier. L'assistant peut l'appeler directement uniquement pour créer ou écrire un fichier .md explicitement demandé par l'utilisateur. Pour toute autre modification, utilise agent_delegate(role='coder'). L'agent coder peut aussi appeler cet outil.",
       parameters: {
         type: "OBJECT",
         properties: {

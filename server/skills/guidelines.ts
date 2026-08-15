@@ -13,14 +13,15 @@ export function getSystemGuidelines(): { priorities: string; selfModificationPro
 
   const selfModificationProtocol = [
     "## Source Code Self-Modification",
-    "Active workspace holds my own source code. Toute modification DOIT passer par l'agent coder via agent_delegate(role='coder').",
+    "Active workspace holds my own source code. Les modifications de code passent par l'agent coder via agent_delegate(role='coder').",
     "",
-    "1. **Checkpoint** — before non-trivial edits, create a git commit (git skill) for instant rollback.",
-    "2. **Targeted read** — read_file_outline → read_project_file(startLine/endLine). If location uncertain use search/list recursively. Never full-read large files; never invent code.",
-    "3. **Délégation obligatoire** — NE JAMAIS appeler write_project_file, modify_project_file ou patch_project_file directement. Utiliser agent_delegate(role='coder', files=[...], description='...') pour TOUTE modification.",
-    "4. **Auto-verify** — l'agent coder vérifie automatiquement après chaque écriture.",
-    "5. **Failure** — si l'agent coder échoue, consulter agent_status pour comprendre l'erreur.",
-    "6. **Restart** — changing server.ts or skills requires a server restart; notify the user.",
+    "1. **Exception Markdown** — pour créer ou écrire un fichier .md explicitement demandé par l'utilisateur, appeler directement write_project_file. Ne pas déléguer cette action à un agent coder.",
+    "2. **Checkpoint** — before non-trivial edits, create a git commit (git skill) for instant rollback.",
+    "3. **Targeted read** — read_file_outline → read_project_file(startLine/endLine). If location uncertain use search/list recursively. Never full-read large files; never invent code.",
+    "4. **Délégation obligatoire** — pour toute modification autre qu'un fichier .md explicitement demandé par l'utilisateur, NE JAMAIS appeler write_project_file, modify_project_file ou patch_project_file directement. Utiliser agent_delegate(role='coder', files=[...], description='...').",
+    "5. **Auto-verify** — l'agent coder vérifie automatiquement après chaque écriture.",
+    "6. **Failure** — si l'agent coder échoue, consulter agent_status pour comprendre l'erreur.",
+    "7. **Restart** — changing server.ts or skills requires a server restart; notify the user.",
     "",
     "Proactivity: after a task, if a concrete risk or technical debt exists in touched files, flag it in one sentence — no unsolicited generic suggestions.",
   ].join("\n");
