@@ -197,6 +197,7 @@ server
 │   ├── geminiTTS.ts
 │   ├── logger.test.ts
 │   ├── logger.ts
+│   ├── pathUtils.ts
 │   ├── postEditValidator.test.ts
 │   ├── postEditValidator.ts
 │   ├── promptInjectionGuard.test.ts
@@ -550,6 +551,8 @@ interface ToolExecutionState {
   filesModified: string[];
   errors: string[];
   observations: string[];
+  /** Nombre de validations échouées par fichier, plafonné pour éviter les boucles d’écriture. */
+  verificationAttempts: Map<string, number>;
   /** Workspace state: contenu des fichiers lus pendant l'exécution (persisté entre les tours) */
   fileSnapshots: Map<string, string>;
 }
@@ -563,7 +566,7 @@ const EXECUTABLE_AGENT_TOOLS = new Set([
   "search_in_files",
   "analyze_project_file",
   "write_project_file",
-  "modify_project_file",
+  "apply_patch",
   "patch_project_file",
   "verify_file",
   "verify_typecheck",
@@ -663,7 +666,7 @@ export class AgentExecutor {
 
       // Un texte non exceptionnel ne suffit jamais : completed nécessite des preuves
       // observables collectées par l'exécuteur, pas seulement déclarées par le modèle.
-      task.status = success ? "completed" : "incomplete";
+      task.status = success ? "completed" : "failed";
       task.completedAt = new Date().toISOString();
       task.result = {
         success,
@@ -717,6 +720,11 @@ export class AgentExecutor {
    * Limité à MAX_TOOL_TURNS tours pour éviter les boucles infinies.
    */
   private static readonly MAX_TOOL_TURNS = 8;
+  private static readonly MAX_FILE_CORRECTIONS = 3;
+  /** Taille maximale d’une observation cumulée envoyée au modèle suivant. */
+  private static readonly MAX_OBSERVATION_CHARS = 240_000;
+  /** Limite de sécurité par snapshot, supérieure aux composants UI usuels. */
+  private static readonly MAX_FILE_CONTEXT_CHARS = 200_000;
 
   private async executeToolLoop(
     agent: { name: string; capabilities: string[] },
@@ -730,6 +738,7 @@ export class AgentExecutor {
       filesModified: [],
       errors: [],
       observations: [],
+      verificationAttempts: new Map(),
       fileSnapshots: new Map(),
     };
 
@@ -740,18 +749,21 @@ export class AgentExecutor {
       // Si on atteint l'avant-dernier tour, forcer la synthèse après exécution
       const isLastAllowedTurn = turn >= AgentExecutor.MAX_TOOL_TURNS - 2;
 
+      const observationCountBefore = state.observations.length;
       await this.executeRequestedTools(agent, calls, state);
-      const observations = state.observations.slice(-calls.length).join("\n");
+      const observations = state.observations
+        .slice(observationCountBefore)
+        .join("\n")
+        .slice(-AgentExecutor.MAX_OBSERVATION_CHARS);
 
       // Construire le contexte des fichiers lus (workspace state persisté)
       const fileContextSection = state.fileSnapshots.size > 0
         ? [
             "",
-            "## Fichiers en mémoire (contenu exact disponible pour modify_project_file)",
+            "## Fichiers en mémoire (état courant autoritaire pour apply_patch)",
             ...[...state.fileSnapshots.entries()].map(([filePath, content]) => {
-              // Limiter chaque fichier à 3000 chars dans le contexte pour économiser les tokens
-              const truncated = content.length > 3000
-                ? content.slice(0, 3000) + `\n... [tronqué — ${content.split("\n").length} lignes au total. Utilise startLine/endLine pour lire une section spécifique]`
+              const truncated = content.length > AgentExecutor.MAX_FILE_CONTEXT_CHARS
+                ? content.slice(0, AgentExecutor.MAX_FILE_CONTEXT_CHARS) + `\n... [tronqué par sécurité — ${content.split("\n").length} lignes au total. Relis la section manquante avec read_project_file(full:true) ou startLine/endLine]`
                 : content;
               return `### ${filePath}\n\`\`\`\n${truncated}\n\`\`\``;
             }),
@@ -759,10 +771,19 @@ export class AgentExecutor {
           ].join("\n")
         : "";
 
+      // ── Compter les lectures répétées sans écriture ──────────────────────
+      const readsSinceWrite = state.filesRead.length - state.filesModified.length;
+      const stallNote = readsSinceWrite >= 2
+        ? `\n⚠️ Tu as lu ${readsSinceWrite} fois le fichier sans avoir émis de apply_patch. Produis maintenant un apply_patch ou déclare le blocage.`
+        : "";
+
       const synthesisInstruction = isLastAllowedTurn
         ? "⚠️ C'est ton dernier tour d'appels d'outils. Tu DOIS maintenant produire le résultat final. Ne demande plus d'appels d'outils."
-        : "Poursuis la tâche avec ces observations. Les appels bash/shell et les chemins /workspace ne sont pas disponibles.\nUtilise uniquement les skills structurés autorisés si une action supplémentaire est indispensable.\nPour modify_project_file, le searchText DOIT être copié EXACTEMENT depuis le contenu du fichier en mémoire ci-dessus.\nSinon, rends maintenant le résultat final vérifié.\nNe renvoie jamais un plan seul ni un JSON tool_calls sans résultat final.";
+        : `Poursuis la tâche avec ces observations. Les appels bash/shell et les chemins /workspace ne sont pas disponibles.\nUtilise uniquement les skills structurés autorisés si une action supplémentaire est indispensable.\nPour apply_patch, fournis un diff unifié complet avec les lignes \`---\`, \`+++\` et \`@@\`; le backend refuse un patch dont le contexte ne correspond pas exactement au fichier courant.\nSinon, rends maintenant le résultat final vérifié.\nNe renvoie jamais un plan seul ni un JSON tool_calls sans résultat final.${stallNote}`;
 
+      // Ne remplacer que le snapshot du fichier dans le followUp —
+      // le prompt initial (contrat d'exécution, liste des outils) doit toujours être présent.
+      // Pour les tours suivants, on injecte uniquement la section fichier + observations.
       const followUpPrompt = [
         executionPrompt,
         fileContextSection,
@@ -876,12 +897,83 @@ export class AgentExecutor {
     return null;
   }
 
+  /** Sérialise une observation sans tronquer le contenu des lectures complètes. */
+  private formatToolObservation(toolName: string, result: any): string {
+    const serialized = JSON.stringify(result) ?? String(result);
+    const limit = ["read_project_file", "read_file_outline"].includes(toolName)
+      ? AgentExecutor.MAX_FILE_CONTEXT_CHARS
+      : 8_000;
+    const suffix = serialized.length > limit
+      ? `\n... [observation tronquée à ${limit} caractères]`
+      : "";
+    return `- ${toolName}: succès — ${serialized.slice(0, limit)}${suffix}`;
+  }
+
+  private formatToolFailure(result: any): string {
+    if (!result) return "outil sans résultat";
+    const phases = [result.typecheck ?? result.tsc, result.lint, result.test].filter(Boolean);
+    const details = phases.flatMap((phase: any) => [
+      phase.output,
+      phase.stdout,
+      phase.stderr,
+      phase.errors,
+      phase.violations,
+    ].flatMap((value: any) => Array.isArray(value)
+      ? value.map((item) => typeof item === "string" ? item : item?.message ?? JSON.stringify(item))
+      : value ? [String(value)] : []));
+    const issues = Array.isArray(result.allIssues)
+      ? result.allIssues.map((issue: any) => `${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? JSON.stringify(issue)}`)
+      : [];
+    const streams = [result.stdout, result.stderr, result.message, result.error, ...details, ...issues]
+      .filter(Boolean)
+      .join("\n");
+    return streams.slice(0, 5000) || `outil en échec (code ${result.exitCode ?? "inconnu"})`;
+  }
+
+  private async refreshFileSnapshot(
+    requestedPath: string,
+    state: ToolExecutionState,
+    reason: string
+  ): Promise<boolean> {
+    try {
+      const result = await this.skillHandler!("read_project_file", { path: requestedPath, full: true });
+      state.toolsExecuted.push("read_project_file");
+
+      if (result?.error || result?.status === "failed" || typeof result?.content !== "string") {
+        const error = this.formatToolFailure(result);
+        state.fileSnapshots.delete(requestedPath);
+        state.observations.push(`- read_project_file ${requestedPath}: échec pendant le rafraîchissement ${reason} — ${error}`);
+        return false;
+      }
+
+      state.filesRead.push(requestedPath);
+      state.fileSnapshots.set(requestedPath, result.content);
+      state.observations.push(`- read_project_file ${requestedPath}: instantané actuel rafraîchi ${reason}; cet état remplace tout contenu initial.`);
+      return true;
+    } catch (error) {
+      const message = (error as Error).message;
+      state.fileSnapshots.delete(requestedPath);
+      state.observations.push(`- read_project_file ${requestedPath}: erreur pendant le rafraîchissement ${reason} — ${message}`);
+      return false;
+    }
+  }
+
   private async executeRequestedTools(
     agent: { name: string; capabilities: string[] },
     calls: AgentToolCall[],
     state: ToolExecutionState
   ): Promise<void> {
+    const seenCalls = new Set<string>();
+    const writePathsHandled = new Set<string>();
+
     for (const call of calls) {
+      const callSignature = `${call.name}:${JSON.stringify(call.parameters)}`;
+      if (seenCalls.has(callSignature)) {
+        state.observations.push(`- ${call.name}: appel identique ignoré dans ce tour; l'observation du premier appel est suffisante.`);
+        continue;
+      }
+      seenCalls.add(callSignature);
+
       if (!EXECUTABLE_AGENT_TOOLS.has(call.name) || !agent.capabilities.includes(call.name)) {
         // Tenter une résolution partielle (le modèle tronque parfois les noms)
         const resolved = [...EXECUTABLE_AGENT_TOOLS].find(
@@ -896,40 +988,81 @@ export class AgentExecutor {
         }
       }
 
+      const requestedPath = typeof call.parameters.path === "string" ? call.parameters.path : undefined;
+      const isWriteCall = requestedPath && ["write_project_file", "apply_patch", "patch_project_file"].includes(call.name);
+      const pathKey = requestedPath?.replace(/\\/g, "/").replace(/^\.\//, "");
+
+      // Tous les patches d'une réponse sont produits à partir du même état. Après une
+      // écriture, tout second patch du même fichier serait nécessairement obsolète.
+      if (isWriteCall && pathKey && writePathsHandled.has(pathKey)) {
+        state.observations.push(`- ${call.name} ${requestedPath}: écriture différée. Une écriture de ce fichier a déjà été traitée ce tour; attends l'instantané rafraîchi avant un nouveau patch.`);
+        continue;
+      }
+      if (isWriteCall && pathKey) writePathsHandled.add(pathKey);
+
+      if (isWriteCall && requestedPath && (state.verificationAttempts.get(requestedPath) ?? 0) >= AgentExecutor.MAX_FILE_CORRECTIONS) {
+        const message = `plafond de ${AgentExecutor.MAX_FILE_CORRECTIONS} corrections atteint pour ${requestedPath}; validation humaine requise`;
+        state.errors.push(`${call.name}: ${message}`);
+        state.observations.push(`- ${call.name} ${requestedPath}: écriture bloquée — ${message}`);
+        continue;
+      }
+
       try {
         log.info(`[${agent.name}] Exécution outil structuré: ${call.name} args=${JSON.stringify(call.parameters).slice(0, 200)}`);
         const result = await this.skillHandler!(call.name, call.parameters);
         state.toolsExecuted.push(call.name);
         if (result?.error || result?.status === "failed") {
-          const error = result?.error ?? result?.message ?? "outil en échec";
-          state.errors.push(`${call.name}: ${error}`);
-          state.observations.push(`- ${call.name}: échec — ${error}`);
+          const error = this.formatToolFailure(result);
+          if (isWriteCall && requestedPath) {
+            const attempt = (state.verificationAttempts.get(requestedPath) ?? 0) + 1;
+            state.verificationAttempts.set(requestedPath, attempt);
+            await this.refreshFileSnapshot(requestedPath, state, "après le refus d'écriture");
+            const limitNote = attempt >= AgentExecutor.MAX_FILE_CORRECTIONS
+              ? ` Plafond atteint (${AgentExecutor.MAX_FILE_CORRECTIONS}) : aucune autre écriture automatique ne sera autorisée.`
+              : " Relis l'instantané actuel avant de régénérer un unique patch ciblé.";
+            if (attempt >= AgentExecutor.MAX_FILE_CORRECTIONS) {
+              state.errors.push(`${call.name}: ${error}`);
+            }
+            state.observations.push(`- ${call.name} ${requestedPath}: échec (tentative ${attempt}/${AgentExecutor.MAX_FILE_CORRECTIONS}) — ${error}${limitNote}`);
+          } else {
+            state.errors.push(`${call.name}: ${error}`);
+            state.observations.push(`- ${call.name}: échec — ${error}`);
+          }
           continue;
         }
 
-        const requestedPath = typeof call.parameters.path === "string" ? call.parameters.path : undefined;
         if (requestedPath && ["read_project_file", "read_file_outline"].includes(call.name)) {
           state.filesRead.push(requestedPath);
           // Persister le contenu lu dans le workspace state pour les tours suivants
-          if (call.name === "read_project_file" && result?.content && result?.status === "success") {
+          if (call.name === "read_project_file" && typeof result?.content === "string" && result?.status === "success") {
             state.fileSnapshots.set(requestedPath, result.content);
           }
         }
-        if (requestedPath && ["write_project_file", "modify_project_file", "patch_project_file"].includes(call.name)) {
+        if (isWriteCall && requestedPath) {
+          // Le prompt de départ contient des fichiers initiaux. Une relecture immédiate
+          // rend le contenu réellement écrit autoritaire pour le prochain tour.
+          await this.refreshFileSnapshot(requestedPath, state, "après l'écriture");
+
           const verification = await this.skillHandler!("verify_file", { path: requestedPath });
           state.toolsExecuted.push("verify_file");
-          if (verification?.error || verification?.status !== "success") {
-            const error = verification?.error ?? verification?.message ?? "post-validation échouée";
-            state.errors.push(`verify_file(${requestedPath}): ${error}`);
-            state.observations.push(`- ${call.name} ${requestedPath}: écrit mais vérification échouée — ${error}`);
+          if (verification?.error || verification?.ok === false || verification?.status === "failed" || verification?.status !== "success") {
+            const attempt = (state.verificationAttempts.get(requestedPath) ?? 0) + 1;
+            state.verificationAttempts.set(requestedPath, attempt);
+            const error = this.formatToolFailure(verification);
+            const limitNote = attempt >= AgentExecutor.MAX_FILE_CORRECTIONS
+              ? ` Plafond atteint (${AgentExecutor.MAX_FILE_CORRECTIONS}) : aucune autre écriture automatique ne sera autorisée.`
+              : " Relis le diagnostic et l'instantané actuel puis applique un patch ciblé avant de revalider.";
+            if (attempt >= AgentExecutor.MAX_FILE_CORRECTIONS) {
+              state.errors.push(`verify_file(${requestedPath}): ${error}`);
+            }
+            state.observations.push(`- ${call.name} ${requestedPath}: écrit mais vérification échouée (tentative ${attempt}/${AgentExecutor.MAX_FILE_CORRECTIONS}) — ${error}${limitNote}`);
             continue;
           }
+          state.verificationAttempts.delete(requestedPath);
           state.filesModified.push(requestedPath);
-          // Invalider le snapshot après modification (forcer relecture)
-          state.fileSnapshots.delete(requestedPath);
         }
 
-        state.observations.push(`- ${call.name}: succès — ${JSON.stringify(result).slice(0, 800)}`);
+        state.observations.push(this.formatToolObservation(call.name, result));
       } catch (error) {
         const message = (error as Error).message;
         state.errors.push(`${call.name}: ${message}`);
@@ -957,14 +1090,20 @@ export class AgentExecutor {
       ...(task.context.metadata?.projectContextDiscovered === true ? ["list_project_files"] : []),
       ...(filesRead.length > 0 ? ["read_project_file"] : []),
       ...toolExecution.toolsExecuted,
-      ...(writeResult.written.length > 0 ? ["write_project_file", "verify_file"] : []),
+      ...(writeResult.written.length > 0 ? ["write_project_file/apply_patch puis verify_file"] : []),
     ])];
     const findings = this.extractFindings(resultText);
-    const writeRequired = ["coder", "test", "docs", "refactor"].includes(task.role);
+    const writeRequired = ["coder", "test", "docs", "refactor"].includes(task.role)
+      // Une sous-tâche explicitement orientée lecture/analyse n'exige pas d'écriture.
+      // On détecte cela par l'absence totale de mot-clé d'écriture dans le titre/description
+      // ET par la présence de mots-clés d'analyse.
+      && !this.isAnalysisOnlyTask(task);
     const readEvidenceRequired = ["review", "security", "architect"].includes(task.role);
     const planningOnly = this.isPlanningOnly(resultText);
+    const declaredFailure = this.resultParser.detectFailure(resultText);
     const errors = [
       ...writeResult.errors.map((error) => `${error.path}: ${error.error}`),
+      ...(declaredFailure ? [`Le rapport final déclare un échec : ${declaredFailure}`] : []),
       ...(planningOnly ? ["La sortie décrit un plan sans résultat d'exécution."] : []),
       ...(writeRequired && writeResult.written.length === 0 ? ["Aucun fichier confirmé par write_project_file puis verify_file."] : []),
       ...(readEvidenceRequired && filesRead.length === 0 ? ["Aucun fichier lu : audit impossible à vérifier."] : []),
@@ -1010,6 +1149,21 @@ export class AgentExecutor {
       .filter((line) => line.length >= 12)
       .filter((line) => !/^(?:je vais|je dois|il faut|je commencerai|i will|i need to)/i.test(line))
       .slice(0, 20);
+  }
+
+  /**
+   * Détecte si une tâche est purement analytique/lecture et ne requiert donc pas d'écriture.
+   * Utilisé pour assouplir le vérificateur writeRequired.
+   */
+  private isAnalysisOnlyTask(task: AgentTask): boolean {
+    const text = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.toLowerCase();
+    // Si le titre/description mentionne explicitement une modification, une correction, une création,
+    // on considère qu'une écriture est attendue.
+    const writingSignal = /\b(?:modifier?|modifi[e é]|crée?r?|write|implement|apply|patch|fix|correct|refactor|add|update|change)\b/i;
+    if (writingSignal.test(text)) return false;
+    // Mots-clés indiquant une tâche d'analyse pure
+    const analysisSignal = /\b(?:analys|inspect|audit|review|check|read|lire|analyser|examin|rapport|report|résumé|summary|checkpoint\s+git|identifier|liste|list)\b/i;
+    return analysisSignal.test(text);
   }
 
   private isPlanningOnly(resultText: string): boolean {
@@ -1252,9 +1406,15 @@ export class AgentExecutor {
 
   private async readContextFiles(files: string[]): Promise<string[]> {
     const fileContents: string[] = [];
-    for (const file of files.slice(0, 10)) {
+    for (const [index, file] of files.slice(0, 10).entries()) {
       try {
-        const content = await this.skillHandler!("read_project_file", { path: file });
+        // Le premier fichier est le fichier principal résolu par la tâche :
+        // injecter son contenu complet évite que le modèle travaille sur une
+        // simple fenêtre startLine/endLine ou sur les 50 premières lignes.
+        const content = await this.skillHandler!("read_project_file", {
+          path: file,
+          ...(index === 0 ? { full: true } : {}),
+        });
         if (content && typeof content === "object" && content.content) {
           fileContents.push(`--- ${file} ---\n${content.content}`);
         }
@@ -1262,7 +1422,7 @@ export class AgentExecutor {
         log.debug(`Échec lecture: ${file} — ${(err as Error).message}`);
       }
     }
-    log.debug(`Fichiers lus: ${fileContents.length}/${files.length}`);
+    log.debug(`Fichiers lus: ${fileContents.length}/${files.length}; principal=${files[0] ?? "aucun"}`);
     return fileContents;
   }
 
@@ -1356,7 +1516,7 @@ export class AgentMessageBus extends EventEmitter {
   /** Dead-letter queue : messages non délivrés car l'agent cible n'était pas abonné */
   private deadLetterQueue: Map<AgentRole, DeadLetterEntry[]> = new Map();
 
-  constructor(private readonly maxHistorySize = 500) {
+  constructor(private readonly maxHistorySize = 100) {
     super();
   }
 
@@ -1382,7 +1542,9 @@ export class AgentMessageBus extends EventEmitter {
     log.debug(`📬 Agent "${agentRole}" abonné au type "${messageType}" (sub: ${subId.slice(0, 8)})`);
 
     // Re-livrer immédiatement les messages en attente pour ce rôle
-    this.flushDeadLetterQueue(agentRole).catch(() => {});
+    this.flushDeadLetterQueue(agentRole).catch((err) => {
+      log.warn(`Échec flush dead-letter queue pour "${agentRole}": ${(err as Error).message}`);
+    });
 
     return subId;
   }
@@ -1936,13 +2098,19 @@ export class AgentOrchestrator {
 
     const agentTasks: AgentTask[] = [];
     const dependencies: Record<string, string[]> = {};
-    const tempIdMap = new Map<number, string>();
 
+    // Première passe : les IDs doivent exister avant de pouvoir résoudre les dépendances.
+    const taskIds = params.tasks.map(() => randomUUID());
+    const idByTitle = new Map<string, string>();
+    params.tasks.forEach((taskDef, index) => {
+      idByTitle.set(taskDef.title, taskIds[index]);
+    });
+
+    // Seconde passe : créer les tâches et traduire les titres du même plan en IDs réels.
     for (let i = 0; i < params.tasks.length; i++) {
       const taskDef = params.tasks[i];
       const agent = getAgentDefinition(taskDef.role);
-      const taskId = randomUUID();
-      tempIdMap.set(i, taskId);
+      const taskId = taskIds[i];
 
       const task: AgentTask = {
         id: taskId,
@@ -1962,7 +2130,9 @@ export class AgentOrchestrator {
 
       agentTasks.push(task);
       this.tasks.set(task.id, task);
-      dependencies[taskId] = taskDef.dependsOn ?? [];
+      dependencies[taskId] = (taskDef.dependsOn ?? []).map(
+        (reference) => idByTitle.get(reference) ?? reference
+      );
     }
 
     const plan: OrchestrationPlan = {
@@ -2016,7 +2186,11 @@ export class AgentOrchestrator {
 
     log.info(`🤝 Collaboration par pattern "${pattern.name}" — ${pattern.participants.length} agent(s): ${pattern.participants.join(", ")}`);
 
-    // Transformer le workflow du pattern en tâches d'orchestration
+    // Transformer les étapes dépendantes en titres de tâches résolvables par orchestrate().
+    const stepTitle = (stepNumber: number) => {
+      const step = pattern.workflow.find((workflowStep) => workflowStep.step === stepNumber);
+      return step ? `[${pattern.name}] Étape ${step.step}: ${step.action}` : undefined;
+    };
     const tasks = pattern.workflow.map((step) => ({
       role: step.agent,
       title: `[${pattern.name}] Étape ${step.step}: ${step.action}`,
@@ -2024,8 +2198,7 @@ export class AgentOrchestrator {
       files: params.context.files,
       instructions: params.context.instructions,
       priority: "high" as TaskPriority,
-      // Convertir les indices d'étapes en IDs de tâches (résolu après création)
-      dependsOn: [] as string[], // Résolu dans orchestrate() via le mapping d'index
+      dependsOn: (step.dependsOn ?? []).map(stepTitle).filter((title): title is string => Boolean(title)),
     }));
 
     // Notifier le bus du démarrage de la collaboration
@@ -2560,7 +2733,7 @@ export class AgentPersistence {
 CREATE TABLE IF NOT EXISTS agent_tasks (
   id                  UUID PRIMARY KEY,
   orchestration_id    UUID REFERENCES agent_orchestrations(id) ON DELETE SET NULL,
-  role                TEXT NOT NULL CHECK (role IN ('test','docs','refactor','security','review','architect')),
+  role                TEXT NOT NULL CHECK (role IN ('coder','test','docs','refactor','security','review','architect')),
   title               TEXT NOT NULL,
   description         TEXT NOT NULL,
   priority            TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low','medium','high','critical')),
@@ -3537,12 +3710,12 @@ export class AutonomousLoop {
 
     // Signal explicite de retry dans la sortie de l'agent
     const hasRetrySignal =
+      result.success === false ||
       /##\s*RETRY|##\s*RELANCER|##\s*CORRECTION_NÉCESSAIRE/i.test(details);
 
-    // Signal explicite de satisfaction
+    // Un échec ne peut jamais être interprété comme un signal DONE.
     const hasDoneSignal =
-      /##\s*TERMINÉ|##\s*DONE|##\s*COMPLET/i.test(details) ||
-      result.success === false;
+      result.success === true && /##\s*TERMINÉ|##\s*DONE|##\s*COMPLET/i.test(details);
 
     const verifyErrors: string[] = [];
 
@@ -3553,17 +3726,19 @@ export class AutonomousLoop {
       }
     }
 
-    // Vérification des fichiers écrits (si activée)
-    if (this.config.verifyFiles && result.filesModified?.length) {
+    // AgentExecutor vérifie déjà chaque écriture et expose la preuve structurée.
+    // Ne relancer les vérifications que si cette preuve est absente ou négative.
+    const evidencePassed = result.evidence?.verification.passed === true;
+    if (this.config.verifyFiles && result.filesModified?.length && !evidencePassed) {
       for (const file of result.filesModified.slice(0, 5)) {
         const error = await this.verifyFile(file);
         if (error) verifyErrors.push(`${file}: ${error}`);
       }
     }
 
-    // Validation build synchrone si des fichiers ont été touchés,
-    // au lieu de compter sur le debounce fire-and-forget de postEditValidator
-    if (result.filesModified?.length) {
+    // Validation build synchrone uniquement lorsque l’exécuteur n’a pas déjà
+    // fourni une vérification complète, afin d’éviter le double travail.
+    if (result.filesModified?.length && !evidencePassed) {
       try {
         const { runValidation } = await import("../utils/postEditValidator");
         const buildResult = await runValidation();
@@ -3595,22 +3770,23 @@ export class AutonomousLoop {
       verifyErrors,
       confidenceScore,
       resultLength: details.length,
+      resultSummary: result.summary,
     };
   }
 
   private async verifyFile(filePath: string): Promise<string | null> {
-    // La vérification passe par le SkillHandler de l'executor
-    // On y accède via une méthode exposée
     try {
-      const result = await (this.executor as any).skillHandler?.("verify_file", {
-        path: filePath,
-      });
-      if (result && result.errors && result.errors.length > 0) {
-        return result.errors.slice(0, 3).join("; ");
-      }
-      return null;
-    } catch {
-      return null; // Vérification non disponible — on ignore
+      const result = await (this.executor as any).skillHandler?.("verify_file", { path: filePath });
+      if (!result || result.ok === true || result.status === "success") return null;
+      const issues = Array.isArray(result.allIssues)
+        ? result.allIssues.slice(0, 10).map((issue: any) => `${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? "Erreur"}`)
+        : [];
+      const phases = [result.typecheck, result.lint, result.test].filter((phase: any) => phase?.ok === false);
+      const phaseOutput = phases.flatMap((phase: any) => [phase.output, phase.stdout, phase.stderr]).filter(Boolean);
+      const details = [...issues, ...phaseOutput, result.message, result.stderr, result.error].filter(Boolean).join("\n");
+      return details.slice(0, 5000) || `verify_file a échoué (code ${result.exitCode ?? "inconnu"}).`;
+    } catch (error) {
+      return `verify_file indisponible: ${(error as Error).message}`;
     }
   }
 
@@ -3676,11 +3852,10 @@ export class AutonomousLoop {
 
     // ── Détection de boucle : comparer les summaries des itérations ──
     if (history.length >= 1) {
-      const currentSummary = obs.resultLength.toString(); // placeholder — sera comparé en similarité textuelle ci-dessous
       const lastSummary = history[history.length - 1].resultSummary;
 
       // Comparaison par similarité textuelle entre les deux derniers résumés
-      const similarity = this.stringSimilarity(lastSummary, currentSummary);
+      const similarity = this.stringSimilarity(lastSummary, obs.resultSummary);
       if (similarity > LOOP_DETECTION_SIMILARITY) {
         return {
           action: "stop_loop_detected",
@@ -3867,6 +4042,7 @@ interface ObservationReport {
   verifyErrors: string[];
   confidenceScore: number;
   resultLength: number;
+  resultSummary: string;
 }
 
 ```
@@ -4373,10 +4549,11 @@ export class GeneratedFileWriter {
         status: "failed",
         message: (err as Error).message,
       }));
-      if (verification?.status !== "success" || verification?.error) {
+      if (verification?.status !== "success" || verification?.ok === false || verification?.error) {
+        const report = JSON.stringify(verification, null, 2).slice(0, 5000);
         const message = verification?.message || verification?.error || "post-validation échouée";
         log.error(`[${agentName}] Post-validation échouée pour ${path}: ${message}`);
-        return `post-validation échouée: ${message}`;
+        return `post-validation échouée: ${message}\nRapport verify_file:\n${report}`;
       }
       return null;
     } catch (err) {
@@ -4548,10 +4725,10 @@ export class PromptBuilder {
     if (fileContents.length > 0) {
       parts.push(
         "",
-        "## Fichiers de contexte",
+        "## Fichiers de contexte (instantané initial)",
         ...fileContents,
         "",
-        "Les fichiers ci-dessus proviennent du workspace actif. Utilise-les immédiatement : ne demande ni archive, ni code source supplémentaire avant d'avoir analysé ce contexte."
+        "Les fichiers ci-dessus sont un instantané initial du workspace actif. Utilise-les immédiatement. Après une écriture, l'exécuteur fournira un bloc « Fichiers en mémoire » : ce dernier est le seul état autoritaire et remplace tout contenu initial du même chemin."
       );
     }
 
@@ -4575,7 +4752,8 @@ export class PromptBuilder {
       "- Fichiers modifiés : ...",
       "- Outils/commandes exécutés : ...",
       "- Vérification : PASS ou FAIL, avec le résultat observé.",
-      "Les seuls appels structurés exécutables sont : list_project_files, read_project_file, read_file_outline, search_in_files, analyze_project_file, write_project_file, modify_project_file, patch_project_file et verify_*. Ne demande jamais bash, shell, find, ls ou /workspace.",
+      "Les seuls appels structurés exécutables sont : list_project_files, read_project_file, read_file_outline, search_in_files, analyze_project_file, write_project_file, apply_patch, patch_project_file et verify_*. Ne demande jamais bash, shell, find, ls ou /workspace.",
+      "Pour déléguer à un autre agent, écris un bloc textuel ## DÉLÉGATION dans ta réponse. N'émets JAMAIS {\"tool_calls\":[{\"name\":\"agent_delegate\"...}]} ni agent_orchestrate — ces outils ne sont pas disponibles ici.",
       "Sans preuve concrète, déclare explicitement la tâche incomplète et explique le blocage."
     );
 
@@ -4634,6 +4812,32 @@ export class ResultParser {
       .filter(Boolean);
 
     return lines.length > 0 ? lines : undefined;
+  }
+
+  /**
+   * Détecte une déclaration d'échec irréfutable dans le rapport final du modèle.
+   *
+   * Règle stricte : on ne refuse QUE si l'agent déclare explicitement
+   * "Vérification : FAIL" (dans la section preuves) ou un titre ## Échec / ## FAIL.
+   * Un texte honnête comme "aucune modification n'a pu être appliquée dans ce tour"
+   * ou "tâche incomplète" n'est PAS considéré comme un marqueur d'échec — cela sera
+   * géré par writeRequired dans collectEvidence sans dupliquer le message d'erreur.
+   */
+  detectFailure(text: string): string | null {
+    // 1. Marqueur dans la section Preuves d'exécution : "Vérification : FAIL"
+    const strictFail = text.match(
+      /[-•]\s*vérification\s*:\s*(?:FAIL|ÉCHEC|ECHEC)\b/i
+    );
+    if (strictFail) return "Le rapport final déclare explicitement une vérification en échec.";
+
+    // 2. Titre de section d'échec irréfutable (## Échec / ## FAIL / ## Blocage)
+    //    Ne pas capturer ## Incomplet, ## Tâche incomplète, ## Résultats vérifiés, etc.
+    const failHeader = text.match(
+      /(?:^|\n)\s*##\s+(?:Échec|Echec|FAIL)\b/i
+    );
+    if (failHeader) return failHeader[0].trim().replace(/^#+\s*/, "").slice(0, 200);
+
+    return null;
   }
 }
 
@@ -4736,6 +4940,26 @@ export class TaskScheduler {
       });
 
       await Promise.allSettled(executions);
+
+      // (Audit §7) Marquer immédiatement les tâches dont toutes les dépendances
+      // incluent une tâche échouée, plutôt que d'attendre le deadlock.
+      for (const task of plan.tasks) {
+        if (task.status !== "pending") continue;
+        const deps = plan.dependencies[task.id] ?? [];
+        const hasFailedDep = deps.some((depId) => failed.has(depId));
+        if (hasFailedDep) {
+          task.status = "incomplete";
+          task.completedAt = new Date().toISOString();
+          task.result = {
+            success: false,
+            summary: "Tâche annulée : dépendance échouée",
+            error: `Dépendance(s) échouée(s): ${deps.filter(d => failed.has(d)).join(", ")}`,
+            durationMs: 0,
+          };
+          failed.add(task.id);
+          log.warn(`[${orchShortId}] Tâche "${task.title}" annulée (dépendance échouée)`);
+        }
+      }
     }
 
     // Une orchestration n'est terminée avec succès que si chaque tâche porte un
@@ -4841,11 +5065,12 @@ PRINCIPES :
 
 DÉLÉGATION OBLIGATOIRE :
 Ne jamais exécuter une tâche qui relève d'un autre agent spécialisé.
-Utilise l'outil agent_orchestrate ou agent_delegate pour déléguer.
+Pour déléguer, inclus un bloc ## DÉLÉGATION dans ta réponse finale (format textuel, pas un tool_call JSON).
+NE JAMAIS émettre {"tool_calls":[{"name":"agent_delegate"...}]} ni {"tool_calls":[{"name":"agent_orchestrate"...}]} — ces outils ne sont pas disponibles dans ce contexte d'exécution.
 
 RÈGLES DE DÉLÉGATION (impératives) :
 - Chaque tâche = UN SEUL rôle. Jamais "docs, refactor" dans un même champ role.
-  → Si deux compétences sont nécessaires, crée DEUX tâches distinctes dans agent_orchestrate.
+  → Si deux compétences sont nécessaires, crée DEUX blocs ## DÉLÉGATION distincts.
 - Pour suivre l'état d'une tâche ou d'une orchestration : utilise agent_status avec l'ID retourné.
   L'outil agent_status accepte indifféremment un taskId ou un orchestrationId.
 
@@ -4919,7 +5144,7 @@ const coderAgent: AgentDefinition = {
   capabilities: [
     "read_project_file",
     "write_project_file",
-    "modify_project_file",
+    "apply_patch",
     "patch_project_file",
     "list_project_files",
     "search_in_files",
@@ -4976,8 +5201,8 @@ const refactorAgent: AgentDefinition = {
   capabilities: [
     "read_project_file",
     "write_project_file",
+    "apply_patch",
     "patch_project_file",
-    "modify_project_file",
     "list_project_files",
     "search_in_files",
     "verify_file",
@@ -5061,9 +5286,7 @@ Tu DOIS suivre ces étapes dans cet ordre exact. Aucune étape ne peut être sau
 Quand un outil est nécessaire, réponds **uniquement** avec un objet JSON valide, sans bloc Markdown, commentaire ni texte avant/après. Le moteur n'exécute aucun pseudo-appel tel que \`patch_project_file({...})\`.
 
 Format exact :
-\`\`\`json
 {"tool_calls":[{"name":"nom_outil","parameters":{"paramètre":"valeur"}}]}
-\`\`\`
 
 Après chaque observation, réponds soit avec le prochain objet \`tool_calls\`, soit avec le rapport final. Ne déclare jamais « je poursuis » ou « je vais modifier » sans appeler l'outil requis.
 
@@ -5074,63 +5297,78 @@ Après chaque observation, réponds soit avec le prochain objet \`tool_calls\`, 
 - Toujours utiliser \`full: true\` pour obtenir le fichier entier.
 - Noter les numéros de ligne fournis dans l'observation.
 
+### Lecture de contexte volumineux
+- Pour le fichier principal d’une tâche, utilise \`read_project_file\` avec \`full: true\`.
+- Si la réponse indique une troncature malgré \`full: true\`, appelle \`read_file_outline\`, puis relis toutes les plages manquantes avec \`startLine\`/\`endLine\` avant de modifier.
+- Ne prétends jamais avoir compris un fichier dont seules quelques lignes ont été reçues.
+
 ### Étape 2 : IDENTIFIER les lignes à modifier
 - Repérer les numéros de ligne EXACTS du bloc à modifier/supprimer.
 - Utiliser les numéros de ligne retournés par \`read_project_file\` (startLine, endLine, totalLines).
 
-### Étape 3 : MODIFIER avec patch_project_file (MÉTHODE RECOMMANDÉE)
+### Étape 3 : MODIFIER avec apply_patch (diff unifié)
 
-**C'est la méthode la PLUS FIABLE. Utilise TOUJOURS \`patch_project_file\` pour modifier ou supprimer du code.**
+**C'est la méthode obligatoire. Utilise TOUJOURS \`apply_patch\` avec un diff unifié complet (\`---\`, \`+++\`, \`@@\`) et un contexte exact.**
 
 \`\`\`json
-{"tool_calls":[{"name":"patch_project_file","parameters":{"path":"chemin/fichier.ts","operations":[{"type":"delete","startLine":73,"endLine":95}]}}]}
+{"tool_calls":[{"name":"apply_patch","parameters":{"path":"chemin/fichier.ts","patch":"--- a/chemin/fichier.ts\n+++ b/chemin/fichier.ts\n@@ -10,4 +10,4 @@\n context line\n-old line\n+new line\n context line"}}]}
 \`\`\`
 
-Opérations disponibles :
-- \`delete\` : supprime les lignes de startLine à endLine (inclus)
-- \`replace\` : remplace les lignes startLine-endLine par content
-- \`insert\` : insère content APRÈS startLine
+Règles impératives du format :
+- Commence par \`--- a/...\` puis \`+++ b/...\` (avec le préfixe \`a/\` et \`b/\`)
+- Chaque hunk commence par \`@@ -L,N +L,N @@\`
+- Lignes de contexte : espace \` \` en première colonne
+- Suppressions : \`-\` en première colonne
+- Ajouts : \`+\` en première colonne
+- **INTERDIT** : \`*** Begin Patch\`, \`Index:\`, \`diff -e\`, diff contextuel (format non unifié)
+
+### Compatibilité legacy : patch_project_file
+\`patch_project_file\` reste disponible pour les intégrations existantes, mais le Coder doit préférer \`apply_patch\`.
 
 ### Étape 4 : VÉRIFIER le résultat
-L'exécuteur lance automatiquement \`verify_file\` après chaque écriture. Relis ensuite le fichier pour confirmer le changement :
+L'exécuteur lance automatiquement \`verify_file\` après chaque écriture et rafraîchit l'instantané du fichier. Pour tout nouveau patch du même fichier, utilise exclusivement cet instantané actuel ; ne réemploie jamais le contenu initial ou un diff déjà proposé.
+Une réponse ne doit contenir qu'**une seule écriture par fichier**. Après son observation, attends le tour suivant avant un autre patch.
+Relis ensuite le fichier pour confirmer le changement :
 \`\`\`json
 {"tool_calls":[{"name":"read_project_file","parameters":{"path":"chemin/fichier.ts","full":true}}]}
 \`\`\`
 - Confirmer que la modification est bien appliquée.
 - Vérifier que le code supprimé n'existe plus.
 
-## MÉTHODE ALTERNATIVE : modify_project_file
+## MÉTHODE LEGACY : patch_project_file
 
-Uniquement pour des remplacements textuels COURTS et SIMPLES (1-3 lignes).
-\`\`\`json
-{"tool_calls":[{"name":"modify_project_file","parameters":{"path":"chemin/fichier.ts","searchText":"TEXTE EXACT copié depuis le fichier lu","replaceText":"nouveau texte"}}]}
-\`\`\`
-- \`searchText\` doit être EXACTEMENT le texte du fichier (espaces, indentation identiques).
-- Pour supprimer : \`replaceText\` = \`\`
+\`patch_project_file\` reste disponible pour les intégrations existantes, mais préfère \`apply_patch\`. N'utilise jamais \`modify_project_file\`.
+
+
 
 ## ERREURS FRÉQUENTES À ÉVITER
 
 - ❌ Utiliser modify_project_file pour supprimer de gros blocs → UTILISE patch_project_file avec delete
-- ❌ Appeler modify_project_file SANS searchText → ERREUR
+- ❌ Appeler modify_project_file ou inventer un searchText → ERREUR
 - ❌ Inventer un searchText sans avoir lu le fichier → ÉCHEC (espaces différents)
 - ❌ Utiliser endMarker = "</div>" (trop générique, correspond à plusieurs endroits)
-- ✅ TOUJOURS utiliser patch_project_file avec les numéros de ligne pour supprimer/modifier
-- ✅ Lire le fichier → noter les lignes → patch_project_file → vérifier
+- ✅ TOUJOURS utiliser apply_patch avec un diff unifié et un contexte exact
+- ✅ Lire le fichier → produire le diff → appliquer → vérifier
 
 ${SECTION_RULES([
   "TOUJOURS lire le fichier avec full: true AVANT de modifier.",
-  "searchText dans modify_project_file = copie EXACTE du fichier lu.",
+  "Diff unifié toujours issu d'une lecture préalable du fichier.",
   "Respecter le style et les conventions existantes du projet.",
   "TypeScript strict : pas de 'any' implicite, typage explicite.",
   "Modifications minimales et ciblées — ne pas toucher au code non concerné.",
+  "Pour une correction UI locale, préserver la structure DOM, le layout, les className Tailwind, les styles inline et le comportement existants; ne modifier que les lignes visées par le diagnostic.",
+  "Ne jamais réécrire tout un composant pour corriger une erreur locale; ne pas inventer de classes Tailwind ou remplacer flex items-center/flex-row par flex-col sans exigence explicite.",
+  "Après un échec verify_file, lire le rapport détaillé (phase, stdout/stderr, exitCode, allIssues), corriger au maximum trois fois puis escalader à l'utilisateur.",
+  "Après chaque écriture ou refus de apply_patch, utiliser l'instantané actualisé fourni par l'exécuteur avant de générer un nouveau diff; ne jamais réutiliser un patch déjà envoyé.",
+  "N'émettre qu'une écriture par fichier et par réponse outil; attendre l'observation actualisée avant toute correction supplémentaire.",
   "Toujours vérifier après écriture.",
   "Préserver les exports publics et les API existantes sauf demande contraire.",
   "Ajouter les imports nécessaires.",
-  "Si modify_project_file échoue, relire le fichier et réessayer avec le texte exact.",
+  "Si apply_patch échoue, relire le fichier et régénérer un diff avec le contexte exact.",
 ])}
 
 ${SECTION_INTERDICTIONS([
-  "Ne JAMAIS appeler modify_project_file sans searchText.",
+  "Ne JAMAIS appeler modify_project_file ni inventer un searchText.",
   "Ne JAMAIS inventer un searchText sans avoir lu le fichier.",
   "Ne jamais modifier un fichier non mentionné sans raison claire.",
   "Ne jamais supprimer du code fonctionnel sans instruction explicite.",
@@ -5144,7 +5382,7 @@ ${SECTION_CRITERES([
   "Respect du style existant (indentation, nommage, structure).",
   "Modifications minimales pour atteindre l'objectif.",
   "Cohérence avec l'architecture existante.",
-  "searchText toujours issu d'une lecture préalable du fichier.",
+  "Diff unifié toujours issu d'une lecture préalable du fichier.",
 ])}
 
 ${SECTION_OUTPUT_FORMAT}
@@ -5956,8 +6194,8 @@ async function executeValidatePatch(
 
     const verifyResult = await handler("verify_file", { path }, context);
 
-    // Succès ?
-    if (verifyResult?.ok === true || verifyResult?.status === "ok") {
+    // Succès : le contrat canonique est status=success, ok=true reste accepté pour compatibilité.
+    if (verifyResult?.ok === true || verifyResult?.status === "success" || verifyResult?.status === "ok") {
       log.info(`[validate_patch] ✓ ${path} valide après ${attempt} vérification(s).`);
       return {
         success: true,
@@ -5968,17 +6206,8 @@ async function executeValidatePatch(
       };
     }
 
-    // Extraire les erreurs
-    const errors = extractVerifyErrors(verifyResult);
-    if (!errors) {
-      // Pas d'erreurs claires, considérer comme succès
-      return {
-        success: true,
-        attempts: attempt,
-        file: path,
-        finalState: "valid",
-      };
-    }
+    // Une vérification échouée sans diagnostics reste un échec : ne jamais le convertir en succès.
+    const errors = extractVerifyErrors(verifyResult) ?? "verify_file a échoué sans fournir de diagnostic exploitable.";
 
     // Dernière tentative → ne pas corriger, juste reporter
     if (attempt === MAX_ATTEMPTS) {
@@ -6209,23 +6438,34 @@ async function executePlanCodeChange(
 // ─── Utilitaires ────────────────────────────────────────────────────────────
 
 function extractVerifyErrors(result: any): string | null {
-  if (!result) return null;
+  if (!result) return "verify_file n'a retourné aucun résultat.";
   const parts: string[] = [];
 
-  if (result.tsc && !result.tsc.ok) {
-    parts.push(result.tsc.errors || result.tsc.stderr || "TSC errors");
-  }
-  if (result.lint && !result.lint.ok) {
-    parts.push(result.lint.errors || result.lint.stderr || "Lint errors");
-  }
-  if (result.test && !result.test.ok) {
-    parts.push(result.test.errors || result.test.stderr || "Test failures");
-  }
-  if (parts.length === 0 && result.error) {
-    parts.push(result.error);
+  if (Array.isArray(result.allIssues)) {
+    parts.push(...result.allIssues.slice(0, 20).map((issue: any) =>
+      `[${issue.type ?? "verification"}${issue.rule ? `/${issue.rule}` : ""}] ${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? "Erreur"}`
+    ));
   }
 
-  return parts.length > 0 ? parts.join("\n") : null;
+  const addPhase = (label: string, phase: any) => {
+    if (!phase || phase.ok !== false) return;
+    const output = [phase.output, phase.stdout, phase.stderr, phase.errors, phase.violations]
+      .flatMap((value) => Array.isArray(value) ? value.map((item) => typeof item === "string" ? item : item.message ?? JSON.stringify(item)) : [value])
+      .filter(Boolean)
+      .join("\n");
+    parts.push(`${label}${phase.exitCode !== undefined ? ` (code ${phase.exitCode})` : ""}: ${output || "échec sans sortie"}`);
+  };
+
+  addPhase("TypeScript", result.typecheck ?? result.tsc);
+  addPhase("Lint", result.lint);
+  addPhase("Tests", result.test);
+
+  if (result.error) parts.push(String(result.error));
+  if (result.message && result.status === "failed") parts.push(String(result.message));
+  if (result.stderr) parts.push(String(result.stderr));
+  if (result.stdout) parts.push(String(result.stdout));
+
+  return parts.length > 0 ? [...new Set(parts)].join("\n") : null;
 }
 
 ```
@@ -6395,7 +6635,7 @@ export class Supervisor {
     verifyResult: any,
   ): { needsCorrection: boolean; directive?: string } {
     // Si verify passe → tout va bien
-    if (verifyResult?.ok === true || verifyResult?.status === "ok" || verifyResult?.valid === true) {
+    if (verifyResult?.ok === true || verifyResult?.status === "success" || verifyResult?.status === "ok" || verifyResult?.valid === true) {
       // Nettoyer le compteur pour ce fichier
       this.correctionHistory.delete(filePath);
       if (this.currentMission) {
@@ -6625,29 +6865,35 @@ export class Supervisor {
   // ─── Utilitaires ─────────────────────────────────────────────────────────
 
   private extractErrors(verifyResult: any): string | null {
-    if (!verifyResult) return null;
-
-    // Format verify_file: { ok: false, tsc: { ok: false, errors: "..." }, lint: {...}, test: {...} }
+    if (!verifyResult) return "verify_file n'a retourné aucun résultat.";
     const parts: string[] = [];
 
-    if (verifyResult.tsc && !verifyResult.tsc.ok) {
-      parts.push(`TypeScript: ${verifyResult.tsc.errors || verifyResult.tsc.stderr || "Erreur"}`);
-    }
-    if (verifyResult.lint && !verifyResult.lint.ok) {
-      parts.push(`Lint: ${verifyResult.lint.errors || verifyResult.lint.stderr || "Erreur"}`);
-    }
-    if (verifyResult.test && !verifyResult.test.ok) {
-      parts.push(`Tests: ${verifyResult.test.errors || verifyResult.test.stderr || "Erreur"}`);
+    if (Array.isArray(verifyResult.allIssues)) {
+      parts.push(...verifyResult.allIssues.slice(0, 20).map((issue: any) =>
+        `[${issue.type ?? "verification"}/${issue.rule ?? "unknown"}] ${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? "Erreur"}`
+      ));
     }
 
-    // Fallback pour d'autres formats
-    if (parts.length === 0) {
-      if (verifyResult.error) parts.push(verifyResult.error);
-      if (verifyResult.errors) parts.push(verifyResult.errors);
-      if (verifyResult.stderr) parts.push(verifyResult.stderr);
-    }
+    const addPhase = (label: string, phase: any) => {
+      if (!phase || phase.ok !== false) return;
+      const output = [phase.output, phase.stdout, phase.stderr, phase.errors, phase.violations]
+        .flatMap((value) => Array.isArray(value)
+          ? value.map((item) => typeof item === "string" ? item : item?.message ?? JSON.stringify(item))
+          : value ? [String(value)] : [])
+        .filter(Boolean)
+        .join("\n");
+      parts.push(`${label} (code ${phase.exitCode ?? "inconnu"}): ${output || "échec sans sortie"}`);
+    };
 
-    return parts.length > 0 ? parts.join("\n") : null;
+    addPhase("TypeScript", verifyResult.typecheck ?? verifyResult.tsc);
+    addPhase("Lint", verifyResult.lint);
+    addPhase("Tests", verifyResult.test);
+    if (verifyResult.error) parts.push(String(verifyResult.error));
+    if (verifyResult.message && verifyResult.status === "failed") parts.push(String(verifyResult.message));
+    if (verifyResult.stderr) parts.push(String(verifyResult.stderr));
+    if (verifyResult.stdout) parts.push(String(verifyResult.stdout));
+
+    return parts.length > 0 ? [...new Set(parts)].join("\n") : null;
   }
 
   /**
@@ -25510,6 +25756,7 @@ export default router;
 ```ts
 import { Router, Request, Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
+import { z } from 'zod';
 import { requestConfirmation } from '../utils/confirmationBridge';
 
 export function createSelfRootRouter(getWss: () => WebSocketServer | null): Router {
@@ -25582,8 +25829,15 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
   // POST /api/self-root/change
   router.post('/change', async (req: Request, res: Response) => {
     try {
-      const { path: newPath, userConfirmed } = req.body as { path?: string; userConfirmed?: boolean };
-      if (!newPath?.trim()) return res.status(400).json({ error: 'Le chemin est requis.' });
+      const ChangeSchema = z.object({
+        path: z.string().min(1, 'Le chemin est requis.'),
+        userConfirmed: z.boolean().optional(),
+      });
+      const parsed = ChangeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Paramètres invalides.' });
+      }
+      const { path: newPath, userConfirmed } = parsed.data;
 
       // Si la demande vient de l'UI Settings (confirmation locale déjà affichée),
       // on bypass la confirmation WS qui nécessite une session vocale active.
@@ -25652,11 +25906,17 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
   // POST /api/self-root/new — créer un projet vierge et l'activer
   router.post('/new', async (req: Request, res: Response) => {
     try {
-      const { path: projectPath, name } = req.body as { path?: string; name?: string };
-
-      if (!projectPath?.trim() && !name?.trim()) {
-        return res.status(400).json({ error: 'Un chemin ou un nom de projet est requis.' });
+      const NewProjectSchema = z.object({
+        path: z.string().optional(),
+        name: z.string().optional(),
+      }).refine(data => !!(data.path?.trim() || data.name?.trim()), {
+        message: 'Un chemin ou un nom de projet est requis.',
+      });
+      const parsed = NewProjectSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Paramètres invalides.' });
       }
+      const { path: projectPath, name } = parsed.data;
 
       const fsModule = await import('fs');
       const pathModule = await import('path');
@@ -29450,8 +29710,8 @@ export const refactorAgent = defineAgent({
   capabilities: [
     "read_project_file",
     "write_project_file",
+    "apply_patch",
     "patch_project_file",
-    "modify_project_file",
     "list_project_files",
     "search_in_files",
     "verify_file",
@@ -34465,6 +34725,7 @@ export const agentsSkill: Skill = {
       description:
         "Orchestre plusieurs agents en parallèle ou en séquence avec dépendances. " +
         "Chaque tâche dans la liste doit avoir un rôle UNIQUE ('docs', 'refactor', etc.) — jamais plusieurs rôles combinés dans une même tâche. " +
+        "Pour créer une dépendance entre tâches du même plan, indique dans dependsOn le titre exact de chaque tâche prérequise ; les IDs de tâches existantes restent aussi acceptés. " +
         "Pour des workflows prédéfinis, préfère agent_collaborate. " +
         "Retourne un orchestrationId : utilise agent_status avec cet ID pour suivre l'avancement global.",
       parameters: {
@@ -34483,7 +34744,7 @@ export const agentsSkill: Skill = {
                 files:        { type: "ARRAY", items: { type: "STRING" }, description: "Fichiers pertinents" },
                 instructions: { type: "STRING", description: "Instructions supplémentaires" },
                 priority:     { type: "STRING", description: "Priorité" },
-                dependsOn:    { type: "ARRAY", items: { type: "STRING" }, description: "IDs des tâches prérequises" },
+                dependsOn:    { type: "ARRAY", items: { type: "STRING" }, description: "Titres exacts des tâches prérequises du même plan (ou IDs de tâches existantes)" },
               },
               required: ["role", "title", "description"],
             },
@@ -36899,6 +37160,7 @@ import {
   handleWriteProjectFile,
   handleModifyProjectFile,
   handlePatchProjectFile,
+  handleApplyPatch,
   handleRenameProjectFile,
   handleDeleteProjectFile,
   handleCreateProjectDirectory
@@ -36974,14 +37236,15 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "search_in_files",
-      description: "Searches for text or a pattern across project files. Returns matching files with surrounding context. Use to find where a function, class or variable is used.",
+      description: "Searches for text or a pattern across project files. Returns matching files with surrounding context. Use to find where a function, class or variable is used. By default, the query is treated as literal text (special characters are auto-escaped). Set regex:true to use a regular expression.",
       parameters: {
         type: "OBJECT",
         properties: {
-          query: { type: "STRING", description: "Exact text or regex pattern to search for." },
+          query: { type: "STRING", description: "Text or regex pattern to search for. Treated as literal text by default (parentheses, brackets, etc. are auto-escaped)." },
           path: { type: "STRING", description: "Directory to search in (optional, defaults to project root)." },
           extensions: { type: "STRING", description: "Comma-separated file extensions to filter (e.g. 'ts,tsx,js'). Optional." },
           caseSensitive: { type: "BOOLEAN", description: "Case-sensitive search. Default false." },
+          regex: { type: "BOOLEAN", description: "If true, treat query as a regular expression. Default false (literal text search)." },
           maxResults: { type: "NUMBER", description: "Maximum number of results. Default 20." },
         },
         required: ["query"],
@@ -37024,6 +37287,18 @@ export const codebaseSkill: Skill = {
           endMarker: { type: "STRING", description: "Alternative à searchText: dernière ligne/texte identifiable qui TERMINE le bloc à remplacer." },
         },
         required: ["path", "replaceText"],
+      },
+    },
+    {
+      name: "apply_patch",
+      description: "⚠️ RÉSERVÉ AUX AGENTS — Applique un diff unifié vérifié sur un fichier. Le contexte des hunks doit correspondre exactement au contenu courant.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          path: { type: "STRING", description: "Chemin relatif du fichier cible." },
+          patch: { type: "STRING", description: "Diff unifié complet avec lignes ---/+++/@@." },
+        },
+        required: ["path", "patch"],
       },
     },
     {
@@ -37139,6 +37414,9 @@ export const codebaseSkill: Skill = {
 
       case "modify_project_file":
         return await handleModifyProjectFile(args, toolContext);
+
+      case "apply_patch":
+        return await handleApplyPatch(args, toolContext);
 
       case "patch_project_file":
         return await handlePatchProjectFile(args, toolContext);
@@ -37740,6 +38018,7 @@ export async function handleSearchInFiles(args: any) {
   if (!normalized) return { error: "Chemin invalide ou en dehors du workspace." };
   const extensions = args.extensions ? String(args.extensions).split(",").map((e: string) => e.trim().replace(/^\./, "")) : null;
   const caseSensitive = args.caseSensitive === true;
+  const isRegex = args.regex === true;
   const maxResults = typeof args.maxResults === "number" ? args.maxResults : 20;
   const allFiles: string[] = [];
 
@@ -37752,7 +38031,22 @@ export async function handleSearchInFiles(args: any) {
   }
 
   const results: Array<{ file: string; line: number; content: string }> = [];
-  const regex = new RegExp(query, caseSensitive ? "g" : "gi");
+
+  // Mode littéral par défaut : échapper les caractères spéciaux regex
+  // Mode regex explicite : utiliser la query telle quelle
+  let pattern: string;
+  if (isRegex) {
+    pattern = query;
+  } else {
+    pattern = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  let regex: RegExp;
+  try {
+    regex = new RegExp(pattern, caseSensitive ? "g" : "gi");
+  } catch (e: any) {
+    return { error: `Expression régulière invalide: ${e.message}. Utilisez regex: false ou échappez les caractères spéciaux.` };
+  }
   for (const filePath of allFiles) {
     if (results.length >= maxResults) break;
     if (extensions) {
@@ -38181,6 +38475,108 @@ export async function handlePatchProjectFile(args: any, toolContext: any) {
     critical,
     sandbox: sandboxMode_patch,
     message: `File ${requestedPath} patched successfully (${appliedOps} operations).${sandboxMode_patch ? ' 📦 (sandbox)' : ''}${critical ? ' ⚠️ Fichier critique modifié.' : ''}`,
+  };
+}
+
+/**
+ * Applique un diff unifié en vérifiant chaque hunk contre le contenu courant.
+ * Le fichier n'est écrit qu'après validation de tous les hunks, afin d'éviter
+ * les remplacements silencieux sur un fichier devenu obsolète.
+ */
+export async function handleApplyPatch(args: any, toolContext: any) {
+  if (!checkWriteRateLimit()) return { error: "Rate limit atteint : trop d'écritures par minute." };
+  if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
+
+  const requestedPath = String(args.path || "").trim();
+  const patch = typeof args.patch === "string" ? args.patch.replace(/\r\n/g, "\n") : "";
+  if (!requestedPath) return { error: "Le chemin de fichier est requis." };
+  if (!patch.trim()) return { error: "Le diff unifié est requis." };
+
+  const target = resolveSandboxWriteTarget(requestedPath);
+  if (!target) return { error: "Chemin invalide ou en dehors du workspace." };
+  const normalized = target.sandboxPath;
+  if (isWriteForbidden(target.logicalPath)) return { error: `Écriture interdite sur ce fichier protégé: ${requestedPath}` };
+  if (!fs.existsSync(normalized)) return { error: "Fichier introuvable." };
+
+  const raw = await fs.promises.readFile(normalized, "utf-8");
+  const sourceLines = raw.replace(/\r\n/g, "\n").split("\n");
+  const patchLines = patch.split("\n");
+  const hunks: Array<{ start: number; oldLines: string[]; newLines: string[] }> = [];
+  let current: { start: number; oldLines: string[]; newLines: string[] } | null = null;
+
+  for (const line of patchLines) {
+    const header = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
+    if (header) {
+      if (current) hunks.push(current);
+      current = { start: Number(header[1]), oldLines: [], newLines: [] };
+      continue;
+    }
+    if (!current) continue;
+    if (line === "\\ No newline at end of file") continue;
+    if (line.startsWith(" ")) {
+      const value = line.slice(1);
+      current.oldLines.push(value);
+      current.newLines.push(value);
+    } else if (line.startsWith("-")) {
+      current.oldLines.push(line.slice(1));
+    } else if (line.startsWith("+")) {
+      current.newLines.push(line.slice(1));
+    }
+  }
+  if (current) hunks.push(current);
+  if (hunks.length === 0) return {
+    error: "Diff unifié invalide : aucun hunk @@ ... @@ trouvé. Utilise UNIQUEMENT le format unifié standard (git diff). Exemple correct :\n--- a/src/file.tsx\n+++ b/src/file.tsx\n@@ -10,4 +10,4 @@\n context line\n-old line\n+new line\n context line\nFormats NON supportés : '*** Begin Patch', 'Index:', 'diff -e', diff contextuel.",
+  };
+
+  // Vérifier d'abord tous les contextes sur le fichier original.
+  for (const hunk of hunks) {
+    const offset = hunk.start - 1;
+    const actual = sourceLines.slice(offset, offset + hunk.oldLines.length);
+    if (actual.length !== hunk.oldLines.length || actual.some((line, index) => line !== hunk.oldLines[index])) {
+      return {
+        error: `Contexte du patch obsolète ou incorrect autour de la ligne ${hunk.start}. Relis le fichier et régénère le diff unifié.`,
+        expected: hunk.oldLines.slice(0, 20).join("\\n"),
+        actual: actual.slice(0, 20).join("\\n"),
+      };
+    }
+  }
+
+  // Appliquer du bas vers le haut : les lignes des hunks restent stables.
+  const nextLines = [...sourceLines];
+  for (const hunk of [...hunks].sort((a, b) => b.start - a.start)) {
+    nextLines.splice(hunk.start - 1, hunk.oldLines.length, ...hunk.newLines);
+  }
+  const newContent = nextLines.join("\n");
+  const critical = isCriticalFile(target.logicalPath);
+  const guard = await guardCriticalFile(critical, requestedPath, "patch", toolContext, `Diff unifié (${hunks.length} hunk(s))`, { proposed: newContent, previous: raw });
+  if (guard.blocked) return { error: guard.error, critical: true };
+
+  const sandboxMode = isSandboxActive();
+  if (!sandboxMode) {
+    try {
+      const { createCheckpoint } = await import("../utils/checkpoint");
+      await createCheckpoint(`avant apply_patch: ${requestedPath}`);
+    } catch { /* non bloquant */ }
+  }
+  if (!resolveCurrentSandboxPath(requestedPath, normalized)) return { error: "Sandbox indisponible ou chemin modifié — patch refusé." };
+  await fs.promises.writeFile(normalized, newContent, "utf-8");
+  if (sandboxMode) markFileModified(requestedPath);
+  appendAuditEvent({ action: "apply_patch", target: requestedPath, actor: "ai", diff: generateDiffSummary(raw, newContent) }).catch((err) => {
+    console.warn(`[Audit] appendAuditEvent failed for apply_patch on ${requestedPath}:`, err);
+  });
+  toolContext.emitIdeAction?.({ type: "open-file", path: requestedPath });
+  toolContext.emitIdeAction?.({ type: "file-changed", path: requestedPath });
+  if (!sandboxMode) {
+    triggerRestartIfNeeded(requestedPath);
+    scheduleValidation();
+  }
+  return {
+    status: "success",
+    path: requestedPath,
+    hunksApplied: hunks.length,
+    critical,
+    sandbox: sandboxMode,
+    message: `Diff unifié appliqué avec succès à ${requestedPath}.${sandboxMode ? " 📦 (sandbox)" : ""}${critical ? " ⚠️ Fichier critique modifié." : ""}`,
   };
 }
 
@@ -38863,8 +39259,8 @@ class GitStatusCacheSingleton {
     invalidations: 0,
   };
 
-  /** Git peut changer à chaque écriture agentique : cache très court, jamais une source de vérité durable. */
-  readonly TTL_MS: number = 3_000;
+  /** Cache de 30 s; les écritures Git invalident ce cache immédiatement. */
+  readonly TTL_MS: number = 30_000;
 
   private getKey(workspace: string): string {
     return workspace || SELF_ROOT;
@@ -43049,6 +43445,7 @@ export const reasoningSkill: Skill = {
           systemPrompt,
           temperature: 0.3,
           thinkingBudget: 0,
+          maxOutputTokens: 16_384,
         });
         const answer = response.text.trim();
         if (answer) {
@@ -43069,6 +43466,7 @@ export const reasoningSkill: Skill = {
           prompt: `${systemPrompt}\n\n${prompt}`,
           temperature: 0.3,
           thinkingBudget: 0,
+          maxOutputTokens: 16_384,
         };
         // Force l'autre provider comme fallback
         if (activeProvider === 'gemini') {
@@ -44277,6 +44675,10 @@ export const systemSkill: Skill = {
                         }
 
                         console.log(`[System] Exécution npm: ${command} dans ${getProjectRoot()}`);
+                        // SECURITY (Audit §2) : Avertir si npm install avec des paquets spécifiques
+                        if ((npmSubcommand === "install" || npmSubcommand === "i") && commandParts.length > 2) {
+                            console.warn(`[System] ⚠️ npm install avec paquets spécifiques: ${commandParts.slice(2).join(" ")}`);
+                        }
                         const NPM_TIMEOUT_MS = 120_000; // 2 minutes pour npm
 
                         try {
@@ -44536,8 +44938,8 @@ import { verifySkill, parseTsErrors, parseLintResults, findAssociatedTestFile } 
 
 // ─── Tests unitaires du skill verify ─────────────────────────────────────────
 
-test("verify skill exposes 4 tool declarations", () => {
-  assert.equal(verifySkill.declarations.length, 5);
+test("verify skill exposes all tool declarations", () => {
+  assert.equal(verifySkill.declarations.length, 7);
   const names = verifySkill.declarations.map((d: any) => d.name);
   assert.ok(names.includes("verify_typecheck"));
   assert.ok(names.includes("verify_file"));
@@ -44763,9 +45165,18 @@ import * as ts from "typescript";
 const execFileAsync = promisify(execFile);
 
 // ── Cache pour les résultats de tests (optimisation) ────────────────────────
+export interface ProcessResult {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  signal?: string | null;
+  timedOut?: boolean;
+}
+
 interface TestCacheEntry {
   hash: string;
-  result: { ok: boolean; stdout: string; stderr: string };
+  result: ProcessResult;
   timestamp: number;
 }
 const testCache = new Map<string, TestCacheEntry>();
@@ -45198,7 +45609,35 @@ function computeFileHash(filePath: string): string {
   }
 }
 
-function getCachedTestResult(testFile: string, sourceFile: string): { ok: boolean; stdout: string; stderr: string } | null {
+function combineOutput(stdout: string, stderr: string): string {
+  return [stdout, stderr].filter(Boolean).join("\n");
+}
+
+function processResultFromError(error: any): ProcessResult {
+  const stdout = truncate(typeof error?.stdout === "string" ? error.stdout : "");
+  const stderr = truncate(typeof error?.stderr === "string" ? error.stderr : (error?.message || "Erreur inconnue"));
+  const rawCode = error?.code;
+  const exitCode = typeof rawCode === "number" ? rawCode : null;
+  return {
+    ok: false,
+    stdout,
+    stderr,
+    exitCode,
+    signal: typeof error?.signal === "string" ? error.signal : null,
+    timedOut: rawCode === "ETIMEDOUT" || error?.killed === true && rawCode === "ETIMEDOUT",
+  };
+}
+
+function resultExitCode(results: Array<ProcessResult | null>): number | null {
+  const failed = results.find((result) => result && !result.ok);
+  return failed?.exitCode ?? (failed ? 1 : 0);
+}
+
+function formatProcessFailure(result: ProcessResult): string {
+  return combineOutput(result.stdout, result.stderr) || `Processus échoué (code ${result.exitCode ?? "inconnu"}).`;
+}
+
+function getCachedTestResult(testFile: string, sourceFile: string): ProcessResult | null {
   const cacheKey = `${testFile}:${sourceFile}`;
   const entry = testCache.get(cacheKey);
   if (!entry) return null;
@@ -45219,7 +45658,7 @@ function getCachedTestResult(testFile: string, sourceFile: string): { ok: boolea
   return entry.result;
 }
 
-function setCachedTestResult(testFile: string, sourceFile: string, result: { ok: boolean; stdout: string; stderr: string }): void {
+function setCachedTestResult(testFile: string, sourceFile: string, result: ProcessResult): void {
   const cacheKey = `${testFile}:${sourceFile}`;
   testCache.set(cacheKey, {
     hash: computeFileHash(sourceFile),
@@ -45228,12 +45667,7 @@ function setCachedTestResult(testFile: string, sourceFile: string, result: { ok:
   });
 }
 
-/**
- * Exécute une commande depuis une allowlist stricte (aucune commande arbitraire).
- * Résout explicitement les .cmd sur Windows pour éviter shell:true et les
- * risques d'interprétation de métacaractères par cmd.exe.
- */
-async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = []): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = []): Promise<ProcessResult> {
   const root = getProjectRoot();
   const isWin = process.platform === "win32";
 
@@ -45253,39 +45687,48 @@ async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = 
     if (cmd === "tsc") {
       result = await execFileAsync(npxBin, ["tsc", "--noEmit", "--incremental", ...args], opts);
     } else if (cmd === "npm-test") {
+      // runAllowed ajoute déjà le séparateur npm; l'appelant ne doit pas en ajouter un second.
       result = await execFileAsync(npmBin, ["test", "--", ...args], opts);
     } else {
       result = await execFileAsync(npmBin, ["run", ...args], opts);
     }
-    return { ok: true, stdout: truncate(result.stdout || ""), stderr: truncate(result.stderr || "") };
-  } catch (e: any) {
     return {
-      ok: false,
-      stdout: truncate(e.stdout || ""),
-      stderr: truncate(e.stderr || e.message || "Erreur inconnue"),
+      ok: true,
+      stdout: truncate(result.stdout || ""),
+      stderr: truncate(result.stderr || ""),
+      exitCode: 0,
+      signal: null,
+      timedOut: false,
     };
+  } catch (e: any) {
+    return processResultFromError(e);
   }
 }
 
 /** Typecheck ciblé avec les options du tsconfig sans échouer sur les erreurs hors du fichier vérifié. */
-function typecheckFileWithProjectConfig(relativePath: string, absolutePath: string): { ok: boolean; stdout: string; stderr: string } {
+function typecheckFileWithProjectConfig(relativePath: string, absolutePath: string): ProcessResult {
   try {
     const root = getProjectRoot();
     const configPath = ts.findConfigFile(root, ts.sys.fileExists, "tsconfig.json");
     if (!configPath) {
-      return { ok: false, stdout: "", stderr: "tsconfig.json introuvable pour la vérification TypeScript." };
+      return { ok: false, stdout: "", stderr: "tsconfig.json introuvable pour la vérification TypeScript.", exitCode: 1 };
     }
 
     const config = ts.readConfigFile(configPath, ts.sys.readFile);
     if (config.error) {
-      return { ok: false, stdout: "", stderr: ts.flattenDiagnosticMessageText(config.error.messageText, "\n") };
+      return {
+        ok: false,
+        stdout: "",
+        stderr: ts.flattenDiagnosticMessageText(config.error.messageText, "\n"),
+        exitCode: 1,
+      };
     }
 
     const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath));
     const targetPath = path.resolve(absolutePath);
     const diagnostics = ts.getPreEmitDiagnostics(ts.createProgram([targetPath], parsed.options))
       .filter((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error)
-      .filter((diagnostic) => diagnostic.file && path.resolve(diagnostic.file.fileName) === targetPath);
+      .filter((diagnostic) => !diagnostic.file || path.resolve(diagnostic.file.fileName) === targetPath);
 
     const errors = diagnostics.map((diagnostic) => {
       const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
@@ -45295,10 +45738,10 @@ function typecheckFileWithProjectConfig(relativePath: string, absolutePath: stri
       const position = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
       return `${relativePath}(${position.line + 1},${position.character + 1}): error TS${diagnostic.code}: ${message}`;
     });
-
-    return { ok: errors.length === 0, stdout: "", stderr: errors.join("\n") };
+    const stderr = truncate(errors.join("\n"));
+    return { ok: errors.length === 0, stdout: "", stderr, exitCode: errors.length === 0 ? 0 : 1 };
   } catch (error) {
-    return { ok: false, stdout: "", stderr: (error as Error).message };
+    return { ok: false, stdout: "", stderr: truncate((error as Error).message), exitCode: 1 };
   }
 }
 
@@ -45339,14 +45782,15 @@ const ALLOWED_SCRIPTS = new Set(["build", "lint", "typecheck", "test"]);
  * Exécute le linter intégré directement via node (scripts/lint.cjs).
  * Plus fiable que de passer par npm run lint car on contrôle l'appel.
  */
-async function runLintDirect(targets: string[] = []): Promise<{ ok: boolean; output: string; violations: ParsedLintViolation[] }> {
+async function runLintDirect(targets: string[] = []): Promise<ProcessResult & { output: string; violations: ParsedLintViolation[] }> {
   const root = getProjectRoot();
   const isWin = process.platform === "win32";
   const nodeBin = isWin ? "node.exe" : "node";
   const lintScript = path.join(root, "scripts", "lint.cjs");
 
   if (!fs.existsSync(lintScript)) {
-    return { ok: true, output: "scripts/lint.cjs introuvable — lint ignoré.", violations: [] };
+    const stdout = "scripts/lint.cjs introuvable — lint ignoré.";
+    return { ok: true, stdout, stderr: "", output: stdout, exitCode: 0, violations: [] };
   }
 
   try {
@@ -45356,13 +45800,14 @@ async function runLintDirect(targets: string[] = []): Promise<{ ok: boolean; out
       maxBuffer: 2 * 1024 * 1024,
       shell: false,
     });
-    const output = (result.stdout || "") + (result.stderr || "");
-    const violations = parseLintResults(output);
-    return { ok: true, output, violations };
+    const stdout = truncate(result.stdout || "");
+    const stderr = truncate(result.stderr || "");
+    const output = combineOutput(stdout, stderr);
+    return { ok: true, stdout, stderr, output, exitCode: 0, violations: parseLintResults(output) };
   } catch (e: any) {
-    const output = (e.stdout || "") + (e.stderr || "");
-    const violations = parseLintResults(output);
-    return { ok: false, output, violations };
+    const failed = processResultFromError(e);
+    const output = combineOutput(failed.stdout, failed.stderr);
+    return { ...failed, output, violations: parseLintResults(output) };
   }
 }
 
@@ -45449,11 +45894,15 @@ export const verifySkill: Skill = {
       if (name === "verify_typecheck") {
         validateArgs(verifySkill.inputSchemas!["verify_typecheck"], args);
         const result = await runAllowed("tsc");
-        const rawOutput = result.ok ? result.stdout : (result.stderr || result.stdout);
+        const rawOutput = combineOutput(result.stdout, result.stderr);
         const parsedErrors = parseTsErrors(rawOutput);
         return {
           status: result.ok ? "success" : "failed",
-          message: result.ok ? "Aucune erreur de typage." : "Erreurs de typage détectées, à corriger avant de continuer.",
+          ok: result.ok,
+          exitCode: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          message: result.ok ? "Aucune erreur de typage." : `Erreurs de typage détectées (code ${result.exitCode ?? "inconnu"}), à corriger avant de continuer.`,
           output: rawOutput,
           parsedErrors,
         };
@@ -45463,7 +45912,18 @@ export const verifySkill: Skill = {
         const validated = validateArgs(verifySkill.inputSchemas!["verify_file"], args);
         const abs = normalizeProjectPath(validated.path);
         if (!abs || !fs.existsSync(abs)) {
-          return { error: `Fichier introuvable dans le workspace: ${validated.path}` };
+          const message = `Fichier introuvable dans le workspace: ${validated.path}`;
+          return {
+            status: "failed",
+            ok: false,
+            exitCode: null,
+            stdout: "",
+            stderr: message,
+            file: validated.path,
+            message,
+            error: message,
+            allIssues: [{ type: "configuration", file: validated.path, line: null, column: null, severity: "error", rule: "file-not-found", message }],
+          };
         }
 
         // ─── PRÉ-VALIDATION SYNTAXIQUE (TypeScript API) ──────────────────────
@@ -45476,8 +45936,17 @@ export const verifySkill: Skill = {
           if (tsSyntaxError) {
             return {
               status: "failed",
+              ok: false,
+              exitCode: 1,
+              stdout: "",
+              stderr: tsSyntaxError,
+              file: validated.path,
               message: `❌ Pré-validation échouée — Erreur syntaxe TypeScript:\n${tsSyntaxError}`,
               prevalidation: { tsSyntax: false, error: tsSyntaxError },
+              typecheck: { ok: false, exitCode: 1, stdout: "", stderr: tsSyntaxError, output: tsSyntaxError, errors: parseTsErrors(tsSyntaxError) },
+              lint: null,
+              test: null,
+              allIssues: [{ type: "typecheck", file: validated.path, line: null, column: null, severity: "error", rule: "syntax", message: tsSyntaxError }],
             };
           }
         }
@@ -45493,16 +45962,16 @@ export const verifySkill: Skill = {
         // Parallélisation intelligente : lint, typecheck et tests lancés simultanément
         const lintPromise = runLintDirect([validated.path]);
 
-        const typecheckPromise = isTypeScript
+        const typecheckPromise: Promise<ProcessResult> = isTypeScript
           ? Promise.resolve(typecheckFileWithProjectConfig(validated.path, abs))
-          : Promise.resolve({ ok: true, stdout: "", stderr: "" });
+          : Promise.resolve({ ok: true, stdout: "", stderr: "", exitCode: 0 });
 
         // Tests avec cache — évite de relancer si le fichier source n'a pas changé
         const testPromise = testFile
           ? (async () => {
               const cached = getCachedTestResult(testFile, abs);
               if (cached) return { ...cached, fromCache: true };
-              const result = await runAllowed("npm-test", ["--", testFile]);
+              const result = await runAllowed("npm-test", [testFile]);
               setCachedTestResult(testFile, abs, result);
               return { ...result, fromCache: false };
             })()
@@ -45510,25 +45979,59 @@ export const verifySkill: Skill = {
 
         const [lintResult, typecheck, testResult] = await Promise.all([lintPromise, typecheckPromise, testPromise]);
 
-        const tcOutput = typecheck.ok ? typecheck.stdout : (typecheck.stderr || typecheck.stdout);
+        const tcOutput = combineOutput(typecheck.stdout, typecheck.stderr);
         const parsedErrors = parseTsErrors(tcOutput);
         const hasLintErrors = lintResult.violations.some((v) => v.severity === "error");
-        const ok = lintResult.ok && typecheck.ok && !hasLintErrors && (!testResult || testResult.ok) && criticalSecurity.length === 0;
+        const lintOk = lintResult.ok && !hasLintErrors;
+        const ok = lintOk && typecheck.ok && (!testResult || testResult.ok) && criticalSecurity.length === 0;
+        const phaseResults = [typecheck, lintResult, testResult].filter(Boolean) as ProcessResult[];
+        const failureOutput = phaseResults
+          .filter((phase) => !phase.ok)
+          .map(formatProcessFailure)
+          .filter(Boolean)
+          .join("\n");
 
-        // Construire le rapport structuré
+        const allIssues = [
+          ...parsedErrors.map(e => ({ type: "typecheck" as const, file: e.file, line: e.line, column: e.column, severity: "error" as const, rule: e.code, message: e.message })),
+          ...lintResult.violations.map(v => ({ type: "lint" as const, file: v.file, line: v.line, column: v.column, severity: v.severity, rule: v.rule, message: v.message })),
+          ...securityIssues.map(i => ({ type: "security" as const, file: i.file, line: i.line, column: i.column, severity: i.severity, rule: i.rule, message: i.message, suggestion: i.suggestion })),
+        ];
+        if (!typecheck.ok && parsedErrors.length === 0) {
+          allIssues.push({ type: "typecheck", file: validated.path, line: null, column: null, severity: "error", rule: "tsc", message: formatProcessFailure(typecheck) } as any);
+        }
+        if (!lintOk && lintResult.violations.length === 0) {
+          allIssues.push({ type: "lint", file: validated.path, line: null, column: null, severity: "error", rule: "lint-process", message: formatProcessFailure(lintResult) } as any);
+        }
+        if (testResult && !testResult.ok) {
+          allIssues.push({ type: "test", file: testFile, line: null, column: null, severity: "error", rule: "test-process", message: formatProcessFailure(testResult) } as any);
+        }
+
+        // Construire un rapport uniforme : chaque phase expose les deux flux et le code de sortie.
         const report: any = {
           status: ok ? "success" : "failed",
+          ok,
+          exitCode: resultExitCode([typecheck, lintResult, testResult]),
+          stdout: [typecheck.stdout, lintResult.stdout, testResult?.stdout].filter(Boolean).join("\n"),
+          stderr: [typecheck.stderr, lintResult.stderr, testResult?.stderr].filter(Boolean).join("\n"),
           message: ok
             ? `✅ Vérification OK pour ${validated.path}${testFile ? ` (tests: ${testFile})` : " (aucun test associé)"}.`
-            : "❌ Échec de vérification — corriger avant de considérer la tâche terminée.",
+            : `❌ Échec de vérification (code ${resultExitCode([typecheck, lintResult, testResult]) ?? "inconnu"}) — corriger avant de considérer la tâche terminée.\n${failureOutput}`,
           file: validated.path,
+          parsedErrors,
           typecheck: {
             ok: typecheck.ok,
+            exitCode: typecheck.exitCode,
+            stdout: typecheck.stdout,
+            stderr: typecheck.stderr,
+            output: tcOutput,
             errors: parsedErrors,
-            output: typecheck.ok ? undefined : tcOutput,
           },
           lint: {
-            ok: lintResult.ok && !hasLintErrors,
+            ok: lintOk,
+            exitCode: lintResult.exitCode,
+            stdout: lintResult.stdout,
+            stderr: lintResult.stderr,
+            output: lintResult.output,
             violations: lintResult.violations,
             summary: {
               errors: lintResult.violations.filter(v => v.severity === "error").length,
@@ -45549,15 +46052,13 @@ export const verifySkill: Skill = {
           test: testResult ? {
             file: testFile,
             ok: testResult.ok,
+            exitCode: testResult.exitCode,
+            stdout: testResult.stdout,
+            stderr: testResult.stderr,
+            output: combineOutput(testResult.stdout, testResult.stderr),
             fromCache: (testResult as any).fromCache || false,
-            output: testResult.ok ? undefined : (testResult.stderr || testResult.stdout),
           } : null,
-          // Tous les problèmes consolidés avec localisation
-          allIssues: [
-            ...parsedErrors.map(e => ({ type: "typecheck" as const, file: e.file, line: e.line, column: e.column, severity: "error" as const, rule: e.code, message: e.message })),
-            ...lintResult.violations.map(v => ({ type: "lint" as const, file: v.file, line: v.line, column: v.column, severity: v.severity, rule: v.rule, message: v.message })),
-            ...securityIssues.map(i => ({ type: "security" as const, file: i.file, line: i.line, column: i.column, severity: i.severity, rule: i.rule, message: i.message, suggestion: i.suggestion })),
-          ],
+          allIssues,
         };
 
         return report;
@@ -45571,9 +46072,13 @@ export const verifySkill: Skill = {
         const result = await runAllowed("npm-run", [validated.script]);
         return {
           status: result.ok ? "success" : "failed",
-          message: result.ok ? `Script ${validated.script} exécuté avec succès.` : `Échec du script ${validated.script}.`,
-          output: result.stdout,
-          error: result.ok ? undefined : result.stderr,
+          ok: result.ok,
+          exitCode: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          message: result.ok ? `Script ${validated.script} exécuté avec succès.` : `Échec du script ${validated.script} (code ${result.exitCode ?? "inconnu"}).`,
+          output: combineOutput(result.stdout, result.stderr),
+          error: result.ok ? undefined : formatProcessFailure(result),
         };
       }
 
@@ -45588,7 +46093,12 @@ export const verifySkill: Skill = {
         };
         return {
           status: lintResult.ok && summary.errors === 0 ? "success" : "failed",
+          ok: lintResult.ok && summary.errors === 0,
+          exitCode: lintResult.exitCode,
+          stdout: lintResult.stdout,
+          stderr: lintResult.stderr,
           message: lintResult.ok && summary.errors === 0 ? "✅ Lint OK — aucune erreur." : `❌ Lint : ${summary.errors} erreur(s), ${summary.warnings} avertissement(s), ${summary.infos} info(s).`,
+          output: lintResult.output,
           violations: lintResult.violations,
           summary,
         };
@@ -45696,7 +46206,7 @@ export const verifySkill: Skill = {
           } catch { /* skip */ }
         }
 
-        const tcOutput = typecheckResult.ok ? typecheckResult.stdout : (typecheckResult.stderr || typecheckResult.stdout);
+        const tcOutput = combineOutput(typecheckResult.stdout, typecheckResult.stderr);
         const parsedErrors = parseTsErrors(tcOutput);
         const hasLintErrors = lintResult.violations.some(v => v.severity === "error");
         const criticalSecurity = allSecurityIssues.filter(i => i.severity === "critical" || i.severity === "high");
@@ -45737,7 +46247,20 @@ export const verifySkill: Skill = {
 
       throw new Error(`Unknown tool in verify: ${name}`);
     } catch (e: any) {
-      return { error: e.message || "Erreur inconnue" };
+      const message = e.message || "Erreur inconnue";
+      if (name === "verify_file") {
+        return {
+          status: "failed",
+          ok: false,
+          exitCode: typeof e.code === "number" ? e.code : null,
+          stdout: typeof e.stdout === "string" ? truncate(e.stdout) : "",
+          stderr: typeof e.stderr === "string" ? truncate(e.stderr) : message,
+          message,
+          error: message,
+          allIssues: [{ type: "verification", file: args?.path ?? null, line: null, column: null, severity: "error", rule: "verify-exception", message }],
+        };
+      }
+      return { error: message };
     }
   },
 };
@@ -47473,49 +47996,60 @@ export function createGeminiClient(): GoogleGenAI | null {
  */
 export async function withGeminiRetry<T>(
   fn: (ai: GoogleGenAI) => Promise<T>,
-  maxRetries?: number
+  maxRetries?: number,
+  /** Timeout global en ms (défaut: 120s). Protège contre les appels bloquants. */
+  timeoutMs: number = 120_000
 ): Promise<T> {
   const enabledCount = keyPool.filter((e) => !e.disabled).length;
   const retries = maxRetries ?? Math.max(enabledCount, 2);
   let lastError: any = null;
 
-  for (let attempt = 0; attempt < retries; attempt++) {
-    const key = getNextGeminiKey();
-    if (!key) {
-      throw new Error("Aucune clé Gemini API disponible. Ajoutez des clés dans les paramètres.");
-    }
+  // (Audit §1) Timeout global pour éviter un blocage indéfini
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`withGeminiRetry timeout après ${timeoutMs}ms`)), timeoutMs);
+  });
 
-    const ai = new GoogleGenAI({ apiKey: key });
-
-    try {
-      const result = await fn(ai);
-      return result;
-    } catch (error: any) {
-      const status = error?.status || error?.httpStatus || error?.code;
-
-      // BUGFIX : lastError n'était jamais assigné auparavant, donc l'erreur
-      // finale (ligne throw ci-dessous) masquait systématiquement la vraie
-      // cause avec un message générique, y compris pour un échec non lié au
-      // rate limiting survenant à la dernière tentative.
-      lastError = error;
-
-      // For rate limiting (429) or overloaded/unavailable (503), rotate key
-      if (status === 429 || status === 503) {
-        console.warn(
-          `[GeminiKeyPool] Erreur de clé (${status}), rotation vers la suivante... (tentative ${attempt + 1}/${retries})`
-        );
-        markKeyError(key, `${status} - ${status === 429 ? 'Rate limited' : 'Overloaded'} (${new Date().toLocaleTimeString()})`);
-        // Small delay before retry
-        await new Promise((r) => setTimeout(r, 1000));
-        continue;
+  const execute = async (): Promise<T> => {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      const key = getNextGeminiKey();
+      if (!key) {
+        throw new Error("Aucune clé Gemini API disponible. Ajoutez des clés dans les paramètres.");
       }
 
-      // For non-429 errors, don't retry
-      throw error;
-    }
-  }
+      const ai = new GoogleGenAI({ apiKey: key });
 
-  throw lastError || new Error("Toutes les clés API ont été rate-limited. Réessayez plus tard.");
+      try {
+        const result = await fn(ai);
+        return result;
+      } catch (error: any) {
+        const status = error?.status || error?.httpStatus || error?.code;
+
+        // BUGFIX : lastError n'était jamais assigné auparavant, donc l'erreur
+        // finale (ligne throw ci-dessous) masquait systématiquement la vraie
+        // cause avec un message générique, y compris pour un échec non lié au
+        // rate limiting survenant à la dernière tentative.
+        lastError = error;
+
+        // For rate limiting (429) or overloaded/unavailable (503), rotate key
+        if (status === 429 || status === 503) {
+          console.warn(
+            `[GeminiKeyPool] Erreur de clé (${status}), rotation vers la suivante... (tentative ${attempt + 1}/${retries})`
+          );
+          markKeyError(key, `${status} - ${status === 429 ? 'Rate limited' : 'Overloaded'} (${new Date().toLocaleTimeString()})`);
+          // Small delay before retry
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+
+        // For non-429 errors, don't retry
+        throw error;
+      }
+    }
+
+    throw lastError || new Error("Toutes les clés API ont été rate-limited. Réessayez plus tard.");
+  };
+
+  return Promise.race([execute(), timeoutPromise]);
 }
 
 // NOTE: loadGeminiKeys() is called explicitly from server.ts at startup.
@@ -47830,6 +48364,89 @@ export const logger = new LoggerInstance();
  */
 export function createLogger(module: string): ModuleLogger {
   return logger.child(module);
+}
+
+```
+
+`utils\pathUtils.ts`:
+
+```ts
+/**
+ * pathUtils.ts — Module centralisé pour la résolution et validation des chemins.
+ *
+ * Regroupe les utilitaires de chemin éparpillés dans selfRoot.ts,
+ * codebaseHelpers.ts, security.ts et sandbox.ts (Audit §3).
+ *
+ * Ce module ré-exporte les fonctions existantes depuis leur source canonique
+ * pour unifier les imports et éviter la duplication.
+ */
+
+import path from "path";
+import fs from "fs";
+
+// ── Ré-exports canoniques ─────────────────────────────────────────────────────
+
+export {
+  SELF_ROOT,
+  hasProject,
+  normalizeSelfPath,
+  isWriteForbidden,
+  isCriticalFile,
+  resolveRealPathWithinSelf,
+} from "./selfRoot";
+
+export {
+  resolveWorkspacePath,
+  getDefaultWorkspaceRoot,
+} from "../security";
+
+export {
+  isSandboxActive,
+  getSandboxRoot,
+  assertSandboxReady,
+  resolveSandboxPath,
+} from "./sandbox";
+
+export {
+  normalizeProjectPath,
+  getProjectRoot,
+  resolveWritePath,
+  resolveSandboxWriteTarget,
+} from "../skills/codebaseHelpers";
+
+// ── Utilitaires additionnels ─────────────────────────────────────────────────
+
+/**
+ * Vérifie si un chemin tente de remonter au-delà du root via `..`.
+ * Retourne true si le chemin est potentiellement dangereux.
+ */
+export function isPathEscape(target: string, root: string): boolean {
+  const resolved = path.resolve(root, target);
+  const relative = path.relative(root, resolved);
+  return relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
+}
+
+/**
+ * Vérifie qu'un chemin est purement relatif (pas absolu, pas Windows drive,
+ * pas UNC). Utilisable comme pré-validation avant toute résolution.
+ */
+export function isStrictlyRelative(target: string): boolean {
+  if (!target || !target.trim()) return false;
+  const t = target.trim();
+  return (
+    !path.isAbsolute(t) &&
+    !path.win32.isAbsolute(t) &&
+    !path.posix.isAbsolute(t) &&
+    !/^[a-zA-Z]:/.test(t) &&
+    !t.startsWith("\\\\")
+  );
+}
+
+/**
+ * Normalise un chemin pour le cross-platform (forward slashes).
+ */
+export function toForwardSlash(p: string): string {
+  return p.replace(/\\/g, "/");
 }
 
 ```
@@ -48357,6 +48974,10 @@ let sandboxState: SandboxState = "DISABLED";
 let sandboxModifiedFiles = new Set<string>();
 let lastSyncTimestamp: number | null = null;
 
+// ── Mutex pour syncToMain (Audit §7) ─────────────────────────────────────────
+// Empêche deux synchronisations simultanées vers le principal.
+let syncLock: Promise<any> | null = null;
+
 // ── Types erreurs structurées TSC ─────────────────────────────────────────────
 
 export interface TscDiagnostic {
@@ -48371,8 +48992,14 @@ export interface TscDiagnostic {
 
 export interface SandboxValidationResult {
   valid: boolean;
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  signal: string | null;
+  timedOut: boolean;
   rawOutput: string;
   diagnostics: TscDiagnostic[];
+  globalDiagnostics: TscDiagnostic[];
   errorsByFile: Record<string, TscDiagnostic[]>;
   errorCount: number;
   warningCount: number;
@@ -48588,6 +49215,28 @@ export function markFileModified(relativePath: string): void {
  * Retourne la liste des fichiers copiés.
  */
 export async function syncToMain(): Promise<{ synced: string[]; checkpointHash: string | null; rolledBack: boolean; error?: string }> {
+  // Mutex : empêcher deux synchronisations concurrentes (Audit §7)
+  if (syncLock) {
+    return {
+      synced: [],
+      checkpointHash: null,
+      rolledBack: false,
+      error: "Synchronisation déjà en cours — opération ignorée.",
+    };
+  }
+
+  let resolve: () => void;
+  syncLock = new Promise<void>((r) => { resolve = r; });
+
+  try {
+    return await syncToMainInternal();
+  } finally {
+    syncLock = null;
+    resolve!();
+  }
+}
+
+async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash: string | null; rolledBack: boolean; error?: string }> {
   if (!isSandboxActive()) {
     return {
       synced: [],
@@ -48618,7 +49267,7 @@ export async function syncToMain(): Promise<{ synced: string[]; checkpointHash: 
   try {
     const { createCheckpoint } = await import("./checkpoint");
     checkpointHash = await createCheckpoint(`avant sync sandbox (${sandboxModifiedFiles.size} fichiers)`);
-  } catch { /* non-bloquant */ }
+  } catch (e) { console.warn("[Sandbox] Création du checkpoint échouée (non bloquant):", (e as Error).message); }
 
   const applied: string[] = [];
   const originals = new Map<string, { existed: boolean; content?: Buffer; deleted?: boolean }>();
@@ -48812,6 +49461,11 @@ export async function rejectFile(relPath: string): Promise<{ reverted: boolean }
  */
 export async function validateSandbox(): Promise<SandboxValidationResult> {
   let rawOutput = "";
+  let stdout = "";
+  let stderr = "";
+  let exitCode: number | null = null;
+  let signal: string | null = null;
+  let timedOut = false;
   let valid = false;
 
   try {
@@ -48831,20 +49485,27 @@ export async function validateSandbox(): Promise<SandboxValidationResult> {
     // donc les mêmes versions de typescript/types que le projet racine.
     const isWin = process.platform === "win32";
     const npxBin = isWin ? "npx.cmd" : "npx";
-    const { stdout, stderr } = await execFileAsync(npxBin, ["tsc", "--noEmit", "--project", sandboxBase], {
+    const result = await execFileAsync(npxBin, ["tsc", "--noEmit", "--project", sandboxBase], {
       cwd: SELF_ROOT,
       timeout: 120_000,
       maxBuffer: 10 * 1024 * 1024,
       shell: false,
     });
-    rawOutput = (stdout || "") + (stderr ? "\n" + stderr : "");
+    stdout = result.stdout || "";
+    stderr = result.stderr || "";
+    rawOutput = [stdout, stderr].filter(Boolean).join("\n");
+    exitCode = 0;
     valid = true;
   } catch (e: any) {
-    // tsc exit code != 0 : récupère stdout (erreurs TS) + stderr + message process
-    const out = (e.stdout || "").trim();
-    const err = (e.stderr || "").trim();
-    const msg = (!out && !err && e.message) ? `tsc error: ${e.message}` : "";
-    rawOutput = [out, err, msg].filter(Boolean).join("\n");
+    // tsc exit code != 0 : conserver séparément stdout, stderr et le code réel.
+    stdout = typeof e.stdout === "string" ? e.stdout : "";
+    stderr = typeof e.stderr === "string" ? e.stderr : "";
+    exitCode = typeof e.code === "number" ? e.code : 1;
+    signal = typeof e.signal === "string" ? e.signal : null;
+    timedOut = e.code === "ETIMEDOUT" || e.killed === true && e.code === "ETIMEDOUT";
+    const msg = (!stdout.trim() && !stderr.trim() && e.message) ? `tsc error: ${e.message}` : "";
+    if (msg) stderr = msg;
+    rawOutput = [stdout, stderr].filter(Boolean).join("\n");
     valid = false;
   }
 
@@ -48877,9 +49538,13 @@ export async function validateSandbox(): Promise<SandboxValidationResult> {
   }));
 
   const errorsByFile: Record<string, TscDiagnostic[]> = {};
+  const globalDiagnostics: TscDiagnostic[] = [];
 
   for (const d of diagnostics) {
-    if (!d.file) continue; // erreurs globales sans fichier : ignorées du groupement par fichier
+    if (!d.file) {
+      globalDiagnostics.push(d);
+      continue;
+    }
     if (!errorsByFile[d.file]) errorsByFile[d.file] = [];
     errorsByFile[d.file].push(d);
   }
@@ -48889,8 +49554,14 @@ export async function validateSandbox(): Promise<SandboxValidationResult> {
 
   return {
     valid,
+    exitCode,
+    stdout: stdout.trim(),
+    stderr: stderr.trim(),
+    signal,
+    timedOut,
     rawOutput: rawOutput.trim(),
     diagnostics,
+    globalDiagnostics,
     errorsByFile,
     errorCount,
     warningCount,
@@ -49425,7 +50096,12 @@ function loadPersistedProject(): string | null {
         return resolved;
       }
     }
-  } catch { /* silent */ }
+  } catch (e) {
+    // Mode dégradé : fichier absent ou corrompu → aucun projet restauré
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.debug("[SelfRoot] loadPersistedProject ignoré:", (e as Error).message);
+    }
+  }
   return null;
 }
 
@@ -49443,7 +50119,9 @@ function clearPersistedProject(): void {
   try {
     const configPath = getPersistedProjectPath();
     if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
-  } catch { /* silent */ }
+  } catch (e) {
+    console.warn("[SelfRoot] clearPersistedProject ignoré:", (e as Error).message);
+  }
 }
 
 // ── SELF_ROOT ─────────────────────────────────────────────────────────────────
@@ -49914,6 +50592,8 @@ export interface GenerateTextOptions {
   temperature?: number;
   /** Max tokens for OpenRouter (default 8192 — suffisant pour les sorties agents complètes) */
   maxTokens?: number;
+  /** Limite de sortie explicite pour Gemini; propagée aussi à OpenRouter si maxTokens absent. */
+  maxOutputTokens?: number;
   /** Gemini model override (default gemini-2.5-flash) */
   geminiModel?: string;
   /** OpenRouter model override (uses profile setting if not provided) */
@@ -49967,6 +50647,9 @@ async function generateWithGemini(options: GenerateTextOptions): Promise<Generat
         contents: [{ role: 'user', parts }],
         config: {
           temperature: options.temperature ?? 0.5,
+          ...(options.maxOutputTokens !== undefined
+            ? { maxOutputTokens: options.maxOutputTokens }
+            : {}),
           ...(options.thinkingBudget !== undefined
             ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } }
             : {}),
@@ -50043,7 +50726,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions): Promise<Gen
         model,
         messages,
         temperature: options.temperature ?? 0.5,
-        max_tokens: options.maxTokens ?? 8192,
+        max_tokens: options.maxTokens ?? options.maxOutputTokens ?? 8192,
       }),
       signal: controller.signal,
     });

@@ -171,13 +171,19 @@ export class AgentOrchestrator {
 
     const agentTasks: AgentTask[] = [];
     const dependencies: Record<string, string[]> = {};
-    const tempIdMap = new Map<number, string>();
 
+    // Première passe : les IDs doivent exister avant de pouvoir résoudre les dépendances.
+    const taskIds = params.tasks.map(() => randomUUID());
+    const idByTitle = new Map<string, string>();
+    params.tasks.forEach((taskDef, index) => {
+      idByTitle.set(taskDef.title, taskIds[index]);
+    });
+
+    // Seconde passe : créer les tâches et traduire les titres du même plan en IDs réels.
     for (let i = 0; i < params.tasks.length; i++) {
       const taskDef = params.tasks[i];
       const agent = getAgentDefinition(taskDef.role);
-      const taskId = randomUUID();
-      tempIdMap.set(i, taskId);
+      const taskId = taskIds[i];
 
       const task: AgentTask = {
         id: taskId,
@@ -197,7 +203,9 @@ export class AgentOrchestrator {
 
       agentTasks.push(task);
       this.tasks.set(task.id, task);
-      dependencies[taskId] = taskDef.dependsOn ?? [];
+      dependencies[taskId] = (taskDef.dependsOn ?? []).map(
+        (reference) => idByTitle.get(reference) ?? reference
+      );
     }
 
     const plan: OrchestrationPlan = {
@@ -251,7 +259,11 @@ export class AgentOrchestrator {
 
     log.info(`🤝 Collaboration par pattern "${pattern.name}" — ${pattern.participants.length} agent(s): ${pattern.participants.join(", ")}`);
 
-    // Transformer le workflow du pattern en tâches d'orchestration
+    // Transformer les étapes dépendantes en titres de tâches résolvables par orchestrate().
+    const stepTitle = (stepNumber: number) => {
+      const step = pattern.workflow.find((workflowStep) => workflowStep.step === stepNumber);
+      return step ? `[${pattern.name}] Étape ${step.step}: ${step.action}` : undefined;
+    };
     const tasks = pattern.workflow.map((step) => ({
       role: step.agent,
       title: `[${pattern.name}] Étape ${step.step}: ${step.action}`,
@@ -259,8 +271,7 @@ export class AgentOrchestrator {
       files: params.context.files,
       instructions: params.context.instructions,
       priority: "high" as TaskPriority,
-      // Convertir les indices d'étapes en IDs de tâches (résolu après création)
-      dependsOn: [] as string[], // Résolu dans orchestrate() via le mapping d'index
+      dependsOn: (step.dependsOn ?? []).map(stepTitle).filter((title): title is string => Boolean(title)),
     }));
 
     // Notifier le bus du démarrage de la collaboration
