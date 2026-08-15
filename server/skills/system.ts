@@ -263,6 +263,10 @@ export const systemSkill: Skill = {
                         }
 
                         console.log(`[System] Exécution npm: ${command} dans ${getProjectRoot()}`);
+                        // SECURITY (Audit §2) : Avertir si npm install avec des paquets spécifiques
+                        if ((npmSubcommand === "install" || npmSubcommand === "i") && commandParts.length > 2) {
+                            console.warn(`[System] ⚠️ npm install avec paquets spécifiques: ${commandParts.slice(2).join(" ")}`);
+                        }
                         const NPM_TIMEOUT_MS = 120_000; // 2 minutes pour npm
 
                         try {

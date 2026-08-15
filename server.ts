@@ -62,6 +62,17 @@ import automationRouter from "./server/routes/automation";
 // Charger les clés Gemini
 loadGeminiKeys().catch(e => console.error('[GeminiKeyPool] Erreur au chargement initial:', e));
 
+// ─── Gestionnaires d'erreurs globaux (Audit §1) ──────────────────────────────
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL] Promesse non gérée:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[FATAL] Exception non rattrapée:', error);
+  // Laisser le processus mourir après un court délai pour flusher les logs
+  setTimeout(() => process.exit(1), 1000);
+});
+
 // ─── Séquence de démarrage async ──────────────────────────────────────────────
 // IMPORTANT: loadWorkflows() DOIT être awaité avant ensureAuditWorkflow().
 // Sans await, listWorkflows() retourne [] et ensureAuditWorkflow() crée un

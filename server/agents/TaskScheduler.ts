@@ -92,6 +92,26 @@ export class TaskScheduler {
       });
 
       await Promise.allSettled(executions);
+
+      // (Audit §7) Marquer immédiatement les tâches dont toutes les dépendances
+      // incluent une tâche échouée, plutôt que d'attendre le deadlock.
+      for (const task of plan.tasks) {
+        if (task.status !== "pending") continue;
+        const deps = plan.dependencies[task.id] ?? [];
+        const hasFailedDep = deps.some((depId) => failed.has(depId));
+        if (hasFailedDep) {
+          task.status = "incomplete";
+          task.completedAt = new Date().toISOString();
+          task.result = {
+            success: false,
+            summary: "Tâche annulée : dépendance échouée",
+            error: `Dépendance(s) échouée(s): ${deps.filter(d => failed.has(d)).join(", ")}`,
+            durationMs: 0,
+          };
+          failed.add(task.id);
+          log.warn(`[${orchShortId}] Tâche "${task.title}" annulée (dépendance échouée)`);
+        }
+      }
     }
 
     // Une orchestration n'est terminée avec succès que si chaque tâche porte un

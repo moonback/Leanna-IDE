@@ -175,49 +175,60 @@ export function createGeminiClient(): GoogleGenAI | null {
  */
 export async function withGeminiRetry<T>(
   fn: (ai: GoogleGenAI) => Promise<T>,
-  maxRetries?: number
+  maxRetries?: number,
+  /** Timeout global en ms (défaut: 120s). Protège contre les appels bloquants. */
+  timeoutMs: number = 120_000
 ): Promise<T> {
   const enabledCount = keyPool.filter((e) => !e.disabled).length;
   const retries = maxRetries ?? Math.max(enabledCount, 2);
   let lastError: any = null;
 
-  for (let attempt = 0; attempt < retries; attempt++) {
-    const key = getNextGeminiKey();
-    if (!key) {
-      throw new Error("Aucune clé Gemini API disponible. Ajoutez des clés dans les paramètres.");
-    }
+  // (Audit §1) Timeout global pour éviter un blocage indéfini
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`withGeminiRetry timeout après ${timeoutMs}ms`)), timeoutMs);
+  });
 
-    const ai = new GoogleGenAI({ apiKey: key });
-
-    try {
-      const result = await fn(ai);
-      return result;
-    } catch (error: any) {
-      const status = error?.status || error?.httpStatus || error?.code;
-
-      // BUGFIX : lastError n'était jamais assigné auparavant, donc l'erreur
-      // finale (ligne throw ci-dessous) masquait systématiquement la vraie
-      // cause avec un message générique, y compris pour un échec non lié au
-      // rate limiting survenant à la dernière tentative.
-      lastError = error;
-
-      // For rate limiting (429) or overloaded/unavailable (503), rotate key
-      if (status === 429 || status === 503) {
-        console.warn(
-          `[GeminiKeyPool] Erreur de clé (${status}), rotation vers la suivante... (tentative ${attempt + 1}/${retries})`
-        );
-        markKeyError(key, `${status} - ${status === 429 ? 'Rate limited' : 'Overloaded'} (${new Date().toLocaleTimeString()})`);
-        // Small delay before retry
-        await new Promise((r) => setTimeout(r, 1000));
-        continue;
+  const execute = async (): Promise<T> => {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      const key = getNextGeminiKey();
+      if (!key) {
+        throw new Error("Aucune clé Gemini API disponible. Ajoutez des clés dans les paramètres.");
       }
 
-      // For non-429 errors, don't retry
-      throw error;
-    }
-  }
+      const ai = new GoogleGenAI({ apiKey: key });
 
-  throw lastError || new Error("Toutes les clés API ont été rate-limited. Réessayez plus tard.");
+      try {
+        const result = await fn(ai);
+        return result;
+      } catch (error: any) {
+        const status = error?.status || error?.httpStatus || error?.code;
+
+        // BUGFIX : lastError n'était jamais assigné auparavant, donc l'erreur
+        // finale (ligne throw ci-dessous) masquait systématiquement la vraie
+        // cause avec un message générique, y compris pour un échec non lié au
+        // rate limiting survenant à la dernière tentative.
+        lastError = error;
+
+        // For rate limiting (429) or overloaded/unavailable (503), rotate key
+        if (status === 429 || status === 503) {
+          console.warn(
+            `[GeminiKeyPool] Erreur de clé (${status}), rotation vers la suivante... (tentative ${attempt + 1}/${retries})`
+          );
+          markKeyError(key, `${status} - ${status === 429 ? 'Rate limited' : 'Overloaded'} (${new Date().toLocaleTimeString()})`);
+          // Small delay before retry
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+
+        // For non-429 errors, don't retry
+        throw error;
+      }
+    }
+
+    throw lastError || new Error("Toutes les clés API ont été rate-limited. Réessayez plus tard.");
+  };
+
+  return Promise.race([execute(), timeoutPromise]);
 }
 
 // NOTE: loadGeminiKeys() is called explicitly from server.ts at startup.

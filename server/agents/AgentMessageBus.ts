@@ -73,7 +73,7 @@ export class AgentMessageBus extends EventEmitter {
   /** Dead-letter queue : messages non délivrés car l'agent cible n'était pas abonné */
   private deadLetterQueue: Map<AgentRole, DeadLetterEntry[]> = new Map();
 
-  constructor(private readonly maxHistorySize = 500) {
+  constructor(private readonly maxHistorySize = 100) {
     super();
   }
 
@@ -99,7 +99,9 @@ export class AgentMessageBus extends EventEmitter {
     log.debug(`📬 Agent "${agentRole}" abonné au type "${messageType}" (sub: ${subId.slice(0, 8)})`);
 
     // Re-livrer immédiatement les messages en attente pour ce rôle
-    this.flushDeadLetterQueue(agentRole).catch(() => {});
+    this.flushDeadLetterQueue(agentRole).catch((err) => {
+      log.warn(`Échec flush dead-letter queue pour "${agentRole}": ${(err as Error).message}`);
+    });
 
     return subId;
   }

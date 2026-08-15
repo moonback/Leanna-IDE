@@ -65,6 +65,10 @@ let sandboxState: SandboxState = "DISABLED";
 let sandboxModifiedFiles = new Set<string>();
 let lastSyncTimestamp: number | null = null;
 
+// ── Mutex pour syncToMain (Audit §7) ─────────────────────────────────────────
+// Empêche deux synchronisations simultanées vers le principal.
+let syncLock: Promise<any> | null = null;
+
 // ── Types erreurs structurées TSC ─────────────────────────────────────────────
 
 export interface TscDiagnostic {
@@ -296,6 +300,28 @@ export function markFileModified(relativePath: string): void {
  * Retourne la liste des fichiers copiés.
  */
 export async function syncToMain(): Promise<{ synced: string[]; checkpointHash: string | null; rolledBack: boolean; error?: string }> {
+  // Mutex : empêcher deux synchronisations concurrentes (Audit §7)
+  if (syncLock) {
+    return {
+      synced: [],
+      checkpointHash: null,
+      rolledBack: false,
+      error: "Synchronisation déjà en cours — opération ignorée.",
+    };
+  }
+
+  let resolve: () => void;
+  syncLock = new Promise<void>((r) => { resolve = r; });
+
+  try {
+    return await syncToMainInternal();
+  } finally {
+    syncLock = null;
+    resolve!();
+  }
+}
+
+async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash: string | null; rolledBack: boolean; error?: string }> {
   if (!isSandboxActive()) {
     return {
       synced: [],
@@ -326,7 +352,7 @@ export async function syncToMain(): Promise<{ synced: string[]; checkpointHash: 
   try {
     const { createCheckpoint } = await import("./checkpoint");
     checkpointHash = await createCheckpoint(`avant sync sandbox (${sandboxModifiedFiles.size} fichiers)`);
-  } catch { /* non-bloquant */ }
+  } catch (e) { console.warn("[Sandbox] Création du checkpoint échouée (non bloquant):", (e as Error).message); }
 
   const applied: string[] = [];
   const originals = new Map<string, { existed: boolean; content?: Buffer; deleted?: boolean }>();

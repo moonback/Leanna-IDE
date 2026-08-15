@@ -70,15 +70,9 @@ export const StatusBar = memo(function StatusBar({
   const [branchSwitching, setBranchSwitching] = useState<string | null>(null);
   
   const [mcpStatus, setMcpStatus] = useState<'ok' | 'error' | 'loading'>('loading');
-  const [buildStatus, setBuildStatus] = useState<'idle' | 'pass' | 'fail' | 'running'>('idle');
   const [sandboxActive, setSandboxActive] = useState(false);
 
   const modifierKey = getModifierKey();
-  const buildStatusLabel =
-    buildStatus === 'running' ? 'Build…' :
-    buildStatus === 'pass' ? 'Build OK' :
-    buildStatus === 'fail' ? 'Échec' :
-    'Build';
   const sandboxLabel = sandboxActive ? 'Sandbox' : 'Sandbox';
 
   // ── Git ────────────────────────────────────────────────────────────────────
@@ -175,17 +169,6 @@ export const StatusBar = memo(function StatusBar({
 
   // ── Build ──────────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    function handleBuildEvent(e: CustomEvent) {
-      if (e.detail?.status) {
-        setBuildStatus(e.detail.status);
-      }
-    }
-    window.addEventListener('jarvis-build-status', handleBuildEvent as EventListener);
-    return () => {
-      window.removeEventListener('jarvis-build-status', handleBuildEvent as EventListener);
-    };
-  }, []);
 
   // ── Sandbox ────────────────────────────────────────────────────────────────
 
@@ -338,26 +321,6 @@ export const StatusBar = memo(function StatusBar({
             </span>
           </button>
 
-          {/* Build — dot + label */}
-          <div
-            className="flex items-center gap-1.5 px-2 py-1 rounded"
-            title={buildStatusLabel}
-          >
-            {buildStatus === 'running' ? (
-              <LoaderCircle size={11} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
-            ) : (
-              <div className={`w-2 h-2 rounded-full ${
-                buildStatus === 'pass' ? 'bg-emerald-500' :
-                buildStatus === 'fail' ? 'bg-red-500' : 'bg-gray-400'
-              }`} />
-            )}
-            <span style={{
-              color: buildStatus === 'pass' ? 'var(--color-success, #059669)' :
-                     buildStatus === 'fail' ? 'var(--color-error, #dc2626)' : 'var(--text-muted)'
-            }} className="font-medium">
-              {buildStatusLabel}
-            </span>
-          </div>
 
           {/* Séparateur */}
           <div className="w-px h-4 bg-[var(--border-base)] opacity-40" />
