@@ -6,6 +6,9 @@ import * as path from "path";
 import { z } from "zod";
 import { SELF_ROOT, normalizeSelfPath } from "../utils/selfRoot";
 import * as ts from "typescript";
+import { createHash } from "crypto";
+import type { VerificationIssue, VerificationRecord } from "../agents/WorkspaceState";
+export type { VerificationIssue, VerificationRecord } from "../agents/WorkspaceState";
 
 const execFileAsync = promisify(execFile);
 
@@ -21,6 +24,7 @@ export interface ProcessResult {
 
 interface TestCacheEntry {
   hash: string;
+  testHash: string;
   result: ProcessResult;
   timestamp: number;
 }
@@ -440,17 +444,11 @@ export function runSecurityAnalysis(code: string, filePath: string): SecurityIss
 
 // ── Cache de tests (optimisation) ───────────────────────────────────────────
 
-function computeFileHash(filePath: string): string {
+export function computeFileHash(filePath: string): string {
   try {
-    const content = fs.readFileSync(filePath, "utf-8");
-    // Hash simple mais rapide (djb2)
-    let hash = 5381;
-    for (let i = 0; i < content.length; i++) {
-      hash = ((hash << 5) + hash + content.charCodeAt(i)) | 0;
-    }
-    return hash.toString(36);
+    return createHash("sha256").update(fs.readFileSync(filePath, "utf-8")).digest("hex");
   } catch {
-    return Date.now().toString(36);
+    return "unreadable";
   }
 }
 
@@ -493,9 +491,9 @@ function getCachedTestResult(testFile: string, sourceFile: string): ProcessResul
     return null;
   }
 
-  // Vérifier si le fichier source a changé
-  const currentHash = computeFileHash(sourceFile);
-  if (currentHash !== entry.hash) {
+  // Both source and associated test must be unchanged. This prevents reusing a
+  // passing test result after either side was edited during a repair loop.
+  if (computeFileHash(sourceFile) !== entry.hash || computeFileHash(path.join(getProjectRoot(), testFile)) !== entry.testHash) {
     testCache.delete(cacheKey);
     return null;
   }
@@ -507,6 +505,7 @@ function setCachedTestResult(testFile: string, sourceFile: string, result: Proce
   const cacheKey = `${testFile}:${sourceFile}`;
   testCache.set(cacheKey, {
     hash: computeFileHash(sourceFile),
+    testHash: computeFileHash(path.join(getProjectRoot(), testFile)),
     result,
     timestamp: Date.now(),
   });
@@ -765,13 +764,17 @@ export const verifySkill: Skill = {
             stdout: "",
             stderr: message,
             file: validated.path,
+            contentHash: "",
+            verifiedAt: new Date().toISOString(),
             message,
             error: message,
+            issues: [{ type: "configuration", file: validated.path, line: null, column: null, severity: "error", rule: "file-not-found", message }],
             allIssues: [{ type: "configuration", file: validated.path, line: null, column: null, severity: "error", rule: "file-not-found", message }],
           };
         }
 
         // ─── PRÉ-VALIDATION SYNTAXIQUE (TypeScript API) ──────────────────────
+        const hashBefore = computeFileHash(abs);
         const code = fs.readFileSync(abs, "utf-8");
         const ext = path.extname(validated.path).toLowerCase();
         const isTypeScript = ext === ".ts" || ext === ".tsx";
@@ -779,19 +782,14 @@ export const verifySkill: Skill = {
         if (isTypeScript) {
           tsSyntaxError = checkTypeScriptSyntax(code, validated.path);
           if (tsSyntaxError) {
+            const syntaxHash = computeFileHash(abs);
+            const syntaxIssues: VerificationIssue[] = [{ type: "typecheck", file: validated.path, line: null, column: null, severity: "error", rule: "syntax", message: tsSyntaxError }];
+            const verificationRecord: VerificationRecord = { file: validated.path, contentHash: syntaxHash, hashBefore, hashAfter: syntaxHash, verifiedAt: new Date().toISOString(), ok: false, status: hashBefore === syntaxHash ? "failed" : "stale", issues: syntaxIssues, allIssues: syntaxIssues };
             return {
-              status: "failed",
-              ok: false,
-              exitCode: 1,
-              stdout: "",
-              stderr: tsSyntaxError,
-              file: validated.path,
-              message: `❌ Pré-validation échouée — Erreur syntaxe TypeScript:\n${tsSyntaxError}`,
-              prevalidation: { tsSyntax: false, error: tsSyntaxError },
-              typecheck: { ok: false, exitCode: 1, stdout: "", stderr: tsSyntaxError, output: tsSyntaxError, errors: parseTsErrors(tsSyntaxError) },
-              lint: null,
-              test: null,
-              allIssues: [{ type: "typecheck", file: validated.path, line: null, column: null, severity: "error", rule: "syntax", message: tsSyntaxError }],
+              status: "failed", ok: false, exitCode: 1, stdout: "", stderr: tsSyntaxError, file: validated.path,
+              contentHash: syntaxHash, verifiedAt: verificationRecord.verifiedAt, issues: syntaxIssues, allIssues: syntaxIssues,
+              verificationRecord, prevalidation: { tsSyntax: false, error: tsSyntaxError },
+              typecheck: { ok: false, exitCode: 1, stdout: "", stderr: tsSyntaxError, output: tsSyntaxError, errors: parseTsErrors(tsSyntaxError) }, lint: null, test: null,
             };
           }
         }
@@ -836,25 +834,39 @@ export const verifySkill: Skill = {
           .filter(Boolean)
           .join("\n");
 
-        const allIssues = [
-          ...parsedErrors.map(e => ({ type: "typecheck" as const, file: e.file, line: e.line, column: e.column, severity: "error" as const, rule: e.code, message: e.message })),
-          ...lintResult.violations.map(v => ({ type: "lint" as const, file: v.file, line: v.line, column: v.column, severity: v.severity, rule: v.rule, message: v.message })),
-          ...securityIssues.map(i => ({ type: "security" as const, file: i.file, line: i.line, column: i.column, severity: i.severity, rule: i.rule, message: i.message, suggestion: i.suggestion })),
+        const allIssues: VerificationIssue[] = [
+          ...parsedErrors.map(e => ({ type: "typecheck", file: e.file, line: e.line, column: e.column, severity: "error" as const, rule: e.code, message: e.message })),
+          ...lintResult.violations.map(v => ({ type: "lint", file: v.file, line: v.line, column: v.column, severity: v.severity as VerificationIssue["severity"], rule: v.rule, message: v.message })),
+          ...securityIssues.map(i => ({ type: "security", file: i.file, line: i.line, column: i.column, severity: i.severity as VerificationIssue["severity"], rule: i.rule, message: i.message, suggestion: i.suggestion })),
         ];
         if (!typecheck.ok && parsedErrors.length === 0) {
-          allIssues.push({ type: "typecheck", file: validated.path, line: null, column: null, severity: "error", rule: "tsc", message: formatProcessFailure(typecheck) } as any);
+          allIssues.push({ type: "typecheck", file: validated.path, line: null, column: null, severity: "error", rule: "tsc", message: formatProcessFailure(typecheck) });
         }
         if (!lintOk && lintResult.violations.length === 0) {
-          allIssues.push({ type: "lint", file: validated.path, line: null, column: null, severity: "error", rule: "lint-process", message: formatProcessFailure(lintResult) } as any);
+          allIssues.push({ type: "lint", file: validated.path, line: null, column: null, severity: "error", rule: "lint-process", message: formatProcessFailure(lintResult) });
         }
         if (testResult && !testResult.ok) {
-          allIssues.push({ type: "test", file: testFile, line: null, column: null, severity: "error", rule: "test-process", message: formatProcessFailure(testResult) } as any);
+          allIssues.push({ type: "test", file: testFile ?? validated.path, line: null, column: null, severity: "error", rule: "test-process", message: formatProcessFailure(testResult) });
         }
+        const hashAfter = computeFileHash(abs);
+        const stale = hashBefore !== hashAfter;
+        const verificationOk = ok && !stale;
+        const verificationRecord: VerificationRecord = {
+          file: validated.path,
+          contentHash: hashAfter,
+          hashBefore,
+          hashAfter,
+          verifiedAt: new Date().toISOString(),
+          ok: verificationOk,
+          status: stale ? "stale" : verificationOk ? "success" : "failed",
+          issues: allIssues.filter((issue) => issue.severity === "error" || issue.severity === "critical"),
+          allIssues,
+        };
 
         // Construire un rapport uniforme : chaque phase expose les deux flux et le code de sortie.
         const report: any = {
-          status: ok ? "success" : "failed",
-          ok,
+          status: verificationOk ? "success" : "failed",
+          ok: verificationOk,
           exitCode: resultExitCode([typecheck, lintResult, testResult]),
           stdout: [typecheck.stdout, lintResult.stdout, testResult?.stdout].filter(Boolean).join("\n"),
           stderr: [typecheck.stderr, lintResult.stderr, testResult?.stderr].filter(Boolean).join("\n"),
@@ -862,6 +874,10 @@ export const verifySkill: Skill = {
             ? `✅ Vérification OK pour ${validated.path}${testFile ? ` (tests: ${testFile})` : " (aucun test associé)"}.`
             : `❌ Échec de vérification (code ${resultExitCode([typecheck, lintResult, testResult]) ?? "inconnu"}) — corriger avant de considérer la tâche terminée.\n${failureOutput}`,
           file: validated.path,
+          contentHash: verificationRecord.contentHash,
+          verifiedAt: verificationRecord.verifiedAt,
+          issues: verificationRecord.issues,
+          verificationRecord,
           parsedErrors,
           typecheck: {
             ok: typecheck.ok,

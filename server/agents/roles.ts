@@ -107,6 +107,7 @@ const coderAgent: AgentDefinition = {
     "verify_file",
     "verify_typecheck",
     "verify_lint",
+    "verify_full",
   ],
   systemPrompt: buildAgentPrompt("coder"),
   maxConcurrency: 3,
