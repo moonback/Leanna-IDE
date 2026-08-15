@@ -237,9 +237,10 @@ export class AgentExecutor {
       // Si on atteint l'avant-dernier tour, forcer la synthèse après exécution
       const isLastAllowedTurn = turn >= AgentExecutor.MAX_TOOL_TURNS - 2;
 
+      const observationCountBefore = state.observations.length;
       await this.executeRequestedTools(agent, calls, state);
       const observations = state.observations
-        .slice(-calls.length)
+        .slice(observationCountBefore)
         .join("\n")
         .slice(-AgentExecutor.MAX_OBSERVATION_CHARS);
 

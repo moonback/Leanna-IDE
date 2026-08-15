@@ -276,6 +276,7 @@ export class AutonomousLoop {
       verifyErrors,
       confidenceScore,
       resultLength: details.length,
+      resultSummary: result.summary,
     };
   }
 
@@ -357,11 +358,10 @@ export class AutonomousLoop {
 
     // ── Détection de boucle : comparer les summaries des itérations ──
     if (history.length >= 1) {
-      const currentSummary = obs.resultLength.toString(); // placeholder — sera comparé en similarité textuelle ci-dessous
       const lastSummary = history[history.length - 1].resultSummary;
 
       // Comparaison par similarité textuelle entre les deux derniers résumés
-      const similarity = this.stringSimilarity(lastSummary, currentSummary);
+      const similarity = this.stringSimilarity(lastSummary, obs.resultSummary);
       if (similarity > LOOP_DETECTION_SIMILARITY) {
         return {
           action: "stop_loop_detected",
@@ -548,4 +548,5 @@ interface ObservationReport {
   verifyErrors: string[];
   confidenceScore: number;
   resultLength: number;
+  resultSummary: string;
 }
