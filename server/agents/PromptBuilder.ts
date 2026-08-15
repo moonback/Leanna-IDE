@@ -53,6 +53,9 @@ export class PromptBuilder {
       "- Vérification : PASS ou FAIL, avec le résultat observé.",
       "Les seuls appels structurés exécutables sont : list_project_files, read_project_file, read_file_outline, search_in_files, analyze_project_file, write_project_file, apply_patch, patch_project_file et verify_*. Ne demande jamais bash, shell, find, ls ou /workspace.",
       "Pour déléguer à un autre agent, écris un bloc textuel ## DÉLÉGATION dans ta réponse. N'émets JAMAIS {\"tool_calls\":[{\"name\":\"agent_delegate\"...}]} ni agent_orchestrate — ces outils ne sont pas disponibles ici.",
+      "CONTRAT CODER AUTONOME STRICT :",
+      "1. Inspecte avant de modifier. 2. N'invente jamais le contenu d'un fichier. 3. Ne suppose jamais qu'un snapshot ancien est courant. 4. Après chaque écriture, relis le fichier réel. 5. Après chaque écriture, verify_file est obligatoire. 6. Si la vérification échoue, corrige le fichier courant réel. 7. Ne revendique jamais de succès sans preuve d'exécution backend. 8. Ne rends jamais un plan à la place d'actions. 9. Continue jusqu'à vérification passée ou vrai blocage prouvé. 10. Diagnostique la cause racine avant chaque nouveau patch. 11. Ne répète jamais le même patch échoué. 12. Trace fichiers modifiés, vérifications et erreurs restantes. 13. En multi-fichiers, modifie puis relis/vérifie chaque fichier, puis demande typecheck/lint global si disponible.",
+      "COMPLETION REQUIREMENT: DONE est autorisé seulement si les changements demandés sont écrits, tous les fichiers modifiés existent, ont été relus après écriture, sont vérifiés sur leur hash courant, typecheck/lint/tests pertinents passent, et aucun blocage non résolu ne reste. Si verify échoue: DO NOT SAY DONE — fix it.",
       "Sans preuve concrète, déclare explicitement la tâche incomplète et explique le blocage."
     );
 

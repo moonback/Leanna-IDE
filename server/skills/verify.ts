@@ -6,6 +6,7 @@ import * as path from "path";
 import { z } from "zod";
 import { SELF_ROOT, normalizeSelfPath } from "../utils/selfRoot";
 import * as ts from "typescript";
+import { hashContent, normalizeIssue } from "../agents/WorkspaceState";
 
 const execFileAsync = promisify(execFile);
 
@@ -773,6 +774,8 @@ export const verifySkill: Skill = {
 
         // ─── PRÉ-VALIDATION SYNTAXIQUE (TypeScript API) ──────────────────────
         const code = fs.readFileSync(abs, "utf-8");
+        const contentHash = hashContent(code);
+        const verifiedAt = new Date().toISOString();
         const ext = path.extname(validated.path).toLowerCase();
         const isTypeScript = ext === ".ts" || ext === ".tsx";
         let tsSyntaxError: string | null = null;
@@ -791,7 +794,9 @@ export const verifySkill: Skill = {
               typecheck: { ok: false, exitCode: 1, stdout: "", stderr: tsSyntaxError, output: tsSyntaxError, errors: parseTsErrors(tsSyntaxError) },
               lint: null,
               test: null,
-              allIssues: [{ type: "typecheck", file: validated.path, line: null, column: null, severity: "error", rule: "syntax", message: tsSyntaxError }],
+              contentHash,
+              verifiedAt,
+              allIssues: [normalizeIssue({ type: "syntax", file: validated.path, line: null, column: null, severity: "error", rule: "syntax", message: tsSyntaxError })],
             };
           }
         }
@@ -837,9 +842,9 @@ export const verifySkill: Skill = {
           .join("\n");
 
         const allIssues = [
-          ...parsedErrors.map(e => ({ type: "typecheck" as const, file: e.file, line: e.line, column: e.column, severity: "error" as const, rule: e.code, message: e.message })),
-          ...lintResult.violations.map(v => ({ type: "lint" as const, file: v.file, line: v.line, column: v.column, severity: v.severity, rule: v.rule, message: v.message })),
-          ...securityIssues.map(i => ({ type: "security" as const, file: i.file, line: i.line, column: i.column, severity: i.severity, rule: i.rule, message: i.message, suggestion: i.suggestion })),
+          ...parsedErrors.map(e => normalizeIssue({ type: "typecheck", file: e.file, line: e.line, column: e.column, severity: "error", rule: e.code, code: e.code, message: e.message, suggestion: "Lire le fichier courant et corriger la cause racine TypeScript." })),
+          ...lintResult.violations.map(v => normalizeIssue({ type: "lint", file: v.file, line: v.line, column: v.column, severity: v.severity, rule: v.rule, message: v.message })),
+          ...securityIssues.map(i => normalizeIssue({ type: "security", file: i.file, line: i.line, column: i.column, severity: i.severity === "critical" ? "critical" : i.severity === "high" ? "error" : "warning", rule: i.rule, message: i.message, suggestion: i.suggestion })),
         ];
         if (!typecheck.ok && parsedErrors.length === 0) {
           allIssues.push({ type: "typecheck", file: validated.path, line: null, column: null, severity: "error", rule: "tsc", message: formatProcessFailure(typecheck) } as any);
@@ -855,6 +860,8 @@ export const verifySkill: Skill = {
         const report: any = {
           status: ok ? "success" : "failed",
           ok,
+          contentHash,
+          verifiedAt,
           exitCode: resultExitCode([typecheck, lintResult, testResult]),
           stdout: [typecheck.stdout, lintResult.stdout, testResult?.stdout].filter(Boolean).join("\n"),
           stderr: [typecheck.stderr, lintResult.stderr, testResult?.stderr].filter(Boolean).join("\n"),
