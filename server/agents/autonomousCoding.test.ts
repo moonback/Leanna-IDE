@@ -49,3 +49,55 @@ test("regression detector reports only new post-edit failures", () => {
   assert.equal(regressions.length, 2);
   assert.ok(regressions.some((r) => r.message.includes("new failure")));
 });
+
+import { AgentExecutor } from "./AgentExecutor";
+import type { AgentTask } from "./types";
+
+test("AgentExecutor coder writes, re-reads, verifies, and runs global checks before completion", async () => {
+  const calls: string[] = [];
+  let content = "export const value = 1;\n";
+  let agentTurn = 0;
+  const executor = new AgentExecutor({ notify() { /* noop */ } } as any);
+  executor.setSkillHandler(async (name: string, args: any) => {
+    calls.push(name);
+    if (name === "list_project_files") return { status: "success", files: ["src/a.ts"], count: 1 };
+    if (name === "read_project_file") return { status: "success", path: args.path, content };
+    if (name === "agent_execute") {
+      agentTurn++;
+      if (agentTurn === 1) {
+        return JSON.stringify({ tool_calls: [{ name: "write_project_file", parameters: { path: "src/a.ts", content: "export const value = 2;\n" } }] });
+      }
+      return "## Résultats vérifiés\n- src/a.ts modifié et vérifié.\n## Preuves d'exécution\n- Vérification : PASS";
+    }
+    if (name === "write_project_file") {
+      content = String(args.content);
+      return { status: "success", path: args.path };
+    }
+    if (name === "verify_file") {
+      return { status: "success", ok: true, contentHash: hashContent(content), typecheck: { ok: true }, lint: { ok: true }, security: { ok: true } };
+    }
+    if (name === "verify_typecheck" || name === "verify_lint") return { status: "success", ok: true };
+    throw new Error(`Unexpected tool: ${name}`);
+  });
+
+  const task: AgentTask = {
+    id: "task-autonomous-1",
+    role: "coder",
+    title: "Update src/a.ts",
+    description: "Change value in src/a.ts",
+    priority: "medium",
+    status: "pending",
+    context: { files: ["src/a.ts"] },
+    createdAt: new Date().toISOString(),
+  };
+
+  await executor.execute(task);
+  assert.equal(task.status, "completed");
+  assert.equal(content, "export const value = 2;\n");
+  assert.ok(calls.includes("write_project_file"));
+  assert.ok(calls.includes("verify_file"));
+  assert.ok(calls.includes("verify_typecheck"));
+  assert.ok(calls.includes("verify_lint"));
+  assert.equal((task.result?.evidence?.verification as any).records.length, 1);
+  assert.equal((task.result?.evidence?.verification as any).workspaceState[0].verificationStatus, "passed");
+});

@@ -42,7 +42,7 @@ interface ToolExecutionState {
   filesModified: string[];
   errors: string[];
   observations: string[];
-  /** Nombre de validations échouées par fichier, plafonné pour éviter les boucles d’écriture. */
+  /** Nombre de validations échouées par fichier, utilisé avec analyse de progression. */
   verificationAttempts: Map<string, number>;
   /** Workspace state: contenu des fichiers lus pendant l'exécution (persisté entre les tours) */
   fileSnapshots: Map<string, string>;
@@ -157,6 +157,7 @@ export class AgentExecutor {
         errors: [...toolExecution.errors.map((error) => ({ path: "tool-call", error })), ...generatedWriteResult.errors],
       };
       const durationMs = Date.now() - startTime;
+      await this.runFinalValidationIfNeeded(toolExecution, writeResult.written);
       const staleIssues = toolExecution.workspaceState.assertCompletionReady(writeResult.written);
       const evidence = this.collectEvidence(task, fileContents, writeResult, resultText, toolExecution, staleIssues);
       const incompleteReason = this.getIncompleteReason(task, resultText, evidence);
@@ -218,7 +219,8 @@ export class AgentExecutor {
    * Limité à MAX_TOOL_TURNS tours pour éviter les boucles infinies.
    */
   private static readonly MAX_TOOL_TURNS = 8;
-  private static readonly MAX_FILE_CORRECTIONS = 3;
+  private static readonly MAX_FILE_CORRECTIONS = 8;
+  private static readonly STRATEGY_REVIEW_AFTER_ATTEMPTS = 3;
   /** Taille maximale d’une observation cumulée envoyée au modèle suivant. */
   private static readonly MAX_OBSERVATION_CHARS = 240_000;
   /** Limite de sécurité par snapshot, supérieure aux composants UI usuels. */
@@ -452,7 +454,6 @@ export class AgentExecutor {
 
       state.filesRead.push(requestedPath);
       state.fileSnapshots.set(requestedPath, result.content);
-            state.workspaceState.recordRead(requestedPath, result.content);
       const fileState = state.workspaceState.recordRead(requestedPath, result.content);
       state.observations.push(`- read_project_file ${requestedPath}: instantané actuel rafraîchi ${reason}; version=${fileState.version}; hash=${fileState.contentHash}; cet état remplace tout contenu initial.`);
       return true;
@@ -508,7 +509,7 @@ export class AgentExecutor {
       if (isWriteCall && pathKey) writePathsHandled.add(pathKey);
 
       if (isWriteCall && requestedPath && (state.verificationAttempts.get(requestedPath) ?? 0) >= AgentExecutor.MAX_FILE_CORRECTIONS) {
-        const message = `plafond de ${AgentExecutor.MAX_FILE_CORRECTIONS} corrections atteint pour ${requestedPath}; validation humaine requise`;
+        const message = `plafond de sécurité de ${AgentExecutor.MAX_FILE_CORRECTIONS} corrections atteint pour ${requestedPath}; diagnostic humain requis après analyse de progression`;
         state.errors.push(`${call.name}: ${message}`);
         state.observations.push(`- ${call.name} ${requestedPath}: écriture bloquée — ${message}`);
         continue;
@@ -516,9 +517,12 @@ export class AgentExecutor {
 
       try {
         log.info(`[${agent.name}] Exécution outil structuré: ${call.name} args=${JSON.stringify(call.parameters).slice(0, 200)}`);
-        const beforeSnapshot = isWriteCall && requestedPath ? state.workspaceState.get(requestedPath)?.content ?? state.fileSnapshots.get(requestedPath) ?? null : null;
+        let beforeSnapshot = isWriteCall && requestedPath
+          ? state.workspaceState.get(requestedPath)?.content ?? state.fileSnapshots.get(requestedPath) ?? null
+          : null;
         if (isWriteCall && requestedPath) {
           await this.refreshFileSnapshot(requestedPath, state, "avant l’écriture pour hashBefore");
+          beforeSnapshot = state.workspaceState.get(requestedPath)?.content ?? state.fileSnapshots.get(requestedPath) ?? beforeSnapshot;
         }
         const result = await this.skillHandler!(call.name, call.parameters);
         state.toolsExecuted.push(call.name);
@@ -529,8 +533,10 @@ export class AgentExecutor {
             state.verificationAttempts.set(requestedPath, attempt);
             await this.refreshFileSnapshot(requestedPath, state, "après le refus d'écriture");
             const limitNote = attempt >= AgentExecutor.MAX_FILE_CORRECTIONS
-              ? ` Plafond atteint (${AgentExecutor.MAX_FILE_CORRECTIONS}) : aucune autre écriture automatique ne sera autorisée.`
-              : " Relis l'instantané actuel avant de régénérer un unique patch ciblé.";
+              ? ` Plafond de sécurité atteint (${AgentExecutor.MAX_FILE_CORRECTIONS}) : aucune autre écriture automatique ne sera autorisée.`
+              : attempt >= AgentExecutor.STRATEGY_REVIEW_AFTER_ATTEMPTS
+                ? " Plusieurs tentatives ont échoué : change de stratégie, regroupe les erreurs et corrige la cause racine."
+                : " Relis l'instantané actuel avant de régénérer un unique patch ciblé.";
             if (attempt >= AgentExecutor.MAX_FILE_CORRECTIONS) {
               state.errors.push(`${call.name}: ${error}`);
             }
@@ -555,6 +561,11 @@ export class AgentExecutor {
           // rend le contenu réellement écrit autoritaire pour le prochain tour.
           await this.refreshFileSnapshot(requestedPath, state, "après l'écriture");
           const afterContent = state.fileSnapshots.get(requestedPath) ?? "";
+          if (afterContent.length === 0 && state.workspaceState.get(requestedPath)?.exists === false) {
+            state.errors.push(`${call.name}: impossible de relire le fichier après écriture: ${requestedPath}`);
+            state.observations.push(`- ${call.name} ${requestedPath}: écriture non prouvée — relecture post-écriture impossible.`);
+            continue;
+          }
           const writtenState = state.workspaceState.recordWrite(requestedPath, beforeSnapshot, afterContent, agent.name);
           state.observations.push(`[run:${state.runId}] [${agent.name}] [EDIT] ${requestedPath} version=${writtenState.version} hashBefore=${writtenState.previousHash} hashAfter=${writtenState.contentHash}`);
 
@@ -569,8 +580,10 @@ export class AgentExecutor {
             state.verificationAttempts.set(requestedPath, attempt);
             const error = this.formatToolFailure(verification);
             const limitNote = attempt >= AgentExecutor.MAX_FILE_CORRECTIONS
-              ? ` Plafond atteint (${AgentExecutor.MAX_FILE_CORRECTIONS}) : aucune autre écriture automatique ne sera autorisée.`
-              : " Relis le diagnostic et l'instantané actuel puis applique un patch ciblé avant de revalider.";
+              ? ` Plafond de sécurité atteint (${AgentExecutor.MAX_FILE_CORRECTIONS}) : aucune autre écriture automatique ne sera autorisée.`
+              : attempt >= AgentExecutor.STRATEGY_REVIEW_AFTER_ATTEMPTS
+                ? " Plusieurs tentatives ont échoué : change de stratégie, regroupe les erreurs liées et corrige la cause racine."
+                : " Relis le diagnostic et l'instantané actuel puis applique un patch ciblé avant de revalider.";
             if (attempt >= AgentExecutor.MAX_FILE_CORRECTIONS) {
               state.errors.push(`verify_file(${requestedPath}): ${error}`);
             }
@@ -588,6 +601,33 @@ export class AgentExecutor {
         const message = (error as Error).message;
         state.errors.push(`${call.name}: ${message}`);
         state.observations.push(`- ${call.name}: erreur — ${message}`);
+      }
+    }
+  }
+
+  private async runFinalValidationIfNeeded(
+    state: ToolExecutionState,
+    writtenFiles: string[]
+  ): Promise<void> {
+    const uniqueFiles = [...new Set(writtenFiles)];
+    if (uniqueFiles.length === 0) return;
+
+    const shouldRunGlobal = uniqueFiles.length > 1 || uniqueFiles.some((file) => /\.(ts|tsx|js|jsx)$/.test(file));
+    if (!shouldRunGlobal) return;
+
+    for (const toolName of ["verify_typecheck", "verify_lint"] as const) {
+      try {
+        const result = await this.skillHandler!(toolName, {});
+        state.toolsExecuted.push(toolName);
+        const failed = result?.error || result?.ok === false || result?.status === "failed";
+        state.observations.push(`- ${toolName}: ${failed ? "échec" : "succès"} — ${this.formatToolFailure(result)}`);
+        if (failed) {
+          state.errors.push(`${toolName}: ${this.formatToolFailure(result)}`);
+        }
+      } catch (error) {
+        const message = (error as Error).message;
+        state.errors.push(`${toolName}: ${message}`);
+        state.observations.push(`- ${toolName}: erreur — ${message}`);
       }
     }
   }
