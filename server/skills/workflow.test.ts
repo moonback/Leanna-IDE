@@ -2,15 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createWorkflow,
-  listWorkflows,
   getWorkflow,
   toggleWorkflow,
   deleteWorkflow,
-  getWorkflowsSnapshot,
 } from './workflow';
 
 test('workflow: CRUD operations', async () => {
-  const initial = getWorkflowsSnapshot();
 
   const wf = await createWorkflow({
     name: 'Test Workflow',

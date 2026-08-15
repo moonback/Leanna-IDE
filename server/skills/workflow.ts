@@ -83,7 +83,7 @@ export interface WorkflowStepRunState {
 const workflowStepSchema = z.object({
   id: z.string().min(1),
   action: z.string().min(1),
-  args: z.record(z.unknown()).optional().default({}),
+  args: z.record(z.string(), z.unknown()).optional().default({}),
   label: z.string().optional(),
   condition: z.string().optional(),
   onError: z.enum(["stop", "skip", "retry"]).optional().default("stop"),
@@ -668,22 +668,23 @@ export async function executeWorkflow(workflow: WorkflowDefinition): Promise<Wor
 
 // ─── CRUD operations ──────────────────────────────────────────────────────────
 
-export async function createWorkflow(input: z.infer<typeof createWorkflowSchema>): Promise<WorkflowDefinition> {
+export async function createWorkflow(input: z.input<typeof createWorkflowSchema>): Promise<WorkflowDefinition> {
+  const parsedInput = createWorkflowSchema.parse(input);
   const id = crypto.randomUUID();
   const workflow: WorkflowDefinition = {
     id,
-    name: input.name,
-    description: input.description || "",
-    steps: input.steps.map((s) => ({
+    name: parsedInput.name,
+    description: parsedInput.description,
+    steps: parsedInput.steps.map((s) => ({
       id: s.id,
       action: s.action,
       args: s.args,
       label: s.label,
       condition: s.condition,
       onError: s.onError || "stop",
-      maxRetries: s.maxRetries || 2,
+      maxRetries: s.maxRetries,
     })),
-    schedule: input.schedule,
+    schedule: parsedInput.schedule,
     enabled: true,
     createdAt: Date.now(),
   };

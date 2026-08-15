@@ -22,6 +22,26 @@ export interface TTSOptions {
   model?: string;
 }
 
+function getInlineAudioData(response: unknown): string | null {
+  if (typeof response !== "object" || response === null) return null;
+  const candidates = (response as Record<string, unknown>).candidates;
+  if (!Array.isArray(candidates) || candidates.length === 0) return null;
+
+  const candidate = candidates[0];
+  if (typeof candidate !== "object" || candidate === null) return null;
+  const content = (candidate as Record<string, unknown>).content;
+  if (typeof content !== "object" || content === null) return null;
+  const parts = (content as Record<string, unknown>).parts;
+  if (!Array.isArray(parts) || parts.length === 0) return null;
+
+  const part = parts[0];
+  if (typeof part !== "object" || part === null) return null;
+  const inlineData = (part as Record<string, unknown>).inlineData;
+  if (typeof inlineData !== "object" || inlineData === null) return null;
+  const data = (inlineData as Record<string, unknown>).data;
+  return typeof data === "string" ? data : null;
+}
+
 /**
  * Génère de l'audio à partir de texte via l'API Gemini TTS.
  * Retourne l'audio en base64 (PCM 24kHz 16-bit mono), prêt à être envoyé au client.
@@ -52,7 +72,7 @@ export async function generateSpeech(
       })
     );
 
-    const audioData = response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    const audioData = getInlineAudioData(response);
     if (!audioData) {
       log.warn(`Pas de données audio retournées pour: "${text.slice(0, 50)}..."`);
       return null;
