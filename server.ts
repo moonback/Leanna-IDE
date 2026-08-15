@@ -619,6 +619,12 @@ async function startServer() {
         warningCount: validation.warningCount,
         diagnostics: validation.diagnostics, // liste plate structurée {file, line, column, code, severity, message, raw}
         errorsByFile: validation.errorsByFile, // groupement par fichier pour l'UI
+        exitCode: validation.exitCode,
+        stdout: validation.stdout,
+        stderr: validation.stderr,
+        signal: validation.signal,
+        timedOut: validation.timedOut,
+        globalDiagnostics: validation.globalDiagnostics,
         rawOutput: validation.rawOutput,       // sortie brute complète sans troncature
       });
     } catch (e: any) {
@@ -640,6 +646,12 @@ async function startServer() {
           warningCount: validation.warningCount,
           diagnostics: validation.diagnostics,
           errorsByFile: validation.errorsByFile,
+          exitCode: validation.exitCode,
+          stdout: validation.stdout,
+          stderr: validation.stderr,
+          signal: validation.signal,
+          timedOut: validation.timedOut,
+          globalDiagnostics: validation.globalDiagnostics,
           rawOutput: validation.rawOutput,
           errors: validation.rawOutput, // compatibilité historique (chaîne brute)
         });

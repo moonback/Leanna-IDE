@@ -39,6 +39,8 @@ interface ToolExecutionState {
   filesModified: string[];
   errors: string[];
   observations: string[];
+  /** Nombre de validations échouées par fichier, plafonné pour éviter les boucles d’écriture. */
+  verificationAttempts: Map<string, number>;
   /** Workspace state: contenu des fichiers lus pendant l'exécution (persisté entre les tours) */
   fileSnapshots: Map<string, string>;
 }
@@ -206,6 +208,7 @@ export class AgentExecutor {
    * Limité à MAX_TOOL_TURNS tours pour éviter les boucles infinies.
    */
   private static readonly MAX_TOOL_TURNS = 8;
+  private static readonly MAX_FILE_CORRECTIONS = 3;
 
   private async executeToolLoop(
     agent: { name: string; capabilities: string[] },
@@ -219,6 +222,7 @@ export class AgentExecutor {
       filesModified: [],
       errors: [],
       observations: [],
+      verificationAttempts: new Map(),
       fileSnapshots: new Map(),
     };
 
@@ -365,6 +369,27 @@ export class AgentExecutor {
     return null;
   }
 
+  private formatToolFailure(result: any): string {
+    if (!result) return "outil sans résultat";
+    const phases = [result.typecheck ?? result.tsc, result.lint, result.test].filter(Boolean);
+    const details = phases.flatMap((phase: any) => [
+      phase.output,
+      phase.stdout,
+      phase.stderr,
+      phase.errors,
+      phase.violations,
+    ].flatMap((value: any) => Array.isArray(value)
+      ? value.map((item) => typeof item === "string" ? item : item?.message ?? JSON.stringify(item))
+      : value ? [String(value)] : []));
+    const issues = Array.isArray(result.allIssues)
+      ? result.allIssues.map((issue: any) => `${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? JSON.stringify(issue)}`)
+      : [];
+    const streams = [result.stdout, result.stderr, result.message, result.error, ...details, ...issues]
+      .filter(Boolean)
+      .join("\n");
+    return streams.slice(0, 5000) || `outil en échec (code ${result.exitCode ?? "inconnu"})`;
+  }
+
   private async executeRequestedTools(
     agent: { name: string; capabilities: string[] },
     calls: AgentToolCall[],
@@ -385,18 +410,26 @@ export class AgentExecutor {
         }
       }
 
+      const requestedPath = typeof call.parameters.path === "string" ? call.parameters.path : undefined;
+      const isWriteCall = requestedPath && ["write_project_file", "modify_project_file", "patch_project_file"].includes(call.name);
+      if (isWriteCall && requestedPath && (state.verificationAttempts.get(requestedPath) ?? 0) >= AgentExecutor.MAX_FILE_CORRECTIONS) {
+        const message = `plafond de ${AgentExecutor.MAX_FILE_CORRECTIONS} corrections atteint pour ${requestedPath}; validation humaine requise`;
+        state.errors.push(`${call.name}: ${message}`);
+        state.observations.push(`- ${call.name} ${requestedPath}: écriture bloquée — ${message}`);
+        continue;
+      }
+
       try {
         log.info(`[${agent.name}] Exécution outil structuré: ${call.name} args=${JSON.stringify(call.parameters).slice(0, 200)}`);
         const result = await this.skillHandler!(call.name, call.parameters);
         state.toolsExecuted.push(call.name);
         if (result?.error || result?.status === "failed") {
-          const error = result?.error ?? result?.message ?? "outil en échec";
+          const error = this.formatToolFailure(result);
           state.errors.push(`${call.name}: ${error}`);
           state.observations.push(`- ${call.name}: échec — ${error}`);
           continue;
         }
 
-        const requestedPath = typeof call.parameters.path === "string" ? call.parameters.path : undefined;
         if (requestedPath && ["read_project_file", "read_file_outline"].includes(call.name)) {
           state.filesRead.push(requestedPath);
           // Persister le contenu lu dans le workspace state pour les tours suivants
@@ -407,12 +440,18 @@ export class AgentExecutor {
         if (requestedPath && ["write_project_file", "modify_project_file", "patch_project_file"].includes(call.name)) {
           const verification = await this.skillHandler!("verify_file", { path: requestedPath });
           state.toolsExecuted.push("verify_file");
-          if (verification?.error || verification?.status !== "success") {
-            const error = verification?.error ?? verification?.message ?? "post-validation échouée";
+          if (verification?.error || verification?.ok === false || verification?.status === "failed" || verification?.status !== "success") {
+            const attempt = (state.verificationAttempts.get(requestedPath) ?? 0) + 1;
+            state.verificationAttempts.set(requestedPath, attempt);
+            const error = this.formatToolFailure(verification);
+            const limitNote = attempt >= AgentExecutor.MAX_FILE_CORRECTIONS
+              ? ` Plafond atteint (${AgentExecutor.MAX_FILE_CORRECTIONS}) : aucune autre écriture automatique ne sera autorisée.`
+              : " Relis le diagnostic puis applique un patch ciblé avant de revalider.";
             state.errors.push(`verify_file(${requestedPath}): ${error}`);
-            state.observations.push(`- ${call.name} ${requestedPath}: écrit mais vérification échouée — ${error}`);
+            state.observations.push(`- ${call.name} ${requestedPath}: écrit mais vérification échouée (tentative ${attempt}/${AgentExecutor.MAX_FILE_CORRECTIONS}) — ${error}${limitNote}`);
             continue;
           }
+          state.verificationAttempts.delete(requestedPath);
           state.filesModified.push(requestedPath);
           // Invalider le snapshot après modification (forcer relecture)
           state.fileSnapshots.delete(requestedPath);

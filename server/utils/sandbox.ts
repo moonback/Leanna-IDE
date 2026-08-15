@@ -83,8 +83,14 @@ export interface TscDiagnostic {
 
 export interface SandboxValidationResult {
   valid: boolean;
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  signal: string | null;
+  timedOut: boolean;
   rawOutput: string;
   diagnostics: TscDiagnostic[];
+  globalDiagnostics: TscDiagnostic[];
   errorsByFile: Record<string, TscDiagnostic[]>;
   errorCount: number;
   warningCount: number;
@@ -546,6 +552,11 @@ export async function rejectFile(relPath: string): Promise<{ reverted: boolean }
  */
 export async function validateSandbox(): Promise<SandboxValidationResult> {
   let rawOutput = "";
+  let stdout = "";
+  let stderr = "";
+  let exitCode: number | null = null;
+  let signal: string | null = null;
+  let timedOut = false;
   let valid = false;
 
   try {
@@ -565,20 +576,27 @@ export async function validateSandbox(): Promise<SandboxValidationResult> {
     // donc les mêmes versions de typescript/types que le projet racine.
     const isWin = process.platform === "win32";
     const npxBin = isWin ? "npx.cmd" : "npx";
-    const { stdout, stderr } = await execFileAsync(npxBin, ["tsc", "--noEmit", "--project", sandboxBase], {
+    const result = await execFileAsync(npxBin, ["tsc", "--noEmit", "--project", sandboxBase], {
       cwd: SELF_ROOT,
       timeout: 120_000,
       maxBuffer: 10 * 1024 * 1024,
       shell: false,
     });
-    rawOutput = (stdout || "") + (stderr ? "\n" + stderr : "");
+    stdout = result.stdout || "";
+    stderr = result.stderr || "";
+    rawOutput = [stdout, stderr].filter(Boolean).join("\n");
+    exitCode = 0;
     valid = true;
   } catch (e: any) {
-    // tsc exit code != 0 : récupère stdout (erreurs TS) + stderr + message process
-    const out = (e.stdout || "").trim();
-    const err = (e.stderr || "").trim();
-    const msg = (!out && !err && e.message) ? `tsc error: ${e.message}` : "";
-    rawOutput = [out, err, msg].filter(Boolean).join("\n");
+    // tsc exit code != 0 : conserver séparément stdout, stderr et le code réel.
+    stdout = typeof e.stdout === "string" ? e.stdout : "";
+    stderr = typeof e.stderr === "string" ? e.stderr : "";
+    exitCode = typeof e.code === "number" ? e.code : 1;
+    signal = typeof e.signal === "string" ? e.signal : null;
+    timedOut = e.code === "ETIMEDOUT" || e.killed === true && e.code === "ETIMEDOUT";
+    const msg = (!stdout.trim() && !stderr.trim() && e.message) ? `tsc error: ${e.message}` : "";
+    if (msg) stderr = msg;
+    rawOutput = [stdout, stderr].filter(Boolean).join("\n");
     valid = false;
   }
 
@@ -611,9 +629,13 @@ export async function validateSandbox(): Promise<SandboxValidationResult> {
   }));
 
   const errorsByFile: Record<string, TscDiagnostic[]> = {};
+  const globalDiagnostics: TscDiagnostic[] = [];
 
   for (const d of diagnostics) {
-    if (!d.file) continue; // erreurs globales sans fichier : ignorées du groupement par fichier
+    if (!d.file) {
+      globalDiagnostics.push(d);
+      continue;
+    }
     if (!errorsByFile[d.file]) errorsByFile[d.file] = [];
     errorsByFile[d.file].push(d);
   }
@@ -623,8 +645,14 @@ export async function validateSandbox(): Promise<SandboxValidationResult> {
 
   return {
     valid,
+    exitCode,
+    stdout: stdout.trim(),
+    stderr: stderr.trim(),
+    signal,
+    timedOut,
     rawOutput: rawOutput.trim(),
     diagnostics,
+    globalDiagnostics,
     errorsByFile,
     errorCount,
     warningCount,

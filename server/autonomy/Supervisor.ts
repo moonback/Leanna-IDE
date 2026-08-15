@@ -160,7 +160,7 @@ export class Supervisor {
     verifyResult: any,
   ): { needsCorrection: boolean; directive?: string } {
     // Si verify passe → tout va bien
-    if (verifyResult?.ok === true || verifyResult?.status === "ok" || verifyResult?.valid === true) {
+    if (verifyResult?.ok === true || verifyResult?.status === "success" || verifyResult?.status === "ok" || verifyResult?.valid === true) {
       // Nettoyer le compteur pour ce fichier
       this.correctionHistory.delete(filePath);
       if (this.currentMission) {
@@ -390,29 +390,35 @@ export class Supervisor {
   // ─── Utilitaires ─────────────────────────────────────────────────────────
 
   private extractErrors(verifyResult: any): string | null {
-    if (!verifyResult) return null;
-
-    // Format verify_file: { ok: false, tsc: { ok: false, errors: "..." }, lint: {...}, test: {...} }
+    if (!verifyResult) return "verify_file n'a retourné aucun résultat.";
     const parts: string[] = [];
 
-    if (verifyResult.tsc && !verifyResult.tsc.ok) {
-      parts.push(`TypeScript: ${verifyResult.tsc.errors || verifyResult.tsc.stderr || "Erreur"}`);
-    }
-    if (verifyResult.lint && !verifyResult.lint.ok) {
-      parts.push(`Lint: ${verifyResult.lint.errors || verifyResult.lint.stderr || "Erreur"}`);
-    }
-    if (verifyResult.test && !verifyResult.test.ok) {
-      parts.push(`Tests: ${verifyResult.test.errors || verifyResult.test.stderr || "Erreur"}`);
+    if (Array.isArray(verifyResult.allIssues)) {
+      parts.push(...verifyResult.allIssues.slice(0, 20).map((issue: any) =>
+        `[${issue.type ?? "verification"}/${issue.rule ?? "unknown"}] ${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? "Erreur"}`
+      ));
     }
 
-    // Fallback pour d'autres formats
-    if (parts.length === 0) {
-      if (verifyResult.error) parts.push(verifyResult.error);
-      if (verifyResult.errors) parts.push(verifyResult.errors);
-      if (verifyResult.stderr) parts.push(verifyResult.stderr);
-    }
+    const addPhase = (label: string, phase: any) => {
+      if (!phase || phase.ok !== false) return;
+      const output = [phase.output, phase.stdout, phase.stderr, phase.errors, phase.violations]
+        .flatMap((value) => Array.isArray(value)
+          ? value.map((item) => typeof item === "string" ? item : item?.message ?? JSON.stringify(item))
+          : value ? [String(value)] : [])
+        .filter(Boolean)
+        .join("\n");
+      parts.push(`${label} (code ${phase.exitCode ?? "inconnu"}): ${output || "échec sans sortie"}`);
+    };
 
-    return parts.length > 0 ? parts.join("\n") : null;
+    addPhase("TypeScript", verifyResult.typecheck ?? verifyResult.tsc);
+    addPhase("Lint", verifyResult.lint);
+    addPhase("Tests", verifyResult.test);
+    if (verifyResult.error) parts.push(String(verifyResult.error));
+    if (verifyResult.message && verifyResult.status === "failed") parts.push(String(verifyResult.message));
+    if (verifyResult.stderr) parts.push(String(verifyResult.stderr));
+    if (verifyResult.stdout) parts.push(String(verifyResult.stdout));
+
+    return parts.length > 0 ? [...new Set(parts)].join("\n") : null;
   }
 
   /**

@@ -91,14 +91,15 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "search_in_files",
-      description: "Searches for text or a pattern across project files. Returns matching files with surrounding context. Use to find where a function, class or variable is used.",
+      description: "Searches for text or a pattern across project files. Returns matching files with surrounding context. Use to find where a function, class or variable is used. By default, the query is treated as literal text (special characters are auto-escaped). Set regex:true to use a regular expression.",
       parameters: {
         type: "OBJECT",
         properties: {
-          query: { type: "STRING", description: "Exact text or regex pattern to search for." },
+          query: { type: "STRING", description: "Text or regex pattern to search for. Treated as literal text by default (parentheses, brackets, etc. are auto-escaped)." },
           path: { type: "STRING", description: "Directory to search in (optional, defaults to project root)." },
           extensions: { type: "STRING", description: "Comma-separated file extensions to filter (e.g. 'ts,tsx,js'). Optional." },
           caseSensitive: { type: "BOOLEAN", description: "Case-sensitive search. Default false." },
+          regex: { type: "BOOLEAN", description: "If true, treat query as a regular expression. Default false (literal text search)." },
           maxResults: { type: "NUMBER", description: "Maximum number of results. Default 20." },
         },
         required: ["query"],

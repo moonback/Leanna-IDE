@@ -278,18 +278,18 @@ export class AutonomousLoop {
   }
 
   private async verifyFile(filePath: string): Promise<string | null> {
-    // La vérification passe par le SkillHandler de l'executor
-    // On y accède via une méthode exposée
     try {
-      const result = await (this.executor as any).skillHandler?.("verify_file", {
-        path: filePath,
-      });
-      if (result && result.errors && result.errors.length > 0) {
-        return result.errors.slice(0, 3).join("; ");
-      }
-      return null;
-    } catch {
-      return null; // Vérification non disponible — on ignore
+      const result = await (this.executor as any).skillHandler?.("verify_file", { path: filePath });
+      if (!result || result.ok === true || result.status === "success") return null;
+      const issues = Array.isArray(result.allIssues)
+        ? result.allIssues.slice(0, 10).map((issue: any) => `${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? "Erreur"}`)
+        : [];
+      const phases = [result.typecheck, result.lint, result.test].filter((phase: any) => phase?.ok === false);
+      const phaseOutput = phases.flatMap((phase: any) => [phase.output, phase.stdout, phase.stderr]).filter(Boolean);
+      const details = [...issues, ...phaseOutput, result.message, result.stderr, result.error].filter(Boolean).join("\n");
+      return details.slice(0, 5000) || `verify_file a échoué (code ${result.exitCode ?? "inconnu"}).`;
+    } catch (error) {
+      return `verify_file indisponible: ${(error as Error).message}`;
     }
   }
 

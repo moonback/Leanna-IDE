@@ -204,8 +204,8 @@ async function executeValidatePatch(
 
     const verifyResult = await handler("verify_file", { path }, context);
 
-    // Succès ?
-    if (verifyResult?.ok === true || verifyResult?.status === "ok") {
+    // Succès : le contrat canonique est status=success, ok=true reste accepté pour compatibilité.
+    if (verifyResult?.ok === true || verifyResult?.status === "success" || verifyResult?.status === "ok") {
       log.info(`[validate_patch] ✓ ${path} valide après ${attempt} vérification(s).`);
       return {
         success: true,
@@ -216,17 +216,8 @@ async function executeValidatePatch(
       };
     }
 
-    // Extraire les erreurs
-    const errors = extractVerifyErrors(verifyResult);
-    if (!errors) {
-      // Pas d'erreurs claires, considérer comme succès
-      return {
-        success: true,
-        attempts: attempt,
-        file: path,
-        finalState: "valid",
-      };
-    }
+    // Une vérification échouée sans diagnostics reste un échec : ne jamais le convertir en succès.
+    const errors = extractVerifyErrors(verifyResult) ?? "verify_file a échoué sans fournir de diagnostic exploitable.";
 
     // Dernière tentative → ne pas corriger, juste reporter
     if (attempt === MAX_ATTEMPTS) {
@@ -457,21 +448,32 @@ async function executePlanCodeChange(
 // ─── Utilitaires ────────────────────────────────────────────────────────────
 
 function extractVerifyErrors(result: any): string | null {
-  if (!result) return null;
+  if (!result) return "verify_file n'a retourné aucun résultat.";
   const parts: string[] = [];
 
-  if (result.tsc && !result.tsc.ok) {
-    parts.push(result.tsc.errors || result.tsc.stderr || "TSC errors");
-  }
-  if (result.lint && !result.lint.ok) {
-    parts.push(result.lint.errors || result.lint.stderr || "Lint errors");
-  }
-  if (result.test && !result.test.ok) {
-    parts.push(result.test.errors || result.test.stderr || "Test failures");
-  }
-  if (parts.length === 0 && result.error) {
-    parts.push(result.error);
+  if (Array.isArray(result.allIssues)) {
+    parts.push(...result.allIssues.slice(0, 20).map((issue: any) =>
+      `[${issue.type ?? "verification"}${issue.rule ? `/${issue.rule}` : ""}] ${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? "Erreur"}`
+    ));
   }
 
-  return parts.length > 0 ? parts.join("\n") : null;
+  const addPhase = (label: string, phase: any) => {
+    if (!phase || phase.ok !== false) return;
+    const output = [phase.output, phase.stdout, phase.stderr, phase.errors, phase.violations]
+      .flatMap((value) => Array.isArray(value) ? value.map((item) => typeof item === "string" ? item : item.message ?? JSON.stringify(item)) : [value])
+      .filter(Boolean)
+      .join("\n");
+    parts.push(`${label}${phase.exitCode !== undefined ? ` (code ${phase.exitCode})` : ""}: ${output || "échec sans sortie"}`);
+  };
+
+  addPhase("TypeScript", result.typecheck ?? result.tsc);
+  addPhase("Lint", result.lint);
+  addPhase("Tests", result.test);
+
+  if (result.error) parts.push(String(result.error));
+  if (result.message && result.status === "failed") parts.push(String(result.message));
+  if (result.stderr) parts.push(String(result.stderr));
+  if (result.stdout) parts.push(String(result.stdout));
+
+  return parts.length > 0 ? [...new Set(parts)].join("\n") : null;
 }

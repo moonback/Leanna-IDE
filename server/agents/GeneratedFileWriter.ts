@@ -177,10 +177,11 @@ export class GeneratedFileWriter {
         status: "failed",
         message: (err as Error).message,
       }));
-      if (verification?.status !== "success" || verification?.error) {
+      if (verification?.status !== "success" || verification?.ok === false || verification?.error) {
+        const report = JSON.stringify(verification, null, 2).slice(0, 5000);
         const message = verification?.message || verification?.error || "post-validation échouée";
         log.error(`[${agentName}] Post-validation échouée pour ${path}: ${message}`);
-        return `post-validation échouée: ${message}`;
+        return `post-validation échouée: ${message}\nRapport verify_file:\n${report}`;
       }
       return null;
     } catch (err) {

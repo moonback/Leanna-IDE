@@ -238,6 +238,7 @@ export async function handleSearchInFiles(args: any) {
   if (!normalized) return { error: "Chemin invalide ou en dehors du workspace." };
   const extensions = args.extensions ? String(args.extensions).split(",").map((e: string) => e.trim().replace(/^\./, "")) : null;
   const caseSensitive = args.caseSensitive === true;
+  const isRegex = args.regex === true;
   const maxResults = typeof args.maxResults === "number" ? args.maxResults : 20;
   const allFiles: string[] = [];
 
@@ -250,7 +251,22 @@ export async function handleSearchInFiles(args: any) {
   }
 
   const results: Array<{ file: string; line: number; content: string }> = [];
-  const regex = new RegExp(query, caseSensitive ? "g" : "gi");
+
+  // Mode littéral par défaut : échapper les caractères spéciaux regex
+  // Mode regex explicite : utiliser la query telle quelle
+  let pattern: string;
+  if (isRegex) {
+    pattern = query;
+  } else {
+    pattern = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  let regex: RegExp;
+  try {
+    regex = new RegExp(pattern, caseSensitive ? "g" : "gi");
+  } catch (e: any) {
+    return { error: `Expression régulière invalide: ${e.message}. Utilisez regex: false ou échappez les caractères spéciaux.` };
+  }
   for (const filePath of allFiles) {
     if (results.length >= maxResults) break;
     if (extensions) {

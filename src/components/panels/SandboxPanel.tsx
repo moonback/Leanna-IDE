@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Box, RefreshCw, Upload, Trash2, Loader2, CheckCircle2,
-  XCircle, FileText, Power, Lock, ShieldCheck, Radio,
-  GitCompareArrows, FilePlus2, FileX2, FileCode2,
+  XCircle, Power, Lock, ShieldCheck, Radio,
+  GitCompareArrows, FilePlus2, FileCode2,
   AlertTriangle, AlertOctagon, Play, ChevronDown,
   Bot, RotateCcw,
 } from 'lucide-react';
@@ -35,9 +35,13 @@ interface ValidationState {
   loading: boolean;
   ran: boolean;
   valid: boolean;
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
   errorCount: number;
   warningCount: number;
   diagnostics: TscDiagnostic[];
+  globalDiagnostics: TscDiagnostic[];
   errorsByFile: Record<string, TscDiagnostic[]>;
   rawOutput: string;
 }
@@ -72,9 +76,13 @@ export function SandboxPanel() {
     loading: false,
     ran: false,
     valid: true,
+    exitCode: null,
+    stdout: '',
+    stderr: '',
     errorCount: 0,
     warningCount: 0,
     diagnostics: [],
+    globalDiagnostics: [],
     errorsByFile: {},
     rawOutput: '',
   });
@@ -87,9 +95,13 @@ export function SandboxPanel() {
       loading: false,
       ran: true,
       valid: !!data.valid,
+      exitCode: typeof data.exitCode === 'number' ? data.exitCode : null,
+      stdout: typeof data.stdout === 'string' ? data.stdout : '',
+      stderr: typeof data.stderr === 'string' ? data.stderr : '',
       errorCount: data.errorCount ?? 0,
       warningCount: data.warningCount ?? 0,
       diagnostics: Array.isArray(data.diagnostics) ? data.diagnostics : [],
+      globalDiagnostics: Array.isArray(data.globalDiagnostics) ? data.globalDiagnostics : [],
       errorsByFile: (data.errorsByFile && typeof data.errorsByFile === 'object') ? data.errorsByFile : {},
       rawOutput: data.rawOutput ?? data.errors ?? '',
     });
@@ -115,7 +127,8 @@ export function SandboxPanel() {
       await runValidation();
     }
     const filesWithIssues = Object.entries(validation.errorsByFile ?? {});
-    if (filesWithIssues.length === 0) {
+    const hasGlobalIssues = (validation.globalDiagnostics ?? []).length > 0;
+    if (filesWithIssues.length === 0 && !hasGlobalIssues) {
       setFeedback({ type: 'success', msg: 'Aucune erreur — rien à corriger' });
       return;
     }
@@ -145,6 +158,12 @@ export function SandboxPanel() {
         ).join('\n');
         diagBlocks.push(`### Erreurs dans ${file} :\n${list}`);
       }
+      if (hasGlobalIssues) {
+        const list = validation.globalDiagnostics.map(d =>
+          `  • [${d.severity.toUpperCase()} ${d.code ?? ''}] ${d.message}`
+        ).join('\n');
+        diagBlocks.push(`### Erreurs globales tsc :\n${list}`);
+      }
 
       const codeBlocks: string[] = [];
       for (const entry of fetched) {
@@ -166,11 +185,13 @@ export function SandboxPanel() {
         '',
         'Règles à suivre OBLIGATOIREMENT :',
         '1. Lis d\'abord chaque fichier concerné dans le sandbox avant de le modifier.',
-        '2. Corriger UNIQUEMENT les erreurs listées ci-dessus — ne PAS faire de refactoring, ne PAS toucher aux lignes non concernées.',
-        '3. Conserver strictement le style, la structure, les noms de variables/fonctions existants.',
-        '4. Après chaque modification : déclencher une re-validation via Valider (côté utilisateur) ou re-tenter tsx --noEmit.',
-        '5. Si une erreur implique un fichier hors sandbox (dépendance du workspace principal), lire le fichier original pour comprendre l\'API attendue.',
-        '6. Ne PAS synchroniser auto vers le workspace principal — laisse l\'utilisateur valider chaque changement.',
+        '2. Corriger UNIQUEMENT les erreurs listées ci-dessus — ne PAS faire de refactoring, ne PAS toucher aux lignes non concernées. Toute correction doit être un patch minimal et réversible.',
+        '3. Conserver strictement le style, la structure DOM, l’ordre des blocs, les noms de variables/fonctions et le comportement existants.',
+        '4. Ne pas remplacer tout le fichier pour une erreur locale. Ne pas modifier className, styles inline, imports d’icônes ou layout sauf si le diagnostic cible précisément cette ligne.',
+        '5. Préserver les classes Tailwind existantes (ne pas introduire de classe arbitraire comme border-slate-8) et ne pas convertir les styles existants vers une autre approche.',
+        '6. Après chaque modification : déclencher une re-validation via Valider (côté utilisateur) ou re-tenter tsc --noEmit.',
+        '7. Si une erreur implique un fichier hors sandbox (dépendance du workspace principal), lire le fichier original pour comprendre l’API attendue.',
+        '8. Ne PAS synchroniser auto vers le workspace principal — laisse l’utilisateur valider chaque changement.',
         '',
         'Commence par résumer brièvement ce que tu vas faire, puis applique les corrections fichier par fichier.',
       ].join('\n');
@@ -683,8 +704,8 @@ export function SandboxPanel() {
 
       {/* ═══ Validation errors panel — fichier par fichier ═══ */}
 
-      {/* Cas tsc config error : valid=false mais aucune erreur parsée — afficher rawOutput */}
-      {validation.ran && !validation.valid && validation.errorCount === 0 && validation.rawOutput && (
+  {/* Cas tsc config/global error : afficher stdout/stderr même sans diagnostic rattaché à un fichier */}
+      {validation.ran && !validation.valid && Object.keys(validation.errorsByFile).length === 0 && validation.rawOutput && (
         <div
           className="rounded-lg overflow-hidden border"
           style={{ borderColor: 'rgba(248,113,113,0.25)', backgroundColor: 'rgba(248,113,113,0.04)' }}
@@ -692,7 +713,7 @@ export function SandboxPanel() {
           <div className="flex items-center gap-1.5 px-2.5 py-1.5">
             <AlertOctagon size={11} style={{ color: '#f87171' }} />
             <span className="text-[10px] font-bold" style={{ color: '#f87171' }}>
-              Échec build (configuration tsc)
+              Échec build{validation.exitCode !== null ? ` (code ${validation.exitCode})` : ''} (configuration ou diagnostic global tsc)
             </span>
           </div>
           <div className="px-2.5 pb-2.5">
@@ -700,7 +721,10 @@ export function SandboxPanel() {
               className="text-[9.5px] font-mono whitespace-pre-wrap break-all max-h-40 overflow-y-auto custom-scrollbar rounded p-2"
               style={{ backgroundColor: 'rgba(0,0,0,0.2)', color: '#fca5a5' }}
             >
-              {validation.rawOutput}
+              {validation.exitCode !== null && `exitCode: ${validation.exitCode}\n`}
+              {validation.stdout && `stdout:\n${validation.stdout}\n`}
+              {validation.stderr && `stderr:\n${validation.stderr}\n`}
+              {!validation.stdout && !validation.stderr && validation.rawOutput}
             </pre>
           </div>
         </div>

@@ -11,7 +11,7 @@ Planifier → Agir → Vérifier → Corriger → Continuer/Terminer
 ## Règles d'autonomie
 
 1. **Vérifier systématiquement** après chaque modification de fichier
-2. **Corriger immédiatement** si verify_file échoue — ne pas passer à autre chose
+2. **Corriger immédiatement** si verify_file échoue — lire les diagnostics détaillés (`allIssues`, phase, `stdout`, `stderr`, `exitCode`), appliquer un patch ciblé et revalider. Limiter les corrections automatiques à 3 tentatives par fichier, puis escalader à l'utilisateur.
 3. **Pivoter** après 2 échecs sur la même approche — essayer autrement
 4. **Escalader** après 3 pivots — expliquer le blocage à l'utilisateur
 5. **Déléguer** quand la tâche sort de ton domaine d'expertise
