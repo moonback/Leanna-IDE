@@ -247,7 +247,7 @@ export class AgentExecutor {
       const fileContextSection = state.fileSnapshots.size > 0
         ? [
             "",
-            "## Fichiers en mémoire (contenu exact disponible pour apply_patch)",
+            "## Fichiers en mémoire (état courant autoritaire pour apply_patch)",
             ...[...state.fileSnapshots.entries()].map(([filePath, content]) => {
               const truncated = content.length > AgentExecutor.MAX_FILE_CONTEXT_CHARS
                 ? content.slice(0, AgentExecutor.MAX_FILE_CONTEXT_CHARS) + `\n... [tronqué par sécurité — ${content.split("\n").length} lignes au total. Relis la section manquante avec read_project_file(full:true) ou startLine/endLine]`
@@ -417,12 +417,50 @@ export class AgentExecutor {
     return streams.slice(0, 5000) || `outil en échec (code ${result.exitCode ?? "inconnu"})`;
   }
 
+  private async refreshFileSnapshot(
+    requestedPath: string,
+    state: ToolExecutionState,
+    reason: string
+  ): Promise<boolean> {
+    try {
+      const result = await this.skillHandler!("read_project_file", { path: requestedPath, full: true });
+      state.toolsExecuted.push("read_project_file");
+
+      if (result?.error || result?.status === "failed" || typeof result?.content !== "string") {
+        const error = this.formatToolFailure(result);
+        state.fileSnapshots.delete(requestedPath);
+        state.observations.push(`- read_project_file ${requestedPath}: échec pendant le rafraîchissement ${reason} — ${error}`);
+        return false;
+      }
+
+      state.filesRead.push(requestedPath);
+      state.fileSnapshots.set(requestedPath, result.content);
+      state.observations.push(`- read_project_file ${requestedPath}: instantané actuel rafraîchi ${reason}; cet état remplace tout contenu initial.`);
+      return true;
+    } catch (error) {
+      const message = (error as Error).message;
+      state.fileSnapshots.delete(requestedPath);
+      state.observations.push(`- read_project_file ${requestedPath}: erreur pendant le rafraîchissement ${reason} — ${message}`);
+      return false;
+    }
+  }
+
   private async executeRequestedTools(
     agent: { name: string; capabilities: string[] },
     calls: AgentToolCall[],
     state: ToolExecutionState
   ): Promise<void> {
+    const seenCalls = new Set<string>();
+    const writePathsHandled = new Set<string>();
+
     for (const call of calls) {
+      const callSignature = `${call.name}:${JSON.stringify(call.parameters)}`;
+      if (seenCalls.has(callSignature)) {
+        state.observations.push(`- ${call.name}: appel identique ignoré dans ce tour; l'observation du premier appel est suffisante.`);
+        continue;
+      }
+      seenCalls.add(callSignature);
+
       if (!EXECUTABLE_AGENT_TOOLS.has(call.name) || !agent.capabilities.includes(call.name)) {
         // Tenter une résolution partielle (le modèle tronque parfois les noms)
         const resolved = [...EXECUTABLE_AGENT_TOOLS].find(
@@ -439,6 +477,16 @@ export class AgentExecutor {
 
       const requestedPath = typeof call.parameters.path === "string" ? call.parameters.path : undefined;
       const isWriteCall = requestedPath && ["write_project_file", "apply_patch", "patch_project_file"].includes(call.name);
+      const pathKey = requestedPath?.replace(/\\/g, "/").replace(/^\.\//, "");
+
+      // Tous les patches d'une réponse sont produits à partir du même état. Après une
+      // écriture, tout second patch du même fichier serait nécessairement obsolète.
+      if (isWriteCall && pathKey && writePathsHandled.has(pathKey)) {
+        state.observations.push(`- ${call.name} ${requestedPath}: écriture différée. Une écriture de ce fichier a déjà été traitée ce tour; attends l'instantané rafraîchi avant un nouveau patch.`);
+        continue;
+      }
+      if (isWriteCall && pathKey) writePathsHandled.add(pathKey);
+
       if (isWriteCall && requestedPath && (state.verificationAttempts.get(requestedPath) ?? 0) >= AgentExecutor.MAX_FILE_CORRECTIONS) {
         const message = `plafond de ${AgentExecutor.MAX_FILE_CORRECTIONS} corrections atteint pour ${requestedPath}; validation humaine requise`;
         state.errors.push(`${call.name}: ${message}`);
@@ -452,19 +500,36 @@ export class AgentExecutor {
         state.toolsExecuted.push(call.name);
         if (result?.error || result?.status === "failed") {
           const error = this.formatToolFailure(result);
-          state.errors.push(`${call.name}: ${error}`);
-          state.observations.push(`- ${call.name}: échec — ${error}`);
+          if (isWriteCall && requestedPath) {
+            const attempt = (state.verificationAttempts.get(requestedPath) ?? 0) + 1;
+            state.verificationAttempts.set(requestedPath, attempt);
+            await this.refreshFileSnapshot(requestedPath, state, "après le refus d'écriture");
+            const limitNote = attempt >= AgentExecutor.MAX_FILE_CORRECTIONS
+              ? ` Plafond atteint (${AgentExecutor.MAX_FILE_CORRECTIONS}) : aucune autre écriture automatique ne sera autorisée.`
+              : " Relis l'instantané actuel avant de régénérer un unique patch ciblé.";
+            if (attempt >= AgentExecutor.MAX_FILE_CORRECTIONS) {
+              state.errors.push(`${call.name}: ${error}`);
+            }
+            state.observations.push(`- ${call.name} ${requestedPath}: échec (tentative ${attempt}/${AgentExecutor.MAX_FILE_CORRECTIONS}) — ${error}${limitNote}`);
+          } else {
+            state.errors.push(`${call.name}: ${error}`);
+            state.observations.push(`- ${call.name}: échec — ${error}`);
+          }
           continue;
         }
 
         if (requestedPath && ["read_project_file", "read_file_outline"].includes(call.name)) {
           state.filesRead.push(requestedPath);
           // Persister le contenu lu dans le workspace state pour les tours suivants
-          if (call.name === "read_project_file" && result?.content && result?.status === "success") {
+          if (call.name === "read_project_file" && typeof result?.content === "string" && result?.status === "success") {
             state.fileSnapshots.set(requestedPath, result.content);
           }
         }
-        if (requestedPath && ["write_project_file", "apply_patch", "patch_project_file"].includes(call.name)) {
+        if (isWriteCall && requestedPath) {
+          // Le prompt de départ contient des fichiers initiaux. Une relecture immédiate
+          // rend le contenu réellement écrit autoritaire pour le prochain tour.
+          await this.refreshFileSnapshot(requestedPath, state, "après l'écriture");
+
           const verification = await this.skillHandler!("verify_file", { path: requestedPath });
           state.toolsExecuted.push("verify_file");
           if (verification?.error || verification?.ok === false || verification?.status === "failed" || verification?.status !== "success") {
@@ -473,15 +538,15 @@ export class AgentExecutor {
             const error = this.formatToolFailure(verification);
             const limitNote = attempt >= AgentExecutor.MAX_FILE_CORRECTIONS
               ? ` Plafond atteint (${AgentExecutor.MAX_FILE_CORRECTIONS}) : aucune autre écriture automatique ne sera autorisée.`
-              : " Relis le diagnostic puis applique un patch ciblé avant de revalider.";
-            state.errors.push(`verify_file(${requestedPath}): ${error}`);
+              : " Relis le diagnostic et l'instantané actuel puis applique un patch ciblé avant de revalider.";
+            if (attempt >= AgentExecutor.MAX_FILE_CORRECTIONS) {
+              state.errors.push(`verify_file(${requestedPath}): ${error}`);
+            }
             state.observations.push(`- ${call.name} ${requestedPath}: écrit mais vérification échouée (tentative ${attempt}/${AgentExecutor.MAX_FILE_CORRECTIONS}) — ${error}${limitNote}`);
             continue;
           }
           state.verificationAttempts.delete(requestedPath);
           state.filesModified.push(requestedPath);
-          // Invalider le snapshot après modification (forcer relecture)
-          state.fileSnapshots.delete(requestedPath);
         }
 
         state.observations.push(this.formatToolObservation(call.name, result));

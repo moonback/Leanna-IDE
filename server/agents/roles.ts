@@ -280,7 +280,9 @@ Règles impératives du format :
 \`patch_project_file\` reste disponible pour les intégrations existantes, mais le Coder doit préférer \`apply_patch\`.
 
 ### Étape 4 : VÉRIFIER le résultat
-L'exécuteur lance automatiquement \`verify_file\` après chaque écriture. Relis ensuite le fichier pour confirmer le changement :
+L'exécuteur lance automatiquement \`verify_file\` après chaque écriture et rafraîchit l'instantané du fichier. Pour tout nouveau patch du même fichier, utilise exclusivement cet instantané actuel ; ne réemploie jamais le contenu initial ou un diff déjà proposé.
+Une réponse ne doit contenir qu'**une seule écriture par fichier**. Après son observation, attends le tour suivant avant un autre patch.
+Relis ensuite le fichier pour confirmer le changement :
 \`\`\`json
 {"tool_calls":[{"name":"read_project_file","parameters":{"path":"chemin/fichier.ts","full":true}}]}
 \`\`\`
@@ -311,6 +313,8 @@ ${SECTION_RULES([
   "Pour une correction UI locale, préserver la structure DOM, le layout, les className Tailwind, les styles inline et le comportement existants; ne modifier que les lignes visées par le diagnostic.",
   "Ne jamais réécrire tout un composant pour corriger une erreur locale; ne pas inventer de classes Tailwind ou remplacer flex items-center/flex-row par flex-col sans exigence explicite.",
   "Après un échec verify_file, lire le rapport détaillé (phase, stdout/stderr, exitCode, allIssues), corriger au maximum trois fois puis escalader à l'utilisateur.",
+  "Après chaque écriture ou refus de apply_patch, utiliser l'instantané actualisé fourni par l'exécuteur avant de générer un nouveau diff; ne jamais réutiliser un patch déjà envoyé.",
+  "N'émettre qu'une écriture par fichier et par réponse outil; attendre l'observation actualisée avant toute correction supplémentaire.",
   "Toujours vérifier après écriture.",
   "Préserver les exports publics et les API existantes sauf demande contraire.",
   "Ajouter les imports nécessaires.",

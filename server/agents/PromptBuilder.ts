@@ -24,10 +24,10 @@ export class PromptBuilder {
     if (fileContents.length > 0) {
       parts.push(
         "",
-        "## Fichiers de contexte",
+        "## Fichiers de contexte (instantané initial)",
         ...fileContents,
         "",
-        "Les fichiers ci-dessus proviennent du workspace actif. Utilise-les immédiatement : ne demande ni archive, ni code source supplémentaire avant d'avoir analysé ce contexte."
+        "Les fichiers ci-dessus sont un instantané initial du workspace actif. Utilise-les immédiatement. Après une écriture, l'exécuteur fournira un bloc « Fichiers en mémoire » : ce dernier est le seul état autoritaire et remplace tout contenu initial du même chemin."
       );
     }
 
