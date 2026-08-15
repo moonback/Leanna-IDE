@@ -136,13 +136,33 @@ export default function IdeView() {
   const [showMissions, setShowMissions] = useState(false);
   const [showKnowledge, setShowKnowledge] = useState(false);
   const [showCheckpoints, setShowCheckpoints] = useState(false);
-    const [showSandbox, setShowSandbox] = useState(false);
-    const [showSystemHealth, setShowSystemHealth] = useState(false);
-    const [showHelp, setShowHelp] = useState(false);
-    const [showHistory, setShowHistory] = useState(false);
-    const [showAutomation, setShowAutomation] = useState(false);
-    const [showMemory, setShowMemory] = useState(false);
-    const [showSandboxDiffOverlay, setShowSandboxDiffOverlay] = useState(false);
+  const [showSandbox, setShowSandbox] = useState(false);
+  const [sandboxView, setSandboxView] = useState<'controls' | 'diff'>('controls');
+  const [selectedSandboxDiffFile, setSelectedSandboxDiffFile] = useState<string | null>(null);
+  const toggleSandbox = useCallback(() => {
+    setShowSandbox((visible) => {
+      if (!visible) {
+        setSandboxView('controls');
+        setSelectedSandboxDiffFile(null);
+      }
+      return !visible;
+    });
+  }, []);
+  const openSandboxDiff = useCallback((initialFile: string | null = null) => {
+    setSelectedSandboxDiffFile(initialFile);
+    setSandboxView('diff');
+    setShowSandbox(true);
+  }, []);
+  const closeSandbox = useCallback(() => {
+    setShowSandbox(false);
+    setSandboxView('controls');
+    setSelectedSandboxDiffFile(null);
+  }, []);
+  const [showSystemHealth, setShowSystemHealth] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showAutomation, setShowAutomation] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
   const [selfEditingFile, setSelfEditingFile] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
 
@@ -279,10 +299,10 @@ export default function IdeView() {
 
   // ── Open Sandbox Diff from StatusBar click ─────────────────────────────────
   useEffect(() => {
-    const handleOpenSandboxDiff = () => setShowSandboxDiffOverlay(true);
+    const handleOpenSandboxDiff = () => openSandboxDiff();
     window.addEventListener('jarvis-open-sandbox-diff', handleOpenSandboxDiff);
     return () => window.removeEventListener('jarvis-open-sandbox-diff', handleOpenSandboxDiff);
-  }, []);
+  }, [openSandboxDiff]);
 
   // Open Agents panel only on explicit user action (button click, overlay)
   useEffect(() => {
@@ -683,7 +703,7 @@ export default function IdeView() {
         onToggleGitHub={() => setShowGitHub(v => !v)}
         onToggleGit={() => setShowGit(v => !v)}
         onToggleCheckpoints={() => setShowCheckpoints(v => !v)}
-        onToggleSandbox={() => setShowSandbox(v => !v)}
+        onToggleSandbox={toggleSandbox}
         onToggleWorkflow={() => setShowWorkflow(v => !v)}
         onToggleSkillsMonitor={() => setShowSkillsMonitor(v => !v)}
         onToggleChat={() => setShowChat(v => !v)}
@@ -768,27 +788,10 @@ export default function IdeView() {
         </div>
       )}
 
-      {/* Sandbox Panel */}
-            {showSandbox && (
-              <div className="border-r flex flex-col min-h-0" style={{ width: '280px', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
-                <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border-base)' }}>
-                  <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>Sandbox</span>
-                  <button onClick={() => setShowSandbox(false)} className="p-1 rounded hover:bg-white/10 transition" title="Fermer">
-                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>✕</span>
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                  <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement du sandbox…</div></div>}>
-                    <SandboxPanel />
-                  </Suspense>
-                </div>
-              </div>
-            )}
-
       {/* Editor Area */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0 relative">
         {/* Tab Bar — masqué quand un panneau plein-écran est actif */}
-        {!showHistory && !showAutomation && !showMemory && !showHelp && !showSettingsPanel && !showKnowledge && (
+        {!showSandbox && !showHistory && !showAutomation && !showMemory && !showHelp && !showSettingsPanel && !showKnowledge && (
           <EditorTabs
             openFiles={fileSystem.openFiles}
             activePath={fileSystem.activePath}
@@ -849,7 +852,43 @@ export default function IdeView() {
                   <div className="flex flex-1 min-h-0">
                     {/* Monaco Editor / Settings Panel */}
                     <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
-                      {showKnowledge ? (
+                      {showSandbox ? (
+                        sandboxView === 'diff' ? (
+                          <SandboxDiffViewer
+                            embedded
+                            initialSelectedFile={selectedSandboxDiffFile}
+                            onClose={() => {
+                              setSandboxView('controls');
+                              setSelectedSandboxDiffFile(null);
+                            }}
+                          />
+                        ) : (
+                          <div className="flex flex-1 flex-col min-h-0" style={{ backgroundColor: 'var(--bg-panel)' }}>
+                            <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-base)' }}>
+                              <div>
+                                <h2 className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Sandbox</h2>
+                                <p className="mt-0.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                  Espace isolé pour examiner et valider vos modifications
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={closeSandbox}
+                                className="p-2 rounded-lg hover:bg-white/10 transition"
+                                title="Fermer le sandbox"
+                                aria-label="Fermer le sandbox"
+                              >
+                                <X size={15} style={{ color: 'var(--text-muted)' }} />
+                              </button>
+                            </div>
+                            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+                              <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{ color: 'var(--text-muted)' }}>Chargement du sandbox…</div></div>}>
+                                <SandboxPanel onOpenDiff={openSandboxDiff} />
+                              </Suspense>
+                            </div>
+                          </div>
+                        )
+                      ) : showKnowledge ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement du dashboard…</div></div>}>
                           <KnowledgeDashboard onClose={() => setShowKnowledge(false)} />
                         </Suspense>
@@ -1070,7 +1109,7 @@ export default function IdeView() {
           column={cursorPosition?.column}
           dirty={activeFile?.dirty}
           assistantBusy={assistantWorking}
-          onToggleSandbox={() => setShowSandbox(v => !v)}
+          onToggleSandbox={toggleSandbox}
           onToggleMcp={() => setShowMcp(v => !v)}
           onToggleAgents={() => setShowAgents(v => !v)}
           onToggleFleet={() => setShowFleet(v => !v)}
@@ -1123,11 +1162,6 @@ export default function IdeView() {
         onOpenAgents={() => setShowAgents(true)}
         onOpenMissions={() => setShowMissions(true)}
       />
-
-      {/* Sandbox Diff Viewer — opened from StatusBar sandbox badge */}
-      {showSandboxDiffOverlay && (
-        <SandboxDiffViewer onClose={() => setShowSandboxDiffOverlay(false)} />
-      )}
 
       {/* Chat Panel — floating overlay above everything */}
       {showChat && !showSkillsMonitor && (
