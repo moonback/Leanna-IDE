@@ -234,28 +234,34 @@ ${SECTION_MISSION([
 
 Tu DOIS suivre ces étapes dans cet ordre exact. Aucune étape ne peut être sautée.
 
-### Étape 1 : LIRE le fichier complet
+## FORMAT D'APPEL EXÉCUTABLE (OBLIGATOIRE)
+
+Quand un outil est nécessaire, réponds **uniquement** avec un objet JSON valide, sans bloc Markdown, commentaire ni texte avant/après. Le moteur n'exécute aucun pseudo-appel tel que \`patch_project_file({...})\`.
+
+Format exact :
+\`\`\`json
+{"tool_calls":[{"name":"nom_outil","parameters":{"paramètre":"valeur"}}]}
 \`\`\`
-read_project_file({ path: "chemin/fichier.ts", full: true })
+
+Après chaque observation, réponds soit avec le prochain objet \`tool_calls\`, soit avec le rapport final. Ne déclare jamais « je poursuis » ou « je vais modifier » sans appeler l'outil requis.
+
+### Étape 1 : LIRE le fichier complet
+\`\`\`json
+{"tool_calls":[{"name":"read_project_file","parameters":{"path":"chemin/fichier.ts","full":true}}]}
 \`\`\`
 - Toujours utiliser \`full: true\` pour obtenir le fichier entier.
-- NOTER les numéros de ligne dans la réponse.
+- Noter les numéros de ligne fournis dans l'observation.
 
 ### Étape 2 : IDENTIFIER les lignes à modifier
 - Repérer les numéros de ligne EXACTS du bloc à modifier/supprimer.
-- Utiliser les numéros de ligne retournés par read_project_file (startLine, endLine, totalLines).
+- Utiliser les numéros de ligne retournés par \`read_project_file\` (startLine, endLine, totalLines).
 
 ### Étape 3 : MODIFIER avec patch_project_file (MÉTHODE RECOMMANDÉE)
 
-**C'est la méthode la PLUS FIABLE. Utilise TOUJOURS patch_project_file pour modifier ou supprimer du code.**
+**C'est la méthode la PLUS FIABLE. Utilise TOUJOURS \`patch_project_file\` pour modifier ou supprimer du code.**
 
-\`\`\`
-patch_project_file({
-  path: "chemin/fichier.ts",
-  operations: [
-    { type: "delete", startLine: 73, endLine: 95 }
-  ]
-})
+\`\`\`json
+{"tool_calls":[{"name":"patch_project_file","parameters":{"path":"chemin/fichier.ts","operations":[{"type":"delete","startLine":73,"endLine":95}]}}]}
 \`\`\`
 
 Opérations disponibles :
@@ -263,21 +269,10 @@ Opérations disponibles :
 - \`replace\` : remplace les lignes startLine-endLine par content
 - \`insert\` : insère content APRÈS startLine
 
-**Exemples :**
-\`\`\`
-// Supprimer les lignes 341 à 361
-patch_project_file({ path: "src/file.tsx", operations: [{ type: "delete", startLine: 341, endLine: 361 }] })
-
-// Remplacer les lignes 10-12 par du nouveau code
-patch_project_file({ path: "src/file.tsx", operations: [{ type: "replace", startLine: 10, endLine: 12, content: "const newCode = true;" }] })
-
-// Insérer après la ligne 50
-patch_project_file({ path: "src/file.tsx", operations: [{ type: "insert", startLine: 50, content: "// nouvelle ligne" }] })
-\`\`\`
-
 ### Étape 4 : VÉRIFIER le résultat
-\`\`\`
-read_project_file({ path: "chemin/fichier.ts", full: true })
+L'exécuteur lance automatiquement \`verify_file\` après chaque écriture. Relis ensuite le fichier pour confirmer le changement :
+\`\`\`json
+{"tool_calls":[{"name":"read_project_file","parameters":{"path":"chemin/fichier.ts","full":true}}]}
 \`\`\`
 - Confirmer que la modification est bien appliquée.
 - Vérifier que le code supprimé n'existe plus.
@@ -285,15 +280,11 @@ read_project_file({ path: "chemin/fichier.ts", full: true })
 ## MÉTHODE ALTERNATIVE : modify_project_file
 
 Uniquement pour des remplacements textuels COURTS et SIMPLES (1-3 lignes).
+\`\`\`json
+{"tool_calls":[{"name":"modify_project_file","parameters":{"path":"chemin/fichier.ts","searchText":"TEXTE EXACT copié depuis le fichier lu","replaceText":"nouveau texte"}}]}
 \`\`\`
-modify_project_file({
-  path: "chemin/fichier.ts",
-  searchText: "TEXTE EXACT copié depuis le fichier lu",
-  replaceText: "nouveau texte"
-})
-\`\`\`
-- searchText doit être EXACTEMENT le texte du fichier (espaces, indentation identiques).
-- Pour supprimer : replaceText = ""
+- \`searchText\` doit être EXACTEMENT le texte du fichier (espaces, indentation identiques).
+- Pour supprimer : \`replaceText\` = \`\`
 
 ## ERREURS FRÉQUENTES À ÉVITER
 

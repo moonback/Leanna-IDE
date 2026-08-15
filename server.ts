@@ -1814,6 +1814,16 @@ async function startServer() {
         }
       }
 
+      // ── Filtrage des outils d'écriture : RÉSERVÉS AUX AGENTS UNIQUEMENT ──
+      // L'assistant principal ne doit JAMAIS modifier des fichiers directement.
+      // Toute modification passe par agent_delegate(role='coder').
+      const AGENT_ONLY_TOOLS = new Set([
+        'write_project_file',
+        'modify_project_file',
+        'patch_project_file',
+      ]);
+      filteredDeclarations = filteredDeclarations.filter(d => !AGENT_ONLY_TOOLS.has(d.name));
+
       const tools = filteredDeclarations.length > 0 ? [{ functionDeclarations: filteredDeclarations }] : undefined;
 
       // Log tool loading

@@ -159,6 +159,8 @@ export function checkTypeScriptSyntax(code: string, filePath: string): string | 
     skipLibCheck: true,
     noEmit: true,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
+    // Les composants .tsx doivent être analysés avec JSX, comme dans tsconfig.json.
+    jsx: filePath.endsWith(".tsx") ? ts.JsxEmit.ReactJSX : undefined,
   };
 
   const host = ts.createCompilerHost(compilerOptions, true);
@@ -512,6 +514,41 @@ async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = 
   }
 }
 
+/** Typecheck ciblé avec les options du tsconfig sans échouer sur les erreurs hors du fichier vérifié. */
+function typecheckFileWithProjectConfig(relativePath: string, absolutePath: string): { ok: boolean; stdout: string; stderr: string } {
+  try {
+    const root = getProjectRoot();
+    const configPath = ts.findConfigFile(root, ts.sys.fileExists, "tsconfig.json");
+    if (!configPath) {
+      return { ok: false, stdout: "", stderr: "tsconfig.json introuvable pour la vérification TypeScript." };
+    }
+
+    const config = ts.readConfigFile(configPath, ts.sys.readFile);
+    if (config.error) {
+      return { ok: false, stdout: "", stderr: ts.flattenDiagnosticMessageText(config.error.messageText, "\n") };
+    }
+
+    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath));
+    const targetPath = path.resolve(absolutePath);
+    const diagnostics = ts.getPreEmitDiagnostics(ts.createProgram([targetPath], parsed.options))
+      .filter((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error)
+      .filter((diagnostic) => diagnostic.file && path.resolve(diagnostic.file.fileName) === targetPath);
+
+    const errors = diagnostics.map((diagnostic) => {
+      const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
+      if (!diagnostic.file || diagnostic.start === undefined) {
+        return `${relativePath}: error TS${diagnostic.code}: ${message}`;
+      }
+      const position = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+      return `${relativePath}(${position.line + 1},${position.character + 1}): error TS${diagnostic.code}: ${message}`;
+    });
+
+    return { ok: errors.length === 0, stdout: "", stderr: errors.join("\n") };
+  } catch (error) {
+    return { ok: false, stdout: "", stderr: (error as Error).message };
+  }
+}
+
 export function findAssociatedTestFile(relativePath: string): string | null {
   const root = getProjectRoot();
   const normalizedRel = path.normalize(relativePath).replace(/\\/g, "/");
@@ -586,7 +623,7 @@ export const verifySkill: Skill = {
     },
     {
       name: "verify_file",
-      description: "Vérifie un fichier modifié : lance lint + tsc --noEmit ciblé + analyse sécurité + tests associés en parallèle. Retourne un rapport structuré avec fichier/ligne/colonne pour chaque problème.",
+      description: "Vérifie un fichier modifié : lance lint + typecheck TypeScript ciblé avec les options du tsconfig + analyse sécurité + tests associés en parallèle. Retourne un rapport structuré avec fichier/ligne/colonne pour chaque problème.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -704,14 +741,7 @@ export const verifySkill: Skill = {
         const lintPromise = runLintDirect([validated.path]);
 
         const typecheckPromise = isTypeScript
-          ? (async () => {
-              let tc = await runAllowed("tsc", [validated.path]);
-              // Si le fichier seul a des imports non résolus, fallback sur le projet complet
-              if (!tc.ok && (tc.stderr.includes("Cannot find module") || tc.stdout.includes("Cannot find module"))) {
-                tc = await runAllowed("tsc");
-              }
-              return tc;
-            })()
+          ? Promise.resolve(typecheckFileWithProjectConfig(validated.path, abs))
           : Promise.resolve({ ok: true, stdout: "", stderr: "" });
 
         // Tests avec cache — évite de relancer si le fichier source n'a pas changé

@@ -42,7 +42,7 @@ export class PromptBuilder {
       "",
       "## Contrat d'exécution obligatoire",
       "Exécute le travail avant de répondre : une intention telle que « Je vais… », « Je dois… » ou un plan seul n'est jamais un résultat.",
-      "Pour toute modification, fournis les fichiers complets dans un format pris en charge puis attends leur écriture et leur vérification.",
+      "Pour toute action sur un fichier, émet d'abord uniquement un JSON valide au format {\"tool_calls\":[{\"name\":\"nom_outil\",\"parameters\":{...}}]}; les pseudo-appels JavaScript et les blocs Markdown ne sont pas exécutés. Après chaque observation, poursuis avec le prochain tool_calls jusqu'à l'écriture et la vérification, puis rends le rapport final.",
       "Termine impérativement par :",
       "## Résultats vérifiés",
       "- Constats ou changements réellement obtenus, avec fichiers concernés.",
