@@ -268,16 +268,11 @@ export class AgentExecutor {
         ? "⚠️ C'est ton dernier tour d'appels d'outils. Tu DOIS maintenant produire le résultat final. Ne demande plus d'appels d'outils."
         : `Poursuis la tâche avec ces observations. Les appels bash/shell et les chemins /workspace ne sont pas disponibles.\nUtilise uniquement les skills structurés autorisés si une action supplémentaire est indispensable.\nPour apply_patch, fournis un diff unifié complet avec les lignes \`---\`, \`+++\` et \`@@\`; le backend refuse un patch dont le contexte ne correspond pas exactement au fichier courant.\nSinon, rends maintenant le résultat final vérifié.\nNe renvoie jamais un plan seul ni un JSON tool_calls sans résultat final.${stallNote}`;
 
-      // Ne ré-inclure le prompt initial que si aucun snapshot n'est disponible,
-      // pour éviter d'envoyer des centaines de ko à chaque tour.
-      const contextHeader = state.fileSnapshots.size > 0
-        ? `# Tâche en cours : ${executionPrompt.match(/# Tâche : ([^\n]+)/)?.[1] ?? "modification fichier"}\n`
-        : (executionPrompt.length > 8_000
-            ? executionPrompt.slice(0, 8_000) + "\n... [contexte initial tronqué]\n"
-            : executionPrompt + "\n");
-
+      // Ne remplacer que le snapshot du fichier dans le followUp —
+      // le prompt initial (contrat d'exécution, liste des outils) doit toujours être présent.
+      // Pour les tours suivants, on injecte uniquement la section fichier + observations.
       const followUpPrompt = [
-        contextHeader,
+        executionPrompt,
         fileContextSection,
         "",
         "## Observations d'exécution (tour " + (turn + 1) + ")",

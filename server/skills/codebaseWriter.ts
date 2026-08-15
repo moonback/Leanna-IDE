@@ -408,7 +408,9 @@ export async function handleApplyPatch(args: any, toolContext: any) {
     }
   }
   if (current) hunks.push(current);
-  if (hunks.length === 0) return { error: "Diff unifié invalide : aucun hunk @@ ... @@ trouvé." };
+  if (hunks.length === 0) return {
+    error: "Diff unifié invalide : aucun hunk @@ ... @@ trouvé. Utilise UNIQUEMENT le format unifié standard (git diff). Exemple correct :\n--- a/src/file.tsx\n+++ b/src/file.tsx\n@@ -10,4 +10,4 @@\n context line\n-old line\n+new line\n context line\nFormats NON supportés : '*** Begin Patch', 'Index:', 'diff -e', diff contextuel.",
+  };
 
   // Vérifier d'abord tous les contextes sur le fichier original.
   for (const hunk of hunks) {

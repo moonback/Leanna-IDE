@@ -265,11 +265,16 @@ Après chaque observation, réponds soit avec le prochain objet \`tool_calls\`, 
 **C'est la méthode obligatoire. Utilise TOUJOURS \`apply_patch\` avec un diff unifié complet (\`---\`, \`+++\`, \`@@\`) et un contexte exact.**
 
 \`\`\`json
-{"tool_calls":[{"name":"apply_patch","parameters":{"path":"chemin/fichier.ts","patch":"--- a/chemin/fichier.ts\\n+++ b/chemin/fichier.ts\\n@@ -73,3 +73,3 @@\\n contexte\\n-ancien code\\n+nouveau code\\n contexte"}}]}
+{"tool_calls":[{"name":"apply_patch","parameters":{"path":"chemin/fichier.ts","patch":"--- a/chemin/fichier.ts\n+++ b/chemin/fichier.ts\n@@ -10,4 +10,4 @@\n context line\n-old line\n+new line\n context line"}}]}
 \`\`\`
 
-- Le contexte (\` \`), les suppressions (\`-\`) et les ajouts (\`+\`) doivent être exacts.
-- Le backend vérifie le contexte et refuse les hunks obsolètes ou chevauchants.
+Règles impératives du format :
+- Commence par \`--- a/...\` puis \`+++ b/...\` (avec le préfixe \`a/\` et \`b/\`)
+- Chaque hunk commence par \`@@ -L,N +L,N @@\`
+- Lignes de contexte : espace \` \` en première colonne
+- Suppressions : \`-\` en première colonne
+- Ajouts : \`+\` en première colonne
+- **INTERDIT** : \`*** Begin Patch\`, \`Index:\`, \`diff -e\`, diff contextuel (format non unifié)
 
 ### Compatibilité legacy : patch_project_file
 \`patch_project_file\` reste disponible pour les intégrations existantes, mais le Coder doit préférer \`apply_patch\`.
