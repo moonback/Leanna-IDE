@@ -1,3 +1,11 @@
+/**
+ * Heuristic first-pass detection for untrusted prompt content.
+ *
+ * This regex-based scan is intentionally not a security boundary: it cannot
+ * reliably detect reformulations, non-Latin scripts, Unicode obfuscation, or
+ * encoded instructions. Callers must keep untrusted content isolated from
+ * privileged instructions and enforce authorization at every action boundary.
+ */
 export type PromptInjectionSeverity = "low" | "medium" | "high";
 
 export interface PromptInjectionFinding {
