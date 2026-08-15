@@ -16,6 +16,7 @@ import {
   handleWriteProjectFile,
   handleModifyProjectFile,
   handlePatchProjectFile,
+  handleApplyPatch,
   handleRenameProjectFile,
   handleDeleteProjectFile,
   handleCreateProjectDirectory
@@ -145,6 +146,18 @@ export const codebaseSkill: Skill = {
       },
     },
     {
+      name: "apply_patch",
+      description: "⚠️ RÉSERVÉ AUX AGENTS — Applique un diff unifié vérifié sur un fichier. Le contexte des hunks doit correspondre exactement au contenu courant.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          path: { type: "STRING", description: "Chemin relatif du fichier cible." },
+          patch: { type: "STRING", description: "Diff unifié complet avec lignes ---/+++/@@." },
+        },
+        required: ["path", "patch"],
+      },
+    },
+    {
       name: "patch_project_file",
       description: "⚠️ RÉSERVÉ AUX AGENTS — Ne PAS appeler directement. Utilise agent_delegate(role='coder') pour toute modification de fichier. Cet outil patche un fichier via des opérations par ligne. Il est appelé automatiquement par l'agent coder. NOTE: operations are internally reordered and applied bottom-to-top (by startLine descending) so line numbers stay stable during the patch; operation ranges must NOT overlap.",
       parameters: {
@@ -257,6 +270,9 @@ export const codebaseSkill: Skill = {
 
       case "modify_project_file":
         return await handleModifyProjectFile(args, toolContext);
+
+      case "apply_patch":
+        return await handleApplyPatch(args, toolContext);
 
       case "patch_project_file":
         return await handlePatchProjectFile(args, toolContext);

@@ -51,7 +51,8 @@ export class PromptBuilder {
       "- Fichiers modifiés : ...",
       "- Outils/commandes exécutés : ...",
       "- Vérification : PASS ou FAIL, avec le résultat observé.",
-      "Les seuls appels structurés exécutables sont : list_project_files, read_project_file, read_file_outline, search_in_files, analyze_project_file, write_project_file, modify_project_file, patch_project_file et verify_*. Ne demande jamais bash, shell, find, ls ou /workspace.",
+      "Les seuls appels structurés exécutables sont : list_project_files, read_project_file, read_file_outline, search_in_files, analyze_project_file, write_project_file, apply_patch, patch_project_file et verify_*. Ne demande jamais bash, shell, find, ls ou /workspace.",
+      "Pour déléguer à un autre agent, écris un bloc textuel ## DÉLÉGATION dans ta réponse. N'émets JAMAIS {\"tool_calls\":[{\"name\":\"agent_delegate\"...}]} ni agent_orchestrate — ces outils ne sont pas disponibles ici.",
       "Sans preuve concrète, déclare explicitement la tâche incomplète et explique le blocage."
     );
 

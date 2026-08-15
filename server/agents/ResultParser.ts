@@ -45,4 +45,30 @@ export class ResultParser {
 
     return lines.length > 0 ? lines : undefined;
   }
+
+  /**
+   * Détecte une déclaration d'échec irréfutable dans le rapport final du modèle.
+   *
+   * Règle stricte : on ne refuse QUE si l'agent déclare explicitement
+   * "Vérification : FAIL" (dans la section preuves) ou un titre ## Échec / ## FAIL.
+   * Un texte honnête comme "aucune modification n'a pu être appliquée dans ce tour"
+   * ou "tâche incomplète" n'est PAS considéré comme un marqueur d'échec — cela sera
+   * géré par writeRequired dans collectEvidence sans dupliquer le message d'erreur.
+   */
+  detectFailure(text: string): string | null {
+    // 1. Marqueur dans la section Preuves d'exécution : "Vérification : FAIL"
+    const strictFail = text.match(
+      /[-•]\s*vérification\s*:\s*(?:FAIL|ÉCHEC|ECHEC)\b/i
+    );
+    if (strictFail) return "Le rapport final déclare explicitement une vérification en échec.";
+
+    // 2. Titre de section d'échec irréfutable (## Échec / ## FAIL / ## Blocage)
+    //    Ne pas capturer ## Incomplet, ## Tâche incomplète, ## Résultats vérifiés, etc.
+    const failHeader = text.match(
+      /(?:^|\n)\s*##\s+(?:Échec|Echec|FAIL)\b/i
+    );
+    if (failHeader) return failHeader[0].trim().replace(/^#+\s*/, "").slice(0, 200);
+
+    return null;
+  }
 }

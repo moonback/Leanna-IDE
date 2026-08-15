@@ -54,7 +54,7 @@ const EXECUTABLE_AGENT_TOOLS = new Set([
   "search_in_files",
   "analyze_project_file",
   "write_project_file",
-  "modify_project_file",
+  "apply_patch",
   "patch_project_file",
   "verify_file",
   "verify_typecheck",
@@ -154,7 +154,7 @@ export class AgentExecutor {
 
       // Un texte non exceptionnel ne suffit jamais : completed nécessite des preuves
       // observables collectées par l'exécuteur, pas seulement déclarées par le modèle.
-      task.status = success ? "completed" : "incomplete";
+      task.status = success ? "completed" : "failed";
       task.completedAt = new Date().toISOString();
       task.result = {
         success,
@@ -209,6 +209,10 @@ export class AgentExecutor {
    */
   private static readonly MAX_TOOL_TURNS = 8;
   private static readonly MAX_FILE_CORRECTIONS = 3;
+  /** Taille maximale d’une observation cumulée envoyée au modèle suivant. */
+  private static readonly MAX_OBSERVATION_CHARS = 240_000;
+  /** Limite de sécurité par snapshot, supérieure aux composants UI usuels. */
+  private static readonly MAX_FILE_CONTEXT_CHARS = 200_000;
 
   private async executeToolLoop(
     agent: { name: string; capabilities: string[] },
@@ -234,17 +238,19 @@ export class AgentExecutor {
       const isLastAllowedTurn = turn >= AgentExecutor.MAX_TOOL_TURNS - 2;
 
       await this.executeRequestedTools(agent, calls, state);
-      const observations = state.observations.slice(-calls.length).join("\n");
+      const observations = state.observations
+        .slice(-calls.length)
+        .join("\n")
+        .slice(-AgentExecutor.MAX_OBSERVATION_CHARS);
 
       // Construire le contexte des fichiers lus (workspace state persisté)
       const fileContextSection = state.fileSnapshots.size > 0
         ? [
             "",
-            "## Fichiers en mémoire (contenu exact disponible pour modify_project_file)",
+            "## Fichiers en mémoire (contenu exact disponible pour apply_patch)",
             ...[...state.fileSnapshots.entries()].map(([filePath, content]) => {
-              // Limiter chaque fichier à 3000 chars dans le contexte pour économiser les tokens
-              const truncated = content.length > 3000
-                ? content.slice(0, 3000) + `\n... [tronqué — ${content.split("\n").length} lignes au total. Utilise startLine/endLine pour lire une section spécifique]`
+              const truncated = content.length > AgentExecutor.MAX_FILE_CONTEXT_CHARS
+                ? content.slice(0, AgentExecutor.MAX_FILE_CONTEXT_CHARS) + `\n... [tronqué par sécurité — ${content.split("\n").length} lignes au total. Relis la section manquante avec read_project_file(full:true) ou startLine/endLine]`
                 : content;
               return `### ${filePath}\n\`\`\`\n${truncated}\n\`\`\``;
             }),
@@ -252,12 +258,26 @@ export class AgentExecutor {
           ].join("\n")
         : "";
 
+      // ── Compter les lectures répétées sans écriture ──────────────────────
+      const readsSinceWrite = state.filesRead.length - state.filesModified.length;
+      const stallNote = readsSinceWrite >= 2
+        ? `\n⚠️ Tu as lu ${readsSinceWrite} fois le fichier sans avoir émis de apply_patch. Produis maintenant un apply_patch ou déclare le blocage.`
+        : "";
+
       const synthesisInstruction = isLastAllowedTurn
         ? "⚠️ C'est ton dernier tour d'appels d'outils. Tu DOIS maintenant produire le résultat final. Ne demande plus d'appels d'outils."
-        : "Poursuis la tâche avec ces observations. Les appels bash/shell et les chemins /workspace ne sont pas disponibles.\nUtilise uniquement les skills structurés autorisés si une action supplémentaire est indispensable.\nPour modify_project_file, le searchText DOIT être copié EXACTEMENT depuis le contenu du fichier en mémoire ci-dessus.\nSinon, rends maintenant le résultat final vérifié.\nNe renvoie jamais un plan seul ni un JSON tool_calls sans résultat final.";
+        : `Poursuis la tâche avec ces observations. Les appels bash/shell et les chemins /workspace ne sont pas disponibles.\nUtilise uniquement les skills structurés autorisés si une action supplémentaire est indispensable.\nPour apply_patch, fournis un diff unifié complet avec les lignes \`---\`, \`+++\` et \`@@\`; le backend refuse un patch dont le contexte ne correspond pas exactement au fichier courant.\nSinon, rends maintenant le résultat final vérifié.\nNe renvoie jamais un plan seul ni un JSON tool_calls sans résultat final.${stallNote}`;
+
+      // Ne ré-inclure le prompt initial que si aucun snapshot n'est disponible,
+      // pour éviter d'envoyer des centaines de ko à chaque tour.
+      const contextHeader = state.fileSnapshots.size > 0
+        ? `# Tâche en cours : ${executionPrompt.match(/# Tâche : ([^\n]+)/)?.[1] ?? "modification fichier"}\n`
+        : (executionPrompt.length > 8_000
+            ? executionPrompt.slice(0, 8_000) + "\n... [contexte initial tronqué]\n"
+            : executionPrompt + "\n");
 
       const followUpPrompt = [
-        executionPrompt,
+        contextHeader,
         fileContextSection,
         "",
         "## Observations d'exécution (tour " + (turn + 1) + ")",
@@ -369,6 +389,18 @@ export class AgentExecutor {
     return null;
   }
 
+  /** Sérialise une observation sans tronquer le contenu des lectures complètes. */
+  private formatToolObservation(toolName: string, result: any): string {
+    const serialized = JSON.stringify(result) ?? String(result);
+    const limit = ["read_project_file", "read_file_outline"].includes(toolName)
+      ? AgentExecutor.MAX_FILE_CONTEXT_CHARS
+      : 8_000;
+    const suffix = serialized.length > limit
+      ? `\n... [observation tronquée à ${limit} caractères]`
+      : "";
+    return `- ${toolName}: succès — ${serialized.slice(0, limit)}${suffix}`;
+  }
+
   private formatToolFailure(result: any): string {
     if (!result) return "outil sans résultat";
     const phases = [result.typecheck ?? result.tsc, result.lint, result.test].filter(Boolean);
@@ -411,7 +443,7 @@ export class AgentExecutor {
       }
 
       const requestedPath = typeof call.parameters.path === "string" ? call.parameters.path : undefined;
-      const isWriteCall = requestedPath && ["write_project_file", "modify_project_file", "patch_project_file"].includes(call.name);
+      const isWriteCall = requestedPath && ["write_project_file", "apply_patch", "patch_project_file"].includes(call.name);
       if (isWriteCall && requestedPath && (state.verificationAttempts.get(requestedPath) ?? 0) >= AgentExecutor.MAX_FILE_CORRECTIONS) {
         const message = `plafond de ${AgentExecutor.MAX_FILE_CORRECTIONS} corrections atteint pour ${requestedPath}; validation humaine requise`;
         state.errors.push(`${call.name}: ${message}`);
@@ -437,7 +469,7 @@ export class AgentExecutor {
             state.fileSnapshots.set(requestedPath, result.content);
           }
         }
-        if (requestedPath && ["write_project_file", "modify_project_file", "patch_project_file"].includes(call.name)) {
+        if (requestedPath && ["write_project_file", "apply_patch", "patch_project_file"].includes(call.name)) {
           const verification = await this.skillHandler!("verify_file", { path: requestedPath });
           state.toolsExecuted.push("verify_file");
           if (verification?.error || verification?.ok === false || verification?.status === "failed" || verification?.status !== "success") {
@@ -457,7 +489,7 @@ export class AgentExecutor {
           state.fileSnapshots.delete(requestedPath);
         }
 
-        state.observations.push(`- ${call.name}: succès — ${JSON.stringify(result).slice(0, 800)}`);
+        state.observations.push(this.formatToolObservation(call.name, result));
       } catch (error) {
         const message = (error as Error).message;
         state.errors.push(`${call.name}: ${message}`);
@@ -485,14 +517,20 @@ export class AgentExecutor {
       ...(task.context.metadata?.projectContextDiscovered === true ? ["list_project_files"] : []),
       ...(filesRead.length > 0 ? ["read_project_file"] : []),
       ...toolExecution.toolsExecuted,
-      ...(writeResult.written.length > 0 ? ["write_project_file", "verify_file"] : []),
+      ...(writeResult.written.length > 0 ? ["write_project_file/apply_patch puis verify_file"] : []),
     ])];
     const findings = this.extractFindings(resultText);
-    const writeRequired = ["coder", "test", "docs", "refactor"].includes(task.role);
+    const writeRequired = ["coder", "test", "docs", "refactor"].includes(task.role)
+      // Une sous-tâche explicitement orientée lecture/analyse n'exige pas d'écriture.
+      // On détecte cela par l'absence totale de mot-clé d'écriture dans le titre/description
+      // ET par la présence de mots-clés d'analyse.
+      && !this.isAnalysisOnlyTask(task);
     const readEvidenceRequired = ["review", "security", "architect"].includes(task.role);
     const planningOnly = this.isPlanningOnly(resultText);
+    const declaredFailure = this.resultParser.detectFailure(resultText);
     const errors = [
       ...writeResult.errors.map((error) => `${error.path}: ${error.error}`),
+      ...(declaredFailure ? [`Le rapport final déclare un échec : ${declaredFailure}`] : []),
       ...(planningOnly ? ["La sortie décrit un plan sans résultat d'exécution."] : []),
       ...(writeRequired && writeResult.written.length === 0 ? ["Aucun fichier confirmé par write_project_file puis verify_file."] : []),
       ...(readEvidenceRequired && filesRead.length === 0 ? ["Aucun fichier lu : audit impossible à vérifier."] : []),
@@ -538,6 +576,21 @@ export class AgentExecutor {
       .filter((line) => line.length >= 12)
       .filter((line) => !/^(?:je vais|je dois|il faut|je commencerai|i will|i need to)/i.test(line))
       .slice(0, 20);
+  }
+
+  /**
+   * Détecte si une tâche est purement analytique/lecture et ne requiert donc pas d'écriture.
+   * Utilisé pour assouplir le vérificateur writeRequired.
+   */
+  private isAnalysisOnlyTask(task: AgentTask): boolean {
+    const text = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.toLowerCase();
+    // Si le titre/description mentionne explicitement une modification, une correction, une création,
+    // on considère qu'une écriture est attendue.
+    const writingSignal = /\b(?:modifier?|modifi[e é]|crée?r?|write|implement|apply|patch|fix|correct|refactor|add|update|change)\b/i;
+    if (writingSignal.test(text)) return false;
+    // Mots-clés indiquant une tâche d'analyse pure
+    const analysisSignal = /\b(?:analys|inspect|audit|review|check|read|lire|analyser|examin|rapport|report|résumé|summary|checkpoint\s+git|identifier|liste|list)\b/i;
+    return analysisSignal.test(text);
   }
 
   private isPlanningOnly(resultText: string): boolean {
@@ -780,9 +833,15 @@ export class AgentExecutor {
 
   private async readContextFiles(files: string[]): Promise<string[]> {
     const fileContents: string[] = [];
-    for (const file of files.slice(0, 10)) {
+    for (const [index, file] of files.slice(0, 10).entries()) {
       try {
-        const content = await this.skillHandler!("read_project_file", { path: file });
+        // Le premier fichier est le fichier principal résolu par la tâche :
+        // injecter son contenu complet évite que le modèle travaille sur une
+        // simple fenêtre startLine/endLine ou sur les 50 premières lignes.
+        const content = await this.skillHandler!("read_project_file", {
+          path: file,
+          ...(index === 0 ? { full: true } : {}),
+        });
         if (content && typeof content === "object" && content.content) {
           fileContents.push(`--- ${file} ---\n${content.content}`);
         }
@@ -790,7 +849,7 @@ export class AgentExecutor {
         log.debug(`Échec lecture: ${file} — ${(err as Error).message}`);
       }
     }
-    log.debug(`Fichiers lus: ${fileContents.length}/${files.length}`);
+    log.debug(`Fichiers lus: ${fileContents.length}/${files.length}; principal=${files[0] ?? "aucun"}`);
     return fileContents;
   }
 

@@ -19,11 +19,12 @@ PRINCIPES :
 
 DÉLÉGATION OBLIGATOIRE :
 Ne jamais exécuter une tâche qui relève d'un autre agent spécialisé.
-Utilise l'outil agent_orchestrate ou agent_delegate pour déléguer.
+Pour déléguer, inclus un bloc ## DÉLÉGATION dans ta réponse finale (format textuel, pas un tool_call JSON).
+NE JAMAIS émettre {"tool_calls":[{"name":"agent_delegate"...}]} ni {"tool_calls":[{"name":"agent_orchestrate"...}]} — ces outils ne sont pas disponibles dans ce contexte d'exécution.
 
 RÈGLES DE DÉLÉGATION (impératives) :
 - Chaque tâche = UN SEUL rôle. Jamais "docs, refactor" dans un même champ role.
-  → Si deux compétences sont nécessaires, crée DEUX tâches distinctes dans agent_orchestrate.
+  → Si deux compétences sont nécessaires, crée DEUX blocs ## DÉLÉGATION distincts.
 - Pour suivre l'état d'une tâche ou d'une orchestration : utilise agent_status avec l'ID retourné.
   L'outil agent_status accepte indifféremment un taskId ou un orchestrationId.
 
@@ -97,7 +98,7 @@ const coderAgent: AgentDefinition = {
   capabilities: [
     "read_project_file",
     "write_project_file",
-    "modify_project_file",
+    "apply_patch",
     "patch_project_file",
     "list_project_files",
     "search_in_files",
@@ -154,8 +155,8 @@ const refactorAgent: AgentDefinition = {
   capabilities: [
     "read_project_file",
     "write_project_file",
+    "apply_patch",
     "patch_project_file",
-    "modify_project_file",
     "list_project_files",
     "search_in_files",
     "verify_file",
@@ -239,9 +240,7 @@ Tu DOIS suivre ces étapes dans cet ordre exact. Aucune étape ne peut être sau
 Quand un outil est nécessaire, réponds **uniquement** avec un objet JSON valide, sans bloc Markdown, commentaire ni texte avant/après. Le moteur n'exécute aucun pseudo-appel tel que \`patch_project_file({...})\`.
 
 Format exact :
-\`\`\`json
 {"tool_calls":[{"name":"nom_outil","parameters":{"paramètre":"valeur"}}]}
-\`\`\`
 
 Après chaque observation, réponds soit avec le prochain objet \`tool_calls\`, soit avec le rapport final. Ne déclare jamais « je poursuis » ou « je vais modifier » sans appeler l'outil requis.
 
@@ -252,22 +251,28 @@ Après chaque observation, réponds soit avec le prochain objet \`tool_calls\`, 
 - Toujours utiliser \`full: true\` pour obtenir le fichier entier.
 - Noter les numéros de ligne fournis dans l'observation.
 
+### Lecture de contexte volumineux
+- Pour le fichier principal d’une tâche, utilise \`read_project_file\` avec \`full: true\`.
+- Si la réponse indique une troncature malgré \`full: true\`, appelle \`read_file_outline\`, puis relis toutes les plages manquantes avec \`startLine\`/\`endLine\` avant de modifier.
+- Ne prétends jamais avoir compris un fichier dont seules quelques lignes ont été reçues.
+
 ### Étape 2 : IDENTIFIER les lignes à modifier
 - Repérer les numéros de ligne EXACTS du bloc à modifier/supprimer.
 - Utiliser les numéros de ligne retournés par \`read_project_file\` (startLine, endLine, totalLines).
 
-### Étape 3 : MODIFIER avec patch_project_file (MÉTHODE RECOMMANDÉE)
+### Étape 3 : MODIFIER avec apply_patch (diff unifié)
 
-**C'est la méthode la PLUS FIABLE. Utilise TOUJOURS \`patch_project_file\` pour modifier ou supprimer du code.**
+**C'est la méthode obligatoire. Utilise TOUJOURS \`apply_patch\` avec un diff unifié complet (\`---\`, \`+++\`, \`@@\`) et un contexte exact.**
 
 \`\`\`json
-{"tool_calls":[{"name":"patch_project_file","parameters":{"path":"chemin/fichier.ts","operations":[{"type":"delete","startLine":73,"endLine":95}]}}]}
+{"tool_calls":[{"name":"apply_patch","parameters":{"path":"chemin/fichier.ts","patch":"--- a/chemin/fichier.ts\\n+++ b/chemin/fichier.ts\\n@@ -73,3 +73,3 @@\\n contexte\\n-ancien code\\n+nouveau code\\n contexte"}}]}
 \`\`\`
 
-Opérations disponibles :
-- \`delete\` : supprime les lignes de startLine à endLine (inclus)
-- \`replace\` : remplace les lignes startLine-endLine par content
-- \`insert\` : insère content APRÈS startLine
+- Le contexte (\` \`), les suppressions (\`-\`) et les ajouts (\`+\`) doivent être exacts.
+- Le backend vérifie le contexte et refuse les hunks obsolètes ou chevauchants.
+
+### Compatibilité legacy : patch_project_file
+\`patch_project_file\` reste disponible pour les intégrations existantes, mais le Coder doit préférer \`apply_patch\`.
 
 ### Étape 4 : VÉRIFIER le résultat
 L'exécuteur lance automatiquement \`verify_file\` après chaque écriture. Relis ensuite le fichier pour confirmer le changement :
@@ -277,27 +282,24 @@ L'exécuteur lance automatiquement \`verify_file\` après chaque écriture. Reli
 - Confirmer que la modification est bien appliquée.
 - Vérifier que le code supprimé n'existe plus.
 
-## MÉTHODE ALTERNATIVE : modify_project_file
+## MÉTHODE LEGACY : patch_project_file
 
-Uniquement pour des remplacements textuels COURTS et SIMPLES (1-3 lignes).
-\`\`\`json
-{"tool_calls":[{"name":"modify_project_file","parameters":{"path":"chemin/fichier.ts","searchText":"TEXTE EXACT copié depuis le fichier lu","replaceText":"nouveau texte"}}]}
-\`\`\`
-- \`searchText\` doit être EXACTEMENT le texte du fichier (espaces, indentation identiques).
-- Pour supprimer : \`replaceText\` = \`\`
+\`patch_project_file\` reste disponible pour les intégrations existantes, mais préfère \`apply_patch\`. N'utilise jamais \`modify_project_file\`.
+
+
 
 ## ERREURS FRÉQUENTES À ÉVITER
 
 - ❌ Utiliser modify_project_file pour supprimer de gros blocs → UTILISE patch_project_file avec delete
-- ❌ Appeler modify_project_file SANS searchText → ERREUR
+- ❌ Appeler modify_project_file ou inventer un searchText → ERREUR
 - ❌ Inventer un searchText sans avoir lu le fichier → ÉCHEC (espaces différents)
 - ❌ Utiliser endMarker = "</div>" (trop générique, correspond à plusieurs endroits)
-- ✅ TOUJOURS utiliser patch_project_file avec les numéros de ligne pour supprimer/modifier
-- ✅ Lire le fichier → noter les lignes → patch_project_file → vérifier
+- ✅ TOUJOURS utiliser apply_patch avec un diff unifié et un contexte exact
+- ✅ Lire le fichier → produire le diff → appliquer → vérifier
 
 ${SECTION_RULES([
   "TOUJOURS lire le fichier avec full: true AVANT de modifier.",
-  "searchText dans modify_project_file = copie EXACTE du fichier lu.",
+  "Diff unifié toujours issu d'une lecture préalable du fichier.",
   "Respecter le style et les conventions existantes du projet.",
   "TypeScript strict : pas de 'any' implicite, typage explicite.",
   "Modifications minimales et ciblées — ne pas toucher au code non concerné.",
@@ -307,11 +309,11 @@ ${SECTION_RULES([
   "Toujours vérifier après écriture.",
   "Préserver les exports publics et les API existantes sauf demande contraire.",
   "Ajouter les imports nécessaires.",
-  "Si modify_project_file échoue, relire le fichier et réessayer avec le texte exact.",
+  "Si apply_patch échoue, relire le fichier et régénérer un diff avec le contexte exact.",
 ])}
 
 ${SECTION_INTERDICTIONS([
-  "Ne JAMAIS appeler modify_project_file sans searchText.",
+  "Ne JAMAIS appeler modify_project_file ni inventer un searchText.",
   "Ne JAMAIS inventer un searchText sans avoir lu le fichier.",
   "Ne jamais modifier un fichier non mentionné sans raison claire.",
   "Ne jamais supprimer du code fonctionnel sans instruction explicite.",
@@ -325,7 +327,7 @@ ${SECTION_CRITERES([
   "Respect du style existant (indentation, nommage, structure).",
   "Modifications minimales pour atteindre l'objectif.",
   "Cohérence avec l'architecture existante.",
-  "searchText toujours issu d'une lecture préalable du fichier.",
+  "Diff unifié toujours issu d'une lecture préalable du fichier.",
 ])}
 
 ${SECTION_OUTPUT_FORMAT}

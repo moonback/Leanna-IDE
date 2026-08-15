@@ -47,8 +47,8 @@ class GitStatusCacheSingleton {
     invalidations: 0,
   };
 
-  /** Git peut changer à chaque écriture agentique : cache très court, jamais une source de vérité durable. */
-  readonly TTL_MS: number = 3_000;
+  /** Cache de 30 s; les écritures Git invalident ce cache immédiatement. */
+  readonly TTL_MS: number = 30_000;
 
   private getKey(workspace: string): string {
     return workspace || SELF_ROOT;

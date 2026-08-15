@@ -216,12 +216,12 @@ export class AutonomousLoop {
 
     // Signal explicite de retry dans la sortie de l'agent
     const hasRetrySignal =
+      result.success === false ||
       /##\s*RETRY|##\s*RELANCER|##\s*CORRECTION_NÉCESSAIRE/i.test(details);
 
-    // Signal explicite de satisfaction
+    // Un échec ne peut jamais être interprété comme un signal DONE.
     const hasDoneSignal =
-      /##\s*TERMINÉ|##\s*DONE|##\s*COMPLET/i.test(details) ||
-      result.success === false;
+      result.success === true && /##\s*TERMINÉ|##\s*DONE|##\s*COMPLET/i.test(details);
 
     const verifyErrors: string[] = [];
 
@@ -232,17 +232,19 @@ export class AutonomousLoop {
       }
     }
 
-    // Vérification des fichiers écrits (si activée)
-    if (this.config.verifyFiles && result.filesModified?.length) {
+    // AgentExecutor vérifie déjà chaque écriture et expose la preuve structurée.
+    // Ne relancer les vérifications que si cette preuve est absente ou négative.
+    const evidencePassed = result.evidence?.verification.passed === true;
+    if (this.config.verifyFiles && result.filesModified?.length && !evidencePassed) {
       for (const file of result.filesModified.slice(0, 5)) {
         const error = await this.verifyFile(file);
         if (error) verifyErrors.push(`${file}: ${error}`);
       }
     }
 
-    // Validation build synchrone si des fichiers ont été touchés,
-    // au lieu de compter sur le debounce fire-and-forget de postEditValidator
-    if (result.filesModified?.length) {
+    // Validation build synchrone uniquement lorsque l’exécuteur n’a pas déjà
+    // fourni une vérification complète, afin d’éviter le double travail.
+    if (result.filesModified?.length && !evidencePassed) {
       try {
         const { runValidation } = await import("../utils/postEditValidator");
         const buildResult = await runValidation();

@@ -446,6 +446,7 @@ export const reasoningSkill: Skill = {
           systemPrompt,
           temperature: 0.3,
           thinkingBudget: 0,
+          maxOutputTokens: 16_384,
         });
         const answer = response.text.trim();
         if (answer) {
@@ -466,6 +467,7 @@ export const reasoningSkill: Skill = {
           prompt: `${systemPrompt}\n\n${prompt}`,
           temperature: 0.3,
           thinkingBudget: 0,
+          maxOutputTokens: 16_384,
         };
         // Force l'autre provider comme fallback
         if (activeProvider === 'gemini') {

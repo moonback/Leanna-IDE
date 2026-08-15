@@ -324,7 +324,7 @@ export class AgentPersistence {
 CREATE TABLE IF NOT EXISTS agent_tasks (
   id                  UUID PRIMARY KEY,
   orchestration_id    UUID REFERENCES agent_orchestrations(id) ON DELETE SET NULL,
-  role                TEXT NOT NULL CHECK (role IN ('test','docs','refactor','security','review','architect')),
+  role                TEXT NOT NULL CHECK (role IN ('coder','test','docs','refactor','security','review','architect')),
   title               TEXT NOT NULL,
   description         TEXT NOT NULL,
   priority            TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low','medium','high','critical')),

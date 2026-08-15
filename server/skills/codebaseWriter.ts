@@ -362,6 +362,106 @@ export async function handlePatchProjectFile(args: any, toolContext: any) {
   };
 }
 
+/**
+ * Applique un diff unifié en vérifiant chaque hunk contre le contenu courant.
+ * Le fichier n'est écrit qu'après validation de tous les hunks, afin d'éviter
+ * les remplacements silencieux sur un fichier devenu obsolète.
+ */
+export async function handleApplyPatch(args: any, toolContext: any) {
+  if (!checkWriteRateLimit()) return { error: "Rate limit atteint : trop d'écritures par minute." };
+  if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
+
+  const requestedPath = String(args.path || "").trim();
+  const patch = typeof args.patch === "string" ? args.patch.replace(/\r\n/g, "\n") : "";
+  if (!requestedPath) return { error: "Le chemin de fichier est requis." };
+  if (!patch.trim()) return { error: "Le diff unifié est requis." };
+
+  const target = resolveSandboxWriteTarget(requestedPath);
+  if (!target) return { error: "Chemin invalide ou en dehors du workspace." };
+  const normalized = target.sandboxPath;
+  if (isWriteForbidden(target.logicalPath)) return { error: `Écriture interdite sur ce fichier protégé: ${requestedPath}` };
+  if (!fs.existsSync(normalized)) return { error: "Fichier introuvable." };
+
+  const raw = await fs.promises.readFile(normalized, "utf-8");
+  const sourceLines = raw.replace(/\r\n/g, "\n").split("\n");
+  const patchLines = patch.split("\n");
+  const hunks: Array<{ start: number; oldLines: string[]; newLines: string[] }> = [];
+  let current: { start: number; oldLines: string[]; newLines: string[] } | null = null;
+
+  for (const line of patchLines) {
+    const header = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
+    if (header) {
+      if (current) hunks.push(current);
+      current = { start: Number(header[1]), oldLines: [], newLines: [] };
+      continue;
+    }
+    if (!current) continue;
+    if (line === "\\ No newline at end of file") continue;
+    if (line.startsWith(" ")) {
+      const value = line.slice(1);
+      current.oldLines.push(value);
+      current.newLines.push(value);
+    } else if (line.startsWith("-")) {
+      current.oldLines.push(line.slice(1));
+    } else if (line.startsWith("+")) {
+      current.newLines.push(line.slice(1));
+    }
+  }
+  if (current) hunks.push(current);
+  if (hunks.length === 0) return { error: "Diff unifié invalide : aucun hunk @@ ... @@ trouvé." };
+
+  // Vérifier d'abord tous les contextes sur le fichier original.
+  for (const hunk of hunks) {
+    const offset = hunk.start - 1;
+    const actual = sourceLines.slice(offset, offset + hunk.oldLines.length);
+    if (actual.length !== hunk.oldLines.length || actual.some((line, index) => line !== hunk.oldLines[index])) {
+      return {
+        error: `Contexte du patch obsolète ou incorrect autour de la ligne ${hunk.start}. Relis le fichier et régénère le diff unifié.`,
+        expected: hunk.oldLines.slice(0, 20).join("\\n"),
+        actual: actual.slice(0, 20).join("\\n"),
+      };
+    }
+  }
+
+  // Appliquer du bas vers le haut : les lignes des hunks restent stables.
+  const nextLines = [...sourceLines];
+  for (const hunk of [...hunks].sort((a, b) => b.start - a.start)) {
+    nextLines.splice(hunk.start - 1, hunk.oldLines.length, ...hunk.newLines);
+  }
+  const newContent = nextLines.join("\n");
+  const critical = isCriticalFile(target.logicalPath);
+  const guard = await guardCriticalFile(critical, requestedPath, "patch", toolContext, `Diff unifié (${hunks.length} hunk(s))`, { proposed: newContent, previous: raw });
+  if (guard.blocked) return { error: guard.error, critical: true };
+
+  const sandboxMode = isSandboxActive();
+  if (!sandboxMode) {
+    try {
+      const { createCheckpoint } = await import("../utils/checkpoint");
+      await createCheckpoint(`avant apply_patch: ${requestedPath}`);
+    } catch { /* non bloquant */ }
+  }
+  if (!resolveCurrentSandboxPath(requestedPath, normalized)) return { error: "Sandbox indisponible ou chemin modifié — patch refusé." };
+  await fs.promises.writeFile(normalized, newContent, "utf-8");
+  if (sandboxMode) markFileModified(requestedPath);
+  appendAuditEvent({ action: "apply_patch", target: requestedPath, actor: "ai", diff: generateDiffSummary(raw, newContent) }).catch((err) => {
+    console.warn(`[Audit] appendAuditEvent failed for apply_patch on ${requestedPath}:`, err);
+  });
+  toolContext.emitIdeAction?.({ type: "open-file", path: requestedPath });
+  toolContext.emitIdeAction?.({ type: "file-changed", path: requestedPath });
+  if (!sandboxMode) {
+    triggerRestartIfNeeded(requestedPath);
+    scheduleValidation();
+  }
+  return {
+    status: "success",
+    path: requestedPath,
+    hunksApplied: hunks.length,
+    critical,
+    sandbox: sandboxMode,
+    message: `Diff unifié appliqué avec succès à ${requestedPath}.${sandboxMode ? " 📦 (sandbox)" : ""}${critical ? " ⚠️ Fichier critique modifié." : ""}`,
+  };
+}
+
 export async function handleRenameProjectFile(args: any, toolContext: any) {
   if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
   const oldPath = String(args.oldPath || "").trim();
