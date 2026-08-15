@@ -138,13 +138,11 @@ export class AgentMessageBus extends EventEmitter {
       `📤 [${message.from}] → [${message.to}] type="${message.type}" id=${message.id.slice(0, 8)}`
     );
 
-    const delivery = this.deliver(message, options);
-
     // Retry si configuré
     if (options.retry) {
-      await this.withRetry(delivery, options.retry);
+      await this.withRetry(() => this.deliver(message, options), options.retry);
     } else {
-      await delivery;
+      await this.deliver(message, options);
     }
   }
 
@@ -437,13 +435,13 @@ export class AgentMessageBus extends EventEmitter {
   }
 
   private async withRetry<T>(
-    operation: Promise<T>,
+    operation: () => Promise<T>,
     retry: NonNullable<PublishOptions["retry"]>
   ): Promise<T> {
     let lastError: Error | undefined;
     for (let attempt = 0; attempt <= retry.maxRetries; attempt++) {
       try {
-        return await operation;
+        return await operation();
       } catch (err) {
         lastError = err as Error;
         if (attempt < retry.maxRetries) {

@@ -453,7 +453,7 @@ export class AgentOrchestrator {
   } {
     const allTasks = Array.from(this.tasks.values());
     const byStatus: Record<TaskStatus, number> = {
-      pending: 0, running: 0, completed: 0, failed: 0, cancelled: 0,
+      pending: 0, running: 0, completed: 0, incomplete: 0, failed: 0, cancelled: 0,
     };
     const byRole: Record<AgentRole, number> = {
       coder: 0, test: 0, docs: 0, refactor: 0, security: 0, review: 0, architect: 0,
