@@ -355,15 +355,22 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
 
   return (
     <>
-    <div className="flex flex-col gap-3 p-3">
+    <motion.div
+      className="flex flex-col gap-4 p-3"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+    >
 
       {/* ═══ Vue d'ensemble ═══ */}
-      <div
-        className="rounded-xl border px-3 py-3 flex items-center gap-3"
+      <motion.div
+        className="rounded-xl border px-3 py-3 flex items-center gap-3 shadow-sm"
         style={{
-          borderColor: status?.active ? 'rgba(74,222,128,0.24)' : 'var(--border-base)',
-          backgroundColor: status?.active ? 'rgba(74,222,128,0.045)' : 'var(--bg-input)',
+          borderColor: status?.active ? 'rgba(74,222,128,0.28)' : 'var(--border-base)',
+          backgroundColor: status?.active ? 'rgba(74,222,128,0.055)' : 'var(--bg-input)',
+          transition: 'border-color 0.3s ease, background-color 0.3s ease',
         }}
+        layout
       >
         <div
           className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -401,13 +408,13 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
         <button
           type="button"
           onClick={fetchStatus}
-          className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-white/8 active:scale-95 transition-all duration-150"
           title="Rafraîchir l'état du sandbox"
           aria-label="Rafraîchir l'état du sandbox"
         >
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} style={{ color: 'var(--text-muted)' }} />
         </button>
-      </div>
+      </motion.div>
 
       {/* ═══ Quick actions — compact row ═══ */}
       <div className="flex flex-col gap-1.5">
@@ -661,6 +668,15 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             </span>
           </button>
           {showModifiedFiles && (
+            <AnimatePresence initial={false}>
+            <motion.div
+              key="modified-files-list"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
             <div className="space-y-0.5 max-h-44 overflow-y-auto custom-scrollbar px-1.5 pb-1.5">
             {status.modifiedFiles.map(f => {
               const Icon = FileCode2;
@@ -710,6 +726,8 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
               );
             })}
             </div>
+            </motion.div>
+            </AnimatePresence>
           )}
         </div>
       )}
@@ -871,7 +889,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
     </>
   );
 }
@@ -892,8 +910,10 @@ function ActionRow({ icon, label, color, onClick, busy, tooltip, highlight }: {
       type="button"
       onClick={onClick}
       disabled={busy}
-      whileTap={{ scale: 0.98 }}
-      className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all disabled:opacity-50 w-full group"
+      whileTap={{ scale: 0.97 }}
+      whileHover={{ x: 2 }}
+      transition={{ duration: 0.12 }}
+      className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all disabled:opacity-50 w-full group hover:bg-white/5"
       style={{
         backgroundColor: highlight
           ? `color-mix(in srgb, ${color} 10%, transparent)`
@@ -905,8 +925,8 @@ function ActionRow({ icon, label, color, onClick, busy, tooltip, highlight }: {
       title={tooltip}
     >
       <div
-        className="flex h-6 w-6 items-center justify-center rounded-md flex-shrink-0 transition-transform group-hover:scale-110"
-        style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}
+        className="flex h-6 w-6 items-center justify-center rounded-md flex-shrink-0 transition-all duration-150 group-hover:scale-110 group-hover:shadow-sm"
+        style={{ backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`, color }}
       >
         {busy ? <Loader2 size={11} className="animate-spin" /> : icon}
       </div>
