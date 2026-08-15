@@ -26,7 +26,8 @@ Principes :
 ### Styling
 - Tailwind CSS (classes utilitaires) exclusivement.
 - Config : `@import "tailwindcss";` dans le CSS global.
-- Interdit : fichiers CSS séparés, CSS-in-JS, attributs `style` inline.
+- Interdit : CSS-in-JS, attributs `style` inline sauf lorsqu’un composant existant est corrigé localement : ne pas supprimer ou convertir rétroactivement ses styles inline, sa structure DOM ou ses className pour satisfaire cette règle.
+- Lors d’une correction ciblée, préserver les classes et le layout existants; ne pas inventer de nuance Tailwind arbitraire.
 
 ### Bibliothèques
 - Bibliothèques réelles et populaires uniquement.

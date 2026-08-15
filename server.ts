@@ -62,6 +62,17 @@ import automationRouter from "./server/routes/automation";
 // Charger les clés Gemini
 loadGeminiKeys().catch(e => console.error('[GeminiKeyPool] Erreur au chargement initial:', e));
 
+// ─── Gestionnaires d'erreurs globaux (Audit §1) ──────────────────────────────
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL] Promesse non gérée:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[FATAL] Exception non rattrapée:', error);
+  // Laisser le processus mourir après un court délai pour flusher les logs
+  setTimeout(() => process.exit(1), 1000);
+});
+
 // ─── Séquence de démarrage async ──────────────────────────────────────────────
 // IMPORTANT: loadWorkflows() DOIT être awaité avant ensureAuditWorkflow().
 // Sans await, listWorkflows() retourne [] et ensureAuditWorkflow() crée un
@@ -608,6 +619,12 @@ async function startServer() {
         warningCount: validation.warningCount,
         diagnostics: validation.diagnostics, // liste plate structurée {file, line, column, code, severity, message, raw}
         errorsByFile: validation.errorsByFile, // groupement par fichier pour l'UI
+        exitCode: validation.exitCode,
+        stdout: validation.stdout,
+        stderr: validation.stderr,
+        signal: validation.signal,
+        timedOut: validation.timedOut,
+        globalDiagnostics: validation.globalDiagnostics,
         rawOutput: validation.rawOutput,       // sortie brute complète sans troncature
       });
     } catch (e: any) {
@@ -629,6 +646,12 @@ async function startServer() {
           warningCount: validation.warningCount,
           diagnostics: validation.diagnostics,
           errorsByFile: validation.errorsByFile,
+          exitCode: validation.exitCode,
+          stdout: validation.stdout,
+          stderr: validation.stderr,
+          signal: validation.signal,
+          timedOut: validation.timedOut,
+          globalDiagnostics: validation.globalDiagnostics,
           rawOutput: validation.rawOutput,
           errors: validation.rawOutput, // compatibilité historique (chaîne brute)
         });
@@ -1813,6 +1836,16 @@ async function startServer() {
           filteredDeclarations = declarations;
         }
       }
+
+      // ── Filtrage des outils d'écriture : RÉSERVÉS AUX AGENTS UNIQUEMENT ──
+      // L'assistant principal ne doit JAMAIS modifier des fichiers directement.
+      // Toute modification passe par agent_delegate(role='coder').
+      const AGENT_ONLY_TOOLS = new Set([
+        'write_project_file',
+        'modify_project_file',
+        'patch_project_file',
+      ]);
+      filteredDeclarations = filteredDeclarations.filter(d => !AGENT_ONLY_TOOLS.has(d.name));
 
       const tools = filteredDeclarations.length > 0 ? [{ functionDeclarations: filteredDeclarations }] : undefined;
 

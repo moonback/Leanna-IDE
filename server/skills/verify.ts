@@ -10,9 +10,18 @@ import * as ts from "typescript";
 const execFileAsync = promisify(execFile);
 
 // ── Cache pour les résultats de tests (optimisation) ────────────────────────
+export interface ProcessResult {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  signal?: string | null;
+  timedOut?: boolean;
+}
+
 interface TestCacheEntry {
   hash: string;
-  result: { ok: boolean; stdout: string; stderr: string };
+  result: ProcessResult;
   timestamp: number;
 }
 const testCache = new Map<string, TestCacheEntry>();
@@ -159,6 +168,8 @@ export function checkTypeScriptSyntax(code: string, filePath: string): string | 
     skipLibCheck: true,
     noEmit: true,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
+    // Les composants .tsx doivent être analysés avec JSX, comme dans tsconfig.json.
+    jsx: filePath.endsWith(".tsx") ? ts.JsxEmit.ReactJSX : undefined,
   };
 
   const host = ts.createCompilerHost(compilerOptions, true);
@@ -443,7 +454,35 @@ function computeFileHash(filePath: string): string {
   }
 }
 
-function getCachedTestResult(testFile: string, sourceFile: string): { ok: boolean; stdout: string; stderr: string } | null {
+function combineOutput(stdout: string, stderr: string): string {
+  return [stdout, stderr].filter(Boolean).join("\n");
+}
+
+function processResultFromError(error: any): ProcessResult {
+  const stdout = truncate(typeof error?.stdout === "string" ? error.stdout : "");
+  const stderr = truncate(typeof error?.stderr === "string" ? error.stderr : (error?.message || "Erreur inconnue"));
+  const rawCode = error?.code;
+  const exitCode = typeof rawCode === "number" ? rawCode : null;
+  return {
+    ok: false,
+    stdout,
+    stderr,
+    exitCode,
+    signal: typeof error?.signal === "string" ? error.signal : null,
+    timedOut: rawCode === "ETIMEDOUT" || error?.killed === true && rawCode === "ETIMEDOUT",
+  };
+}
+
+function resultExitCode(results: Array<ProcessResult | null>): number | null {
+  const failed = results.find((result) => result && !result.ok);
+  return failed?.exitCode ?? (failed ? 1 : 0);
+}
+
+function formatProcessFailure(result: ProcessResult): string {
+  return combineOutput(result.stdout, result.stderr) || `Processus échoué (code ${result.exitCode ?? "inconnu"}).`;
+}
+
+function getCachedTestResult(testFile: string, sourceFile: string): ProcessResult | null {
   const cacheKey = `${testFile}:${sourceFile}`;
   const entry = testCache.get(cacheKey);
   if (!entry) return null;
@@ -464,7 +503,7 @@ function getCachedTestResult(testFile: string, sourceFile: string): { ok: boolea
   return entry.result;
 }
 
-function setCachedTestResult(testFile: string, sourceFile: string, result: { ok: boolean; stdout: string; stderr: string }): void {
+function setCachedTestResult(testFile: string, sourceFile: string, result: ProcessResult): void {
   const cacheKey = `${testFile}:${sourceFile}`;
   testCache.set(cacheKey, {
     hash: computeFileHash(sourceFile),
@@ -473,12 +512,7 @@ function setCachedTestResult(testFile: string, sourceFile: string, result: { ok:
   });
 }
 
-/**
- * Exécute une commande depuis une allowlist stricte (aucune commande arbitraire).
- * Résout explicitement les .cmd sur Windows pour éviter shell:true et les
- * risques d'interprétation de métacaractères par cmd.exe.
- */
-async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = []): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = []): Promise<ProcessResult> {
   const root = getProjectRoot();
   const isWin = process.platform === "win32";
 
@@ -498,17 +532,61 @@ async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = 
     if (cmd === "tsc") {
       result = await execFileAsync(npxBin, ["tsc", "--noEmit", "--incremental", ...args], opts);
     } else if (cmd === "npm-test") {
+      // runAllowed ajoute déjà le séparateur npm; l'appelant ne doit pas en ajouter un second.
       result = await execFileAsync(npmBin, ["test", "--", ...args], opts);
     } else {
       result = await execFileAsync(npmBin, ["run", ...args], opts);
     }
-    return { ok: true, stdout: truncate(result.stdout || ""), stderr: truncate(result.stderr || "") };
-  } catch (e: any) {
     return {
-      ok: false,
-      stdout: truncate(e.stdout || ""),
-      stderr: truncate(e.stderr || e.message || "Erreur inconnue"),
+      ok: true,
+      stdout: truncate(result.stdout || ""),
+      stderr: truncate(result.stderr || ""),
+      exitCode: 0,
+      signal: null,
+      timedOut: false,
     };
+  } catch (e: any) {
+    return processResultFromError(e);
+  }
+}
+
+/** Typecheck ciblé avec les options du tsconfig sans échouer sur les erreurs hors du fichier vérifié. */
+function typecheckFileWithProjectConfig(relativePath: string, absolutePath: string): ProcessResult {
+  try {
+    const root = getProjectRoot();
+    const configPath = ts.findConfigFile(root, ts.sys.fileExists, "tsconfig.json");
+    if (!configPath) {
+      return { ok: false, stdout: "", stderr: "tsconfig.json introuvable pour la vérification TypeScript.", exitCode: 1 };
+    }
+
+    const config = ts.readConfigFile(configPath, ts.sys.readFile);
+    if (config.error) {
+      return {
+        ok: false,
+        stdout: "",
+        stderr: ts.flattenDiagnosticMessageText(config.error.messageText, "\n"),
+        exitCode: 1,
+      };
+    }
+
+    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath));
+    const targetPath = path.resolve(absolutePath);
+    const diagnostics = ts.getPreEmitDiagnostics(ts.createProgram([targetPath], parsed.options))
+      .filter((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error)
+      .filter((diagnostic) => !diagnostic.file || path.resolve(diagnostic.file.fileName) === targetPath);
+
+    const errors = diagnostics.map((diagnostic) => {
+      const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
+      if (!diagnostic.file || diagnostic.start === undefined) {
+        return `${relativePath}: error TS${diagnostic.code}: ${message}`;
+      }
+      const position = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+      return `${relativePath}(${position.line + 1},${position.character + 1}): error TS${diagnostic.code}: ${message}`;
+    });
+    const stderr = truncate(errors.join("\n"));
+    return { ok: errors.length === 0, stdout: "", stderr, exitCode: errors.length === 0 ? 0 : 1 };
+  } catch (error) {
+    return { ok: false, stdout: "", stderr: truncate((error as Error).message), exitCode: 1 };
   }
 }
 
@@ -549,14 +627,15 @@ const ALLOWED_SCRIPTS = new Set(["build", "lint", "typecheck", "test"]);
  * Exécute le linter intégré directement via node (scripts/lint.cjs).
  * Plus fiable que de passer par npm run lint car on contrôle l'appel.
  */
-async function runLintDirect(targets: string[] = []): Promise<{ ok: boolean; output: string; violations: ParsedLintViolation[] }> {
+async function runLintDirect(targets: string[] = []): Promise<ProcessResult & { output: string; violations: ParsedLintViolation[] }> {
   const root = getProjectRoot();
   const isWin = process.platform === "win32";
   const nodeBin = isWin ? "node.exe" : "node";
   const lintScript = path.join(root, "scripts", "lint.cjs");
 
   if (!fs.existsSync(lintScript)) {
-    return { ok: true, output: "scripts/lint.cjs introuvable — lint ignoré.", violations: [] };
+    const stdout = "scripts/lint.cjs introuvable — lint ignoré.";
+    return { ok: true, stdout, stderr: "", output: stdout, exitCode: 0, violations: [] };
   }
 
   try {
@@ -566,13 +645,14 @@ async function runLintDirect(targets: string[] = []): Promise<{ ok: boolean; out
       maxBuffer: 2 * 1024 * 1024,
       shell: false,
     });
-    const output = (result.stdout || "") + (result.stderr || "");
-    const violations = parseLintResults(output);
-    return { ok: true, output, violations };
+    const stdout = truncate(result.stdout || "");
+    const stderr = truncate(result.stderr || "");
+    const output = combineOutput(stdout, stderr);
+    return { ok: true, stdout, stderr, output, exitCode: 0, violations: parseLintResults(output) };
   } catch (e: any) {
-    const output = (e.stdout || "") + (e.stderr || "");
-    const violations = parseLintResults(output);
-    return { ok: false, output, violations };
+    const failed = processResultFromError(e);
+    const output = combineOutput(failed.stdout, failed.stderr);
+    return { ...failed, output, violations: parseLintResults(output) };
   }
 }
 
@@ -586,7 +666,7 @@ export const verifySkill: Skill = {
     },
     {
       name: "verify_file",
-      description: "Vérifie un fichier modifié : lance lint + tsc --noEmit ciblé + analyse sécurité + tests associés en parallèle. Retourne un rapport structuré avec fichier/ligne/colonne pour chaque problème.",
+      description: "Vérifie un fichier modifié : lance lint + typecheck TypeScript ciblé avec les options du tsconfig + analyse sécurité + tests associés en parallèle. Retourne un rapport structuré avec fichier/ligne/colonne pour chaque problème.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -659,11 +739,15 @@ export const verifySkill: Skill = {
       if (name === "verify_typecheck") {
         validateArgs(verifySkill.inputSchemas!["verify_typecheck"], args);
         const result = await runAllowed("tsc");
-        const rawOutput = result.ok ? result.stdout : (result.stderr || result.stdout);
+        const rawOutput = combineOutput(result.stdout, result.stderr);
         const parsedErrors = parseTsErrors(rawOutput);
         return {
           status: result.ok ? "success" : "failed",
-          message: result.ok ? "Aucune erreur de typage." : "Erreurs de typage détectées, à corriger avant de continuer.",
+          ok: result.ok,
+          exitCode: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          message: result.ok ? "Aucune erreur de typage." : `Erreurs de typage détectées (code ${result.exitCode ?? "inconnu"}), à corriger avant de continuer.`,
           output: rawOutput,
           parsedErrors,
         };
@@ -673,7 +757,18 @@ export const verifySkill: Skill = {
         const validated = validateArgs(verifySkill.inputSchemas!["verify_file"], args);
         const abs = normalizeProjectPath(validated.path);
         if (!abs || !fs.existsSync(abs)) {
-          return { error: `Fichier introuvable dans le workspace: ${validated.path}` };
+          const message = `Fichier introuvable dans le workspace: ${validated.path}`;
+          return {
+            status: "failed",
+            ok: false,
+            exitCode: null,
+            stdout: "",
+            stderr: message,
+            file: validated.path,
+            message,
+            error: message,
+            allIssues: [{ type: "configuration", file: validated.path, line: null, column: null, severity: "error", rule: "file-not-found", message }],
+          };
         }
 
         // ─── PRÉ-VALIDATION SYNTAXIQUE (TypeScript API) ──────────────────────
@@ -686,8 +781,17 @@ export const verifySkill: Skill = {
           if (tsSyntaxError) {
             return {
               status: "failed",
+              ok: false,
+              exitCode: 1,
+              stdout: "",
+              stderr: tsSyntaxError,
+              file: validated.path,
               message: `❌ Pré-validation échouée — Erreur syntaxe TypeScript:\n${tsSyntaxError}`,
               prevalidation: { tsSyntax: false, error: tsSyntaxError },
+              typecheck: { ok: false, exitCode: 1, stdout: "", stderr: tsSyntaxError, output: tsSyntaxError, errors: parseTsErrors(tsSyntaxError) },
+              lint: null,
+              test: null,
+              allIssues: [{ type: "typecheck", file: validated.path, line: null, column: null, severity: "error", rule: "syntax", message: tsSyntaxError }],
             };
           }
         }
@@ -703,23 +807,16 @@ export const verifySkill: Skill = {
         // Parallélisation intelligente : lint, typecheck et tests lancés simultanément
         const lintPromise = runLintDirect([validated.path]);
 
-        const typecheckPromise = isTypeScript
-          ? (async () => {
-              let tc = await runAllowed("tsc", [validated.path]);
-              // Si le fichier seul a des imports non résolus, fallback sur le projet complet
-              if (!tc.ok && (tc.stderr.includes("Cannot find module") || tc.stdout.includes("Cannot find module"))) {
-                tc = await runAllowed("tsc");
-              }
-              return tc;
-            })()
-          : Promise.resolve({ ok: true, stdout: "", stderr: "" });
+        const typecheckPromise: Promise<ProcessResult> = isTypeScript
+          ? Promise.resolve(typecheckFileWithProjectConfig(validated.path, abs))
+          : Promise.resolve({ ok: true, stdout: "", stderr: "", exitCode: 0 });
 
         // Tests avec cache — évite de relancer si le fichier source n'a pas changé
         const testPromise = testFile
           ? (async () => {
               const cached = getCachedTestResult(testFile, abs);
               if (cached) return { ...cached, fromCache: true };
-              const result = await runAllowed("npm-test", ["--", testFile]);
+              const result = await runAllowed("npm-test", [testFile]);
               setCachedTestResult(testFile, abs, result);
               return { ...result, fromCache: false };
             })()
@@ -727,25 +824,59 @@ export const verifySkill: Skill = {
 
         const [lintResult, typecheck, testResult] = await Promise.all([lintPromise, typecheckPromise, testPromise]);
 
-        const tcOutput = typecheck.ok ? typecheck.stdout : (typecheck.stderr || typecheck.stdout);
+        const tcOutput = combineOutput(typecheck.stdout, typecheck.stderr);
         const parsedErrors = parseTsErrors(tcOutput);
         const hasLintErrors = lintResult.violations.some((v) => v.severity === "error");
-        const ok = lintResult.ok && typecheck.ok && !hasLintErrors && (!testResult || testResult.ok) && criticalSecurity.length === 0;
+        const lintOk = lintResult.ok && !hasLintErrors;
+        const ok = lintOk && typecheck.ok && (!testResult || testResult.ok) && criticalSecurity.length === 0;
+        const phaseResults = [typecheck, lintResult, testResult].filter(Boolean) as ProcessResult[];
+        const failureOutput = phaseResults
+          .filter((phase) => !phase.ok)
+          .map(formatProcessFailure)
+          .filter(Boolean)
+          .join("\n");
 
-        // Construire le rapport structuré
+        const allIssues = [
+          ...parsedErrors.map(e => ({ type: "typecheck" as const, file: e.file, line: e.line, column: e.column, severity: "error" as const, rule: e.code, message: e.message })),
+          ...lintResult.violations.map(v => ({ type: "lint" as const, file: v.file, line: v.line, column: v.column, severity: v.severity, rule: v.rule, message: v.message })),
+          ...securityIssues.map(i => ({ type: "security" as const, file: i.file, line: i.line, column: i.column, severity: i.severity, rule: i.rule, message: i.message, suggestion: i.suggestion })),
+        ];
+        if (!typecheck.ok && parsedErrors.length === 0) {
+          allIssues.push({ type: "typecheck", file: validated.path, line: null, column: null, severity: "error", rule: "tsc", message: formatProcessFailure(typecheck) } as any);
+        }
+        if (!lintOk && lintResult.violations.length === 0) {
+          allIssues.push({ type: "lint", file: validated.path, line: null, column: null, severity: "error", rule: "lint-process", message: formatProcessFailure(lintResult) } as any);
+        }
+        if (testResult && !testResult.ok) {
+          allIssues.push({ type: "test", file: testFile, line: null, column: null, severity: "error", rule: "test-process", message: formatProcessFailure(testResult) } as any);
+        }
+
+        // Construire un rapport uniforme : chaque phase expose les deux flux et le code de sortie.
         const report: any = {
           status: ok ? "success" : "failed",
+          ok,
+          exitCode: resultExitCode([typecheck, lintResult, testResult]),
+          stdout: [typecheck.stdout, lintResult.stdout, testResult?.stdout].filter(Boolean).join("\n"),
+          stderr: [typecheck.stderr, lintResult.stderr, testResult?.stderr].filter(Boolean).join("\n"),
           message: ok
             ? `✅ Vérification OK pour ${validated.path}${testFile ? ` (tests: ${testFile})` : " (aucun test associé)"}.`
-            : "❌ Échec de vérification — corriger avant de considérer la tâche terminée.",
+            : `❌ Échec de vérification (code ${resultExitCode([typecheck, lintResult, testResult]) ?? "inconnu"}) — corriger avant de considérer la tâche terminée.\n${failureOutput}`,
           file: validated.path,
+          parsedErrors,
           typecheck: {
             ok: typecheck.ok,
+            exitCode: typecheck.exitCode,
+            stdout: typecheck.stdout,
+            stderr: typecheck.stderr,
+            output: tcOutput,
             errors: parsedErrors,
-            output: typecheck.ok ? undefined : tcOutput,
           },
           lint: {
-            ok: lintResult.ok && !hasLintErrors,
+            ok: lintOk,
+            exitCode: lintResult.exitCode,
+            stdout: lintResult.stdout,
+            stderr: lintResult.stderr,
+            output: lintResult.output,
             violations: lintResult.violations,
             summary: {
               errors: lintResult.violations.filter(v => v.severity === "error").length,
@@ -766,15 +897,13 @@ export const verifySkill: Skill = {
           test: testResult ? {
             file: testFile,
             ok: testResult.ok,
+            exitCode: testResult.exitCode,
+            stdout: testResult.stdout,
+            stderr: testResult.stderr,
+            output: combineOutput(testResult.stdout, testResult.stderr),
             fromCache: (testResult as any).fromCache || false,
-            output: testResult.ok ? undefined : (testResult.stderr || testResult.stdout),
           } : null,
-          // Tous les problèmes consolidés avec localisation
-          allIssues: [
-            ...parsedErrors.map(e => ({ type: "typecheck" as const, file: e.file, line: e.line, column: e.column, severity: "error" as const, rule: e.code, message: e.message })),
-            ...lintResult.violations.map(v => ({ type: "lint" as const, file: v.file, line: v.line, column: v.column, severity: v.severity, rule: v.rule, message: v.message })),
-            ...securityIssues.map(i => ({ type: "security" as const, file: i.file, line: i.line, column: i.column, severity: i.severity, rule: i.rule, message: i.message, suggestion: i.suggestion })),
-          ],
+          allIssues,
         };
 
         return report;
@@ -788,9 +917,13 @@ export const verifySkill: Skill = {
         const result = await runAllowed("npm-run", [validated.script]);
         return {
           status: result.ok ? "success" : "failed",
-          message: result.ok ? `Script ${validated.script} exécuté avec succès.` : `Échec du script ${validated.script}.`,
-          output: result.stdout,
-          error: result.ok ? undefined : result.stderr,
+          ok: result.ok,
+          exitCode: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          message: result.ok ? `Script ${validated.script} exécuté avec succès.` : `Échec du script ${validated.script} (code ${result.exitCode ?? "inconnu"}).`,
+          output: combineOutput(result.stdout, result.stderr),
+          error: result.ok ? undefined : formatProcessFailure(result),
         };
       }
 
@@ -805,7 +938,12 @@ export const verifySkill: Skill = {
         };
         return {
           status: lintResult.ok && summary.errors === 0 ? "success" : "failed",
+          ok: lintResult.ok && summary.errors === 0,
+          exitCode: lintResult.exitCode,
+          stdout: lintResult.stdout,
+          stderr: lintResult.stderr,
           message: lintResult.ok && summary.errors === 0 ? "✅ Lint OK — aucune erreur." : `❌ Lint : ${summary.errors} erreur(s), ${summary.warnings} avertissement(s), ${summary.infos} info(s).`,
+          output: lintResult.output,
           violations: lintResult.violations,
           summary,
         };
@@ -913,7 +1051,7 @@ export const verifySkill: Skill = {
           } catch { /* skip */ }
         }
 
-        const tcOutput = typecheckResult.ok ? typecheckResult.stdout : (typecheckResult.stderr || typecheckResult.stdout);
+        const tcOutput = combineOutput(typecheckResult.stdout, typecheckResult.stderr);
         const parsedErrors = parseTsErrors(tcOutput);
         const hasLintErrors = lintResult.violations.some(v => v.severity === "error");
         const criticalSecurity = allSecurityIssues.filter(i => i.severity === "critical" || i.severity === "high");
@@ -954,7 +1092,20 @@ export const verifySkill: Skill = {
 
       throw new Error(`Unknown tool in verify: ${name}`);
     } catch (e: any) {
-      return { error: e.message || "Erreur inconnue" };
+      const message = e.message || "Erreur inconnue";
+      if (name === "verify_file") {
+        return {
+          status: "failed",
+          ok: false,
+          exitCode: typeof e.code === "number" ? e.code : null,
+          stdout: typeof e.stdout === "string" ? truncate(e.stdout) : "",
+          stderr: typeof e.stderr === "string" ? truncate(e.stderr) : message,
+          message,
+          error: message,
+          allIssues: [{ type: "verification", file: args?.path ?? null, line: null, column: null, severity: "error", rule: "verify-exception", message }],
+        };
+      }
+      return { error: message };
     }
   },
 };

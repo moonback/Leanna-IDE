@@ -45,6 +45,8 @@ export interface GenerateTextOptions {
   temperature?: number;
   /** Max tokens for OpenRouter (default 8192 — suffisant pour les sorties agents complètes) */
   maxTokens?: number;
+  /** Limite de sortie explicite pour Gemini; propagée aussi à OpenRouter si maxTokens absent. */
+  maxOutputTokens?: number;
   /** Gemini model override (default gemini-2.5-flash) */
   geminiModel?: string;
   /** OpenRouter model override (uses profile setting if not provided) */
@@ -98,6 +100,9 @@ async function generateWithGemini(options: GenerateTextOptions): Promise<Generat
         contents: [{ role: 'user', parts }],
         config: {
           temperature: options.temperature ?? 0.5,
+          ...(options.maxOutputTokens !== undefined
+            ? { maxOutputTokens: options.maxOutputTokens }
+            : {}),
           ...(options.thinkingBudget !== undefined
             ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } }
             : {}),
@@ -174,7 +179,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions): Promise<Gen
         model,
         messages,
         temperature: options.temperature ?? 0.5,
-        max_tokens: options.maxTokens ?? 8192,
+        max_tokens: options.maxTokens ?? options.maxOutputTokens ?? 8192,
       }),
       signal: controller.signal,
     });

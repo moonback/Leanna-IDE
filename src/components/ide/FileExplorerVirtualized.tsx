@@ -9,7 +9,6 @@ import type { TreeEntry } from '../../types/ide';
 import Tree from 'react-window-tree';
 import { motion, AnimatePresence } from 'motion/react';
 
-// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type SortMode = 'name-asc' | 'name-desc' | 'type';
 

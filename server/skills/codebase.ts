@@ -16,6 +16,7 @@ import {
   handleWriteProjectFile,
   handleModifyProjectFile,
   handlePatchProjectFile,
+  handleApplyPatch,
   handleRenameProjectFile,
   handleDeleteProjectFile,
   handleCreateProjectDirectory
@@ -66,13 +67,14 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "read_project_file",
-      description: "Reads a file from the project workspace. For large files, use startLine/endLine to read only the relevant section. Use read_file_outline first to identify which lines to read.",
+      description: "Reads a file from the project workspace. For large files, use startLine/endLine to read only the relevant section, OR set full=true to force reading the entire file. Use read_file_outline first to identify which lines to read.",
       parameters: {
         type: "OBJECT",
         properties: {
           path: { type: "STRING", description: "Relative path from project root (e.g. src/App.tsx)." },
           startLine: { type: "NUMBER", description: "First line to read (1-based). Use this for large files to avoid reading everything." },
           endLine: { type: "NUMBER", description: "Last line to read (1-based). Recommended: read ±20 lines around the area to modify." },
+          full: { type: "BOOLEAN", description: "Si true, retourne le fichier complet même s'il est volumineux. Utile quand on a besoin de tout le contenu pour une modification." },
         },
         required: ["path"],
       },
@@ -90,14 +92,15 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "search_in_files",
-      description: "Searches for text or a pattern across project files. Returns matching files with surrounding context. Use to find where a function, class or variable is used.",
+      description: "Searches for text or a pattern across project files. Returns matching files with surrounding context. Use to find where a function, class or variable is used. By default, the query is treated as literal text (special characters are auto-escaped). Set regex:true to use a regular expression.",
       parameters: {
         type: "OBJECT",
         properties: {
-          query: { type: "STRING", description: "Exact text or regex pattern to search for." },
+          query: { type: "STRING", description: "Text or regex pattern to search for. Treated as literal text by default (parentheses, brackets, etc. are auto-escaped)." },
           path: { type: "STRING", description: "Directory to search in (optional, defaults to project root)." },
           extensions: { type: "STRING", description: "Comma-separated file extensions to filter (e.g. 'ts,tsx,js'). Optional." },
           caseSensitive: { type: "BOOLEAN", description: "Case-sensitive search. Default false." },
+          regex: { type: "BOOLEAN", description: "If true, treat query as a regular expression. Default false (literal text search)." },
           maxResults: { type: "NUMBER", description: "Maximum number of results. Default 20." },
         },
         required: ["query"],
@@ -116,7 +119,7 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "write_project_file",
-      description: "Creates or completely overwrites a file. Use modify_project_file for partial changes. Always read the file first with read_project_file before overwriting.",
+      description: "⚠️ RÉSERVÉ AUX AGENTS — Ne PAS appeler directement. Utilise agent_delegate(role='coder') pour toute modification de fichier. Cet outil crée ou écrase un fichier. Il est appelé automatiquement par l'agent coder.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -128,21 +131,35 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "modify_project_file",
-      description: "Modifies a file by replacing exact text with new content. Use read_project_file first to get the exact text including whitespace and indentation.",
+      description: "⚠️ RÉSERVÉ AUX AGENTS — Ne PAS appeler directement. Utilise agent_delegate(role='coder') pour toute modification de fichier. Cet outil modifie un fichier par remplacement de texte exact. Il est appelé automatiquement par l'agent coder. Deux modes: 1) searchText exact (copié depuis read_project_file), 2) startMarker/endMarker (le backend extrait le bloc).",
       parameters: {
         type: "OBJECT",
         properties: {
           path: { type: "STRING", description: "Relative path of the file to modify." },
-          searchText: { type: "STRING", description: "Exact text to find and replace (whitespace and indentation must match exactly)." },
-          replaceText: { type: "STRING", description: "New text to replace searchText with." },
+          searchText: { type: "STRING", description: "Exact text to find and replace (whitespace and indentation must match exactly). Si absent, utiliser startMarker/endMarker." },
+          replaceText: { type: "STRING", description: "New text to replace searchText with. Vide '' pour supprimer." },
           replaceAll: { type: "BOOLEAN", description: "If true, replaces all occurrences. Default false (first occurrence only)." },
+          startMarker: { type: "STRING", description: "Alternative à searchText: première ligne/texte identifiable qui COMMENCE le bloc à remplacer. Le backend lit le fichier et extrait le bloc entre startMarker et endMarker." },
+          endMarker: { type: "STRING", description: "Alternative à searchText: dernière ligne/texte identifiable qui TERMINE le bloc à remplacer." },
         },
-        required: ["path", "searchText", "replaceText"],
+        required: ["path", "replaceText"],
+      },
+    },
+    {
+      name: "apply_patch",
+      description: "⚠️ RÉSERVÉ AUX AGENTS — Applique un diff unifié vérifié sur un fichier. Le contexte des hunks doit correspondre exactement au contenu courant.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          path: { type: "STRING", description: "Chemin relatif du fichier cible." },
+          patch: { type: "STRING", description: "Diff unifié complet avec lignes ---/+++/@@." },
+        },
+        required: ["path", "patch"],
       },
     },
     {
       name: "patch_project_file",
-      description: "Modifies a file using line-based operations. More token-efficient than modify_project_file for targeted changes. Use read_file_outline to identify line numbers first. NOTE: operations are internally reordered and applied bottom-to-top (by startLine descending) so line numbers stay stable during the patch; operation ranges must NOT overlap (this is validated and rejected with an error).",
+      description: "⚠️ RÉSERVÉ AUX AGENTS — Ne PAS appeler directement. Utilise agent_delegate(role='coder') pour toute modification de fichier. Cet outil patche un fichier via des opérations par ligne. Il est appelé automatiquement par l'agent coder. NOTE: operations are internally reordered and applied bottom-to-top (by startLine descending) so line numbers stay stable during the patch; operation ranges must NOT overlap.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -253,6 +270,9 @@ export const codebaseSkill: Skill = {
 
       case "modify_project_file":
         return await handleModifyProjectFile(args, toolContext);
+
+      case "apply_patch":
+        return await handleApplyPatch(args, toolContext);
 
       case "patch_project_file":
         return await handlePatchProjectFile(args, toolContext);

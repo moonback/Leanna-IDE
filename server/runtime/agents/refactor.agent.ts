@@ -11,8 +11,8 @@ export const refactorAgent = defineAgent({
   capabilities: [
     "read_project_file",
     "write_project_file",
+    "apply_patch",
     "patch_project_file",
-    "modify_project_file",
     "list_project_files",
     "search_in_files",
     "verify_file",

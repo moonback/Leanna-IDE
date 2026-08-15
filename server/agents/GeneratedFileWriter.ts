@@ -118,14 +118,21 @@ export class GeneratedFileWriter {
   // ─── Pattern 3: JSON structuré ────────────────────────────────────────────
 
   private async extractPatternJson(agentName: string, text: string): Promise<WriteFromOutputResult> {
-    const jsonMatch = text.match(/\{[\s\S]*"files"\s*:\s*\[([\s\S]*?)\][\s\S]*\}/);
-    if (!jsonMatch) return { written: [], errors: [] };
-
     const written: string[] = [];
     const errors: FileValidationError[] = [];
 
+    // Localiser la clé puis extraire son objet englobant sans regex gloutonne.
+    const filesKeyIdx = text.indexOf('"files"');
+    if (filesKeyIdx === -1) return { written, errors };
+
+    const objectStart = text.lastIndexOf("{", filesKeyIdx);
+    if (objectStart === -1) return { written, errors };
+
+    const jsonText = this.extractBalancedJsonObject(text, objectStart);
+    if (!jsonText) return { written, errors };
+
     try {
-      const parsed = JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(jsonText);
       if (Array.isArray(parsed.files)) {
         for (const f of parsed.files) {
           if (f.path && f.content) {
@@ -140,6 +147,40 @@ export class GeneratedFileWriter {
     }
 
     return { written, errors };
+  }
+
+  /** Extrait un objet JSON équilibré en ignorant les accolades dans les chaînes. */
+  private extractBalancedJsonObject(text: string, startIdx: number): string | null {
+    if (text[startIdx] !== "{") return null;
+
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+
+    for (let i = startIdx; i < text.length; i++) {
+      const ch = text[i];
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\" && inString) {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+
+      if (ch === "{") depth++;
+      else if (ch === "}") {
+        depth--;
+        if (depth === 0) return text.slice(startIdx, i + 1);
+      }
+    }
+
+    return null;
   }
 
   // ─── Helper interne ───────────────────────────────────────────────────────
@@ -177,10 +218,11 @@ export class GeneratedFileWriter {
         status: "failed",
         message: (err as Error).message,
       }));
-      if (verification?.status !== "success" || verification?.error) {
+      if (verification?.status !== "success" || verification?.ok === false || verification?.error) {
+        const report = JSON.stringify(verification, null, 2).slice(0, 5000);
         const message = verification?.message || verification?.error || "post-validation échouée";
         log.error(`[${agentName}] Post-validation échouée pour ${path}: ${message}`);
-        return `post-validation échouée: ${message}`;
+        return `post-validation échouée: ${message}\nRapport verify_file:\n${report}`;
       }
       return null;
     } catch (err) {

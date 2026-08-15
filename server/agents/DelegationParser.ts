@@ -139,7 +139,7 @@ export class DelegationParser {
     // RAISON (obligatoire)
     const reason =
       fields["raison"] ?? fields["reason"] ?? fields["motif"] ??
-      fields["description"] ?? fields["tâche"] ?? fields["tache"] ?? "";
+      fields["description"] ?? fields["tache"] ?? "";
     if (!reason) {
       return { warning: `Bloc #${blockIndex}: champ RAISON manquant. Champs reçus: ${Object.keys(fields).join(", ")}` };
     }
@@ -152,7 +152,7 @@ export class DelegationParser {
 
     // PRIORITÉ (optionnel)
     const priorityRaw = (
-      fields["priorité"] ?? fields["priorite"] ?? fields["priority"] ?? "medium"
+      fields["priorite"] ?? fields["priority"] ?? "medium"
     ).toLowerCase() as TaskPriority;
     const priority: TaskPriority = VALID_PRIORITIES.has(priorityRaw) ? priorityRaw : "medium";
 
@@ -190,7 +190,7 @@ export class DelegationParser {
 
     const filesRaw = fields["fichiers"] ?? fields["files"] ?? "";
     const files = filesRaw ? filesRaw.split(/[,;]/).map((f) => f.trim()).filter(Boolean) : [];
-    const priorityRaw = (fields["priorité"] ?? fields["priorite"] ?? fields["priority"] ?? "medium").toLowerCase() as TaskPriority;
+    const priorityRaw = (fields["priorite"] ?? fields["priority"] ?? "medium").toLowerCase() as TaskPriority;
 
     return {
       targetRole,

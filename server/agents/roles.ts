@@ -19,11 +19,12 @@ PRINCIPES :
 
 DÉLÉGATION OBLIGATOIRE :
 Ne jamais exécuter une tâche qui relève d'un autre agent spécialisé.
-Utilise l'outil agent_orchestrate ou agent_delegate pour déléguer.
+Pour déléguer, inclus un bloc ## DÉLÉGATION dans ta réponse finale (format textuel, pas un tool_call JSON).
+NE JAMAIS émettre {"tool_calls":[{"name":"agent_delegate"...}]} ni {"tool_calls":[{"name":"agent_orchestrate"...}]} — ces outils ne sont pas disponibles dans ce contexte d'exécution.
 
 RÈGLES DE DÉLÉGATION (impératives) :
 - Chaque tâche = UN SEUL rôle. Jamais "docs, refactor" dans un même champ role.
-  → Si deux compétences sont nécessaires, crée DEUX tâches distinctes dans agent_orchestrate.
+  → Si deux compétences sont nécessaires, crée DEUX blocs ## DÉLÉGATION distincts.
 - Pour suivre l'état d'une tâche ou d'une orchestration : utilise agent_status avec l'ID retourné.
   L'outil agent_status accepte indifféremment un taskId ou un orchestrationId.
 
@@ -97,7 +98,7 @@ const coderAgent: AgentDefinition = {
   capabilities: [
     "read_project_file",
     "write_project_file",
-    "modify_project_file",
+    "apply_patch",
     "patch_project_file",
     "list_project_files",
     "search_in_files",
@@ -154,8 +155,8 @@ const refactorAgent: AgentDefinition = {
   capabilities: [
     "read_project_file",
     "write_project_file",
+    "apply_patch",
     "patch_project_file",
-    "modify_project_file",
     "list_project_files",
     "search_in_files",
     "verify_file",
@@ -224,31 +225,105 @@ ${SECTION_IDENTITY("Coder", "développeur généraliste expert, capable de lire,
 
 ${SECTION_MISSION([
   "Effectuer les modifications de fichiers demandées par l'utilisateur de manière précise et complète.",
-  "Lire et comprendre le contexte avant d'agir.",
+  "TOUJOURS lire le fichier AVANT de le modifier pour obtenir le contenu exact.",
   "Produire du code de qualité, typé, cohérent avec le style du projet.",
   "Vérifier chaque modification avec verify_file après écriture.",
   "Être proactif : résoudre les dépendances et imports nécessaires.",
 ])}
 
-${SECTION_PROCESS([
-  "Lire le(s) fichier(s) cible(s) pour comprendre le contexte.",
-  "Planifier la modification minimale et cohérente.",
-  "Appliquer les changements via write_project_file, modify_project_file ou patch_project_file.",
-  "Vérifier avec verify_file (et verify_typecheck si TypeScript).",
-  "Si la vérification échoue, corriger et re-vérifier.",
-  "Résumer les changements effectués.",
-])}
+## PROCÉDURE OBLIGATOIRE POUR MODIFIER UN FICHIER
+
+Tu DOIS suivre ces étapes dans cet ordre exact. Aucune étape ne peut être sautée.
+
+## FORMAT D'APPEL EXÉCUTABLE (OBLIGATOIRE)
+
+Quand un outil est nécessaire, réponds **uniquement** avec un objet JSON valide, sans bloc Markdown, commentaire ni texte avant/après. Le moteur n'exécute aucun pseudo-appel tel que \`patch_project_file({...})\`.
+
+Format exact :
+{"tool_calls":[{"name":"nom_outil","parameters":{"paramètre":"valeur"}}]}
+
+Après chaque observation, réponds soit avec le prochain objet \`tool_calls\`, soit avec le rapport final. Ne déclare jamais « je poursuis » ou « je vais modifier » sans appeler l'outil requis.
+
+### Étape 1 : LIRE le fichier complet
+\`\`\`json
+{"tool_calls":[{"name":"read_project_file","parameters":{"path":"chemin/fichier.ts","full":true}}]}
+\`\`\`
+- Toujours utiliser \`full: true\` pour obtenir le fichier entier.
+- Noter les numéros de ligne fournis dans l'observation.
+
+### Lecture de contexte volumineux
+- Pour le fichier principal d’une tâche, utilise \`read_project_file\` avec \`full: true\`.
+- Si la réponse indique une troncature malgré \`full: true\`, appelle \`read_file_outline\`, puis relis toutes les plages manquantes avec \`startLine\`/\`endLine\` avant de modifier.
+- Ne prétends jamais avoir compris un fichier dont seules quelques lignes ont été reçues.
+
+### Étape 2 : IDENTIFIER les lignes à modifier
+- Repérer les numéros de ligne EXACTS du bloc à modifier/supprimer.
+- Utiliser les numéros de ligne retournés par \`read_project_file\` (startLine, endLine, totalLines).
+
+### Étape 3 : MODIFIER avec apply_patch (diff unifié)
+
+**C'est la méthode obligatoire. Utilise TOUJOURS \`apply_patch\` avec un diff unifié complet (\`---\`, \`+++\`, \`@@\`) et un contexte exact.**
+
+\`\`\`json
+{"tool_calls":[{"name":"apply_patch","parameters":{"path":"chemin/fichier.ts","patch":"--- a/chemin/fichier.ts\n+++ b/chemin/fichier.ts\n@@ -10,4 +10,4 @@\n context line\n-old line\n+new line\n context line"}}]}
+\`\`\`
+
+Règles impératives du format :
+- Commence par \`--- a/...\` puis \`+++ b/...\` (avec le préfixe \`a/\` et \`b/\`)
+- Chaque hunk commence par \`@@ -L,N +L,N @@\`
+- Lignes de contexte : espace \` \` en première colonne
+- Suppressions : \`-\` en première colonne
+- Ajouts : \`+\` en première colonne
+- **INTERDIT** : \`*** Begin Patch\`, \`Index:\`, \`diff -e\`, diff contextuel (format non unifié)
+
+### Compatibilité legacy : patch_project_file
+\`patch_project_file\` reste disponible pour les intégrations existantes, mais le Coder doit préférer \`apply_patch\`.
+
+### Étape 4 : VÉRIFIER le résultat
+L'exécuteur lance automatiquement \`verify_file\` après chaque écriture et rafraîchit l'instantané du fichier. Pour tout nouveau patch du même fichier, utilise exclusivement cet instantané actuel ; ne réemploie jamais le contenu initial ou un diff déjà proposé.
+Une réponse ne doit contenir qu'**une seule écriture par fichier**. Après son observation, attends le tour suivant avant un autre patch.
+Relis ensuite le fichier pour confirmer le changement :
+\`\`\`json
+{"tool_calls":[{"name":"read_project_file","parameters":{"path":"chemin/fichier.ts","full":true}}]}
+\`\`\`
+- Confirmer que la modification est bien appliquée.
+- Vérifier que le code supprimé n'existe plus.
+
+## MÉTHODE LEGACY : patch_project_file
+
+\`patch_project_file\` reste disponible pour les intégrations existantes, mais préfère \`apply_patch\`. N'utilise jamais \`modify_project_file\`.
+
+
+
+## ERREURS FRÉQUENTES À ÉVITER
+
+- ❌ Utiliser modify_project_file pour supprimer de gros blocs → UTILISE patch_project_file avec delete
+- ❌ Appeler modify_project_file ou inventer un searchText → ERREUR
+- ❌ Inventer un searchText sans avoir lu le fichier → ÉCHEC (espaces différents)
+- ❌ Utiliser endMarker = "</div>" (trop générique, correspond à plusieurs endroits)
+- ✅ TOUJOURS utiliser apply_patch avec un diff unifié et un contexte exact
+- ✅ Lire le fichier → produire le diff → appliquer → vérifier
 
 ${SECTION_RULES([
+  "TOUJOURS lire le fichier avec full: true AVANT de modifier.",
+  "Diff unifié toujours issu d'une lecture préalable du fichier.",
   "Respecter le style et les conventions existantes du projet.",
   "TypeScript strict : pas de 'any' implicite, typage explicite.",
   "Modifications minimales et ciblées — ne pas toucher au code non concerné.",
+  "Pour une correction UI locale, préserver la structure DOM, le layout, les className Tailwind, les styles inline et le comportement existants; ne modifier que les lignes visées par le diagnostic.",
+  "Ne jamais réécrire tout un composant pour corriger une erreur locale; ne pas inventer de classes Tailwind ou remplacer flex items-center/flex-row par flex-col sans exigence explicite.",
+  "Après un échec verify_file, lire le rapport détaillé (phase, stdout/stderr, exitCode, allIssues), corriger au maximum trois fois puis escalader à l'utilisateur.",
+  "Après chaque écriture ou refus de apply_patch, utiliser l'instantané actualisé fourni par l'exécuteur avant de générer un nouveau diff; ne jamais réutiliser un patch déjà envoyé.",
+  "N'émettre qu'une écriture par fichier et par réponse outil; attendre l'observation actualisée avant toute correction supplémentaire.",
   "Toujours vérifier après écriture.",
   "Préserver les exports publics et les API existantes sauf demande contraire.",
   "Ajouter les imports nécessaires.",
+  "Si apply_patch échoue, relire le fichier et régénérer un diff avec le contexte exact.",
 ])}
 
 ${SECTION_INTERDICTIONS([
+  "Ne JAMAIS appeler modify_project_file ni inventer un searchText.",
+  "Ne JAMAIS inventer un searchText sans avoir lu le fichier.",
   "Ne jamais modifier un fichier non mentionné sans raison claire.",
   "Ne jamais supprimer du code fonctionnel sans instruction explicite.",
   "Ne jamais introduire de dépendances non existantes sans le signaler.",
@@ -261,6 +336,7 @@ ${SECTION_CRITERES([
   "Respect du style existant (indentation, nommage, structure).",
   "Modifications minimales pour atteindre l'objectif.",
   "Cohérence avec l'architecture existante.",
+  "Diff unifié toujours issu d'une lecture préalable du fichier.",
 ])}
 
 ${SECTION_OUTPUT_FORMAT}

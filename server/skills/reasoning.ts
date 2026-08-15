@@ -1,6 +1,5 @@
 ﻿import { Skill } from "./base";
-import { exec } from "child_process";
-import os from "os";
+import fs from "fs";
 import { generateText, getActiveProvider } from "../utils/textGeneration";
 import { generateSpeech } from "../utils/geminiTTS";
 import { SELF_ROOT, normalizeSelfPath } from "../utils/selfRoot";
@@ -20,8 +19,10 @@ function normalizeProjectPath(target: string): string | null {
   return normalizeSelfPath(target);
 }
 
-function isSafeReasoningCommand(command: string): boolean {
-  return /^(dir|ls)(\s+.*)?$/i.test(command);
+function parseReasoningListCommand(command: unknown): string | null {
+  if (typeof command !== "string") return null;
+  const match = /^(?:dir|ls)(?:\s+(.+?))?\s*$/i.exec(command);
+  return match ? (match[1]?.trim() || "") : null;
 }
 
 // ─── Thinking Strategies ────────────────────────────────────────────────────
@@ -446,6 +447,7 @@ export const reasoningSkill: Skill = {
           systemPrompt,
           temperature: 0.3,
           thinkingBudget: 0,
+          maxOutputTokens: 16_384,
         });
         const answer = response.text.trim();
         if (answer) {
@@ -466,6 +468,7 @@ export const reasoningSkill: Skill = {
           prompt: `${systemPrompt}\n\n${prompt}`,
           temperature: 0.3,
           thinkingBudget: 0,
+          maxOutputTokens: 16_384,
         };
         // Force l'autre provider comme fallback
         if (activeProvider === 'gemini') {
@@ -690,7 +693,8 @@ export const reasoningSkill: Skill = {
               );
             }
           } else if (task_type === "execute_command") {
-            if (!isSafeReasoningCommand(payload)) {
+            const targetArg = parseReasoningListCommand(payload);
+            if (targetArg === null) {
               if (context && context.notifyLiveAPI) {
                 context.notifyLiveAPI(
                   `Commande refusée: seules les commandes 'dir' ou 'ls' sont autorisées dans le workspace du projet.`
@@ -698,9 +702,7 @@ export const reasoningSkill: Skill = {
               }
               return;
             }
-            const commandParts = payload.split(/\s+/);
-            const verb = commandParts[0].toLowerCase();
-            const targetArg = commandParts.slice(1).join(" ").trim();
+
             let resolvedPath = getProjectRoot();
             if (targetArg) {
               const normalized = normalizeProjectPath(targetArg);
@@ -715,25 +717,24 @@ export const reasoningSkill: Skill = {
               resolvedPath = normalized;
             }
 
-            console.log(`[Reasoning] Exécution de la commande en arrière-plan: ${payload}`);
-            const commandToRun =
-              verb === "dir" && os.platform() === "win32"
-                ? `dir "${resolvedPath}"`
-                : `ls -la "${resolvedPath}"`;
-
-            exec(commandToRun, (error, stdout, stderr) => {
-              if (context && context.notifyLiveAPI) {
-                if (error) {
-                  context.notifyLiveAPI(
-                    `La tâche '${payload}' s'est terminée avec une erreur: ${error.message}\nStderr: ${stderr.substring(0, 500)}`
-                  );
-                } else {
-                  context.notifyLiveAPI(
-                    `La tâche '${payload}' est terminée avec succès.\nStdout: ${stdout.substring(0, 500)}`
-                  );
-                }
-              }
-            });
+            // A directory listing does not need a shell or child process. Using
+            // the filesystem API keeps untrusted paths as data, never commands.
+            console.log(`[Reasoning] Listing workspace directory: ${resolvedPath}`);
+            try {
+              const entries = await fs.promises.readdir(resolvedPath, { withFileTypes: true });
+              const output = entries
+                .slice(0, 500)
+                .map((entry) => `${entry.isDirectory() ? "[DIR] " : "      "}${entry.name}`)
+                .join("\n");
+              const truncated = entries.length > 500 ? "\n… liste tronquée à 500 éléments" : "";
+              context?.notifyLiveAPI?.(
+                `La tâche '${payload}' est terminée avec succès.\nStdout: ${(output + truncated).substring(0, 500)}`
+              );
+            } catch (error) {
+              context?.notifyLiveAPI?.(
+                `La tâche '${payload}' s'est terminée avec une erreur: ${(error as Error).message}`
+              );
+            }
           }
         } catch (e: any) {
           console.error("[Reasoning] Erreur en arrière-plan:", e);

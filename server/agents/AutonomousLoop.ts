@@ -216,12 +216,12 @@ export class AutonomousLoop {
 
     // Signal explicite de retry dans la sortie de l'agent
     const hasRetrySignal =
+      result.success === false ||
       /##\s*RETRY|##\s*RELANCER|##\s*CORRECTION_NÉCESSAIRE/i.test(details);
 
-    // Signal explicite de satisfaction
+    // Un échec ne peut jamais être interprété comme un signal DONE.
     const hasDoneSignal =
-      /##\s*TERMINÉ|##\s*DONE|##\s*COMPLET/i.test(details) ||
-      result.success === false;
+      result.success === true && /##\s*TERMINÉ|##\s*DONE|##\s*COMPLET/i.test(details);
 
     const verifyErrors: string[] = [];
 
@@ -232,17 +232,19 @@ export class AutonomousLoop {
       }
     }
 
-    // Vérification des fichiers écrits (si activée)
-    if (this.config.verifyFiles && result.filesModified?.length) {
+    // AgentExecutor vérifie déjà chaque écriture et expose la preuve structurée.
+    // Ne relancer les vérifications que si cette preuve est absente ou négative.
+    const evidencePassed = result.evidence?.verification.passed === true;
+    if (this.config.verifyFiles && result.filesModified?.length && !evidencePassed) {
       for (const file of result.filesModified.slice(0, 5)) {
         const error = await this.verifyFile(file);
         if (error) verifyErrors.push(`${file}: ${error}`);
       }
     }
 
-    // Validation build synchrone si des fichiers ont été touchés,
-    // au lieu de compter sur le debounce fire-and-forget de postEditValidator
-    if (result.filesModified?.length) {
+    // Validation build synchrone uniquement lorsque l’exécuteur n’a pas déjà
+    // fourni une vérification complète, afin d’éviter le double travail.
+    if (result.filesModified?.length && !evidencePassed) {
       try {
         const { runValidation } = await import("../utils/postEditValidator");
         const buildResult = await runValidation();
@@ -274,22 +276,23 @@ export class AutonomousLoop {
       verifyErrors,
       confidenceScore,
       resultLength: details.length,
+      resultSummary: result.summary,
     };
   }
 
   private async verifyFile(filePath: string): Promise<string | null> {
-    // La vérification passe par le SkillHandler de l'executor
-    // On y accède via une méthode exposée
     try {
-      const result = await (this.executor as any).skillHandler?.("verify_file", {
-        path: filePath,
-      });
-      if (result && result.errors && result.errors.length > 0) {
-        return result.errors.slice(0, 3).join("; ");
-      }
-      return null;
-    } catch {
-      return null; // Vérification non disponible — on ignore
+      const result = await (this.executor as any).skillHandler?.("verify_file", { path: filePath });
+      if (!result || result.ok === true || result.status === "success") return null;
+      const issues = Array.isArray(result.allIssues)
+        ? result.allIssues.slice(0, 10).map((issue: any) => `${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? "Erreur"}`)
+        : [];
+      const phases = [result.typecheck, result.lint, result.test].filter((phase: any) => phase?.ok === false);
+      const phaseOutput = phases.flatMap((phase: any) => [phase.output, phase.stdout, phase.stderr]).filter(Boolean);
+      const details = [...issues, ...phaseOutput, result.message, result.stderr, result.error].filter(Boolean).join("\n");
+      return details.slice(0, 5000) || `verify_file a échoué (code ${result.exitCode ?? "inconnu"}).`;
+    } catch (error) {
+      return `verify_file indisponible: ${(error as Error).message}`;
     }
   }
 
@@ -355,11 +358,10 @@ export class AutonomousLoop {
 
     // ── Détection de boucle : comparer les summaries des itérations ──
     if (history.length >= 1) {
-      const currentSummary = obs.resultLength.toString(); // placeholder — sera comparé en similarité textuelle ci-dessous
       const lastSummary = history[history.length - 1].resultSummary;
 
       // Comparaison par similarité textuelle entre les deux derniers résumés
-      const similarity = this.stringSimilarity(lastSummary, currentSummary);
+      const similarity = this.stringSimilarity(lastSummary, obs.resultSummary);
       if (similarity > LOOP_DETECTION_SIMILARITY) {
         return {
           action: "stop_loop_detected",
@@ -546,4 +548,5 @@ interface ObservationReport {
   verifyErrors: string[];
   confidenceScore: number;
   resultLength: number;
+  resultSummary: string;
 }

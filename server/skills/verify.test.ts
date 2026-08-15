@@ -14,8 +14,8 @@ import { verifySkill, parseTsErrors, parseLintResults, findAssociatedTestFile } 
 
 // ─── Tests unitaires du skill verify ─────────────────────────────────────────
 
-test("verify skill exposes 4 tool declarations", () => {
-  assert.equal(verifySkill.declarations.length, 5);
+test("verify skill exposes all tool declarations", () => {
+  assert.equal(verifySkill.declarations.length, 7);
   const names = verifySkill.declarations.map((d: any) => d.name);
   assert.ok(names.includes("verify_typecheck"));
   assert.ok(names.includes("verify_file"));

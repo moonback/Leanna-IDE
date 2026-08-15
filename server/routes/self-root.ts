@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
+import { z } from 'zod';
 import { requestConfirmation } from '../utils/confirmationBridge';
 
 export function createSelfRootRouter(getWss: () => WebSocketServer | null): Router {
@@ -72,8 +73,15 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
   // POST /api/self-root/change
   router.post('/change', async (req: Request, res: Response) => {
     try {
-      const { path: newPath, userConfirmed } = req.body as { path?: string; userConfirmed?: boolean };
-      if (!newPath?.trim()) return res.status(400).json({ error: 'Le chemin est requis.' });
+      const ChangeSchema = z.object({
+        path: z.string().min(1, 'Le chemin est requis.'),
+        userConfirmed: z.boolean().optional(),
+      });
+      const parsed = ChangeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Paramètres invalides.' });
+      }
+      const { path: newPath, userConfirmed } = parsed.data;
 
       // Si la demande vient de l'UI Settings (confirmation locale déjà affichée),
       // on bypass la confirmation WS qui nécessite une session vocale active.
@@ -142,11 +150,17 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
   // POST /api/self-root/new — créer un projet vierge et l'activer
   router.post('/new', async (req: Request, res: Response) => {
     try {
-      const { path: projectPath, name } = req.body as { path?: string; name?: string };
-
-      if (!projectPath?.trim() && !name?.trim()) {
-        return res.status(400).json({ error: 'Un chemin ou un nom de projet est requis.' });
+      const NewProjectSchema = z.object({
+        path: z.string().optional(),
+        name: z.string().optional(),
+      }).refine(data => !!(data.path?.trim() || data.name?.trim()), {
+        message: 'Un chemin ou un nom de projet est requis.',
+      });
+      const parsed = NewProjectSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Paramètres invalides.' });
       }
+      const { path: projectPath, name } = parsed.data;
 
       const fsModule = await import('fs');
       const pathModule = await import('path');

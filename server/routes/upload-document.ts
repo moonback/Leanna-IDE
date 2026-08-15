@@ -83,6 +83,27 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
         analysisPrompt = 'Décris cette image en français et extrais les textes pertinents. Sois concis et structure ta réponse.';
       }
 
+      // The regex guard is only a heuristic, but a high-risk text document must
+      // never be forwarded to a model without an explicit user decision.
+      if (promptInjection.blocked) {
+        log.warn('High-risk document rejected before model analysis', {
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+          riskScore: promptInjection.riskScore,
+          findings: promptInjection.findings.map((finding) => finding.pattern),
+        });
+        res.status(422).json({
+          error: 'Document potentiellement malveillant : analyse automatique refusée.',
+          fileName: file.originalname,
+          promptInjection: {
+            riskScore: promptInjection.riskScore,
+            blocked: true,
+            findings: promptInjection.findings,
+          },
+        });
+        return;
+      }
+
       const profile = getProfile();
       const provider = profile.textProvider || 'gemini';
       let summary = '';

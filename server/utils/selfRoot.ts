@@ -76,7 +76,12 @@ function loadPersistedProject(): string | null {
         return resolved;
       }
     }
-  } catch { /* silent */ }
+  } catch (e) {
+    // Mode dégradé : fichier absent ou corrompu → aucun projet restauré
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.debug("[SelfRoot] loadPersistedProject ignoré:", (e as Error).message);
+    }
+  }
   return null;
 }
 
@@ -94,7 +99,9 @@ function clearPersistedProject(): void {
   try {
     const configPath = getPersistedProjectPath();
     if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
-  } catch { /* silent */ }
+  } catch (e) {
+    console.warn("[SelfRoot] clearPersistedProject ignoré:", (e as Error).message);
+  }
 }
 
 // ── SELF_ROOT ─────────────────────────────────────────────────────────────────

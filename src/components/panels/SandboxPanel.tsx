@@ -1,16 +1,14 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Box, RefreshCw, Upload, Trash2, Loader2, CheckCircle2,
-  XCircle, FileText, Power, Lock, ShieldCheck, Radio,
-  GitCompareArrows, FilePlus2, FileX2, FileCode2,
+  XCircle, Power, Lock, ShieldCheck,
+  GitCompareArrows, FileCode2,
   AlertTriangle, AlertOctagon, Play, ChevronDown,
   Bot, RotateCcw,
 } from 'lucide-react';
 import { useSandboxWatcher } from '../../hooks/useSandboxWatcher';
-import { SandboxDiffViewer } from '../sandbox/SandboxDiffViewer';
 import { useLiveAPIContext } from '../../context/LiveAPIContext';
-import { PromptContextIndicator } from './PromptContextIndicator';
 
 interface SandboxStatus {
   active: boolean;
@@ -35,9 +33,13 @@ interface ValidationState {
   loading: boolean;
   ran: boolean;
   valid: boolean;
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
   errorCount: number;
   warningCount: number;
   diagnostics: TscDiagnostic[];
+  globalDiagnostics: TscDiagnostic[];
   errorsByFile: Record<string, TscDiagnostic[]>;
   rawOutput: string;
 }
@@ -47,49 +49,59 @@ function authHeaders(): Record<string, string> {
   return token ? { 'x-jarvis-token': token } : {};
 }
 
+interface SandboxPanelProps {
+  onOpenDiff: (initialFile: string | null) => void;
+}
+
 /**
  * SandboxPanel — Panneau de contrôle du workspace sandbox.
  * Design épuré, suivi d'état clair, tooltips, fichiers cliquables.
  */
-export function SandboxPanel() {
+export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
   const [status, setStatus] = useState<SandboxStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
-  const [realtimeEvents, setRealtimeEvents] = useState<number>(0);
   const [showCodeInput, setShowCodeInput] = useState(false);
   const [securityCode, setSecurityCode] = useState('');
   const [showResetCodeInput, setShowResetCodeInput] = useState(false);
   const [resetCode, setResetCode] = useState('');
-  const [showDiffViewer, setShowDiffViewer] = useState(false);
-  const [selectedDiffFile, setSelectedDiffFile] = useState<string | null>(null);
   const codeInputRef = useRef<HTMLInputElement>(null);
   const resetCodeRef = useRef<HTMLInputElement>(null);
   const hasFetched = useRef(false);
-  const [expandedErrors, setExpandedErrors] = useState<boolean>(true);
+  const [expandedErrors, setExpandedErrors] = useState(false);
+  const [showModifiedFiles, setShowModifiedFiles] = useState(false);
+  const [showAdvancedActions, setShowAdvancedActions] = useState(false);
   const [askingAI, setAskingAI] = useState(false);
   const [validation, setValidation] = useState<ValidationState>({
     loading: false,
     ran: false,
     valid: true,
+    exitCode: null,
+    stdout: '',
+    stderr: '',
     errorCount: 0,
     warningCount: 0,
     diagnostics: [],
+    globalDiagnostics: [],
     errorsByFile: {},
     rawOutput: '',
   });
 
   const liveAPI = useLiveAPIContext();
-  const { promptContext, connected } = liveAPI;
 
   const applyValidationResult = useCallback((data: any) => {
     setValidation({
       loading: false,
       ran: true,
       valid: !!data.valid,
+      exitCode: typeof data.exitCode === 'number' ? data.exitCode : null,
+      stdout: typeof data.stdout === 'string' ? data.stdout : '',
+      stderr: typeof data.stderr === 'string' ? data.stderr : '',
       errorCount: data.errorCount ?? 0,
       warningCount: data.warningCount ?? 0,
       diagnostics: Array.isArray(data.diagnostics) ? data.diagnostics : [],
+      globalDiagnostics: Array.isArray(data.globalDiagnostics) ? data.globalDiagnostics : [],
       errorsByFile: (data.errorsByFile && typeof data.errorsByFile === 'object') ? data.errorsByFile : {},
       rawOutput: data.rawOutput ?? data.errors ?? '',
     });
@@ -115,7 +127,8 @@ export function SandboxPanel() {
       await runValidation();
     }
     const filesWithIssues = Object.entries(validation.errorsByFile ?? {});
-    if (filesWithIssues.length === 0) {
+    const hasGlobalIssues = (validation.globalDiagnostics ?? []).length > 0;
+    if (filesWithIssues.length === 0 && !hasGlobalIssues) {
       setFeedback({ type: 'success', msg: 'Aucune erreur — rien à corriger' });
       return;
     }
@@ -145,6 +158,12 @@ export function SandboxPanel() {
         ).join('\n');
         diagBlocks.push(`### Erreurs dans ${file} :\n${list}`);
       }
+      if (hasGlobalIssues) {
+        const list = validation.globalDiagnostics.map(d =>
+          `  • [${d.severity.toUpperCase()} ${d.code ?? ''}] ${d.message}`
+        ).join('\n');
+        diagBlocks.push(`### Erreurs globales tsc :\n${list}`);
+      }
 
       const codeBlocks: string[] = [];
       for (const entry of fetched) {
@@ -166,11 +185,13 @@ export function SandboxPanel() {
         '',
         'Règles à suivre OBLIGATOIREMENT :',
         '1. Lis d\'abord chaque fichier concerné dans le sandbox avant de le modifier.',
-        '2. Corriger UNIQUEMENT les erreurs listées ci-dessus — ne PAS faire de refactoring, ne PAS toucher aux lignes non concernées.',
-        '3. Conserver strictement le style, la structure, les noms de variables/fonctions existants.',
-        '4. Après chaque modification : déclencher une re-validation via Valider (côté utilisateur) ou re-tenter tsx --noEmit.',
-        '5. Si une erreur implique un fichier hors sandbox (dépendance du workspace principal), lire le fichier original pour comprendre l\'API attendue.',
-        '6. Ne PAS synchroniser auto vers le workspace principal — laisse l\'utilisateur valider chaque changement.',
+        '2. Corriger UNIQUEMENT les erreurs listées ci-dessus — ne PAS faire de refactoring, ne PAS toucher aux lignes non concernées. Toute correction doit être un patch minimal et réversible.',
+        '3. Conserver strictement le style, la structure DOM, l’ordre des blocs, les noms de variables/fonctions et le comportement existants.',
+        '4. Ne pas remplacer tout le fichier pour une erreur locale. Ne pas modifier className, styles inline, imports d’icônes ou layout sauf si le diagnostic cible précisément cette ligne.',
+        '5. Préserver les classes Tailwind existantes (ne pas introduire de classe arbitraire comme border-slate-8) et ne pas convertir les styles existants vers une autre approche.',
+        '6. Après chaque modification : déclencher une re-validation via Valider (côté utilisateur) ou re-tenter tsc --noEmit.',
+        '7. Si une erreur implique un fichier hors sandbox (dépendance du workspace principal), lire le fichier original pour comprendre l’API attendue.',
+        '8. Ne PAS synchroniser auto vers le workspace principal — laisse l’utilisateur valider chaque changement.',
         '',
         'Commence par résumer brièvement ce que tu vas faire, puis applique les corrections fichier par fichier.',
       ].join('\n');
@@ -221,7 +242,6 @@ export function SandboxPanel() {
     enabled: status?.active ?? false,
     onFileChanged: useCallback((_rp: string) => {
       fetchStatus();
-      setRealtimeEvents(prev => prev + 1);
     }, [fetchStatus]),
     onTreeChanged: useCallback(() => {
       fetchStatus();
@@ -337,15 +357,17 @@ export function SandboxPanel() {
     <>
     <div className="flex flex-col gap-3 p-3">
 
-      {/* ═══ Status header ═══ */}
-      <div className="flex items-center gap-3 py-1">
+      {/* ═══ Vue d'ensemble ═══ */}
+      <div
+        className="rounded-xl border px-3 py-3 flex items-center gap-3"
+        style={{
+          borderColor: status?.active ? 'rgba(74,222,128,0.24)' : 'var(--border-base)',
+          backgroundColor: status?.active ? 'rgba(74,222,128,0.045)' : 'var(--bg-input)',
+        }}
+      >
         <div
-          className="h-8 w-8 rounded-lg flex items-center justify-center"
-          style={{
-            backgroundColor: status?.active
-              ? 'color-mix(in srgb, var(--color-success) 12%, transparent)'
-              : 'var(--bg-input)',
-          }}
+          className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: status?.active ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.04)' }}
         >
           <Box size={15} style={{ color: status?.active ? 'var(--color-success)' : 'var(--text-dimmed)' }} />
         </div>
@@ -354,49 +376,38 @@ export function SandboxPanel() {
             <span className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
               {status?.active ? 'Sandbox actif' : 'Sandbox inactif'}
             </span>
-            {status?.active && <ShieldCheck size={11} style={{ color: 'var(--color-success)' }} />}
+            {status?.active && <ShieldCheck size={12} style={{ color: 'var(--color-success)' }} />}
           </div>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-              {status?.modifiedCount ?? 0} modification{(status?.modifiedCount ?? 0) > 1 ? 's' : ''}
-            </span>
-            {validation.ran && (
-              <span
-                className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-[1px] text-[9px] font-bold"
-                style={{
-                  backgroundColor: validation.valid
-                    ? 'rgba(74,222,128,0.12)'
-                    : 'rgba(248,113,113,0.12)',
-                  color: validation.valid ? 'var(--color-success)' : '#f87171',
-                }}
-                title={validation.valid ? 'Build sandbox valide' : `Build sandbox invalide — ${validation.errorCount} erreurs`}
-              >
-                {validation.loading
-                  ? <><Loader2 size={8} className="animate-spin" /> TSC…</>
-                  : validation.valid
-                  ? <><CheckCircle2 size={8} /> OK{validation.warningCount > 0 ? `·${validation.warningCount}w` : ''}</>
-                  : <><AlertOctagon size={8} /> {validation.errorCount}{validation.warningCount > 0 ? `·${validation.warningCount}w` : ''}</>}
-              </span>
-            )}
-            {realtimeEvents > 0 && (
-              <span className="flex items-center gap-1 text-[9px]" style={{ color: 'var(--color-success)' }}>
-                <Radio size={7} className="animate-pulse" />
-                live
-              </span>
-            )}
-          </div>
+          <p className="mt-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {status?.modifiedCount ?? 0} modification{(status?.modifiedCount ?? 0) > 1 ? 's' : ''}
+          </p>
         </div>
+        {validation.ran && (
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold flex-shrink-0"
+            style={{
+              backgroundColor: validation.valid ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)',
+              color: validation.valid ? 'var(--color-success)' : '#f87171',
+            }}
+            title={validation.valid ? 'Build sandbox valide' : `Build sandbox invalide — ${validation.errorCount} erreurs`}
+          >
+            {validation.loading
+              ? <><Loader2 size={10} className="animate-spin" /> Validation</>
+              : validation.valid
+              ? <><CheckCircle2 size={10} /> Prêt</>
+              : <><AlertOctagon size={10} /> {validation.errorCount} erreur{validation.errorCount > 1 ? 's' : ''}</>}
+          </span>
+        )}
         <button
+          type="button"
           onClick={fetchStatus}
           className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
           title="Rafraîchir l'état du sandbox"
+          aria-label="Rafraîchir l'état du sandbox"
         >
-          <RefreshCw size={12} className={loading ? 'animate-spin' : ''} style={{ color: 'var(--text-muted)' }} />
+          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} style={{ color: 'var(--text-muted)' }} />
         </button>
       </div>
-
-      {/* ═══ Contexte prompt temps réel ═══ */}
-      <PromptContextIndicator context={promptContext} connected={connected} />
 
       {/* ═══ Quick actions — compact row ═══ */}
       <div className="flex flex-col gap-1.5">
@@ -553,92 +564,116 @@ export function SandboxPanel() {
           )}
         </AnimatePresence>
 
-        {/* Separator */}
+        {/* ═══ Changements ═══ */}
         {status?.active && status.modifiedCount > 0 && (
-          <div className="h-px my-1" style={{ backgroundColor: 'var(--border-base)' }} />
+          <>
+            <div className="h-px my-1" style={{ backgroundColor: 'var(--border-base)' }} />
+            <ActionRow
+              icon={<GitCompareArrows size={12} />}
+              label="Examiner les modifications"
+              color="var(--color-info)"
+              onClick={() => onOpenDiff(null)}
+              busy={false}
+              tooltip="Comparer avant/après, accepter ou rejeter fichier par fichier"
+              highlight
+            />
+          </>
         )}
 
-        {/* View diff */}
-        {status?.active && status.modifiedCount > 0 && (
-          <ActionRow
-            icon={<GitCompareArrows size={12} />}
-            label="Voir les différences"
-            color="var(--color-info)"
-            onClick={() => {
-              setSelectedDiffFile(null);
-              setShowDiffViewer(true);
-            }}
-            busy={false}
-            tooltip="Comparer avant/après, accepter ou rejeter fichier par fichier"
-            highlight
-          />
+        {/* ═══ Actions avancées ═══ */}
+        {status?.exists && (
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedActions(value => !value)}
+              className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[11px] font-medium transition-colors hover:bg-white/5"
+              style={{ color: 'var(--text-muted)' }}
+              aria-expanded={showAdvancedActions}
+            >
+              <span>Actions avancées</span>
+              <ChevronDown
+                size={13}
+                style={{ transform: showAdvancedActions ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .15s' }}
+              />
+            </button>
+            <AnimatePresence initial={false}>
+              {showAdvancedActions && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex flex-col gap-1 pt-1">
+                    {status.active && status.modifiedCount > 0 && (
+                      <ActionRow
+                        icon={<Upload size={12} />}
+                        label="Synchroniser tout"
+                        color="var(--color-success)"
+                        onClick={() => doAction('sync')}
+                        busy={busy === 'sync'}
+                        tooltip="Valider le build puis appliquer toutes les modifications au repo principal"
+                      />
+                    )}
+                    {status.active && status.modifiedCount > 0 && (
+                      <ActionRow
+                        icon={<Trash2 size={12} />}
+                        label="Tout rejeter"
+                        color="var(--color-error)"
+                        onClick={() => doAction('discard')}
+                        busy={busy === 'discard'}
+                        tooltip="Supprimer toutes les modifications et réinitialiser le sandbox"
+                      />
+                    )}
+                    <ActionRow
+                      icon={<RotateCcw size={12} />}
+                      label="Réinitialiser le sandbox"
+                      color="var(--color-warning)"
+                      onClick={handleReset}
+                      busy={busy === 'reset'}
+                      tooltip="Écraser le sandbox avec une copie fraîche du code source (code requis)"
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         )}
-
-        {/* Sync */}
-        {status?.active && status.modifiedCount > 0 && (
-          <ActionRow
-            icon={<Upload size={12} />}
-            label="Synchroniser tout"
-            color="var(--color-success)"
-            onClick={() => doAction('sync')}
-            busy={busy === 'sync'}
-            tooltip="Valider le build puis appliquer toutes les modifications au repo principal"
-          />
-        )}
-
-        {/* Discard */}
-                {status?.active && status.modifiedCount > 0 && (
-                  <ActionRow
-                    icon={<Trash2 size={12} />}
-                    label="Tout rejeter"
-                    color="var(--color-error)"
-                    onClick={() => doAction('discard')}
-                    busy={busy === 'discard'}
-                    tooltip="Supprimer toutes les modifications et réinitialiser le sandbox"
-                  />
-                )}
-
-                {/* Reset sandbox */}
-                {status?.exists && (
-                  <ActionRow
-                    icon={<RotateCcw size={12} />}
-                    label="Réinitialiser sandbox"
-                    color="var(--color-warning)"
-                    onClick={handleReset}
-                    busy={busy === 'reset'}
-                    tooltip="Écraser le sandbox avec une copie fraîche du code source (code requis)"
-                  />
-                )}
-              </div>
+      </div>
 
       {/* ═══ Modified files — clickable to open diff ═══ */}
       {status?.active && status.modifiedFiles.length > 0 && (
-        <div className="mt-1">
-          <div className="flex items-center justify-between px-1 mb-1.5">
-            <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+        <div className="mt-1 rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-base)' }}>
+          <button
+            type="button"
+            onClick={() => setShowModifiedFiles(value => !value)}
+            className="flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-white/5"
+            aria-expanded={showModifiedFiles}
+          >
+            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
               Fichiers modifiés
             </span>
-            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{ color: 'var(--text-dimmed)', backgroundColor: 'var(--bg-input)' }}>
-              {status.modifiedFiles.length}
+            <span className="flex items-center gap-2">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-input)' }}>
+                {status.modifiedFiles.length}
+              </span>
+              <ChevronDown size={13} style={{ color: 'var(--text-dimmed)', transform: showModifiedFiles ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .15s' }} />
             </span>
-          </div>
-          <div className="space-y-0.5 max-h-44 overflow-y-auto custom-scrollbar">
+          </button>
+          {showModifiedFiles && (
+            <div className="space-y-0.5 max-h-44 overflow-y-auto custom-scrollbar px-1.5 pb-1.5">
             {status.modifiedFiles.map(f => {
-              const isNew = false;
-              const Icon = isNew ? FilePlus2 : FileCode2;
+              const Icon = FileCode2;
               const fileDiags = validation.ran ? (validation.errorsByFile[f] ?? []) : [];
               const errCount = fileDiags.filter(d => d.severity === 'error').length;
               const warnCount = fileDiags.filter(d => d.severity === 'warning').length;
               const hasIssues = errCount > 0 || warnCount > 0;
-              const iconColor = hasIssues ? '#f87171' : (isNew ? '#4ade80' : 'var(--accent-primary)');
+              const iconColor = hasIssues ? '#f87171' : 'var(--accent-primary)';
 
               return (
                 <button
                   key={f}
-                  onClick={() => {
-                    setShowDiffViewer(true);
-                    setSelectedDiffFile(f);
-                  }}
+                  onClick={() => onOpenDiff(f)}
                   className="group w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all hover:bg-white/5"
                   style={{
                     borderLeft: hasIssues ? `2px solid rgba(248,113,113,0.45)` : '2px solid transparent',
@@ -670,21 +705,19 @@ export function SandboxPanel() {
                         {warnCount}
                       </span>
                     )}
-                    <span className="text-[8px] opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--text-dimmed)' }}>
-                      diff →
-                    </span>
                   </div>
                 </button>
               );
             })}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* ═══ Validation errors panel — fichier par fichier ═══ */}
 
-      {/* Cas tsc config error : valid=false mais aucune erreur parsée — afficher rawOutput */}
-      {validation.ran && !validation.valid && validation.errorCount === 0 && validation.rawOutput && (
+  {/* Cas tsc config/global error : afficher stdout/stderr même sans diagnostic rattaché à un fichier */}
+      {validation.ran && !validation.valid && Object.keys(validation.errorsByFile).length === 0 && validation.rawOutput && (
         <div
           className="rounded-lg overflow-hidden border"
           style={{ borderColor: 'rgba(248,113,113,0.25)', backgroundColor: 'rgba(248,113,113,0.04)' }}
@@ -692,7 +725,7 @@ export function SandboxPanel() {
           <div className="flex items-center gap-1.5 px-2.5 py-1.5">
             <AlertOctagon size={11} style={{ color: '#f87171' }} />
             <span className="text-[10px] font-bold" style={{ color: '#f87171' }}>
-              Échec build (configuration tsc)
+              Échec build{validation.exitCode !== null ? ` (code ${validation.exitCode})` : ''} (configuration ou diagnostic global tsc)
             </span>
           </div>
           <div className="px-2.5 pb-2.5">
@@ -700,7 +733,10 @@ export function SandboxPanel() {
               className="text-[9.5px] font-mono whitespace-pre-wrap break-all max-h-40 overflow-y-auto custom-scrollbar rounded p-2"
               style={{ backgroundColor: 'rgba(0,0,0,0.2)', color: '#fca5a5' }}
             >
-              {validation.rawOutput}
+              {validation.exitCode !== null && `exitCode: ${validation.exitCode}\n`}
+              {validation.stdout && `stdout:\n${validation.stdout}\n`}
+              {validation.stderr && `stderr:\n${validation.stderr}\n`}
+              {!validation.stdout && !validation.stderr && validation.rawOutput}
             </pre>
           </div>
         </div>
@@ -836,16 +872,6 @@ export function SandboxPanel() {
         )}
       </AnimatePresence>
     </div>
-
-    {/* ═══ Diff Viewer overlay ═══ */}
-    <AnimatePresence>
-      {showDiffViewer && (
-        <SandboxDiffViewer
-          onClose={() => { setShowDiffViewer(false); setSelectedDiffFile(null); fetchStatus(); }}
-          initialSelectedFile={selectedDiffFile}
-        />
-      )}
-    </AnimatePresence>
     </>
   );
 }

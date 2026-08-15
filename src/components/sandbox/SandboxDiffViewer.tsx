@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   X, ChevronRight, ChevronDown, ChevronUp, FileCode2, FilePlus2, FileX2,
   RefreshCcw, Loader2, Check, RotateCcw, CheckCheck, XCircle,
-  ArrowDown, ArrowUp, Columns2, AlignJustify, Keyboard, AlertTriangle,
+  ArrowDown, ArrowUp, ArrowLeft, Columns2, AlignJustify, Keyboard, AlertTriangle,
   AlertOctagon, Play, Bot,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext';
@@ -422,9 +422,10 @@ const DiagnosticPanel = memo(function DiagnosticPanel({
 interface SandboxDiffViewerProps {
   onClose: () => void;
   initialSelectedFile?: string | null;
+  embedded?: boolean;
 }
 
-export function SandboxDiffViewer({ onClose, initialSelectedFile }: SandboxDiffViewerProps) {
+export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = false }: SandboxDiffViewerProps) {
   const liveAPI = useLiveAPIContext();
 
   // ─── State ───────────────────────────────────────────────────────────────────
@@ -1052,7 +1053,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile }: SandboxDiffV
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex flex-col"
+      className={embedded ? 'relative flex flex-1 min-h-0 flex-col' : 'fixed inset-0 z-50 flex flex-col'}
       style={{ backgroundColor: 'var(--bg-base)' }}
     >
       {/* ─── Header ────────────────────────────────────────────────────────── */}
@@ -1224,8 +1225,13 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile }: SandboxDiffV
           >
             <Keyboard size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
-          <button onClick={onClose} className="p-2 rounded-lg transition-colors hover:bg-white/5" title="Fermer (Escape)">
-            <X size={16} style={{ color: 'var(--text-muted)' }} />
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg transition-colors hover:bg-white/5"
+            title={embedded ? 'Retour aux contrôles du sandbox (Escape)' : 'Fermer (Escape)'}
+            aria-label={embedded ? 'Retour aux contrôles du sandbox' : 'Fermer'}
+          >
+            {embedded ? <ArrowLeft size={16} style={{ color: 'var(--text-muted)' }} /> : <X size={16} style={{ color: 'var(--text-muted)' }} />}
           </button>
         </div>
       </div>

@@ -24,10 +24,10 @@ export class PromptBuilder {
     if (fileContents.length > 0) {
       parts.push(
         "",
-        "## Fichiers de contexte",
+        "## Fichiers de contexte (instantané initial)",
         ...fileContents,
         "",
-        "Les fichiers ci-dessus proviennent du workspace actif. Utilise-les immédiatement : ne demande ni archive, ni code source supplémentaire avant d'avoir analysé ce contexte."
+        "Les fichiers ci-dessus sont un instantané initial du workspace actif. Utilise-les immédiatement. Après une écriture, l'exécuteur fournira un bloc « Fichiers en mémoire » : ce dernier est le seul état autoritaire et remplace tout contenu initial du même chemin."
       );
     }
 
@@ -42,7 +42,7 @@ export class PromptBuilder {
       "",
       "## Contrat d'exécution obligatoire",
       "Exécute le travail avant de répondre : une intention telle que « Je vais… », « Je dois… » ou un plan seul n'est jamais un résultat.",
-      "Pour toute modification, fournis les fichiers complets dans un format pris en charge puis attends leur écriture et leur vérification.",
+      "Pour toute action sur un fichier, émet d'abord uniquement un JSON valide au format {\"tool_calls\":[{\"name\":\"nom_outil\",\"parameters\":{...}}]}; les pseudo-appels JavaScript et les blocs Markdown ne sont pas exécutés. Après chaque observation, poursuis avec le prochain tool_calls jusqu'à l'écriture et la vérification, puis rends le rapport final.",
       "Termine impérativement par :",
       "## Résultats vérifiés",
       "- Constats ou changements réellement obtenus, avec fichiers concernés.",
@@ -51,7 +51,8 @@ export class PromptBuilder {
       "- Fichiers modifiés : ...",
       "- Outils/commandes exécutés : ...",
       "- Vérification : PASS ou FAIL, avec le résultat observé.",
-      "Les seuls appels structurés exécutables sont : list_project_files, read_project_file, read_file_outline, search_in_files, analyze_project_file, write_project_file, modify_project_file, patch_project_file et verify_*. Ne demande jamais bash, shell, find, ls ou /workspace.",
+      "Les seuls appels structurés exécutables sont : list_project_files, read_project_file, read_file_outline, search_in_files, analyze_project_file, write_project_file, apply_patch, patch_project_file et verify_*. Ne demande jamais bash, shell, find, ls ou /workspace.",
+      "Pour déléguer à un autre agent, écris un bloc textuel ## DÉLÉGATION dans ta réponse. N'émets JAMAIS {\"tool_calls\":[{\"name\":\"agent_delegate\"...}]} ni agent_orchestrate — ces outils ne sont pas disponibles ici.",
       "Sans preuve concrète, déclare explicitement la tâche incomplète et explique le blocage."
     );
 

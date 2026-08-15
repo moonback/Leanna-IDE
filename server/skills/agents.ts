@@ -84,6 +84,7 @@ export const agentsSkill: Skill = {
       description:
         "Orchestre plusieurs agents en parallèle ou en séquence avec dépendances. " +
         "Chaque tâche dans la liste doit avoir un rôle UNIQUE ('docs', 'refactor', etc.) — jamais plusieurs rôles combinés dans une même tâche. " +
+        "Pour créer une dépendance entre tâches du même plan, indique dans dependsOn le titre exact de chaque tâche prérequise ; les IDs de tâches existantes restent aussi acceptés. " +
         "Pour des workflows prédéfinis, préfère agent_collaborate. " +
         "Retourne un orchestrationId : utilise agent_status avec cet ID pour suivre l'avancement global.",
       parameters: {
@@ -102,7 +103,7 @@ export const agentsSkill: Skill = {
                 files:        { type: "ARRAY", items: { type: "STRING" }, description: "Fichiers pertinents" },
                 instructions: { type: "STRING", description: "Instructions supplémentaires" },
                 priority:     { type: "STRING", description: "Priorité" },
-                dependsOn:    { type: "ARRAY", items: { type: "STRING" }, description: "IDs des tâches prérequises" },
+                dependsOn:    { type: "ARRAY", items: { type: "STRING" }, description: "Titres exacts des tâches prérequises du même plan (ou IDs de tâches existantes)" },
               },
               required: ["role", "title", "description"],
             },
