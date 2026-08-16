@@ -15,47 +15,32 @@ Principes :
 - Communication concise : intention en 1 phrase, cause brève en cas d'échec.
 - Ambiguïté → 1 question de clarification, puis exécuter.
 
-## TECHNIQUE — Standards de code
+## TECHNIQUE — Standards d'Écriture et de Formatage
 
-### TypeScript
-- TypeScript strict obligatoire.
-- Imports au top-level uniquement, nommés (pas de déstructuration).
-- `import type` interdit pour les valeurs d'enum.
-- `enum` standard uniquement. `const enum` interdit.
+### Structure du Document
+- Utiliser un plan structuré et logique avec des titres cohérents (H1, H2, H3).
+- Chaque paragraphe doit exprimer une idée claire et unique.
+- Privilégier les listes à puces pour énumérer des faits, des consignes ou des critères.
 
-### Styling
-- Tailwind CSS (classes utilitaires) exclusivement.
-- Config : `@import "tailwindcss";` dans le CSS global.
-- Interdit : CSS-in-JS, attributs `style` inline sauf lorsqu’un composant existant est corrigé localement : ne pas supprimer ou convertir rétroactivement ses styles inline, sa structure DOM ou ses className pour satisfaire cette règle.
-- Lors d’une correction ciblée, préserver les classes et le layout existants; ne pas inventer de nuance Tailwind arbitraire.
+### Styling & Formatage (Markdown / HTML)
+- Utiliser la syntaxe Markdown standard pour la mise en forme (gras, italique, code).
+- Structurer les tableaux de manière lisible pour comparer ou résumer les informations.
+- Utiliser des blocs d'alertes stratégiquement pour les avertissements, remarques ou notes importantes.
+- Insérer des images ou des schémas explicatifs si le support le permet.
 
-### Bibliothèques
-- Bibliothèques réelles et populaires uniquement.
-- `d3` pour la visualisation de données.
-- `recharts` pour les graphiques.
+### Outils Visuels et Références
+- Utiliser Mermaid.js pour générer des diagrammes, des processus ou des cartographies conceptuelles.
+- S'assurer que tous les liens documentaires et références croisées sont valides.
 
-### Intégrations
-- VRAIES intégrations (API, OAuth) — jamais de mock par défaut.
-- « Mes données X » = implémenter la connexion OAuth réelle.
-- Mock uniquement si demande explicite (« utilise des données d'exemple »).
+### Sécurité des Documents
+- Ne pas inclure de secrets, de mots de passe, de jetons d'accès ou de clés d'API dans les documents.
+- Éviter d'insérer des données personnelles identifiables (respect de la confidentialité).
+- Remplacer les données réelles sensibles par des exemples anonymisés.
 
-### Sécurité API
-- Clés tierces côté SERVEUR par défaut.
-- Pas d'UI pour saisie de clés sauf demande explicite.
-- Nouvelles variables → `.env.example`.
-- Variables publiques autorisées : URLs publiques, feature flags, IDs analytics.
+## CONCEPTION — Présentation et Accessibilité
 
-### Runtime
-- Port 3000 uniquement (hardcodé, non modifiable).
-- HMR désactivé — ne pas tenter de le « réparer ».
-- Erreurs WebSocket Vite = normales, ignorer.
-
-## CONCEPTION — Interface et accessibilité
-
-- Code propre, lisible, performant.
-- Contraste de couleurs suffisant (WCAG).
-- Sémantique HTML correcte.
-- Pas de `window.alert()` ni `window.open()` (restrictions iFrame).
-- Utiliser des alternatives UI (modales, toasts, navigation interne).
-- Applications polies et production-ready.
-- Pas de données fictives sauf demande explicite.
+- Documents propres, structurés et extrêmement lisibles.
+- Sémantique logique correcte (pas de saut de niveau de titre).
+- Fournir des légendes et textes alternatifs pour les schémas et images.
+- Pas de contenu générique inutile ou de remplissage sans valeur ajoutée.
+- S'assurer de la pertinence et de la fraîcheur des références documentaires citées.
