@@ -26,6 +26,7 @@ export interface IDEPanelState {
   showAgents: boolean;
   showMissions: boolean;
   showSystemHealth: boolean;
+  showKnowledgeSystem: boolean;
   showMcp: boolean;
   showFleet: boolean;
   previewUrl: string | null;
@@ -50,6 +51,7 @@ export interface IDEPanelActions {
   onToggleAgents: () => void;
   onToggleMissions: () => void;
   onToggleSystemHealth: () => void;
+  onToggleKnowledgeSystem: () => void;
   onToggleMcp: () => void;
   onToggleFleet: () => void;
   onToggleVision: () => void;
@@ -102,6 +104,7 @@ export interface UnifiedSidebarProps {
   showAgents?: boolean;
   showMissions?: boolean;
   showSystemHealth?: boolean;
+  showKnowledgeSystem?: boolean;
   showMcp?: boolean;
   showFleet?: boolean;
   previewUrl?: string | null;
@@ -127,6 +130,7 @@ export interface UnifiedSidebarProps {
   onToggleAgents?: () => void;
   onToggleMissions?: () => void;
   onToggleSystemHealth?: () => void;
+  onToggleKnowledgeSystem?: () => void;
   onToggleMcp?: () => void;
   onToggleFleet?: () => void;
   onToggleVision?: () => void;

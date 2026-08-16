@@ -2,10 +2,10 @@
  * Types du Knowledge System — Compréhension avancée du projet
  *
  * Définit les structures de données pour :
- * - ProjectIndexer : scan des fichiers et extraction d'entités
+ * - ProjectIndexer : scan des fichiers et extraction d'entités (code et documents)
  * - KnowledgeGraph : graphe permanent des connaissances du projet
  * - ProjectMemory : mémoire projet persistante
- * - SemanticSearch : recherche sémantique dans le codebase
+ * - SemanticSearch : recherche sémantique dans les documents du projet
  */
 
 import { z } from "zod";
@@ -14,8 +14,9 @@ import { z } from "zod";
 // Types ProjectIndexer
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Types d'entités de code que l'indexeur peut extraire */
+/** Types d'entités que l'indexeur peut extraire (code + documents) */
 export type CodeEntityType =
+  // ── Entités de code ─────────────────────────────────────────────────────
   | "class"
   | "function"
   | "interface"
@@ -31,7 +32,15 @@ export type CodeEntityType =
   | "db_table"        // Database table reference
   | "env_var"         // Environment variable usage
   | "test"            // Test case (describe/it/test)
-  | "symbol";         // Exported symbol (function call target)
+  | "symbol"          // Exported symbol (function call target)
+  // ── Entités documentaires ────────────────────────────────────────────────
+  | "section"         // Titre de section Markdown (H1-H6)
+  | "summary"         // Paragraphe introductif / résumé d'une section
+  | "todo"            // Tâche à faire (checkbox Markdown - [ ] / - [x])
+  | "frontmatter"     // Métadonnée YAML en en-tête (titre, auteur, date, tags)
+  | "code_block"      // Bloc de code dans un document (```lang ... ```)
+  | "alert"           // Bloc d'alerte (> [!NOTE], > [!WARNING], > [!TIP]...)
+  | "doc_link";       // Lien vers un autre document ([texte](./doc.md))
 
 /** Une entité de code extraite d'un fichier */
 export interface CodeEntity {
@@ -71,22 +80,32 @@ export interface FileNode {
   lines: number;
   /** Date de dernière modification */
   lastModified: string;
-  /** Entités de code contenues dans ce fichier */
+  /** Entités contenues dans ce fichier (code ou documentaires) */
   entities: CodeEntity[];
-  /** Imports du fichier (chemins résolus) */
+  /** Imports / liens sortants du fichier */
   imports: string[];
-  /** Exports du fichier (noms exportés) */
+  /** Exports / sections exportées du fichier */
   exports: string[];
   /** Langage détecté */
-  language: "typescript" | "javascript" | "json" | "markdown" | "css" | "html" | "other";
+  language:
+    | "typescript" | "javascript"
+    | "json"
+    | "markdown" | "mdx"
+    | "plaintext"
+    | "yaml"
+    | "csv"
+    | "rst"
+    | "css" | "html"
+    | "other";
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types KnowledgeGraph
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Types de relations sémantiques entre entités */
+/** Types de relations sémantiques entre entités (code + documents) */
 export type EntityRelationType =
+  // ── Relations de code ───────────────────────────────────────────────────
   | "extends"       // Classe hérite d'une autre
   | "implements"    // Classe implémente une interface
   | "uses"          // Fonction/méthode appelle une autre entité
@@ -99,7 +118,11 @@ export type EntityRelationType =
   | "reads_env"     // Fichier lit une variable d'environnement
   | "writes_table"  // Code écrit dans une table DB
   | "reads_table"   // Code lit depuis une table DB
-  | "tested_by";    // Entité est testée par un fichier de test
+  | "tested_by"     // Entité est testée par un fichier de test
+  // ── Relations documentaires ─────────────────────────────────────────────
+  | "references"    // Document A mentionne ou cite le document B
+  | "includes"      // Document A inclut le document B (![[note]] ou embed)
+  | "mentions"      // Document A mentionne le titre d'un autre document;
 
 /** Une relation sémantique entre deux entités du graphe */
 export interface EntityRelation {
@@ -191,6 +214,7 @@ export interface ImpactReport {
 
 /** Catégories de connaissances projet */
 export type ProjectKnowledgeCategory =
+  // ── Catégories générales ─────────────────────────────────────────────────
   | "architecture"
   | "convention"
   | "pattern"
@@ -202,7 +226,14 @@ export type ProjectKnowledgeCategory =
   | "security"
   | "stack"
   | "refactoring"
-  | "todo";
+  | "todo"
+  // ── Catégories documentaires ─────────────────────────────────────────────
+  | "document"       // Document ou fichier texte du projet
+  | "style-guide"    // Guide de style rédactionnel
+  | "glossary"       // Définition de termes / glossaire
+  | "template"       // Modèle de document réutilisable
+  | "editorial"      // Décision éditoriale (ton, registre, format)
+  | "structure";     // Organisation de la hiérarchie documentaire
 
 /** Un fait de connaissance projet */
 export interface ProjectFact {
@@ -403,7 +434,14 @@ export interface LearningResult {
 
 export const codeEntitySchema = z.object({
   name: z.string().min(1),
-  type: z.enum(["class", "function", "interface", "enum", "type", "constant", "variable", "component", "method", "import", "export", "route", "db_table", "env_var", "test", "symbol"]),
+  type: z.enum([
+    // Entités de code
+    "class", "function", "interface", "enum", "type", "constant",
+    "variable", "component", "method", "import", "export",
+    "route", "db_table", "env_var", "test", "symbol",
+    // Entités documentaires
+    "section", "summary", "todo", "frontmatter", "code_block", "alert", "doc_link",
+  ]),
   filePath: z.string().min(1),
   lineStart: z.number().int().nonnegative(),
   lineEnd: z.number().int().positive().optional(),
@@ -411,7 +449,7 @@ export const codeEntitySchema = z.object({
   modifiers: z.array(z.string()).optional(),
   description: z.string().optional(),
   dependencies: z.array(z.string()).optional(),
-  /** Métadonnées supplémentaires (HTTP method pour routes, table name pour DB, etc.) */
+  /** Métadonnées supplémentaires (niveau de titre, langage du bloc, cible du lien, etc.) */
   metadata: z.record(z.any()).optional(),
 });
 

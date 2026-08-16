@@ -42,11 +42,13 @@ const log = createLogger("UnderstandingEngine");
 
 /** Stratégie de construction de contexte */
 export type ContextStrategy =
-  | "balanced"      // Fichiers + faits + dépendances (défaut)
-  | "code_first"    // Priorité aux fichiers et entités
-  | "memory_first"  // Priorité aux décisions et patterns
-  | "graph_first"   // Priorité aux dépendances et chemins
-  | "minimal";      // Contexte ultra-condensé (pour prompts courts)
+  | "balanced"        // Documents + faits + liens (défaut)
+  | "document_first"  // Priorité aux documents (.md, .txt) et entités documentaires
+  | "code_first"      // Alias pour document_first
+  | "memory_first"    // Priorité aux décisions, guides de style et patterns
+  | "links_first"     // Priorité aux liens entre documents
+  | "graph_first"     // Alias pour links_first
+  | "minimal";        // Contexte ultra-condensé (pour prompts courts)
 
 /** Niveau de détail du contexte */
 export type ContextDetailLevel = "compact" | "standard" | "verbose";
@@ -234,6 +236,7 @@ export class UnderstandingEngine {
 
     // 4. Ajustement selon la stratégie
     switch (opts.strategy) {
+      case "document_first":
       case "code_first":
         maxFiles = Math.min(maxFiles + 3, 25);
         maxFacts = Math.max(3, maxFacts - 2);
@@ -246,6 +249,7 @@ export class UnderstandingEngine {
         maxFiles = Math.min(maxFiles, 4);
         maxFacts = Math.min(maxFacts, 4);
         break;
+      case "links_first":
       case "graph_first":
         maxFiles = Math.min(maxFiles + 2, 20);
         break;
@@ -653,8 +657,9 @@ export class UnderstandingEngine {
 
     // 1. Adapter fichiers selon stratégie
     switch (opts.strategy) {
+      case "document_first":
       case "code_first": {
-        // Prioriser les fichiers à haute pertinence textuelle, ignorés les faits mémoire
+        // Prioriser les documents à haute pertinence textuelle
         working.files = working.files
           .sort((a, b) => b.relevance - a.relevance)
           .slice(0, maxFiles);
@@ -680,8 +685,9 @@ export class UnderstandingEngine {
         working.facts = [...working.facts, ...bonusFacts].slice(0, maxFacts + 5);
         break;
       }
+      case "links_first":
       case "graph_first": {
-        // Ajouter : fichiers dans la chaîne d'impact des fichiers trouvés
+        // Ajouter : fichiers dans la chaîne de liens/dépendances des fichiers trouvés
         const added = new Set(working.files.map((f) => f.filePath));
         for (const f of working.files.slice(0, 6)) {
           const chain = dependencyGraph.getImpactChain(f.filePath).slice(1, 4);
@@ -690,7 +696,7 @@ export class UnderstandingEngine {
               working.files.push({
                 filePath: dep,
                 relevance: Math.max(0.1, f.relevance - 0.2),
-                reason: `[graph_first] Dans la chaîne d'impact de ${f.filePath}`,
+                reason: `[links_first] Référencé par ou en lien avec ${f.filePath}`,
                 relevantSections: [],
               });
               added.add(dep);

@@ -15,7 +15,7 @@ import {
   GitBranch, Camera, Monitor,
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Cable, ShieldCheck, Container, Bot, Crosshair,
-  Activity, Wrench, Code2, Users,
+  Activity, Wrench, Code2, Users, BookOpen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -162,6 +162,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
         icon: Wrench,
         label: 'Données & Outils',
         children: [
+          {
+            id: 'knowledge-system',
+            type: 'button',
+            icon: BookOpen,
+            label: 'Knowledge System (Documents & RAG)',
+            stateKey: 'showKnowledgeSystem',
+            actionKey: 'onToggleKnowledgeSystem',
+          },
           {
             id: 'system-health',
             type: 'button',

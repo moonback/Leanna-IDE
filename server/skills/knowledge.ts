@@ -25,12 +25,20 @@ const CATEGORY_VALUES: ProjectKnowledgeCategory[] = [
   "stack",
   "refactoring",
   "todo",
+  "document",
+  "style-guide",
+  "glossary",
+  "template",
+  "editorial",
+  "structure",
 ];
 
 const STRATEGY_VALUES: ContextStrategy[] = [
   "balanced",
-  "code_first",
+  "document_first",
   "memory_first",
+  "links_first",
+  "code_first",
   "graph_first",
   "minimal",
 ];
@@ -46,8 +54,8 @@ export const knowledgeSkill: Skill = {
     {
       name: "knowledge_build_context",
       description:
-        "🔎 Outil PRINCIPAL de compréhension projet. Combine en un appel : recherche sémantique, mémoire projet, graphe de dépendances, score de compréhension et recommandations. " +
-        "À utiliser en début de mission (≥ 2 fichiers ou architecture inconnue). " +
+        "🔎 Outil PRINCIPAL de compréhension des documents et du projet. Combine en un appel : recherche sémantique, mémoire projet, graphe de liens documentaires, score de compréhension et recommandations. " +
+        "À utiliser en début de mission (≥ 2 fichiers ou documentation inconnue). " +
         "Retourne un ContextBatch réutilisable pour toutes les sous-tâches — ne pas rappeler pour chaque fichier.",
       parameters: {
         type: "OBJECT",
@@ -55,14 +63,14 @@ export const knowledgeSkill: Skill = {
           query: {
             type: "STRING",
             description:
-              "La requête / tâche / objectif pour lequel tu as besoin de contexte (ex: 'Ajouter un système de paiement Stripe', 'Corriger le bug sur le login').",
+              "La requête / tâche / objectif pour lequel tu as besoin de contexte (ex: 'Rédiger le cahier des charges', 'Revoir l'orthographe du rapport').",
           },
           strategy: {
             type: "STRING",
             description:
-              "Stratégie de collecte : 'balanced' (défaut) = fichiers + faits + dépendances ; " +
-              "'code_first' = priorise fichiers/entités ; 'memory_first' = priorise décisions/patterns ; " +
-              "'graph_first' = priorise dépendances/impacts ; 'minimal' = ultra-condensé.",
+              "Stratégie de collecte : 'balanced' (défaut) = documents + faits + liens ; " +
+              "'document_first' = priorise documents/sections ; 'memory_first' = priorise décisions/style ; " +
+              "'links_first' = priorise liens/références ; 'minimal' = ultra-condensé.",
             enum: STRATEGY_VALUES,
           },
           detail: {
@@ -86,7 +94,7 @@ export const knowledgeSkill: Skill = {
     {
       name: "knowledge_semantic_search",
       description:
-        "🔍 Recherche sémantique dans le codebase : combine noms d'entités, chemins de fichiers et contenu textuel (TF-IDF). " +
+        "🔍 Recherche sémantique dans les documents du projet : combine titres de sections, métadonnées et contenu textuel (TF-IDF). " +
         "Plus efficace que search_in_files pour un concept dont tu ignores les mots exacts. " +
         "Lance en parallèle avec knowledge_search_entities si les deux sont pertinents.",
       parameters: {
@@ -94,7 +102,7 @@ export const knowledgeSkill: Skill = {
         properties: {
           query: {
             type: "STRING",
-            description: "Terme ou concept à rechercher (ex: 'authentification JWT', 'gestion erreurs API').",
+            description: "Terme ou concept à rechercher (ex: 'guide de style', 'spécifications techniques').",
           },
           max_results: {
             type: "NUMBER",
@@ -111,9 +119,9 @@ export const knowledgeSkill: Skill = {
     {
       name: "knowledge_search_entities",
       description:
-        "🔎 Recherche uniquement des ENTITÉS DE CODE (classes, fonctions, interfaces, composants, types, constantes...) " +
-        "dans le graphe de connaissance. Utilise ceci plutôt que knowledge_semantic_search quand tu sais " +
-        "que tu cherches spécifiquement un symbole du code.",
+        "🔎 Recherche des ENTITÉS DOCUMENTAIRES (sections H1-H6, métadonnées YAML, todos, alertes, blocs de code...) " +
+        "dans le graphe de connaissance. Utilise ceci plutôt que knowledge_semantic_search quand tu cherches " +
+        "une section ou un titre spécifique dans les documents.",
       parameters: {
         type: "OBJECT",
         properties: {

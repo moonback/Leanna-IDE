@@ -25,7 +25,6 @@ import { useFileSystem } from '../hooks/useFileSystem';
 import { useIdeSettings } from '../hooks/useIdeSettings';
 import { useEditorActions } from '../hooks/useEditorActions';
 import { useLiveAPIContext } from '../context/LiveAPIContext';
-import { ideApi } from '../services/ideApi';
 import { useScreenShare } from '../context/ScreenShareContext';
 import { useSandboxWatcher } from '../hooks/useSandboxWatcher';
 import { AgentProgressBar } from '../components/ide/AgentProgressBar';
@@ -43,6 +42,7 @@ import { AgentPanel } from '../components/panels/AgentPanel';
 import { initActivityStore } from '../stores/agentActivityStore';
 import { MissionPanel } from '../components/panels/MissionPanel';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard';
+import { KnowledgePanel } from '../components/panels/KnowledgePanel';
 import { AgentFleetPanel } from '../components/panels/AgentFleetPanel';
 import { AssistantLogsPanel } from '../components/panels/AssistantLogsPanel';
 import { AgentActivityOverlay } from '../components/ide/AgentActivityOverlay';
@@ -79,19 +79,20 @@ export default function IdeView() {
 
     // Reconnect after mode change: wait until status is idle then reconnect
     useEffect(() => {
-    if (pendingReconnectMode && !connected) {
-      const timer = setTimeout(() => {
-        connect([], pendingReconnectMode);
-        setPendingReconnectMode(null);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [pendingReconnectMode, connected, connect]);
+      if (pendingReconnectMode && !connected) {
+        const timer = setTimeout(() => {
+          connect([], pendingReconnectMode);
+          setPendingReconnectMode(null);
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+      return undefined;
+    }, [pendingReconnectMode, connected, connect]);
 
   // Custom hooks for logic separation
   const fileSystem = useFileSystem();
   const { settings: ideSettings, updateSetting } = useIdeSettings(profile.theme);
-  const { editorRef, monacoRef, editorPathRef, formatDocument, navigateToPosition, applySettingsToEditor, pushContentToEditor } = useEditorActions();
+  const { editorRef, monacoRef, editorPathRef, formatDocument, navigateToPosition, applySettingsToEditor } = useEditorActions();
 
   // ── Sandbox Watcher — dispatcher les événements de fichiers en temps réel ──
   // Ce hook maintient une connexion WebSocket vers /sandbox-watch et dispatche
@@ -155,6 +156,7 @@ export default function IdeView() {
     setSelectedSandboxDiffFile(null);
   }, []);
   const [showSystemHealth, setShowSystemHealth] = useState(false);
+  const [showKnowledgeSystem, setShowKnowledgeSystem] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
@@ -676,6 +678,7 @@ export default function IdeView() {
         showFleet={showFleet}
         showMissions={showMissions}
         showSystemHealth={showSystemHealth}
+        showKnowledgeSystem={showKnowledgeSystem}
         showMcp={showMcp}
         previewUrl={previewUrl}
         assistantConnected={connected}
@@ -702,6 +705,7 @@ export default function IdeView() {
         onToggleFleet={() => setShowFleet(v => !v)}
         onToggleMissions={() => setShowMissions(v => !v)}
         onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
+        onToggleKnowledgeSystem={() => setShowKnowledgeSystem(v => !v)}
         onToggleMcp={() => setShowMcp(v => !v)}
         onToggleVision={() => setVisionEnabled(v => !v)}
         onToggleScreenShare={toggleScreenShare}
@@ -884,6 +888,8 @@ export default function IdeView() {
                         <AutomationPanel onClose={() => setShowAutomation(false)} />
                       ) : showMemory ? (
                         <MemoryPanel onClose={() => setShowMemory(false)} />
+                      ) : showKnowledgeSystem ? (
+                        <KnowledgePanel onClose={() => setShowKnowledgeSystem(false)} />
                       ) : activeFile ? (
                                               markdownPreview && activeFile.language === 'markdown' ? (
                                                 <MarkdownPreview content={activeFile.content} />

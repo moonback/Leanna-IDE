@@ -2,11 +2,11 @@
  * ProjectIndexer — Indexeur intelligent du projet
  *
  * Responsabilité unique : scanner tous les fichiers du projet,
- * extraire les entités de code (classes, fonctions, interfaces, etc.),
- * et alimenter le KnowledgeGraph.
+ * extraire les entités (sections de documents, titres Markdown, métadonnées,
+ * tâches, blocs de code, liens) et alimenter le KnowledgeGraph.
  *
- * Utilise les parsers disponibles (extractFileOutline depuis codebaseHelpers)
- * pour une extraction légère et rapide, sans dépendance à un parser TypeScript complet.
+ * Orientation : documents structurés (Markdown, texte, YAML, CSV, RST)
+ * en plus des fichiers de code (TypeScript/JavaScript).
  *
  * Architecture :
  *   ProjectIndexer.scanAll()
@@ -69,8 +69,20 @@ const EXCLUDED_FILES = new Set([
   "ProjectMemory.json",
 ]);
 
-/** Extensions de fichiers analysables */
+/**
+ * Extensions de fichiers analysables.
+ * Les extensions documentaires (.md, .txt, .yaml, .csv, .rst) sont prioritaires.
+ */
 const ANALYZABLE_EXTENSIONS = new Set([
+  // ── Documents (prioritaires) ───────────────────────────────────────────────
+  ".md",
+  ".mdx",
+  ".txt",
+  ".yaml",
+  ".yml",
+  ".csv",
+  ".rst",
+  // ── Code et configuration ──────────────────────────────────────────────────
   ".ts",
   ".tsx",
   ".js",
@@ -78,7 +90,6 @@ const ANALYZABLE_EXTENSIONS = new Set([
   ".mjs",
   ".cjs",
   ".json",
-  ".md",
   ".css",
   ".scss",
   ".html",
@@ -323,29 +334,234 @@ export class ProjectIndexer {
       entities.push(...this.extractSymbolEntities(relativePath, lines));
     }
 
-    // Pour les fichiers Markdown : extraire les titres comme "entités"
-    if (ext === ".md") {
+    // ─── Fichiers Markdown et MDX : extraction documentaire enrichie ─────────
+    if (ext === ".md" || ext === ".mdx") {
+      entities.push(...this.extractMarkdownEntities(relativePath, content, lines));
+    }
+
+    // ─── Fichiers texte brut ──────────────────────────────────────────────────
+    if (ext === ".txt") {
       for (let i = 0; i < lines.length; i++) {
-        const headingMatch = lines[i].match(/^(#{1,3})\s+(.+)/);
-        if (headingMatch) {
+        const line = lines[i];
+        // Lignes qui ressemblent à des titres de section (ex: "== SECTION ==", "--- TITRE ---")
+        if (/^[=\-*_]{3,}\s+.+\s+[=\-*_]{3,}$/.test(line.trim()) || /^[A-ZÀÁÂÃÄÅ ]{6,}$/.test(line.trim())) {
           entities.push({
-            name: headingMatch[2].trim(),
-            type: "export",
+            name: line.trim().replace(/[=\-*_]+/g, "").trim() || line.trim(),
+            type: "section",
             filePath: relativePath,
             lineStart: i + 1,
-            signature: lines[i].trim().slice(0, 200),
+            signature: line.trim().slice(0, 200),
+            metadata: { level: 1, format: "text" },
           });
         }
       }
     }
 
-    // Pour les fichiers JSON : extraire les clés racines
+    // ─── Fichiers YAML ────────────────────────────────────────────────────────
+    if (ext === ".yaml" || ext === ".yml") {
+      for (let i = 0; i < lines.length; i++) {
+        // Clés de niveau racine (non indentées)
+        const topLevelKey = lines[i].match(/^([a-zA-Z_][\w\-]*):/);
+        if (topLevelKey) {
+          entities.push({
+            name: topLevelKey[1],
+            type: "frontmatter",
+            filePath: relativePath,
+            lineStart: i + 1,
+            signature: lines[i].trim().slice(0, 200),
+            metadata: { format: "yaml" },
+          });
+        }
+      }
+    }
+
+    // ─── Fichiers CSV : en-têtes de colonnes ──────────────────────────────────
+    if (ext === ".csv" && lines.length > 0) {
+      const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+      headers.forEach((header, idx) => {
+        if (header) {
+          entities.push({
+            name: header,
+            type: "frontmatter",
+            filePath: relativePath,
+            lineStart: 1,
+            signature: `colonne[${idx}]: ${header}`,
+            metadata: { format: "csv", columnIndex: idx, totalRows: lines.length - 1 },
+          });
+        }
+      });
+    }
+
+    // ─── Fichiers JSON : extraire les clés racines ────────────────────────────
     if (ext === ".json") {
       try {
         const parsed = JSON.parse(content);
         this.extractJsonKeys(parsed, relativePath, entities, "");
       } catch {
         // Ignorer les JSON invalides
+      }
+    }
+
+    return entities;
+  }
+
+  /**
+   * Extraction complète des entités d'un document Markdown ou MDX.
+   *
+   * Extrait :
+   * - Titres H1-H6 (type "section") avec niveau, texte et résumé du paragraphe suivant
+   * - Frontmatter YAML (type "frontmatter") : titre, auteur, date, tags, etc.
+   * - Tâches Markdown (type "todo") : - [ ] et - [x]
+   * - Blocs de code (type "code_block") avec le langage détecté
+   * - Alertes GitHub-style (type "alert") : > [!NOTE], > [!WARNING], etc.
+   * - Liens documentaires (type "doc_link") : [texte](./doc.md)
+   */
+  private extractMarkdownEntities(
+    filePath: string,
+    _content: string,
+    lines: string[]
+  ): CodeEntity[] {
+    const entities: CodeEntity[] = [];
+    let inFrontmatter = false;
+    let inCodeBlock = false;
+    let codeBlockLang = "";
+    let codeBlockStart = -1;
+    const alertPattern = /^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i;
+    const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+    const seenLinks = new Set<string>();
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // ── Frontmatter YAML (--- au début du fichier) ─────────────────────────
+      if (i === 0 && trimmed === "---") {
+        inFrontmatter = true;
+        continue;
+      }
+      if (inFrontmatter) {
+        if (trimmed === "---" || trimmed === "...") {
+          inFrontmatter = false;
+        } else {
+          const fmKey = trimmed.match(/^([\w\-]+):\s*(.*)/);
+          if (fmKey) {
+            entities.push({
+              name: fmKey[1],
+              type: "frontmatter",
+              filePath,
+              lineStart: i + 1,
+              signature: trimmed.slice(0, 200),
+              metadata: { key: fmKey[1], value: fmKey[2].trim() },
+            });
+          }
+        }
+        continue;
+      }
+
+      // ── Blocs de code (```lang ... ```) ────────────────────────────────────
+      const codeBlockOpen = trimmed.match(/^```(\w*)/);
+      if (codeBlockOpen && !inCodeBlock) {
+        inCodeBlock = true;
+        codeBlockLang = codeBlockOpen[1] || "text";
+        codeBlockStart = i + 1;
+        continue;
+      }
+      if (inCodeBlock && trimmed === "```") {
+        const blockLines = i - codeBlockStart;
+        if (blockLines > 0) {
+          entities.push({
+            name: "bloc_" + (codeBlockLang || "code") + "_L" + codeBlockStart,
+            type: "code_block",
+            filePath,
+            lineStart: codeBlockStart,
+            lineEnd: i + 1,
+            signature: "```" + codeBlockLang + " (" + blockLines + " lignes)",
+            metadata: { language: codeBlockLang, lines: blockLines },
+          });
+        }
+        inCodeBlock = false;
+        codeBlockLang = "";
+        codeBlockStart = -1;
+        continue;
+      }
+      if (inCodeBlock) continue;
+
+      // ── Titres H1-H6 ───────────────────────────────────────────────────────
+      const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)/);
+      if (headingMatch) {
+        const level = headingMatch[1].length;
+        const title = headingMatch[2].trim();
+        // Récupère le premier paragraphe sous ce titre comme résumé
+        let summary = "";
+        for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+          const nextLine = lines[j].trim();
+          if (nextLine && !nextLine.startsWith("#") && !nextLine.startsWith(">") && !nextLine.startsWith("-") && !nextLine.startsWith("```")) {
+            summary = nextLine.slice(0, 200);
+            break;
+          }
+        }
+        entities.push({
+          name: title,
+          type: "section",
+          filePath,
+          lineStart: i + 1,
+          signature: trimmed.slice(0, 200),
+          description: summary || undefined,
+          metadata: { level, anchor: title.toLowerCase().replace(/[^a-z0-9\u00e0-\u00ff]+/g, "-") },
+        });
+        continue;
+      }
+
+      // ── Alertes GitHub-style ────────────────────────────────────────────────
+      const alertMatch = trimmed.match(alertPattern);
+      if (alertMatch) {
+        const alertType = alertMatch[1].toUpperCase();
+        const alertText = lines[i + 1]?.trim().replace(/^>\s*/, "") || "";
+        entities.push({
+          name: "[" + alertType + "] " + alertText.slice(0, 60),
+          type: "alert",
+          filePath,
+          lineStart: i + 1,
+          signature: trimmed.slice(0, 200),
+          metadata: { alertType, text: alertText.slice(0, 300) },
+        });
+        continue;
+      }
+
+      // ── Tâches (checkboxes) ─────────────────────────────────────────────────
+      const todoMatch = trimmed.match(/^-\s+\[( |x|X)\]\s+(.+)/);
+      if (todoMatch) {
+        const done = todoMatch[1].toLowerCase() === "x";
+        const taskText = todoMatch[2].trim();
+        entities.push({
+          name: taskText.slice(0, 100),
+          type: "todo",
+          filePath,
+          lineStart: i + 1,
+          signature: trimmed.slice(0, 200),
+          metadata: { done, text: taskText.slice(0, 300) },
+        });
+        continue;
+      }
+
+      // ── Liens documentaires (ne garde que les liens relatifs vers des fichiers)
+      let linkMatch: RegExpExecArray | null;
+      linkPattern.lastIndex = 0;
+      while ((linkMatch = linkPattern.exec(line)) !== null) {
+        const linkText = linkMatch[1];
+        const linkTarget = linkMatch[2];
+        if (!linkTarget.startsWith("http") && !linkTarget.startsWith("#") && !seenLinks.has(linkTarget)) {
+          seenLinks.add(linkTarget);
+          entities.push({
+            name: linkText.slice(0, 100),
+            type: "doc_link",
+            filePath,
+            lineStart: i + 1,
+            signature: ("[" + linkText + "](" + linkTarget + ")").slice(0, 200),
+            dependencies: [linkTarget],
+            metadata: { target: linkTarget, text: linkText },
+          });
+        }
       }
     }
 
@@ -776,6 +992,17 @@ export class ProjectIndexer {
         return "json";
       case ".md":
         return "markdown";
+      case ".mdx":
+        return "mdx";
+      case ".txt":
+        return "plaintext";
+      case ".yaml":
+      case ".yml":
+        return "yaml";
+      case ".csv":
+        return "csv";
+      case ".rst":
+        return "rst";
       case ".css":
       case ".scss":
         return "css";
