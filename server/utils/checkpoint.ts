@@ -15,6 +15,20 @@ const execFileAsync = promisify(execFile);
 const GIT_TIMEOUT_MS = 10_000;
 const MAX_BUFFER = 2 * 1024 * 1024;
 
+/**
+ * Vérifie si Git est activé dans le profil courant.
+ * Retourne false si gitEnabled === false explicitement.
+ */
+let _getProfile: (() => { gitEnabled?: boolean }) | null = null;
+export function setCheckpointProfileGetter(getter: () => { gitEnabled?: boolean }) {
+  _getProfile = getter;
+}
+
+function isGitEnabled(): boolean {
+  if (!_getProfile) return true; // activé par défaut si pas de getter configuré
+  return _getProfile().gitEnabled !== false;
+}
+
 function getProjectRoot(): string {
   if (!hasProject() || !SELF_ROOT.trim()) {
     throw new Error("Aucun projet actif. Sélectionnez un projet avant de créer ou restaurer un checkpoint.");
@@ -39,6 +53,11 @@ async function git(args: string[]): Promise<{ stdout: string; stderr: string }> 
  * Retourne le hash du commit créé, ou null si rien à commiter.
  */
 export async function createCheckpoint(reason: string): Promise<string | null> {
+  // Skip si git est désactivé dans le profil
+  if (!isGitEnabled()) {
+    return null;
+  }
+
   try {
     // Utiliser le cache Git pour éviter un spawn inutile si le statut est déjà connu
     let hasChanges: boolean | null = null;
@@ -86,6 +105,10 @@ export async function createCheckpoint(reason: string): Promise<string | null> {
  * dans le working tree, permettant à l'utilisateur de voir ce qui a changé).
  */
 export async function rollbackToCheckpoint(commitHash: string): Promise<boolean> {
+  if (!isGitEnabled()) {
+    console.warn(`[Checkpoint] Git désactivé — rollback impossible`);
+    return false;
+  }
   try {
     await git(["reset", "--soft", commitHash]);
     console.log(`[Checkpoint] Rollback vers: ${commitHash.slice(0, 8)}`);
@@ -100,6 +123,7 @@ export async function rollbackToCheckpoint(commitHash: string): Promise<boolean>
  * Liste les derniers checkpoints créés par l'IA.
  */
 export async function listCheckpoints(count = 10): Promise<Array<{ hash: string; date: string; message: string }>> {
+  if (!isGitEnabled()) return [];
   try {
     const { stdout } = await git([
       "log",

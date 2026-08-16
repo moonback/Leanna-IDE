@@ -33,6 +33,8 @@ export interface ProfileConfig {
   promptProfile?: PromptProfile;
   /** Configuration du système multi-agents */
   agents?: AgentsConfig;
+  /** Désactiver Git (pour les projets sans repo git) */
+  gitEnabled?: boolean;
 }
 
 export const STYLE_INSTRUCTIONS: Record<ResponseStyle, string> = {

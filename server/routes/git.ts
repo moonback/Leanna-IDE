@@ -1,9 +1,22 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { SkillManager } from '../skills/SkillManager';
 import { gitStatusCache } from '../skills/git';
 
-export function createGitRouter(skillManager: SkillManager): Router {
+export function createGitRouter(skillManager: SkillManager, getProfile?: () => { gitEnabled?: boolean }): Router {
   const router = Router();
+
+  // Middleware: bloquer toutes les routes git si désactivé
+  router.use((_req: Request, res: Response, next: NextFunction) => {
+    if (getProfile && getProfile().gitEnabled === false) {
+      res.status(503).json({
+        error: 'Git est désactivé pour ce projet.',
+        hint: 'Activez Git dans Paramètres > Comportement ou initialisez un dépôt avec "git init".',
+        gitEnabled: false,
+      });
+      return;
+    }
+    next();
+  });
 
   // GET /api/git/status
   router.get('/status', async (_req: Request, res: Response) => {

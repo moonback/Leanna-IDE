@@ -1,4 +1,4 @@
-import { Languages } from 'lucide-react';
+import { Languages, GitBranch } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext';
 import { Section, SectionDivider, Field, ChipGroup, ToggleSwitch, TextInput } from './SettingsPrimitives';
 import { LANGUAGES, RESPONSE_STYLES } from './constants';
@@ -14,6 +14,17 @@ export function BehaviorSection() {
         </Field>
         <Field label="Style de réponse">
           <ChipGroup options={RESPONSE_STYLES} value={profile.responseStyle} onChange={v => setField('responseStyle', v)} />
+        </Field>
+
+        <SectionDivider label="Intégrations" />
+
+        <Field label="Git" hint="Désactivez si le projet n'a pas de dépôt git (évite les erreurs 'fatal: not a git repository')">
+          <ToggleSwitch
+            value={profile.gitEnabled}
+            onChange={v => setField('gitEnabled', v)}
+            label="Intégration Git"
+            hint={profile.gitEnabled ? 'Checkpoints, commits et branches actifs' : 'Git désactivé — pas de checkpoints ni de commandes git'}
+          />
         </Field>
        
         <SectionDivider label="Mode Muet Automatique" />

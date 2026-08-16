@@ -92,6 +92,8 @@ export default function SettingsView() {
           language: profile.language, responseStyle: profile.responseStyle,
           temperature: profile.temperature, topP: profile.topP,
           textProvider: profile.textProvider, openrouterModel: profile.openrouterModel,
+          agents: profile.agents,
+          gitEnabled: profile.gitEnabled,
         }),
       });
       success('Paramètres sauvegardés ✓');
@@ -379,6 +381,7 @@ function getSectionDescription(id: string): string {
   const descriptions: Record<string, string> = {
     'profile-settings': 'Personnalisez votre identité pour des échanges adaptés.',
     'ai-settings': 'Configurez le nom et la voix de votre assistant IA.',
+    'agents-settings': 'Activez ou désactivez les agents spécialisés (coder, test, docs, etc.).',
     'custom-skills-settings': 'Créez et gérez vos skills personnalisés stockés en BDD.',
     'openrouter-settings': 'Sélectionnez votre provider et modèle pour les requêtes texte.',
     'model-settings': 'Ajustez la créativité et la cohérence des réponses.',

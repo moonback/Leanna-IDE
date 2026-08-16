@@ -252,6 +252,11 @@ function saveProfile(profile: ProfileConfig): void {
 let currentProfile: ProfileConfig = loadProfile();
 setTextGenerationProfile(currentProfile);
 
+// Wire checkpoint git guard avec le profil courant
+import("./server/utils/checkpoint").then(({ setCheckpointProfileGetter }) => {
+  setCheckpointProfileGetter(() => currentProfile);
+}).catch(() => {});
+
 // ── Tool token estimation helpers ──────────────────────────────────────────
 function estimateToolTokens(declaration: any): number {
   let tokens = 0;
@@ -424,7 +429,7 @@ async function startServer() {
   app.use("/api/automation", automationRouter);
   app.use("/api/workflows", workflowsRouter);
   app.use("/api/custom-skills", customSkillsRouter);
-  app.use("/api/git", createGitRouter(skillManager));
+  app.use("/api/git", createGitRouter(skillManager, () => currentProfile));
   app.use("/api/github", createGithubRouter(skillManager));
   app.use("/api/agents", createAgentsRouter(skillManager));
 
@@ -1863,10 +1868,16 @@ async function startServer() {
         filteredDeclarations = filteredDeclarations.filter(d => !AGENT_TOOLS.has(d.name));
       }
 
+      // ── Filtrage Git si désactivé ──
+      if (currentProfile.gitEnabled === false) {
+        filteredDeclarations = filteredDeclarations.filter(d => !d.name.startsWith('git_'));
+      }
+
       const tools = filteredDeclarations.length > 0 ? [{ functionDeclarations: filteredDeclarations }] : undefined;
 
       // Log tool loading
-      console.log(`[TokenOptimizer] 🔧 Outils chargés: ${filteredDeclarations.length}/${declarations.length} (mode: ${sessionMode}${requestedSkills ? ', skills: ' + requestedSkills.join(',') : ''}, agents: ${agentsEnabled ? 'ON' : 'OFF'})`);
+      const gitStatus = currentProfile.gitEnabled === false ? ', git: OFF' : '';
+      console.log(`[TokenOptimizer] 🔧 Outils chargés: ${filteredDeclarations.length}/${declarations.length} (mode: ${sessionMode}${requestedSkills ? ', skills: ' + requestedSkills.join(',') : ''}, agents: ${agentsEnabled ? 'ON' : 'OFF'}${gitStatus})`);
       console.log(`[TokenOptimizer]    Outils: ${filteredDeclarations.map(d => d.name).join(', ')}`);
 
       if (scoringInfo && scoringInfo.scored.length > 0) {
@@ -2788,6 +2799,17 @@ async function startServer() {
                 clientWs.send(JSON.stringify({ tool_used: call.name, info: `[BLOQUÉ - Rôle "${requestedRole}" désactivé]` }));
                 continue;
               }
+            }
+
+            // ── Git guard: block git tools when gitEnabled === false ──
+            if (call.name.startsWith('git_') && currentProfile.gitEnabled === false) {
+              functionResponses.push({
+                id: call.id,
+                name: call.name,
+                response: { error: "Git est désactivé pour ce projet (gitEnabled: false dans le profil). Ce projet n'a pas de dépôt git initialisé." }
+              });
+              clientWs.send(JSON.stringify({ tool_used: call.name, info: '[BLOQUÉ - Git désactivé]' }));
+              continue;
             }
 
             const response = await skillManager.handleToolCall(call.name, call.args, context);

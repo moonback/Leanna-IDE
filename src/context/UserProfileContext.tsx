@@ -41,6 +41,8 @@ export interface UserProfile {
   compactPrompt: boolean;  // Utiliser le system prompt compact (−40% tokens)
   // Agent system
   agents:        AgentsConfig;  // Configuration du système multi-agents
+  // Git
+  gitEnabled:    boolean;  // Activer/désactiver les opérations git
 }
 
 const STORAGE_KEY = 'jarvis_user_profile';
@@ -70,6 +72,8 @@ const DEFAULT_PROFILE: UserProfile = {
     enabled: true,
     allowedRoles: ['coder', 'test', 'docs', 'refactor', 'security', 'review', 'architect'],
   },
+  // Git
+  gitEnabled: true,
 };
 
 function load(): UserProfile {
