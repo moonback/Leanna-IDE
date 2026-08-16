@@ -14,33 +14,17 @@ import { z } from "zod";
 // Types ProjectIndexer
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Types d'entités que l'indexeur peut extraire (code + documents) */
+/** Types d'entités que l'indexeur extrait des documents */
 export type CodeEntityType =
-  // ── Entités de code ─────────────────────────────────────────────────────
-  | "class"
-  | "function"
-  | "interface"
-  | "enum"
-  | "type"
-  | "constant"
-  | "variable"
-  | "component"
-  | "method"
-  | "import"
-  | "export"
-  | "route"           // API endpoint (GET /api/users)
-  | "db_table"        // Database table reference
-  | "env_var"         // Environment variable usage
-  | "test"            // Test case (describe/it/test)
-  | "symbol"          // Exported symbol (function call target)
-  // ── Entités documentaires ────────────────────────────────────────────────
   | "section"         // Titre de section Markdown (H1-H6)
   | "summary"         // Paragraphe introductif / résumé d'une section
   | "todo"            // Tâche à faire (checkbox Markdown - [ ] / - [x])
   | "frontmatter"     // Métadonnée YAML en en-tête (titre, auteur, date, tags)
   | "code_block"      // Bloc de code dans un document (```lang ... ```)
   | "alert"           // Bloc d'alerte (> [!NOTE], > [!WARNING], > [!TIP]...)
-  | "doc_link";       // Lien vers un autre document ([texte](./doc.md))
+  | "doc_link"        // Lien vers un autre document ([texte](./doc.md))
+  | "export"          // Élément exporté
+  | "import";         // Élément ou lien importé
 
 /** Une entité de code extraite d'un fichier */
 export interface CodeEntity {
@@ -103,26 +87,12 @@ export interface FileNode {
 // Types KnowledgeGraph
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Types de relations sémantiques entre entités (code + documents) */
+/** Types de relations sémantiques entre entités documentaires */
 export type EntityRelationType =
-  // ── Relations de code ───────────────────────────────────────────────────
-  | "extends"       // Classe hérite d'une autre
-  | "implements"    // Classe implémente une interface
-  | "uses"          // Fonction/méthode appelle une autre entité
-  | "tests"         // Fichier test vérifie un fichier source
-  | "configures"    // Fichier config affecte un module
-  | "composes"      // Composant utilise un autre composant
-  | "depends_on"    // Dépendance import (file-level)
-  | "calls"         // Fonction appelle une autre fonction
-  | "serves"        // Fichier sert une route API
-  | "reads_env"     // Fichier lit une variable d'environnement
-  | "writes_table"  // Code écrit dans une table DB
-  | "reads_table"   // Code lit depuis une table DB
-  | "tested_by"     // Entité est testée par un fichier de test
-  // ── Relations documentaires ─────────────────────────────────────────────
   | "references"    // Document A mentionne ou cite le document B
   | "includes"      // Document A inclut le document B (![[note]] ou embed)
-  | "mentions"      // Document A mentionne le titre d'un autre document;
+  | "mentions"      // Document A mentionne le titre d'un autre document
+  | "depends_on";   // Lien ou dépendance documentaire directe
 
 /** Une relation sémantique entre deux entités du graphe */
 export interface EntityRelation {

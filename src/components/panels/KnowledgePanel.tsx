@@ -34,11 +34,6 @@ interface KnowledgeDashboardData {
       alerts?: number;
       docLinks?: number;
       codeBlocks?: number;
-      routes?: number;
-      databaseTables?: number;
-      environmentVariables?: number;
-      tests?: number;
-      symbols?: number;
     };
     relations: {
       total: number;

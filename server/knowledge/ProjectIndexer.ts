@@ -24,8 +24,6 @@ import { SELF_ROOT } from "../utils/selfRoot";
 import { createLogger } from "../utils/logger";
 import { knowledgeGraph } from "./KnowledgeGraph";
 import type { CodeEntity, FileNode } from "./types";
-import { extractFileOutline } from "../skills/codebaseHelpers";
-import type { OutlineEntry } from "../skills/codebaseHelpers";
 import { isSandboxActive, getSandboxRoot } from "../utils/sandbox";
 import { fileWatcher } from "./FileWatcher";
 import type { FileChangeEvent } from "./FileWatcher";
@@ -69,12 +67,8 @@ const EXCLUDED_FILES = new Set([
   "ProjectMemory.json",
 ]);
 
-/**
- * Extensions de fichiers analysables.
- * Les extensions documentaires (.md, .txt, .yaml, .csv, .rst) sont prioritaires.
- */
+/** Extensions de fichiers documentaires analysables */
 const ANALYZABLE_EXTENSIONS = new Set([
-  // ── Documents (prioritaires) ───────────────────────────────────────────────
   ".md",
   ".mdx",
   ".txt",
@@ -82,17 +76,7 @@ const ANALYZABLE_EXTENSIONS = new Set([
   ".yml",
   ".csv",
   ".rst",
-  // ── Code et configuration ──────────────────────────────────────────────────
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
   ".json",
-  ".css",
-  ".scss",
-  ".html",
 ]);
 
 /** Taille maximale d'un fichier pour l'analyse (500 KB) */
@@ -266,73 +250,6 @@ export class ProjectIndexer {
     ext: string
   ): CodeEntity[] {
     const entities: CodeEntity[] = [];
-
-    // Utiliser extractFileOutline pour les fichiers TypeScript/JavaScript
-    if (/^\.(ts|tsx|js|jsx|mjs|cjs)$/i.test(ext)) {
-      const outline = extractFileOutline(lines, ext);
-
-      for (const entry of outline) {
-        // Déterminer le type CodeEntityType depuis OutlineEntry
-        const entityType = this.mapOutlineType(entry.type);
-        const signature = entry.signature || lines[entry.line - 1]?.trimStart().slice(0, 200);
-
-        // Détecter les modificateurs
-        const modifiers: string[] = [];
-        if (entry.type === "export" || this.isExportLine(lines[entry.line - 1])) {
-          modifiers.push("export");
-        }
-        if (entry.type === "import") {
-          modifiers.push("import");
-        }
-        if (
-          entry.type === "function" &&
-          lines[entry.line - 1]?.trimStart().startsWith("async")
-        ) {
-          modifiers.push("async");
-        }
-
-        // Extraire la description JSDoc si présente
-        const description = this.extractJsDoc(lines, entry.line);
-
-        // Extraire les dépendances (imports)
-        const dependencies: string[] = [];
-        if (entry.type === "import") {
-          const importMatch = lines[entry.line - 1]?.match(/from\s+['"](.+)['"]/);
-          if (importMatch) {
-            dependencies.push(importMatch[1]);
-          }
-        }
-
-        const entity: CodeEntity = {
-          name: entry.name,
-          type: entityType,
-          filePath: relativePath,
-          lineStart: entry.line,
-          lineEnd: entry.endLine,
-          signature,
-          modifiers: modifiers.length > 0 ? modifiers : undefined,
-          description: description || undefined,
-          dependencies: dependencies.length > 0 ? dependencies : undefined,
-        };
-
-        entities.push(entity);
-      }
-
-      // ── Extraction des routes/endpoints API ────────────────────────────────
-      entities.push(...this.extractRouteEntities(relativePath, lines));
-
-      // ── Extraction des variables d'environnement ───────────────────────────
-      entities.push(...this.extractEnvVarEntities(relativePath, lines));
-
-      // ── Extraction des tables de base de données ───────────────────────────
-      entities.push(...this.extractDbTableEntities(relativePath, lines));
-
-      // ── Extraction des cas de test ─────────────────────────────────────────
-      entities.push(...this.extractTestEntities(relativePath, lines));
-
-      // ── Extraction des symboles importés et exportés ───────────────────────
-      entities.push(...this.extractSymbolEntities(relativePath, lines));
-    }
 
     // ─── Fichiers Markdown et MDX : extraction documentaire enrichie ─────────
     if (ext === ".md" || ext === ".mdx") {
@@ -579,68 +496,21 @@ export class ProjectIndexer {
     const imports: string[] = [];
     const exports: string[] = [];
 
-    if (!/^\.(ts|tsx|js|jsx|mjs|cjs)$/i.test(ext)) {
-      return { imports, exports };
-    }
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      // Imports et réexports ES modules (default, named et combinaisons)
-      const staticImport = line.match(/^(?:import|export)\b.*?\s+from\s+['"]([^'"]+)['"]/);
-      if (staticImport) {
-        imports.push(staticImport[1]);
-      }
-
-      // Imports sans binding : import "./polyfill"
-      const sideEffectImport = line.match(/^import\s+['"]([^'"]+)['"]/);
-      if (sideEffectImport) {
-        imports.push(sideEffectImport[1]);
-      }
-
-      // Imports CommonJS
-      const requireImport = line.match(/\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/);
-      if (requireImport) {
-        imports.push(requireImport[1]);
-      }
-
-      // Dynamic imports
-      const dynamicImport = line.match(/import\(['"]([^'"]+)['"]\)/);
-      if (dynamicImport) {
-        imports.push(dynamicImport[1]);
-      }
-
-      // Exports named
-      const exportMatch = line.match(
-        /^export\s+(?:default\s+)?(?:const|let|var|function|class|interface|type|enum)\s+(\w+)/
-      );
-      if (exportMatch) {
-        exports.push(exportMatch[1]);
-      }
-
-      // Export { ... }
-      const exportBrace = line.match(/^export\s+\{([^}]+)\}/);
-      if (exportBrace) {
-        const names = exportBrace[1]
-          .split(",")
-          .map((n) => n.trim().split(/\s+as\s+/)[0])
-          .filter(Boolean);
-        exports.push(...names);
-      }
-
-      // Export * from
-      const exportStar = line.match(/^export\s+\*\s+from\s+['"]([^'"]+)['"]/);
-      if (exportStar) {
-        exports.push(`* from ${exportStar[1]}`);
-      }
-
-      // Export default
-      if (/^export\s+default\s+/.test(line) && !exportMatch) {
-        const defaultMatch = line.match(/^export\s+default\s+(function|class)\s+(\w+)/);
-        if (defaultMatch) {
-          exports.push(`default:${defaultMatch[2]}`);
-        } else {
-          exports.push("default");
+    if (ext === ".md" || ext === ".mdx") {
+      const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+      for (const line of lines) {
+        const trimmed = line.trim();
+        const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)/);
+        if (headingMatch) {
+          exports.push(headingMatch[2].trim());
+        }
+        let match: RegExpExecArray | null;
+        linkPattern.lastIndex = 0;
+        while ((match = linkPattern.exec(line)) !== null) {
+          const target = match[2];
+          if (!target.startsWith("http") && !target.startsWith("#")) {
+            imports.push(target);
+          }
         }
       }
     }
@@ -650,190 +520,7 @@ export class ProjectIndexer {
 
   // ─── Entités structurelles ─────────────────────────────────────────────────
 
-  /** Extrait les endpoints Express définis par le fichier. */
-  private extractRouteEntities(filePath: string, lines: string[]): CodeEntity[] {
-    const entities: CodeEntity[] = [];
-    const seen = new Set<string>();
-    const routePattern = /\b(?:app|router)\.(get|post|put|delete|patch|all)\s*\(\s*['"`]([^'"`]+)['"`]/i;
 
-    for (let i = 0; i < lines.length; i++) {
-      const match = lines[i].match(routePattern);
-      if (!match) continue;
-
-      const method = match[1].toUpperCase();
-      const routePath = match[2];
-      const name = `${method} ${routePath}`;
-      if (seen.has(name)) continue;
-      seen.add(name);
-
-      entities.push({
-        name,
-        type: "route",
-        filePath,
-        lineStart: i + 1,
-        signature: lines[i].trim().slice(0, 200),
-        metadata: { framework: "express", method, path: routePath },
-      });
-    }
-
-    return entities;
-  }
-
-  /** Extrait les accès Node/Vite à des variables d'environnement, sans leur valeur. */
-  private extractEnvVarEntities(filePath: string, lines: string[]): CodeEntity[] {
-    const entities: CodeEntity[] = [];
-    const seen = new Set<string>();
-    const patterns: { regex: RegExp; runtime: "node" | "vite" }[] = [
-      { regex: /process\.env\.([A-Z_][A-Z0-9_]*)/g, runtime: "node" },
-      { regex: /process\.env\[['"]([A-Z_][A-Z0-9_]*)['"]\]/g, runtime: "node" },
-      { regex: /import\.meta\.env\.([A-Z_][A-Z0-9_]*)/g, runtime: "vite" },
-    ];
-
-    for (let i = 0; i < lines.length; i++) {
-      for (const { regex, runtime } of patterns) {
-        regex.lastIndex = 0;
-        for (const match of lines[i].matchAll(regex)) {
-          const name = match[1];
-          if (seen.has(name)) continue;
-          seen.add(name);
-          entities.push({
-            name,
-            type: "env_var",
-            filePath,
-            lineStart: i + 1,
-            signature: lines[i].trim().slice(0, 200),
-            metadata: { runtime },
-          });
-        }
-      }
-    }
-
-    return entities;
-  }
-
-  /** Extrait les tables SQL/Supabase référencées et leur mode d'accès. */
-  private extractDbTableEntities(filePath: string, lines: string[]): CodeEntity[] {
-    const tables = new Map<string, { line: number; access: Set<"read" | "write" | "schema"> }>();
-    const addTable = (name: string, line: number, access: "read" | "write" | "schema") => {
-      const current = tables.get(name) ?? { line, access: new Set<"read" | "write" | "schema">() };
-      current.access.add(access);
-      tables.set(name, current);
-    };
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const supabase = line.match(/\.from\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]\s*\)/i);
-      if (supabase) {
-        const isWrite = /\.(?:insert|update|upsert|delete)\s*\(/.test(`${line}\n${lines[i + 1] ?? ""}`);
-        addTable(supabase[1], i + 1, isWrite ? "write" : "read");
-      }
-
-      const create = line.match(/\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
-      if (create) addTable(create[1], i + 1, "schema");
-
-      const select = line.match(/\bSELECT\b.*\bFROM\s+(\w+)/i);
-      if (select) addTable(select[1], i + 1, "read");
-
-      const insert = line.match(/\bINSERT\s+INTO\s+(\w+)/i);
-      if (insert) addTable(insert[1], i + 1, "write");
-
-      const update = line.match(/\bUPDATE\s+(\w+)\s+SET\b/i);
-      if (update) addTable(update[1], i + 1, "write");
-
-      const deleteFrom = line.match(/\bDELETE\s+FROM\s+(\w+)/i);
-      if (deleteFrom) addTable(deleteFrom[1], i + 1, "write");
-    }
-
-    return [...tables.entries()].map(([name, { line, access }]) => ({
-      name,
-      type: "db_table" as const,
-      filePath,
-      lineStart: line,
-      signature: `Database table ${name}`,
-      metadata: { access: [...access].sort() },
-    }));
-  }
-
-  /** Extrait les suites et cas de test déclarés avec describe, it ou test. */
-  private extractTestEntities(filePath: string, lines: string[]): CodeEntity[] {
-    if (!/\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(filePath) && !/(?:^|\/)tests?\//i.test(filePath)) {
-      return [];
-    }
-
-    const entities: CodeEntity[] = [];
-    const seen = new Set<string>();
-    const testPattern = /\b(describe|it|test)\s*\(\s*['"`]([^'"`]+)['"`]/;
-    for (let i = 0; i < lines.length; i++) {
-      const match = lines[i].match(testPattern);
-      if (!match) continue;
-      const [, kind, label] = match;
-      const name = `${kind}: ${label}`;
-      if (seen.has(name)) continue;
-      seen.add(name);
-      entities.push({
-        name,
-        type: "test",
-        filePath,
-        lineStart: i + 1,
-        signature: lines[i].trim().slice(0, 200),
-        metadata: { kind },
-      });
-    }
-    return entities;
-  }
-
-  /** Extrait des symboles nommés importés ou exportés, avec leur module d'origine. */
-  private extractSymbolEntities(filePath: string, lines: string[]): CodeEntity[] {
-    const entities: CodeEntity[] = [];
-    const seen = new Set<string>();
-    const addSymbol = (
-      name: string,
-      line: number,
-      direction: "import" | "export",
-      source?: string,
-      exportedAs?: string
-    ) => {
-      const key = `${direction}:${name}:${source ?? ""}:${exportedAs ?? ""}`;
-      if (!name || seen.has(key)) return;
-      seen.add(key);
-      entities.push({
-        name,
-        type: "symbol",
-        filePath,
-        lineStart: line,
-        signature: `${direction} ${name}${source ? ` from ${source}` : ""}`,
-        modifiers: [direction],
-        metadata: { direction, source, exportedAs },
-      });
-    };
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const namedImport = line.match(/^\s*import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/);
-      if (namedImport) {
-        for (const binding of namedImport[1].split(",")) {
-          const [original, local = original] = binding.trim().split(/\s+as\s+/);
-          addSymbol(local.trim(), i + 1, "import", namedImport[2], original.trim());
-        }
-      }
-
-      const defaultImport = line.match(/^\s*import\s+(?:type\s+)?([A-Za-z_$][\w$]*)\s*(?:,\s*[^;]+)?\s+from\s+['"]([^'"]+)['"]/);
-      if (defaultImport) addSymbol(defaultImport[1], i + 1, "import", defaultImport[2], "default");
-
-      const declarationExport = line.match(/^\s*export\s+(?:default\s+)?(?:const|let|var|function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/);
-      if (declarationExport) addSymbol(declarationExport[1], i + 1, "export");
-
-      const namedExport = line.match(/^\s*export\s+\{([^}]+)\}(?:\s+from\s+['"]([^'"]+)['"])?/);
-      if (namedExport) {
-        for (const binding of namedExport[1].split(",")) {
-          const [original, exported = original] = binding.trim().split(/\s+as\s+/);
-          addSymbol(exported.trim(), i + 1, "export", namedExport[2], original.trim());
-        }
-      }
-    }
-
-    return entities;
-  }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -873,63 +560,7 @@ export class ProjectIndexer {
     }
   }
 
-  /**
-   * Mappe le type OutlineEntry vers CodeEntityType.
-   */
-  private mapOutlineType(outlineType: OutlineEntry["type"]): CodeEntity["type"] {
-    const mapping: Record<string, CodeEntity["type"]> = {
-      function: "function",
-      class: "class",
-      interface: "interface",
-      type: "type",
-      export: "export",
-      import: "import",
-      variable: "variable",
-      method: "method",
-      component: "component",
-    };
-    return mapping[outlineType] || "export";
-  }
 
-  /**
-   * Détecte si une ligne est un export.
-   */
-  private isExportLine(line: string | undefined): boolean {
-    if (!line) return false;
-    return line.trimStart().startsWith("export ");
-  }
-
-  /**
-   * Extrait la description JSDoc au-dessus d'une ligne donnée.
-   */
-  private extractJsDoc(lines: string[], lineNumber: number): string | null {
-    const jsDocLines: string[] = [];
-    let i = lineNumber - 2; // ligne avant l'entité
-
-    // Remonter les lignes de commentaires
-    while (i >= 0) {
-      const trimmed = lines[i].trim();
-      if (trimmed.startsWith("*") || trimmed.startsWith("/**")) {
-        jsDocLines.unshift(trimmed);
-      } else if (trimmed.startsWith("//")) {
-        jsDocLines.unshift(trimmed);
-      } else if (trimmed === "") {
-        // Ligne vide — continue (peut-être un padding)
-      } else {
-        break; // Ligne de code ou autre
-      }
-      i--;
-    }
-
-    if (jsDocLines.length === 0) return null;
-
-    // Nettoyer les marqueurs JSDoc
-    return jsDocLines
-      .map((l) => l.replace(/^\/\*\*?\s*/, "").replace(/^\s*\*\s?/, "").replace(/\s*\*\/$/, "").trim())
-      .filter(Boolean)
-      .join(" ")
-      .slice(0, 500);
-  }
 
   /**
    * Extrait les clés d'un objet JSON comme entités.
@@ -948,7 +579,7 @@ export class ProjectIndexer {
       if (typeof value === "object" && value !== null && !Array.isArray(value)) {
         entities.push({
           name: fullName,
-          type: "constant",
+          type: "frontmatter",
           filePath,
           lineStart: 0,
           signature: `{ ${Object.keys(value).join(", ")} }`,
@@ -964,7 +595,7 @@ export class ProjectIndexer {
             : JSON.stringify(value);
         entities.push({
           name: fullName,
-          type: "constant",
+          type: "frontmatter",
           filePath,
           lineStart: 0,
           signature: `${key}: ${valueStr}`,
@@ -1040,8 +671,7 @@ export class ProjectIndexer {
     const allRelations: import("./types").EntityRelation[] = [];
 
     for (const fileNode of parsedFiles) {
-      // Ne traiter que les fichiers TypeScript/JavaScript
-      if (!/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(fileNode.extension)) continue;
+      if (!/\.(md|mdx|txt|yaml|yml|csv|rst|json)$/i.test(fileNode.extension)) continue;
 
       try {
         const absPath = path.join(root, fileNode.path);
@@ -1054,7 +684,7 @@ export class ProjectIndexer {
       }
     }
 
-    log.info(`🔗 Relations extraites: ${allRelations.length} (extends: ${allRelations.filter(r => r.relationType === "extends").length}, implements: ${allRelations.filter(r => r.relationType === "implements").length}, composes: ${allRelations.filter(r => r.relationType === "composes").length}, tests: ${allRelations.filter(r => r.relationType === "tests").length})`);
+    log.info(`🔗 Relations extraites: ${allRelations.length} (references: ${allRelations.filter(r => r.relationType === "references").length}, includes: ${allRelations.filter(r => r.relationType === "includes").length}, mentions: ${allRelations.filter(r => r.relationType === "mentions").length})`);
     return allRelations;
   }
 

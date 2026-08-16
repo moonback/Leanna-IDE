@@ -103,19 +103,12 @@ router.get('/dashboard', (_req: Request, res: Response) => {
       relationsByType[relation.relationType] = (relationsByType[relation.relationType] || 0) + 1;
     }
     const structuralEntities = {
-      // Entités documentaires
       sections: kgStats.entitiesByType.section || 0,
       todos: kgStats.entitiesByType.todo || 0,
       frontmatter: kgStats.entitiesByType.frontmatter || 0,
       alerts: kgStats.entitiesByType.alert || 0,
       docLinks: kgStats.entitiesByType.doc_link || 0,
       codeBlocks: kgStats.entitiesByType.code_block || 0,
-      // Entités de code
-      routes: kgStats.entitiesByType.route || 0,
-      databaseTables: kgStats.entitiesByType.db_table || 0,
-      environmentVariables: kgStats.entitiesByType.env_var || 0,
-      tests: kgStats.entitiesByType.test || 0,
-      symbols: kgStats.entitiesByType.symbol || 0,
     };
 
     // 2. DependencyGraph : cycles + fichiers les plus couplés
@@ -268,9 +261,9 @@ router.get('/search', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Le paramètre "q" est requis.' });
     }
     const results = knowledgeGraph.searchEntities(query);
-    res.json({ status: 'success', results });
+    return res.json({ status: 'success', results });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
