@@ -25,6 +25,10 @@ const builder = new SystemPromptBuilder();
  * Interface identique à l'ancienne — drop-in replacement.
  */
 export function buildSystemInstruction(profile: ProfileConfig = {}): string {
+  const extraSections = profile.customSystemPrompt
+    ? [{ id: 'custom-user-prompt', content: `## Instructions personnalisées de l'utilisateur\n\n${profile.customSystemPrompt}` }]
+    : undefined;
+
   return builder.build({
     aiName: profile.aiName,
     userName: profile.userName,
@@ -34,6 +38,7 @@ export function buildSystemInstruction(profile: ProfileConfig = {}): string {
     compact: profile.compactPrompt,
     mode: profile.mode,
     agents: profile.agents,
+    extraSections,
   });
 }
 

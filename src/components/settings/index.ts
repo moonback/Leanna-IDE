@@ -12,4 +12,5 @@ export { SelfRootSection } from './SelfRootSection';
 export { SafeguardsSection } from './SafeguardsSection';
 export { CustomSkillsSection } from './CustomSkillsSection';
 export { KnowledgeHealthSection } from './KnowledgeHealthSection';
+export { SystemPromptSection } from './SystemPromptSection';
 export { Section, Field, TextInput, SecretInput, ChipGroup, ToggleSwitch, SectionDivider, InfoRow } from './SettingsPrimitives';

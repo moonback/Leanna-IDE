@@ -43,6 +43,8 @@ export interface UserProfile {
   agents:        AgentsConfig;  // Configuration du système multi-agents
   // Git
   gitEnabled:    boolean;  // Activer/désactiver les opérations git
+  // Custom system prompt
+  customSystemPrompt: string;  // Prompt système personnalisé (ajouté au prompt de base)
 }
 
 const STORAGE_KEY = 'jarvis_user_profile';
@@ -74,6 +76,8 @@ const DEFAULT_PROFILE: UserProfile = {
   },
   // Git
   gitEnabled: true,
+  // Custom system prompt
+  customSystemPrompt: '',
 };
 
 function load(): UserProfile {

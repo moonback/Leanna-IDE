@@ -23,6 +23,7 @@ import {
   SafeguardsSection,
   CustomSkillsSection,
   KnowledgeHealthSection,
+  SystemPromptSection,
 } from '../components/settings';
 
 // ─── Nav Groups (4 catégories — Phase 4c du plan) ─────────────────────────────
@@ -39,6 +40,7 @@ const NAV_GROUPS = [
     label: 'IA & Modèles',
     items: [
       { id: 'ai-settings', icon: Cpu, label: 'Assistant IA', keywords: 'voix nom ia leanna jarvis identité' },
+      { id: 'systemprompt-settings', icon: Settings2, label: 'Prompt Système', keywords: 'prompt systeme instruction personnaliser comportement custom system' },
       { id: 'agents-settings', icon: Bot, label: 'Agents', keywords: 'agent multi-agents coder test docs refactor security review architect délégation solo' },
       { id: 'custom-skills-settings', icon: Code2, label: 'Skills custom', keywords: 'skill personnalisé custom outil tool instruction prompt automatisation' },
       { id: 'openrouter-settings', icon: Globe, label: 'Modèles & API', keywords: 'openrouter cles providers gpt gemini claude modèle' },
@@ -94,6 +96,7 @@ export default function SettingsView() {
           textProvider: profile.textProvider, openrouterModel: profile.openrouterModel,
           agents: profile.agents,
           gitEnabled: profile.gitEnabled,
+          customSystemPrompt: profile.customSystemPrompt,
         }),
       });
       success('Paramètres sauvegardés ✓');
@@ -354,6 +357,7 @@ export default function SettingsView() {
               >
                 {activeSection === 'profile-settings' && <ProfileSection />}
                 {activeSection === 'ai-settings' && <AiSection />}
+                {activeSection === 'systemprompt-settings' && <SystemPromptSection />}
                 {activeSection === 'agents-settings' && <AgentsSection />}
                 {activeSection === 'custom-skills-settings' && <CustomSkillsSection />}
                 {activeSection === 'openrouter-settings' && <OpenRouterSection />}
@@ -381,6 +385,7 @@ function getSectionDescription(id: string): string {
   const descriptions: Record<string, string> = {
     'profile-settings': 'Personnalisez votre identité pour des échanges adaptés.',
     'ai-settings': 'Configurez le nom et la voix de votre assistant IA.',
+    'systemprompt-settings': 'Personnalisez les instructions système de l\'assistant.',
     'agents-settings': 'Activez ou désactivez les agents spécialisés (coder, test, docs, etc.).',
     'custom-skills-settings': 'Créez et gérez vos skills personnalisés stockés en BDD.',
     'openrouter-settings': 'Sélectionnez votre provider et modèle pour les requêtes texte.',

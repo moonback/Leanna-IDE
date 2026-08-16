@@ -35,6 +35,8 @@ export interface ProfileConfig {
   agents?: AgentsConfig;
   /** Désactiver Git (pour les projets sans repo git) */
   gitEnabled?: boolean;
+  /** Custom system prompt (appended to base instructions) */
+  customSystemPrompt?: string;
 }
 
 export const STYLE_INSTRUCTIONS: Record<ResponseStyle, string> = {
