@@ -10,6 +10,7 @@ import {
   X,
   Users,
   Radio,
+  ScrollText,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext';
 import { useProfile } from '../../context/UserProfileContext';
@@ -31,6 +32,7 @@ interface StatusBarProps {
   onToggleSandbox?: () => void;
   onToggleAgents?: () => void;
   onToggleFleet?: () => void;
+  onToggleLogs?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -52,6 +54,7 @@ export const StatusBar = memo(function StatusBar({
   onToggleSandbox,
   onToggleAgents,
   onToggleFleet,
+  onToggleLogs,
 }: StatusBarProps) {
   const { tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
@@ -375,6 +378,17 @@ export const StatusBar = memo(function StatusBar({
           >
             <Radio size={12} style={{ color: '#a78bfa' }} />
             <span style={{ color: 'var(--text-muted)' }} className="font-medium">Flotte</span>
+          </button>
+
+          {/* Logs */}
+          <button
+            type="button"
+            onClick={onToggleLogs}
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover,rgba(128,128,128,0.12))]"
+            title="Ouvrir les logs de l'assistant et des agents"
+          >
+            <ScrollText size={12} style={{ color: '#38bdf8' }} />
+            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Logs</span>
           </button>
         </div>
 

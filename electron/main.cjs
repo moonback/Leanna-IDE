@@ -103,7 +103,7 @@ function createWindow(splash, splashMinEnd) {
   });
 
   const port = process.env.VITE_SERVER_PORT || 5000;
-  const startUrl = process.env.ELECTRON_START_URL || `http://localhost:${port}`;
+  const startUrl = process.env.ELECTRON_START_URL || `http://127.0.0.1:${port}`;
   log('Loading URL:', startUrl);
   win.loadURL(startUrl);
 

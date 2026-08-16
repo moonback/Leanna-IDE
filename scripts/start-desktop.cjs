@@ -16,11 +16,11 @@ if (fs.existsSync(envPath)) {
 const port = process.env.VITE_SERVER_PORT || 5000;
 const isDebug = process.env.ELECTRON_DEBUG === '1' || process.argv.includes('--debug');
 
-console.log(`[Desktop Runner] Waiting for http://localhost:${port}...`);
+console.log(`[Desktop Runner] Waiting for http://127.0.0.1:${port}...`);
 
 try {
-  // Wait for the dev server
-  execSync(`npx wait-on http://localhost:${port}`, { stdio: 'inherit' });
+  // Wait for the dev server (Express is explicitly bound to IPv4).
+  execSync(`npx wait-on http://127.0.0.1:${port}`, { stdio: 'inherit' });
 
   // Run electron
   console.log(`[Desktop Runner] Starting Electron...`);

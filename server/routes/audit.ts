@@ -5,6 +5,9 @@ import fs from 'fs';
 import { readAuditEntries, analyzeAuditLog } from '../audit';
 import { SELF_ROOT } from '../utils/selfRoot';
 import { isSandboxActive, getSandboxRoot } from '../utils/sandbox';
+import { getLogEntries, type LogLevel } from '../utils/logger';
+
+const AGENT_LOG_MODULE = /^(Agent|Orchestrator|TaskScheduler|FileWriter|DelegationParser|Autonomous)/;
 
 const router = Router();
 
@@ -70,6 +73,31 @@ router.get('/logs', async (_req: Request, res: Response) => {
     console.error('[Audit] Failed to read logs:', e);
     res.status(500).json({ status: 'error', error: e.message || 'Unknown error' });
   }
+});
+
+// GET /api/audit/runtime-logs
+// Expose uniquement l'historique assaini du logger de la session courante.
+router.get('/runtime-logs', (req: Request, res: Response) => {
+  const scope = req.query.scope === 'assistant' || req.query.scope === 'agents'
+    ? req.query.scope
+    : 'all';
+  const level = typeof req.query.level === 'string' && ['debug', 'info', 'warn', 'error'].includes(req.query.level)
+    ? req.query.level as LogLevel
+    : undefined;
+  const module = typeof req.query.module === 'string' && /^[A-Za-z0-9:_-]{1,120}$/.test(req.query.module)
+    ? req.query.module
+    : undefined;
+  const requestedLimit = Number(req.query.limit);
+  const limit = Number.isInteger(requestedLimit) ? Math.max(1, Math.min(requestedLimit, 100)) : 50;
+
+  const entries = getLogEntries({ level, module, limit: 1_000 })
+    .filter((entry) => scope === 'all' || (scope === 'assistant'
+      ? entry.module === 'Assistant'
+      : AGENT_LOG_MODULE.test(entry.module)))
+    .slice(0, limit);
+
+  res.set('Cache-Control', 'no-store');
+  res.json({ status: 'ok', scope, entries });
 });
 
 // GET /api/audit/analysis

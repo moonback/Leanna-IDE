@@ -23,7 +23,6 @@ import type { TaskRequestPayload } from "./AgentCommunication";
 import { createLogger } from "../utils/logger";
 import { WorkspaceState, type VerificationRecord } from "./WorkspaceState";
 import { AgentRepairLoop } from "./AgentRepairLoop";
-import { AgentValidation, type RegressionReport, type ValidationSnapshot } from "./AgentValidation";
 
 const log = createLogger("AgentExecutor");
 
@@ -103,10 +102,10 @@ export class AgentExecutor {
     const agent = getAgentDefinition(task.role);
     const taskShortId = task.id.slice(0, 8);
 
-    log.info(`▶ [${agent.name}] Démarrage tâche ${taskShortId}: "${task.title}"`);
+    log.info(`[task:${taskShortId}] ▶ [${agent.name}] Démarrage tâche: "${task.title}"`);
 
     if (!this.skillHandler) {
-      log.error(`[${agent.name}] SkillHandler non initialisé`);
+      log.error(`[task:${taskShortId}] [${agent.name}] SkillHandler non initialisé`);
       task.status = "failed";
       task.result = {
         success: false,
@@ -189,7 +188,7 @@ export class AgentExecutor {
         task.result.delegatedSubTasks = subTaskIds;
       }
 
-      log.info(`✅ [${agent.name}] Terminé en ${(durationMs / 1000).toFixed(1)}s — ${task.result.summary}`);
+      log.info(`[task:${taskShortId}] ✅ [${agent.name}] Terminé en ${(durationMs / 1000).toFixed(1)}s — ${task.result.summary}`);
       this.notifier.notify(task, "completed");
     } catch (error) {
       const durationMs = Date.now() - startTime;
@@ -202,7 +201,7 @@ export class AgentExecutor {
         durationMs,
       };
 
-      log.error(`❌ [${agent.name}] Échec après ${(durationMs / 1000).toFixed(1)}s: ${(error as Error).message}`);
+      log.error(`[task:${taskShortId}] ❌ [${agent.name}] Échec après ${(durationMs / 1000).toFixed(1)}s: ${(error as Error).message}`);
       this.notifier.notify(task, "failed");
     } finally {
       this.decrementRunning(task.role);

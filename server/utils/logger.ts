@@ -32,6 +32,16 @@ export interface LoggerOptions {
   colors?: boolean;
 }
 
+/** Filtre appliqué à l'historique de logs consultable par l'assistant. */
+export interface LogQuery {
+  /** Préfixe du module (par exemple "Agent" ou "Assistant"). */
+  module?: string;
+  level?: LogLevel;
+  since?: string;
+  /** Maximum d'entrées, renvoyées de la plus récente à la plus ancienne. */
+  limit?: number;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Constantes
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -57,10 +67,22 @@ const BOLD = "\x1b[1m";
 // Logger
 // ═══════════════════════════════════════════════════════════════════════════════
 
+const MAX_HISTORY_ENTRIES = 1_000;
+const MAX_HISTORY_MESSAGE_CHARS = 4_000;
+
+/** Supprime les secrets les plus courants avant qu'un log ne soit réinjecté au modèle. */
+function sanitizeHistoryMessage(message: string): string {
+  return message
+    .replace(/\b(api[_-]?key|access[_-]?token|refresh[_-]?token|secret|password|authorization|cookie)\b\s*([:=])\s*(?:"[^"]*"|'[^']*'|\S+)/gi, "$1$2[REDACTED]")
+    .replace(/\b(sk-[A-Za-z0-9_-]{12,}|AIza[A-Za-z0-9_-]{12,}|eyJ[A-Za-z0-9_-]{20,})\b/g, "[REDACTED]")
+    .slice(0, MAX_HISTORY_MESSAGE_CHARS);
+}
+
 class LoggerInstance {
   private level: LogLevel;
   private timestamps: boolean;
   private colors: boolean;
+  private readonly history: LogEntry[] = [];
 
   constructor(options: LoggerOptions = {}) {
     this.level = options.level ?? (process.env.LOG_LEVEL as LogLevel) ?? "info";
@@ -85,8 +107,36 @@ class LoggerInstance {
     return LEVEL_PRIORITY[level] >= LEVEL_PRIORITY[this.level];
   }
 
+  /** Retourne des logs sûrs et bornés, sans les payloads bruts associés. */
+  getEntries(query: LogQuery = {}): LogEntry[] {
+    const limit = Math.max(1, Math.min(query.limit ?? 50, MAX_HISTORY_ENTRIES));
+    const since = query.since ? Date.parse(query.since) : Number.NEGATIVE_INFINITY;
+    const hasValidSince = Number.isFinite(since);
+
+    return this.history
+      .filter((entry) => !query.module || entry.module.startsWith(query.module))
+      .filter((entry) => !query.level || entry.level === query.level)
+      .filter((entry) => !hasValidSince || Date.parse(entry.timestamp) >= since)
+      .slice(-limit)
+      .reverse()
+      .map(({ level, module, message, timestamp }) => ({ level, module, message, timestamp }));
+  }
+
+  private addToHistory(entry: LogEntry): void {
+    this.history.push({
+      level: entry.level,
+      module: entry.module,
+      message: sanitizeHistoryMessage(entry.message),
+      timestamp: entry.timestamp,
+    });
+    if (this.history.length > MAX_HISTORY_ENTRIES) {
+      this.history.splice(0, this.history.length - MAX_HISTORY_ENTRIES);
+    }
+  }
+
   /** Méthode interne d'écriture */
   write(entry: LogEntry): void {
+    this.addToHistory(entry);
     if (!this.isLevelEnabled(entry.level)) return;
 
     const parts: string[] = [];
@@ -195,6 +245,14 @@ export class ModuleLogger {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const logger = new LoggerInstance();
+
+/**
+ * Lit l'historique de logs structuré, conservé en mémoire pour la session active.
+ * Les entrées sont assainies et excluent systématiquement les payloads `data` bruts.
+ */
+export function getLogEntries(query: LogQuery = {}): LogEntry[] {
+  return logger.getEntries(query);
+}
 
 /**
  * Crée un logger pour un module spécifique.
