@@ -52,6 +52,7 @@ function resolveJarvisAppRoot(): string {
 }
 
 const JARVIS_APP_ROOT = resolveJarvisAppRoot();
+export { JARVIS_APP_ROOT };
 
 // ── Persistance du projet sélectionné ────────────────────────────────────────
 

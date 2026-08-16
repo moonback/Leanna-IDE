@@ -17,7 +17,7 @@ import fs from "fs";
 import os from "os";
 import { authenticateRequest, authenticateToken, createRateLimiter, resolveWorkspacePath } from "./server/security";
 import { appendAuditEvent } from "./server/audit";
-import { SELF_ROOT, CRITICAL_FILES, initSelfRoot, hasProject } from "./server/utils/selfRoot";
+import { SELF_ROOT, JARVIS_APP_ROOT, CRITICAL_FILES, initSelfRoot, hasProject } from "./server/utils/selfRoot";
 import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox";
 import { subscribeToValidation } from "./server/utils/postEditValidator";
 import * as pty from "node-pty";
@@ -228,7 +228,8 @@ function getDefaultWorkspaceRoot(): string {
 
 // In-memory profile store (persisted to a local JSON file in production)
 function getProfilePath(): string {
-  return path.join(getDefaultWorkspaceRoot(), ".jarvis-profile.json");
+  // Le profil est toujours dans le dossier de l'app Jarvis, pas le projet actif
+  return path.join(JARVIS_APP_ROOT, ".jarvis-profile.json");
 }
 
 function loadProfile(): ProfileConfig {
@@ -251,6 +252,21 @@ function saveProfile(profile: ProfileConfig): void {
 
 let currentProfile: ProfileConfig = loadProfile();
 setTextGenerationProfile(currentProfile);
+
+// ── File watcher : recharger le profil quand le fichier est modifié à la main ──
+try {
+  const profilePath = getProfilePath();
+  fs.watchFile(profilePath, { interval: 2000 }, () => {
+    try {
+      const reloaded = loadProfile();
+      currentProfile = reloaded;
+      setTextGenerationProfile(currentProfile);
+      console.log(`[Profile] ♻️ Rechargé depuis le disque (keys: ${Object.keys(reloaded).join(', ')})`);
+    } catch (e) {
+      console.warn(`[Profile] Erreur lors du rechargement:`, (e as Error).message);
+    }
+  });
+} catch { /* non bloquant */ }
 
 // Wire checkpoint git guard avec le profil courant
 import("./server/utils/checkpoint").then(({ setCheckpointProfileGetter }) => {
