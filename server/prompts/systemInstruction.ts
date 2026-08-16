@@ -33,6 +33,7 @@ export function buildSystemInstruction(profile: ProfileConfig = {}): string {
     responseStyle: profile.responseStyle,
     compact: profile.compactPrompt,
     mode: profile.mode,
+    agents: profile.agents,
   });
 }
 

@@ -2,6 +2,14 @@ export type ResponseStyle = "concise" | "balanced" | "detailed";
 export type Language = "fr" | "en" | "es" | "de" | "pt";
 export type AssistantMode = "full" | "ask";
 export type PromptProfile = "jarvis-agent-v2";
+export type AgentRole = "coder" | "test" | "docs" | "refactor" | "security" | "review" | "architect";
+
+export interface AgentsConfig {
+  /** Désactiver complètement le système multi-agents (l'assistant agit seul) */
+  enabled: boolean;
+  /** Liste des rôles autorisés. Si vide/undefined et enabled=true, tous sont actifs */
+  allowedRoles?: AgentRole[];
+}
 
 export interface ProfileConfig {
   userName?: string;
@@ -23,6 +31,8 @@ export interface ProfileConfig {
   compactPrompt?: boolean;
   /** System prompt behavior profile. Current version: jarvis-agent-v2 */
   promptProfile?: PromptProfile;
+  /** Configuration du système multi-agents */
+  agents?: AgentsConfig;
 }
 
 export const STYLE_INSTRUCTIONS: Record<ResponseStyle, string> = {

@@ -5,6 +5,12 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 export type ResponseStyle = 'concise' | 'balanced' | 'detailed';
 export type Language      = 'fr' | 'en' | 'es' | 'de' | 'pt';
 export type AIProvider    = 'gemini' | 'openrouter';
+export type AgentRole     = 'coder' | 'test' | 'docs' | 'refactor' | 'security' | 'review' | 'architect';
+
+export interface AgentsConfig {
+  enabled: boolean;
+  allowedRoles: AgentRole[];
+}
 
 export interface UserProfile {
   // User identity
@@ -33,6 +39,8 @@ export interface UserProfile {
   floatingOrb:   boolean;  // Afficher l'orb flottant déplaçable
   // Token optimization
   compactPrompt: boolean;  // Utiliser le system prompt compact (−40% tokens)
+  // Agent system
+  agents:        AgentsConfig;  // Configuration du système multi-agents
 }
 
 const STORAGE_KEY = 'jarvis_user_profile';
@@ -57,6 +65,11 @@ const DEFAULT_PROFILE: UserProfile = {
   accentColor:   '#0ea5e9',
   floatingOrb:   false,
   compactPrompt: true,
+  // Agents
+  agents: {
+    enabled: true,
+    allowedRoles: ['coder', 'test', 'docs', 'refactor', 'security', 'review', 'architect'],
+  },
 };
 
 function load(): UserProfile {

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, RotateCcw, Save, ChevronRight, Settings2,
   User, Cpu, Globe, SlidersHorizontal, Languages,
-  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft
+  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot
 } from 'lucide-react';
 import { useProfile } from '../context/UserProfileContext';
 import { useToast } from '../components/ui/Toast';
@@ -12,6 +12,7 @@ import {
   ProfileSection,
   AiSection,
   BehaviorSection,
+  AgentsSection,
   AppearanceSection,
   TokensSection,
   AuditSection,
@@ -38,6 +39,7 @@ const NAV_GROUPS = [
     label: 'IA & Modèles',
     items: [
       { id: 'ai-settings', icon: Cpu, label: 'Assistant IA', keywords: 'voix nom ia leanna jarvis identité' },
+      { id: 'agents-settings', icon: Bot, label: 'Agents', keywords: 'agent multi-agents coder test docs refactor security review architect délégation solo' },
       { id: 'custom-skills-settings', icon: Code2, label: 'Skills custom', keywords: 'skill personnalisé custom outil tool instruction prompt automatisation' },
       { id: 'openrouter-settings', icon: Globe, label: 'Modèles & API', keywords: 'openrouter cles providers gpt gemini claude modèle' },
       { id: 'model-settings', icon: SlidersHorizontal, label: 'Hyperparamètres', keywords: 'temperature top p créativité précis équilibré preset' },
@@ -350,6 +352,7 @@ export default function SettingsView() {
               >
                 {activeSection === 'profile-settings' && <ProfileSection />}
                 {activeSection === 'ai-settings' && <AiSection />}
+                {activeSection === 'agents-settings' && <AgentsSection />}
                 {activeSection === 'custom-skills-settings' && <CustomSkillsSection />}
                 {activeSection === 'openrouter-settings' && <OpenRouterSection />}
                 {activeSection === 'model-settings' && <ModelSection />}

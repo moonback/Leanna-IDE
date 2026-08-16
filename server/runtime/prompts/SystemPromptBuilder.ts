@@ -40,6 +40,8 @@ export interface SystemPromptConfig {
   compact?: boolean;
   /** Mode de session : 'full' (agent) ou 'ask' (chat/Q&A documentaire) */
   mode?: "full" | "ask";
+  /** Configuration des agents (enabled/disabled + rôles autorisés) */
+  agents?: { enabled: boolean; allowedRoles?: string[] };
   /** Sections à exclure du prompt */
   excludeSections?: string[];
   /** Sections additionnelles à inclure */
@@ -134,9 +136,20 @@ export class SystemPromptBuilder {
         sections.push(this.registry.render("safety", renderOpts));
       }
 
-      // 5. Système multi-agents
-      if (this.registry.has("agents-system")) {
-        sections.push(this.registry.render("agents-system", renderOpts));
+      // 5. Système multi-agents (conditionnel selon config.agents)
+      const agentsEnabled = config.agents?.enabled !== false; // activé par défaut
+      if (agentsEnabled && this.registry.has("agents-system")) {
+        const allowedRoles = config.agents?.allowedRoles;
+        if (allowedRoles && allowedRoles.length > 0) {
+          // Injecter un prompt agents filtré avec seulement les rôles autorisés
+          sections.push(this.buildFilteredAgentsPrompt(allowedRoles, renderOpts));
+        } else {
+          // Tous les agents actifs
+          sections.push(this.registry.render("agents-system", renderOpts));
+        }
+      } else if (!agentsEnabled) {
+        // Agents désactivés : l'assistant agit seul, peut écrire directement
+        sections.push(this.buildSoloModePrompt());
       }
 
       // 6. Directives AI Studio Build (comportement, technique, conception)
@@ -167,6 +180,78 @@ export class SystemPromptBuilder {
   }
 
   // ─── Privé ───────────────────────────────────────────────────────────────
+
+  /**
+   * Construit un prompt agents filtré avec uniquement les rôles autorisés.
+   */
+  private buildFilteredAgentsPrompt(allowedRoles: string[], _renderOpts: any): string {
+    const ALL_ROLES: Record<string, { description: string; write: boolean }> = {
+      coder:     { description: "Modifications de fichiers demandées par l'utilisateur", write: true },
+      test:      { description: "Tests unitaires, d'intégration et E2E", write: true },
+      docs:      { description: "Documentation technique", write: true },
+      refactor:  { description: "Refactoring (pas de changement de comportement)", write: true },
+      security:  { description: "Audit de sécurité", write: false },
+      review:    { description: "Revue de code", write: false },
+      architect: { description: "Architecture et coordination", write: false },
+    };
+
+    const lines: string[] = [];
+    lines.push("# Système Multi-Agents (restreint)");
+    lines.push("");
+    lines.push("Tu fais partie du système multi-agents Jarvis-OS.");
+    lines.push(`**Agents activés :** ${allowedRoles.join(", ")}`);
+    lines.push("");
+
+    // Si coder est actif, garder la règle de délégation obligatoire
+    if (allowedRoles.includes("coder")) {
+      lines.push("## ⚠️ RÈGLE — MODIFICATIONS DE FICHIERS");
+      lines.push("");
+      lines.push("Toute modification de code DOIT être déléguée à l'agent `coder` via `agent_delegate`.");
+      lines.push("Tu ne dois JAMAIS appeler `write_project_file`, `modify_project_file` ou `patch_project_file` directement.");
+      lines.push("");
+    }
+
+    lines.push("## Agents disponibles");
+    lines.push("");
+    lines.push("| Rôle | Description | Écriture |");
+    lines.push("|------|-------------|----------|");
+    for (const role of allowedRoles) {
+      const info = ALL_ROLES[role];
+      if (info) {
+        const writeCol = info.write ? "✅ OUI" : "❌ Lecture seule";
+        lines.push(`| **${role}** | ${info.description} | ${writeCol} |`);
+      }
+    }
+    lines.push("");
+    lines.push(`**Agents NON disponibles :** les rôles non listés ci-dessus sont désactivés. Ne tente pas de déléguer à un agent non autorisé.`);
+
+    return lines.join("\n");
+  }
+
+  /**
+   * Prompt pour le mode solo (agents désactivés) : l'assistant peut agir directement.
+   */
+  private buildSoloModePrompt(): string {
+    return [
+      "# Mode Solo — Agents désactivés",
+      "",
+      "Le système multi-agents est **désactivé**. Tu agis seul.",
+      "",
+      "## Règles en mode solo",
+      "",
+      "1. **Tu peux modifier les fichiers directement** via `write_project_file`, `modify_project_file` ou `patch_project_file`",
+      "2. **Pas de délégation** — `agent_delegate` et `agent_orchestrate` ne sont pas disponibles",
+      "3. **Vérification obligatoire** — Après chaque modification, vérifie le résultat avec `verify_file`",
+      "4. **Checkpoint git** — Avant une modification non triviale, crée un commit pour rollback",
+      "5. **Lecture ciblée** — `read_file_outline` d'abord, puis lignes pertinentes uniquement",
+      "",
+      "## Processus d'exécution",
+      "",
+      "```",
+      "Lire le fichier → Comprendre le contexte → Modifier → Vérifier → Confirmer à l'utilisateur",
+      "```",
+    ].join("\n");
+  }
 
   private buildFooter(config: SystemPromptConfig): string {
     const parts: string[] = [];

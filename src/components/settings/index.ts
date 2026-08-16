@@ -1,6 +1,7 @@
 export { ProfileSection } from './ProfileSection';
 export { AiSection } from './AiSection';
 export { BehaviorSection } from './BehaviorSection';
+export { AgentsSection } from './AgentsSection';
 export { AppearanceSection } from './AppearanceSection';
 export { TokensSection } from './TokensSection';
 export { AuditSection } from './AuditSection';

@@ -1,4 +1,4 @@
-import { User, Cpu, Languages, Palette, Key, Database, Trash2, SlidersHorizontal, Globe, Shield, ShieldCheck } from 'lucide-react';
+import { User, Cpu, Languages, Palette, Key, Database, Trash2, SlidersHorizontal, Globe, Shield, ShieldCheck, Bot } from 'lucide-react';
 import type { Language, ResponseStyle } from '../../context/UserProfileContext';
 
 export const VOICES = [
@@ -41,6 +41,7 @@ export const CATEGORIES = [
   { id: 'behavior-settings', icon: Languages, label: 'Comportement', description: 'Langue et style', group: 'Général' },
   // ─── IA & Modèles ───
   { id: 'ai-settings', icon: Cpu, label: 'Assistant IA', description: 'Nom et voix', group: 'IA & Modèles' },
+  { id: 'agents-settings', icon: Bot, label: 'Agents', description: 'Multi-agents & rôles', group: 'IA & Modèles' },
   { id: 'openrouter-settings', icon: Globe, label: 'Multi-Modèle', description: 'OpenRouter & modèles', group: 'IA & Modèles' },
   { id: 'model-settings', icon: SlidersHorizontal, label: 'Modèle', description: 'Hyperparamètres', group: 'IA & Modèles' },
   { id: 'tokens-settings', icon: Key, label: 'Tokens', description: 'Clés API', group: 'IA & Modèles' },

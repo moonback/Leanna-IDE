@@ -1837,20 +1837,36 @@ async function startServer() {
         }
       }
 
-      // ── Filtrage des outils d'écriture : RÉSERVÉS AUX AGENTS UNIQUEMENT ──
-      // L'assistant principal ne doit JAMAIS modifier des fichiers directement.
-      // Toute modification passe par agent_delegate(role='coder').
-      const AGENT_ONLY_TOOLS = new Set([
-        'write_project_file',
-        'modify_project_file',
-        'patch_project_file',
-      ]);
-      filteredDeclarations = filteredDeclarations.filter(d => !AGENT_ONLY_TOOLS.has(d.name));
+      // ── Filtrage des outils d'écriture et agents selon la config ──
+      const agentsConfig = currentProfile.agents;
+      const agentsEnabled = agentsConfig?.enabled !== false; // activé par défaut
+
+      if (agentsEnabled) {
+        // Agents actifs : l'assistant ne peut PAS écrire directement
+        const AGENT_ONLY_TOOLS = new Set([
+          'write_project_file',
+          'modify_project_file',
+          'patch_project_file',
+        ]);
+        filteredDeclarations = filteredDeclarations.filter(d => !AGENT_ONLY_TOOLS.has(d.name));
+      } else {
+        // Agents désactivés : retirer les outils agents, garder les outils d'écriture directe
+        const AGENT_TOOLS = new Set([
+          'agent_delegate',
+          'agent_orchestrate',
+          'agent_status',
+          'agent_list_tasks',
+          'agent_list_roles',
+          'agent_cancel',
+          'agent_stats',
+        ]);
+        filteredDeclarations = filteredDeclarations.filter(d => !AGENT_TOOLS.has(d.name));
+      }
 
       const tools = filteredDeclarations.length > 0 ? [{ functionDeclarations: filteredDeclarations }] : undefined;
 
       // Log tool loading
-      console.log(`[TokenOptimizer] 🔧 Outils chargés: ${filteredDeclarations.length}/${declarations.length} (mode: ${sessionMode}${requestedSkills ? ', skills: ' + requestedSkills.join(',') : ''})`);
+      console.log(`[TokenOptimizer] 🔧 Outils chargés: ${filteredDeclarations.length}/${declarations.length} (mode: ${sessionMode}${requestedSkills ? ', skills: ' + requestedSkills.join(',') : ''}, agents: ${agentsEnabled ? 'ON' : 'OFF'})`);
       console.log(`[TokenOptimizer]    Outils: ${filteredDeclarations.map(d => d.name).join(', ')}`);
 
       if (scoringInfo && scoringInfo.scored.length > 0) {
@@ -2758,6 +2774,20 @@ async function startServer() {
                 });
               }
               continue;
+            }
+
+            // ── Agent role guard: block delegation to unauthorized roles ──
+            if (call.name === 'agent_delegate' && agentsConfig?.enabled !== false && agentsConfig?.allowedRoles?.length) {
+              const requestedRole = String(call.args?.role || '').toLowerCase();
+              if (!agentsConfig.allowedRoles.includes(requestedRole as any)) {
+                functionResponses.push({
+                  id: call.id,
+                  name: call.name,
+                  response: { error: `Rôle "${requestedRole}" non autorisé. Rôles disponibles: ${agentsConfig.allowedRoles.join(', ')}. Adapte ta stratégie ou demande à l'utilisateur d'activer ce rôle.` }
+                });
+                clientWs.send(JSON.stringify({ tool_used: call.name, info: `[BLOQUÉ - Rôle "${requestedRole}" désactivé]` }));
+                continue;
+              }
             }
 
             const response = await skillManager.handleToolCall(call.name, call.args, context);
