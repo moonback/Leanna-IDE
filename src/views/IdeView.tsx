@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspens
 // Monaco Editor - lazy loaded to reduce initial bundle
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.Editor })));
 // Panels - lazy loaded
-const KnowledgeDashboard = lazy(() => import('../components/panels/KnowledgeDashboard').then(m => ({ default: m.KnowledgeDashboard })));
 const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel').then(m => ({ default: m.SandboxPanel })));
 const VisionPanel = lazy(() => import('../components/panels/VisionPanel').then(m => ({ default: m.VisionPanel })));
 import { Plus, X } from 'lucide-react';
@@ -136,7 +135,6 @@ export default function IdeView() {
   const [showFleet, setShowFleet] = useState(false);
   const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
-  const [showKnowledge, setShowKnowledge] = useState(false);
   const [showCheckpoints, setShowCheckpoints] = useState(false);
   const [showSandbox, setShowSandbox] = useState(false);
   const [sandboxView, setSandboxView] = useState<'controls' | 'diff'>('controls');
@@ -683,7 +681,6 @@ export default function IdeView() {
         showAgents={showAgents}
         showFleet={showFleet}
         showMissions={showMissions}
-        showKnowledge={showKnowledge}
         showSystemHealth={showSystemHealth}
         showMcp={showMcp}
         previewUrl={previewUrl}
@@ -699,7 +696,7 @@ export default function IdeView() {
         onTogglePreview={() => setShowPreview(v => !v)}
         onToggleSettings={() => {
           setShowSettingsPanel(v => !v);
-          if (!showSettingsPanel) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); }
+          if (!showSettingsPanel) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); }
         }}
         onToggleRunMenu={() => setShowRunMenu(v => !v)}
         onToggleGitHub={() => setShowGitHub(v => !v)}
@@ -712,10 +709,6 @@ export default function IdeView() {
         onToggleAgents={() => setShowAgents(v => !v)}
         onToggleFleet={() => setShowFleet(v => !v)}
         onToggleMissions={() => setShowMissions(v => !v)}
-        onToggleKnowledge={() => {
-          setShowKnowledge(v => !v);
-          if (!showKnowledge) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); }
-        }}
         onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
         onToggleMcp={() => setShowMcp(v => !v)}
         onToggleVision={() => setVisionEnabled(v => !v)}
@@ -735,22 +728,22 @@ export default function IdeView() {
         showHelp={showHelp}
         onToggleHelp={() => {
           setShowHelp(v => !v);
-          if (!showHelp) { setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowMemory(false); }
+          if (!showHelp) { setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowMemory(false); }
         }}
         showHistory={showHistory}
         onToggleHistory={() => {
           setShowHistory(v => !v);
-          if (!showHistory) { setShowHelp(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowMemory(false); }
+          if (!showHistory) { setShowHelp(false); setShowAutomation(false); setShowSettingsPanel(false); setShowMemory(false); }
         }}
         showAutomation={showAutomation}
         onToggleAutomation={() => {
           setShowAutomation(v => !v);
-          if (!showAutomation) { setShowHelp(false); setShowHistory(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowMemory(false); }
+          if (!showAutomation) { setShowHelp(false); setShowHistory(false); setShowSettingsPanel(false); setShowMemory(false); }
         }}
         showMemory={showMemory}
         onToggleMemory={() => {
           setShowMemory(v => !v);
-          if (!showMemory) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); }
+          if (!showMemory) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); }
         }}
       />
 
@@ -793,7 +786,7 @@ export default function IdeView() {
       {/* Editor Area */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0 relative">
         {/* Tab Bar — masqué quand un panneau plein-écran est actif */}
-        {!showSandbox && !showHistory && !showAutomation && !showMemory && !showHelp && !showSettingsPanel && !showKnowledge && (
+        {!showSandbox && !showHistory && !showAutomation && !showMemory && !showHelp && !showSettingsPanel && (
           <EditorTabs
             openFiles={fileSystem.openFiles}
             activePath={fileSystem.activePath}
@@ -890,10 +883,6 @@ export default function IdeView() {
                             </div>
                           </div>
                         )
-                      ) : showKnowledge ? (
-                        <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement du dashboard…</div></div>}>
-                          <KnowledgeDashboard onClose={() => setShowKnowledge(false)} />
-                        </Suspense>
                       ) : showSettingsPanel ? (
                         <SettingsPanel
                           settings={ideSettings}

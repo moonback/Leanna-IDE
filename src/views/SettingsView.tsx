@@ -22,7 +22,6 @@ import {
   SelfRootSection,
   SafeguardsSection,
   CustomSkillsSection,
-  KnowledgeHealthSection,
   SystemPromptSection,
 } from '../components/settings';
 
@@ -49,9 +48,8 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Sécurité & Connaissances',
+    label: 'Sécurité',
     items: [
-      { id: 'knowledge-settings', icon: Database, label: 'Knowledge System', keywords: 'graphe index mémoire faits dépendances santé codebase réindexer' },
       { id: 'selfroot-settings', icon: Shield, label: 'Self-Root', keywords: 'workspace projet verrouillé périmètre auto-référentiel git branche' },
       { id: 'safeguards-settings', icon: ShieldCheck, label: 'Garde-fous', keywords: 'checkpoint rollback validation build test protection critique' },
       { id: 'audit-settings', icon: Database, label: 'Journal système', keywords: 'audit logs historique opérations traçabilité' },
@@ -365,7 +363,7 @@ export default function SettingsView() {
                 {activeSection === 'behavior-settings' && <BehaviorSection />}
                 {activeSection === 'appearance-settings' && <AppearanceSection />}
                 {activeSection === 'tokens-settings' && <TokensSection />}
-                {activeSection === 'knowledge-settings' && <KnowledgeHealthSection />}
+
                 {activeSection === 'audit-settings' && <AuditSection />}
                 {activeSection === 'selfroot-settings' && <SelfRootSection />}
                 {activeSection === 'safeguards-settings' && <SafeguardsSection />}
@@ -393,7 +391,7 @@ function getSectionDescription(id: string): string {
     'behavior-settings': 'Langue, style et format des réponses de l\'IA.',
     'appearance-settings': 'Thème visuel, couleur d\'accent et éléments d\'interface.',
     'tokens-settings': 'Gérez vos clés API et le pool de rotation Gemini.',
-    'knowledge-settings': 'Analysez et contrôlez la santé du Knowledge System et du graphe de dépendances.',
+
     'audit-settings': 'Consultez le journal des opérations système.',
     'selfroot-settings': 'Périmètre verrouillé — l\'IDE n\'opère que sur son propre repo.',
     'safeguards-settings': 'Checkpoints, validation et protections pour l\'auto-modification.',

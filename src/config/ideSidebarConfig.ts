@@ -14,7 +14,7 @@ import {
   Search, SquareTerminal, Frame,
   GitBranch, Camera, Monitor,
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
-  Cable, ShieldCheck, Container, Bot, Crosshair, Database,
+  Cable, ShieldCheck, Container, Bot, Crosshair,
   GitBranchPlus, Activity, Wrench, Code2, Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -179,14 +179,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
         icon: Wrench,
         label: 'Données & Outils',
         children: [
-          {
-            id: 'knowledge',
-            type: 'button',
-            icon: Database,
-            label: 'Knowledge System',
-            stateKey: 'showKnowledge',
-            actionKey: 'onToggleKnowledge',
-          },
           {
             id: 'system-health',
             type: 'button',

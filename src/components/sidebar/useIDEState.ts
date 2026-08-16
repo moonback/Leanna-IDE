@@ -26,7 +26,6 @@ export function useIDEState(props: UnifiedSidebarProps) {
     showChat: props.showChat ?? false,
     showAgents: props.showAgents ?? false,
     showMissions: props.showMissions ?? false,
-    showKnowledge: props.showKnowledge ?? false,
     showSystemHealth: props.showSystemHealth ?? false,
     showMcp: props.showMcp ?? false,
     showFleet: props.showFleet ?? false,
@@ -39,7 +38,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.showGitHub, props.showGit, props.showCheckpoints,
     props.showSandbox, props.showWorkflow, props.showSkillsMonitor,
     props.showChat, props.showAgents, props.showMissions,
-    props.showKnowledge, props.showSystemHealth, props.showMcp,
+    props.showSystemHealth, props.showMcp,
     props.showFleet, props.previewUrl, props.visionEnabled,
     props.screenShareEnabled,
   ]);
@@ -60,7 +59,6 @@ export function useIDEState(props: UnifiedSidebarProps) {
     onToggleChat: props.onToggleChat ?? noop,
     onToggleAgents: props.onToggleAgents ?? noop,
     onToggleMissions: props.onToggleMissions ?? noop,
-    onToggleKnowledge: props.onToggleKnowledge ?? noop,
     onToggleSystemHealth: props.onToggleSystemHealth ?? noop,
     onToggleMcp: props.onToggleMcp ?? noop,
     onToggleFleet: props.onToggleFleet ?? noop,
@@ -72,7 +70,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.onToggleGitHub, props.onToggleGit, props.onToggleCheckpoints,
     props.onToggleSandbox, props.onToggleWorkflow, props.onToggleSkillsMonitor,
     props.onToggleChat, props.onToggleAgents, props.onToggleMissions,
-    props.onToggleKnowledge, props.onToggleSystemHealth, props.onToggleMcp,
+    props.onToggleSystemHealth, props.onToggleMcp,
     props.onToggleFleet, props.onToggleVision, props.onToggleScreenShare,
   ]);
 
