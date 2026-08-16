@@ -240,8 +240,7 @@ export class ProjectIndexer {
   // ─── Extraction d'entités ─────────────────────────────────────────────────
 
   /**
-   * Extrait les entités de code d'un fichier.
-   * Utilise extractFileOutline pour le parsing (déjà existant dans codebaseHelpers).
+   * Extrait les entités documentaires d'un fichier (Markdown, texte brut, YAML, CSV, JSON).
    */
   private extractEntities(
     relativePath: string,

@@ -808,7 +808,7 @@ export class UnderstandingEngine {
   // ──────────────────────────────────────────────────────────────────────
 
   private computeUnderstandingScore(
-    query: string,
+    _query: string,
     batch: ContextBatch,
     health: KnowledgeHealth,
     opts: typeof DEFAULTS
@@ -1005,7 +1005,7 @@ export class UnderstandingEngine {
   private computeRecommendations(
     score: UnderstandingScore,
     missing: MissingAction[],
-    batch: ContextBatch,
+    _batch: ContextBatch,
     opts: typeof DEFAULTS
   ): ContextualRecommendation[] {
     const recs: ContextualRecommendation[] = [];

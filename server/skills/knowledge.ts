@@ -46,7 +46,6 @@ const STRATEGY_VALUES: ContextStrategy[] = [
 const DETAIL_VALUES: ContextDetailLevel[] = ["compact", "standard", "verbose"];
 
 const IMPACT_MODES: ImpactMode[] = ["quick", "standard", "deep", "reverse"];
-const RISK_LEVELS: RiskLevel[] = ["low", "medium", "high", "critical"];
 
 export const knowledgeSkill: Skill = {
   name: "knowledge",
