@@ -47,6 +47,7 @@ import { initActivityStore } from '../stores/agentActivityStore';
 import { MissionPanel } from '../components/panels/MissionPanel';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard';
 import { AgentFleetPanel } from '../components/panels/AgentFleetPanel';
+import { AssistantLogsPanel } from '../components/panels/AssistantLogsPanel';
 import { AgentActivityOverlay } from '../components/ide/AgentActivityOverlay';
 
 // ─── Main Component ─────────────────────────────────────────────────────────
@@ -133,6 +134,7 @@ export default function IdeView() {
   const [pendingChatMessage, setPendingChatMessage] = useState<{ text: string; displayText?: string } | null>(null);
   const [showAgents, setShowAgents] = useState(false);
   const [showFleet, setShowFleet] = useState(false);
+  const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
   const [showKnowledge, setShowKnowledge] = useState(false);
   const [showCheckpoints, setShowCheckpoints] = useState(false);
@@ -1113,6 +1115,7 @@ export default function IdeView() {
           onToggleMcp={() => setShowMcp(v => !v)}
           onToggleAgents={() => setShowAgents(v => !v)}
           onToggleFleet={() => setShowFleet(v => !v)}
+          onToggleLogs={() => setShowAssistantLogs(v => !v)}
         />
       </div>
 
@@ -1170,6 +1173,11 @@ export default function IdeView() {
           onPendingMessageConsumed={() => setPendingChatMessage(null)}
           onDockedChange={setChatDocked}
         />
+      )}
+
+      {/* Assistant Logs — modal overlay */}
+      {showAssistantLogs && (
+        <AssistantLogsPanel onClose={() => setShowAssistantLogs(false)} />
       )}
 
       {/* Agents Panel — modal overlay */}

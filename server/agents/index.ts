@@ -29,6 +29,13 @@ export type {
   BroadcastPayload,
 } from "./AgentCommunication";
 
+export { WorkspaceState } from "./WorkspaceState";
+export type { WorkspaceFileState, WorkspaceCompletionReport, WorkspaceRead, VerificationIssue, VerificationRecord, VerificationSeverity } from "./WorkspaceState";
+export { AgentValidation } from "./AgentValidation";
+export type { ValidationSnapshot, RegressionReport } from "./AgentValidation";
+export { AgentRepairLoop } from "./AgentRepairLoop";
+export type { RepairAction, RepairDirective } from "./AgentRepairLoop";
+
 // Exports existants (inchangés)
 export { AGENT_REGISTRY, getAgentDefinition, listAgentDefinitions } from "./roles";
 export type {

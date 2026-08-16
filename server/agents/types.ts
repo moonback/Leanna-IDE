@@ -112,7 +112,13 @@ export interface TaskEvidence {
   filesModified: string[];
   toolsExecuted: string[];
   commandsExecuted: string[];
-  findings: string[];
+  /** Pre/post global checks and delta-based regression evidence. */
+  globalValidation?: {
+    baseline: unknown;
+    current: unknown;
+    regressions: string[];
+    passed: boolean;
+  };
   verification: {
     passed: boolean;
     checks: string[];

@@ -99,6 +99,10 @@ test("verify_file with a valid file returns structured result", async () => {
   assert.ok("test" in result, "should have test result (or null)");
   assert.ok("message" in result, "should have a message");
   assert.ok(Array.isArray(result.parsedErrors), "should return parsedErrors array");
+  assert.ok(result.verificationRecord, "should expose hash-bound verification evidence");
+  assert.equal(result.verificationRecord.hashBefore.length, 64);
+  assert.equal(result.verificationRecord.hashAfter.length, 64);
+  assert.ok(["success", "failed", "stale"].includes(result.verificationRecord.status));
 });
 
 test("verify_file detects associated test file for verify.ts", async () => {

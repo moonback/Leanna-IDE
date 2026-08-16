@@ -21,6 +21,8 @@ import { ProgressNotifier } from "./ProgressNotifier";
 import { agentMessageBus } from "./AgentMessageBus";
 import type { TaskRequestPayload } from "./AgentCommunication";
 import { createLogger } from "../utils/logger";
+import { WorkspaceState, type VerificationRecord } from "./WorkspaceState";
+import { AgentRepairLoop } from "./AgentRepairLoop";
 
 const log = createLogger("AgentExecutor");
 
@@ -39,9 +41,13 @@ interface ToolExecutionState {
   filesModified: string[];
   errors: string[];
   observations: string[];
-  /** Nombre de validations échouées par fichier, plafonné pour éviter les boucles d’écriture. */
-  verificationAttempts: Map<string, number>;
-  /** Workspace state: contenu des fichiers lus pendant l'exécution (persisté entre les tours) */
+  /** Every successful or rejected write; completion gates all of these files. */
+  touchedFiles: Set<string>;
+  /** Bounded, progress-aware repair policies, isolated per file. */
+  repairLoops: Map<string, AgentRepairLoop>;
+  blockedFiles: Set<string>;
+  /** Authoritative disk observations and hash-bound verification evidence. */
+  workspace: WorkspaceState;
   fileSnapshots: Map<string, string>;
 }
 
@@ -59,6 +65,7 @@ const EXECUTABLE_AGENT_TOOLS = new Set([
   "verify_file",
   "verify_typecheck",
   "verify_lint",
+  "verify_full",
 ]);
 
 export class AgentExecutor {
@@ -95,10 +102,10 @@ export class AgentExecutor {
     const agent = getAgentDefinition(task.role);
     const taskShortId = task.id.slice(0, 8);
 
-    log.info(`▶ [${agent.name}] Démarrage tâche ${taskShortId}: "${task.title}"`);
+    log.info(`[task:${taskShortId}] ▶ [${agent.name}] Démarrage tâche: "${task.title}"`);
 
     if (!this.skillHandler) {
-      log.error(`[${agent.name}] SkillHandler non initialisé`);
+      log.error(`[task:${taskShortId}] [${agent.name}] SkillHandler non initialisé`);
       task.status = "failed";
       task.result = {
         success: false,
@@ -143,9 +150,10 @@ export class AgentExecutor {
 
       // ── Étape 4: Matérialisation et vérification des modifications ──
       const generatedWriteResult = await this.fileWriter.writeFromAgentOutput(task, resultText);
+      const generatedRegistration = await this.registerGeneratedWrites(generatedWriteResult.written, toolExecution);
       const writeResult = {
-        written: [...new Set([...toolExecution.filesModified, ...generatedWriteResult.written])],
-        errors: [...toolExecution.errors.map((error) => ({ path: "tool-call", error })), ...generatedWriteResult.errors],
+        written: [...new Set([...toolExecution.filesModified, ...generatedRegistration.verified])],
+        errors: [...toolExecution.errors.map((error) => ({ path: "tool-call", error })), ...generatedWriteResult.errors, ...generatedRegistration.errors],
       };
       const durationMs = Date.now() - startTime;
       const evidence = this.collectEvidence(task, fileContents, writeResult, resultText, toolExecution);
@@ -180,7 +188,7 @@ export class AgentExecutor {
         task.result.delegatedSubTasks = subTaskIds;
       }
 
-      log.info(`✅ [${agent.name}] Terminé en ${(durationMs / 1000).toFixed(1)}s — ${task.result.summary}`);
+      log.info(`[task:${taskShortId}] ✅ [${agent.name}] Terminé en ${(durationMs / 1000).toFixed(1)}s — ${task.result.summary}`);
       this.notifier.notify(task, "completed");
     } catch (error) {
       const durationMs = Date.now() - startTime;
@@ -193,7 +201,7 @@ export class AgentExecutor {
         durationMs,
       };
 
-      log.error(`❌ [${agent.name}] Échec après ${(durationMs / 1000).toFixed(1)}s: ${(error as Error).message}`);
+      log.error(`[task:${taskShortId}] ❌ [${agent.name}] Échec après ${(durationMs / 1000).toFixed(1)}s: ${(error as Error).message}`);
       this.notifier.notify(task, "failed");
     } finally {
       this.decrementRunning(task.role);
@@ -208,7 +216,6 @@ export class AgentExecutor {
    * Limité à MAX_TOOL_TURNS tours pour éviter les boucles infinies.
    */
   private static readonly MAX_TOOL_TURNS = 8;
-  private static readonly MAX_FILE_CORRECTIONS = 3;
   /** Taille maximale d’une observation cumulée envoyée au modèle suivant. */
   private static readonly MAX_OBSERVATION_CHARS = 240_000;
   /** Limite de sécurité par snapshot, supérieure aux composants UI usuels. */
@@ -226,7 +233,16 @@ export class AgentExecutor {
       filesModified: [],
       errors: [],
       observations: [],
-      verificationAttempts: new Map(),
+      touchedFiles: new Set(),
+      repairLoops: new Map(),
+      blockedFiles: new Set(),
+      workspace: new WorkspaceState(async (path) => {
+        const result = await this.skillHandler!("read_project_file", { path, full: true });
+        if (result?.error || result?.status === "failed" || typeof result?.content !== "string") {
+          throw new Error(this.formatToolFailure(result));
+        }
+        return result.content;
+      }),
       fileSnapshots: new Map(),
     };
 
@@ -421,29 +437,56 @@ export class AgentExecutor {
   private async refreshFileSnapshot(
     requestedPath: string,
     state: ToolExecutionState,
-    reason: string
+    reason: string,
+    afterWrite = false,
   ): Promise<boolean> {
-    try {
-      const result = await this.skillHandler!("read_project_file", { path: requestedPath, full: true });
-      state.toolsExecuted.push("read_project_file");
-
-      if (result?.error || result?.status === "failed" || typeof result?.content !== "string") {
-        const error = this.formatToolFailure(result);
-        state.fileSnapshots.delete(requestedPath);
-        state.observations.push(`- read_project_file ${requestedPath}: échec pendant le rafraîchissement ${reason} — ${error}`);
-        return false;
-      }
-
-      state.filesRead.push(requestedPath);
-      state.fileSnapshots.set(requestedPath, result.content);
-      state.observations.push(`- read_project_file ${requestedPath}: instantané actuel rafraîchi ${reason}; cet état remplace tout contenu initial.`);
-      return true;
-    } catch (error) {
-      const message = (error as Error).message;
+    const file = await state.workspace.reread(requestedPath, afterWrite ? "write" : "read");
+    state.toolsExecuted.push("read_project_file");
+    if (file.status === "error" || !file.exists || typeof file.content !== "string") {
       state.fileSnapshots.delete(requestedPath);
-      state.observations.push(`- read_project_file ${requestedPath}: erreur pendant le rafraîchissement ${reason} — ${message}`);
+      state.observations.push(`- read_project_file ${requestedPath}: échec pendant le rafraîchissement ${reason} — ${file.errors.at(-1) ?? "contenu indisponible"}`);
       return false;
     }
+    state.filesRead.push(requestedPath);
+    state.fileSnapshots.set(requestedPath, file.content);
+    state.observations.push(`- read_project_file ${requestedPath}: instantané courant SHA-256 ${file.contentHash.slice(0, 12)} rafraîchi ${reason}; il remplace tout contenu initial.`);
+    return true;
+  }
+
+  private async registerGeneratedWrites(paths: string[], state: ToolExecutionState): Promise<{ verified: string[]; errors: { path: string; error: string }[] }> {
+    const verified: string[] = []; const errors: { path: string; error: string }[] = [];
+    for (const filePath of [...new Set(paths)]) {
+      state.touchedFiles.add(filePath);
+      if (!await this.refreshFileSnapshot(filePath, state, "après la génération", true)) { errors.push({ path: filePath, error: "Relecture post-écriture impossible." }); continue; }
+      const verification = await this.skillHandler!("verify_file", { path: filePath });
+      state.toolsExecuted.push("verify_file");
+      const record = verification?.verificationRecord;
+      if (this.isVerificationRecord(record)) state.workspace.recordVerification(filePath, record);
+      else state.workspace.markError(filePath, "verify_file n'a pas retourné de preuve hashée structurée.");
+      await this.refreshFileSnapshot(filePath, state, "après la vérification générée");
+      const file = state.workspace.get(filePath);
+      if (verification?.ok === true && verification?.status === "success" && file?.status === "verified" && file.verifiedHash === file.contentHash) { verified.push(filePath); state.filesModified.push(filePath); }
+      else errors.push({ path: filePath, error: this.formatToolFailure(verification) });
+    }
+    return { verified, errors };
+  }
+
+  private repairInstruction(state: ToolExecutionState, path: string, issues: unknown, patch?: string): string {
+    const normalized = Array.isArray(issues) && issues.length > 0
+      ? issues as import("./WorkspaceState").VerificationIssue[]
+      : [{ type: "execution", file: path, line: null, column: null, severity: "error" as const, rule: "tool-result", message: "Écriture ou vérification non confirmée." }];
+    const key = path.replace(/\\/g, "/").replace(/^\.\//, "");
+    const loop = state.repairLoops.get(key) ?? new AgentRepairLoop();
+    state.repairLoops.set(key, loop);
+    const file = state.workspace.get(path);
+    const directive = loop.assess({ issues: normalized, currentHash: file?.contentHash, currentVersion: file?.version, patch });
+    if (directive.action === "stop") { state.blockedFiles.add(key); state.errors.push(`repair(${path}): ${directive.reason}`); }
+    return directive.requiredAction;
+  }
+
+  private isVerificationRecord(value: unknown): value is VerificationRecord {
+    const record = value as Partial<VerificationRecord> | undefined;
+    return Boolean(record && typeof record.contentHash === "string" && typeof record.hashBefore === "string" && typeof record.hashAfter === "string" && typeof record.ok === "boolean" && ["success", "failed", "stale"].includes(record.status ?? ""));
   }
 
   private async executeRequestedTools(
@@ -487,11 +530,8 @@ export class AgentExecutor {
         continue;
       }
       if (isWriteCall && pathKey) writePathsHandled.add(pathKey);
-
-      if (isWriteCall && requestedPath && (state.verificationAttempts.get(requestedPath) ?? 0) >= AgentExecutor.MAX_FILE_CORRECTIONS) {
-        const message = `plafond de ${AgentExecutor.MAX_FILE_CORRECTIONS} corrections atteint pour ${requestedPath}; validation humaine requise`;
-        state.errors.push(`${call.name}: ${message}`);
-        state.observations.push(`- ${call.name} ${requestedPath}: écriture bloquée — ${message}`);
+      if (isWriteCall && pathKey && state.blockedFiles.has(pathKey)) {
+        state.observations.push(`- ${call.name} ${requestedPath}: écriture bloquée par le diagnostic de non-progression; signaler le bloqueur au lieu de répéter le patch.`);
         continue;
       }
 
@@ -499,19 +539,13 @@ export class AgentExecutor {
         log.info(`[${agent.name}] Exécution outil structuré: ${call.name} args=${JSON.stringify(call.parameters).slice(0, 200)}`);
         const result = await this.skillHandler!(call.name, call.parameters);
         state.toolsExecuted.push(call.name);
+        if (isWriteCall && requestedPath) state.touchedFiles.add(requestedPath);
         if (result?.error || result?.status === "failed") {
           const error = this.formatToolFailure(result);
           if (isWriteCall && requestedPath) {
-            const attempt = (state.verificationAttempts.get(requestedPath) ?? 0) + 1;
-            state.verificationAttempts.set(requestedPath, attempt);
             await this.refreshFileSnapshot(requestedPath, state, "après le refus d'écriture");
-            const limitNote = attempt >= AgentExecutor.MAX_FILE_CORRECTIONS
-              ? ` Plafond atteint (${AgentExecutor.MAX_FILE_CORRECTIONS}) : aucune autre écriture automatique ne sera autorisée.`
-              : " Relis l'instantané actuel avant de régénérer un unique patch ciblé.";
-            if (attempt >= AgentExecutor.MAX_FILE_CORRECTIONS) {
-              state.errors.push(`${call.name}: ${error}`);
-            }
-            state.observations.push(`- ${call.name} ${requestedPath}: échec (tentative ${attempt}/${AgentExecutor.MAX_FILE_CORRECTIONS}) — ${error}${limitNote}`);
+            const instruction = this.repairInstruction(state, requestedPath, result?.allIssues, JSON.stringify(call.parameters));
+            state.observations.push(`- ${call.name} ${requestedPath}: échec — ${error}\n${instruction}`);
           } else {
             state.errors.push(`${call.name}: ${error}`);
             state.observations.push(`- ${call.name}: échec — ${error}`);
@@ -521,32 +555,32 @@ export class AgentExecutor {
 
         if (requestedPath && ["read_project_file", "read_file_outline"].includes(call.name)) {
           state.filesRead.push(requestedPath);
-          // Persister le contenu lu dans le workspace state pour les tours suivants
           if (call.name === "read_project_file" && typeof result?.content === "string" && result?.status === "success") {
+            state.workspace.observe(requestedPath, result.content);
             state.fileSnapshots.set(requestedPath, result.content);
           }
         }
         if (isWriteCall && requestedPath) {
-          // Le prompt de départ contient des fichiers initiaux. Une relecture immédiate
-          // rend le contenu réellement écrit autoritaire pour le prochain tour.
-          await this.refreshFileSnapshot(requestedPath, state, "après l'écriture");
+          if (!await this.refreshFileSnapshot(requestedPath, state, "après l'écriture", true)) {
+            state.workspace.markError(requestedPath, "Impossible de relire le fichier réellement écrit.");
+            state.errors.push(`${call.name}(${requestedPath}): relecture post-écriture impossible.`);
+            continue;
+          }
 
           const verification = await this.skillHandler!("verify_file", { path: requestedPath });
           state.toolsExecuted.push("verify_file");
-          if (verification?.error || verification?.ok === false || verification?.status === "failed" || verification?.status !== "success") {
-            const attempt = (state.verificationAttempts.get(requestedPath) ?? 0) + 1;
-            state.verificationAttempts.set(requestedPath, attempt);
+          const record = verification?.verificationRecord;
+          if (!this.isVerificationRecord(record)) state.workspace.markError(requestedPath, "verify_file n'a pas retourné de preuve hashée structurée.");
+          else state.workspace.recordVerification(requestedPath, record);
+          await this.refreshFileSnapshot(requestedPath, state, "après la vérification");
+          const file = state.workspace.get(requestedPath);
+          const verified = Boolean(record && this.isVerificationRecord(record) && verification?.status === "success" && verification?.ok === true && file?.status === "verified" && file.verifiedHash === file.contentHash);
+          if (!verified) {
             const error = this.formatToolFailure(verification);
-            const limitNote = attempt >= AgentExecutor.MAX_FILE_CORRECTIONS
-              ? ` Plafond atteint (${AgentExecutor.MAX_FILE_CORRECTIONS}) : aucune autre écriture automatique ne sera autorisée.`
-              : " Relis le diagnostic et l'instantané actuel puis applique un patch ciblé avant de revalider.";
-            if (attempt >= AgentExecutor.MAX_FILE_CORRECTIONS) {
-              state.errors.push(`verify_file(${requestedPath}): ${error}`);
-            }
-            state.observations.push(`- ${call.name} ${requestedPath}: écrit mais vérification échouée (tentative ${attempt}/${AgentExecutor.MAX_FILE_CORRECTIONS}) — ${error}${limitNote}`);
+            const instruction = this.repairInstruction(state, requestedPath, verification?.allIssues ?? record?.allIssues, JSON.stringify(call.parameters));
+            state.observations.push(`- ${call.name} ${requestedPath}: écrit mais vérification non courante/échouée — ${error}\n${instruction}`);
             continue;
           }
-          state.verificationAttempts.delete(requestedPath);
           state.filesModified.push(requestedPath);
         }
 
@@ -581,6 +615,7 @@ export class AgentExecutor {
       ...(writeResult.written.length > 0 ? ["write_project_file/apply_patch puis verify_file"] : []),
     ])];
     const findings = this.extractFindings(resultText);
+    const completion = toolExecution.workspace.completionReport(toolExecution.touchedFiles);
     const writeRequired = ["coder", "test", "docs", "refactor"].includes(task.role)
       // Une sous-tâche explicitement orientée lecture/analyse n'exige pas d'écriture.
       // On détecte cela par l'absence totale de mot-clé d'écriture dans le titre/description
@@ -591,6 +626,7 @@ export class AgentExecutor {
     const declaredFailure = this.resultParser.detectFailure(resultText);
     const errors = [
       ...writeResult.errors.map((error) => `${error.path}: ${error.error}`),
+      ...completion.errors,
       ...(declaredFailure ? [`Le rapport final déclare un échec : ${declaredFailure}`] : []),
       ...(planningOnly ? ["La sortie décrit un plan sans résultat d'exécution."] : []),
       ...(writeRequired && writeResult.written.length === 0 ? ["Aucun fichier confirmé par write_project_file puis verify_file."] : []),
@@ -604,6 +640,7 @@ export class AgentExecutor {
       toolsExecuted,
       commandsExecuted: [],
       findings,
+      workspaceCompletion: completion,
       verification: {
         passed: errors.length === 0,
         checks: [
