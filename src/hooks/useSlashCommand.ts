@@ -12,8 +12,6 @@ export interface SlashCommandSuggestion {
 const AVAILABLE_SKILLS: SlashCommandSuggestion[] = [
   { name: 'automation', description: 'Gérer les tâches automatisées et workflows' },
   { name: 'codebase', description: 'Analyser et naviguer dans le code source' },
-  { name: 'git', description: 'Opérations Git (commit, branch, status…)' },
-  { name: 'github', description: 'Interactions GitHub (issues, PRs, repos)' },
   { name: 'guidelines', description: 'Consulter et appliquer les conventions du projet' },
   { name: 'history', description: 'Historique des conversations et actions' },
   { name: 'list', description: 'Gérer des listes (todo, notes, etc.)' },

@@ -31,10 +31,8 @@ import { useSandboxWatcher } from '../hooks/useSandboxWatcher';
 import { AgentProgressBar } from '../components/ide/AgentProgressBar';
 import { ChatPanel } from '../components/ide/ChatPanel';
 import { LiveSkillsMonitor } from '../components/ide/LiveSkillsMonitor';
-import { GitHubPanel } from '../components/ide/GitHubPanel';
 import { WorkflowPanel } from '../components/ide/WorkflowPanel';
 import { McpPanel } from '../components/panels/McpPanel';
-import { GitSourceControl } from '../components/ide/GitSourceControl';
 import { PreviewPanel } from '../components/ide/PreviewPanel';
 import { MarkdownPreview } from '../components/ide/MarkdownPreview';
 import { EmptyEditorState } from '../components/ide/EmptyEditorState';
@@ -123,8 +121,6 @@ export default function IdeView() {
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [showRunMenu, setShowRunMenu] = useState(false);
-  const [showGitHub, setShowGitHub] = useState(false);
-  const [showGit, setShowGit] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
   const [showMcp, setShowMcp] = useState(false);
   const [showSkillsMonitor, setShowSkillsMonitor] = useState(false);
@@ -671,8 +667,6 @@ export default function IdeView() {
         showPreview={showPreview}
         showSettings={showSettingsPanel}
         showRunMenu={showRunMenu}
-        showGitHub={showGitHub}
-        showGit={showGit}
         showCheckpoints={showCheckpoints}
         showSandbox={showSandbox}
         showWorkflow={showWorkflow}
@@ -699,8 +693,6 @@ export default function IdeView() {
           if (!showSettingsPanel) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); }
         }}
         onToggleRunMenu={() => setShowRunMenu(v => !v)}
-        onToggleGitHub={() => setShowGitHub(v => !v)}
-        onToggleGit={() => setShowGit(v => !v)}
         onToggleCheckpoints={() => setShowCheckpoints(v => !v)}
         onToggleSandbox={toggleSandbox}
         onToggleWorkflow={() => setShowWorkflow(v => !v)}
@@ -748,7 +740,7 @@ export default function IdeView() {
       />
 
       {/* File Explorer */}
-      {showExplorer && !showGit && (
+      {showExplorer && (
         <FileExplorer
           tree={fileSystem.tree}
           expandedDirs={fileSystem.expandedDirs}
@@ -769,11 +761,6 @@ export default function IdeView() {
           onNavigate={fileSystem.setCurrentDir}
           onMoveEntry={fileSystem.moveEntry}
         />
-      )}
-
-      {/* Git Source Control Panel */}
-      {showGit && (
-        <GitSourceControl onClose={() => setShowGit(false)} />
       )}
 
       {/* Checkpoints Panel */}
@@ -949,10 +936,7 @@ export default function IdeView() {
               />
             )}
 
-            {/* GitHub Panel */}
-            {showGitHub && (
-              <GitHubPanel onClose={() => setShowGitHub(false)} />
-            )}
+
 
             {/* Workflow Panel */}
             {showWorkflow && (

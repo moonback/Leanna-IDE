@@ -24,7 +24,16 @@ export function setCheckpointProfileGetter(getter: () => { gitEnabled?: boolean 
   _getProfile = getter;
 }
 
+import * as fs from "fs";
+import * as path from "path";
+
 function isGitEnabled(): boolean {
+  try {
+    const root = getProjectRoot();
+    if (!fs.existsSync(path.join(root, ".git"))) return false;
+  } catch {
+    return false;
+  }
   if (!_getProfile) return true; // activé par défaut si pas de getter configuré
   return _getProfile().gitEnabled !== false;
 }

@@ -18,8 +18,6 @@ export interface IDEPanelState {
   showPreview: boolean;
   showSettings: boolean;
   showRunMenu: boolean;
-  showGitHub: boolean;
-  showGit: boolean;
   showCheckpoints: boolean;
   showSandbox: boolean;
   showWorkflow: boolean;
@@ -44,8 +42,6 @@ export interface IDEPanelActions {
   onTogglePreview: () => void;
   onToggleSettings: () => void;
   onToggleRunMenu: () => void;
-  onToggleGitHub: () => void;
-  onToggleGit: () => void;
   onToggleCheckpoints: () => void;
   onToggleSandbox: () => void;
   onToggleWorkflow: () => void;
@@ -98,8 +94,6 @@ export interface UnifiedSidebarProps {
   showPreview?: boolean;
   showSettings?: boolean;
   showRunMenu?: boolean;
-  showGitHub?: boolean;
-  showGit?: boolean;
   showCheckpoints?: boolean;
   showSandbox?: boolean;
   showWorkflow?: boolean;
@@ -125,8 +119,6 @@ export interface UnifiedSidebarProps {
   onTogglePreview?: () => void;
   onToggleSettings?: () => void;
   onToggleRunMenu?: () => void;
-  onToggleGitHub?: () => void;
-  onToggleGit?: () => void;
   onToggleCheckpoints?: () => void;
   onToggleSandbox?: () => void;
   onToggleWorkflow?: () => void;

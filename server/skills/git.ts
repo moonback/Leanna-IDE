@@ -118,9 +118,26 @@ export function invalidateGitStatusCache(workspace?: string) {
   gitStatusCache.invalidate(workspace);
 }
 
+import * as fs from "fs";
+import * as path from "path";
+
 async function git(args: string[]): Promise<{ stdout: string; stderr: string }> {
   const workDir = getProjectRoot();
   const mainCmd = args[0]?.toLowerCase();
+  
+  // Vérifier la présence du dépôt Git
+  if (!fs.existsSync(path.join(workDir, ".git"))) {
+    const mockOutput = { stdout: "", stderr: "" };
+    if (mainCmd === "status") {
+      mockOutput.stdout = "On branch main\nnothing to commit, working tree clean";
+    } else if (mainCmd === "branch" || mainCmd === "branches") {
+      mockOutput.stdout = "* main";
+    } else if (mainCmd === "rev-parse") {
+      mockOutput.stdout = "main";
+    }
+    return mockOutput;
+  }
+
   if (mainCmd && !["status", "branch", "log", "diff", "show"].includes(mainCmd)) {
     gitStatusCache.invalidate(workDir);
   }

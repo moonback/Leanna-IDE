@@ -26,6 +26,8 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
       }
 
       const { execSync } = await import('child_process');
+      const fs = await import('fs');
+      const path = await import('path');
       const execOpts = { cwd: SELF_ROOT, encoding: 'utf-8' as const, timeout: 5000 };
       let gitBranch = '—';
       let gitStatus: 'clean' | 'dirty' | 'unknown' = 'unknown';
@@ -34,36 +36,40 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
       let ahead = 0;
       let behind = 0;
 
-      // Utiliser le cache git_status s'il est disponible (évite un spawn)
-      try {
-        const { gitStatusCache } = await import('../skills/git');
-        const cached = gitStatusCache.get(SELF_ROOT);
-        if (cached && cached.branch) {
-          gitBranch = cached.branch;
-          gitStatus = (cached.files?.length ?? 0) === 0 ? 'clean' : 'dirty';
-        } else {
+      const hasGit = fs.existsSync(path.join(SELF_ROOT, '.git'));
+
+      if (hasGit) {
+        // Utiliser le cache git_status s'il est disponible (évite un spawn)
+        try {
+          const { gitStatusCache } = await import('../skills/git');
+          const cached = gitStatusCache.get(SELF_ROOT);
+          if (cached && cached.branch) {
+            gitBranch = cached.branch;
+            gitStatus = (cached.files?.length ?? 0) === 0 ? 'clean' : 'dirty';
+          } else {
+            try { gitBranch = execSync('git rev-parse --abbrev-ref HEAD', execOpts).trim(); } catch {}
+            try {
+              const statusOutput = execSync('git status --porcelain', execOpts).trim();
+              gitStatus = statusOutput.length === 0 ? 'clean' : 'dirty';
+            } catch {}
+          }
+        } catch {
           try { gitBranch = execSync('git rev-parse --abbrev-ref HEAD', execOpts).trim(); } catch {}
           try {
             const statusOutput = execSync('git status --porcelain', execOpts).trim();
             gitStatus = statusOutput.length === 0 ? 'clean' : 'dirty';
           } catch {}
         }
-      } catch {
-        try { gitBranch = execSync('git rev-parse --abbrev-ref HEAD', execOpts).trim(); } catch {}
         try {
-          const statusOutput = execSync('git status --porcelain', execOpts).trim();
-          gitStatus = statusOutput.length === 0 ? 'clean' : 'dirty';
+          lastCommit = execSync('git log -1 --pretty=format:%s', execOpts).trim();
+          lastCommitDate = execSync('git log -1 --pretty=format:%cr', execOpts).trim();
+        } catch {}
+        try {
+          const abOutput = execSync(`git rev-list --left-right --count origin/${gitBranch}...HEAD`, execOpts).trim();
+          const parts = abOutput.split(/\s+/);
+          if (parts.length === 2) { behind = parseInt(parts[0], 10) || 0; ahead = parseInt(parts[1], 10) || 0; }
         } catch {}
       }
-      try {
-        lastCommit = execSync('git log -1 --pretty=format:%s', execOpts).trim();
-        lastCommitDate = execSync('git log -1 --pretty=format:%cr', execOpts).trim();
-      } catch {}
-      try {
-        const abOutput = execSync(`git rev-list --left-right --count origin/${gitBranch}...HEAD`, execOpts).trim();
-        const parts = abOutput.split(/\s+/);
-        if (parts.length === 2) { behind = parseInt(parts[0], 10) || 0; ahead = parseInt(parts[1], 10) || 0; }
-      } catch {}
       res.json({ rootPath: SELF_ROOT, locked: true, gitBranch, gitStatus, lastCommit, lastCommitDate, aheadBehind: { ahead, behind } });
     } catch (e: any) {
       res.status(500).json({ error: e.message || 'Erreur interne' });

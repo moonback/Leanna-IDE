@@ -15,10 +15,9 @@ import {
   GitBranch, Camera, Monitor,
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Cable, ShieldCheck, Container, Bot, Crosshair,
-  GitBranchPlus, Activity, Wrench, Code2, Users,
+  Activity, Wrench, Code2, Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Github } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -123,22 +122,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
         icon: GitBranch,
         label: 'Source & Déploiement',
         children: [
-          {
-            id: 'git',
-            type: 'button',
-            icon: GitBranchPlus,
-            label: 'Contrôle de source',
-            stateKey: 'showGit',
-            actionKey: 'onToggleGit',
-          },
-          {
-            id: 'github',
-            type: 'button',
-            icon: Github,
-            label: 'GitHub',
-            stateKey: 'showGitHub',
-            actionKey: 'onToggleGitHub',
-          },
           {
             id: 'checkpoints',
             type: 'button',
