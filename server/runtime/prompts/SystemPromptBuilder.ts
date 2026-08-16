@@ -38,6 +38,8 @@ export interface SystemPromptConfig {
   responseStyle?: "concise" | "balanced" | "detailed";
   /** Mode compact (économie de tokens) */
   compact?: boolean;
+  /** Mode de session : 'full' (agent) ou 'ask' (chat/Q&A documentaire) */
+  mode?: "full" | "ask";
   /** Sections à exclure du prompt */
   excludeSections?: string[];
   /** Sections additionnelles à inclure */
@@ -86,40 +88,64 @@ export class SystemPromptBuilder {
       exclude: config.excludeSections,
     };
 
+    const isAskMode = config.mode === "ask";
+
     // Assembler les sections dans l'ordre
     const sections: string[] = [];
 
-    // 1. Base (identité, processus de réflexion, communication)
-    if (this.registry.has("base")) {
-      sections.push(this.registry.render("base", renderOpts));
+    if (isAskMode) {
+      // ── Mode Chat/Ask : prompt optimisé pour le Q&A documentaire ──
+
+      // 1. Chat prompt (analyse documentaire, Q&A contextuel)
+      if (this.registry.has("chat")) {
+        sections.push(this.registry.render("chat", renderOpts));
+      }
+
+      // 2. Sécurité (toujours présente)
+      if (this.registry.has("safety")) {
+        sections.push(this.registry.render("safety", renderOpts));
+      }
+
+      // 3. Efficacité des outils (lecture seule en ask mode)
+      if (this.registry.has("efficiency")) {
+        sections.push(this.registry.render("efficiency", renderOpts));
+      }
+
+    } else {
+      // ── Mode Full : prompt agent complet ──
+
+      // 1. Base (identité, processus de réflexion, communication)
+      if (this.registry.has("base")) {
+        sections.push(this.registry.render("base", renderOpts));
+      }
+
+      // 2. Autonomie (boucle de contrôle)
+      if (this.registry.has("autonomy")) {
+        sections.push(this.registry.render("autonomy", renderOpts));
+      }
+
+      // 3. Efficacité des outils
+      if (this.registry.has("efficiency")) {
+        sections.push(this.registry.render("efficiency", renderOpts));
+      }
+
+      // 4. Sécurité
+      if (this.registry.has("safety")) {
+        sections.push(this.registry.render("safety", renderOpts));
+      }
+
+      // 5. Système multi-agents
+      if (this.registry.has("agents-system")) {
+        sections.push(this.registry.render("agents-system", renderOpts));
+      }
+
+      // 6. Directives AI Studio Build (comportement, technique, conception)
+      if (this.registry.has("ai-studio-directives")) {
+        sections.push(this.registry.render("ai-studio-directives", renderOpts));
+      }
     }
 
-    // 2. Autonomie (boucle de contrôle)
-    if (this.registry.has("autonomy")) {
-      sections.push(this.registry.render("autonomy", renderOpts));
-    }
-
-    // 3. Efficacité des outils
-    if (this.registry.has("efficiency")) {
-      sections.push(this.registry.render("efficiency", renderOpts));
-    }
-
-    // 4. Sécurité
-    if (this.registry.has("safety")) {
-      sections.push(this.registry.render("safety", renderOpts));
-    }
-
-    // 5. Système multi-agents
-    if (this.registry.has("agents-system")) {
-      sections.push(this.registry.render("agents-system", renderOpts));
-    }
-
-    // 6. Directives AI Studio Build (comportement, technique, conception)
-    if (this.registry.has("ai-studio-directives")) {
-      sections.push(this.registry.render("ai-studio-directives", renderOpts));
-    }
-
-    // 7. Sections additionnelles (extensibilité)
+    // 7. Sections additionnelles (extensibilité) — les deux modes
     if (config.extraSections) {
       for (const section of config.extraSections) {
         sections.push(section.content);

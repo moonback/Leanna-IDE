@@ -32,6 +32,7 @@ export function buildSystemInstruction(profile: ProfileConfig = {}): string {
     language: profile.language,
     responseStyle: profile.responseStyle,
     compact: profile.compactPrompt,
+    mode: profile.mode,
   });
 }
 
