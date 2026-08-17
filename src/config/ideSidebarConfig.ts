@@ -5,7 +5,7 @@
  * Icônes visibles (5 au total) :
  * 1. Explorateur (accès direct — le plus utilisé)
  * 2. Fichiers & Code (sous-menu : Recherche)
- * 3. Source & Déploiement (sous-menu : Git, GitHub, Checkpoints, Sandbox, Workflow)
+ * 3. Source & Déploiement (sous-menu : Git, Sandbox, Workflow)
  * 4. Données & Outils (sous-menu : Knowledge, Santé, MCP, Médias)
  * 5. (IA via le menu agent en bas — inchangé)
  */
@@ -14,12 +14,11 @@ import {
   Search,
   GitBranch, Camera, Monitor,
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
-  Cable, ShieldCheck, Container, Bot, Crosshair, Database,
+  Cable, Container, Bot, Crosshair, Database,
   GitBranchPlus, Activity, Wrench, Code2, Users, FileStack,
   Wand2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Github } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -113,22 +112,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Contrôle de source',
             stateKey: 'showGit',
             actionKey: 'onToggleGit',
-          },
-          {
-            id: 'github',
-            type: 'button',
-            icon: Github,
-            label: 'GitHub',
-            stateKey: 'showGitHub',
-            actionKey: 'onToggleGitHub',
-          },
-          {
-            id: 'checkpoints',
-            type: 'button',
-            icon: ShieldCheck,
-            label: 'Checkpoints',
-            stateKey: 'showCheckpoints',
-            actionKey: 'onToggleCheckpoints',
           },
           {
             id: 'sandbox',

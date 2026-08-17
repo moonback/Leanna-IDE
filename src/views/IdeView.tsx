@@ -33,14 +33,12 @@ import { useSandboxWatcher } from '../hooks/useSandboxWatcher';
 import { AgentProgressBar } from '../components/ide/AgentProgressBar';
 import { ChatPanel } from '../components/ide/ChatPanel';
 import { LiveSkillsMonitor } from '../components/ide/LiveSkillsMonitor';
-import { GitHubPanel } from '../components/ide/GitHubPanel';
 import { WorkflowPanel } from '../components/ide/WorkflowPanel';
 import { McpPanel } from '../components/panels/McpPanel';
 import { GitSourceControl } from '../components/ide/GitSourceControl';
 import { MarkdownPreview } from '../components/ide/MarkdownPreview';
 import { EmptyEditorState } from '../components/ide/EmptyEditorState';
 import { SelfEditBanner } from '../components/ide/SelfEditBanner';
-import { CheckpointPanel } from '../components/ide/CheckpointPanel';
 import { SandboxDiffViewer } from '../components/sandbox/SandboxDiffViewer';
 import { AgentPanel } from '../components/panels/AgentPanel';
 import { AgentBuilderPanel } from '../components/panels/AgentBuilderPanel';
@@ -123,7 +121,6 @@ export default function IdeView() {
   const [showCommandPalette, setShowCommandPalette] = useState<'files' | 'commands' | null>(null);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showRunMenu, setShowRunMenu] = useState(false);
-  const [showGitHub, setShowGitHub] = useState(false);
   const [showGit, setShowGit] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
   const [showMcp, setShowMcp] = useState(false);
@@ -138,7 +135,6 @@ export default function IdeView() {
   const [showMissions, setShowMissions] = useState(false);
   const [showKnowledge, setShowKnowledge] = useState(false);
   const [showDocuments, setShowDocuments] = useState(false);
-  const [showCheckpoints, setShowCheckpoints] = useState(false);
   const [showSandbox, setShowSandbox] = useState(false);
   const [sandboxView, setSandboxView] = useState<'controls' | 'diff'>('controls');
   const [selectedSandboxDiffFile, setSelectedSandboxDiffFile] = useState<string | null>(null);
@@ -413,10 +409,6 @@ export default function IdeView() {
         // Lancer la validation build
         fetch('/api/safeguards/validate', { method: 'POST' }).catch(() => {});
       }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'H') {
-        e.preventDefault();
-        setShowCheckpoints(v => !v);
-      }
       // Markdown preview toggle (Ctrl+Shift+M) — only when a .md file is active
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
         if (fileSystem.activePath?.toLowerCase().endsWith('.md')) {
@@ -557,9 +549,7 @@ export default function IdeView() {
         showGlobalSearch={showGlobalSearch}
         showSettings={showSettingsPanel}
         showRunMenu={showRunMenu}
-        showGitHub={showGitHub}
         showGit={showGit}
-        showCheckpoints={showCheckpoints}
         showSandbox={showSandbox}
         showWorkflow={showWorkflow}
         showSkillsMonitor={showSkillsMonitor}
@@ -585,9 +575,7 @@ export default function IdeView() {
           if (!showSettingsPanel) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); }
         }}
         onToggleRunMenu={() => setShowRunMenu(v => !v)}
-        onToggleGitHub={() => setShowGitHub(v => !v)}
         onToggleGit={() => setShowGit(v => !v)}
-        onToggleCheckpoints={() => setShowCheckpoints(v => !v)}
         onToggleSandbox={toggleSandbox}
         onToggleWorkflow={() => setShowWorkflow(v => !v)}
         onToggleSkillsMonitor={() => setShowSkillsMonitor(v => !v)}
@@ -665,13 +653,6 @@ export default function IdeView() {
       {/* Git Source Control Panel */}
       {showGit && (
         <GitSourceControl onClose={() => setShowGit(false)} />
-      )}
-
-      {/* Checkpoints Panel */}
-      {showCheckpoints && (
-        <div className="border-r flex flex-col min-h-0" style={{ width: '260px', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
-          <CheckpointPanel />
-        </div>
       )}
 
       {/* Editor Area */}
@@ -832,11 +813,6 @@ export default function IdeView() {
               >
                 <GlobalSearch onOpenFile={openFileAt} onClose={() => setShowGlobalSearch(false)} />
               </div>
-            )}
-
-            {/* GitHub Panel */}
-            {showGitHub && (
-              <GitHubPanel onClose={() => setShowGitHub(false)} />
             )}
 
             {/* Workflow Panel */}
