@@ -55,19 +55,35 @@ Jarvis-OS est un assistant intelligent spécialisé dans la **gestion de documen
 - **Chat textuel** : Interface de conversation avec historique et commandes
 - **Résumé automatique** : Compression intelligente du contexte conversationnel
 
-### 🤖 Système Multi-Agents
+### 🤖 Système Multi-Agents Documentaires
 
-- **Orchestrateur** : Planification et délégation de tâches documentaires complexes
-- **Agent rédacteur** : Rédaction autonome de sections ou documents complets
-- **Agent correcteur** : Relecture, correction grammaticale et amélioration stylistique
-- **Agent structurant** : Réorganisation et hiérarchisation du contenu
-- **Agent recherche** : Collecte d'informations et synthèse documentaire
+Jarvis-OS dispose de **7 agents spécialisés** exclusivement dédiés à la rédaction et au traitement de documents :
+
+| Agent | Rôle | Capacité |
+| :--- | :--- | :--- |
+| ✍️ **Rédacteur** (`writer`) | Rédaction de documents complets | Lecture/Écriture |
+| 🎨 **Mise en Forme** (`formatter`) | Formatage Markdown, tables, TOC, structure | Lecture/Écriture |
+| 🔍 **Recherche** (`researcher`) | Collecte d'infos, vérification de faits, sources | Lecture seule |
+| ✅ **Correcteur** (`proofreader`) | Orthographe, grammaire, style, cohérence | Lecture/Écriture |
+| 🌐 **Traducteur** (`translator`) | Traduction et localisation multilingue | Lecture/Écriture |
+| 📋 **Synthèse** (`summarizer`) | Résumés exécutifs, abstracts, condensés | Lecture/Écriture |
+| 📐 **Planificateur** (`planner`) | Plans, outlines, structures de documents | Lecture seule |
+
+**Patterns de collaboration prédéfinis :**
+
+- `document-complet` : Planificateur → Rédacteur → Correcteur → Mise en Forme
+- `traduction-verifiee` : Rédacteur → Traducteur → Correcteur
+- `recherche-redaction` : Recherche → Planificateur → Rédacteur → Correcteur
+
+**Délégation automatique** : Chaque agent peut déléguer à un autre selon une matrice de compétences (ex. rédaction terminée → correction automatique).
 
 ### ⚙️ Automatisation & Workflows
 
-- **Workflows documentaires** : Chaînes de traitement (rédaction → relecture → mise en forme → export)
+- **Workflows documentaires** : Chaînes de traitement orchestrées (rédaction → relecture → mise en forme → export)
+- **Orchestration multi-agents** : Exécution parallèle ou séquentielle avec dépendances entre tâches
 - **Tâches planifiées** : Génération récurrente de rapports ou mises à jour
 - **Versionning** : Suivi des modifications avec possibilité de rollback
+- **Agent Builder** : Interface visuelle pour créer des agents documentaires personnalisés
 
 ### 🔌 Passerelle MCP (Model Context Protocol)
 
@@ -156,13 +172,13 @@ Jarvis-os-original/
 ├── assets/                  # Ressources statiques (images, icônes)
 ├── electron/                # Cycle de vie Electron (main, preload, splash)
 ├── server/                  # Backend Node.js / Express
-│   ├── agents/              # Orchestrateur multi-agents documentaires
+│   ├── agents/              # Orchestrateur & 7 agents documentaires spécialisés
 │   ├── autonomy/            # Superviseur de boucle autonome
 │   ├── knowledge/           # Base de connaissances, recherche sémantique
 │   ├── mcp/                 # Bridge MCP (stdio/SSE)
 │   ├── mission/             # Planification de missions documentaires
 │   ├── routes/              # Endpoints REST
-│   ├── runtime/             # Runtime (ToolRegistry, Prompts, Observability)
+│   ├── runtime/             # Runtime (ToolRegistry, Prompts, AgentPlugins)
 │   ├── skills/              # Skills intégrées (rédaction, recherche, mémoire)
 │   ├── utils/               # Sandbox, validation, crypto
 │   └── workflows/           # Moteur de workflows documentaires
