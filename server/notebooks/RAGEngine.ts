@@ -1,7 +1,8 @@
 /**
  * RAGEngine — Retrieval-Augmented Generation pour les notebooks
  *
- * Pipeline de recherche en 4 étapes :
+ * Pipeline de recherche en 5 étapes :
+ *   0. Expansion de requête — décomposition LLM en sous-questions (rappel ++)
  *   1. Recherche sémantique via Gemini Embeddings (similarité cosinus)
  *   2. Recherche lexicale TF-IDF (correspondance exacte de termes)
  *   3. Fusion Reciprocal Rank Fusion (RRF) des deux scores
@@ -10,6 +11,7 @@
  * La combinaison hybride + re-ranking garantit :
  * - Rappel élevé (embeddings captent le sens, TF-IDF capte les mots exacts)
  * - Précision élevée (le LLM élimine les faux positifs en fin de pipeline)
+ * - Couverture étendue (l'expansion de requête capture les angles multiples)
  */
 
 import { createLogger } from "../utils/logger";
@@ -38,12 +40,21 @@ const RERANK_TOP_K = 20;
 /** Active/désactive le re-ranking LLM (peut être désactivé pour économiser des tokens) */
 const RERANK_ENABLED = true;
 
+/** Active/désactive l'expansion de requête via LLM */
+const QUERY_EXPANSION_ENABLED = true;
+
+/** Nombre maximum de sous-questions générées lors de l'expansion */
+const QUERY_EXPANSION_MAX_SUBQUERIES = 3;
+
+/** Longueur minimale de la query pour déclencher l'expansion (les questions très courtes n'en bénéficient pas) */
+const QUERY_EXPANSION_MIN_LENGTH = 15;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export class RAGEngine {
 
   /**
-   * Recherche hybride complète : embeddings + TF-IDF + fusion RRF + re-ranking LLM.
+   * Recherche hybride complète : expansion → embeddings + TF-IDF + fusion RRF + re-ranking LLM.
    * Fallback automatique sur TF-IDF seul si les embeddings ne sont pas disponibles.
    */
   async searchHybrid(query: string, sources: Source[], options: RAGSearchOptions = {}): Promise<RAGSearchResult[]> {
@@ -66,26 +77,48 @@ export class RAGEngine {
 
     if (chunkMap.size === 0) return [];
 
-    // ── Étape 1 : Recherche sémantique via embeddings ──────────────────────
+    // ── Étape 0 : Expansion de requête via LLM ────────────────────────────
+    // Décompose la question en sous-questions pour augmenter le rappel
+    const queries = await this.expandQuery(query);
+    log.debug(`Expansion: ${queries.length} requête(s) → [${queries.map(q => q.slice(0, 50)).join(" | ")}]`);
+
+    // ── Étape 1 : Recherche sémantique via embeddings (toutes les queries) ─
     let semanticResults: Map<string, number> = new Map();
     try {
-      const embeddingResults = await embeddingStore.search(query, {
-        sourceIds: options.sourceIds,
-        maxResults: RERANK_TOP_K * 2,
-        minSimilarity: 0.2,
-      });
+      for (const q of queries) {
+        const embeddingResults = await embeddingStore.search(q, {
+          sourceIds: options.sourceIds,
+          maxResults: RERANK_TOP_K * 2,
+          minSimilarity: 0.2,
+        });
 
-      for (const result of embeddingResults) {
-        if (chunkMap.has(result.chunkId)) {
-          semanticResults.set(result.chunkId, result.similarity);
+        for (const result of embeddingResults) {
+          if (chunkMap.has(result.chunkId)) {
+            // Garder le meilleur score parmi toutes les sous-queries
+            const existing = semanticResults.get(result.chunkId) || 0;
+            semanticResults.set(result.chunkId, Math.max(existing, result.similarity));
+          }
         }
       }
     } catch (e: any) {
       log.warn(`Embeddings search fallback: ${e.message}`);
     }
 
-    // ── Étape 2 : Recherche lexicale TF-IDF ────────────────────────────────
-    const lexicalResults = this.searchTFIDF(query, filteredSources, RERANK_TOP_K * 2);
+    // ── Étape 2 : Recherche lexicale TF-IDF (toutes les queries) ───────────
+    const lexicalScores = new Map<string, number>();
+    for (const q of queries) {
+      const lexResults = this.searchTFIDF(q, filteredSources, RERANK_TOP_K * 2);
+      for (const result of lexResults) {
+        const existing = lexicalScores.get(result.chunk.id) || 0;
+        lexicalScores.set(result.chunk.id, Math.max(existing, result.relevance));
+      }
+    }
+    // Convertir en RAGSearchResult[] pour compatibilité avec la fusion
+    const lexicalResults: RAGSearchResult[] = [];
+    for (const [chunkId, score] of lexicalScores) {
+      const entry = chunkMap.get(chunkId);
+      if (entry) lexicalResults.push({ chunk: entry.chunk, source: entry.source, relevance: score });
+    }
 
     // ── Étape 3 : Fusion RRF ───────────────────────────────────────────────
     const fusedScores = new Map<string, number>();
@@ -149,6 +182,87 @@ export class RAGEngine {
   }
 
   // ─── Re-ranking LLM ──────────────────────────────────────────────────────
+
+  /**
+   * Expansion de requête via LLM — décompose la question en sous-questions.
+   *
+   * Stratégie :
+   *   - Questions courtes ou simples → retournées telles quelles
+   *   - Questions complexes → décomposées en 2-3 sous-questions ciblées
+   *   - La question originale est TOUJOURS incluse (garantit le rappel de base)
+   *
+   * Exemples :
+   *   "Comment fonctionne le système d'authentification et quelles sont les failles connues ?"
+   *   → ["Comment fonctionne le système d'authentification et quelles sont les failles connues ?",
+   *       "Architecture et mécanisme du système d'authentification",
+   *       "Vulnérabilités et failles de sécurité connues dans l'authentification"]
+   */
+  private async expandQuery(query: string): Promise<string[]> {
+    // Désactivé ou query trop courte → pas d'expansion
+    if (!QUERY_EXPANSION_ENABLED || query.length < QUERY_EXPANSION_MIN_LENGTH) {
+      return [query];
+    }
+
+    try {
+      const prompt = `Tu es un moteur d'expansion de requête pour un système de recherche documentaire.
+
+TÂCHE : Décompose la question suivante en sous-questions distinctes pour améliorer le rappel de recherche.
+
+QUESTION ORIGINALE : "${query}"
+
+RÈGLES :
+- Génère 2 à ${QUERY_EXPANSION_MAX_SUBQUERIES} sous-questions MAXIMUM
+- Chaque sous-question doit couvrir un angle ou aspect différent de la question
+- Les sous-questions doivent être concises (< 80 caractères chacune)
+- Utilise des reformulations sémantiques variées (synonymes, perspectives différentes)
+- Si la question est déjà simple et atomique, retourne un tableau vide []
+- Ne répète PAS la question originale dans les sous-questions
+
+Réponds UNIQUEMENT en JSON strict :
+["sous-question 1", "sous-question 2"]
+
+Si la question est trop simple pour être décomposée :
+[]`;
+
+      const result = await generateText({
+        prompt,
+        temperature: 0.3,
+        maxOutputTokens: 256,
+        thinkingBudget: 0,
+      });
+
+      // Parser la réponse JSON
+      const jsonMatch = result.text.match(/\[.*\]/s);
+      if (!jsonMatch) {
+        log.debug("Query expansion: pas de JSON dans la réponse, skip");
+        return [query];
+      }
+
+      const subQueries: string[] = JSON.parse(jsonMatch[0]);
+
+      // Validation : doit être un tableau de strings non-vides
+      if (!Array.isArray(subQueries) || subQueries.length === 0) {
+        return [query];
+      }
+
+      // Filtrer les sous-questions valides et limiter
+      const validSubQueries = subQueries
+        .filter(q => typeof q === "string" && q.trim().length >= 5)
+        .slice(0, QUERY_EXPANSION_MAX_SUBQUERIES);
+
+      if (validSubQueries.length === 0) {
+        return [query];
+      }
+
+      // Toujours inclure la question originale en premier
+      return [query, ...validSubQueries];
+    } catch (e: any) {
+      log.warn(`Query expansion skipped: ${e.message}`);
+      return [query];
+    }
+  }
+
+  // ─── Re-ranking LLM (passage scoring) ─────────────────────────────────────
 
   /**
    * Re-score les candidats avec un appel LLM léger.
