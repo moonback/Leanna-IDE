@@ -122,3 +122,13 @@ export {
   type DocumentStoreData,
 } from "./DocumentStore";
 
+// Sprint 12 — DocumentExtractor (extraction automatique des documents du workspace)
+export {
+  DocumentExtractor,
+  documentExtractor,
+  type ExtractedDocument,
+  type DocumentSection,
+  type DocumentMetadata,
+  type ExtractionStats,
+} from "./DocumentExtractor";
+

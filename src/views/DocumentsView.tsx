@@ -191,6 +191,7 @@ export default function DocumentsView() {
 function DocumentsTab() {
   const { success, error: toastError } = useToast();
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [workspaceDocuments, setWorkspaceDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -203,10 +204,18 @@ function DocumentsTab() {
     setLoading(true);
     try {
       const params = filterCollection ? `?collection=${encodeURIComponent(filterCollection)}` : '';
-      const res = await fetch(`/api/documents${params}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setDocuments(data.documents || []);
+      const [docsRes, wsDocsRes] = await Promise.all([
+        fetch(`/api/documents${params}`),
+        fetch('/api/knowledge/documents'),
+      ]);
+      if (docsRes.ok) {
+        const data = await docsRes.json();
+        setDocuments(data.documents || []);
+      }
+      if (wsDocsRes.ok) {
+        const wsData = await wsDocsRes.json();
+        setWorkspaceDocuments(wsData.documents || []);
+      }
     } catch (e: any) {
       toastError('Impossible de charger les documents');
     } finally {
@@ -351,7 +360,8 @@ function DocumentsTab() {
 
         {/* Count */}
         <span className="ml-auto text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
-          {documents.length} document{documents.length !== 1 ? 's' : ''}
+          {documents.length + workspaceDocuments.length} document{(documents.length + workspaceDocuments.length) !== 1 ? 's' : ''}
+          {workspaceDocuments.length > 0 && ` (${workspaceDocuments.length} auto-extraits)`}
         </span>
       </div>
 
@@ -420,7 +430,7 @@ function DocumentsTab() {
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Chargement...</p>
           </div>
-        ) : documents.length === 0 ? (
+        ) : documents.length === 0 && workspaceDocuments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'var(--bg-panel)' }}>
               <FileText className="w-8 h-8" style={{ color: 'var(--text-dimmed)' }} />
@@ -428,12 +438,16 @@ function DocumentsTab() {
             <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Aucun document</p>
             <p className="text-xs text-center max-w-xs" style={{ color: 'var(--text-dimmed)' }}>
               Uploadez des PDF, fichiers texte ou ingérez des pages web pour alimenter la base de connaissances.
+              Les documents du workspace (.md, .txt, .rst, etc.) seront extraits automatiquement au démarrage.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            <AnimatePresence initial={false}>
-              {documents.map((doc, i) => (
+          <div className="space-y-4">
+            {/* Uploaded documents */}
+            {documents.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                <AnimatePresence initial={false}>
+                  {documents.map((doc, i) => (
                 <motion.div
                   key={doc.id}
                   layout
@@ -506,6 +520,60 @@ function DocumentsTab() {
                 </motion.div>
               ))}
             </AnimatePresence>
+          </div>
+            )}
+
+            {/* Workspace documents (auto-extracted) */}
+            {workspaceDocuments.length > 0 && (
+              <>
+                <div className="flex items-center gap-2 pt-2">
+                  <div className="h-px flex-1" style={{ backgroundColor: 'var(--border-base)' }} />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    📄 Documents du Workspace ({workspaceDocuments.length})
+                  </span>
+                  <div className="h-px flex-1" style={{ backgroundColor: 'var(--border-base)' }} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {workspaceDocuments.map((doc: any) => (
+                    <div
+                      key={doc.id}
+                      className="group p-4 rounded-2xl border flex flex-col gap-2 transition-all hover:border-cyan-500/30"
+                      style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="text-base flex-shrink-0">📝</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                            {doc.fileName}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                              {doc.mimeType} • {(doc.textLength / 1000).toFixed(1)}k chars
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 font-medium">
+                              auto-extrait
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-[10px] leading-relaxed line-clamp-3" style={{ color: 'var(--text-muted)' }}>
+                        {doc.summary || 'Extrait automatiquement du workspace.'}
+                      </p>
+                      {doc.tags && doc.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-auto pt-1">
+                          {doc.tags.slice(0, 5).map((tag: string, i: number) => (
+                            <span key={i} className="text-[8px] px-1.5 py-0.5 rounded-full"
+                              style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )
       )}

@@ -41,11 +41,15 @@ Jarvis-OS est un assistant intelligent spécialisé dans la **gestion de documen
 
 ### 🧠 Moteur de Connaissance (Knowledge Engine)
 
-- **Indexation documentaire** : Graphe de relations entre documents, sections et concepts
+- **Extraction automatique** : Au démarrage, le système scanne le workspace et extrait automatiquement tous les documents (`.md`, `.txt`, `.rst`, `.adoc`, `.tex`, `.csv`, `.yaml`, etc.)
+- **Indexation incrémentale** : Chaque modification de fichier est détectée et ré-indexée en temps réel via FileWatcher
+- **Structure documentaire** : Extraction des sections, titres, métadonnées (nombre de mots, langue, liens, tables) pour chaque document
+- **Indexation du code** : Graphe de relations entre fichiers, entités, dépendances et imports
 - **Recherche sémantique** : Recherche intelligente dans la base documentaire sans API externe
 - **Analyse de cohérence** : Détection de contradictions ou doublons entre documents
-- **Apprentissage** : Accumulation des conventions d'écriture et préférences de style
+- **Mémoire projet** : Accumulation des conventions d'écriture et préférences de style
 - **Dashboard** : Visualisation de la base documentaire et de ses relations
+- **Analyse d'impact** : Identification des documents affectés avant une modification
 
 ### 🎙️ Assistant Multimodal (Gemini Live)
 

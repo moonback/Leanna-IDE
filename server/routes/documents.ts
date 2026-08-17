@@ -90,6 +90,25 @@ export function createDocumentsRouter(_getProfile: () => ProfileConfig): Router 
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // POST /api/documents/list — Alias POST pour le DocumentPanel sidebar
+  router.post("/list", (req: Request, res: Response) => {
+    try {
+      const { include_summaries, include_links } = req.body || {};
+      let documents = documentMemory.getAllDocuments();
+
+      const mapped = documents.map((d) => ({
+        id: d.id, fileName: d.title || d.source, mimeType: d.type,
+        uploadedAt: d.addedAt, keywords: d.keywords, tags: d.tags,
+        summary: include_summaries ? d.summary : undefined,
+        textLength: d.metadata?.wordCount ?? 0,
+      }));
+
+      const links = include_links ? documentMemory.getAllRelations() : [];
+
+      res.json({ status: "success", documents: mapped, links });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // GET /api/documents/stats
   router.get("/stats", (_req: Request, res: Response) => {
     try {

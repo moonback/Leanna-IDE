@@ -112,6 +112,17 @@ process.on('uncaughtException', (error) => {
         console.log(`[KnowledgeGraph] ✅ Projet indexé: ${stats.totalFiles} fichiers, ${stats.totalEntities} entités (${(stats.durationMs / 1000).toFixed(1)}s)`);
         // 5b. Activer l'indexation incrémentale via FileWatcher
         projectIndexer.startWatching();
+
+        // 6. Extraction automatique des documents du workspace
+        import("./server/knowledge/DocumentExtractor").then(({ documentExtractor }) => {
+          documentExtractor.extractAll().then(docStats => {
+            console.log(`[DocumentExtractor] ✅ ${docStats.totalExtracted} document(s) extrait(s), ${docStats.totalWords} mots, ${docStats.totalSections} sections (${(docStats.durationMs / 1000).toFixed(1)}s)`);
+            // 6b. Activer l'extraction incrémentale
+            documentExtractor.startWatching();
+          }).catch(e => {
+            console.error('[DocumentExtractor] ❌ Erreur extraction:', e.message);
+          });
+        });
       }).catch(e => {
         console.error('[KnowledgeGraph] ❌ Erreur indexation:', e.message);
       });
