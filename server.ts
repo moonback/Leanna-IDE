@@ -1236,7 +1236,7 @@ async function startServer() {
     const absolutePath = resolved.absolutePath;
 
     if (!fs.existsSync(absolutePath)) return res.status(404).json({ error: 'Fichier introuvable.' });
-    fs.rmSync(absolutePath, { force: true });
+    fs.rmSync(absolutePath, { recursive: true, force: true });
     await appendAuditEvent({ action: 'delete_file', target: requestedPath, details: 'deleted via IDE', actor: 'user' });
     res.json({ status: 'success', path: requestedPath });
   });

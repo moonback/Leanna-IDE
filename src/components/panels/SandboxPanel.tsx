@@ -4,11 +4,9 @@ import {
   Box, RefreshCw, Upload, Trash2, Loader2, CheckCircle2,
   XCircle, Power, Lock, ShieldCheck,
   GitCompareArrows, FileCode2,
-  AlertTriangle, AlertOctagon, Play, ChevronDown,
-  Bot, RotateCcw,
+  ChevronDown, RotateCcw,
 } from 'lucide-react';
 import { useSandboxWatcher } from '../../hooks/useSandboxWatcher';
-import { useLiveAPIContext } from '../../context/LiveAPIContext';
 
 interface SandboxStatus {
   active: boolean;
@@ -17,31 +15,6 @@ interface SandboxStatus {
   modifiedCount: number;
   lastSync: string | null;
   exists: boolean;
-}
-
-interface TscDiagnostic {
-  file: string | null;
-  line: number | null;
-  column: number | null;
-  code: string | null;
-  severity: 'error' | 'warning' | 'info';
-  message: string;
-  raw: string;
-}
-
-interface ValidationState {
-  loading: boolean;
-  ran: boolean;
-  valid: boolean;
-  exitCode: number | null;
-  stdout: string;
-  stderr: string;
-  errorCount: number;
-  warningCount: number;
-  diagnostics: TscDiagnostic[];
-  globalDiagnostics: TscDiagnostic[];
-  errorsByFile: Record<string, TscDiagnostic[]>;
-  rawOutput: string;
 }
 
 function authHeaders(): Record<string, string> {
@@ -69,142 +42,9 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
   const codeInputRef = useRef<HTMLInputElement>(null);
   const resetCodeRef = useRef<HTMLInputElement>(null);
   const hasFetched = useRef(false);
-  const [expandedErrors, setExpandedErrors] = useState(false);
   const [showModifiedFiles, setShowModifiedFiles] = useState(false);
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
-  const [askingAI, setAskingAI] = useState(false);
-  const [validation, setValidation] = useState<ValidationState>({
-    loading: false,
-    ran: false,
-    valid: true,
-    exitCode: null,
-    stdout: '',
-    stderr: '',
-    errorCount: 0,
-    warningCount: 0,
-    diagnostics: [],
-    globalDiagnostics: [],
-    errorsByFile: {},
-    rawOutput: '',
-  });
 
-  const liveAPI = useLiveAPIContext();
-
-  const applyValidationResult = useCallback((data: any) => {
-    setValidation({
-      loading: false,
-      ran: true,
-      valid: !!data.valid,
-      exitCode: typeof data.exitCode === 'number' ? data.exitCode : null,
-      stdout: typeof data.stdout === 'string' ? data.stdout : '',
-      stderr: typeof data.stderr === 'string' ? data.stderr : '',
-      errorCount: data.errorCount ?? 0,
-      warningCount: data.warningCount ?? 0,
-      diagnostics: Array.isArray(data.diagnostics) ? data.diagnostics : [],
-      globalDiagnostics: Array.isArray(data.globalDiagnostics) ? data.globalDiagnostics : [],
-      errorsByFile: (data.errorsByFile && typeof data.errorsByFile === 'object') ? data.errorsByFile : {},
-      rawOutput: data.rawOutput ?? data.errors ?? '',
-    });
-  }, []);
-
-  const runValidation = useCallback(async () => {
-    setValidation(v => ({ ...v, loading: true }));
-    try {
-      const res = await fetch('/api/sandbox/validate', { method: 'POST', headers: authHeaders() });
-      if (!res.ok) {
-        setValidation(v => ({ ...v, loading: false, ran: true, valid: false, errorCount: 0, warningCount: 0, diagnostics: [], errorsByFile: {}, rawOutput: `HTTP ${res.status}` }));
-        return;
-      }
-      const data = await res.json();
-      applyValidationResult(data);
-    } catch {
-      setValidation(v => ({ ...v, loading: false, ran: true, valid: false, errorCount: 0, warningCount: 0, diagnostics: [], errorsByFile: {}, rawOutput: 'Erreur réseau' }));
-    }
-  }, [applyValidationResult]);
-
-  const askAIToFix = useCallback(async () => {
-    if (!validation.ran) {
-      await runValidation();
-    }
-    const filesWithIssues = Object.entries(validation.errorsByFile ?? {});
-    const hasGlobalIssues = (validation.globalDiagnostics ?? []).length > 0;
-    if (filesWithIssues.length === 0 && !hasGlobalIssues) {
-      setFeedback({ type: 'success', msg: 'Aucune erreur — rien à corriger' });
-      return;
-    }
-    if (!liveAPI.connected) {
-      setFeedback({ type: 'error', msg: 'Connecte d\'abord l\'assistant vocal (bouton orb)' });
-      return;
-    }
-    setAskingAI(true);
-    try {
-      const fetched: string[] = [];
-      for (const [file] of filesWithIssues) {
-        try {
-          const r = await fetch(`/api/sandbox/file-diff?path=${encodeURIComponent(file)}`, { headers: authHeaders() });
-          if (r.ok) {
-            const d = await r.json();
-            if (typeof d.modified === 'string') {
-              fetched.push(file + '||' + d.modified);
-            }
-          }
-        } catch { /* skip */ }
-      }
-
-      const diagBlocks: string[] = [];
-      for (const [file, diags] of filesWithIssues) {
-        const list = (diags as TscDiagnostic[]).map(d =>
-          `  • [${d.severity.toUpperCase()} ${d.code ?? ''}] L${d.line}${d.column !== null ? `:C${d.column}` : ''} — ${d.message}`
-        ).join('\n');
-        diagBlocks.push(`### Erreurs dans ${file} :\n${list}`);
-      }
-      if (hasGlobalIssues) {
-        const list = validation.globalDiagnostics.map(d =>
-          `  • [${d.severity.toUpperCase()} ${d.code ?? ''}] ${d.message}`
-        ).join('\n');
-        diagBlocks.push(`### Erreurs globales tsc :\n${list}`);
-      }
-
-      const codeBlocks: string[] = [];
-      for (const entry of fetched) {
-        const [file, ...rest] = entry.split('||');
-        const content = rest.join('||');
-        codeBlocks.push(`### Contenu sandbox de ${file} :\n\`\`\`${file.endsWith('.tsx') || file.endsWith('.ts') ? 'typescript' : file.endsWith('.json') ? 'json' : ''}\n${content}\n\`\`\``);
-      }
-
-      const prompt = [
-        '## DEMANDE : Corriger les erreurs TypeScript du SANDBOX',
-        '',
-        'Contexte : Les modifications ci-dessous se trouvent DANS LE SANDBOX (`.jarvis/sandbox/`) et ont été validées par `tsc --noEmit`. Il faut corriger uniquement les erreurs listées dans CHAQUE FICHIER, en respectant strictement l\'intention du code original. Ecris dans le sandbox via les outils `read_project_file`/`modify_project_file`/`write_project_file` en utilisant le path sandbox comme WORKSPACE TEMPORAIRE (le vrai workspace racine est le dossier contenant `.jarvis/sandbox/`).',
-        '',
-        '## Liste des erreurs TSC :',
-        ...diagBlocks,
-        '',
-        '## Code sandbox complet (contenu modifié actuel) :',
-        ...codeBlocks,
-        '',
-        'Règles à suivre OBLIGATOIREMENT :',
-        '1. Lis d\'abord chaque fichier concerné dans le sandbox avant de le modifier.',
-        '2. Corriger UNIQUEMENT les erreurs listées ci-dessus — ne PAS faire de refactoring, ne PAS toucher aux lignes non concernées. Toute correction doit être un patch minimal et réversible.',
-        '3. Conserver strictement le style, la structure DOM, l’ordre des blocs, les noms de variables/fonctions et le comportement existants.',
-        '4. Ne pas remplacer tout le fichier pour une erreur locale. Ne pas modifier className, styles inline, imports d’icônes ou layout sauf si le diagnostic cible précisément cette ligne.',
-        '5. Préserver les classes Tailwind existantes (ne pas introduire de classe arbitraire comme border-slate-8) et ne pas convertir les styles existants vers une autre approche.',
-        '6. Après chaque modification : déclencher une re-validation via Valider (côté utilisateur) ou re-tenter tsc --noEmit.',
-        '7. Si une erreur implique un fichier hors sandbox (dépendance du workspace principal), lire le fichier original pour comprendre l’API attendue.',
-        '8. Ne PAS synchroniser auto vers le workspace principal — laisse l’utilisateur valider chaque changement.',
-        '',
-        'Commence par résumer brièvement ce que tu vas faire, puis applique les corrections fichier par fichier.',
-      ].join('\n');
-
-      liveAPI.sendTextMessage(prompt);
-      window.dispatchEvent(new CustomEvent('jarvis-ide-action', { detail: { type: 'open-ide' } }));
-      setFeedback({ type: 'success', msg: `Demande envoyée — ${filesWithIssues.length} fichier(s) à corriger` });
-    } catch (e: any) {
-      setFeedback({ type: 'error', msg: e.message || 'Échec envoi' });
-    } finally {
-      setAskingAI(false);
-    }
-  }, [validation.errorsByFile, validation.ran, liveAPI, runValidation]);
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
@@ -231,12 +71,6 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
       resetCodeRef.current.focus();
     }
   }, [showCodeInput, showResetCodeInput]);
-
-  useEffect(() => {
-    if (!status?.active) return;
-    if (validation.ran) return;
-    runValidation();
-  }, [status?.active, validation.ran, runValidation]);
 
   useSandboxWatcher({
     enabled: status?.active ?? false,
@@ -268,28 +102,8 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
         window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
         setShowCodeInput(false);
         setSecurityCode('');
-        // Si sync réussit : reset validation à "clean"
-                if (action === 'sync' || action === 'discard') {
-                  applyValidationResult({ valid: true, errorCount: 0, warningCount: 0, diagnostics: [], errorsByFile: {}, rawOutput: '' });
-                }
-                if (action === 'init' || action === 'activate' || action === 'reset') {
-                  runValidation();
-                }
       } else if (data.status === 'validation_failed') {
-        applyValidationResult(data);
-        const filesInError = Object.keys(data.errorsByFile || {}).length;
-        const errCount = data.errorCount ?? 0;
-        let msg: string;
-        if (errCount === 0 && filesInError === 0) {
-          // Échec tsc sans erreurs parsées — problème de config ou chemin
-          const raw = (data.rawOutput || data.errors || '').trim();
-          msg = raw
-            ? `Échec build (config tsc) — ${raw.slice(0, 120)}${raw.length > 120 ? '…' : ''}`
-            : 'Échec build — vérifiez la config tsc du sandbox';
-        } else {
-          msg = `${errCount} erreur(s) dans ${filesInError} fichier(s) — voir les différences`;
-        }
-        setFeedback({ type: 'error', msg });
+        setFeedback({ type: 'error', msg: 'Synchronisation refusée' });
       } else {
         setFeedback({ type: 'error', msg: data.error || 'Erreur' });
       }
@@ -297,7 +111,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
     } catch (e: any) {
       setFeedback({ type: 'error', msg: e.message || 'Erreur réseau' });
     } finally { setBusy(null); }
-  }, [fetchStatus, applyValidationResult, runValidation]);
+  }, [fetchStatus]);
 
   const handleDeactivate = useCallback(() => {
     if (!showCodeInput) {
@@ -389,22 +203,6 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             {status?.modifiedCount ?? 0} modification{(status?.modifiedCount ?? 0) > 1 ? 's' : ''}
           </p>
         </div>
-        {validation.ran && (
-          <span
-            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold flex-shrink-0"
-            style={{
-              backgroundColor: validation.valid ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)',
-              color: validation.valid ? 'var(--color-success)' : '#f87171',
-            }}
-            title={validation.valid ? 'Build sandbox valide' : `Build sandbox invalide — ${validation.errorCount} erreurs`}
-          >
-            {validation.loading
-              ? <><Loader2 size={10} className="animate-spin" /> Validation</>
-              : validation.valid
-              ? <><CheckCircle2 size={10} /> Prêt</>
-              : <><AlertOctagon size={10} /> {validation.errorCount} erreur{validation.errorCount > 1 ? 's' : ''}</>}
-          </span>
-        )}
         <button
           type="button"
           onClick={fetchStatus}
@@ -452,36 +250,6 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             onClick={() => doAction('init')}
             busy={busy === 'init'}
             tooltip="Copier le code source dans un espace isolé"
-          />
-        )}
-
-        {/* Validate build */}
-        {status?.active && (
-          <ActionRow
-            icon={validation.loading ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-            label={validation.ran
-              ? validation.valid
-                ? `Build valide${validation.warningCount ? ` · ${validation.warningCount} warn` : ''}`
-                : `Corriger ${validation.errorCount} erreur${validation.errorCount > 1 ? 's' : ''}`
-              : 'Valider le build'}
-            color={validation.ran && !validation.valid ? 'var(--color-error)' : 'var(--accent-primary)'}
-            onClick={runValidation}
-            busy={validation.loading}
-            tooltip="Lancer TypeScript --noEmit sur le sandbox pour détecter erreurs et avertissements"
-          />
-        )}
-
-        {/* Ask AI to fix */}
-        {status?.active && validation.ran && (validation.errorCount + validation.warningCount) > 0 && (
-          <ActionRow
-            icon={askingAI ? <Loader2 size={12} className="animate-spin" /> : <Bot size={12} />}
-            label={askingAI
-              ? 'Envoi en cours…'
-              : `Demander à l'IA de corriger (${Object.keys(validation.errorsByFile).length} fichier${Object.keys(validation.errorsByFile).length > 1 ? 's' : ''})`}
-            color="var(--color-purple, #a78bfa)"
-            onClick={askAIToFix}
-            busy={askingAI}
-            tooltip="Envoyer à l'assistant IA le code sandbox complet + toutes les erreurs TSC, avec instruction de ne corriger que ces erreurs"
           />
         )}
 
@@ -619,7 +387,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                         color="var(--color-success)"
                         onClick={() => doAction('sync')}
                         busy={busy === 'sync'}
-                        tooltip="Valider le build puis appliquer toutes les modifications au repo principal"
+                        tooltip="Appliquer toutes les modifications au repo principal"
                       />
                     )}
                     {status.active && status.modifiedCount > 0 && (
@@ -680,48 +448,18 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             <div className="space-y-0.5 max-h-44 overflow-y-auto custom-scrollbar px-1.5 pb-1.5">
             {status.modifiedFiles.map(f => {
               const Icon = FileCode2;
-              const fileDiags = validation.ran ? (validation.errorsByFile[f] ?? []) : [];
-              const errCount = fileDiags.filter(d => d.severity === 'error').length;
-              const warnCount = fileDiags.filter(d => d.severity === 'warning').length;
-              const hasIssues = errCount > 0 || warnCount > 0;
-              const iconColor = hasIssues ? '#f87171' : 'var(--accent-primary)';
 
               return (
                 <button
                   key={f}
                   onClick={() => onOpenDiff(f)}
                   className="group w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all hover:bg-white/5"
-                  style={{
-                    borderLeft: hasIssues ? `2px solid rgba(248,113,113,0.45)` : '2px solid transparent',
-                  }}
-                  title={hasIssues
-                    ? `${f} — ${errCount} erreur(s), ${warnCount} avertissement(s)`
-                    : `Cliquer pour voir les modifications de ${f}`}
+                  style={{ borderLeft: '2px solid transparent' }}
                 >
-                  <Icon size={11} style={{ color: iconColor, flexShrink: 0 }} />
+                  <Icon size={11} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
                   <span className="text-[10px] font-mono truncate flex-1 transition-colors group-hover:text-[var(--text-primary)]" style={{ color: 'var(--text-secondary)' }}>
                     {f}
                   </span>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {errCount > 0 && (
-                      <span
-                        className="inline-flex items-center gap-0.5 rounded-full px-1 py-[1px] text-[8px] font-bold"
-                        style={{ backgroundColor: 'rgba(248,113,113,0.15)', color: '#f87171' }}
-                      >
-                        <AlertOctagon size={7} />
-                        {errCount}
-                      </span>
-                    )}
-                    {warnCount > 0 && (
-                      <span
-                        className="inline-flex items-center gap-0.5 rounded-full px-1 py-[1px] text-[8px] font-bold"
-                        style={{ backgroundColor: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}
-                      >
-                        <AlertTriangle size={7} />
-                        {warnCount}
-                      </span>
-                    )}
-                  </div>
                 </button>
               );
             })}
@@ -732,135 +470,6 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
         </div>
       )}
 
-      {/* ═══ Validation errors panel — fichier par fichier ═══ */}
-
-  {/* Cas tsc config/global error : afficher stdout/stderr même sans diagnostic rattaché à un fichier */}
-      {validation.ran && !validation.valid && Object.keys(validation.errorsByFile).length === 0 && validation.rawOutput && (
-        <div
-          className="rounded-lg overflow-hidden border"
-          style={{ borderColor: 'rgba(248,113,113,0.25)', backgroundColor: 'rgba(248,113,113,0.04)' }}
-        >
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5">
-            <AlertOctagon size={11} style={{ color: '#f87171' }} />
-            <span className="text-[10px] font-bold" style={{ color: '#f87171' }}>
-              Échec build{validation.exitCode !== null ? ` (code ${validation.exitCode})` : ''} (configuration ou diagnostic global tsc)
-            </span>
-          </div>
-          <div className="px-2.5 pb-2.5">
-            <pre
-              className="text-[9.5px] font-mono whitespace-pre-wrap break-all max-h-40 overflow-y-auto custom-scrollbar rounded p-2"
-              style={{ backgroundColor: 'rgba(0,0,0,0.2)', color: '#fca5a5' }}
-            >
-              {validation.exitCode !== null && `exitCode: ${validation.exitCode}\n`}
-              {validation.stdout && `stdout:\n${validation.stdout}\n`}
-              {validation.stderr && `stderr:\n${validation.stderr}\n`}
-              {!validation.stdout && !validation.stderr && validation.rawOutput}
-            </pre>
-          </div>
-        </div>
-      )}
-
-      {validation.ran && validation.errorCount + validation.warningCount > 0 && (
-        <div
-          className="rounded-lg overflow-hidden border"
-          style={{
-            borderColor: validation.errorCount > 0 ? 'rgba(248,113,113,0.25)' : 'rgba(251,191,36,0.25)',
-            backgroundColor: validation.errorCount > 0 ? 'rgba(248,113,113,0.04)' : 'rgba(251,191,36,0.04)',
-          }}
-        >
-          <div
-            className="flex items-center justify-between px-2.5 py-1.5 cursor-pointer select-none"
-            onClick={() => setExpandedErrors(v => !v)}
-          >
-            <div className="flex items-center gap-1.5">
-              {validation.errorCount > 0 ? (
-                <AlertOctagon size={11} style={{ color: '#f87171' }} />
-              ) : (
-                <AlertTriangle size={11} style={{ color: '#fbbf24' }} />
-              )}
-              <span className="text-[10px] font-bold" style={{ color: validation.errorCount > 0 ? '#f87171' : '#fbbf24' }}>
-                {validation.errorCount} erreur{validation.errorCount > 1 ? 's' : ''}
-                {validation.warningCount > 0 && ` · ${validation.warningCount} avertissement${validation.warningCount > 1 ? 's' : ''}`}
-              </span>
-              <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
-                dans {Object.keys(validation.errorsByFile).length} fichier{Object.keys(validation.errorsByFile).length > 1 ? 's' : ''}
-              </span>
-            </div>
-            <ChevronDown size={12} style={{ color: 'var(--text-dimmed)', transform: expandedErrors ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .15s' }} />
-          </div>
-          <AnimatePresence initial={false}>
-            {expandedErrors && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="divide-y max-h-64 overflow-y-auto custom-scrollbar" style={{ borderColor: 'var(--border-base)' }}>
-                  {Object.entries(validation.errorsByFile).map(([file, diags]) => {
-                    const errs = (diags as TscDiagnostic[]).filter(d => d.severity === 'error').length;
-                    const warns = (diags as TscDiagnostic[]).filter(d => d.severity === 'warning').length;
-                    return (
-                      <div key={file} className="px-2.5 py-2">
-                        <div className="flex items-center gap-1.5 mb-1.5">
-                          <FileCode2 size={9} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-                          <span className="text-[9.5px] font-mono truncate flex-1" style={{ color: 'var(--text-secondary)' }}>
-                            {file}
-                          </span>
-                          {errs > 0 && (
-                            <span
-                              className="inline-flex items-center gap-0.5 rounded-full px-1 py-[1px] text-[8px] font-bold"
-                              style={{ backgroundColor: 'rgba(248,113,113,0.15)', color: '#f87171' }}
-                            >
-                              <AlertOctagon size={6} />{errs}
-                            </span>
-                          )}
-                          {warns > 0 && (
-                            <span
-                              className="inline-flex items-center gap-0.5 rounded-full px-1 py-[1px] text-[8px] font-bold"
-                              style={{ backgroundColor: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}
-                            >
-                              <AlertTriangle size={6} />{warns}
-                            </span>
-                          )}
-                        </div>
-                        <ul className="space-y-0.5 font-mono pl-2.5">
-                          {(diags as TscDiagnostic[]).map((d, i) => (
-                            <li key={i} className="flex gap-1.5 text-[9.5px] leading-snug">
-                              <span
-                                className="flex-shrink-0 w-20 text-right tabular-nums"
-                                style={{ color: 'var(--text-dimmed)' }}
-                              >
-                                {d.line !== null
-                                  ? `L${d.line}${d.column !== null ? `:C${d.column}` : ''}`
-                                  : 'global'}
-                              </span>
-                              <span
-                                className="flex-shrink-0 w-14 font-bold uppercase tracking-wider"
-                                style={{
-                                  color:
-                                    d.severity === 'error' ? '#f87171' :
-                                    d.severity === 'warning' ? '#fbbf24' :
-                                    'var(--text-muted)',
-                                }}
-                              >
-                                {d.code ?? d.severity}
-                              </span>
-                              <span style={{ color: 'var(--text-primary)' }} className="flex-1">
-                                {d.message}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
 
       {/* ═══ Last sync ═══ */}
       {status?.lastSync && (

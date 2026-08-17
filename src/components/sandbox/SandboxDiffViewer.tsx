@@ -1,12 +1,10 @@
-import { useState, useEffect, useCallback, useMemo, useRef, useReducer, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X, ChevronRight, ChevronDown, ChevronUp, FileCode2, FilePlus2, FileX2,
   RefreshCcw, Loader2, Check, RotateCcw, CheckCheck, XCircle,
-  ArrowDown, ArrowUp, ArrowLeft, Columns2, AlignJustify, Keyboard, AlertTriangle,
-  AlertOctagon, Play, Bot,
+  ArrowLeft, Columns2, AlignJustify, Keyboard,
 } from 'lucide-react';
-import { useLiveAPIContext } from '../../context/LiveAPIContext';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -24,28 +22,7 @@ export interface DiffLine {
   lineNumNew?: number;
 }
 
-export interface TscDiagnostic {
-  file: string | null;
-  line: number | null;
-  column: number | null;
-  code: string | null;
-  severity: 'error' | 'warning' | 'info';
-  message: string;
-  raw: string;
-}
-
 export type DiffMode = 'side-by-side' | 'unified';
-
-export interface ValidationState {
-  loading: boolean;
-  ran: boolean;
-  valid: boolean;
-  errorCount: number;
-  warningCount: number;
-  diagnostics: TscDiagnostic[];
-  errorsByFile: Record<string, TscDiagnostic[]>;
-  rawOutput: string;
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -258,13 +235,11 @@ const FileList = memo(function FileList({
   files,
   selectedPath,
   onSelect,
-  validation,
   loading,
 }: {
   files: FileDiff[];
   selectedPath: string | null;
   onSelect: (path: string) => void;
-  validation: ValidationState;
   loading: boolean;
 }) {
   return (
@@ -289,10 +264,6 @@ const FileList = memo(function FileList({
             const isSelected = selectedPath === file.path;
             const Icon = file.status === 'added' ? FilePlus2 : file.status === 'deleted' ? FileX2 : FileCode2;
             const iconColor = file.status === 'added' ? '#4ade80' : file.status === 'deleted' ? '#f87171' : '#fbbf24';
-            const fileDiags = validation.ran ? (validation.errorsByFile[file.path] ?? []) : [];
-            const errCount = fileDiags.filter((d) => d.severity === 'error').length;
-            const warnCount = fileDiags.filter((d) => d.severity === 'warning').length;
-            const hasIssues = errCount > 0 || warnCount > 0;
 
             return (
               <button
@@ -301,14 +272,10 @@ const FileList = memo(function FileList({
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors group"
                 style={{
                   backgroundColor: isSelected ? 'var(--bg-input)' : 'transparent',
-                  borderLeft: isSelected
-                    ? `2px solid ${errCount > 0 ? '#f87171' : warnCount > 0 ? '#fbbf24' : iconColor}`
-                    : hasIssues
-                    ? `2px solid rgba(248,113,113,0.25)`
-                    : '2px solid transparent',
+                  borderLeft: isSelected ? `2px solid ${iconColor}` : '2px solid transparent',
                 }}
               >
-                <Icon size={13} style={{ color: hasIssues ? '#f87171' : iconColor, flexShrink: 0 }} />
+                <Icon size={13} style={{ color: iconColor, flexShrink: 0 }} />
                 <div className="flex-1 min-w-0">
                   <span
                     className="text-[11px] font-medium truncate block"
@@ -323,94 +290,12 @@ const FileList = memo(function FileList({
                     {file.path}
                   </span>
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {errCount > 0 && (
-                    <span
-                      className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-[1px] text-[9px] font-bold"
-                      style={{ backgroundColor: 'rgba(248,113,113,0.15)', color: '#f87171' }}
-                      title={`${errCount} erreur${errCount > 1 ? 's' : ''}`}
-                    >
-                      <AlertOctagon size={8} />
-                      {errCount}
-                    </span>
-                  )}
-                  {warnCount > 0 && (
-                    <span
-                      className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-[1px] text-[9px] font-bold"
-                      style={{ backgroundColor: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}
-                      title={`${warnCount} avertissement${warnCount > 1 ? 's' : ''}`}
-                    >
-                      <AlertTriangle size={8} />
-                      {warnCount}
-                    </span>
-                  )}
-                  {isSelected && <ChevronRight size={11} style={{ color: hasIssues ? '#f87171' : 'var(--text-dimmed)' }} />}
-                </div>
+                {isSelected && <ChevronRight size={11} style={{ color: 'var(--text-dimmed)' }} />}
               </button>
             );
           })}
         </div>
       )}
-    </div>
-  );
-});
-
-// ─── Diagnostic Panel ──────────────────────────────────────────────────────
-
-const DiagnosticPanel = memo(function DiagnosticPanel({
-  diagnostics,
-}: {
-  diagnostics: TscDiagnostic[];
-}) {
-  if (diagnostics.length === 0) return null;
-
-  const hasErrors = diagnostics.some((d) => d.severity === 'error');
-  const hasWarnings = diagnostics.some((d) => d.severity === 'warning');
-
-  return (
-    <div
-      className="px-4 py-2 max-h-40 overflow-y-auto custom-scrollbar"
-      style={{
-        backgroundColor: hasErrors ? 'rgba(248,113,113,0.05)' : 'rgba(251,191,36,0.05)',
-        borderBottom: `1px solid ${hasErrors ? 'rgba(248,113,113,0.2)' : 'rgba(251,191,36,0.2)'}`,
-      }}
-    >
-      <div className="flex items-center gap-2 mb-1.5">
-        {hasErrors ? (
-          <AlertOctagon size={12} style={{ color: '#f87171' }} />
-        ) : (
-          <AlertTriangle size={12} style={{ color: '#fbbf24' }} />
-        )}
-        <span className="text-[11px] font-semibold" style={{ color: hasErrors ? '#f87171' : '#fbbf24' }}>
-          {diagnostics.filter((d) => d.severity === 'error').length} erreur
-          {diagnostics.filter((d) => d.severity === 'error').length > 1 ? 's' : ''}
-          {hasWarnings &&
-            ` · ${diagnostics.filter((d) => d.severity === 'warning').length} avertissement${
-              diagnostics.filter((d) => d.severity === 'warning').length > 1 ? 's' : ''
-            }`}
-        </span>
-      </div>
-      <ul className="space-y-1 font-mono">
-        {diagnostics.map((d, i) => (
-          <li key={i} className="flex gap-2 text-[10.5px] leading-snug">
-            <span
-              className="flex-shrink-0 w-[7.5rem] text-right tabular-nums"
-              style={{ color: 'var(--text-dimmed)' }}
-            >
-              {d.line !== null ? `L${d.line}${d.column !== null ? `:C${d.column}` : ''}` : 'global'}
-            </span>
-            <span
-              className="flex-shrink-0 w-16 font-bold uppercase tracking-wider"
-              style={{
-                color: d.severity === 'error' ? '#f87171' : d.severity === 'warning' ? '#fbbf24' : 'var(--text-muted)',
-              }}
-            >
-              {d.code ?? d.severity}
-            </span>
-            <span style={{ color: 'var(--text-primary)' }}>{d.message}</span>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 });
@@ -426,8 +311,6 @@ interface SandboxDiffViewerProps {
 }
 
 export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = false }: SandboxDiffViewerProps) {
-  const liveAPI = useLiveAPIContext();
-
   // ─── State ───────────────────────────────────────────────────────────────────
 
   const [files, setFiles] = useState<FileDiff[]>([]);
@@ -440,17 +323,6 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [diffMode, setDiffMode] = useState<DiffMode>('side-by-side');
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [askingAI, setAskingAI] = useState(false);
-  const [validation, setValidation] = useState<ValidationState>({
-    loading: false,
-    ran: false,
-    valid: true,
-    errorCount: 0,
-    warningCount: 0,
-    diagnostics: [],
-    errorsByFile: {},
-    rawOutput: '',
-  });
 
   // ─── Refs for scrolling ─────────────────────────────────────────────────────
 
@@ -486,141 +358,6 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
   useEffect(() => {
     loadDiffs();
   }, [loadDiffs]);
-
-  // ─── Validation ────────────────────────────────────────────────────────────
-
-  const applyValidationResult = useCallback((data: any) => {
-    setValidation({
-      loading: false,
-      ran: true,
-      valid: !!data.valid,
-      errorCount: data.errorCount ?? 0,
-      warningCount: data.warningCount ?? 0,
-      diagnostics: Array.isArray(data.diagnostics) ? data.diagnostics : [],
-      errorsByFile: data.errorsByFile && typeof data.errorsByFile === 'object' ? data.errorsByFile : {},
-      rawOutput: data.rawOutput ?? data.errors ?? '',
-    });
-  }, []);
-
-  const runValidation = useCallback(async () => {
-    setValidation((v) => ({ ...v, loading: true }));
-    try {
-      const res = await fetch('/api/sandbox/validate', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) {
-        setValidation((v) => ({
-          ...v,
-          loading: false,
-          ran: true,
-          valid: false,
-          errorCount: 0,
-          warningCount: 0,
-          diagnostics: [],
-          errorsByFile: {},
-          rawOutput: `HTTP ${res.status}`,
-        }));
-        return;
-      }
-      const data = await res.json();
-      applyValidationResult(data);
-    } catch {
-      setValidation((v) => ({
-        ...v,
-        loading: false,
-        ran: true,
-        valid: false,
-        errorCount: 0,
-        warningCount: 0,
-        diagnostics: [],
-        errorsByFile: {},
-        rawOutput: 'Erreur réseau',
-      }));
-    }
-  }, [applyValidationResult]);
-
-  useEffect(() => {
-    runValidation();
-  }, [runValidation]);
-
-  // ─── Ask AI to fix ─────────────────────────────────────────────────────────
-
-  const askAIToFix = useCallback(async () => {
-    if (!validation.ran) await runValidation();
-    const filesWithIssues = Object.entries(validation.errorsByFile ?? {});
-    if (filesWithIssues.length === 0) {
-      setFeedback({ type: 'success', msg: 'Aucune erreur — rien à corriger' });
-      return;
-    }
-    if (!liveAPI.connected) {
-      setFeedback({ type: 'error', msg: 'Connecte d\'abord l\'assistant vocal (bouton orb)' });
-      return;
-    }
-    setAskingAI(true);
-    try {
-      const fetched: string[] = [];
-      for (const [file] of filesWithIssues) {
-        try {
-          const r = await fetch(`/api/sandbox/file-diff?path=${encodeURIComponent(file)}`, {
-            headers: getAuthHeaders(),
-          });
-          if (r.ok) {
-            const d = await r.json();
-            if (typeof d.modified === 'string') fetched.push(file + '||' + d.modified);
-          }
-        } catch {
-          /* skip */
-        }
-      }
-      const diagBlocks = filesWithIssues.map(([file, diags]) =>
-        `### Erreurs dans ${file} :\n` +
-          (diags as TscDiagnostic[])
-            .map(
-              (d) =>
-                `  • [${d.severity.toUpperCase()} ${d.code ?? ''}] L${d.line}${d.column !== null ? `:C${d.column}` : ''} — ${
-                  d.message
-                }`
-            )
-            .join('\n')
-      );
-      const codeBlocks = fetched.map((entry) => {
-        const [file, ...rest] = entry.split('||');
-        const content = rest.join('||');
-        const lang = file.endsWith('.tsx') || file.endsWith('.ts') ? 'typescript' : file.endsWith('.json') ? 'json' : '';
-        return `### Contenu sandbox de ${file} :\n\`\`\`${lang}\n${content}\n\`\`\``;
-      });
-
-      const prompt = [
-        '## DEMANDE : Corriger les erreurs TypeScript du SANDBOX',
-        '',
-        'Contexte : Les modifications ci-dessous se trouvent DANS LE SANDBOX (`.jarvis/sandbox/`) et ont été validées par `tsc --noEmit`. Il faut corriger uniquement les erreurs listées dans CHAQUE FICHIER, en respectant strictement l\'intention du code original. Ecris dans le sandbox via les outils `read_project_file`/`modify_project_file`/`write_project_file` en utilisant le path sandbox comme WORKSPACE TEMPORAIRE (le vrai workspace racine est le dossier contenant `.jarvis/sandbox/`).',
-        '',
-        '## Liste des erreurs TSC :',
-        ...diagBlocks,
-        '',
-        '## Code sandbox complet (contenu modifié actuel) :',
-        ...codeBlocks,
-        '',
-        'Règles à suivre OBLIGATOIREMENT :',
-        '1. Lis d\'abord chaque fichier concerné dans le sandbox avant de le modifier.',
-        '2. Corriger UNIQUEMENT les erreurs listées ci-dessus — ne PAS faire de refactoring, ne PAS toucher aux lignes non concernées.',
-        '3. Conserver strictement le style, la structure, les noms de variables/fonctions existants.',
-        '4. Après chaque modification : déclencher une re-validation via Valider (côté utilisateur) ou re-tenter tsc --noEmit.',
-        '5. Si une erreur implique un fichier hors sandbox (dépendance du workspace principal), lire le fichier original pour comprendre l\'API attendue.',
-        '6. Ne PAS synchroniser auto vers le workspace principal — laisse l\'utilisateur valider chaque changement.',
-        '',
-        'Commence par résumer brièvement ce que tu vas faire, puis applique les corrections fichier par fichier.',
-      ].join('\n');
-
-      liveAPI.sendTextMessage(prompt);
-      setFeedback({ type: 'success', msg: `Demande envoyée — ${filesWithIssues.length} fichier(s) à corriger` });
-    } catch (e: any) {
-      setFeedback({ type: 'error', msg: e.message || 'Échec envoi' });
-    } finally {
-      setAskingAI(false);
-    }
-  }, [validation.errorsByFile, validation.ran, liveAPI, runValidation]);
 
   // ─── Load file content ─────────────────────────────────────────────────────
 
@@ -673,9 +410,6 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
           const remaining = files.filter((f) => f.path !== filePath);
           setSelectedFile(remaining.length > 0 ? remaining[0].path : null);
           window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
-          if (data.postValidation && typeof data.postValidation === 'object') {
-            applyValidationResult(data.postValidation);
-          }
         } else {
           setFeedback({ type: 'error', msg: 'Fichier introuvable dans le sandbox' });
         }
@@ -685,7 +419,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
         setActionBusy(null);
       }
     },
-    [files, applyValidationResult]
+    [files]
   );
 
   const handleRejectFile = useCallback(
@@ -705,9 +439,6 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
           const remaining = files.filter((f) => f.path !== filePath);
           setSelectedFile(remaining.length > 0 ? remaining[0].path : null);
           window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
-          if (data.postValidation && typeof data.postValidation === 'object') {
-            applyValidationResult(data.postValidation);
-          }
         } else {
           setFeedback({ type: 'error', msg: 'Fichier introuvable' });
         }
@@ -717,7 +448,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
         setActionBusy(null);
       }
     },
-    [files, applyValidationResult]
+    [files]
   );
 
   // ─── Accept / Reject ALL ──────────────────────────────────────────────────
@@ -736,27 +467,15 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
         setFiles([]);
         setSelectedFile(null);
         window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
-      } else if (data.status === 'validation_failed') {
-        applyValidationResult(data);
-        const filesInError = Object.keys(data.errorsByFile || {}).length;
-        const errCount = data.errorCount ?? 0;
-        let msg: string;
-        if (errCount === 0 && filesInError === 0) {
-          const raw = (data.rawOutput || data.errors || '').trim();
-          msg = raw
-            ? `Échec build (config tsc) — ${raw.slice(0, 120)}${raw.length > 120 ? '…' : ''}`
-            : 'Échec build — vérifiez la config tsc du sandbox';
-        } else {
-          msg = `Validation échouée : ${errCount} erreur(s) dans ${filesInError} fichier(s)`;
-        }
-        setFeedback({ type: 'error', msg });
+      } else {
+        setFeedback({ type: 'error', msg: data.error || 'Erreur' });
       }
     } catch {
       setFeedback({ type: 'error', msg: 'Erreur réseau' });
     } finally {
       setActionBusy(null);
     }
-  }, [applyValidationResult]);
+  }, []);
 
   const handleRejectAll = useCallback(async () => {
     setActionBusy('all');
@@ -772,14 +491,13 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
         setFiles([]);
         setSelectedFile(null);
         window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
-        applyValidationResult({ valid: true, errorCount: 0, warningCount: 0, diagnostics: [], errorsByFile: {}, rawOutput: '' });
       }
     } catch {
       setFeedback({ type: 'error', msg: 'Erreur réseau' });
     } finally {
       setActionBusy(null);
     }
-  }, [applyValidationResult]);
+  }, []);
 
   // ─── Compute diff lines ────────────────────────────────────────────────────
 
@@ -1031,21 +749,6 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
   const selectedFileStatus = files.find((f) => f.path === selectedFile)?.status;
   const isBusy = actionBusy !== null;
 
-  const selectedFileDiagnostics = useMemo<TscDiagnostic[]>(() => {
-    if (!selectedFile || !validation.ran) return [];
-    return validation.errorsByFile[selectedFile] ?? [];
-  }, [selectedFile, validation]);
-
-  const selectedFileErrorCount = useMemo(
-    () => selectedFileDiagnostics.filter((d) => d.severity === 'error').length,
-    [selectedFileDiagnostics]
-  );
-  const selectedFileWarnCount = useMemo(
-    () => selectedFileDiagnostics.filter((d) => d.severity === 'warning').length,
-    [selectedFileDiagnostics]
-  );
-  const hasSelectedFileErrors = selectedFileErrorCount > 0;
-
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
@@ -1071,78 +774,9 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
           >
             {files.length} fichier{files.length > 1 ? 's' : ''}
           </span>
-          {validation.ran && (
-            <div className="flex items-center gap-1.5">
-              {validation.loading ? (
-                <span
-                  className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                  style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-muted)' }}
-                >
-                  <Loader2 size={11} className="animate-spin" /> TSC…
-                </span>
-              ) : validation.valid ? (
-                <span
-                  className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                  style={{ backgroundColor: 'rgba(74,222,128,0.1)', color: '#4ade80' }}
-                >
-                  <Check size={11} />
-                  {validation.warningCount > 0
-                    ? `OK · ${validation.warningCount} warning${validation.warningCount > 1 ? 's' : ''}`
-                    : 'Build OK'}
-                </span>
-              ) : (
-                <span
-                  className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                  style={{ backgroundColor: 'rgba(248,113,113,0.12)', color: '#f87171' }}
-                >
-                  <AlertOctagon size={11} />
-                  {validation.errorCount} erreur{validation.errorCount > 1 ? 's' : ''}
-                  {validation.warningCount > 0 && ` · ${validation.warningCount} warn`}
-                </span>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Ask AI to fix */}
-          {validation.ran && validation.errorCount + validation.warningCount > 0 && (
-            <button
-              onClick={askAIToFix}
-              disabled={askingAI || isBusy}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all hover:brightness-110 disabled:opacity-50"
-              style={{
-                backgroundColor: 'rgba(167,139,250,0.1)',
-                color: '#a78bfa',
-                border: '1px solid rgba(167,139,250,0.25)',
-              }}
-              title="Envoyer le code sandbox complet + les erreurs TSC à l'assistant IA avec instructions de correction"
-            >
-              {askingAI ? <Loader2 size={12} className="animate-spin" /> : <Bot size={12} />}
-              Corriger via IA
-              <span className="text-[9.5px] opacity-75">({Object.keys(validation.errorsByFile).length})</span>
-            </button>
-          )}
-
-          {/* Validate button */}
-          <button
-            onClick={runValidation}
-            disabled={validation.loading || isBusy}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all hover:brightness-110 disabled:opacity-50"
-            style={{
-              backgroundColor: validation.ran && !validation.valid ? 'rgba(248,113,113,0.1)' : 'rgba(56,189,248,0.08)',
-              color: validation.ran && !validation.valid ? '#f87171' : '#38bdf8',
-              border:
-                validation.ran && !validation.valid
-                  ? '1px solid rgba(248,113,113,0.22)'
-                  : '1px solid rgba(56,189,248,0.22)',
-            }}
-            title="Lancer TypeScript --noEmit sur le sandbox"
-          >
-            {validation.loading ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-            Valider
-          </button>
-
           {/* Mode toggle */}
           <button
             onClick={() => setDiffMode((prev) => (prev === 'side-by-side' ? 'unified' : 'side-by-side'))}
@@ -1314,7 +948,6 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
           files={files}
           selectedPath={selectedFile}
           onSelect={setSelectedFile}
-          validation={validation}
           loading={loading}
         />
 
@@ -1346,15 +979,11 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                   disabled={isBusy}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-50 hover:brightness-110"
                   style={{
-                    backgroundColor: hasSelectedFileErrors
-                      ? 'rgba(248,113,113,0.1)'
-                      : 'rgba(74,222,128,0.12)',
-                    color: hasSelectedFileErrors ? '#f87171' : '#4ade80',
-                    border: hasSelectedFileErrors
-                      ? '1px solid rgba(248,113,113,0.25)'
-                      : '1px solid rgba(74,222,128,0.25)',
+                    backgroundColor: 'rgba(74,222,128,0.12)',
+                    color: '#4ade80',
+                    border: '1px solid rgba(74,222,128,0.25)',
                   }}
-                  title={hasSelectedFileErrors ? `Ce fichier contient ${selectedFileErrorCount} erreur(s) — A` : 'Accepter ce fichier (A)'}
+                  title="Accepter ce fichier (A)"
                 >
                   {actionBusy === selectedFile ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
                   Accepter
@@ -1375,11 +1004,6 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                 </button>
               </div>
             </div>
-          )}
-
-          {/* Diagnostic panel */}
-          {selectedFile && selectedFileDiagnostics.length > 0 && (
-            <DiagnosticPanel diagnostics={selectedFileDiagnostics} />
           )}
 
           {/* Diff content */}
