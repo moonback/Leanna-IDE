@@ -1,17 +1,19 @@
 /**
  * RAGEngine — Retrieval-Augmented Generation pour les notebooks
  *
- * Moteur de recherche HYBRIDE :
+ * Pipeline de recherche en 4 étapes :
  *   1. Recherche sémantique via Gemini Embeddings (similarité cosinus)
  *   2. Recherche lexicale TF-IDF (correspondance exacte de termes)
  *   3. Fusion Reciprocal Rank Fusion (RRF) des deux scores
+ *   4. Re-ranking LLM — re-scorer les top candidats avec un appel modèle court
  *
- * La combinaison hybride garantit de bons résultats même quand :
- * - Les termes sont différents mais le sens est proche (embeddings)
- * - La correspondance exacte est importante (TF-IDF)
+ * La combinaison hybride + re-ranking garantit :
+ * - Rappel élevé (embeddings captent le sens, TF-IDF capte les mots exacts)
+ * - Précision élevée (le LLM élimine les faux positifs en fin de pipeline)
  */
 
 import { createLogger } from "../utils/logger";
+import { generateText } from "../utils/textGeneration";
 import { embeddingStore } from "./EmbeddingStore";
 import type { Source, SourceChunk, RAGSearchOptions, RAGSearchResult } from "./types";
 
@@ -30,12 +32,18 @@ const LEXICAL_WEIGHT = 0.35;
 /** Constante k pour le Reciprocal Rank Fusion */
 const RRF_K = 60;
 
+/** Nombre de candidats à re-ranker via LLM */
+const RERANK_TOP_K = 20;
+
+/** Active/désactive le re-ranking LLM (peut être désactivé pour économiser des tokens) */
+const RERANK_ENABLED = true;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export class RAGEngine {
 
   /**
-   * Recherche hybride : embeddings + TF-IDF avec fusion RRF.
+   * Recherche hybride complète : embeddings + TF-IDF + fusion RRF + re-ranking LLM.
    * Fallback automatique sur TF-IDF seul si les embeddings ne sont pas disponibles.
    */
   async searchHybrid(query: string, sources: Source[], options: RAGSearchOptions = {}): Promise<RAGSearchResult[]> {
@@ -58,12 +66,12 @@ export class RAGEngine {
 
     if (chunkMap.size === 0) return [];
 
-    // 1. Recherche sémantique via embeddings
+    // ── Étape 1 : Recherche sémantique via embeddings ──────────────────────
     let semanticResults: Map<string, number> = new Map();
     try {
       const embeddingResults = await embeddingStore.search(query, {
         sourceIds: options.sourceIds,
-        maxResults: maxChunks * 3, // Récupérer plus pour la fusion
+        maxResults: RERANK_TOP_K * 2,
         minSimilarity: 0.2,
       });
 
@@ -74,60 +82,146 @@ export class RAGEngine {
       }
     } catch (e: any) {
       log.warn(`Embeddings search fallback: ${e.message}`);
-      // Continue avec TF-IDF seul
     }
 
-    // 2. Recherche lexicale TF-IDF
-    const lexicalResults = this.searchTFIDF(query, filteredSources, maxChunks * 3);
+    // ── Étape 2 : Recherche lexicale TF-IDF ────────────────────────────────
+    const lexicalResults = this.searchTFIDF(query, filteredSources, RERANK_TOP_K * 2);
 
-    // 3. Fusion des résultats
+    // ── Étape 3 : Fusion RRF ───────────────────────────────────────────────
     const fusedScores = new Map<string, number>();
 
     if (semanticResults.size > 0) {
-      // Mode hybride : Reciprocal Rank Fusion
       const semanticRanked = Array.from(semanticResults.entries())
         .sort((a, b) => b[1] - a[1]);
       const lexicalRanked = lexicalResults
         .sort((a, b) => b.relevance - a.relevance);
 
-      // RRF pour les résultats sémantiques
       for (let rank = 0; rank < semanticRanked.length; rank++) {
         const [chunkId, similarity] = semanticRanked[rank];
         const rrfScore = SEMANTIC_WEIGHT / (RRF_K + rank + 1);
-        // Bonus pour les scores très élevés
         const similarityBonus = similarity > 0.7 ? 0.1 : similarity > 0.5 ? 0.05 : 0;
         fusedScores.set(chunkId, (fusedScores.get(chunkId) || 0) + rrfScore + similarityBonus);
       }
 
-      // RRF pour les résultats lexicaux
       for (let rank = 0; rank < lexicalRanked.length; rank++) {
         const { chunk } = lexicalRanked[rank];
         const rrfScore = LEXICAL_WEIGHT / (RRF_K + rank + 1);
         fusedScores.set(chunk.id, (fusedScores.get(chunk.id) || 0) + rrfScore);
       }
     } else {
-      // Mode TF-IDF seul (fallback)
       for (const result of lexicalResults) {
         fusedScores.set(result.chunk.id, result.relevance);
       }
     }
 
-    // 4. Construire les résultats finaux
-    const results: RAGSearchResult[] = [];
+    // Construire les candidats triés
+    let candidates: RAGSearchResult[] = [];
     for (const [chunkId, score] of fusedScores) {
-      if (score < minRelevance) continue;
+      if (score < minRelevance * 0.5) continue; // Seuil souple pré-rerank
       const entry = chunkMap.get(chunkId);
       if (!entry) continue;
-      results.push({
+      candidates.push({
         chunk: entry.chunk,
         source: entry.source,
         relevance: Math.min(score, 1.0),
       });
     }
+    candidates.sort((a, b) => b.relevance - a.relevance);
 
-    // Trier et limiter
-    results.sort((a, b) => b.relevance - a.relevance);
-    return results.slice(0, maxChunks);
+    // ── Étape 4 : Re-ranking LLM ──────────────────────────────────────────
+    const topCandidates = candidates.slice(0, RERANK_TOP_K);
+
+    if (RERANK_ENABLED && topCandidates.length > 3) {
+      try {
+        const reranked = await this.rerankWithLLM(query, topCandidates);
+        // Remplacer les candidats par les résultats re-rankés
+        candidates = reranked;
+      } catch (e: any) {
+        log.warn(`Re-ranking LLM skipped: ${e.message}`);
+        // Continuer avec l'ordre de fusion RRF
+      }
+    }
+
+    // Filtrer et limiter
+    return candidates
+      .filter(r => r.relevance >= minRelevance)
+      .slice(0, maxChunks);
+  }
+
+  // ─── Re-ranking LLM ──────────────────────────────────────────────────────
+
+  /**
+   * Re-score les candidats avec un appel LLM léger.
+   * Le modèle évalue la pertinence de chaque passage par rapport à la question.
+   *
+   * Stratégie : un seul appel batch qui note tous les passages (pas un appel par chunk).
+   * Retourne les résultats re-triés avec des scores ajustés.
+   */
+  private async rerankWithLLM(query: string, candidates: RAGSearchResult[]): Promise<RAGSearchResult[]> {
+    // Préparer les passages pour le LLM (tronqués pour économiser les tokens)
+    const passages = candidates.map((c, i) => ({
+      index: i,
+      text: c.chunk.content.slice(0, 400), // Max 400 chars par passage
+      source: c.source.title,
+    }));
+
+    const prompt = `Tu es un système de re-ranking de recherche. Évalue la pertinence de chaque passage par rapport à la question.
+
+QUESTION : "${query}"
+
+PASSAGES :
+${passages.map(p => `[${p.index}] (${p.source}) ${p.text}`).join("\n\n")}
+
+Pour chaque passage, attribue un score de pertinence de 0 à 10 :
+- 0 = totalement hors sujet
+- 3 = tangentiellement lié
+- 5 = partiellement pertinent
+- 7 = pertinent
+- 10 = répond directement à la question
+
+Réponds UNIQUEMENT en JSON strict, un tableau de scores dans l'ordre des passages :
+[score_0, score_1, score_2, ...]`;
+
+    const result = await generateText({
+      prompt,
+      temperature: 0.0,
+      maxOutputTokens: 256,
+      thinkingBudget: 0, // Pas besoin de chain-of-thought
+    });
+
+    // Parser les scores
+    const jsonMatch = result.text.match(/\[[\d\s,.\n]+\]/);
+    if (!jsonMatch) {
+      log.warn("Re-ranking: impossible de parser la réponse LLM");
+      return candidates;
+    }
+
+    const scores: number[] = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(scores) || scores.length === 0) {
+      return candidates;
+    }
+
+    // Appliquer les scores LLM (normaliser à 0-1 et combiner avec le score initial)
+    const reranked: RAGSearchResult[] = [];
+    for (let i = 0; i < candidates.length; i++) {
+      const llmScore = (scores[i] ?? 5) / 10; // Normaliser 0-10 → 0-1
+      const originalScore = candidates[i].relevance;
+
+      // Score final : combinaison du score hybride et du score LLM
+      // Le LLM a le dernier mot (poids 60%) mais le score initial pèse aussi (40%)
+      const finalScore = originalScore * 0.4 + llmScore * 0.6;
+
+      reranked.push({
+        ...candidates[i],
+        relevance: Math.min(finalScore, 1.0),
+      });
+    }
+
+    // Re-trier par le nouveau score
+    reranked.sort((a, b) => b.relevance - a.relevance);
+
+    log.debug(`Re-ranking: ${candidates.length} passages re-scorés, top score: ${reranked[0]?.relevance.toFixed(3)}`);
+    return reranked;
   }
 
   /**
