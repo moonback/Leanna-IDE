@@ -1,9 +1,12 @@
 /**
  * AudioOverviewPanel — Génération et lecture de podcasts IA
+ *
+ * UI améliorée avec meilleur layout, animations, et feedback visuel.
  */
 
 import { useState, useCallback } from 'react';
-import { Mic, Play, Loader2, Clock, Users } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Mic, Play, Loader2, Clock, Users, Radio, Pause } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 
 interface AudioOverview {
@@ -63,42 +66,57 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
   return (
     <div className="h-full flex flex-col lg:flex-row">
       {/* Left: Generator + list */}
-      <div className="w-full lg:w-80 flex-shrink-0 border-b lg:border-b-0 lg:border-r overflow-y-auto custom-scrollbar p-5 space-y-4"
-        style={{ borderColor: 'var(--border-base)' }}>
-
-        {/* Generator */}
-        <div className="p-4 rounded-2xl border space-y-4"
-          style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
-          <div className="flex items-center gap-2">
-            <Mic className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-            <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Audio Overview
-            </p>
+      <div
+        className="w-full lg:w-80 flex-shrink-0 border-b lg:border-b-0 lg:border-r overflow-y-auto custom-scrollbar p-5 space-y-5"
+        style={{ borderColor: 'var(--border-base)' }}
+      >
+        {/* Generator card */}
+        <div
+          className="p-5 rounded-2xl border space-y-4"
+          style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+        >
+          <div className="flex items-center gap-2.5">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: 'var(--accent-subtle)' }}
+            >
+              <Mic className="w-4.5 h-4.5" style={{ color: 'var(--accent-primary)' }} />
+            </div>
+            <div>
+              <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                Audio Overview
+              </p>
+              <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                Script de podcast IA
+              </p>
+            </div>
           </div>
-          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-            Génère un script de podcast : deux hôtes discutent du contenu de vos sources
+
+          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            Génère un script conversationnel : deux hôtes discutent du contenu de vos sources
             dans un format engageant et accessible.
           </p>
 
           {/* Duration selector */}
-          <div className="space-y-1">
-            <p className="text-[9px] font-medium" style={{ color: 'var(--text-dimmed)' }}>Durée</p>
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Durée cible</p>
             <div className="flex gap-2">
               {([
-                { key: 'short' as const, label: '~5 min' },
-                { key: 'medium' as const, label: '~10 min' },
-                { key: 'long' as const, label: '~15 min' },
+                { key: 'short' as const, label: '~5 min', icon: '⚡' },
+                { key: 'medium' as const, label: '~10 min', icon: '📻' },
+                { key: 'long' as const, label: '~15 min', icon: '🎙️' },
               ]).map(opt => (
                 <button
                   key={opt.key}
                   onClick={() => setDuration(opt.key)}
-                  className="px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all"
+                  className="flex-1 flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl text-[10px] font-medium transition-all"
                   style={{
                     backgroundColor: duration === opt.key ? 'var(--accent-subtle)' : 'var(--bg-base)',
                     color: duration === opt.key ? 'var(--accent-primary)' : 'var(--text-muted)',
-                    border: `1px solid ${duration === opt.key ? 'var(--accent-primary)' : 'var(--border-base)'}`,
+                    border: `1.5px solid ${duration === opt.key ? 'var(--accent-primary)' : 'var(--border-base)'}`,
                   }}
                 >
+                  <span className="text-sm">{opt.icon}</span>
                   {opt.label}
                 </button>
               ))}
@@ -108,17 +126,17 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
           <button
             onClick={handleGenerate}
             disabled={generating}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-bold transition-all active:scale-95 disabled:opacity-50 shadow-sm"
             style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
           >
             {generating ? (
               <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Génération...
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Génération en cours...
               </>
             ) : (
               <>
-                <Mic className="w-3.5 h-3.5" />
+                <Radio className="w-4 h-4" />
                 Générer le podcast
               </>
             )}
@@ -128,33 +146,45 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
         {/* Previous overviews */}
         {overviews.length > 0 && (
           <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
               Podcasts ({overviews.length})
             </p>
-            {overviews.map(ov => (
-              <button
-                key={ov.id}
-                onClick={() => setSelectedOverview(ov)}
-                className={`w-full p-3 rounded-xl border text-left transition-all ${selectedOverview?.id === ov.id ? 'border-[var(--accent-primary)]' : ''}`}
-                style={{ borderColor: selectedOverview?.id === ov.id ? 'var(--accent-primary)' : 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-              >
-                <div className="flex items-center gap-2">
-                  <Play className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} />
-                  <p className="text-[10px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                    {ov.title}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="text-[9px] flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}>
-                    <Clock className="w-2.5 h-2.5" />
-                    {formatDuration(ov.estimatedDuration)}
-                  </span>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${ov.status === 'ready' ? 'bg-green-500/10 text-green-400' : ov.status === 'error' ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
-                    {ov.status === 'ready' ? 'Prêt' : ov.status === 'error' ? 'Erreur' : 'En cours'}
-                  </span>
-                </div>
-              </button>
-            ))}
+            <AnimatePresence initial={false}>
+              {overviews.map(ov => (
+                <motion.button
+                  key={ov.id}
+                  layout
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={() => setSelectedOverview(ov)}
+                  className={`w-full p-3.5 rounded-xl border text-left transition-all hover:shadow-sm ${selectedOverview?.id === ov.id ? 'ring-1 ring-[var(--accent-primary)]' : ''}`}
+                  style={{ borderColor: selectedOverview?.id === ov.id ? 'var(--accent-primary)' : 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: 'var(--accent-subtle)' }}
+                    >
+                      <Play className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                        {ov.title}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[9px] flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}>
+                          <Clock className="w-2.5 h-2.5" />
+                          {formatDuration(ov.estimatedDuration)}
+                        </span>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${ov.status === 'ready' ? 'bg-green-500/10 text-green-400' : ov.status === 'error' ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
+                          {ov.status === 'ready' ? '● Prêt' : ov.status === 'error' ? '● Erreur' : '● En cours'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.button>
+              ))}
+            </AnimatePresence>
           </div>
         )}
       </div>
@@ -162,21 +192,32 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
       {/* Right: Script viewer */}
       <div className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-7">
         {selectedOverview ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Users className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+          <div className="space-y-5 max-w-2xl mx-auto">
+            {/* Header */}
+            <div className="flex items-center gap-3 pb-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ backgroundColor: 'var(--accent-subtle)' }}
+              >
+                <Users className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+              </div>
               <div>
                 <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                   {selectedOverview.title}
                 </h2>
-                <p className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
-                  Durée estimée : {formatDuration(selectedOverview.estimatedDuration)}
+                <p className="text-[10px] flex items-center gap-2" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {formatDuration(selectedOverview.estimatedDuration)}
+                  </span>
+                  <span>•</span>
+                  <span>{new Date(selectedOverview.createdAt).toLocaleDateString('fr-FR')}</span>
                 </p>
               </div>
             </div>
 
-            {/* Script */}
-            <div className="space-y-3">
+            {/* Script as chat bubbles */}
+            <div className="space-y-4">
               {selectedOverview.script.split('\n').map((line, i) => {
                 const isAlex = line.trim().startsWith('Alex:') || line.trim().startsWith('Alex :');
                 const isSam = line.trim().startsWith('Sam:') || line.trim().startsWith('Sam :');
@@ -185,29 +226,42 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
                   const speaker = isAlex ? 'Alex' : 'Sam';
                   const text = line.replace(/^(Alex|Sam)\s*:\s*/i, '');
                   return (
-                    <div key={i} className={`flex gap-3 ${isAlex ? '' : 'flex-row-reverse'}`}>
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.02 }}
+                      className={`flex gap-3 ${isSam ? 'flex-row-reverse' : ''}`}
+                    >
                       <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 shadow-sm"
                         style={{
                           backgroundColor: isAlex ? '#60a5fa20' : '#34d39920',
                           color: isAlex ? '#60a5fa' : '#34d399',
+                          border: `1.5px solid ${isAlex ? '#60a5fa40' : '#34d39940'}`,
                         }}
                       >
                         {speaker[0]}
                       </div>
-                      <div
-                        className={`max-w-[80%] p-3 rounded-2xl text-xs leading-relaxed ${isAlex ? 'rounded-tl-md' : 'rounded-tr-md'}`}
-                        style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
-                      >
-                        {text}
+                      <div className="max-w-[80%]">
+                        <p className="text-[9px] font-semibold mb-1 px-1" style={{ color: isAlex ? '#60a5fa' : '#34d399' }}>
+                          {speaker}
+                        </p>
+                        <div
+                          className={`p-3.5 rounded-2xl text-xs leading-relaxed ${isAlex ? 'rounded-tl-md' : 'rounded-tr-md'}`}
+                          style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                        >
+                          {text}
+                        </div>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 }
 
                 if (!line.trim()) return null;
                 return (
-                  <p key={i} className="text-[10px] italic text-center py-1" style={{ color: 'var(--text-dimmed)' }}>
+                  <p key={i} className="text-[10px] italic text-center py-2 px-4 rounded-lg"
+                    style={{ color: 'var(--text-dimmed)', backgroundColor: 'var(--bg-base)' }}>
                     {line}
                   </p>
                 );
@@ -215,12 +269,22 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
             </div>
           </div>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center gap-3">
-            <Mic className="w-8 h-8" style={{ color: 'var(--text-dimmed)' }} />
-            <p className="text-xs text-center max-w-sm" style={{ color: 'var(--text-dimmed)' }}>
-              Générez un Audio Overview pour obtenir un script de podcast
-              où deux hôtes discutent du contenu de vos sources.
-            </p>
+          <div className="h-full flex flex-col items-center justify-center gap-4">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center"
+              style={{ backgroundColor: 'var(--accent-subtle)' }}
+            >
+              <Mic className="w-7 h-7" style={{ color: 'var(--accent-primary)' }} />
+            </div>
+            <div className="text-center space-y-1.5">
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                Audio Overview
+              </p>
+              <p className="text-xs max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                Générez un podcast IA pour obtenir un script conversationnel
+                où deux hôtes discutent du contenu de vos sources.
+              </p>
+            </div>
           </div>
         )}
       </div>

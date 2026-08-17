@@ -1,77 +1,363 @@
 /**
  * RAGEngine — Retrieval-Augmented Generation pour les notebooks
  *
- * Moteur de recherche sémantique local (TF-IDF) sur les chunks des sources.
- * Fournit le contexte groundé pour le chat Q&A avec citations.
+ * Pipeline de recherche en 5 étapes :
+ *   0. Expansion de requête — décomposition LLM en sous-questions (rappel ++)
+ *   1. Recherche sémantique via Gemini Embeddings (similarité cosinus)
+ *   2. Recherche lexicale TF-IDF (correspondance exacte de termes)
+ *   3. Fusion Reciprocal Rank Fusion (RRF) des deux scores
+ *   4. Re-ranking LLM — re-scorer les top candidats avec un appel modèle court
+ *
+ * La combinaison hybride + re-ranking garantit :
+ * - Rappel élevé (embeddings captent le sens, TF-IDF capte les mots exacts)
+ * - Précision élevée (le LLM élimine les faux positifs en fin de pipeline)
+ * - Couverture étendue (l'expansion de requête capture les angles multiples)
  */
 
+import { createLogger } from "../utils/logger";
+import { generateText } from "../utils/textGeneration";
+import { embeddingStore } from "./EmbeddingStore";
 import type { Source, SourceChunk, RAGSearchOptions, RAGSearchResult } from "./types";
+
+const log = createLogger("RAGEngine");
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 const DEFAULT_MAX_CHUNKS = 10;
 const DEFAULT_MIN_RELEVANCE = 0.1;
 
+/** Poids de la recherche sémantique dans le score final */
+const SEMANTIC_WEIGHT = 0.65;
+/** Poids de la recherche lexicale dans le score final */
+const LEXICAL_WEIGHT = 0.35;
+
+/** Constante k pour le Reciprocal Rank Fusion */
+const RRF_K = 60;
+
+/** Nombre de candidats à re-ranker via LLM */
+const RERANK_TOP_K = 20;
+
+/** Active/désactive le re-ranking LLM (peut être désactivé pour économiser des tokens) */
+const RERANK_ENABLED = true;
+
+/** Active/désactive l'expansion de requête via LLM */
+const QUERY_EXPANSION_ENABLED = true;
+
+/** Nombre maximum de sous-questions générées lors de l'expansion */
+const QUERY_EXPANSION_MAX_SUBQUERIES = 3;
+
+/** Longueur minimale de la query pour déclencher l'expansion (les questions très courtes n'en bénéficient pas) */
+const QUERY_EXPANSION_MIN_LENGTH = 15;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export class RAGEngine {
 
   /**
-   * Recherche les chunks les plus pertinents pour une query dans un ensemble de sources.
+   * Recherche hybride complète : expansion → embeddings + TF-IDF + fusion RRF + re-ranking LLM.
+   * Fallback automatique sur TF-IDF seul si les embeddings ne sont pas disponibles.
    */
-  search(query: string, sources: Source[], options: RAGSearchOptions = {}): RAGSearchResult[] {
+  async searchHybrid(query: string, sources: Source[], options: RAGSearchOptions = {}): Promise<RAGSearchResult[]> {
     const maxChunks = options.maxChunks ?? DEFAULT_MAX_CHUNKS;
     const minRelevance = options.minRelevance ?? DEFAULT_MIN_RELEVANCE;
 
-    // Filtrer par source IDs si spécifié
     const filteredSources = options.sourceIds
       ? sources.filter(s => options.sourceIds!.includes(s.id))
       : sources;
 
     if (filteredSources.length === 0) return [];
 
-    // Tokeniser la query
-    const queryTokens = this.tokenize(query.toLowerCase());
-    if (queryTokens.length === 0) return [];
-
-    // Calculer IDF global sur l'ensemble des chunks
-    const allChunks: { chunk: SourceChunk; source: Source }[] = [];
+    // Collecter tous les chunks
+    const chunkMap = new Map<string, { chunk: SourceChunk; source: Source }>();
     for (const source of filteredSources) {
       for (const chunk of source.chunks) {
-        allChunks.push({ chunk, source });
+        chunkMap.set(chunk.id, { chunk, source });
       }
     }
 
-    const totalDocs = allChunks.length;
-    if (totalDocs === 0) return [];
+    if (chunkMap.size === 0) return [];
 
-    // Calculer le document frequency pour chaque terme de la query
-    const docFreq = new Map<string, number>();
-    for (const token of queryTokens) {
-      let count = 0;
-      for (const { chunk } of allChunks) {
-        if (chunk.content.toLowerCase().includes(token)) {
-          count++;
+    // ── Étape 0 : Expansion de requête via LLM ────────────────────────────
+    // Décompose la question en sous-questions pour augmenter le rappel
+    const queries = await this.expandQuery(query);
+    log.debug(`Expansion: ${queries.length} requête(s) → [${queries.map(q => q.slice(0, 50)).join(" | ")}]`);
+
+    // ── Étape 1 : Recherche sémantique via embeddings (toutes les queries) ─
+    let semanticResults: Map<string, number> = new Map();
+    try {
+      for (const q of queries) {
+        const embeddingResults = await embeddingStore.search(q, {
+          sourceIds: options.sourceIds,
+          maxResults: RERANK_TOP_K * 2,
+          minSimilarity: 0.2,
+        });
+
+        for (const result of embeddingResults) {
+          if (chunkMap.has(result.chunkId)) {
+            // Garder le meilleur score parmi toutes les sous-queries
+            const existing = semanticResults.get(result.chunkId) || 0;
+            semanticResults.set(result.chunkId, Math.max(existing, result.similarity));
+          }
         }
       }
-      docFreq.set(token, count);
+    } catch (e: any) {
+      log.warn(`Embeddings search fallback: ${e.message}`);
     }
 
-    // Scorer chaque chunk
-    const results: RAGSearchResult[] = [];
+    // ── Étape 2 : Recherche lexicale TF-IDF (toutes les queries) ───────────
+    const lexicalScores = new Map<string, number>();
+    for (const q of queries) {
+      const lexResults = this.searchTFIDF(q, filteredSources, RERANK_TOP_K * 2);
+      for (const result of lexResults) {
+        const existing = lexicalScores.get(result.chunk.id) || 0;
+        lexicalScores.set(result.chunk.id, Math.max(existing, result.relevance));
+      }
+    }
+    // Convertir en RAGSearchResult[] pour compatibilité avec la fusion
+    const lexicalResults: RAGSearchResult[] = [];
+    for (const [chunkId, score] of lexicalScores) {
+      const entry = chunkMap.get(chunkId);
+      if (entry) lexicalResults.push({ chunk: entry.chunk, source: entry.source, relevance: score });
+    }
 
-    for (const { chunk, source } of allChunks) {
-      const score = this.scoreChunk(chunk, queryTokens, docFreq, totalDocs, query);
-      if (score >= minRelevance) {
-        results.push({ chunk, source, relevance: score });
+    // ── Étape 3 : Fusion RRF ───────────────────────────────────────────────
+    const fusedScores = new Map<string, number>();
+
+    if (semanticResults.size > 0) {
+      const semanticRanked = Array.from(semanticResults.entries())
+        .sort((a, b) => b[1] - a[1]);
+      const lexicalRanked = lexicalResults
+        .sort((a, b) => b.relevance - a.relevance);
+
+      for (let rank = 0; rank < semanticRanked.length; rank++) {
+        const [chunkId, similarity] = semanticRanked[rank];
+        const rrfScore = SEMANTIC_WEIGHT / (RRF_K + rank + 1);
+        const similarityBonus = similarity > 0.7 ? 0.1 : similarity > 0.5 ? 0.05 : 0;
+        fusedScores.set(chunkId, (fusedScores.get(chunkId) || 0) + rrfScore + similarityBonus);
+      }
+
+      for (let rank = 0; rank < lexicalRanked.length; rank++) {
+        const { chunk } = lexicalRanked[rank];
+        const rrfScore = LEXICAL_WEIGHT / (RRF_K + rank + 1);
+        fusedScores.set(chunk.id, (fusedScores.get(chunk.id) || 0) + rrfScore);
+      }
+    } else {
+      for (const result of lexicalResults) {
+        fusedScores.set(result.chunk.id, result.relevance);
       }
     }
 
-    // Trier par pertinence décroissante
-    results.sort((a, b) => b.relevance - a.relevance);
+    // Construire les candidats triés
+    let candidates: RAGSearchResult[] = [];
+    for (const [chunkId, score] of fusedScores) {
+      if (score < minRelevance * 0.5) continue; // Seuil souple pré-rerank
+      const entry = chunkMap.get(chunkId);
+      if (!entry) continue;
+      candidates.push({
+        chunk: entry.chunk,
+        source: entry.source,
+        relevance: Math.min(score, 1.0),
+      });
+    }
+    candidates.sort((a, b) => b.relevance - a.relevance);
 
-    // Limiter le nombre de résultats
-    return results.slice(0, maxChunks);
+    // ── Étape 4 : Re-ranking LLM ──────────────────────────────────────────
+    const topCandidates = candidates.slice(0, RERANK_TOP_K);
+
+    if (RERANK_ENABLED && topCandidates.length > 3) {
+      try {
+        const reranked = await this.rerankWithLLM(query, topCandidates);
+        // Remplacer les candidats par les résultats re-rankés
+        candidates = reranked;
+      } catch (e: any) {
+        log.warn(`Re-ranking LLM skipped: ${e.message}`);
+        // Continuer avec l'ordre de fusion RRF
+      }
+    }
+
+    // Filtrer et limiter
+    return candidates
+      .filter(r => r.relevance >= minRelevance)
+      .slice(0, maxChunks);
+  }
+
+  // ─── Re-ranking LLM ──────────────────────────────────────────────────────
+
+  /**
+   * Expansion de requête via LLM — décompose la question en sous-questions.
+   *
+   * Stratégie :
+   *   - Questions courtes ou simples → retournées telles quelles
+   *   - Questions complexes → décomposées en 2-3 sous-questions ciblées
+   *   - La question originale est TOUJOURS incluse (garantit le rappel de base)
+   *
+   * Exemples :
+   *   "Comment fonctionne le système d'authentification et quelles sont les failles connues ?"
+   *   → ["Comment fonctionne le système d'authentification et quelles sont les failles connues ?",
+   *       "Architecture et mécanisme du système d'authentification",
+   *       "Vulnérabilités et failles de sécurité connues dans l'authentification"]
+   */
+  private async expandQuery(query: string): Promise<string[]> {
+    // Désactivé ou query trop courte → pas d'expansion
+    if (!QUERY_EXPANSION_ENABLED || query.length < QUERY_EXPANSION_MIN_LENGTH) {
+      return [query];
+    }
+
+    try {
+      const prompt = `Tu es un moteur d'expansion de requête pour un système de recherche documentaire.
+
+TÂCHE : Décompose la question suivante en sous-questions distinctes pour améliorer le rappel de recherche.
+
+QUESTION ORIGINALE : "${query}"
+
+RÈGLES :
+- Génère 2 à ${QUERY_EXPANSION_MAX_SUBQUERIES} sous-questions MAXIMUM
+- Chaque sous-question doit couvrir un angle ou aspect différent de la question
+- Les sous-questions doivent être concises (< 80 caractères chacune)
+- Utilise des reformulations sémantiques variées (synonymes, perspectives différentes)
+- Si la question est déjà simple et atomique, retourne un tableau vide []
+- Ne répète PAS la question originale dans les sous-questions
+
+Réponds UNIQUEMENT en JSON strict :
+["sous-question 1", "sous-question 2"]
+
+Si la question est trop simple pour être décomposée :
+[]`;
+
+      const result = await generateText({
+        prompt,
+        temperature: 0.3,
+        maxOutputTokens: 256,
+        thinkingBudget: 0,
+      });
+
+      // Parser la réponse JSON
+      const jsonMatch = result.text.match(/\[.*\]/s);
+      if (!jsonMatch) {
+        log.debug("Query expansion: pas de JSON dans la réponse, skip");
+        return [query];
+      }
+
+      const subQueries: string[] = JSON.parse(jsonMatch[0]);
+
+      // Validation : doit être un tableau de strings non-vides
+      if (!Array.isArray(subQueries) || subQueries.length === 0) {
+        return [query];
+      }
+
+      // Filtrer les sous-questions valides et limiter
+      const validSubQueries = subQueries
+        .filter(q => typeof q === "string" && q.trim().length >= 5)
+        .slice(0, QUERY_EXPANSION_MAX_SUBQUERIES);
+
+      if (validSubQueries.length === 0) {
+        return [query];
+      }
+
+      // Toujours inclure la question originale en premier
+      return [query, ...validSubQueries];
+    } catch (e: any) {
+      log.warn(`Query expansion skipped: ${e.message}`);
+      return [query];
+    }
+  }
+
+  // ─── Re-ranking LLM (passage scoring) ─────────────────────────────────────
+
+  /**
+   * Re-score les candidats avec un appel LLM léger.
+   * Le modèle évalue la pertinence de chaque passage par rapport à la question.
+   *
+   * Stratégie : un seul appel batch qui note tous les passages (pas un appel par chunk).
+   * Retourne les résultats re-triés avec des scores ajustés.
+   */
+  private async rerankWithLLM(query: string, candidates: RAGSearchResult[]): Promise<RAGSearchResult[]> {
+    // Préparer les passages pour le LLM (tronqués pour économiser les tokens)
+    const passages = candidates.map((c, i) => ({
+      index: i,
+      text: c.chunk.content.slice(0, 400), // Max 400 chars par passage
+      source: c.source.title,
+    }));
+
+    const prompt = `Tu es un système de re-ranking de recherche. Évalue la pertinence de chaque passage par rapport à la question.
+
+QUESTION : "${query}"
+
+PASSAGES :
+${passages.map(p => `[${p.index}] (${p.source}) ${p.text}`).join("\n\n")}
+
+Pour chaque passage, attribue un score de pertinence de 0 à 10 :
+- 0 = totalement hors sujet
+- 3 = tangentiellement lié
+- 5 = partiellement pertinent
+- 7 = pertinent
+- 10 = répond directement à la question
+
+Réponds UNIQUEMENT en JSON strict, un tableau de scores dans l'ordre des passages :
+[score_0, score_1, score_2, ...]`;
+
+    const result = await generateText({
+      prompt,
+      temperature: 0.0,
+      maxOutputTokens: 256,
+      thinkingBudget: 0, // Pas besoin de chain-of-thought
+    });
+
+    // Parser les scores
+    const jsonMatch = result.text.match(/\[[\d\s,.\n]+\]/);
+    if (!jsonMatch) {
+      log.warn("Re-ranking: impossible de parser la réponse LLM");
+      return candidates;
+    }
+
+    const scores: number[] = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(scores) || scores.length === 0) {
+      return candidates;
+    }
+
+    // Appliquer les scores LLM (normaliser à 0-1 et combiner avec le score initial)
+    const reranked: RAGSearchResult[] = [];
+    for (let i = 0; i < candidates.length; i++) {
+      const llmScore = (scores[i] ?? 5) / 10; // Normaliser 0-10 → 0-1
+      const originalScore = candidates[i].relevance;
+
+      // Score final : combinaison du score hybride et du score LLM
+      // Le LLM a le dernier mot (poids 60%) mais le score initial pèse aussi (40%)
+      const finalScore = originalScore * 0.4 + llmScore * 0.6;
+
+      reranked.push({
+        ...candidates[i],
+        relevance: Math.min(finalScore, 1.0),
+      });
+    }
+
+    // Re-trier par le nouveau score
+    reranked.sort((a, b) => b.relevance - a.relevance);
+
+    log.debug(`Re-ranking: ${candidates.length} passages re-scorés, top score: ${reranked[0]?.relevance.toFixed(3)}`);
+    return reranked;
+  }
+
+  /**
+   * Recherche synchrone TF-IDF (pas d'embeddings).
+   * Utilisé comme fallback et comme composante de la recherche hybride.
+   */
+  search(query: string, sources: Source[], options: RAGSearchOptions = {}): RAGSearchResult[] {
+    const maxChunks = options.maxChunks ?? DEFAULT_MAX_CHUNKS;
+    const minRelevance = options.minRelevance ?? DEFAULT_MIN_RELEVANCE;
+
+    const filteredSources = options.sourceIds
+      ? sources.filter(s => options.sourceIds!.includes(s.id))
+      : sources;
+
+    if (filteredSources.length === 0) return [];
+
+    const results = this.searchTFIDF(query, filteredSources, maxChunks * 2);
+
+    return results
+      .filter(r => r.relevance >= minRelevance)
+      .sort((a, b) => b.relevance - a.relevance)
+      .slice(0, maxChunks);
   }
 
   /**
@@ -147,7 +433,47 @@ export class RAGEngine {
     return citations;
   }
 
-  // ─── Scoring TF-IDF ──────────────────────────────────────────────────────
+  // ─── TF-IDF interne ──────────────────────────────────────────────────────
+
+  private searchTFIDF(query: string, sources: Source[], maxResults: number): RAGSearchResult[] {
+    const queryTokens = this.tokenize(query.toLowerCase());
+    if (queryTokens.length === 0) return [];
+
+    // Collecter tous les chunks
+    const allChunks: { chunk: SourceChunk; source: Source }[] = [];
+    for (const source of sources) {
+      for (const chunk of source.chunks) {
+        allChunks.push({ chunk, source });
+      }
+    }
+
+    const totalDocs = allChunks.length;
+    if (totalDocs === 0) return [];
+
+    // Document frequency
+    const docFreq = new Map<string, number>();
+    for (const token of queryTokens) {
+      let count = 0;
+      for (const { chunk } of allChunks) {
+        if (chunk.content.toLowerCase().includes(token)) {
+          count++;
+        }
+      }
+      docFreq.set(token, count);
+    }
+
+    // Scorer chaque chunk
+    const results: RAGSearchResult[] = [];
+    for (const { chunk, source } of allChunks) {
+      const score = this.scoreChunk(chunk, queryTokens, docFreq, totalDocs, query);
+      if (score > 0) {
+        results.push({ chunk, source, relevance: score });
+      }
+    }
+
+    results.sort((a, b) => b.relevance - a.relevance);
+    return results.slice(0, maxResults);
+  }
 
   private scoreChunk(
     chunk: SourceChunk,
@@ -164,13 +490,10 @@ export class RAGEngine {
     let score = 0;
     let matchedTerms = 0;
 
-    // TF-IDF scoring
     for (const token of queryTokens) {
-      // Term Frequency (normalisée)
       const tf = contentTokens.filter(t => t === token).length / contentTokens.length;
       if (tf === 0) continue;
 
-      // Inverse Document Frequency
       const df = docFreq.get(token) || 1;
       const idf = Math.log(1 + totalDocs / df);
 
@@ -183,41 +506,33 @@ export class RAGEngine {
       score += 0.5;
     }
 
-    // Bonus: couverture de la query (% de termes trouvés)
+    // Bonus: couverture de la query
     const coverage = matchedTerms / queryTokens.length;
     score += coverage * 0.3;
 
-    // Bonus: proximité des termes (termes proches dans le texte)
+    // Bonus: proximité des termes
     if (matchedTerms >= 2) {
-      const proximityBonus = this.computeProximityBonus(contentLower, queryTokens);
-      score += proximityBonus;
+      score += this.computeProximityBonus(contentLower, queryTokens);
     }
 
-    // Normaliser entre 0 et 1
     return Math.min(score, 1.0);
   }
 
-  /**
-   * Bonus de proximité : les termes de la query sont-ils proches dans le chunk ?
-   */
   private computeProximityBonus(content: string, queryTokens: string[]): number {
     const positions: number[] = [];
-
     for (const token of queryTokens) {
       const idx = content.indexOf(token);
       if (idx >= 0) positions.push(idx);
     }
 
     if (positions.length < 2) return 0;
-
     positions.sort((a, b) => a - b);
     const span = positions[positions.length - 1] - positions[0];
-    const maxSpan = 500; // Si les termes sont dans un fenêtre de 500 chars
+    const maxSpan = 500;
 
     if (span <= maxSpan) {
       return 0.2 * (1 - span / maxSpan);
     }
-
     return 0;
   }
 
@@ -233,14 +548,12 @@ export class RAGEngine {
 // ─── Stop Words FR/EN ────────────────────────────────────────────────────────
 
 const STOP_WORDS = new Set([
-  // Français
   "le", "la", "les", "de", "du", "des", "un", "une", "et", "en", "au", "aux",
   "ce", "ces", "son", "sa", "ses", "il", "elle", "on", "nous", "vous", "ils",
   "elles", "se", "ne", "pas", "que", "qui", "ou", "mais", "donc", "car",
   "dans", "sur", "par", "pour", "avec", "sans", "sous", "entre",
   "cette", "mon", "ton", "leur", "nos", "vos", "leurs",
   "est", "sont", "été", "avoir", "être", "fait", "peut", "plus",
-  // Anglais
   "the", "is", "are", "was", "were", "be", "been", "being",
   "have", "has", "had", "do", "does", "did", "will", "would",
   "shall", "should", "may", "might", "can", "could",

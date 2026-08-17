@@ -4,11 +4,14 @@
  * based on the user's profile setting (textProvider).
  *
  * Usage:
- *   import { generateText, setTextGenerationProfile } from './utils/textGeneration';
+ *   import { generateText, generateTextStream, setTextGenerationProfile } from './utils/textGeneration';
  *   const result = await generateText({ prompt: "...", systemPrompt: "..." });
+ *   const stream = generateTextStream({ prompt: "...", onChunk: (text) => ... });
  */
 
 import { withGeminiRetry } from "./geminiKeyPool";
+import { getNextGeminiKey } from "./geminiKeyPool";
+import { GoogleGenAI } from "@google/genai";
 
 // ── Profile interface (minimal subset needed here) ──────────────────────────
 
@@ -76,7 +79,179 @@ export async function generateText(options: GenerateTextOptions): Promise<Genera
   return generateWithGemini(options);
 }
 
-// ── Gemini implementation ───────────────────────────────────────────────────
+// ── Streaming support ───────────────────────────────────────────────────────
+
+export interface GenerateTextStreamOptions extends GenerateTextOptions {
+  /** Callback appelé pour chaque chunk de texte reçu */
+  onChunk: (text: string) => void;
+  /** Callback appelé quand le stream est terminé (optionnel) */
+  onDone?: (fullText: string) => void;
+  /** Callback d'erreur (optionnel) */
+  onError?: (error: Error) => void;
+  /** Signal d'annulation (optionnel) */
+  signal?: AbortSignal;
+}
+
+/**
+ * Generate text in streaming mode — appelle onChunk au fur et à mesure.
+ * Supporte Gemini (generateContentStream) et OpenRouter (SSE).
+ */
+export async function generateTextStream(options: GenerateTextStreamOptions): Promise<string> {
+  const provider = _profile.textProvider || 'gemini';
+
+  if (provider === 'openrouter') {
+    return streamWithOpenRouter(options);
+  }
+  return streamWithGemini(options);
+}
+
+// ── Gemini streaming implementation ─────────────────────────────────────────
+
+async function streamWithGemini(options: GenerateTextStreamOptions): Promise<string> {
+  const model = options.geminiModel || 'gemini-2.5-flash';
+
+  const parts = options.geminiParts
+    ? options.geminiParts
+    : [{ text: options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt }];
+
+  const key = getNextGeminiKey();
+  if (!key) throw new Error("Aucune clé Gemini API disponible.");
+
+  const ai = new GoogleGenAI({ apiKey: key });
+
+  const response = await ai.models.generateContentStream({
+    model,
+    contents: [{ role: 'user', parts }],
+    config: {
+      temperature: options.temperature ?? 0.5,
+      ...(options.maxOutputTokens !== undefined
+        ? { maxOutputTokens: options.maxOutputTokens }
+        : {}),
+      ...(options.thinkingBudget !== undefined
+        ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } }
+        : {}),
+    },
+  });
+
+  let fullText = "";
+
+  for await (const chunk of response) {
+    if (options.signal?.aborted) break;
+
+    // Extraire le texte visible (ignorer les parties "thought")
+    const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+    for (const part of parts) {
+      if ((part as any).thought) continue;
+      const text = (part as any).text;
+      if (text) {
+        fullText += text;
+        options.onChunk(text);
+      }
+    }
+  }
+
+  options.onDone?.(fullText);
+  return fullText;
+}
+
+// ── OpenRouter streaming implementation ─────────────────────────────────────
+
+async function streamWithOpenRouter(options: GenerateTextStreamOptions): Promise<string> {
+  const orKey = _profile.openrouterApiKey?.trim()
+    || process.env.OPENROUTER_API_KEY
+    || process.env.OPENROUTER_FREE_API_KEY;
+
+  if (!orKey) {
+    console.warn('[TextGen] OpenRouter configuré mais aucune clé disponible, fallback Gemini stream');
+    return streamWithGemini(options);
+  }
+
+  const model = options.openrouterModel || _profile.openrouterModel || 'google/gemini-2.5-flash';
+
+  const messages: any[] = [];
+  if (options.systemPrompt) {
+    messages.push({ role: 'system', content: options.systemPrompt });
+  }
+  messages.push({ role: 'user', content: options.prompt });
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
+  // Si un signal externe est fourni, le propager
+  if (options.signal) {
+    options.signal.addEventListener('abort', () => controller.abort());
+  }
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${orKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.OPENROUTER_REFERER || 'https://jarvis-os.local',
+        'X-Title': process.env.OPENROUTER_TITLE || 'Jarvis-OS',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: options.temperature ?? 0.5,
+        max_tokens: options.maxTokens ?? options.maxOutputTokens ?? 8192,
+        stream: true,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`OpenRouter ${response.status}: ${errText.slice(0, 300)}`);
+    }
+
+    let fullText = "";
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("No response body reader");
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") break;
+
+        try {
+          const parsed = JSON.parse(data);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) {
+            fullText += content;
+            options.onChunk(content);
+          }
+        } catch { /* skip malformed chunks */ }
+      }
+    }
+
+    options.onDone?.(fullText);
+    return fullText;
+  } catch (e: any) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') {
+      options.onDone?.(``);
+      return "";
+    }
+    options.onError?.(e);
+    throw e;
+  }
+}
+
+// ── Gemini non-streaming implementation ─────────────────────────────────────
 
 async function generateWithGemini(options: GenerateTextOptions): Promise<GenerateTextResult> {
   const model = options.geminiModel || 'gemini-2.5-flash';
