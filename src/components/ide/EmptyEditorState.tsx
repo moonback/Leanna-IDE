@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 import {
   Plus, X, FolderOpen, FileText,
-  Command, MessageSquare,
+  MessageSquare,
   Code2, GitBranch, BrainCircuit,
   Circle, Search,
 } from 'lucide-react';
@@ -88,7 +88,6 @@ const BURST_DURATION = 1.1; // secondes, durée de l'explosion à la connexion
 
 interface ParticleFieldProps {
   connected: boolean;
-  connecting?: boolean;
   isBusy: boolean;
   activeTool: string;
   getInputAmplitude: () => number;
@@ -97,7 +96,6 @@ interface ParticleFieldProps {
 
 const ParticleField = React.memo(function ParticleField({
   connected,
-  connecting = false,
   isBusy,
   activeTool,
   getInputAmplitude,
@@ -750,11 +748,10 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   onOpenFile,
   onCreateFile,
   onShowSettings,
-  onOpenSearch,
   onOpenChat,
 }: EmptyEditorStateProps) {
   const ws = useWorkspaceState();
-  const { connected, connecting, isBusy, getInputAmplitude, getOutputAmplitude, connect } =
+  const { connected, isBusy, getInputAmplitude, getOutputAmplitude, connect } =
     useLiveAPIContext();
   const { profile } = useProfile();
   const { theme } = useTheme();
@@ -846,22 +843,21 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
   // Handler Chat IA : connecte l'assistant si nécessaire, puis ouvre le panneau chat
   const handleOpenChat = useCallback(() => {
-    if (!connected && !connecting) {
+    if (!connected) {
       connect([], 'full');
     }
     if (autoOpenChat) {
       onOpenChat?.();
     }
-  }, [connected, connecting, connect, onOpenChat, autoOpenChat]);
+  }, [connected, connect, onOpenChat, autoOpenChat]);
 
   // Raccourcis pour les actions
   const actions = useMemo(
     () => [
       { label: 'Nouveau fichier', desc: 'Créer un fichier dans le projet actif', icon: Plus, onClick: onCreateFile, shortcut: `${MOD}+N`, id: 'new-file' },
-      // { label: 'Recherche', desc: 'Chercher dans tout le projet', icon: Search, onClick: onOpenSearch, shortcut: `${MOD}+Shift+F`, id: 'search' },
       { label: 'Chat IA', desc: `Discuter avec ${profile.aiName || 'l\'agent'}`, icon: MessageSquare, onClick: handleOpenChat, shortcut: `${MOD}+L`, id: 'chat-ia' },
     ],
-    [onCreateFile, onShowSettings, onOpenSearch, handleOpenChat, profile.aiName]
+    [onCreateFile, handleOpenChat, profile.aiName]
   );
 
   // Liens rapides
@@ -920,7 +916,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
       )}
 
       <motion.div
-        className="w-full max-w-[720px] px-8 py-10 relative z-10"
+        className="w-full max-w-[680px] px-8 py-10 relative z-10"
         style={{
           backgroundColor: 'var(--bg-panel)',
           border: '1px solid var(--border-base)',
@@ -932,103 +928,64 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25, ease: 'easeOut' }}
       >
-        {/* Indicateur de statut */}
+        {/* ── Header : statut + salutation ── */}
         <motion.div
-          className="flex items-center justify-center mb-5"
+          className="text-center mb-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.05 }}
         >
-          <div
-            className="flex items-center gap-2 px-3 py-2"
-            style={{
-              backgroundColor: 'var(--bg-panel)',
-              border: '1px solid var(--border-base)',
-              borderRadius: 'var(--radius-full)',
-            }}
-          >
-            <span
-              className="w-[6px] h-[6px] rounded-full"
+          <div className="flex items-center justify-center mb-4">
+            <div
+              className="flex items-center gap-2 px-3 py-1.5"
               style={{
-                backgroundColor: connected ? 'var(--color-success)' : 'var(--color-warning)',
-                boxShadow: connected
-                  ? '0 0 6px var(--color-success)'
-                  : '0 0 6px var(--color-warning)',
-              }}
-            />
-            <span
-              className="text-[10px] font-mono uppercase tracking-[0.14em]"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {profile.aiName || 'Leanna'} · {connected ? 'en ligne' : 'hors ligne'}
-            </span>
-          </div>
-        </motion.div>
-
-        {/* Salutation */}
-        <motion.h1
-          className="text-[22px] font-semibold tracking-tight text-center mb-8"
-          style={{ color: 'var(--text-primary)' }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-        >
-          {profile.userName ? `${greeting}, ${profile.userName}` : greeting}
-        </motion.h1>
-
-
-        {/* Activation Agent */}
-        {/* {!connected && (
-          <motion.div
-            className="mb-7 flex justify-center"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12 }}
-          >
-            <button
-              type="button"
-              onClick={() => connect([], 'full')}
-              disabled={connecting}
-              className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl font-semibold transition-all duration-200"
-              style={{
-                backgroundColor: 'var(--accent-primary)',
-                color: '#fff',
-                boxShadow: '0 14px 40px rgba(56,189,248,0.28), 0 0 60px rgba(56,189,248,0.12)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-                e.currentTarget.style.boxShadow = '0 18px 50px rgba(56,189,248,0.35), 0 0 80px rgba(56,189,248,0.18)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'none';
-                e.currentTarget.style.boxShadow = '0 14px 40px rgba(56,189,248,0.28), 0 0 60px rgba(56,189,248,0.12)';
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border-base)',
+                borderRadius: 'var(--radius-full)',
               }}
             >
-              <BrainCircuit size={16} />
-              <span>
-                {connecting ? 'Connexion...' : `Activer ${profile.aiName || 'l’agent'}`}
+              <span
+                className="w-[6px] h-[6px] rounded-full"
+                style={{
+                  backgroundColor: connected ? 'var(--color-success)' : 'var(--color-warning)',
+                  boxShadow: connected
+                    ? '0 0 6px var(--color-success)'
+                    : '0 0 6px var(--color-warning)',
+                }}
+              />
+              <span
+                className="text-[10px] font-mono uppercase tracking-[0.12em]"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                {profile.aiName || 'Leanna'} · {connected ? 'en ligne' : 'hors ligne'}
               </span>
-            </button>
-          </motion.div>
-        )} */}
+            </div>
+          </div>
+          <h1
+            className="text-[24px] font-semibold tracking-tight"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {profile.userName ? `${greeting}, ${profile.userName}` : greeting}
+          </h1>
+        </motion.div>
 
         {/* Cartes d'action */}
         <motion.div
-          className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6"
+          className="grid grid-cols-2 gap-3 mb-5"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.15 }}
+          transition={{ delay: 0.12 }}
         >
           {actions.map(({ label, desc, icon: Icon, onClick, shortcut, id }) => (
-            <div key={label} className="relative flex flex-col">
+            <div key={label} className="flex">
               <button
                 onClick={onClick}
                 disabled={!onClick}
-                className="group card-hover-gradient flex flex-col items-start gap-2.5 p-4 text-left transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none"
+                className="group flex flex-col items-start gap-3 p-4 text-left transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none w-full justify-between"
                 style={{
                   backgroundColor: 'var(--bg-secondary)',
                   border: '1px solid var(--border-base)',
-                  borderRadius: id === 'chat-ia' ? 'var(--radius-xl) var(--radius-xl) 0 0' : 'var(--radius-xl)',
+                  borderRadius: 'var(--radius-xl)',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = 'var(--accent-primary)';
@@ -1045,73 +1002,65 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               >
                 <div className="flex items-center justify-between w-full">
                   <div
-                    className="w-8 h-8 flex items-center justify-center"
+                    className="w-9 h-9 flex items-center justify-center"
                     style={{
                       backgroundColor: 'var(--accent-subtle)',
                       borderRadius: 'var(--radius-md)',
                     }}
                   >
-                    <Icon size={14} style={{ color: 'var(--accent-primary)' }} />
+                    <Icon size={15} style={{ color: 'var(--accent-primary)' }} />
                   </div>
                   {shortcut && <Kbd>{shortcut}</Kbd>}
                 </div>
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  <span className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
                     {label}
                   </span>
                   <span className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                     {desc}
                   </span>
                 </div>
-              </button>
 
-              {/* Toggle "Ouvrir le panneau" — uniquement sur la carte Chat IA */}
-              {id === 'chat-ia' && (
-                <div
-                  className="flex items-center justify-between px-4 py-2"
-                  style={{
-                    backgroundColor: 'var(--bg-secondary)',
-                    borderLeft: '1px solid var(--border-base)',
-                    borderRight: '1px solid var(--border-base)',
-                    borderBottom: '1px solid var(--border-base)',
-                    borderRadius: '0 0 var(--radius-xl) var(--radius-xl)',
-                  }}
-                >
-                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                    Ouvrir le panneau
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); toggleAutoOpenChat(); }}
-                    className="relative w-[28px] h-[14px] rounded-full transition-colors duration-200"
-                    style={{
-                      backgroundColor: autoOpenChat
-                        ? 'var(--accent-primary)'
-                        : 'var(--bg-ctrl)',
-                      border: `1px solid ${autoOpenChat ? 'var(--accent-primary)' : 'var(--border-base)'}`,
-                    }}
-                    aria-label={autoOpenChat ? 'Désactiver ouverture auto du panneau chat' : 'Activer ouverture auto du panneau chat'}
-                    aria-pressed={autoOpenChat}
-                    title={autoOpenChat ? 'Panneau chat : s\'ouvre automatiquement' : 'Panneau chat : ne s\'ouvre pas automatiquement'}
+                {/* Toggle intégré — uniquement sur la carte Chat IA */}
+                {id === 'chat-ia' && (
+                  <div
+                    className="flex items-center justify-between w-full mt-2 pt-2.5"
+                    style={{ borderTop: '1px solid var(--border-base)' }}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <div
-                      className="absolute top-[1.5px] w-[9px] h-[9px] rounded-full transition-all duration-200"
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      Ouvrir le panneau
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleAutoOpenChat(); }}
+                      className="relative w-[28px] h-[14px] rounded-full transition-colors duration-200"
                       style={{
-                        left: autoOpenChat ? '15px' : '2px',
-                        backgroundColor: autoOpenChat ? '#fff' : 'var(--text-muted)',
-                        boxShadow: autoOpenChat ? '0 0 4px rgba(56,189,248,0.4)' : 'none',
+                        backgroundColor: autoOpenChat ? 'var(--accent-primary)' : 'var(--bg-ctrl)',
+                        border: `1px solid ${autoOpenChat ? 'var(--accent-primary)' : 'var(--border-base)'}`,
                       }}
-                    />
-                  </button>
-                </div>
-              )}
+                      aria-label={autoOpenChat ? 'Désactiver ouverture auto du panneau chat' : 'Activer ouverture auto du panneau chat'}
+                      aria-pressed={autoOpenChat}
+                    >
+                      <div
+                        className="absolute top-[1.5px] w-[9px] h-[9px] rounded-full transition-all duration-200"
+                        style={{
+                          left: autoOpenChat ? '15px' : '2px',
+                          backgroundColor: autoOpenChat ? '#fff' : 'var(--text-muted)',
+                          boxShadow: autoOpenChat ? '0 0 4px rgba(56,189,248,0.4)' : 'none',
+                        }}
+                      />
+                    </button>
+                  </div>
+                )}
+              </button>
             </div>
           ))}
         </motion.div>
 
         {/* Fichiers récents */}
         {recentFiles.length > 0 && (
-          <motion.div className="mb-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+          <motion.div className="mb-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.18 }}>
             <div className="flex items-center justify-between mb-2.5 px-0.5">
               <span
                 className="text-[9px] font-mono uppercase tracking-[0.14em] font-semibold"
@@ -1139,12 +1088,11 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             <div
               className="overflow-hidden"
               style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border-base)',
-                borderRadius: 'var(--radius-xl)',
-                backdropFilter: 'blur(14px)',
-              }}
-            >
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-base)',
+                  borderRadius: 'var(--radius-xl)',
+                }}
+              >
               {recentFiles.map(({ path, language }, index) => {
                 const fileName = path.split(/[/\\]/).pop() || path;
                 const dirPath = path.split(/[/\\]/).slice(-3, -1).join('/');
@@ -1156,11 +1104,9 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                     style={{ borderTop: index === 0 ? 'none' : '1px solid var(--border-base)' }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = 'var(--ctrl-hover)';
-                      e.currentTarget.style.paddingLeft = '16px';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.paddingLeft = '14px';
                     }}
                   >
                     <FileText size={12} style={{ color: 'var(--ctrl-icon)' }} className="flex-shrink-0" />
@@ -1194,7 +1140,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
         {/* Barre d'état workspace / git */}
         <motion.div
-          className="flex items-center text-[10px] font-mono overflow-hidden mb-6"
+          className="flex items-center text-[10px] font-mono overflow-hidden mb-4"
           style={{
             borderRadius: 'var(--radius-lg)',
             backgroundColor: 'var(--bg-secondary)',
