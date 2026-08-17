@@ -2,10 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspens
 // Monaco Editor - lazy loaded to reduce initial bundle
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.Editor })));
 // Panels - lazy loaded
-const KnowledgeDashboard = lazy(() => import('../components/panels/KnowledgeDashboard').then(m => ({ default: m.KnowledgeDashboard })));
 const DocumentPanel = lazy(() => import('../components/panels/DocumentPanel').then(m => ({ default: m.DocumentPanel })));
 const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel').then(m => ({ default: m.SandboxPanel })));
 const VisionPanel = lazy(() => import('../components/panels/VisionPanel').then(m => ({ default: m.VisionPanel })));
+const DocumentsView = lazy(() => import('./DocumentsView'));
 import { X } from 'lucide-react';
 import { IdeModal, type ModalMode } from '../components/ide/IdeModal';
 import { ContextMenu, type ContextTarget, type ClipboardEntry } from '../components/ide/ContextMenu';
@@ -748,7 +748,7 @@ export default function IdeView() {
                         )
                       ) : showKnowledge ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement du dashboard…</div></div>}>
-                          <KnowledgeDashboard onClose={() => setShowKnowledge(false)} />
+                          <DocumentsView />
                         </Suspense>
                       ) : showDocuments ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement…</div></div>}>

@@ -48,6 +48,7 @@ const CRITICAL_SKILLS = [
   'aiStudioDirectives',
   'guidelines',
   'documentLinker',
+  'documentKnowledge',
 ];
 const CRITICAL_SKILL_SET = new Set(CRITICAL_SKILLS);
 
@@ -89,6 +90,7 @@ import { projectSkill } from "./project";
 import { agentsSkill } from "./agents";
 import { aiStudioDirectivesSkill } from "./aiStudioDirectives";
 import { documentLinkerSkill } from "./documentLinker";
+import { documentKnowledgeSkill } from "./documentKnowledge";
 import { agentOrchestrator } from "../agents";
 import { missionSkill, initMissionSystem, updateMissionSkills } from "./mission";
 import { Executor } from "../mission";
@@ -114,6 +116,7 @@ const STATIC_SKILLS: Record<string, Skill> = {
   mission: missionSkill,
   aiStudioDirectives: aiStudioDirectivesSkill,
   documentLinker: documentLinkerSkill,
+  document_knowledge: documentKnowledgeSkill,
 };
 
 // ── Compatibilité ESM/CJS pour __dirname ──────────────────────────────────────
