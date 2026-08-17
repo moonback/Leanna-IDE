@@ -75,12 +75,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
     label: 'Code & Recherche',
     items: [
       {
-        id: 'code-tools',
-        type: 'submenu',
-        icon: Code2,
-        label: 'Code & Recherche',
-        children: [
-          {
             id: 'search',
             type: 'button',
             icon: Search,
@@ -89,8 +83,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
             stateKey: 'showGlobalSearch',
             actionKey: 'onToggleSearch',
           },
-        ],
-      },
     ],
   },
 
