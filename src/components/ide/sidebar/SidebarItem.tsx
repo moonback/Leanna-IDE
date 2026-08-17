@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { ChevronRight, Brain, MessageCirclePlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { LucideIcon } from 'lucide-react';
@@ -20,20 +20,8 @@ interface SidebarItemProps {
 
 export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmenu }: SidebarItemProps) {
   const [hovered, setHovered] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
   const [ripple, setRipple] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rippleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (hovered) {
-      timerRef.current = setTimeout(() => setShowTooltip(true), 300);
-    } else {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      setShowTooltip(false);
-    }
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [hovered]);
 
   const handleClick = () => {
     setRipple(true);
@@ -157,62 +145,6 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
           </div>
         )}
       </motion.button>
-
-      {/* Tooltip */}
-      <AnimatePresence>
-        {showTooltip && (
-          <motion.div
-            initial={{ opacity: 0, x: -6, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: -6, scale: 0.95 }}
-            transition={{ duration: 0.1, ease: 'easeOut' }}
-            className="absolute left-full ml-2.5 pointer-events-none z-[200] whitespace-nowrap"
-            style={{
-              top: '50%',
-              transform: 'translateY(-50%)',
-            }}
-          >
-            {/* Arrow */}
-            <div
-              className="absolute top-1/2 -left-[4px] -translate-y-1/2"
-              style={{
-                width: 0,
-                height: 0,
-                borderTop: '4px solid transparent',
-                borderBottom: '4px solid transparent',
-                borderRight: '4px solid var(--border-strong)',
-              }}
-            />
-            <div
-              className="absolute top-1/2 -left-[2px] -translate-y-1/2"
-              style={{
-                width: 0,
-                height: 0,
-                borderTop: '3px solid transparent',
-                borderBottom: '3px solid transparent',
-                borderRight: '3px solid var(--bg-ctrl)',
-              }}
-            />
-            {/* Label */}
-            <div
-              className="px-2.5 py-1.5 rounded-lg"
-              style={{
-                backgroundColor: 'var(--bg-ctrl)',
-                border: '1px solid var(--border-strong)',
-                boxShadow: 'var(--shadow-md)',
-                backdropFilter: 'blur(12px)',
-              }}
-            >
-              <span
-                className="text-[11px] font-medium"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                {title}
-              </span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -258,7 +190,6 @@ export function SidebarStatusIndicator({
           transition: 'background-color 0.25s ease, box-shadow 0.3s ease',
         }}
         type="button"
-        title={muted ? 'Micro coup\u00e9 \u2014 clic pour reactiver' : 'Micro actif \u2014 clic pour couper'}
         aria-label={muted ? 'Reactiver le micro' : 'Couper le micro'}
         aria-pressed={true}
         onClick={handleClick}
@@ -330,7 +261,6 @@ export function SidebarStatusIndicator({
         transition: 'background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
       }}
       type="button"
-      title="Demarrer l'assistant IA"
       aria-label="Activer l'agent IA"
       aria-pressed={false}
       onClick={handleClick}

@@ -15,7 +15,7 @@ import {
   GitBranch, Camera, Monitor,
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Cable, Container, Bot, Crosshair, Database,
-  GitBranchPlus, Activity, Wrench, Code2, Users, FileStack,
+  Activity, Wrench, Code2, Users, FileStack,
   Wand2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -105,14 +105,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
         icon: GitBranch,
         label: 'Source & Déploiement',
         children: [
-          {
-            id: 'git',
-            type: 'button',
-            icon: GitBranchPlus,
-            label: 'Contrôle de source',
-            stateKey: 'showGit',
-            actionKey: 'onToggleGit',
-          },
           {
             id: 'sandbox',
             type: 'button',

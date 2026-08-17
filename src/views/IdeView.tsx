@@ -35,7 +35,6 @@ import { ChatPanel } from '../components/ide/ChatPanel';
 import { LiveSkillsMonitor } from '../components/ide/LiveSkillsMonitor';
 import { WorkflowPanel } from '../components/ide/WorkflowPanel';
 import { McpPanel } from '../components/panels/McpPanel';
-import { GitSourceControl } from '../components/ide/GitSourceControl';
 import { MarkdownPreview } from '../components/ide/MarkdownPreview';
 import { EmptyEditorState } from '../components/ide/EmptyEditorState';
 import { SelfEditBanner } from '../components/ide/SelfEditBanner';
@@ -121,7 +120,6 @@ export default function IdeView() {
   const [showCommandPalette, setShowCommandPalette] = useState<'files' | 'commands' | null>(null);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showRunMenu, setShowRunMenu] = useState(false);
-  const [showGit, setShowGit] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
   const [showMcp, setShowMcp] = useState(false);
   const [showSkillsMonitor, setShowSkillsMonitor] = useState(false);
@@ -549,7 +547,6 @@ export default function IdeView() {
         showGlobalSearch={showGlobalSearch}
         showSettings={showSettingsPanel}
         showRunMenu={showRunMenu}
-        showGit={showGit}
         showSandbox={showSandbox}
         showWorkflow={showWorkflow}
         showSkillsMonitor={showSkillsMonitor}
@@ -575,7 +572,6 @@ export default function IdeView() {
           if (!showSettingsPanel) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); }
         }}
         onToggleRunMenu={() => setShowRunMenu(v => !v)}
-        onToggleGit={() => setShowGit(v => !v)}
         onToggleSandbox={toggleSandbox}
         onToggleWorkflow={() => setShowWorkflow(v => !v)}
         onToggleSkillsMonitor={() => setShowSkillsMonitor(v => !v)}
@@ -627,7 +623,7 @@ export default function IdeView() {
       />
 
       {/* File Explorer */}
-      {showExplorer && !showGit && (
+      {showExplorer && (
         <FileExplorer
           tree={fileSystem.tree}
           expandedDirs={fileSystem.expandedDirs}
@@ -648,11 +644,6 @@ export default function IdeView() {
           onNavigate={fileSystem.setCurrentDir}
           onMoveEntry={fileSystem.moveEntry}
         />
-      )}
-
-      {/* Git Source Control Panel */}
-      {showGit && (
-        <GitSourceControl onClose={() => setShowGit(false)} />
       )}
 
       {/* Editor Area */}

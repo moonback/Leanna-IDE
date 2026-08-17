@@ -15,7 +15,6 @@ export function useIDEState(props: UnifiedSidebarProps) {
     showGlobalSearch: props.showGlobalSearch ?? false,
     showSettings: props.showSettings ?? false,
     showRunMenu: props.showRunMenu ?? false,
-    showGit: props.showGit ?? false,
     showSandbox: props.showSandbox ?? false,
     showWorkflow: props.showWorkflow ?? false,
     showSkillsMonitor: props.showSkillsMonitor ?? false,
@@ -33,7 +32,6 @@ export function useIDEState(props: UnifiedSidebarProps) {
   }), [
     props.showExplorer, props.showGlobalSearch,
     props.showSettings, props.showRunMenu,
-    props.showGit,
     props.showSandbox, props.showWorkflow, props.showSkillsMonitor,
     props.showChat, props.showAgents, props.showAgentBuilder, props.showMissions,
     props.showKnowledge, props.showDocuments, props.showSystemHealth, props.showMcp,
@@ -46,7 +44,6 @@ export function useIDEState(props: UnifiedSidebarProps) {
     onToggleSearch: props.onToggleSearch ?? noop,
     onToggleSettings: props.onToggleSettings ?? noop,
     onToggleRunMenu: props.onToggleRunMenu ?? noop,
-    onToggleGit: props.onToggleGit ?? noop,
     onToggleSandbox: props.onToggleSandbox ?? noop,
     onToggleWorkflow: props.onToggleWorkflow ?? noop,
     onToggleSkillsMonitor: props.onToggleSkillsMonitor ?? noop,
@@ -64,7 +61,6 @@ export function useIDEState(props: UnifiedSidebarProps) {
   }), [
     props.onToggleExplorer, props.onToggleSearch,
     props.onToggleSettings, props.onToggleRunMenu,
-    props.onToggleGit,
     props.onToggleSandbox, props.onToggleWorkflow, props.onToggleSkillsMonitor,
     props.onToggleChat, props.onToggleAgents, props.onToggleAgentBuilder, props.onToggleMissions,
     props.onToggleKnowledge, props.onToggleDocuments, props.onToggleSystemHealth, props.onToggleMcp,

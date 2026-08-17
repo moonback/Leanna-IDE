@@ -16,7 +16,6 @@ export interface IDEPanelState {
   showGlobalSearch: boolean;
   showSettings: boolean;
   showRunMenu: boolean;
-  showGit: boolean;
   showSandbox: boolean;
   showWorkflow: boolean;
   showSkillsMonitor: boolean;
@@ -40,7 +39,6 @@ export interface IDEPanelActions {
   onToggleSearch: () => void;
   onToggleSettings: () => void;
   onToggleRunMenu: () => void;
-  onToggleGit: () => void;
   onToggleSandbox: () => void;
   onToggleWorkflow: () => void;
   onToggleSkillsMonitor: () => void;
@@ -93,7 +91,6 @@ export interface UnifiedSidebarProps {
   showGlobalSearch?: boolean;
   showSettings?: boolean;
   showRunMenu?: boolean;
-  showGit?: boolean;
   showSandbox?: boolean;
   showWorkflow?: boolean;
   showSkillsMonitor?: boolean;
@@ -118,7 +115,6 @@ export interface UnifiedSidebarProps {
   onToggleSearch?: () => void;
   onToggleSettings?: () => void;
   onToggleRunMenu?: () => void;
-  onToggleGit?: () => void;
   onToggleSandbox?: () => void;
   onToggleWorkflow?: () => void;
   onToggleSkillsMonitor?: () => void;
