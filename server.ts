@@ -477,6 +477,34 @@ async function startServer() {
   app.use("/api/knowledge", understandingRouter);
   // ── Fin routeurs modulaires ───────────────────────────────────────────────
 
+  // ── Agent Builder: génération IA d'agents personnalisés ───────────────────
+  app.post("/api/agent-builder/generate", requireAuth, async (req, res) => {
+    const { handleGenerateAgent } = await import("./server/routes/generate-agent");
+    return handleGenerateAgent(req, res);
+  });
+
+  // ── Custom Agents: CRUD persisté dans .jarvis/custom-agents.json ──────────
+  app.get("/api/custom-agents", requireAuth, async (req, res) => {
+    const { handleListAgents } = await import("./server/routes/custom-agents");
+    return handleListAgents(req, res);
+  });
+  app.post("/api/custom-agents", requireAuth, async (req, res) => {
+    const { handleCreateAgent } = await import("./server/routes/custom-agents");
+    return handleCreateAgent(req, res);
+  });
+  app.put("/api/custom-agents/:id", requireAuth, async (req, res) => {
+    const { handleUpdateAgent } = await import("./server/routes/custom-agents");
+    return handleUpdateAgent(req, res);
+  });
+  app.delete("/api/custom-agents/:id", requireAuth, async (req, res) => {
+    const { handleDeleteAgent } = await import("./server/routes/custom-agents");
+    return handleDeleteAgent(req, res);
+  });
+  app.post("/api/custom-agents/import", requireAuth, async (req, res) => {
+    const { handleImportAgents } = await import("./server/routes/custom-agents");
+    return handleImportAgents(req, res);
+  });
+
   // ── Gemini Key Pool (liste de clés avec rotation) ──────────────────────────
 
   app.get("/api/gemini-keys", (_req, res) => {

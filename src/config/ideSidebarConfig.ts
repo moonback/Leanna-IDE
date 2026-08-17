@@ -16,6 +16,7 @@ import {
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Cable, ShieldCheck, Container, Bot, Crosshair, Database,
   GitBranchPlus, Activity, Wrench, Code2, Users, FileStack,
+  Wand2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Github } from 'lucide-react';
@@ -194,6 +195,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
             actionKey: 'onToggleMcp',
           },
           {
+            id: 'agent-builder',
+            type: 'button',
+            icon: Wand2,
+            label: 'Agent Builder (créer des agents)',
+            stateKey: 'showAgentBuilder',
+            actionKey: 'onToggleAgentBuilder',
+          },
+          {
             id: 'vision',
             type: 'button',
             icon: Camera,
@@ -249,6 +258,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
         actionKey: 'onToggleFleet',
         requiresAssistant: true,
       },
+
       {
         id: 'missions',
         type: 'button',

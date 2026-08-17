@@ -43,6 +43,7 @@ import { SelfEditBanner } from '../components/ide/SelfEditBanner';
 import { CheckpointPanel } from '../components/ide/CheckpointPanel';
 import { SandboxDiffViewer } from '../components/sandbox/SandboxDiffViewer';
 import { AgentPanel } from '../components/panels/AgentPanel';
+import { AgentBuilderPanel } from '../components/panels/AgentBuilderPanel';
 import { initActivityStore } from '../stores/agentActivityStore';
 import { MissionPanel } from '../components/panels/MissionPanel';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard';
@@ -131,6 +132,7 @@ export default function IdeView() {
   const [chatDocked, setChatDocked] = useState(false);
   const [pendingChatMessage, setPendingChatMessage] = useState<{ text: string; displayText?: string } | null>(null);
   const [showAgents, setShowAgents] = useState(false);
+  const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showFleet, setShowFleet] = useState(false);
   const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
@@ -563,6 +565,7 @@ export default function IdeView() {
         showSkillsMonitor={showSkillsMonitor}
         showChat={showChat}
         showAgents={showAgents}
+        showAgentBuilder={showAgentBuilder}
         showFleet={showFleet}
         showMissions={showMissions}
         showKnowledge={showKnowledge}
@@ -590,6 +593,7 @@ export default function IdeView() {
         onToggleSkillsMonitor={() => setShowSkillsMonitor(v => !v)}
         onToggleChat={() => setShowChat(v => !v)}
         onToggleAgents={() => setShowAgents(v => !v)}
+        onToggleAgentBuilder={() => setShowAgentBuilder(v => !v)}
         onToggleFleet={() => setShowFleet(v => !v)}
         onToggleMissions={() => setShowMissions(v => !v)}
         onToggleKnowledge={() => {
@@ -978,6 +982,11 @@ export default function IdeView() {
       {/* Agents Panel — modal overlay */}
       {showAgents && (
         <AgentPanel inline onClose={() => setShowAgents(false)} />
+      )}
+
+      {/* Agent Builder Panel — modal overlay */}
+      {showAgentBuilder && (
+        <AgentBuilderPanel inline onClose={() => setShowAgentBuilder(false)} />
       )}
 
       {/* Fleet Panel — modal overlay */}
