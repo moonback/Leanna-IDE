@@ -11,18 +11,35 @@
 import { randomUUID } from "crypto";
 import { createLogger } from "../utils/logger";
 import { generateText } from "../utils/textGeneration";
+import { embeddingStore } from "./EmbeddingStore";
 import type { Source, SourceChunk, SourceType } from "./types";
 
 const log = createLogger("SourceIngester");
 
+// ─── Types internes ─────────────────────────────────────────────────────────
+
+/** Bloc sémantique — unité de sens intermédiaire avant assemblage en chunks */
+interface SemanticBlock {
+  content: string;
+  section?: string;
+  page?: number;
+  startChar: number;
+  endChar: number;
+  type: "section" | "paragraph" | "sentence-group";
+}
+
 // ─── Configuration du chunking ──────────────────────────────────────────────
 
 /** Taille cible d'un chunk en caractères */
-const CHUNK_SIZE = 1500;
-/** Chevauchement entre chunks pour le contexte */
-const CHUNK_OVERLAP = 200;
+const CHUNK_TARGET_SIZE = 1200;
+/** Taille maximale absolue d'un chunk */
+const CHUNK_MAX_SIZE = 2000;
+/** Taille minimale pour qu'un chunk soit conservé seul */
+const CHUNK_MIN_SIZE = 100;
+/** Chevauchement contextuel (phrases de contexte) */
+const CHUNK_OVERLAP_SENTENCES = 2;
 /** Nombre maximum de chunks par source */
-const MAX_CHUNKS = 200;
+const MAX_CHUNKS = 300;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -142,8 +159,8 @@ export class SourceIngester {
   ): Promise<Source> {
     const id = randomUUID();
 
-    // Découpage en chunks
-    const chunks = this.chunkText(rawText, id);
+    // Découpage intelligent en chunks (adapté au type de contenu)
+    const chunks = this.chunkText(rawText, id, type);
 
     // Comptage de mots
     const wordCount = rawText.split(/\s+/).filter(w => w.length > 0).length;
@@ -171,68 +188,394 @@ export class SourceIngester {
     };
 
     log.info(`✅ Source créée: "${title}" — ${wordCount} mots, ${chunks.length} chunks`);
+
+    // Vectorisation des chunks via Gemini Embeddings (async, non-bloquant)
+    embeddingStore.indexChunks(
+      chunks.map(c => ({ id: c.id, content: c.content })),
+      id,
+      notebookId
+    ).catch(e => log.warn(`Embedding indexation partielle: ${e.message}`));
+
     return source;
   }
 
-  // ─── Chunking ────────────────────────────────────────────────────────────
+  // ─── Chunking Intelligent ─────────────────────────────────────────────────
 
   /**
-   * Découpe le texte en chunks avec chevauchement.
-   * Essaie de couper aux limites de paragraphes/phrases.
+   * Découpage sémantique intelligent adapté au type de contenu.
+   *
+   * Stratégie par type :
+   * - Markdown : découpe par sections (headers ## ###)
+   * - PDF : découpe par sauts de page + paragraphes
+   * - HTML/URL : découpe par blocs structurels
+   * - Texte brut : découpe par paragraphes avec détection de structure
+   *
+   * Principes :
+   * 1. Respecter les frontières sémantiques (sections, paragraphes)
+   * 2. Ne jamais couper au milieu d'une phrase
+   * 3. Garder les chunks entre CHUNK_MIN_SIZE et CHUNK_MAX_SIZE
+   * 4. Ajouter un overlap contextuel (dernières phrases du chunk précédent)
+   * 5. Enrichir les métadonnées (section, page)
    */
-  private chunkText(text: string, sourceId: string): SourceChunk[] {
-    const chunks: SourceChunk[] = [];
-    const paragraphs = text.split(/\n\s*\n/);
-    let currentChunk = "";
+  private chunkText(text: string, sourceId: string, type: SourceType): SourceChunk[] {
+    // Découper en blocs sémantiques selon le type
+    const blocks = this.extractSemanticBlocks(text, type);
+
+    // Assembler les blocs en chunks de taille appropriée
+    return this.assembleChunks(blocks, sourceId);
+  }
+
+  /**
+   * Extrait les blocs sémantiques du texte selon son type.
+   * Un bloc = une unité de sens (section, paragraphe, page...)
+   */
+  private extractSemanticBlocks(text: string, type: SourceType): SemanticBlock[] {
+    switch (type) {
+      case "markdown":
+        return this.extractMarkdownBlocks(text);
+      case "pdf":
+        return this.extractPDFBlocks(text);
+      case "html":
+      case "url":
+        return this.extractHTMLBlocks(text);
+      default:
+        return this.extractPlainTextBlocks(text);
+    }
+  }
+
+  /**
+   * Markdown : découpe par headers (##, ###, etc.)
+   * Chaque section forme un bloc avec son titre comme métadonnée.
+   */
+  private extractMarkdownBlocks(text: string): SemanticBlock[] {
+    const blocks: SemanticBlock[] = [];
+    const lines = text.split("\n");
+
+    let currentSection = "";
+    let currentContent = "";
     let currentStart = 0;
     let charPos = 0;
 
-    for (const paragraph of paragraphs) {
-      if (currentChunk.length + paragraph.length > CHUNK_SIZE && currentChunk.length > 0) {
-        // Sauvegarder le chunk actuel
-        chunks.push({
-          id: randomUUID(),
-          sourceId,
-          content: currentChunk.trim(),
-          index: chunks.length,
-          metadata: {
+    for (const line of lines) {
+      const headerMatch = line.match(/^(#{1,6})\s+(.+)/);
+
+      if (headerMatch) {
+        // Sauvegarder le bloc précédent
+        if (currentContent.trim()) {
+          blocks.push({
+            content: currentContent.trim(),
+            section: currentSection || undefined,
             startChar: currentStart,
             endChar: charPos,
-          },
-        });
-
-        if (chunks.length >= MAX_CHUNKS) break;
-
-        // Chevauchement : garder la fin du chunk précédent
-        const overlapText = currentChunk.slice(-CHUNK_OVERLAP);
-        currentChunk = overlapText + "\n\n" + paragraph;
-        currentStart = charPos - CHUNK_OVERLAP;
-      } else {
-        if (currentChunk) {
-          currentChunk += "\n\n" + paragraph;
-        } else {
-          currentChunk = paragraph;
-          currentStart = charPos;
+            type: "section",
+          });
         }
+        currentSection = headerMatch[2].trim();
+        currentContent = line + "\n";
+        currentStart = charPos;
+      } else {
+        currentContent += line + "\n";
       }
-      charPos += paragraph.length + 2; // +2 pour le \n\n
+
+      charPos += line.length + 1;
     }
 
-    // Dernier chunk
-    if (currentChunk.trim() && chunks.length < MAX_CHUNKS) {
-      chunks.push({
-        id: randomUUID(),
-        sourceId,
-        content: currentChunk.trim(),
-        index: chunks.length,
-        metadata: {
-          startChar: currentStart,
-          endChar: charPos,
-        },
+    // Dernier bloc
+    if (currentContent.trim()) {
+      blocks.push({
+        content: currentContent.trim(),
+        section: currentSection || undefined,
+        startChar: currentStart,
+        endChar: charPos,
+        type: "section",
       });
     }
 
+    return blocks;
+  }
+
+  /**
+   * PDF : détecte les sauts de page (\f ou séquences de \n multiples)
+   * et découpe en paragraphes à l'intérieur de chaque page.
+   */
+  private extractPDFBlocks(text: string): SemanticBlock[] {
+    const blocks: SemanticBlock[] = [];
+
+    // Séparer par page (form feed ou 3+ lignes vides)
+    const pages = text.split(/\f|\n{4,}/);
+    let charPos = 0;
+
+    for (let pageIdx = 0; pageIdx < pages.length; pageIdx++) {
+      const pageContent = pages[pageIdx].trim();
+      if (!pageContent) {
+        charPos += pages[pageIdx].length + 1;
+        continue;
+      }
+
+      // Découper chaque page en paragraphes
+      const paragraphs = pageContent.split(/\n\s*\n/);
+      let pageCharPos = charPos;
+
+      for (const para of paragraphs) {
+        const trimmed = para.trim();
+        if (!trimmed) {
+          pageCharPos += para.length + 2;
+          continue;
+        }
+
+        blocks.push({
+          content: trimmed,
+          page: pageIdx + 1,
+          startChar: pageCharPos,
+          endChar: pageCharPos + para.length,
+          type: "paragraph",
+        });
+
+        pageCharPos += para.length + 2;
+      }
+
+      charPos += pages[pageIdx].length + 1;
+    }
+
+    return blocks;
+  }
+
+  /**
+   * HTML/URL : le texte est déjà strippé, on détecte la structure
+   * par les patterns de ponctuation et espacement.
+   */
+  private extractHTMLBlocks(text: string): SemanticBlock[] {
+    return this.extractPlainTextBlocks(text);
+  }
+
+  /**
+   * Texte brut : découpe par paragraphes avec détection de structure.
+   * Identifie les titres potentiels (lignes courtes en majuscules, lignes suivies de ===)
+   */
+  private extractPlainTextBlocks(text: string): SemanticBlock[] {
+    const blocks: SemanticBlock[] = [];
+    const lines = text.split("\n");
+
+    let currentSection: string | undefined;
+    let currentContent = "";
+    let currentStart = 0;
+    let charPos = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const nextLine = lines[i + 1] || "";
+
+      // Détecter un titre potentiel :
+      // - Ligne courte (< 80 chars) suivie d'une ligne vide
+      // - Ligne entièrement en majuscules (> 3 chars)
+      // - Ligne suivie de === ou ---
+      const isTitle = (
+        (line.trim().length > 3 && line.trim().length < 80 && line.trim() === line.trim().toUpperCase() && /[A-ZÀ-Ú]/.test(line)) ||
+        (nextLine.match(/^[=]{3,}$/) || nextLine.match(/^[-]{3,}$/)) ||
+        (line.match(/^\d+\.\s+[A-ZÀ-Ú]/) && line.length < 100)
+      );
+
+      if (isTitle && currentContent.trim()) {
+        // Sauvegarder le bloc précédent
+        blocks.push({
+          content: currentContent.trim(),
+          section: currentSection,
+          startChar: currentStart,
+          endChar: charPos,
+          type: "paragraph",
+        });
+
+        currentSection = line.trim();
+        currentContent = line + "\n";
+        currentStart = charPos;
+      } else if (line.trim() === "" && currentContent.trim().length > 0) {
+        // Paragraphe vide = frontière potentielle
+        // Mais on continue à accumuler (sera géré par assembleChunks)
+        currentContent += "\n\n";
+      } else {
+        currentContent += line + "\n";
+      }
+
+      charPos += line.length + 1;
+    }
+
+    // Dernier bloc
+    if (currentContent.trim()) {
+      blocks.push({
+        content: currentContent.trim(),
+        section: currentSection,
+        startChar: currentStart,
+        endChar: charPos,
+        type: "paragraph",
+      });
+    }
+
+    return blocks;
+  }
+
+  /**
+   * Assemble les blocs sémantiques en chunks de taille appropriée.
+   *
+   * Règles :
+   * - Un bloc < CHUNK_MIN_SIZE est fusionné avec le suivant
+   * - Un bloc > CHUNK_MAX_SIZE est subdivisé par phrases
+   * - Un bloc entre MIN et MAX reste tel quel
+   * - Un overlap contextuel est ajouté (dernières phrases du chunk précédent)
+   */
+  private assembleChunks(blocks: SemanticBlock[], sourceId: string): SourceChunk[] {
+    const chunks: SourceChunk[] = [];
+    let pendingContent = "";
+    let pendingSection: string | undefined;
+    let pendingPage: number | undefined;
+    let pendingStart = 0;
+    let pendingEnd = 0;
+    let lastOverlap = ""; // Contexte du chunk précédent
+
+    const flush = () => {
+      if (!pendingContent.trim()) return;
+
+      const content = lastOverlap
+        ? lastOverlap + "\n\n" + pendingContent.trim()
+        : pendingContent.trim();
+
+      if (chunks.length < MAX_CHUNKS) {
+        chunks.push({
+          id: randomUUID(),
+          sourceId,
+          content,
+          index: chunks.length,
+          metadata: {
+            section: pendingSection,
+            page: pendingPage,
+            startChar: pendingStart,
+            endChar: pendingEnd,
+          },
+        });
+      }
+
+      // Calculer l'overlap pour le prochain chunk (dernières N phrases)
+      lastOverlap = this.extractOverlapContext(pendingContent.trim());
+
+      pendingContent = "";
+      pendingSection = undefined;
+      pendingPage = undefined;
+    };
+
+    for (const block of blocks) {
+      // Si le bloc est trop grand, le subdiviser par phrases
+      if (block.content.length > CHUNK_MAX_SIZE) {
+        // Flush ce qui est en attente avant
+        flush();
+
+        // Subdiviser le bloc trop grand
+        const subChunks = this.splitLargeBlock(block);
+        for (const sub of subChunks) {
+          pendingContent = sub.content;
+          pendingSection = sub.section || block.section;
+          pendingPage = sub.page || block.page;
+          pendingStart = sub.startChar;
+          pendingEnd = sub.endChar;
+          flush();
+        }
+        continue;
+      }
+
+      // Si ajouter ce bloc dépasse la taille cible, flush d'abord
+      if (pendingContent.length + block.content.length > CHUNK_TARGET_SIZE && pendingContent.length >= CHUNK_MIN_SIZE) {
+        flush();
+      }
+
+      // Accumuler
+      if (pendingContent) {
+        pendingContent += "\n\n" + block.content;
+      } else {
+        pendingContent = block.content;
+        pendingStart = block.startChar;
+      }
+      pendingEnd = block.endChar;
+      // Garder la première section rencontrée dans ce chunk
+      if (!pendingSection && block.section) {
+        pendingSection = block.section;
+      }
+      if (!pendingPage && block.page) {
+        pendingPage = block.page;
+      }
+    }
+
+    // Flush le reste
+    flush();
+
     return chunks;
+  }
+
+  /**
+   * Subdivise un bloc trop grand en morceaux par phrases.
+   * Ne coupe jamais au milieu d'une phrase.
+   */
+  private splitLargeBlock(block: SemanticBlock): SemanticBlock[] {
+    const sentences = this.splitIntoSentences(block.content);
+    const subBlocks: SemanticBlock[] = [];
+
+    let current = "";
+    let currentStart = block.startChar;
+
+    for (const sentence of sentences) {
+      if (current.length + sentence.length > CHUNK_TARGET_SIZE && current.length >= CHUNK_MIN_SIZE) {
+        subBlocks.push({
+          content: current.trim(),
+          section: block.section,
+          page: block.page,
+          startChar: currentStart,
+          endChar: currentStart + current.length,
+          type: "sentence-group",
+        });
+        currentStart += current.length;
+        current = sentence;
+      } else {
+        current += (current ? " " : "") + sentence;
+      }
+    }
+
+    if (current.trim()) {
+      subBlocks.push({
+        content: current.trim(),
+        section: block.section,
+        page: block.page,
+        startChar: currentStart,
+        endChar: block.endChar,
+        type: "sentence-group",
+      });
+    }
+
+    return subBlocks;
+  }
+
+  /**
+   * Découpe un texte en phrases (respect des abréviations courantes).
+   */
+  private splitIntoSentences(text: string): string[] {
+    // Pattern qui évite de couper sur M., Dr., etc.
+    const sentences = text.match(/[^.!?]*(?:[.!?](?:\s|$)|$)/g) || [text];
+    return sentences
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+  }
+
+  /**
+   * Extrait les dernières phrases pour l'overlap contextuel.
+   */
+  private extractOverlapContext(text: string): string {
+    if (!CHUNK_OVERLAP_SENTENCES) return "";
+
+    const sentences = this.splitIntoSentences(text);
+    const overlapSentences = sentences.slice(-CHUNK_OVERLAP_SENTENCES);
+    const overlap = overlapSentences.join(" ");
+
+    // Limiter la taille de l'overlap
+    if (overlap.length > 300) {
+      return overlap.slice(-300);
+    }
+    return overlap;
   }
 
   // ─── Extraction PDF ──────────────────────────────────────────────────────

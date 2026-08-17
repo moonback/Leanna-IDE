@@ -1,77 +1,155 @@
 /**
  * RAGEngine — Retrieval-Augmented Generation pour les notebooks
  *
- * Moteur de recherche sémantique local (TF-IDF) sur les chunks des sources.
- * Fournit le contexte groundé pour le chat Q&A avec citations.
+ * Moteur de recherche HYBRIDE :
+ *   1. Recherche sémantique via Gemini Embeddings (similarité cosinus)
+ *   2. Recherche lexicale TF-IDF (correspondance exacte de termes)
+ *   3. Fusion Reciprocal Rank Fusion (RRF) des deux scores
+ *
+ * La combinaison hybride garantit de bons résultats même quand :
+ * - Les termes sont différents mais le sens est proche (embeddings)
+ * - La correspondance exacte est importante (TF-IDF)
  */
 
+import { createLogger } from "../utils/logger";
+import { embeddingStore } from "./EmbeddingStore";
 import type { Source, SourceChunk, RAGSearchOptions, RAGSearchResult } from "./types";
+
+const log = createLogger("RAGEngine");
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 const DEFAULT_MAX_CHUNKS = 10;
 const DEFAULT_MIN_RELEVANCE = 0.1;
 
+/** Poids de la recherche sémantique dans le score final */
+const SEMANTIC_WEIGHT = 0.65;
+/** Poids de la recherche lexicale dans le score final */
+const LEXICAL_WEIGHT = 0.35;
+
+/** Constante k pour le Reciprocal Rank Fusion */
+const RRF_K = 60;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export class RAGEngine {
 
   /**
-   * Recherche les chunks les plus pertinents pour une query dans un ensemble de sources.
+   * Recherche hybride : embeddings + TF-IDF avec fusion RRF.
+   * Fallback automatique sur TF-IDF seul si les embeddings ne sont pas disponibles.
    */
-  search(query: string, sources: Source[], options: RAGSearchOptions = {}): RAGSearchResult[] {
+  async searchHybrid(query: string, sources: Source[], options: RAGSearchOptions = {}): Promise<RAGSearchResult[]> {
     const maxChunks = options.maxChunks ?? DEFAULT_MAX_CHUNKS;
     const minRelevance = options.minRelevance ?? DEFAULT_MIN_RELEVANCE;
 
-    // Filtrer par source IDs si spécifié
     const filteredSources = options.sourceIds
       ? sources.filter(s => options.sourceIds!.includes(s.id))
       : sources;
 
     if (filteredSources.length === 0) return [];
 
-    // Tokeniser la query
-    const queryTokens = this.tokenize(query.toLowerCase());
-    if (queryTokens.length === 0) return [];
-
-    // Calculer IDF global sur l'ensemble des chunks
-    const allChunks: { chunk: SourceChunk; source: Source }[] = [];
+    // Collecter tous les chunks
+    const chunkMap = new Map<string, { chunk: SourceChunk; source: Source }>();
     for (const source of filteredSources) {
       for (const chunk of source.chunks) {
-        allChunks.push({ chunk, source });
+        chunkMap.set(chunk.id, { chunk, source });
       }
     }
 
-    const totalDocs = allChunks.length;
-    if (totalDocs === 0) return [];
+    if (chunkMap.size === 0) return [];
 
-    // Calculer le document frequency pour chaque terme de la query
-    const docFreq = new Map<string, number>();
-    for (const token of queryTokens) {
-      let count = 0;
-      for (const { chunk } of allChunks) {
-        if (chunk.content.toLowerCase().includes(token)) {
-          count++;
+    // 1. Recherche sémantique via embeddings
+    let semanticResults: Map<string, number> = new Map();
+    try {
+      const embeddingResults = await embeddingStore.search(query, {
+        sourceIds: options.sourceIds,
+        maxResults: maxChunks * 3, // Récupérer plus pour la fusion
+        minSimilarity: 0.2,
+      });
+
+      for (const result of embeddingResults) {
+        if (chunkMap.has(result.chunkId)) {
+          semanticResults.set(result.chunkId, result.similarity);
         }
       }
-      docFreq.set(token, count);
+    } catch (e: any) {
+      log.warn(`Embeddings search fallback: ${e.message}`);
+      // Continue avec TF-IDF seul
     }
 
-    // Scorer chaque chunk
-    const results: RAGSearchResult[] = [];
+    // 2. Recherche lexicale TF-IDF
+    const lexicalResults = this.searchTFIDF(query, filteredSources, maxChunks * 3);
 
-    for (const { chunk, source } of allChunks) {
-      const score = this.scoreChunk(chunk, queryTokens, docFreq, totalDocs, query);
-      if (score >= minRelevance) {
-        results.push({ chunk, source, relevance: score });
+    // 3. Fusion des résultats
+    const fusedScores = new Map<string, number>();
+
+    if (semanticResults.size > 0) {
+      // Mode hybride : Reciprocal Rank Fusion
+      const semanticRanked = Array.from(semanticResults.entries())
+        .sort((a, b) => b[1] - a[1]);
+      const lexicalRanked = lexicalResults
+        .sort((a, b) => b.relevance - a.relevance);
+
+      // RRF pour les résultats sémantiques
+      for (let rank = 0; rank < semanticRanked.length; rank++) {
+        const [chunkId, similarity] = semanticRanked[rank];
+        const rrfScore = SEMANTIC_WEIGHT / (RRF_K + rank + 1);
+        // Bonus pour les scores très élevés
+        const similarityBonus = similarity > 0.7 ? 0.1 : similarity > 0.5 ? 0.05 : 0;
+        fusedScores.set(chunkId, (fusedScores.get(chunkId) || 0) + rrfScore + similarityBonus);
+      }
+
+      // RRF pour les résultats lexicaux
+      for (let rank = 0; rank < lexicalRanked.length; rank++) {
+        const { chunk } = lexicalRanked[rank];
+        const rrfScore = LEXICAL_WEIGHT / (RRF_K + rank + 1);
+        fusedScores.set(chunk.id, (fusedScores.get(chunk.id) || 0) + rrfScore);
+      }
+    } else {
+      // Mode TF-IDF seul (fallback)
+      for (const result of lexicalResults) {
+        fusedScores.set(result.chunk.id, result.relevance);
       }
     }
 
-    // Trier par pertinence décroissante
-    results.sort((a, b) => b.relevance - a.relevance);
+    // 4. Construire les résultats finaux
+    const results: RAGSearchResult[] = [];
+    for (const [chunkId, score] of fusedScores) {
+      if (score < minRelevance) continue;
+      const entry = chunkMap.get(chunkId);
+      if (!entry) continue;
+      results.push({
+        chunk: entry.chunk,
+        source: entry.source,
+        relevance: Math.min(score, 1.0),
+      });
+    }
 
-    // Limiter le nombre de résultats
+    // Trier et limiter
+    results.sort((a, b) => b.relevance - a.relevance);
     return results.slice(0, maxChunks);
+  }
+
+  /**
+   * Recherche synchrone TF-IDF (pas d'embeddings).
+   * Utilisé comme fallback et comme composante de la recherche hybride.
+   */
+  search(query: string, sources: Source[], options: RAGSearchOptions = {}): RAGSearchResult[] {
+    const maxChunks = options.maxChunks ?? DEFAULT_MAX_CHUNKS;
+    const minRelevance = options.minRelevance ?? DEFAULT_MIN_RELEVANCE;
+
+    const filteredSources = options.sourceIds
+      ? sources.filter(s => options.sourceIds!.includes(s.id))
+      : sources;
+
+    if (filteredSources.length === 0) return [];
+
+    const results = this.searchTFIDF(query, filteredSources, maxChunks * 2);
+
+    return results
+      .filter(r => r.relevance >= minRelevance)
+      .sort((a, b) => b.relevance - a.relevance)
+      .slice(0, maxChunks);
   }
 
   /**
@@ -147,7 +225,47 @@ export class RAGEngine {
     return citations;
   }
 
-  // ─── Scoring TF-IDF ──────────────────────────────────────────────────────
+  // ─── TF-IDF interne ──────────────────────────────────────────────────────
+
+  private searchTFIDF(query: string, sources: Source[], maxResults: number): RAGSearchResult[] {
+    const queryTokens = this.tokenize(query.toLowerCase());
+    if (queryTokens.length === 0) return [];
+
+    // Collecter tous les chunks
+    const allChunks: { chunk: SourceChunk; source: Source }[] = [];
+    for (const source of sources) {
+      for (const chunk of source.chunks) {
+        allChunks.push({ chunk, source });
+      }
+    }
+
+    const totalDocs = allChunks.length;
+    if (totalDocs === 0) return [];
+
+    // Document frequency
+    const docFreq = new Map<string, number>();
+    for (const token of queryTokens) {
+      let count = 0;
+      for (const { chunk } of allChunks) {
+        if (chunk.content.toLowerCase().includes(token)) {
+          count++;
+        }
+      }
+      docFreq.set(token, count);
+    }
+
+    // Scorer chaque chunk
+    const results: RAGSearchResult[] = [];
+    for (const { chunk, source } of allChunks) {
+      const score = this.scoreChunk(chunk, queryTokens, docFreq, totalDocs, query);
+      if (score > 0) {
+        results.push({ chunk, source, relevance: score });
+      }
+    }
+
+    results.sort((a, b) => b.relevance - a.relevance);
+    return results.slice(0, maxResults);
+  }
 
   private scoreChunk(
     chunk: SourceChunk,
@@ -164,13 +282,10 @@ export class RAGEngine {
     let score = 0;
     let matchedTerms = 0;
 
-    // TF-IDF scoring
     for (const token of queryTokens) {
-      // Term Frequency (normalisée)
       const tf = contentTokens.filter(t => t === token).length / contentTokens.length;
       if (tf === 0) continue;
 
-      // Inverse Document Frequency
       const df = docFreq.get(token) || 1;
       const idf = Math.log(1 + totalDocs / df);
 
@@ -183,41 +298,33 @@ export class RAGEngine {
       score += 0.5;
     }
 
-    // Bonus: couverture de la query (% de termes trouvés)
+    // Bonus: couverture de la query
     const coverage = matchedTerms / queryTokens.length;
     score += coverage * 0.3;
 
-    // Bonus: proximité des termes (termes proches dans le texte)
+    // Bonus: proximité des termes
     if (matchedTerms >= 2) {
-      const proximityBonus = this.computeProximityBonus(contentLower, queryTokens);
-      score += proximityBonus;
+      score += this.computeProximityBonus(contentLower, queryTokens);
     }
 
-    // Normaliser entre 0 et 1
     return Math.min(score, 1.0);
   }
 
-  /**
-   * Bonus de proximité : les termes de la query sont-ils proches dans le chunk ?
-   */
   private computeProximityBonus(content: string, queryTokens: string[]): number {
     const positions: number[] = [];
-
     for (const token of queryTokens) {
       const idx = content.indexOf(token);
       if (idx >= 0) positions.push(idx);
     }
 
     if (positions.length < 2) return 0;
-
     positions.sort((a, b) => a - b);
     const span = positions[positions.length - 1] - positions[0];
-    const maxSpan = 500; // Si les termes sont dans un fenêtre de 500 chars
+    const maxSpan = 500;
 
     if (span <= maxSpan) {
       return 0.2 * (1 - span / maxSpan);
     }
-
     return 0;
   }
 
@@ -233,14 +340,12 @@ export class RAGEngine {
 // ─── Stop Words FR/EN ────────────────────────────────────────────────────────
 
 const STOP_WORDS = new Set([
-  // Français
   "le", "la", "les", "de", "du", "des", "un", "une", "et", "en", "au", "aux",
   "ce", "ces", "son", "sa", "ses", "il", "elle", "on", "nous", "vous", "ils",
   "elles", "se", "ne", "pas", "que", "qui", "ou", "mais", "donc", "car",
   "dans", "sur", "par", "pour", "avec", "sans", "sous", "entre",
   "cette", "mon", "ton", "leur", "nos", "vos", "leurs",
   "est", "sont", "été", "avoir", "être", "fait", "peut", "plus",
-  // Anglais
   "the", "is", "are", "was", "were", "be", "been", "being",
   "have", "has", "had", "do", "does", "did", "will", "would",
   "shall", "should", "may", "might", "can", "could",

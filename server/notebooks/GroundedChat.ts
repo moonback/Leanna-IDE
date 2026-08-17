@@ -57,8 +57,8 @@ export class GroundedChat {
     const userMessage: ChatMessage = this.buildMessage("user", question, []);
     notebookManager.addChatMessage(notebookId, userMessage);
 
-    // 2. Recherche RAG dans les chunks des sources
-    const ragResults = ragEngine.search(question, notebook.sources, {
+    // 2. Recherche RAG hybride (embeddings + TF-IDF) dans les chunks des sources
+    const ragResults = await ragEngine.searchHybrid(question, notebook.sources, {
       maxChunks: 8,
       minRelevance: 0.1,
     });

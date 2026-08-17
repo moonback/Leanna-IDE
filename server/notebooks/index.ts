@@ -7,6 +7,7 @@
 
 export { notebookManager } from "./NotebookManager";
 export { sourceIngester } from "./SourceIngester";
+export { embeddingStore } from "./EmbeddingStore";
 export { ragEngine } from "./RAGEngine";
 export { groundedChat } from "./GroundedChat";
 export { contentGenerator } from "./ContentGenerator";

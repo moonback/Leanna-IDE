@@ -10,6 +10,7 @@ import fs from "fs";
 import path from "path";
 import { createLogger } from "../utils/logger";
 import { SELF_ROOT } from "../utils/selfRoot";
+import { embeddingStore } from "./EmbeddingStore";
 import type { Notebook, NotebookNote, Source, ChatMessage, GeneratedDocument, AudioOverview } from "./types";
 
 const log = createLogger("NotebookManager");
@@ -137,6 +138,10 @@ export class NotebookManager {
 
     this.notebooks.delete(id);
     this.remove(id);
+
+    // Nettoyer tous les embeddings du notebook
+    embeddingStore.removeNotebook(id);
+
     log.info(`🗑️ Notebook supprimé: "${notebook.title}" (${id})`);
     return true;
   }
@@ -164,6 +169,10 @@ export class NotebookManager {
     notebook.sources.splice(index, 1);
     notebook.updatedAt = new Date().toISOString();
     this.persist(notebook);
+
+    // Nettoyer les embeddings associés
+    embeddingStore.removeSource(sourceId, notebookId);
+
     return true;
   }
 

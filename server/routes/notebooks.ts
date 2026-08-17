@@ -7,7 +7,7 @@
 
 import { Router, Request, Response } from "express";
 import multer from "multer";
-import { notebookManager, sourceIngester, groundedChat, contentGenerator } from "../notebooks";
+import { notebookManager, sourceIngester, groundedChat, contentGenerator, embeddingStore } from "../notebooks";
 import type { GeneratedDocType } from "../notebooks/types";
 
 // Configuration multer
@@ -461,6 +461,65 @@ export function createNotebooksRouter(): Router {
         return;
       }
       res.json({ status: "success", overviews: notebook.audioOverviews });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EMBEDDINGS (gestion des vecteurs)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // POST /api/notebooks/:id/embeddings/reindex — Re-vectoriser toutes les sources
+  router.post("/:id/embeddings/reindex", async (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      let totalIndexed = 0;
+      for (const source of notebook.sources) {
+        const indexed = await embeddingStore.indexChunks(
+          source.chunks.map(c => ({ id: c.id, content: c.content })),
+          source.id,
+          notebook.id
+        );
+        totalIndexed += indexed;
+      }
+
+      res.json({
+        status: "success",
+        message: `${totalIndexed} chunks vectorisés sur ${notebook.sources.reduce((acc, s) => acc + s.chunks.length, 0)} total.`,
+        indexed: totalIndexed,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/notebooks/:id/embeddings/stats — Stats des embeddings
+  router.get("/:id/embeddings/stats", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      const stats = embeddingStore.getStats(req.params.id);
+      const totalChunks = notebook.sources.reduce((acc, s) => acc + s.chunks.length, 0);
+
+      res.json({
+        status: "success",
+        stats: {
+          indexed: stats.total,
+          totalChunks,
+          coverage: totalChunks > 0 ? Math.round((stats.total / totalChunks) * 100) : 0,
+          bySource: Object.fromEntries(stats.bySource),
+        },
+      });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
