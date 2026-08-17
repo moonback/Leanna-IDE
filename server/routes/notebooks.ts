@@ -435,6 +435,98 @@ export function createNotebooksRouter(): Router {
     }
   });
 
+  // GET /api/notebooks/:id/chat/export — Exporter la conversation en Markdown
+  router.get("/:id/chat/export", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      if (notebook.chatHistory.length === 0) {
+        res.status(400).json({ error: "Aucun message à exporter." });
+        return;
+      }
+
+      const format = (req.query.format as string) || "markdown";
+
+      // Construire le Markdown
+      const lines: string[] = [];
+      lines.push(`# Chat — ${notebook.title}`);
+      lines.push(`> Exporté le ${new Date().toLocaleString("fr-FR")}`);
+      lines.push(`> ${notebook.chatHistory.length} messages\n`);
+      lines.push("---\n");
+
+      for (const msg of notebook.chatHistory) {
+        const role = msg.role === "user" ? "🧑 **Utilisateur**" : "🤖 **Assistant**";
+        const time = new Date(msg.timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+        lines.push(`### ${role} — ${time}\n`);
+        lines.push(msg.content);
+
+        if (msg.citations.length > 0) {
+          lines.push("\n<details><summary>📚 Citations</summary>\n");
+          for (const cit of msg.citations) {
+            lines.push(`- **${cit.sourceTitle}** (pertinence: ${(cit.relevance * 100).toFixed(0)}%)`);
+            lines.push(`  > ${cit.excerpt}\n`);
+          }
+          lines.push("</details>");
+        }
+        lines.push("\n---\n");
+      }
+
+      const markdown = lines.join("\n");
+
+      if (format === "markdown") {
+        const filename = `chat-${notebook.title.replace(/[^a-zA-Z0-9]/g, "-").slice(0, 40)}-${Date.now()}.md`;
+        res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.send(markdown);
+      } else {
+        // JSON fallback (le frontend peut convertir en PDF côté client)
+        res.json({ status: "success", markdown, title: notebook.title });
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/notebooks/:id/chat/chunk/:chunkId — Récupérer le contenu complet d'un chunk (pour hover citations)
+  router.get("/:id/chat/chunk/:chunkId", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      const chunkId = req.params.chunkId;
+
+      // Chercher le chunk dans toutes les sources
+      for (const source of notebook.sources) {
+        const chunk = source.chunks.find(c => c.id === chunkId);
+        if (chunk) {
+          res.json({
+            status: "success",
+            chunk: {
+              id: chunk.id,
+              content: chunk.content,
+              sourceTitle: source.title,
+              sourceId: source.id,
+              index: chunk.index,
+              metadata: chunk.metadata,
+            },
+          });
+          return;
+        }
+      }
+
+      res.status(404).json({ error: "Chunk introuvable." });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ═══════════════════════════════════════════════════════════════════════════
   // NOTES
   // ═══════════════════════════════════════════════════════════════════════════

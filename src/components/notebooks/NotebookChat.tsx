@@ -5,9 +5,9 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
-  Send, Loader2, Lightbulb, BookOpen, Trash2, Quote, Telescope,
+  Send, Loader2, Lightbulb, BookOpen, Trash2, Quote, Telescope, Download,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 
@@ -43,6 +43,8 @@ export function NotebookChat({ notebookId, hasSources }: Props) {
   const [streamingText, setStreamingText] = useState('');
   const [deepDiveProgress, setDeepDiveProgress] = useState('');
   const [showCitations, setShowCitations] = useState<string | null>(null);
+  const [hoveredCitation, setHoveredCitation] = useState<{ citation: Citation; fullContent: string; x: number; y: number } | null>(null);
+  const chunkCache = useRef<Map<string, string>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -273,6 +275,67 @@ export function NotebookChat({ notebookId, hasSources }: Props) {
     }
   }, [handleSend]);
 
+  // ─── Citation Hover ─────────────────────────────────────────────────────────
+
+  const handleCitationHover = useCallback(async (citation: Citation, event: React.MouseEvent) => {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+
+    // Vérifier le cache d'abord
+    const cached = chunkCache.current.get(citation.chunkId);
+    if (cached) {
+      setHoveredCitation({ citation, fullContent: cached, x: rect.left, y: rect.top });
+      return;
+    }
+
+    // Fallback : afficher l'excerpt immédiatement
+    setHoveredCitation({ citation, fullContent: citation.excerpt, x: rect.left, y: rect.top });
+
+    // Fetch le contenu complet du chunk
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/chat/chunk/${citation.chunkId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.chunk?.content || citation.excerpt;
+        chunkCache.current.set(citation.chunkId, content);
+        // Mettre à jour si toujours hovered
+        setHoveredCitation(prev =>
+          prev?.citation.chunkId === citation.chunkId
+            ? { ...prev, fullContent: content }
+            : prev
+        );
+      }
+    } catch { /* ignore, keep excerpt */ }
+  }, [notebookId]);
+
+  const handleCitationLeave = useCallback(() => {
+    setHoveredCitation(null);
+  }, []);
+
+  // ─── Export Chat ────────────────────────────────────────────────────────────
+
+  const handleExport = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/chat/export?format=markdown`);
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: 'Erreur' }));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+
+      // Télécharger le fichier Markdown
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'chat-export.md';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toastError(e.message);
+    }
+  }, [notebookId, toastError]);
+
   if (!hasSources) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-8">
@@ -340,7 +403,7 @@ export function NotebookChat({ notebookId, hasSources }: Props) {
                 >
                   <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.content}</p>
 
-                  {/* Citations */}
+                  {/* Citations avec hover */}
                   {msg.citations.length > 0 && (
                     <div className="mt-3 pt-2 border-t" style={{ borderColor: msg.role === 'user' ? 'rgba(255,255,255,0.2)' : 'var(--border-base)' }}>
                       <button
@@ -356,10 +419,13 @@ export function NotebookChat({ notebookId, hasSources }: Props) {
                           {msg.citations.map((cit, i) => (
                             <div
                               key={i}
-                              className="p-2 rounded-lg text-[10px]"
+                              className="p-2 rounded-lg text-[10px] cursor-pointer transition-colors hover:bg-[var(--bg-panel)]"
                               style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)' }}
+                              onMouseEnter={(e) => handleCitationHover(cit, e)}
+                              onMouseLeave={handleCitationLeave}
                             >
                               <span className="font-semibold">{cit.sourceTitle}</span>
+                              <span className="ml-2 opacity-50 text-[9px]">({(cit.relevance * 100).toFixed(0)}%)</span>
                               <p className="mt-0.5 line-clamp-2 opacity-75">{cit.excerpt}</p>
                             </div>
                           ))}
@@ -437,6 +503,37 @@ export function NotebookChat({ notebookId, hasSources }: Props) {
         )}
       </div>
 
+      {/* Citation hover tooltip */}
+      <AnimatePresence>
+        {hoveredCitation && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="fixed z-50 max-w-md p-4 rounded-xl shadow-xl pointer-events-none"
+            style={{
+              left: Math.min(hoveredCitation.x, window.innerWidth - 420),
+              top: Math.max(hoveredCitation.y - 200, 8),
+              backgroundColor: 'var(--bg-panel)',
+              border: '1px solid var(--border-focus)',
+              color: 'var(--text-primary)',
+            }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Quote className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+              <span className="text-[10px] font-semibold truncate">{hoveredCitation.citation.sourceTitle}</span>
+              <span className="text-[9px] opacity-50 flex-shrink-0">
+                {(hoveredCitation.citation.relevance * 100).toFixed(0)}% pertinent
+              </span>
+            </div>
+            <p className="text-[11px] leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar" style={{ color: 'var(--text-muted)' }}>
+              {hoveredCitation.fullContent}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Input */}
       <div className="flex-shrink-0 border-t p-4 lg:px-7" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
         <div className="flex items-end gap-2">
@@ -475,6 +572,16 @@ export function NotebookChat({ notebookId, hasSources }: Props) {
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
+          {messages.length > 0 && (
+            <button
+              onClick={handleExport}
+              className="p-3 rounded-xl border transition-colors hover:bg-white/5"
+              style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+              title="Exporter en Markdown"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          )}
           {messages.length > 0 && (
             <button
               onClick={handleClear}
