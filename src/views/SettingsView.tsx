@@ -96,6 +96,7 @@ export default function SettingsView() {
           textProvider: profile.textProvider, openrouterModel: profile.openrouterModel,
           agents: profile.agents,
           gitEnabled: profile.gitEnabled,
+          reasoningEnabled: profile.reasoningEnabled,
           customSystemPrompt: profile.customSystemPrompt,
         }),
       });

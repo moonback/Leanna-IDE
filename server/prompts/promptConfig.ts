@@ -35,6 +35,8 @@ export interface ProfileConfig {
   agents?: AgentsConfig;
   /** Désactiver Git (pour les projets sans repo git) */
   gitEnabled?: boolean;
+  /** Désactiver le raisonnement structuré (Chain of Thought, etc.) */
+  reasoningEnabled?: boolean;
   /** Custom system prompt (appended to base instructions) */
   customSystemPrompt?: string;
 }

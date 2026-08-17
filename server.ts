@@ -1889,6 +1889,11 @@ async function startServer() {
         filteredDeclarations = filteredDeclarations.filter(d => !d.name.startsWith('git_'));
       }
 
+      // ── Filtrage Reasoning si désactivé ──
+      if (currentProfile.reasoningEnabled === false) {
+        filteredDeclarations = filteredDeclarations.filter(d => !d.name.startsWith('reasoning_'));
+      }
+
       const tools = filteredDeclarations.length > 0 ? [{ functionDeclarations: filteredDeclarations }] : undefined;
 
       // Log tool loading
@@ -2825,6 +2830,17 @@ async function startServer() {
                 response: { error: "Git est désactivé pour ce projet (gitEnabled: false dans le profil). Ce projet n'a pas de dépôt git initialisé." }
               });
               clientWs.send(JSON.stringify({ tool_used: call.name, info: '[BLOQUÉ - Git désactivé]' }));
+              continue;
+            }
+
+            // ── Reasoning guard: block reasoning tools when reasoningEnabled === false ──
+            if (call.name.startsWith('reasoning_') && currentProfile.reasoningEnabled === false) {
+              functionResponses.push({
+                id: call.id,
+                name: call.name,
+                response: { error: "Le raisonnement structuré est désactivé (reasoningEnabled: false dans le profil). Réponds directement sans utiliser d'outil de raisonnement." }
+              });
+              clientWs.send(JSON.stringify({ tool_used: call.name, info: '[BLOQUÉ - Raisonnement désactivé]' }));
               continue;
             }
 

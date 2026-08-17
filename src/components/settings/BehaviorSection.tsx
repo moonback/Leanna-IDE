@@ -26,6 +26,17 @@ export function BehaviorSection() {
             hint={profile.gitEnabled ? 'Checkpoints, commits et branches actifs' : 'Git désactivé — pas de checkpoints ni de commandes git'}
           />
         </Field>
+
+        <SectionDivider label="Raisonnement" />
+
+        <Field label="Raisonnement structuré" hint="Chain of Thought, Tree of Thought, décomposition… Désactivez pour des réponses plus directes et rapides">
+          <ToggleSwitch
+            value={profile.reasoningEnabled}
+            onChange={v => setField('reasoningEnabled', v)}
+            label="Raisonnement"
+            hint={profile.reasoningEnabled ? 'L\'IA peut réfléchir étape par étape avant de répondre' : 'Raisonnement désactivé — réponses directes uniquement'}
+          />
+        </Field>
        
         <SectionDivider label="Mode Muet Automatique" />
        

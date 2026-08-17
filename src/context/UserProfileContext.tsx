@@ -43,6 +43,8 @@ export interface UserProfile {
   agents:        AgentsConfig;  // Configuration du système multi-agents
   // Git
   gitEnabled:    boolean;  // Activer/désactiver les opérations git
+  // Reasoning
+  reasoningEnabled: boolean;  // Activer/désactiver le raisonnement structuré (CoT, etc.)
   // Custom system prompt
   customSystemPrompt: string;  // Prompt système personnalisé (ajouté au prompt de base)
 }
@@ -76,6 +78,8 @@ const DEFAULT_PROFILE: UserProfile = {
   },
   // Git
   gitEnabled: true,
+  // Reasoning
+  reasoningEnabled: true,
   // Custom system prompt
   customSystemPrompt: '',
 };
