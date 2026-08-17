@@ -18,7 +18,7 @@ const TOOL_KEYWORDS: Record<string, string[]> = {
   weather: ['meteo', 'weather', 'temperature', 'pluie', 'soleil', 'vent', 'prevision', 'forecast'],
   reasoning: ['raisonnement', 'reasoning', 'reflechir', 'think', 'planifier', 'analyse', 'critique', 'critic', 'brainstorm', 'idee', 'stratégie', 'strategy', 'solution', 'problem solving', 'résoudre', 'solve', 'étape', 'step', 'méthode', 'method'],
   history: ['historique', 'history', 'conversation', 'precedent', 'derniere', 'passe', 'recherche', 'search history', 'context'],
-  system: ['systeme', 'system', 'fichier', 'terminal', 'commande', 'process', 'notifier', 'notification', 'ouvrir', 'open', 'executer', 'execute'],
+  system: ['systeme', 'system', 'fichier', 'commande', 'process', 'notifier', 'notification', 'ouvrir', 'open', 'executer', 'execute'],
   knowledge: ['knowledge', 'connaissance', 'contexte', 'context', 'impact', 'memoire projet', 'project memory', 'reindex', 'semantic', 'entite', 'entity', 'graph', 'convention', 'architecture', 'decision', 'comprendre', 'understand', 'analyse projet', 'project analysis', 'score', 'health', 'feedback', 'learning', 'lesson', 'pattern', 'dependency', 'diagram', 'couplage', 'coupling'],
   memory: ['memoire', 'memory', 'souvenir', 'preference', 'utilisateur', 'user', 'rappeler', 'remember', 'profil', 'profile', 'user profile', 'personnalité', 'personality', 'préférence', 'preference', 'habitude', 'habit'],
   time: ['heure', 'date', 'time', 'calendrier', 'calendar', 'jour', 'heure actuelle', 'today'],

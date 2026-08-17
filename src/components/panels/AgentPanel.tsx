@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Users, Bot, FlaskConical, FileText, RefreshCw, Shield, Eye,
   Building2, Loader2, CheckCircle2, XCircle, Clock,
-  ChevronRight, Trash2, Code, GitBranch, Terminal, Globe,
+  ChevronRight, Trash2, Code, GitBranch, Globe,
   Brain, Database, Target, Activity, ArrowRight,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel';
@@ -33,7 +33,6 @@ const ROLE_META: Record<string, {
   code:     { icon: Code,         color: '#60a5fa', label: 'Code',         description: 'Lecture/écriture de fichiers' },
   files:    { icon: FileText,     color: '#4ade80', label: 'Fichiers',     description: 'Gestion de fichiers' },
   git:      { icon: GitBranch,    color: '#f472b6', label: 'Git',          description: 'Contrôle de version' },
-  terminal: { icon: Terminal,     color: '#fbbf24', label: 'Terminal',     description: 'Commandes système' },
   web:      { icon: Globe,        color: '#34d399', label: 'Web',          description: 'Navigation web' },
   memory:   { icon: Database,     color: '#a855f7', label: 'Mémoire',     description: 'Mémoire persistante' },
   reasoning:{ icon: Brain,        color: '#f97316', label: 'Raisonnement', description: 'Réflexion et planification' },

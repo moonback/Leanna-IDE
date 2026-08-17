@@ -3,8 +3,8 @@ import React, {
 } from 'react';
 import {
   Plus, X, FolderOpen, FileText,
-  Terminal, Command, MessageSquare,
-  Code2, MonitorSmartphone, GitBranch, BrainCircuit,
+  Command, MessageSquare,
+  Code2, GitBranch, BrainCircuit,
   Circle, Search,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -42,7 +42,7 @@ function toolColor(tool: string): string {
   if (/write|modify|create/.test(tool)) return '52, 211, 153';    // emerald
   if (/read|list|search|analyze/.test(tool)) return '56, 189, 248'; // sky
   if (/git|commit|push|branch/.test(tool)) return '251, 191, 36';  // amber
-  if (/terminal|shell|exec/.test(tool)) return '244, 114, 182';    // pink
+  if (/shell|exec/.test(tool)) return '244, 114, 182';    // pink
   if (/agent|mission|workflow/.test(tool)) return '168, 85, 247';  // purple
   return '99, 102, 241';
 }
@@ -628,10 +628,8 @@ function CapabilitiesModal({ onClose, aiName }: CapabilitiesModalProps) {
   const capabilities = [
     { icon: MessageSquare, label: 'Chat vocal', desc: 'Communication vocale en temps réel avec dictée et réponses audio.' },
     { icon: Code2, label: 'Édition de code', desc: 'Génération, refactoring et correction automatique multi-langages.' },
-    { icon: Terminal, label: 'Terminal intégré', desc: "Exécution de commandes shell, builds et tests automatisés." },
     { icon: GitBranch, label: 'Git intégré', desc: 'Commits, branches, push/pull, diffs — gestion complète.' },
     { icon: Search, label: 'Recherche intelligente', desc: 'Fichiers, symboles et documentation avec contexte IA.' },
-    { icon: MonitorSmartphone, label: 'Preview live', desc: 'Aperçu en temps réel des applications web intégré.' },
   ];
 
   return (
@@ -744,20 +742,16 @@ interface EmptyEditorStateProps {
   onOpenFile: (path: string) => void;
   onCreateFile: () => void;
   onShowSettings: () => void;
-  onOpenTerminal?: () => void;
   onOpenSearch?: () => void;
   onOpenChat?: () => void;
-  onRunProject?: () => void;
 }
 
 export const EmptyEditorState = React.memo(function EmptyEditorState({
   onOpenFile,
   onCreateFile,
   onShowSettings,
-  onOpenTerminal,
   onOpenSearch,
   onOpenChat,
-  onRunProject,
 }: EmptyEditorStateProps) {
   const ws = useWorkspaceState();
   const { connected, connecting, isBusy, getInputAmplitude, getOutputAmplitude, connect } =
@@ -864,13 +858,10 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const actions = useMemo(
     () => [
       { label: 'Nouveau fichier', desc: 'Créer un fichier dans le projet actif', icon: Plus, onClick: onCreateFile, shortcut: `${MOD}+N`, id: 'new-file' },
-      { label: 'Terminal', desc: 'Ouvrir un terminal intégré', icon: Terminal, onClick: onOpenTerminal, shortcut: `${MOD}+\``, id: 'terminal' },
       // { label: 'Recherche', desc: 'Chercher dans tout le projet', icon: Search, onClick: onOpenSearch, shortcut: `${MOD}+Shift+F`, id: 'search' },
       { label: 'Chat IA', desc: `Discuter avec ${profile.aiName || 'l\'agent'}`, icon: MessageSquare, onClick: handleOpenChat, shortcut: `${MOD}+L`, id: 'chat-ia' },
-      // { label: 'Lancer le projet', desc: 'Exécuter npm run dev', icon: Code2, onClick: onRunProject, shortcut: '', id: 'run' },
-      // { label: 'Paramètres', desc: 'Configurer l\'IA, le thème et les préférences', icon: Command, onClick: onShowSettings, shortcut: `${MOD}+,`, id: 'settings' },
     ],
-    [onCreateFile, onShowSettings, onOpenTerminal, onOpenSearch, handleOpenChat, onRunProject, profile.aiName]
+    [onCreateFile, onShowSettings, onOpenSearch, handleOpenChat, profile.aiName]
   );
 
   // Liens rapides

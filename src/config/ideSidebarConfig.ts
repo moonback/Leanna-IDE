@@ -4,14 +4,14 @@
  *
  * Icônes visibles (5 au total) :
  * 1. Explorateur (accès direct — le plus utilisé)
- * 2. Fichiers & Code (sous-menu : Recherche, Terminal, Aperçu)
+ * 2. Fichiers & Code (sous-menu : Recherche)
  * 3. Source & Déploiement (sous-menu : Git, GitHub, Checkpoints, Sandbox, Workflow)
  * 4. Données & Outils (sous-menu : Knowledge, Santé, MCP, Médias)
  * 5. (IA via le menu agent en bas — inchangé)
  */
 
 import {
-  Search, SquareTerminal, Frame,
+  Search,
   GitBranch, Camera, Monitor,
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Cable, ShieldCheck, Container, Bot, Crosshair, Database,
@@ -69,16 +69,16 @@ export const sidebarSections: SidebarSectionConfig[] = [
     ],
   },
 
-  // ═══ Code & Exécution — sous-menu regroupant Recherche, Terminal, Aperçu ═══
+  // ═══ Code & Recherche ═══
   {
     id: 'code-exec',
-    label: 'Code & Exécution',
+    label: 'Code & Recherche',
     items: [
       {
         id: 'code-tools',
         type: 'submenu',
         icon: Code2,
-        label: 'Code & Exécution',
+        label: 'Code & Recherche',
         children: [
           {
             id: 'search',
@@ -88,24 +88,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
             shortcut: 'Ctrl+Shift+F',
             stateKey: 'showGlobalSearch',
             actionKey: 'onToggleSearch',
-          },
-          {
-            id: 'terminal',
-            type: 'button',
-            icon: SquareTerminal,
-            label: 'Terminal (Ctrl+`)',
-            shortcut: 'Ctrl+`',
-            stateKey: 'showTerminal',
-            actionKey: 'onToggleTerminal',
-          },
-          {
-            id: 'preview',
-            type: 'button',
-            icon: Frame,
-            label: 'Aperçu web',
-            stateKey: 'showPreview',
-            actionKey: 'onTogglePreview',
-            dotStateKey: 'previewUrl',
           },
         ],
       },

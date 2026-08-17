@@ -14,8 +14,6 @@ export type SidebarContext = 'global' | 'ide';
 export interface IDEPanelState {
   showExplorer: boolean;
   showGlobalSearch: boolean;
-  showTerminal: boolean;
-  showPreview: boolean;
   showSettings: boolean;
   showRunMenu: boolean;
   showGitHub: boolean;
@@ -32,7 +30,6 @@ export interface IDEPanelState {
   showSystemHealth: boolean;
   showMcp: boolean;
   showFleet: boolean;
-  previewUrl: string | null;
   visionEnabled: boolean;
   screenShareEnabled: boolean;
 }
@@ -42,8 +39,6 @@ export interface IDEPanelState {
 export interface IDEPanelActions {
   onToggleExplorer: () => void;
   onToggleSearch: () => void;
-  onToggleTerminal: () => void;
-  onTogglePreview: () => void;
   onToggleSettings: () => void;
   onToggleRunMenu: () => void;
   onToggleGitHub: () => void;
@@ -98,8 +93,6 @@ export interface UnifiedSidebarProps {
   // ── IDE State (only used when context === 'ide') ──
   showExplorer?: boolean;
   showGlobalSearch?: boolean;
-  showTerminal?: boolean;
-  showPreview?: boolean;
   showSettings?: boolean;
   showRunMenu?: boolean;
   showGitHub?: boolean;
@@ -116,7 +109,6 @@ export interface UnifiedSidebarProps {
   showSystemHealth?: boolean;
   showMcp?: boolean;
   showFleet?: boolean;
-  previewUrl?: string | null;
   assistantConnected?: boolean;
   assistantWorking?: boolean;
   assistantMuted?: boolean;
@@ -127,8 +119,6 @@ export interface UnifiedSidebarProps {
   // ── IDE Actions (only used when context === 'ide') ──
   onToggleExplorer?: () => void;
   onToggleSearch?: () => void;
-  onToggleTerminal?: () => void;
-  onTogglePreview?: () => void;
   onToggleSettings?: () => void;
   onToggleRunMenu?: () => void;
   onToggleGitHub?: () => void;
@@ -148,7 +138,6 @@ export interface UnifiedSidebarProps {
   onToggleVision?: () => void;
   onToggleScreenShare?: () => void;
   onToggleMode?: () => void;
-  onRunCommand?: (command: string) => void;
   onDisconnectAssistant?: () => void;
   onConnectAssistant?: () => void;
   onMuteToggle?: () => void;

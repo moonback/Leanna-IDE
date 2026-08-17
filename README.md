@@ -29,14 +29,13 @@ Jarvis-OS est un système d'exploitation de développement et un IDE multimodal 
 | **Monaco Editor** | Moteur d'édition de code (identique à VS Code) | `^0.53.0` |
 | **Google GenAI** | SDK officiel pour l'intégration de Gemini Live (WebSocket) | `^2.4.0` |
 | **Puppeteer** | Automatisation de navigateur et agent de test web | `^25.3.0` |
-| **node-pty** | Terminal virtuel interactif (PTY) de commande | `^1.1.0` |
 
 ---
 
 ## ✨ Fonctionnalités Principales
 
 ### 💻 Orientées Développeur (Developer-centric)
-- **IDE Intégré Immersif** : Éditeur Monaco complet avec coloration, explorateur de fichiers virtuel, panneau Git et terminal PTY interactif.
+- **IDE Intégré Immersif** : Éditeur Monaco complet avec coloration, explorateur de fichiers virtuel et panneau Git.
 - **Bac à Sable Sécurisé (Sandbox)** : Toutes les écritures de l'IA sont isolées dans `.jarvis/sandbox/` et ne sont appliquées au workspace réel qu'après validation.
 - **Rationnalisation de Typecheck** : Validation automatique du code via `tsc --noEmit` avant de synchroniser le sandbox.
 - **Checkpoints Git automatiques** : Sauvegarde locale automatique avant toute modification de fichier pour un rollback instantané.
@@ -107,7 +106,7 @@ Voici la liste de toutes les variables d'environnement gérées par l'applicatio
 
 ## 🚀 Lancement de l'Application
 
-### Mode Développement (Web et Terminal)
+### Mode Développement (Web)
 Pour lancer le backend Express combiné au serveur HMR de Vite :
 ```bash
 npm run dev

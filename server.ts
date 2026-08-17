@@ -14,13 +14,12 @@ import { loadWorkflows, stopAllWorkflowTimers } from "./server/skills/workflow";
 import { startConversation, endConversation, saveMessage, getConversationMessages } from "./server/skills/history";
 import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
-import os from "os";
 import { authenticateRequest, authenticateToken, createRateLimiter, resolveWorkspacePath } from "./server/security";
 import { appendAuditEvent } from "./server/audit";
 import { SELF_ROOT, JARVIS_APP_ROOT, CRITICAL_FILES, initSelfRoot, hasProject } from "./server/utils/selfRoot";
 import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox";
 import { subscribeToValidation } from "./server/utils/postEditValidator";
-import * as pty from "node-pty";
+
 import { knowledgeGraph, projectIndexer, projectMemory, understandingEngine } from "./server/knowledge";
 
 import { loadGeminiKeys, getGeminiKeys, addGeminiKey, removeGeminiKey, toggleGeminiKey, updateGeminiKeyLabel, withGeminiRetry, createGeminiClient, getNextGeminiKey } from "./server/utils/geminiKeyPool";
@@ -1331,8 +1330,6 @@ async function startServer() {
   // WebSocket server for Live API
   const wss = new WebSocketServer({ noServer: true });
 
-  // WebSocket server for Terminal
-  const terminalWss = new WebSocketServer({ noServer: true });
 
   // WebSocket server for Sandbox file watching (real-time)
   const sandboxWss = new WebSocketServer({ noServer: true });
@@ -1373,16 +1370,10 @@ async function startServer() {
     const url = new URL(request.url!, `http://${request.headers.host}`);
     const pathname = url.pathname;
 
-    // BUGFIX (sécurité critique) : le WebSocket /terminal ouvrait un shell
-    // interactif complet (bash/powershell) sur la machine hôte pour QUICONQUE
-    // se connectait, sans aucune vérification — combiné au listen sur
-    // 0.0.0.0, cela permettait une exécution de commande à distance non
-    // authentifiée depuis tout client réseau. /live donnait un accès
-    // équivalent aux outils (fichiers, git, système...) exposés à l'IA.
-    // On exige désormais le même jeton que pour les routes /api (passé en
+    // Sécurité : on exige le même jeton que pour les routes /api (passé en
     // query string car les navigateurs ne permettent pas d'en-têtes
     // personnalisés lors d'un upgrade WebSocket).
-    if (pathname === '/live' || pathname === '/terminal' || pathname === '/sandbox-watch') {
+    if (pathname === '/live' || pathname === '/sandbox-watch') {
       const cookieHeader = request.headers.cookie || '';
       const cookies: Record<string, string> = {};
       cookieHeader.split(';').forEach(c => {
@@ -1405,10 +1396,6 @@ async function startServer() {
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
       });
-    } else if (pathname === '/terminal') {
-      terminalWss.handleUpgrade(request, socket, head, (ws) => {
-        terminalWss.emit('connection', ws, request);
-      });
     } else if (pathname === '/sandbox-watch') {
       sandboxWss.handleUpgrade(request, socket, head, (ws) => {
         sandboxWss.emit('connection', ws, request);
@@ -1419,112 +1406,6 @@ async function startServer() {
       // In production, no other WS paths are expected so destroy.
       if (!vite) {
         socket.destroy();
-      }
-    }
-  });
-
-  terminalWss.on("connection", (clientWs, req) => {
-    console.log("[Terminal WS] New terminal connection attempt from", req.socket.remoteAddress);
-    try {
-      // Create pseudoterminal
-      const shell = os.platform() === "win32" ? "powershell.exe" : "bash";
-      const cwd = getWorkspaceRoot();
-
-      // En mode sandbox, injecter PORT=5000 pour que les scripts utilisent ce port
-      const sandboxEnv = isSandboxActive()
-        ? { ...process.env, TERM: "xterm-256color", PORT: "5000" }
-        : { ...process.env, TERM: "xterm-256color" };
-
-      let ptyProcess;
-      
-      // FIX: tsx intercepts node-pty's internal fork() and loads the .ts file, breaking AttachConsole on Windows.
-      // We temporarily strip tsx from process.execArgv around pty.spawn.
-      const originalExecArgv = process.execArgv;
-      if (os.platform() === 'win32') {
-        const cleanExecArgv: string[] = [];
-        for (let i = 0; i < process.execArgv.length; i++) {
-          const arg = process.execArgv[i];
-          if ((arg === '--require' || arg === '--import') && i + 1 < process.execArgv.length && process.execArgv[i + 1].includes('tsx')) {
-            i++; // skip next arg
-            continue;
-          }
-          if ((arg.startsWith('--require=') || arg.startsWith('--import=')) && arg.includes('tsx')) {
-            continue;
-          }
-          cleanExecArgv.push(arg);
-        }
-        process.execArgv = cleanExecArgv;
-      }
-
-      try {
-        // Try with useConpty: true first
-        ptyProcess = pty.spawn(shell, [], {
-          name: "xterm-256color",
-          cols: 80,
-          rows: 24,
-          cwd: cwd,
-          env: sandboxEnv,
-          useConpty: true
-        });
-      } catch (err) {
-        ptyProcess = pty.spawn(shell, [], {
-          name: "xterm-256color",
-          cols: 80,
-          rows: 24,
-          cwd: cwd,
-          env: sandboxEnv,
-          useConpty: false
-        });
-      } finally {
-        if (os.platform() === 'win32') {
-          process.execArgv = originalExecArgv;
-        }
-      }
-      
-      console.log("[Terminal WS] Terminal connection established successfully, PTY PID:", ptyProcess.pid);
-
-      // Relay data from pty to client
-      ptyProcess.onData((data) => {
-        if (clientWs.readyState === 1) { // WebSocket.OPEN
-          clientWs.send(data);
-        }
-      });
-
-      // Relay data from client to pty
-      clientWs.on("message", (data) => {
-        try {
-          const msg = JSON.parse(data.toString());
-          if (msg.type === "input") {
-            ptyProcess.write(msg.data);
-          } else if (msg.type === "resize") {
-            ptyProcess.resize(msg.cols, msg.rows);
-          }
-        } catch (e) {
-          // If it's not JSON, treat it as raw input (for backwards compatibility)
-          ptyProcess.write(data.toString());
-        }
-      });
-
-      // Cleanup on close
-      clientWs.on("close", () => {
-        try { ptyProcess.kill(); } catch (killErr) { /* ignore */ }
-      });
-
-      clientWs.on("error", (err) => {
-        console.error("[Terminal WS] WebSocket error:", err);
-        try { ptyProcess.kill(); } catch (killErr) { /* ignore */ }
-      });
-
-      ptyProcess.onExit(() => {
-        if (clientWs.readyState === 1) {
-          clientWs.close();
-        }
-      });
-    } catch (err) {
-      console.error("[Terminal] Failed to initialize terminal:", err);
-      if (clientWs.readyState === 1) {
-        clientWs.send("ERROR: Failed to start terminal\r\n");
-        clientWs.close();
       }
     }
   });
@@ -2953,7 +2834,6 @@ async function startServer() {
     // 2. Fermer les WebSocket servers
     await Promise.all([
       new Promise<void>(resolve => wss.close(() => resolve())),
-      new Promise<void>(resolve => terminalWss.close(() => resolve())),
     ]);
     console.log('[Lifecycle] WebSocket servers fermés.');
 

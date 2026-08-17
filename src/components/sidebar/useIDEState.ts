@@ -13,8 +13,6 @@ export function useIDEState(props: UnifiedSidebarProps) {
   const state: IDEPanelState = useMemo(() => ({
     showExplorer: props.showExplorer ?? false,
     showGlobalSearch: props.showGlobalSearch ?? false,
-    showTerminal: props.showTerminal ?? false,
-    showPreview: props.showPreview ?? false,
     showSettings: props.showSettings ?? false,
     showRunMenu: props.showRunMenu ?? false,
     showGitHub: props.showGitHub ?? false,
@@ -31,25 +29,22 @@ export function useIDEState(props: UnifiedSidebarProps) {
     showSystemHealth: props.showSystemHealth ?? false,
     showMcp: props.showMcp ?? false,
     showFleet: props.showFleet ?? false,
-    previewUrl: props.previewUrl ?? null,
     visionEnabled: props.visionEnabled ?? false,
     screenShareEnabled: props.screenShareEnabled ?? false,
   }), [
-    props.showExplorer, props.showGlobalSearch, props.showTerminal,
-    props.showPreview, props.showSettings, props.showRunMenu,
+    props.showExplorer, props.showGlobalSearch,
+    props.showSettings, props.showRunMenu,
     props.showGitHub, props.showGit, props.showCheckpoints,
     props.showSandbox, props.showWorkflow, props.showSkillsMonitor,
     props.showChat, props.showAgents, props.showMissions,
     props.showKnowledge, props.showDocuments, props.showSystemHealth, props.showMcp,
-    props.showFleet, props.previewUrl, props.visionEnabled,
+    props.showFleet, props.visionEnabled,
     props.screenShareEnabled,
   ]);
 
   const actions: IDEPanelActions = useMemo(() => ({
     onToggleExplorer: props.onToggleExplorer ?? noop,
     onToggleSearch: props.onToggleSearch ?? noop,
-    onToggleTerminal: props.onToggleTerminal ?? noop,
-    onTogglePreview: props.onTogglePreview ?? noop,
     onToggleSettings: props.onToggleSettings ?? noop,
     onToggleRunMenu: props.onToggleRunMenu ?? noop,
     onToggleGitHub: props.onToggleGitHub ?? noop,
@@ -69,8 +64,8 @@ export function useIDEState(props: UnifiedSidebarProps) {
     onToggleVision: props.onToggleVision ?? noop,
     onToggleScreenShare: props.onToggleScreenShare ?? noop,
   }), [
-    props.onToggleExplorer, props.onToggleSearch, props.onToggleTerminal,
-    props.onTogglePreview, props.onToggleSettings, props.onToggleRunMenu,
+    props.onToggleExplorer, props.onToggleSearch,
+    props.onToggleSettings, props.onToggleRunMenu,
     props.onToggleGitHub, props.onToggleGit, props.onToggleCheckpoints,
     props.onToggleSandbox, props.onToggleWorkflow, props.onToggleSkillsMonitor,
     props.onToggleChat, props.onToggleAgents, props.onToggleMissions,

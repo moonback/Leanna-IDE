@@ -53,10 +53,8 @@ export function ShortcutsModal({ onClose }: ShortcutsModalProps) {
               { label: 'Aller à la ligne', key: 'Ctrl+G' },
             ]},
             { category: 'Panneaux', items: [
-              { label: 'Terminal', key: 'Ctrl+`' },
               { label: 'Explorateur', key: 'Ctrl+Shift+E' },
               { label: 'Contrôle de source', key: 'Ctrl+Shift+G' },
-              { label: 'Preview', key: 'Ctrl+Shift+V' },
             ]},
             { category: 'Self-IDE (Auto-modification)', items: [
               { label: 'Créer un checkpoint', key: 'Ctrl+Shift+K' },

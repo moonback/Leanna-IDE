@@ -303,7 +303,7 @@ export class SkillScorer {
       patch_project_file: { category: "write", keywords: ["corriger", "patch", "ligne"] },
       list_project_files: { category: "read", keywords: ["lister", "arborescence", "structure"] },
       search_in_files: { category: "search", keywords: ["chercher", "trouver", "rechercher", "grep"] },
-      run_command: { category: "system", keywords: ["exécuter", "commande", "terminal", "npm", "git"] },
+      run_command: { category: "system", keywords: ["exécuter", "commande", "npm", "git"] },
       verify_file: { category: "verify", keywords: ["vérifier", "typescript", "compilation"] },
       verify_typecheck: { category: "verify", keywords: ["types", "typescript", "tsc"] },
       verify_run_script: { category: "test", keywords: ["test", "tester", "script"] },

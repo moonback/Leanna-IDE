@@ -32,10 +32,7 @@
       ".env.example"
     ],
     "asar": true,
-    "asarUnpack": [
-      "**/node-pty/**/*",
-      "**/node_modules/node-pty/**/*"
-    ],
+    "asarUnpack": [],
     "win": {
       "target": [
         {
@@ -62,8 +59,6 @@
     "@tailwindcss/vite": "^4.1.14",
     "@types/react-window": "^1.8.8",
     "@vitejs/plugin-react": "^5.0.4",
-    "@xterm/addon-fit": "^0.11.0",
-    "@xterm/xterm": "^6.0.0",
     "clsx": "2.1.1",
     "compression": "^1.8.1",
     "cva": "1.0.0-beta.2",
@@ -75,7 +70,6 @@
     "monaco-editor": "^0.53.0",
     "motion": "^12.23.24",
     "multer": "^2.2.0",
-    "node-pty": "^1.1.0",
     "pdf-parse": "^2.4.5",
     "puppeteer": "^25.3.0",
     "react": "^19.0.1",
