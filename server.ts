@@ -1682,6 +1682,7 @@ async function startServer() {
       const TIER1_CORE_TOOLS = new Set([
         'read_file_outline', 'read_project_file', 'list_project_files',
         'modify_project_file', 'patch_project_file', 'write_project_file',
+        'rename_project_file', 'delete_project_file', 'create_project_directory',
         'search_in_files',
         'open_project_file', 'open_ide', 'get_workspace_info',
         'analyze_project_file', 'get_workspace_info',
@@ -1785,13 +1786,9 @@ async function startServer() {
       const agentsEnabled = agentsConfig?.enabled !== false; // activé par défaut
 
       if (agentsEnabled) {
-        // Agents actifs : l'assistant ne peut PAS écrire directement
-        const AGENT_ONLY_TOOLS = new Set([
-          'write_project_file',
-          'modify_project_file',
-          'patch_project_file',
-        ]);
-        filteredDeclarations = filteredDeclarations.filter(d => !AGENT_ONLY_TOOLS.has(d.name));
+        // Agents actifs : l'assistant PEUT écrire directement ET déléguer aux agents
+        // Les outils d'écriture restent disponibles pour permettre les opérations
+        // de fichiers directes (créer dossiers, déplacer fichiers, modifications simples)
       } else {
         // Agents désactivés : retirer les outils agents, garder les outils d'écriture directe
         const AGENT_TOOLS = new Set([

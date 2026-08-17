@@ -119,35 +119,35 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "write_project_file",
-      description: "Crée ou écrase un fichier. L'assistant peut l'appeler directement uniquement pour créer ou écrire un fichier .md explicitement demandé par l'utilisateur. Pour toute autre modification, utilise agent_delegate(role='coder'). L'agent coder peut aussi appeler cet outil.",
+      description: "Crée un nouveau fichier ou écrase un fichier existant avec le contenu fourni. Utilise cet outil pour créer des fichiers de tout type (code, config, documentation, etc.).",
       parameters: {
         type: "OBJECT",
         properties: {
-          path: { type: "STRING", description: "Relative path from project root (e.g. src/newFile.ts)." },
-          content: { type: "STRING", description: "Full file content to write." },
+          path: { type: "STRING", description: "Chemin relatif depuis la racine du projet (ex: src/newFile.ts, docs/README.md)." },
+          content: { type: "STRING", description: "Contenu complet du fichier à écrire." },
         },
         required: ["path", "content"],
       },
     },
     {
       name: "modify_project_file",
-      description: "⚠️ RÉSERVÉ AUX AGENTS — Ne PAS appeler directement. Utilise agent_delegate(role='coder') pour toute modification de fichier. Cet outil modifie un fichier par remplacement de texte exact. Il est appelé automatiquement par l'agent coder. Deux modes: 1) searchText exact (copié depuis read_project_file), 2) startMarker/endMarker (le backend extrait le bloc).",
+      description: "Modifie un fichier existant par remplacement de texte exact. Deux modes: 1) searchText exact (copié depuis read_project_file), 2) startMarker/endMarker (le backend extrait le bloc entre les deux marqueurs).",
       parameters: {
         type: "OBJECT",
         properties: {
-          path: { type: "STRING", description: "Relative path of the file to modify." },
-          searchText: { type: "STRING", description: "Exact text to find and replace (whitespace and indentation must match exactly). Si absent, utiliser startMarker/endMarker." },
-          replaceText: { type: "STRING", description: "New text to replace searchText with. Vide '' pour supprimer." },
-          replaceAll: { type: "BOOLEAN", description: "If true, replaces all occurrences. Default false (first occurrence only)." },
-          startMarker: { type: "STRING", description: "Alternative à searchText: première ligne/texte identifiable qui COMMENCE le bloc à remplacer. Le backend lit le fichier et extrait le bloc entre startMarker et endMarker." },
-          endMarker: { type: "STRING", description: "Alternative à searchText: dernière ligne/texte identifiable qui TERMINE le bloc à remplacer." },
+          path: { type: "STRING", description: "Chemin relatif du fichier à modifier." },
+          searchText: { type: "STRING", description: "Texte exact à trouver et remplacer (espaces et indentation doivent correspondre). Si absent, utiliser startMarker/endMarker." },
+          replaceText: { type: "STRING", description: "Nouveau texte pour remplacer searchText. Vide '' pour supprimer." },
+          replaceAll: { type: "BOOLEAN", description: "Si true, remplace toutes les occurrences. Par défaut false (première occurrence)." },
+          startMarker: { type: "STRING", description: "Alternative à searchText: première ligne/texte qui COMMENCE le bloc à remplacer." },
+          endMarker: { type: "STRING", description: "Alternative à searchText: dernière ligne/texte qui TERMINE le bloc à remplacer." },
         },
         required: ["path", "replaceText"],
       },
     },
     {
       name: "apply_patch",
-      description: "⚠️ RÉSERVÉ AUX AGENTS — Applique un diff unifié vérifié sur un fichier. Le contexte des hunks doit correspondre exactement au contenu courant.",
+      description: "Applique un diff unifié (format git diff) sur un fichier. Le contexte des hunks doit correspondre exactement au contenu courant du fichier.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -159,7 +159,7 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "patch_project_file",
-      description: "⚠️ RÉSERVÉ AUX AGENTS — Ne PAS appeler directement. Utilise agent_delegate(role='coder') pour toute modification de fichier. Cet outil patche un fichier via des opérations par ligne. Il est appelé automatiquement par l'agent coder. NOTE: operations are internally reordered and applied bottom-to-top (by startLine descending) so line numbers stay stable during the patch; operation ranges must NOT overlap.",
+      description: "Patche un fichier via des opérations par ligne (replace, insert, delete). Les opérations sont réordonnées et appliquées de bas en haut pour garder les numéros de ligne stables. Les plages ne doivent PAS se chevaucher.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -184,12 +184,12 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "rename_project_file",
-      description: "Renames or moves a file or directory within the project workspace.",
+      description: "Renomme ou DÉPLACE un fichier ou dossier. Pour déplacer un fichier dans un autre dossier, spécifie le nouveau chemin complet dans newPath. Exemple: oldPath='utils.ts', newPath='src/helpers/utils.ts' déplace le fichier dans src/helpers/.",
       parameters: {
         type: "OBJECT",
         properties: {
-          oldPath: { type: "STRING", description: "Current relative path of the file or directory." },
-          newPath: { type: "STRING", description: "New relative path (can include a directory change to move the file)." },
+          oldPath: { type: "STRING", description: "Chemin relatif actuel du fichier ou dossier." },
+          newPath: { type: "STRING", description: "Nouveau chemin relatif (peut inclure un changement de dossier pour déplacer le fichier). Les dossiers parents sont créés automatiquement." },
         },
         required: ["oldPath", "newPath"],
       },
@@ -207,11 +207,11 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "create_project_directory",
-      description: "Creates a directory in the project workspace (including parent directories if needed).",
+      description: "Crée un dossier dans le workspace (crée automatiquement tous les dossiers parents si nécessaire). Utiliser AVANT de déplacer des fichiers vers un nouveau dossier, ou pour organiser la structure du projet.",
       parameters: {
         type: "OBJECT",
         properties: {
-          path: { type: "STRING", description: "Relative path of the directory to create (e.g. src/components/new)." },
+          path: { type: "STRING", description: "Chemin relatif du dossier à créer (ex: src/components/ui, tests/unit)." },
         },
         required: ["path"],
       },

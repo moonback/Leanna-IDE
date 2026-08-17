@@ -94,7 +94,11 @@ const writerAgent: AgentDefinition = {
   capabilities: [
     "read_project_file",
     "write_project_file",
+    "modify_project_file",
     "patch_project_file",
+    "rename_project_file",
+    "delete_project_file",
+    "create_project_directory",
     "list_project_files",
     "search_in_files",
     "read_file_outline",
@@ -111,7 +115,10 @@ const formatterAgent: AgentDefinition = {
   capabilities: [
     "read_project_file",
     "write_project_file",
+    "modify_project_file",
     "patch_project_file",
+    "rename_project_file",
+    "create_project_directory",
     "list_project_files",
     "search_in_files",
     "read_file_outline",
@@ -188,11 +195,15 @@ const summarizerAgent: AgentDefinition = {
 const plannerAgent: AgentDefinition = {
   role: "planner",
   name: "Agent Planificateur",
-  description: "Création de plans, outlines, structures de documents, tables des matières.",
+  description: "Création de plans, outlines, structures de documents, tables des matières. Peut créer des dossiers et déplacer des fichiers pour réorganiser un projet.",
   capabilities: [
     "read_project_file",
     "write_project_file",
+    "modify_project_file",
     "patch_project_file",
+    "rename_project_file",
+    "delete_project_file",
+    "create_project_directory",
     "list_project_files",
     "search_in_files",
     "read_file_outline",
@@ -200,7 +211,7 @@ const plannerAgent: AgentDefinition = {
   ],
   systemPrompt: buildAgentPrompt("planner"),
   maxConcurrency: 1,
-  defaultTimeoutMs: 60_000,
+  defaultTimeoutMs: 90_000,
 };
 
 // ─── Fonction de construction du prompt final ──────────────────────────────
