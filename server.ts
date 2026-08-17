@@ -59,6 +59,7 @@ import conversationsRouter from "./server/routes/conversations";
 import listsRouter from "./server/routes/lists";
 import automationRouter from "./server/routes/automation";
 import { createNotebooksRouter } from "./server/routes/notebooks";
+import { notebookManager } from "./server/notebooks";
 
 // Charger les clés Gemini
 loadGeminiKeys().catch(e => console.error('[GeminiKeyPool] Erreur au chargement initial:', e));
@@ -1981,12 +1982,41 @@ async function startServer() {
         console.debug(`[Knowledge] Module indisponible: ${(e as Error).message}`);
       }
 
+      // ── Notebooks — Injection du contenu complet des notebooks ──────────
+      // Donne à l'assistant un accès intégral aux sources de tous les notebooks
+      let notebookContext = "";
+      try {
+        const allNotebooks = notebookManager.getAllNotebooks();
+        if (allNotebooks.length > 0) {
+          const sections: string[] = [];
+          for (const nb of allNotebooks) {
+            if (nb.sources && nb.sources.length > 0) {
+              const sourcesText = nb.sources.map(s => {
+                const title = s.title || s.origin || "Source";
+                const text = s.rawText || s.summary || "";
+                return `### ${title}\n${text}`;
+              }).join("\n\n");
+              sections.push(`## 📓 Notebook : ${nb.title}\n\n${sourcesText}`);
+            }
+          }
+          if (sections.length > 0) {
+            notebookContext = "\n\n[Notebooks — Contenu complet des sources]\n\n" + sections.join("\n\n---\n\n");
+            const nbTokens = Math.ceil(notebookContext.length / 4);
+            console.log(`[Notebooks] 📓 Contexte notebooks injecté: ~${nbTokens} tokens (${allNotebooks.length} notebook(s), ${allNotebooks.reduce((sum, nb) => sum + (nb.sources?.length || 0), 0)} source(s))`);
+          }
+        }
+      } catch (e) {
+        console.debug(`[Notebooks] Module indisponible: ${(e as Error).message}`);
+      }
+
       // ── Log token budget summary ────────────────────────────────────────
       const memoryTokensEst = Math.ceil((memoryContext.split(/\s+/).length * 1.3 + memoryContext.length / 4) / 2);
       const knowledgeTokensEst = Math.ceil(knowledgeContext.length / 4);
-      const totalPromptTokens = systemTokensEst + memoryTokensEst + knowledgeTokensEst;
+      const notebookTokensEst = Math.ceil(notebookContext.length / 4);
+      const totalPromptTokens = systemTokensEst + memoryTokensEst + knowledgeTokensEst + notebookTokensEst;
       console.log(`[TokenOptimizer] 🧠 Contexte mémoire: ~${memoryTokensEst} tokens (${memoryContext.length} chars)`);
       console.log(`[TokenOptimizer] 🧠 Contexte Knowledge: ~${knowledgeTokensEst} tokens (${knowledgeContext.length} chars)`);
+      console.log(`[TokenOptimizer] 📓 Contexte Notebooks: ~${notebookTokensEst} tokens (${notebookContext.length} chars)`);
       console.log(`[TokenOptimizer] 📦 Total prompt injecté: ~${totalPromptTokens} tokens`);
       console.log(`[TokenOptimizer]    Budget mémoire: ${memoryBudgetTokens} | Max mémoires: ${maxMemories} | Max convs: ${maxConversations}`);
       if (memoryTokensEst === 0) {
@@ -2032,7 +2062,7 @@ async function startServer() {
                   voiceConfig: { prebuiltVoiceConfig: { voiceName } },
                 },
                 systemInstruction: {
-                  parts: [{ text: systemText + memoryContext + knowledgeContext }]
+                  parts: [{ text: systemText + memoryContext + knowledgeContext + notebookContext }]
                 },
                 tools: tools,
                 // Enable audio transcriptions for persistent history
@@ -2177,8 +2207,8 @@ async function startServer() {
                 closeCode,
                 closeReasonText,
                 toolCount: filteredDeclarations.length,
-                systemPromptLength: (systemText + memoryContext + knowledgeContext).length,
-                estimatedTotalTokens: toolTokensEstimate + systemTokensEst + memoryTokensEst + knowledgeTokensEst,
+                systemPromptLength: (systemText + memoryContext + knowledgeContext + notebookContext).length,
+                estimatedTotalTokens: toolTokensEstimate + systemTokensEst + memoryTokensEst + knowledgeTokensEst + notebookTokensEst,
                 context_monitor: {
                   turns: conversationCtx.turns,
                   total_prompt: conversationCtx.totalPromptTokens,
@@ -2283,7 +2313,7 @@ async function startServer() {
         }));
       }
 
-      const initialPromptSize = estimateTokens(systemText + memoryContext + knowledgeContext + (contextResumeSummary ? contextResumeSummary : ''));
+      const initialPromptSize = estimateTokens(systemText + memoryContext + knowledgeContext + notebookContext + (contextResumeSummary ? contextResumeSummary : ''));
       sendContextSize(initialPromptSize, { turns: 0 });
       console.log(
               `[ContextMonitor] 📦 Prompt initial: ~${initialPromptSize} tokens ` +
@@ -2346,7 +2376,7 @@ async function startServer() {
 
                   const summaryTokens = estimateTokens(summaryText);
                   const keptTokens = keptMessages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
-                  const baseTokens = estimateTokens(systemText + memoryContext + knowledgeContext);
+                  const baseTokens = estimateTokens(systemText + memoryContext + knowledgeContext + notebookContext);
                   const newSize = summaryTokens + keptTokens + baseTokens;
 
                   conversationCtx.totalPromptTokens = Math.floor(newSize * 0.7);
@@ -2507,7 +2537,7 @@ async function startServer() {
 
                 const summaryTokens = estimateTokens(summaryText);
                 const keptTokens = keptMessages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
-                const baseTokens = estimateTokens(systemText + memoryContext + knowledgeContext);
+                const baseTokens = estimateTokens(systemText + memoryContext + knowledgeContext + notebookContext);
                 const newSize = summaryTokens + keptTokens + baseTokens;
 
                 conversationCtx.totalPromptTokens = Math.floor(newSize * 0.7);
