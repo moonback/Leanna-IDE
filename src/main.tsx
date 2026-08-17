@@ -25,6 +25,7 @@ const AutomationView = lazy(() => import('./views/AutomationView'));
 const HistoryView = lazy(() => import('./views/HistoryView'));
 const GitHubView = lazy(() => import('./views/GitHubView'));
 const DocumentsView = lazy(() => import('./views/DocumentsView'));
+const NotebooksView = lazy(() => import('./views/NotebooksView'));
 import './index.css';
 
 // ── Global fetch interceptor: auto-inject auth token + dedup + CIRCUIT BREAKER
@@ -455,6 +456,7 @@ function AnimatedRoutes() {
         <Route path="/github"     element={wrap(<GitHubView />)} />
         <Route path="/automation" element={wrap(<AutomationView />)} />
         <Route path="/documents"  element={wrap(<DocumentsView />)} />
+        <Route path="/notebooks"  element={wrap(<NotebooksView />)} />
         <Route path="/help"       element={wrap(<HelpView />)} />
       </Routes>
     </AnimatePresence>

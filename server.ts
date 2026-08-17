@@ -58,6 +58,7 @@ import memoriesRouter from "./server/routes/memories";
 import conversationsRouter from "./server/routes/conversations";
 import listsRouter from "./server/routes/lists";
 import automationRouter from "./server/routes/automation";
+import { createNotebooksRouter } from "./server/routes/notebooks";
 
 // Charger les clés Gemini
 loadGeminiKeys().catch(e => console.error('[GeminiKeyPool] Erreur au chargement initial:', e));
@@ -486,6 +487,7 @@ async function startServer() {
   app.use("/api/knowledge", memoryRouter);
   app.use("/api/knowledge", impactRouter);
   app.use("/api/knowledge", understandingRouter);
+  app.use("/api/notebooks", createNotebooksRouter());
   // ── Fin routeurs modulaires ───────────────────────────────────────────────
 
   // ── Agent Builder: génération IA d'agents personnalisés ───────────────────

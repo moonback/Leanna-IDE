@@ -6,9 +6,10 @@ import {
   MessageSquare, FolderPlus,
   Code2, GitBranch, BrainCircuit,
   Circle, Search, ChevronRight, Trash2,
-  Command,
+  Command, BookOpen,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState';
 import { useLiveAPIContext } from '../../context/LiveAPIContext';
 import { useProfile } from '../../context/UserProfileContext';
@@ -710,6 +711,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   onOpenChat,
 }: EmptyEditorStateProps) {
   const ws = useWorkspaceState();
+  const navigate = useNavigate();
   const { connected, isBusy, getInputAmplitude, getOutputAmplitude, connect } =
     useLiveAPIContext();
   const { profile } = useProfile();
@@ -1048,6 +1050,41 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                 {createMode === 'file' ? <FolderPlus size={13} /> : <FileText size={13} />}
               </button>
             </div>
+
+            {/* Notebooks — accès rapide */}
+            <button
+              onClick={() => navigate('/notebooks')}
+              className="group flex items-center gap-3.5 w-full px-4 py-3.5 text-left transition-all duration-200"
+              style={{
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border-base)',
+                borderRadius: 'var(--radius-lg)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                e.currentTarget.style.backgroundColor = 'var(--bg-panel)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-base)';
+                e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
+              }}
+            >
+              <div
+                className="w-9 h-9 flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: 'var(--accent-subtle)', borderRadius: 'var(--radius-md)' }}
+              >
+                <BookOpen size={15} style={{ color: 'var(--accent-primary)' }} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Notebooks
+                </div>
+                <div className="text-[10.5px] truncate" style={{ color: 'var(--text-muted)' }}>
+                  Sources, chat IA groundé, résumés et podcasts
+                </div>
+              </div>
+              <ChevronRight size={14} style={{ color: 'var(--text-dimmed)' }} className="flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
+            </button>
           </motion.div>
 
           {/* ── Fichiers récents ── */}
