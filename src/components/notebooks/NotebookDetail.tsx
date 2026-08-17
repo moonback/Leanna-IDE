@@ -2,12 +2,14 @@
  * NotebookDetail — Vue détaillée d'un notebook
  *
  * Onglets : Sources | Chat | Notes | Générer | Audio
+ * Avec indicateur animé sur le tab actif et transition de contenu.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft, FileText, MessageSquare, StickyNote, Sparkles, Mic,
-  Loader2, RefreshCw,
+  Loader2, RefreshCw, Settings,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { SourcePanel } from './SourcePanel';
@@ -43,6 +45,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [notebook, setNotebook] = useState<NotebookData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('sources');
+  const tabsRef = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   const loadNotebook = useCallback(async () => {
     setLoading(true);
@@ -62,8 +65,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
   if (loading || !notebook) {
     return (
-      <div className="h-full flex items-center justify-center" style={{ backgroundColor: 'var(--bg-base)' }}>
+      <div className="h-full flex flex-col items-center justify-center gap-3" style={{ backgroundColor: 'var(--bg-base)' }}>
         <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Chargement du notebook...</p>
       </div>
     );
   }
@@ -80,20 +84,21 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       {/* Header */}
       <header
-        className="flex flex-shrink-0 items-center gap-3 border-b px-5 py-3 lg:px-7"
+        className="flex flex-shrink-0 items-center gap-3 border-b px-5 py-3.5 lg:px-7"
         style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
       >
         <button
           onClick={onBack}
-          className="p-2 rounded-lg transition-colors hover:bg-white/5"
+          className="p-2 rounded-lg transition-all hover:bg-white/5 active:scale-95"
           style={{ color: 'var(--text-muted)' }}
+          title="Retour aux notebooks"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
 
         <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
-          style={{ backgroundColor: `${notebook.color}20` }}
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 shadow-sm"
+          style={{ backgroundColor: `${notebook.color}20`, border: `1px solid ${notebook.color}30` }}
         >
           {notebook.icon}
         </div>
@@ -103,57 +108,85 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             {notebook.title}
           </h1>
           {notebook.description && (
-            <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
               {notebook.description}
             </p>
           )}
         </div>
 
-        <button
-          onClick={loadNotebook}
-          className="p-2 rounded-lg transition-colors hover:bg-white/5"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={loadNotebook}
+            className="p-2 rounded-lg transition-all hover:bg-white/5 active:scale-95"
+            style={{ color: 'var(--text-muted)' }}
+            title="Actualiser"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </header>
 
-      {/* Tabs */}
+      {/* Tabs with animated indicator */}
       <div
-        className="flex items-center gap-1 px-5 py-2 flex-shrink-0 border-b overflow-x-auto lg:px-7"
+        className="relative flex items-center gap-0.5 px-5 py-1.5 flex-shrink-0 border-b overflow-x-auto lg:px-7"
         style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
       >
         {tabs.map(({ key, icon: Icon, label, badge }) => (
           <button
             key={key}
+            ref={(el) => { if (el) tabsRef.current.set(key, el); }}
             onClick={() => setActiveTab(key)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap"
+            className="relative flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap"
             style={{
-              backgroundColor: activeTab === key ? 'var(--accent-subtle)' : 'transparent',
               color: activeTab === key ? 'var(--accent-primary)' : 'var(--text-muted)',
             }}
           >
-            <Icon className="w-3.5 h-3.5" />
-            {label}
-            {badge !== undefined && badge > 0 && (
-              <span
-                className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold"
-                style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}
-              >
-                {badge}
-              </span>
+            {/* Active background indicator */}
+            {activeTab === key && (
+              <motion.div
+                layoutId="activeTabBg"
+                className="absolute inset-0 rounded-lg"
+                style={{ backgroundColor: 'var(--accent-subtle)' }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              />
             )}
+            <span className="relative flex items-center gap-1.5">
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+              {badge !== undefined && badge > 0 && (
+                <span
+                  className="px-1.5 py-0.5 rounded-full text-[9px] font-bold min-w-[18px] text-center"
+                  style={{
+                    backgroundColor: activeTab === key ? 'var(--accent-primary)' : 'var(--bg-base)',
+                    color: activeTab === key ? '#fff' : 'var(--text-dimmed)',
+                  }}
+                >
+                  {badge}
+                </span>
+              )}
+            </span>
           </button>
         ))}
       </div>
 
-      {/* Content */}
+      {/* Content with crossfade */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === 'sources' && <SourcePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} />}
-        {activeTab === 'chat' && <NotebookChat notebookId={notebookId} hasSources={notebook.sources.length > 0} />}
-        {activeTab === 'notes' && <NotesPanel notebookId={notebookId} notes={notebook.notes} onRefresh={loadNotebook} />}
-        {activeTab === 'generate' && <GeneratePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} />}
-        {activeTab === 'audio' && <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} onRefresh={loadNotebook} />}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className="h-full"
+          >
+            {activeTab === 'sources' && <SourcePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} />}
+            {activeTab === 'chat' && <NotebookChat notebookId={notebookId} hasSources={notebook.sources.length > 0} />}
+            {activeTab === 'notes' && <NotesPanel notebookId={notebookId} notes={notebook.notes} onRefresh={loadNotebook} />}
+            {activeTab === 'generate' && <GeneratePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} />}
+            {activeTab === 'audio' && <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} onRefresh={loadNotebook} />}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );

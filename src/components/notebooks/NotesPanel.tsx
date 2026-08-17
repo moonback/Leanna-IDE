@@ -1,10 +1,12 @@
 /**
  * NotesPanel — Gestion des notes d'un notebook
+ *
+ * UI améliorée avec meilleur layout, compteur de caractères, et animations plus fluides.
  */
 
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Pin, Trash2, Edit3, Save, X } from 'lucide-react';
+import { Plus, Pin, Trash2, Edit3, Save, X, StickyNote, Clock } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 
 interface NoteItem {
@@ -20,6 +22,17 @@ interface Props {
   notebookId: string;
   notes: NoteItem[];
   onRefresh: () => void;
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (days > 0) return `${days}j`;
+  if (hours > 0) return `${hours}h`;
+  if (mins > 0) return `${mins}m`;
+  return 'now';
 }
 
 export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
@@ -91,6 +104,14 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
     setEditingId(note.id);
     setTitle(note.title);
     setContent(note.content);
+    setShowForm(false);
+  };
+
+  const cancelForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setTitle('');
+    setContent('');
   };
 
   // Trier : pinnées d'abord, puis par date
@@ -100,17 +121,31 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
 
+  const pinnedCount = notes.filter(n => n.pinned).length;
+
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar p-5 lg:p-7 space-y-4">
-      {/* Add button */}
-      <button
-        onClick={() => { setShowForm(true); setEditingId(null); setTitle(''); setContent(''); }}
-        className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
-        style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
-      >
-        <Plus className="w-3.5 h-3.5" />
-        Nouvelle note
-      </button>
+    <div className="h-full overflow-y-auto custom-scrollbar p-5 lg:p-7 space-y-5">
+      {/* Header with stats */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => { setShowForm(true); setEditingId(null); setTitle(''); setContent(''); }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 shadow-sm"
+          style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+        >
+          <Plus className="w-4 h-4" />
+          Nouvelle note
+        </button>
+
+        <div className="ml-auto flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+          {pinnedCount > 0 && (
+            <span className="flex items-center gap-1">
+              <Pin className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} />
+              {pinnedCount} épinglée{pinnedCount > 1 ? 's' : ''}
+            </span>
+          )}
+          <span>{notes.length} note{notes.length !== 1 ? 's' : ''}</span>
+        </div>
+      </div>
 
       {/* Create/Edit Form */}
       <AnimatePresence>
@@ -119,42 +154,61 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="p-4 rounded-2xl border space-y-3"
-              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
+            <div
+              className="p-5 rounded-2xl border space-y-3"
+              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--accent-primary)', boxShadow: '0 0 0 1px var(--accent-primary)' }}
+            >
+              <div className="flex items-center gap-2">
+                <StickyNote className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  {editingId ? 'Modifier la note' : 'Nouvelle note'}
+                </p>
+              </div>
+
               <input
                 type="text"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="Titre de la note..."
-                className="w-full px-4 py-2 rounded-xl text-xs outline-none"
+                autoFocus
+                className="w-full px-4 py-2.5 rounded-xl text-sm font-medium outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
                 style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
               />
-              <textarea
-                value={content}
-                onChange={e => setContent(e.target.value)}
-                placeholder="Contenu..."
-                rows={5}
-                className="w-full px-4 py-3 rounded-xl text-xs outline-none resize-none"
-                style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
-              />
-              <div className="flex gap-2">
+
+              <div className="relative">
+                <textarea
+                  value={content}
+                  onChange={e => setContent(e.target.value)}
+                  placeholder="Contenu de la note..."
+                  rows={6}
+                  className="w-full px-4 py-3 rounded-xl text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)] leading-relaxed"
+                  style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                />
+                <span className="absolute bottom-2 right-3 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                  {content.length} car.
+                </span>
+              </div>
+
+              <div className="flex gap-2 pt-1">
                 <button
                   onClick={() => editingId ? handleUpdate(editingId) : handleCreate()}
                   disabled={!title.trim()}
-                  className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-40 transition active:scale-95"
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold disabled:opacity-40 transition-all active:scale-95"
                   style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
                 >
-                  <Save className="w-3 h-3" />
+                  <Save className="w-3.5 h-3.5" />
                   {editingId ? 'Mettre à jour' : 'Créer'}
                 </button>
                 <button
-                  onClick={() => { setShowForm(false); setEditingId(null); setTitle(''); setContent(''); }}
-                  className="px-3 py-2 rounded-xl text-xs"
+                  onClick={cancelForm}
+                  className="flex items-center gap-1 px-3 py-2.5 rounded-xl text-xs transition-colors hover:bg-white/5"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   <X className="w-3.5 h-3.5" />
+                  Annuler
                 </button>
               </div>
             </div>
@@ -164,43 +218,95 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
 
       {/* Notes List */}
       {sorted.length === 0 && !showForm ? (
-        <p className="text-xs text-center py-8" style={{ color: 'var(--text-dimmed)' }}>
-          Aucune note. Créez des notes pour organiser vos idées et annotations.
-        </p>
+        <div className="flex flex-col items-center justify-center py-14 gap-4">
+          <div
+            className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            style={{ backgroundColor: 'var(--accent-subtle)' }}
+          >
+            <StickyNote className="w-6 h-6" style={{ color: 'var(--accent-primary)' }} />
+          </div>
+          <div className="text-center space-y-1">
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              Aucune note
+            </p>
+            <p className="text-xs max-w-xs" style={{ color: 'var(--text-muted)' }}>
+              Créez des notes pour organiser vos idées, annotations et insights.
+            </p>
+          </div>
+        </div>
       ) : (
-        <div className="space-y-3">
-          {sorted.map((note) => (
-            <div
-              key={note.id}
-              className="group p-4 rounded-2xl border"
-              style={{ backgroundColor: 'var(--bg-panel)', borderColor: note.pinned ? 'var(--accent-primary)' : 'var(--border-base)' }}
-            >
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    {note.pinned && <Pin className="w-3 h-3 inline mr-1" style={{ color: 'var(--accent-primary)' }} />}
-                    {note.title}
-                  </p>
-                  {note.content && (
-                    <p className="text-[10px] mt-1 whitespace-pre-wrap line-clamp-4" style={{ color: 'var(--text-muted)' }}>
-                      {note.content}
-                    </p>
-                  )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <AnimatePresence initial={false}>
+            {sorted.map((note) => (
+              <motion.div
+                key={note.id}
+                layout
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                className="group p-4 rounded-2xl border transition-all hover:shadow-md hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: 'var(--bg-panel)',
+                  borderColor: note.pinned ? 'var(--accent-primary)' : 'var(--border-base)',
+                  borderWidth: note.pinned ? '1.5px' : '1px',
+                }}
+              >
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      {note.pinned && <Pin className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
+                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                        {note.title}
+                      </p>
+                    </div>
+                    {note.content && (
+                      <p className="text-[11px] mt-1.5 whitespace-pre-wrap line-clamp-4 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                        {note.content}
+                      </p>
+                    )}
+                    {/* Meta */}
+                    <div className="flex items-center gap-2 mt-2.5">
+                      <span className="flex items-center gap-1 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                        <Clock className="w-2.5 h-2.5" />
+                        {timeAgo(note.updatedAt)}
+                      </span>
+                      {note.content && (
+                        <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                          {note.content.length} car.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                    <button
+                      onClick={() => handleTogglePin(note.id, note.pinned)}
+                      className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                      title={note.pinned ? 'Désépingler' : 'Épingler'}
+                    >
+                      <Pin className="w-3 h-3" style={{ color: note.pinned ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
+                    </button>
+                    <button
+                      onClick={() => startEdit(note)}
+                      className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                      title="Modifier"
+                    >
+                      <Edit3 className="w-3 h-3" style={{ color: 'var(--text-dimmed)' }} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(note.id)}
+                      className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="w-3 h-3" style={{ color: 'var(--color-error)' }} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                  <button onClick={() => handleTogglePin(note.id, note.pinned)} className="p-1 rounded hover:bg-white/5">
-                    <Pin className="w-3 h-3" style={{ color: note.pinned ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
-                  </button>
-                  <button onClick={() => startEdit(note)} className="p-1 rounded hover:bg-white/5">
-                    <Edit3 className="w-3 h-3" style={{ color: 'var(--text-dimmed)' }} />
-                  </button>
-                  <button onClick={() => handleDelete(note.id)} className="p-1 rounded hover:bg-red-500/10">
-                    <Trash2 className="w-3 h-3" style={{ color: 'var(--color-error)' }} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       )}
     </div>
