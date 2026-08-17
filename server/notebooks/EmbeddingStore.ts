@@ -21,8 +21,8 @@ const log = createLogger("EmbeddingStore");
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
-/** Modèle d'embedding Gemini */
-const EMBEDDING_MODEL = "text-embedding-004";
+/** Modèle d'embedding Gemini (gemini-embedding-001 remplace text-embedding-004 sur v1beta) */
+const EMBEDDING_MODEL = "gemini-embedding-001";
 
 /** Dimensionalité des vecteurs (256 = bon compromis performance/qualité) */
 const EMBEDDING_DIMENSIONS = 256;
@@ -87,18 +87,25 @@ export class EmbeddingStore {
     ensureDataDir();
     try {
       const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith(".json"));
+      let skippedLegacy = 0;
       for (const file of files) {
         try {
           const raw = fs.readFileSync(path.join(DATA_DIR, file), "utf-8");
           const index: EmbeddingIndex = JSON.parse(raw);
-          if (index.model === EMBEDDING_MODEL && index.dimensions === EMBEDDING_DIMENSIONS) {
-            for (const entry of index.entries) {
-              this.vectors.set(entry.chunkId, entry);
+          // Accepter les embeddings du modèle actuel ET avec la bonne dimensionalité
+          if (index.dimensions === EMBEDDING_DIMENSIONS) {
+            if (index.model === EMBEDDING_MODEL) {
+              for (const entry of index.entries) {
+                this.vectors.set(entry.chunkId, entry);
+              }
+            } else {
+              // Ancien modèle (ex: text-embedding-004) — ignorer, sera réindexé
+              skippedLegacy++;
             }
           }
         } catch { /* skip corrupted files */ }
       }
-      log.info(`✅ ${this.vectors.size} embeddings chargés depuis le disque`);
+      log.info(`✅ ${this.vectors.size} embeddings chargés depuis le disque${skippedLegacy > 0 ? ` (${skippedLegacy} fichier(s) legacy ignorés, réindexation nécessaire)` : ''}`);
     } catch (e: any) {
       log.warn(`Impossible de charger les embeddings: ${e.message}`);
     }
