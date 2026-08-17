@@ -299,6 +299,108 @@ export function createNotebooksRouter(): Router {
     }
   });
 
+  // POST /api/notebooks/:id/chat/stream — Poser une question (SSE streaming)
+  router.post("/:id/chat/stream", async (req: Request, res: Response) => {
+    try {
+      const { question } = req.body;
+      if (!question || typeof question !== "string") {
+        res.status(400).json({ error: "Le champ 'question' est requis." });
+        return;
+      }
+
+      // Headers SSE
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+
+      // Envoyer un event "start" pour confirmer la connexion
+      res.write(`event: start\ndata: ${JSON.stringify({ status: "streaming" })}\n\n`);
+
+      // Stream la réponse chunk par chunk
+      const message = await groundedChat.askStream(
+        req.params.id,
+        question.trim(),
+        (chunk: string) => {
+          res.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
+        }
+      );
+
+      // Générer les follow-ups en parallèle
+      let followUps: string[] = [];
+      try {
+        followUps = await groundedChat.generateFollowUps(req.params.id);
+      } catch { /* ignore */ }
+
+      // Envoyer le message final complet avec citations et follow-ups
+      res.write(`event: done\ndata: ${JSON.stringify({ message, followUps })}\n\n`);
+      res.end();
+    } catch (e: any) {
+      // Si les headers SSE sont déjà envoyés, envoyer l'erreur en event
+      if (res.headersSent) {
+        res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  });
+
+  // GET /api/notebooks/:id/chat/follow-ups — Questions de suivi contextuelles
+  router.get("/:id/chat/follow-ups", async (req: Request, res: Response) => {
+    try {
+      const followUps = await groundedChat.generateFollowUps(req.params.id);
+      res.json({ status: "success", followUps });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/notebooks/:id/chat/deep-dive — Mode exploration approfondie (SSE)
+  router.post("/:id/chat/deep-dive", async (req: Request, res: Response) => {
+    try {
+      const { question } = req.body;
+      if (!question || typeof question !== "string") {
+        res.status(400).json({ error: "Le champ 'question' est requis." });
+        return;
+      }
+
+      // Headers SSE
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+
+      res.write(`event: start\ndata: ${JSON.stringify({ mode: "deep-dive" })}\n\n`);
+
+      const message = await groundedChat.deepDive(
+        req.params.id,
+        question.trim(),
+        (stage: string, content: string) => {
+          res.write(`event: progress\ndata: ${JSON.stringify({ stage, content })}\n\n`);
+        }
+      );
+
+      // Follow-ups après deep dive
+      let followUps: string[] = [];
+      try {
+        followUps = await groundedChat.generateFollowUps(req.params.id);
+      } catch { /* ignore */ }
+
+      res.write(`event: done\ndata: ${JSON.stringify({ message, followUps })}\n\n`);
+      res.end();
+    } catch (e: any) {
+      if (res.headersSent) {
+        res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  });
+
   // GET /api/notebooks/:id/chat/history — Historique du chat
   router.get("/:id/chat/history", (req: Request, res: Response) => {
     try {
