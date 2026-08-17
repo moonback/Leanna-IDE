@@ -15,7 +15,7 @@ import { createLogger } from "../utils/logger";
 
 const log = createLogger("DelegationParser");
 
-const VALID_ROLES = new Set<AgentRole>(["coder", "test", "docs", "refactor", "security", "review", "architect"]);
+const VALID_ROLES = new Set<AgentRole>(["writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner"]);
 const VALID_PRIORITIES = new Set<TaskPriority>(["low", "medium", "high", "critical"]);
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -215,36 +215,52 @@ export class DelegationParser {
 
     // Table d'alias — mappe les variantes connues vers le rôle canonique
     const ROLE_ALIASES: Record<string, AgentRole> = {
-      // docs
-      "documentation": "docs",
-      "agent documentation": "docs",
-      "docs agent": "docs",
-      "doc": "docs",
-      // test
-      "testing": "test",
-      "tests": "test",
-      "agent test": "test",
-      "test agent": "test",
-      // refactor
-      "refactoring": "refactor",
-      "agent refactor": "refactor",
-      "refactor agent": "refactor",
-      // security
-      "sécurité": "security",
-      "securite": "security",
-      "security agent": "security",
-      "agent security": "security",
-      "security-audit": "security",
-      // review
-      "code review": "review",
-      "reviewer": "review",
-      "review agent": "review",
-      "agent review": "review",
-      // architect
-      "architecture": "architect",
-      "architecte": "architect",
-      "architect agent": "architect",
-      "agent architect": "architect",
+      // writer
+      "redacteur": "writer",
+      "rédacteur": "writer",
+      "rédaction": "writer",
+      "redaction": "writer",
+      "agent rédacteur": "writer",
+      "writer agent": "writer",
+      "write": "writer",
+      // formatter
+      "mise en forme": "formatter",
+      "formatage": "formatter",
+      "format": "formatter",
+      "formatter agent": "formatter",
+      "agent formatter": "formatter",
+      // researcher
+      "recherche": "researcher",
+      "research": "researcher",
+      "chercheur": "researcher",
+      "researcher agent": "researcher",
+      "agent recherche": "researcher",
+      // proofreader
+      "correcteur": "proofreader",
+      "correction": "proofreader",
+      "relecture": "proofreader",
+      "proofreader agent": "proofreader",
+      "agent correcteur": "proofreader",
+      // translator
+      "traducteur": "translator",
+      "traduction": "translator",
+      "translate": "translator",
+      "translator agent": "translator",
+      "agent traducteur": "translator",
+      // summarizer
+      "synthese": "summarizer",
+      "synthèse": "summarizer",
+      "résumé": "summarizer",
+      "resume": "summarizer",
+      "summarizer agent": "summarizer",
+      "agent synthèse": "summarizer",
+      // planner
+      "planificateur": "planner",
+      "planification": "planner",
+      "plan": "planner",
+      "outline": "planner",
+      "planner agent": "planner",
+      "agent planificateur": "planner",
     };
 
     // Check alias exact

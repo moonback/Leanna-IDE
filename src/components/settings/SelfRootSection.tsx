@@ -136,7 +136,7 @@ export function SelfRootSection() {
       <Section
         icon={Shield}
         title="Périmètre du repo"
-        description="Chemin du repo sur lequel l'assistant travaille. Toutes les opérations (lecture, écriture, terminal) ciblent ce dossier."
+        description="Chemin du repo sur lequel l'assistant travaille. Toutes les opérations (lecture, écriture) ciblent ce dossier."
       >
         {/* Current path + edit */}
         <Field label="Chemin du repo" hint="Chemin absolu vers la racine du projet. Le changement prend effet immédiatement.">

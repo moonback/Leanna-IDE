@@ -10,7 +10,6 @@ import type { AIProvider } from '../../context/UserProfileContext';
 
 export const OPENROUTER_MODELS = [
   // ── Coding agents ─────────────────────────────────────────────────────────
-  { id: 'openai/gpt-5.6-luna:batch',                         name: 'GPT-5.6-Batch',               provider: 'Openai',      free: true, desc: 'MoE 72B-A7B, 128K contexte, excellent pour le code'},
   { id: 'openai/gpt-5.6-luna',                               name: 'GPT-5.6',               provider: 'Openai',      free: true, desc: 'MoE 72B-A7B, 128K contexte, excellent pour le code'},
   { id: 'poolside/laguna-s-2.1:free',                        name: 'Laguna S 2.1',          provider: 'Poolside',  free: true, desc: '118B-A8B coding agent — meilleur score code de Poolside, 262K ctx' },
   { id: 'poolside/laguna-xs-2.1:free',                       name: 'Laguna XS 2.1',         provider: 'Poolside',  free: true, desc: '33B-A3B coding agent léger et rapide, 262K contexte' },

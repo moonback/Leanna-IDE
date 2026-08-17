@@ -4,21 +4,21 @@
  *
  * Icônes visibles (5 au total) :
  * 1. Explorateur (accès direct — le plus utilisé)
- * 2. Fichiers & Code (sous-menu : Recherche, Terminal, Aperçu)
- * 3. Source & Déploiement (sous-menu : Git, GitHub, Checkpoints, Sandbox, Workflow)
+ * 2. Fichiers & Code (sous-menu : Recherche)
+ * 3. Source & Déploiement (sous-menu : Git, Sandbox, Workflow)
  * 4. Données & Outils (sous-menu : Knowledge, Santé, MCP, Médias)
  * 5. (IA via le menu agent en bas — inchangé)
  */
 
 import {
-  Search, SquareTerminal, Frame,
+  Search,
   GitBranch, Camera, Monitor,
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
-  Cable, ShieldCheck, Container, Bot, Crosshair, Database,
-  GitBranchPlus, Activity, Wrench, Code2, Users, FileStack,
+  Cable, Container, Bot, Crosshair, Database,
+  Activity, Wrench, Code2, Users, FileStack,
+  Wand2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Github } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -69,18 +69,12 @@ export const sidebarSections: SidebarSectionConfig[] = [
     ],
   },
 
-  // ═══ Code & Exécution — sous-menu regroupant Recherche, Terminal, Aperçu ═══
+  // ═══ Code & Recherche ═══
   {
     id: 'code-exec',
-    label: 'Code & Exécution',
+    label: 'Code & Recherche',
     items: [
       {
-        id: 'code-tools',
-        type: 'submenu',
-        icon: Code2,
-        label: 'Code & Exécution',
-        children: [
-          {
             id: 'search',
             type: 'button',
             icon: Search,
@@ -89,26 +83,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
             stateKey: 'showGlobalSearch',
             actionKey: 'onToggleSearch',
           },
-          {
-            id: 'terminal',
-            type: 'button',
-            icon: SquareTerminal,
-            label: 'Terminal (Ctrl+`)',
-            shortcut: 'Ctrl+`',
-            stateKey: 'showTerminal',
-            actionKey: 'onToggleTerminal',
-          },
-          {
-            id: 'preview',
-            type: 'button',
-            icon: Frame,
-            label: 'Aperçu web',
-            stateKey: 'showPreview',
-            actionKey: 'onTogglePreview',
-            dotStateKey: 'previewUrl',
-          },
-        ],
-      },
     ],
   },
 
@@ -123,30 +97,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
         icon: GitBranch,
         label: 'Source & Déploiement',
         children: [
-          {
-            id: 'git',
-            type: 'button',
-            icon: GitBranchPlus,
-            label: 'Contrôle de source',
-            stateKey: 'showGit',
-            actionKey: 'onToggleGit',
-          },
-          {
-            id: 'github',
-            type: 'button',
-            icon: Github,
-            label: 'GitHub',
-            stateKey: 'showGitHub',
-            actionKey: 'onToggleGitHub',
-          },
-          {
-            id: 'checkpoints',
-            type: 'button',
-            icon: ShieldCheck,
-            label: 'Checkpoints',
-            stateKey: 'showCheckpoints',
-            actionKey: 'onToggleCheckpoints',
-          },
           {
             id: 'sandbox',
             type: 'button',
@@ -212,6 +162,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
             actionKey: 'onToggleMcp',
           },
           {
+            id: 'agent-builder',
+            type: 'button',
+            icon: Wand2,
+            label: 'Agent Builder (créer des agents)',
+            stateKey: 'showAgentBuilder',
+            actionKey: 'onToggleAgentBuilder',
+          },
+          {
             id: 'vision',
             type: 'button',
             icon: Camera,
@@ -267,6 +225,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
         actionKey: 'onToggleFleet',
         requiresAssistant: true,
       },
+
       {
         id: 'missions',
         type: 'button',

@@ -236,7 +236,7 @@ export class AgentOrchestrator {
 
   /**
    * Lance une collaboration structurée entre agents selon un pattern prédéfini.
-   * Ex: "refactor-with-safety", "security-audit-full", "new-feature-complete"
+   * Ex: "document-complet", "traduction-verifiee", "recherche-redaction"
    *
    * @param patternName - Nom du pattern de collaboration (voir COLLABORATION_PATTERNS)
    * @param context - Contexte partagé pour tous les agents du pattern
@@ -275,7 +275,7 @@ export class AgentOrchestrator {
     }));
 
     // Notifier le bus du démarrage de la collaboration
-    await agentMessageBus.broadcast("architect", "collaboration_started", {
+    await agentMessageBus.broadcast("planner", "collaboration_started", {
       pattern: pattern.name,
       participants: pattern.participants,
       title: params.context.title,
@@ -323,7 +323,7 @@ export class AgentOrchestrator {
 
     // Notifier le bus de messages que l'orchestrateur a délégué cette tâche
     await agentMessageBus
-      .broadcast("architect", "task_delegated_by_orchestrator", {
+      .broadcast("planner", "task_delegated_by_orchestrator", {
         taskId: task.id,
         role: params.role,
         title: params.title,
@@ -456,7 +456,7 @@ export class AgentOrchestrator {
       pending: 0, running: 0, completed: 0, incomplete: 0, failed: 0, cancelled: 0,
     };
     const byRole: Record<AgentRole, number> = {
-      coder: 0, test: 0, docs: 0, refactor: 0, security: 0, review: 0, architect: 0,
+      writer: 0, formatter: 0, researcher: 0, proofreader: 0, translator: 0, summarizer: 0, planner: 0,
     };
 
     for (const task of allTasks) {

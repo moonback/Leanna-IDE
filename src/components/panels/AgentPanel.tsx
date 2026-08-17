@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Users, Bot, FlaskConical, FileText, RefreshCw, Shield, Eye,
-  Building2, Loader2, CheckCircle2, XCircle, Clock,
-  ChevronRight, Trash2, Code, GitBranch, Terminal, Globe,
+  Users, Bot, FileText,
+  Loader2, CheckCircle2, XCircle, Clock,
+  ChevronRight, Trash2, Code, GitBranch, Globe,
   Brain, Database, Target, Activity, ArrowRight,
+  PenTool, AlignLeft, Search, SpellCheck, Languages, ListTree,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel';
 import { IconButton } from '../ui/IconButton';
+import { useProfile } from '../../context/UserProfileContext';
+import type { AgentRole } from '../../context/UserProfileContext';
 import {
   getToolActivities, getAgentTasks, subscribe,
   clearCompletedTools, clearCompletedTasks,
@@ -24,16 +27,16 @@ const ROLE_META: Record<string, {
   label: string;
   description: string;
 }> = {
-  test:     { icon: FlaskConical, color: '#4ade80', label: 'Tests',        description: 'Tests unitaires & intégration' },
-  docs:     { icon: FileText,     color: '#60a5fa', label: 'Docs',         description: 'Documentation technique' },
-  refactor: { icon: RefreshCw,    color: '#fbbf24', label: 'Refactor',     description: 'Refactoring iso-fonctionnel' },
-  security: { icon: Shield,       color: '#f87171', label: 'Sécurité',     description: 'Audit de vulnérabilités' },
-  review:   { icon: Eye,          color: '#a78bfa', label: 'Review',       description: 'Code review & qualité' },
-  architect:{ icon: Building2,    color: '#f97316', label: 'Architecture', description: 'Analyse architecturale' },
+  writer:      { icon: PenTool,    color: '#60a5fa', label: 'Rédacteur',    description: 'Rédaction de documents' },
+  formatter:   { icon: AlignLeft,  color: '#4ade80', label: 'Mise en forme',description: 'Formatage & structure' },
+  researcher:  { icon: Search,     color: '#a78bfa', label: 'Recherche',    description: 'Collecte & synthèse' },
+  proofreader: { icon: SpellCheck,  color: '#fbbf24', label: 'Correcteur',  description: 'Orthographe & grammaire' },
+  translator:  { icon: Languages,  color: '#f87171', label: 'Traducteur',   description: 'Traduction & localisation' },
+  summarizer:  { icon: FileText,   color: '#fb923c', label: 'Synthèse',     description: 'Résumés & condensés' },
+  planner:     { icon: ListTree,   color: '#2dd4bf', label: 'Planificateur',description: 'Plans & outlines' },
   code:     { icon: Code,         color: '#60a5fa', label: 'Code',         description: 'Lecture/écriture de fichiers' },
   files:    { icon: FileText,     color: '#4ade80', label: 'Fichiers',     description: 'Gestion de fichiers' },
   git:      { icon: GitBranch,    color: '#f472b6', label: 'Git',          description: 'Contrôle de version' },
-  terminal: { icon: Terminal,     color: '#fbbf24', label: 'Terminal',     description: 'Commandes système' },
   web:      { icon: Globe,        color: '#34d399', label: 'Web',          description: 'Navigation web' },
   memory:   { icon: Database,     color: '#a855f7', label: 'Mémoire',     description: 'Mémoire persistante' },
   reasoning:{ icon: Brain,        color: '#f97316', label: 'Raisonnement', description: 'Réflexion et planification' },
@@ -43,6 +46,20 @@ const ROLE_META: Record<string, {
 function getRoleMeta(role: string) {
   return ROLE_META[role] ?? { icon: Bot, color: '#94a3b8', label: role, description: '' };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Agent Roster Config (matches SettingsView roles)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const AGENT_ROSTER: { id: AgentRole; label: string; desc: string; icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>; color: string }[] = [
+  { id: 'writer',      label: 'Rédacteur',      desc: 'Rédaction de documents',           icon: PenTool,    color: '#60a5fa' },
+  { id: 'formatter',   label: 'Mise en Forme',  desc: 'Formatage & structure Markdown',   icon: AlignLeft,  color: '#4ade80' },
+  { id: 'researcher',  label: 'Recherche',      desc: 'Collecte & synthèse d\'infos',     icon: Search,     color: '#a78bfa' },
+  { id: 'proofreader', label: 'Correcteur',     desc: 'Orthographe, grammaire, style',    icon: SpellCheck,  color: '#fbbf24' },
+  { id: 'translator',  label: 'Traducteur',     desc: 'Traduction & localisation',        icon: Languages,  color: '#f87171' },
+  { id: 'summarizer',  label: 'Synthèse',       desc: 'Résumés & condensés',              icon: FileText,   color: '#fb923c' },
+  { id: 'planner',     label: 'Planificateur',  desc: 'Plans & outlines de documents',    icon: ListTree,   color: '#2dd4bf' },
+];
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -118,9 +135,10 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
   // Subscribe to the global store — re-renders on every change
   const toolActivities = useSyncExternalStore(subscribe, getToolActivities);
   const delegatedTasks = useSyncExternalStore(subscribe, getAgentTasks);
+  const { profile } = useProfile();
 
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
-  const [tab, setTab] = useState<'live' | 'delegated'>('live');
+  const [tab, setTab] = useState<'roster' | 'live' | 'delegated'>('roster');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-switch to delegated tab when agents arrive
@@ -140,6 +158,22 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
     return groups;
   }, [toolActivities]);
 
+  // Determine which roles are currently active (running tasks)
+  const activeRoles = useMemo(() => {
+    const roles = new Set<string>();
+    for (const task of delegatedTasks) {
+      if (task.status === 'running' || task.status === 'pending') {
+        roles.add(task.role);
+      }
+    }
+    for (const [agentId, activities] of groupedActivities) {
+      if (activities.some(a => a.status === 'running')) {
+        roles.add(agentId);
+      }
+    }
+    return roles;
+  }, [delegatedTasks, groupedActivities]);
+
   // Stats
   const liveRunning = toolActivities.filter(a => a.status === 'running').length;
   const delegatedRunning = delegatedTasks.filter(t => t.status === 'running' || t.status === 'pending').length;
@@ -147,29 +181,43 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
   const delegatedFailed = delegatedTasks.filter(t => t.status === 'failed').length;
   const totalDone = toolActivities.filter(a => a.status === 'done').length;
 
+  const allowedCount = profile.agents.allowedRoles.length;
+  const totalAgents = AGENT_ROSTER.length;
+
   const content = (
     <div className="flex flex-col h-full">
       {/* Tab switcher + stats bar */}
       <div className="flex flex-col flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)' }}>
         <div className="flex items-center gap-1 px-3 py-2">
+          <TabBtn active={tab === 'roster'} onClick={() => setTab('roster')} count={allowedCount}>
+            <Users size={10} /> Roster
+          </TabBtn>
           <TabBtn active={tab === 'live'} onClick={() => setTab('live')} count={liveRunning}>
             <Activity size={10} /> Activité
           </TabBtn>
           <TabBtn active={tab === 'delegated'} onClick={() => setTab('delegated')} count={delegatedRunning}>
-            <Bot size={10} /> Agents
+            <Bot size={10} /> Tâches
           </TabBtn>
           <div className="flex-1" />
-          <IconButton
-            variant="default"
-            icon={<Trash2 className="w-3 h-3" />}
-            onClick={tab === 'live' ? clearCompletedTools : clearCompletedTasks}
-            tooltip="Effacer terminés"
-            aria-label="Effacer terminés"
-            className="p-1 rounded"
-          />
+          {tab !== 'roster' && (
+            <IconButton
+              variant="default"
+              icon={<Trash2 className="w-3 h-3" />}
+              onClick={tab === 'live' ? clearCompletedTools : clearCompletedTasks}
+              tooltip="Effacer terminés"
+              aria-label="Effacer terminés"
+              className="p-1 rounded"
+            />
+          )}
         </div>
         {/* Quick stats */}
         <div className="flex items-center gap-3 px-3 pb-2">
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px]"
+            style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)', color: 'var(--accent-primary)' }}>
+            <Users size={8} />
+            <span className="font-bold">{allowedCount}</span>
+            <span className="opacity-70">/{totalAgents} dispo</span>
+          </div>
           <StatPill icon={<Loader2 size={8} className="animate-spin" />} value={liveRunning + delegatedRunning} label="actifs" color="#38bdf8" />
           <StatPill icon={<CheckCircle2 size={8} />} value={totalDone + delegatedDone} label="terminés" color="#4ade80" />
           {delegatedFailed > 0 && <StatPill icon={<XCircle size={8} />} value={delegatedFailed} label="erreurs" color="#f87171" />}
@@ -178,7 +226,9 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 custom-scrollbar">
-        {tab === 'live' ? (
+        {tab === 'roster' ? (
+          <RosterTab allowedRoles={profile.agents.allowedRoles} activeRoles={activeRoles} />
+        ) : tab === 'live' ? (
           <LiveTab groupedActivities={groupedActivities} expanded={expandedTask} onToggle={id => setExpandedTask(prev => prev === id ? null : id)} />
         ) : (
           <DelegatedTab tasks={delegatedTasks} expanded={expandedTask} onToggle={id => setExpandedTask(prev => prev === id ? null : id)} />
@@ -285,6 +335,84 @@ function TabBtn({ active, onClick, count, children }: { active: boolean; onClick
         </span>
       )}
     </button>
+  );
+}
+
+// ── Roster Tab: Available agents and their status ────────────────────────
+
+function RosterTab({ allowedRoles, activeRoles }: { allowedRoles: AgentRole[]; activeRoles: Set<string> }) {
+  return (
+    <div className="space-y-1.5">
+      {AGENT_ROSTER.map(agent => {
+        const isAllowed = allowedRoles.includes(agent.id);
+        const isActive = activeRoles.has(agent.id);
+        const Icon = agent.icon;
+
+        return (
+          <motion.div
+            key={agent.id}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors"
+            style={{
+              backgroundColor: isActive ? `${agent.color}10` : 'var(--bg-input)',
+              border: `1px solid ${isActive ? `${agent.color}40` : isAllowed ? 'var(--border-base)' : 'transparent'}`,
+              opacity: isAllowed ? 1 : 0.45,
+            }}
+          >
+            {/* Icon */}
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 relative"
+              style={{ backgroundColor: `${agent.color}18` }}
+            >
+              <Icon size={14} style={{ color: agent.color }} />
+              {isActive && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+                  style={{ backgroundColor: '#4ade80', borderColor: 'var(--bg-panel)' }} />
+              )}
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-semibold" style={{ color: isAllowed ? 'var(--text-primary)' : 'var(--text-dimmed)' }}>
+                  {agent.label}
+                </span>
+                {isActive && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider"
+                    style={{ backgroundColor: 'rgba(56,189,248,0.12)', color: '#38bdf8' }}>
+                    <Loader2 size={7} className="animate-spin" /> en cours
+                  </span>
+                )}
+              </div>
+              <p className="text-[9px] mt-0.5 truncate" style={{ color: 'var(--text-dimmed)' }}>
+                {agent.desc}
+              </p>
+            </div>
+
+            {/* Status */}
+            <div className="flex-shrink-0">
+              {isAllowed ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold"
+                  style={{ backgroundColor: 'rgba(74,222,128,0.1)', color: '#4ade80' }}>
+                  <CheckCircle2 size={9} /> Disponible
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold"
+                  style={{ backgroundColor: 'rgba(113,113,122,0.1)', color: 'var(--text-dimmed)' }}>
+                  <XCircle size={9} /> Désactivé
+                </span>
+              )}
+            </div>
+          </motion.div>
+        );
+      })}
+
+      {/* Footer hint */}
+      <p className="text-center text-[9px] pt-3 pb-1" style={{ color: 'var(--text-dimmed)' }}>
+        Gérez les agents dans <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>Paramètres → Agents</span>
+      </p>
+    </div>
   );
 }
 

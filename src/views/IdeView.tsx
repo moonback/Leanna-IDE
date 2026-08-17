@@ -2,18 +2,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspens
 // Monaco Editor - lazy loaded to reduce initial bundle
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.Editor })));
 // Panels - lazy loaded
-const KnowledgeDashboard = lazy(() => import('../components/panels/KnowledgeDashboard').then(m => ({ default: m.KnowledgeDashboard })));
 const DocumentPanel = lazy(() => import('../components/panels/DocumentPanel').then(m => ({ default: m.DocumentPanel })));
 const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel').then(m => ({ default: m.SandboxPanel })));
 const VisionPanel = lazy(() => import('../components/panels/VisionPanel').then(m => ({ default: m.VisionPanel })));
-import { Plus, X } from 'lucide-react';
+const DocumentsView = lazy(() => import('./DocumentsView'));
+import { X } from 'lucide-react';
 import { IdeModal, type ModalMode } from '../components/ide/IdeModal';
 import { ContextMenu, type ContextTarget, type ClipboardEntry } from '../components/ide/ContextMenu';
 import { DiffViewer } from '../components/ide/DiffViewer';
 import { CommandPalette } from '../components/ide/CommandPalette';
 import { GlobalSearch } from '../components/ide/GlobalSearch';
 import { StatusBar } from '../components/ide/StatusBar';
-import { TerminalComponent, type TerminalRef } from '../components/ide/Terminal';
+
 import { EditorTabs } from '../components/ide/EditorTabs';
 import { SettingsPanel } from '../components/ide/SettingsPanel';
 import { HelpPanel } from '../components/ide/HelpPanel';
@@ -33,17 +33,14 @@ import { useSandboxWatcher } from '../hooks/useSandboxWatcher';
 import { AgentProgressBar } from '../components/ide/AgentProgressBar';
 import { ChatPanel } from '../components/ide/ChatPanel';
 import { LiveSkillsMonitor } from '../components/ide/LiveSkillsMonitor';
-import { GitHubPanel } from '../components/ide/GitHubPanel';
 import { WorkflowPanel } from '../components/ide/WorkflowPanel';
 import { McpPanel } from '../components/panels/McpPanel';
-import { GitSourceControl } from '../components/ide/GitSourceControl';
-import { PreviewPanel } from '../components/ide/PreviewPanel';
 import { MarkdownPreview } from '../components/ide/MarkdownPreview';
 import { EmptyEditorState } from '../components/ide/EmptyEditorState';
 import { SelfEditBanner } from '../components/ide/SelfEditBanner';
-import { CheckpointPanel } from '../components/ide/CheckpointPanel';
 import { SandboxDiffViewer } from '../components/sandbox/SandboxDiffViewer';
 import { AgentPanel } from '../components/panels/AgentPanel';
+import { AgentBuilderPanel } from '../components/panels/AgentBuilderPanel';
 import { initActivityStore } from '../stores/agentActivityStore';
 import { MissionPanel } from '../components/panels/MissionPanel';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard';
@@ -66,7 +63,6 @@ export default function IdeView() {
 
   // Vision & Mode state
     const [visionEnabled, setVisionEnabled] = useState(false);
-    const [terminalLoading, setTerminalLoading] = useState(false);
     const [mode, setMode] = useState<'full' | 'ask'>(() => 'full');
     const [pendingReconnectMode, setPendingReconnectMode] = useState<'full' | 'ask' | null>(null);
 
@@ -123,10 +119,7 @@ export default function IdeView() {
   const [showDiffViewer, setShowDiffViewer] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState<'files' | 'commands' | null>(null);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
-  const [showTerminal, setShowTerminal] = useState(false);
   const [showRunMenu, setShowRunMenu] = useState(false);
-  const [showGitHub, setShowGitHub] = useState(false);
-  const [showGit, setShowGit] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
   const [showMcp, setShowMcp] = useState(false);
   const [showSkillsMonitor, setShowSkillsMonitor] = useState(false);
@@ -134,12 +127,12 @@ export default function IdeView() {
   const [chatDocked, setChatDocked] = useState(false);
   const [pendingChatMessage, setPendingChatMessage] = useState<{ text: string; displayText?: string } | null>(null);
   const [showAgents, setShowAgents] = useState(false);
+  const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showFleet, setShowFleet] = useState(false);
   const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
   const [showKnowledge, setShowKnowledge] = useState(false);
   const [showDocuments, setShowDocuments] = useState(false);
-  const [showCheckpoints, setShowCheckpoints] = useState(false);
   const [showSandbox, setShowSandbox] = useState(false);
   const [sandboxView, setSandboxView] = useState<'controls' | 'diff'>('controls');
   const [selectedSandboxDiffFile, setSelectedSandboxDiffFile] = useState<string | null>(null);
@@ -180,46 +173,6 @@ export default function IdeView() {
       setShowSkillsMonitor(false);
     }
   }, [connected]);
-
-  // Multiple terminals state
-  const [terminals, setTerminals] = useState<{ id: number }[]>([{ id: 1 }]);
-  const [activeTerminalId, setActiveTerminalId] = useState(1);
-  const terminalRefs = useRef<Record<number, TerminalRef | null>>({});
-
-  // Generate unique terminal ID
-  const getNextTerminalId = useCallback(() => {
-    const maxId = terminals.length > 0 ? Math.max(...terminals.map(t => t.id)) : 0;
-    return maxId + 1;
-  }, [terminals]);
-
-  // Add a new terminal
-  const addTerminal = useCallback(() => {
-    const newId = getNextTerminalId();
-    setTerminals(prev => [...prev, { id: newId }]);
-    setActiveTerminalId(newId);
-    setShowTerminal(true);
-  }, [getNextTerminalId]);
-
-  // Close a terminal
-  const closeTerminal = useCallback((id: number, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    if (terminals.length <= 1) {
-      setShowTerminal(false);
-      return;
-    }
-    setTerminals(prev => prev.filter(t => t.id !== id));
-    if (activeTerminalId === id) {
-      const remaining = terminals.filter(t => t.id !== id);
-      setActiveTerminalId(remaining[remaining.length - 1].id);
-    }
-    delete terminalRefs.current[id];
-  }, [terminals, activeTerminalId]);
-
-  // Preview panel state
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewKey, setPreviewKey] = useState(0);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Markdown preview toggle — per-file, reset to false for non-md files
   const [markdownPreview, setMarkdownPreview] = useState(false);
@@ -454,10 +407,6 @@ export default function IdeView() {
         // Lancer la validation build
         fetch('/api/safeguards/validate', { method: 'POST' }).catch(() => {});
       }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'H') {
-        e.preventDefault();
-        setShowCheckpoints(v => !v);
-      }
       // Markdown preview toggle (Ctrl+Shift+M) — only when a .md file is active
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
         if (fileSystem.activePath?.toLowerCase().endsWith('.md')) {
@@ -481,47 +430,6 @@ export default function IdeView() {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [fileSystem.openFiles]);
-
-  // Terminal management
-  useEffect(() => {
-    if (showTerminal) {
-      setTimeout(() => {
-        terminalRefs.current[activeTerminalId]?.fit();
-        terminalRefs.current[activeTerminalId]?.focus();
-      }, 100);
-    }
-  }, [showTerminal, activeTerminalId]);
-
-  // ── Terminal output → detect dev server URL ────────────────────────────────
-
-  const handleTerminalOutput = useCallback((chunk: string) => {
-    const chunkLower = chunk.toLowerCase();
-    if (
-      chunkLower.includes('compiled') ||
-      chunkLower.includes('successfully') ||
-      chunkLower.includes('exited with') ||
-      chunkLower.includes('failed') ||
-      chunkLower.includes('done in') ||
-      chunkLower.includes('error') ||
-      chunkLower.includes('✓ terminal connecté')
-    ) {
-      setTerminalLoading(false);
-    }
-
-    if (previewUrl) return;
-    const match = chunk.match(/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?/);
-    if (match) {
-      const detected = match[0].replace(/\/$/, '');
-      const currentPort = window.location.port || '80';
-      const detectedPort = (match[2] || ':80').replace(':', '');
-      if (detectedPort === currentPort) return;
-      setPreviewUrl(detected);
-      setPreviewKey(k => k + 1);
-      setShowPreview(true);
-      setShowTerminal(true);
-      setTerminalLoading(false);
-    }
-  }, [previewUrl]);
 
   // ── Editor handlers ────────────────────────────────────────────────────────
 
@@ -605,40 +513,6 @@ export default function IdeView() {
     showFoldingControls: 'mouseover' as const,
   }), []);
 
-  // ── Run command handler ────────────────────────────────────────────────────
-
-  const handleRunCommand = useCallback(async (cmd: string) => {
-    setShowRunMenu(false);
-    setShowTerminal(true);
-    setTerminalLoading(true);
-    if (cmd === 'npm run dev') {
-      setPreviewUrl(null);
-      setShowPreview(false);
-    }
-
-    // Vérifier si le mode sandbox est actif pour rediriger l'exécution
-    let sandboxPrefix = '';
-    try {
-      const token = localStorage.getItem('jarvis_api_token');
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch('/api/sandbox/status', { headers });
-      const data = await res.json();
-      if (data.status === 'success' && data.sandbox?.active && data.sandbox?.path) {
-        // En mode sandbox : forcer PORT=5000 et cd vers le sandbox
-        const sandboxRoot = data.sandbox.path.replace(/\\/g, '/');
-        sandboxPrefix = `cd "${sandboxRoot}" ; $env:PORT="5000" ; `;
-      }
-    } catch {
-      // Ignore — on exécute la commande normalement
-    }
-
-    setTimeout(() => {
-      terminalRefs.current[activeTerminalId]?.fit();
-      terminalRefs.current[activeTerminalId]?.sendCommand(sandboxPrefix + cmd);
-    }, 300);
-  }, [activeTerminalId]);
-
   // ── Active file ────────────────────────────────────────────────────────────
 
   const activeFile = useMemo(
@@ -671,25 +545,20 @@ export default function IdeView() {
         context="ide"
         showExplorer={showExplorer}
         showGlobalSearch={showGlobalSearch}
-        showTerminal={showTerminal}
-        showPreview={showPreview}
         showSettings={showSettingsPanel}
         showRunMenu={showRunMenu}
-        showGitHub={showGitHub}
-        showGit={showGit}
-        showCheckpoints={showCheckpoints}
         showSandbox={showSandbox}
         showWorkflow={showWorkflow}
         showSkillsMonitor={showSkillsMonitor}
         showChat={showChat}
         showAgents={showAgents}
+        showAgentBuilder={showAgentBuilder}
         showFleet={showFleet}
         showMissions={showMissions}
         showKnowledge={showKnowledge}
         showDocuments={showDocuments}
         showSystemHealth={showSystemHealth}
         showMcp={showMcp}
-        previewUrl={previewUrl}
         assistantConnected={connected}
         assistantWorking={assistantWorking}
         assistantMuted={muted}
@@ -698,21 +567,17 @@ export default function IdeView() {
         mode={mode}
         onToggleExplorer={() => setShowExplorer(v => !v)}
         onToggleSearch={() => setShowGlobalSearch(v => !v)}
-        onToggleTerminal={() => setShowTerminal(v => !v)}
-        onTogglePreview={() => setShowPreview(v => !v)}
         onToggleSettings={() => {
           setShowSettingsPanel(v => !v);
           if (!showSettingsPanel) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); }
         }}
         onToggleRunMenu={() => setShowRunMenu(v => !v)}
-        onToggleGitHub={() => setShowGitHub(v => !v)}
-        onToggleGit={() => setShowGit(v => !v)}
-        onToggleCheckpoints={() => setShowCheckpoints(v => !v)}
         onToggleSandbox={toggleSandbox}
         onToggleWorkflow={() => setShowWorkflow(v => !v)}
         onToggleSkillsMonitor={() => setShowSkillsMonitor(v => !v)}
         onToggleChat={() => setShowChat(v => !v)}
         onToggleAgents={() => setShowAgents(v => !v)}
+        onToggleAgentBuilder={() => setShowAgentBuilder(v => !v)}
         onToggleFleet={() => setShowFleet(v => !v)}
         onToggleMissions={() => setShowMissions(v => !v)}
         onToggleKnowledge={() => {
@@ -732,7 +597,6 @@ export default function IdeView() {
             disconnect();
           }
         }}
-        onRunCommand={handleRunCommand}
         onDisconnectAssistant={disconnect}
         onConnectAssistant={() => connect([], mode)}
         onMuteToggle={toggleMute}
@@ -759,7 +623,7 @@ export default function IdeView() {
       />
 
       {/* File Explorer */}
-      {showExplorer && !showGit && (
+      {showExplorer && (
         <FileExplorer
           tree={fileSystem.tree}
           expandedDirs={fileSystem.expandedDirs}
@@ -780,18 +644,6 @@ export default function IdeView() {
           onNavigate={fileSystem.setCurrentDir}
           onMoveEntry={fileSystem.moveEntry}
         />
-      )}
-
-      {/* Git Source Control Panel */}
-      {showGit && (
-        <GitSourceControl onClose={() => setShowGit(false)} />
-      )}
-
-      {/* Checkpoints Panel */}
-      {showCheckpoints && (
-        <div className="border-r flex flex-col min-h-0" style={{ width: '260px', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
-          <CheckpointPanel />
-        </div>
       )}
 
       {/* Editor Area */}
@@ -841,7 +693,7 @@ export default function IdeView() {
         />
 
         {/* Global Progress Bar */}
-        {(fileSystem.loading || assistantWorking || terminalLoading) && (
+        {(fileSystem.loading || assistantWorking) && (
           <div className="absolute top-[35px] left-0 right-0 h-[2px] z-50 overflow-hidden bg-white/5">
             <div
               className="h-full bg-[var(--accent-primary)] animate-shimmer"
@@ -896,7 +748,7 @@ export default function IdeView() {
                         )
                       ) : showKnowledge ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement du dashboard…</div></div>}>
-                          <KnowledgeDashboard onClose={() => setShowKnowledge(false)} />
+                          <DocumentsView />
                         </Suspense>
                       ) : showDocuments ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement…</div></div>}>
@@ -937,11 +789,10 @@ export default function IdeView() {
                         <EmptyEditorState
                                                   onOpenFile={openFileAt}
                                                   onCreateFile={() => setModalState({ type: 'create-file', dir: fileSystem.currentDir })}
+                                                  onCreateFolder={() => setModalState({ type: 'create-folder', dir: fileSystem.currentDir })}
                                                   onShowSettings={() => setShowSettingsPanel(true)}
-                                                  onOpenTerminal={() => setShowTerminal(true)}
                                                   onOpenSearch={() => setShowGlobalSearch(true)}
                                                   onOpenChat={() => setShowChat(true)}
-                                                  onRunProject={() => handleRunCommand('npm run dev')}
                                                 />
                       )}
                     </div>
@@ -954,23 +805,6 @@ export default function IdeView() {
               >
                 <GlobalSearch onOpenFile={openFileAt} onClose={() => setShowGlobalSearch(false)} />
               </div>
-            )}
-
-            {/* Preview Panel */}
-            {showPreview && (
-              <PreviewPanel
-                previewUrl={previewUrl}
-                previewKey={previewKey}
-                iframeRef={iframeRef}
-                onRefresh={() => setPreviewKey(k => k + 1)}
-                onOpenExternal={() => previewUrl && window.open(previewUrl, '_blank')}
-                onClose={() => setShowPreview(false)}
-              />
-            )}
-
-            {/* GitHub Panel */}
-            {showGitHub && (
-              <GitHubPanel onClose={() => setShowGitHub(false)} />
             )}
 
             {/* Workflow Panel */}
@@ -1031,81 +865,6 @@ export default function IdeView() {
               </div>
             )}
           </div>
-
-          {/* Terminal Panel */}
-          {showTerminal && (
-            <div
-              className="border-t flex flex-col flex-shrink-0"
-              style={{ height: '280px', minHeight: '180px', borderColor: 'var(--border-base)', backgroundColor: '#1a1a1a' }}
-              role="region"
-              aria-label="Panneau de terminal"
-            >
-              <div
-                className="flex items-center gap-2 px-2 py-1 border-b flex-shrink-0"
-                style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-                role="tablist"
-                aria-label="Onglets de terminal"
-              >
-                <div className="flex items-center gap-1 flex-1 overflow-x-auto">
-                  {terminals.map((terminal) => (
-                    <div
-                      key={terminal.id}
-                      onClick={() => setActiveTerminalId(terminal.id)}
-                      role="tab"
-                      aria-selected={activeTerminalId === terminal.id}
-                      className={`flex items-center gap-2 px-3 py-1 rounded-t text-xs transition-colors cursor-pointer ${
-                        activeTerminalId === terminal.id ? 'bg-white/10' : 'hover:bg-white/5'
-                      }`}
-                      style={{ color: 'var(--text-primary)' }}
-                    >
-                      <span>Terminal {terminal.id}</span>
-                      <button
-                        onClick={(e) => closeTerminal(terminal.id, e)}
-                        className="p-0.5 rounded hover:bg-white/10"
-                        title="Fermer le terminal"
-                        aria-label={`Fermer Terminal ${terminal.id}`}
-                      >
-                        <X size={10} style={{ color: 'var(--text-muted)' }} />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={addTerminal}
-                    className="p-1.5 rounded hover:bg-white/10"
-                    title="Nouveau terminal"
-                    aria-label="Ajouter un nouveau terminal"
-                  >
-                    <Plus size={12} style={{ color: 'var(--text-muted)' }} />
-                  </button>
-                </div>
-                <button
-                  onClick={() => setShowTerminal(false)}
-                  className="rounded p-1 hover:bg-white/10"
-                  title="Fermer le panneau"
-                  aria-label="Fermer le panneau de terminal"
-                >
-                  <X size={12} style={{ color: 'var(--text-muted)' }} />
-                </button>
-              </div>
-
-              {/* Active Terminal Content */}
-              <div className="flex-1 min-h-0 overflow-hidden">
-                {terminals.map((terminal) => (
-                  <div
-                    key={terminal.id}
-                    id={`terminal-panel-${terminal.id}`}
-                    role="tabpanel"
-                    className={`w-full h-full ${activeTerminalId === terminal.id ? 'block' : 'hidden'}`}
-                  >
-                    <TerminalComponent
-                      ref={(ref) => { terminalRefs.current[terminal.id] = ref; }}
-                      onOutput={handleTerminalOutput}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Agent Progress Bar */}
@@ -1191,6 +950,11 @@ export default function IdeView() {
       {/* Agents Panel — modal overlay */}
       {showAgents && (
         <AgentPanel inline onClose={() => setShowAgents(false)} />
+      )}
+
+      {/* Agent Builder Panel — modal overlay */}
+      {showAgentBuilder && (
+        <AgentBuilderPanel inline onClose={() => setShowAgentBuilder(false)} />
       )}
 
       {/* Fleet Panel — modal overlay */}

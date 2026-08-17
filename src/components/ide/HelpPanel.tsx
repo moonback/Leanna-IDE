@@ -5,7 +5,7 @@
 
 import {
   BrainCircuit, Camera, Code2, Command, Cpu,
-  Keyboard, Layers3, Mic, Search, Terminal, X, Zap,
+  Keyboard, Layers3, Mic, Search, X, Zap,
 } from 'lucide-react';
 import type { LucideIcon, } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -74,7 +74,6 @@ export function HelpPanel({ onClose }: HelpPanelProps) {
               <p><Kbd>Ctrl+Shift+P</Kbd> Palette de commandes</p>
               <p><Kbd>Ctrl+Shift+E</Kbd> Explorateur</p>
               <p><Kbd>Ctrl+Shift+F</Kbd> Recherche globale</p>
-              <p><Kbd>Ctrl+`</Kbd> Terminal</p>
               <p><Kbd>Ctrl+L</Kbd> Chat IA</p>
               <p><Kbd>Ctrl+S</Kbd> Sauvegarder</p>
               <p><Kbd>Ctrl+/</Kbd> Commenter</p>
@@ -96,8 +95,6 @@ export function HelpPanel({ onClose }: HelpPanelProps) {
             <ul className="list-disc list-inside space-y-0.5">
               <li>Monaco Editor (moteur VS Code)</li>
               <li>Explorateur de fichiers</li>
-              <li>Terminal PTY intégré</li>
-              <li>Prévisualisation live</li>
               <li>Recherche globale avec regex</li>
             </ul>
           </Card>
@@ -131,14 +128,6 @@ export function HelpPanel({ onClose }: HelpPanelProps) {
               <li>Tâches récurrentes planifiables</li>
               <li>Navigation web headless</li>
               <li>Extraction de données automatisée</li>
-            </ul>
-          </Card>
-
-          <Card icon={Terminal} title="Terminal">
-            <ul className="list-disc list-inside space-y-0.5">
-              <li>Shell PTY réel (PowerShell/bash/zsh)</li>
-              <li>Plusieurs terminaux simultanés</li>
-              <li>Supporte couleurs et apps interactives</li>
             </ul>
           </Card>
 

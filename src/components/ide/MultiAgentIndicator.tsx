@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Code, GitBranch, Terminal, Globe, Brain, Database,
+  Code, GitBranch, Globe, Brain, Database,
   FileText, Search, Loader2, Target, Users, FlaskConical,
   RefreshCw, Shield, Eye, Building2,
 } from 'lucide-react';
@@ -38,13 +38,6 @@ const TOOL_AGENTS: AgentDef[] = [
     icon: GitBranch,
     color: '#f472b6',
     tools: ['git_status', 'git_diff', 'git_stage', 'git_unstage', 'git_commit', 'git_push', 'git_pull', 'git_branches', 'git_switch_branch', 'git_log'],
-  },
-  {
-    id: 'terminal',
-    name: 'Terminal',
-    icon: Terminal,
-    color: '#fbbf24',
-    tools: ['system_execute_command', 'system_open', 'system_notify'],
   },
   {
     id: 'web',
@@ -108,7 +101,7 @@ interface LiveAgent {
 
 /**
  * Shows which "agents" are currently active based on:
- * 1. Tools being used (code, git, terminal, etc.)
+ * 1. Tools being used (code, git, etc.)
  * 2. Multi-role agents running tasks (test, docs, refactor, etc.)
  * 3. Missions in progress
  *

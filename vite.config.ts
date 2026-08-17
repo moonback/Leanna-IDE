@@ -61,10 +61,10 @@ export default defineConfig(({ mode }) => {
               './src/services/ideApi',
             ],
             'panels': [
-              './src/components/panels/KnowledgeDashboard',
               './src/components/panels/SandboxPanel',
               './src/components/panels/AgentPanel',
               './src/components/panels/VisionPanel',
+              './src/views/DocumentsView',
             ],
           },
         },

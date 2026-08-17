@@ -1,6 +1,8 @@
 /**
  * Agent Plugins — Auto-discovery et export
  * 
+ * Agents spécialisés dans la rédaction de documents.
+ * 
  * Pour ajouter un nouvel agent :
  * 1. Créer un fichier <nom>.agent.ts dans ce dossier
  * 2. Exporter un AgentPlugin via defineAgent()
@@ -12,30 +14,33 @@
 export { defineAgent } from "./plugin";
 export type { AgentConfig } from "./plugin";
 
-export { architectAgent } from "./architect.agent";
-export { reviewAgent } from "./review.agent";
-export { securityAgent } from "./security.agent";
-export { testAgent } from "./test.agent";
-export { refactorAgent } from "./refactor.agent";
-export { docsAgent } from "./docs.agent";
+export { writerAgent } from "./writer.agent";
+export { formatterAgent } from "./formatter.agent";
+export { researcherAgent } from "./researcher.agent";
+export { proofreaderAgent } from "./proofreader.agent";
+export { translatorAgent } from "./translator.agent";
+export { summarizerAgent } from "./summarizer.agent";
+export { plannerAgent } from "./planner.agent";
 
 import type { AgentPlugin } from "../AgentRuntime";
-import { architectAgent } from "./architect.agent";
-import { reviewAgent } from "./review.agent";
-import { securityAgent } from "./security.agent";
-import { testAgent } from "./test.agent";
-import { refactorAgent } from "./refactor.agent";
-import { docsAgent } from "./docs.agent";
+import { writerAgent } from "./writer.agent";
+import { formatterAgent } from "./formatter.agent";
+import { researcherAgent } from "./researcher.agent";
+import { proofreaderAgent } from "./proofreader.agent";
+import { translatorAgent } from "./translator.agent";
+import { summarizerAgent } from "./summarizer.agent";
+import { plannerAgent } from "./planner.agent";
 
 /**
- * Tous les agents par défaut.
+ * Tous les agents par défaut — spécialisés rédaction de documents.
  * Le runtime les enregistre tous au démarrage.
  */
 export const defaultAgents: AgentPlugin[] = [
-  architectAgent,
-  reviewAgent,
-  securityAgent,
-  testAgent,
-  refactorAgent,
-  docsAgent,
+  writerAgent,
+  formatterAgent,
+  researcherAgent,
+  proofreaderAgent,
+  translatorAgent,
+  summarizerAgent,
+  plannerAgent,
 ];

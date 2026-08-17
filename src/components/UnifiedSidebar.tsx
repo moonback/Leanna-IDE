@@ -31,6 +31,7 @@ import {
   BrainCircuit,
   ChevronUp,
   LayoutList,
+  FileText,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -309,6 +310,7 @@ function GlobalNavSection({
     { id: 'history', path: '/history', icon: History, label: 'Historique', active: showHistory, onClick: onToggleHistory },
     { id: 'memories', path: '/memories', icon: BrainCircuit, label: 'Mémoires', active: showMemory, onClick: onToggleMemory },
     { id: 'automation', path: '/automation', icon: Zap, label: 'Tâches', active: showAutomation, onClick: onToggleAutomation },
+    { id: 'documents', path: '/documents', icon: FileText, label: 'Documents', active: currentPath === '/documents', onClick: () => navigate('/documents') },
   ];
 
   const anyActive = subItems.some(item =>

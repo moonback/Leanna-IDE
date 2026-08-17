@@ -1,180 +1,208 @@
-# 🧠 Jarvis-OS — L'IDE universel piloté par l'IA
+# 🧠 Jarvis-OS — Assistant IA de Gestion Documentaire
+
 <img src="assets/images/header.png" alt="Jarvis-OS" />
-Jarvis-OS est un système d'exploitation de développement et un IDE multimodal en temps réel conçu pour les développeurs modernes. Il combine une interface de bureau immersive avec une interaction vocale et visuelle permanente basée sur l'API Gemini Live. Il permet d'importer instantanément n'importe quel projet local pour l'indexer, le modifier en toute sécurité au sein d'une Sandbox isolée, et déléguer des tâches complexes à des agents autonomes. C'est l'assistant idéal pour accélérer le prototypage, l'audit de code et la refactorisation de projets complexes.
+
+Jarvis-OS est un assistant intelligent spécialisé dans la **gestion de documents**. Il permet de créer, structurer, organiser et améliorer tous types de documents professionnels : MVPs, rapports de conception, cahiers des charges, spécifications techniques, plans de projet, notes de recherche et documentation. Piloté par l'IA (Gemini), il offre une interaction multimodale (voix, texte, vision) pour accélérer la production documentaire.
 
 ---
 
 ## 🛡️ Badges
 
-[![Version](https://img.shields.io/badge/version-0.4.0-blue)](https://github.com/yourusername/Jarvis-os-original/releases)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue)](https://github.com/yourusername/Jarvis-os-original/releases)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](#)
-[![License](https://img.shields.io/badge/license-MIT-green)](file:///c:/Users/Mayss/Desktop/Jarvis-os-ori/CONTRIBUTING.md#licence)
+[![License](https://img.shields.io/badge/license-MIT-green)](CONTRIBUTING.md#licence)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.12.0-brightgreen)](https://nodejs.org)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](file:///c:/Users/Mayss/Desktop/Jarvis-os-ori/CONTRIBUTING.md)
-
----
-
-## 🛠️ Stack Technique
-
-| Technologie | Rôle / Utilisation | Version détectée |
-| :--- | :--- | :--- |
-| **Node.js** | Environnement d'exécution serveur (Backend) | `>= 22.12.0` |
-| **Express** | Framework d'API REST et gestion des serveurs WebSocket | `^4.21.2` |
-| **React** | Framework de construction de l'interface utilisateur | `^19.0.1` |
-| **TypeScript** | Langage principal de développement (Mode strict) | `^5.0.0` |
-| **Vite** | Outil de build rapide et serveur HMR frontend | `^6.2.3` |
-| **Tailwind CSS** | Framework CSS utilitaire pour le design system | `^4.1.14` |
-| **Electron** | Wrapper desktop pour l'exécution locale de bureau | `^43.1.0` |
-| **Supabase JS** | Client de persistance des conversations, listes et RAG | `^2.110.2` |
-| **Monaco Editor** | Moteur d'édition de code (identique à VS Code) | `^0.53.0` |
-| **Google GenAI** | SDK officiel pour l'intégration de Gemini Live (WebSocket) | `^2.4.0` |
-| **Puppeteer** | Automatisation de navigateur et agent de test web | `^25.3.0` |
-| **node-pty** | Terminal virtuel interactif (PTY) de commande | `^1.1.0` |
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 ---
 
 ## ✨ Fonctionnalités Principales
 
-### 💻 Orientées Développeur (Developer-centric)
-- **IDE Intégré Immersif** : Éditeur Monaco complet avec coloration, explorateur de fichiers virtuel, panneau Git et terminal PTY interactif.
-- **Bac à Sable Sécurisé (Sandbox)** : Toutes les écritures de l'IA sont isolées dans `.jarvis/sandbox/` et ne sont appliquées au workspace réel qu'après validation.
-- **Rationnalisation de Typecheck** : Validation automatique du code via `tsc --noEmit` avant de synchroniser le sandbox.
-- **Checkpoints Git automatiques** : Sauvegarde locale automatique avant toute modification de fichier pour un rollback instantané.
-- **Moteur de Connaissance** : Graphe de dépendances, analyse d'impact des modifications, et recherche sémantique TF-IDF locale.
+### 📄 Gestion de Documents
 
-### 🎙️ Orientées Utilisateur (User-centric)
-- **Assistant Multimodal Gemini Live** : Interaction vocale fluide et vision par webcam/partage d'écran en temps réel via WebSocket.
-- **Palette de commandes** : Raccourcis clavier complets (`Ctrl+Shift+P`, `Ctrl+P`) pour piloter l'IDE sans souris.
-- **Visualiseur Markdown** : Mode d'aperçu HTML enrichi pour la documentation avec bascule rapide.
-- **Mémoire long terme (RAG)** : Conservation automatique des préférences utilisateur et décisions de conception.
+- **Création assistée** : Génération de documents structurés (MVPs, rapports, specs, plans) à partir d'instructions simples
+- **Templates intelligents** : Modèles pré-configurés pour chaque type de document
+- **Édition collaborative** : Modifications ciblées avec historique des versions
+- **Structuration automatique** : Table des matières, numérotation, hiérarchie des sections
+- **Export multi-format** : Markdown, PDF, DOCX, texte brut
 
-### ⚙️ Orientées Administrateur (Admin-centric)
-- **Passerelle MCP (Model Context Protocol)** : Connexion à chaud de serveurs d'outils externes en stdio ou SSE avec reconnexion automatique.
-- **Gestionnaire de Workflows** : Création et planification de suites d'actions automatisées persistées dans la base de données.
-- **Créateur de Skills Dynamiques** : Interface de création de compétences personnalisées pour étendre le function calling de l'IA.
-- **Audit de Sécurité** : Enregistrement de toutes les actions et modifications dans un fichier de log d'audit.
+### 📋 Types de Documents Supportés
+
+| Type | Description |
+| :--- | :--- |
+| **MVP** | Document de vision produit minimum viable |
+| **Rapport de conception** | Architecture, choix techniques, diagrammes |
+| **Cahier des charges** | Exigences fonctionnelles et non-fonctionnelles |
+| **Spécification technique** | API, schémas de données, protocoles |
+| **Plan de projet** | Jalons, livrables, planning |
+| **Note de recherche** | Synthèse, état de l'art, analyse comparative |
+| **Documentation** | Guides utilisateur, tutoriels, README |
+| **Roadmap** | Feuille de route avec phases et objectifs |
+
+### 🧠 Moteur de Connaissance (Knowledge Engine)
+
+- **Extraction automatique** : Au démarrage, le système scanne le workspace et extrait automatiquement tous les documents (`.md`, `.txt`, `.rst`, `.adoc`, `.tex`, `.csv`, `.yaml`, etc.)
+- **Indexation incrémentale** : Chaque modification de fichier est détectée et ré-indexée en temps réel via FileWatcher
+- **Structure documentaire** : Extraction des sections, titres, métadonnées (nombre de mots, langue, liens, tables) pour chaque document
+- **Indexation du code** : Graphe de relations entre fichiers, entités, dépendances et imports
+- **Recherche sémantique** : Recherche intelligente dans la base documentaire sans API externe
+- **Analyse de cohérence** : Détection de contradictions ou doublons entre documents
+- **Mémoire projet** : Accumulation des conventions d'écriture et préférences de style
+- **Dashboard** : Visualisation de la base documentaire et de ses relations
+- **Analyse d'impact** : Identification des documents affectés avant une modification
+
+### 🎙️ Assistant Multimodal (Gemini Live)
+
+- **Dictée vocale** : Rédaction de documents par la voix en temps réel
+- **Vision par webcam** : Analyse de documents physiques ou de schémas manuscrits
+- **Partage d'écran** : Capture et interprétation de contenu visuel
+- **Chat textuel** : Interface de conversation avec historique et commandes
+- **Résumé automatique** : Compression intelligente du contexte conversationnel
+
+### 🤖 Système Multi-Agents Documentaires
+
+Jarvis-OS dispose de **7 agents spécialisés** exclusivement dédiés à la rédaction et au traitement de documents :
+
+| Agent | Rôle | Capacité |
+| :--- | :--- | :--- |
+| ✍️ **Rédacteur** (`writer`) | Rédaction de documents complets | Lecture/Écriture |
+| 🎨 **Mise en Forme** (`formatter`) | Formatage Markdown, tables, TOC, structure | Lecture/Écriture |
+| 🔍 **Recherche** (`researcher`) | Collecte d'infos, vérification de faits, sources | Lecture seule |
+| ✅ **Correcteur** (`proofreader`) | Orthographe, grammaire, style, cohérence | Lecture/Écriture |
+| 🌐 **Traducteur** (`translator`) | Traduction et localisation multilingue | Lecture/Écriture |
+| 📋 **Synthèse** (`summarizer`) | Résumés exécutifs, abstracts, condensés | Lecture/Écriture |
+| 📐 **Planificateur** (`planner`) | Plans, outlines, structures de documents | Lecture seule |
+
+**Patterns de collaboration prédéfinis :**
+
+- `document-complet` : Planificateur → Rédacteur → Correcteur → Mise en Forme
+- `traduction-verifiee` : Rédacteur → Traducteur → Correcteur
+- `recherche-redaction` : Recherche → Planificateur → Rédacteur → Correcteur
+
+**Délégation automatique** : Chaque agent peut déléguer à un autre selon une matrice de compétences (ex. rédaction terminée → correction automatique).
+
+### ⚙️ Automatisation & Workflows
+
+- **Workflows documentaires** : Chaînes de traitement orchestrées (rédaction → relecture → mise en forme → export)
+- **Orchestration multi-agents** : Exécution parallèle ou séquentielle avec dépendances entre tâches
+- **Tâches planifiées** : Génération récurrente de rapports ou mises à jour
+- **Versionning** : Suivi des modifications avec possibilité de rollback
+- **Agent Builder** : Interface visuelle pour créer des agents documentaires personnalisés
+
+### 🔌 Passerelle MCP (Model Context Protocol)
+
+- **Connexion à chaud** : Ajout de serveurs MCP externes sans redémarrage
+- **Outils documentaires** : Invocation d'outils spécialisés (traduction, résumé, extraction)
+- **Interface de gestion** : Panneau UI pour configurer les serveurs MCP
+
+### 🔐 Sécurité & Audit
+
+- **Authentification API** : Protection des endpoints via jeton `x-jarvis-token`
+- **Isolation** : Les modifications IA sont isolées dans un bac à sable avant validation
+- **Log d'audit** : Enregistrement de toutes les actions documentaires
+- **Chiffrement** : Données sensibles protégées
+
+### 💾 Persistance (Supabase — optionnel)
+
+- **Historique** : Conservation et reprise des sessions
+- **Mémoire long terme** : Stockage des préférences et décisions éditoriales
+- **Base documentaire** : Indexation et recherche dans tous les documents créés
 
 ---
 
 ## 📋 Prérequis
 
-- **Node.js** : Version `>= 22.12.0` installée sur le système.
-- **npm** : Version `>= 10.x`.
-- **Git** : Installé (requis pour les fonctionnalités de checkpointing local).
-- **Clé API Gemini** : Un compte Google AI Studio valide avec une clé d'API.
-- **Compte Supabase** (Optionnel) : Si vous souhaitez activer l'historique et la mémoire vectorielle RAG.
+- **Node.js** : Version `>= 22.12.0`
+- **npm** : Version `>= 10.x`
+- **Clé API Gemini** : Un compte Google AI Studio valide
+- **Compte Supabase** (Optionnel) : Pour la persistance et la mémoire long terme
 
 ---
 
 ## 📦 Installation
 
-Suivez les étapes ci-dessous pour installer et démarrer l'application localement.
-
 ```bash
-# 1. Cloner le dépôt de Jarvis-OS
+# 1. Cloner le dépôt
 git clone https://github.com/yourusername/Jarvis-os-original.git
 cd Jarvis-os-original
 
-# 2. Installer les dépendances du projet
+# 2. Installer les dépendances
 npm install
 
-# 3. Préparer le fichier de configuration d'environnement
+# 3. Configurer l'environnement
 cp .env.example .env
-# --> Ouvrir le fichier .env et renseigner au minimum la variable GEMINI_API_KEY
+# --> Ouvrir .env et renseigner au minimum GEMINI_API_KEY
 ```
 
 ---
 
 ## ⚙️ Configuration (.env)
 
-Voici la liste de toutes les variables d'environnement gérées par l'application :
-
-| Variable | Description | Exemple | Obligatoire |
-| :--- | :--- | :--- | :--- |
-| `GEMINI_API_KEY` | Clé API requise pour utiliser le modèle principal Gemini. | `AIzaSy...` | **Oui** |
-| `OPENROUTER_API_KEY` | Clé pour exploiter d'autres modèles en fallback via OpenRouter. | `sk-or-...` | Non |
-| `JARVIS_API_TOKEN` | Jeton pour sécuriser les appels d'API (header `x-jarvis-token`). | `mypassword123` | Recommandé |
-| `SUPABASE_URL` | URL de l'API REST de votre base de données Supabase. | `https://xyz.supabase.co` | Non (RAG inactif) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Clé secrète de rôle de service de Supabase. | `eyJhbGc...` | Non (RAG inactif) |
-| `GITHUB_TOKEN` | Jeton GitHub pour la gestion des Pull Requests et dépôts. | `ghp_...` | Non |
-| `VITE_SERVER_PORT` | Port d'écoute du serveur Node/Express. | `5000` | Non (défaut : 5000) |
-| `SELF_HEAL_READONLY` | Désactive les écritures automatiques lors d'une auto-guérison. | `true` | Non (défaut : false) |
-| `SANDBOX_EXIT_CODE` | Code à 6 chiffres pour sortir du mode sandbox dans l'IDE. | `123456` | Non |
-
-> ⚠️ **Note Supabase** : `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` doivent être définies ensemble. Si une seule des deux est présente, le serveur refusera de démarrer.
+| Variable | Description | Obligatoire |
+| :--- | :--- | :--- |
+| `GEMINI_API_KEY` | Clé API pour le modèle principal Gemini | **Oui** |
+| `JARVIS_API_TOKEN` | Jeton pour sécuriser les appels API | Recommandé |
+| `SUPABASE_URL` | URL de l'API REST Supabase | Non |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clé secrète Supabase | Non |
+| `VITE_SERVER_PORT` | Port d'écoute (défaut : 5000) | Non |
 
 ---
 
-## 🚀 Lancement de l'Application
+## 🚀 Lancement
 
-### Mode Développement (Web et Terminal)
-Pour lancer le backend Express combiné au serveur HMR de Vite :
+### Mode Développement (Web)
 ```bash
 npm run dev
 ```
-L'interface sera alors accessible dans votre navigateur à l'adresse `http://localhost:5000`.
+Interface accessible sur `http://localhost:5000`.
 
 ### Mode Desktop (Electron)
-Pour exécuter l'application sous forme de client lourd de bureau local :
 ```bash
-# Lancement de l'interface en mode débogage avec DevTools
 npm run desktop:debug
 ```
 
-### Mode Production (Compilation & Lancement)
-Pour builder le bundle de production et lancer le serveur optimisé :
+### Mode Production
 ```bash
-# Compiler le frontend (Vite) et bundler le serveur (esbuild)
 npm run build
-
-# Démarrer le serveur web compilé
 npm start
-```
-
-Pour packager l'application en exécutable Windows (.exe) :
-```bash
-npm run dist:win
 ```
 
 ---
 
 ## 📁 Structure du Projet
 
-Voici l'organisation simplifiée du projet (limité à 3 niveaux de profondeur) :
-
 ```
 Jarvis-os-original/
 ├── assets/                  # Ressources statiques (images, icônes)
-├── electron/                # Fichiers de configuration et de cycle de vie Electron
-│   ├── main.cjs             # Processus principal Electron
-│   └── preload.cjs          # Script de pré-chargement Electron
+├── electron/                # Cycle de vie Electron (main, preload, splash)
 ├── server/                  # Backend Node.js / Express
-│   ├── agents/              # Orchestration multi-agents et gestionnaires de tâches
-│   ├── autonomy/            # Superviseurs de la boucle de décision autonome
-│   ├── knowledge/           # Indexeur, Graphe de connaissances et raisonnement
-│   ├── mcp/                 # Connexion et gestion des serveurs MCP externes
-│   ├── mission/             # Décomposition, planification et réflexion de missions
-│   ├── routes/              # Déclarations des endpoints Express (REST)
-│   ├── runtime/             # Nouveau runtime d'agents et registre d'outils
-│   ├── skills/              # Déclarations et logique des outils du LLM
-│   └── utils/               # Sandbox, checkpoints Git, cryptographie, self-root
-├── src/                     # Code source de l'interface utilisateur React
-│   ├── components/          # Composants UI (IDE, settings, workflows)
-│   ├── context/             # États partagés globaux (Live API, profils)
-│   ├── hooks/               # Logique de hooks React réutilisables
-│   ├── services/            # Services de requête HTTP vers le backend
-│   └── views/               # Vues majeures de l'application (IDE, Settings, Help)
-└── supabase/                # Fichiers SQL de configuration et de schémas des tables
+│   ├── agents/              # Orchestrateur & 7 agents documentaires spécialisés
+│   ├── autonomy/            # Superviseur de boucle autonome
+│   ├── knowledge/           # Base de connaissances, recherche sémantique
+│   ├── mcp/                 # Bridge MCP (stdio/SSE)
+│   ├── mission/             # Planification de missions documentaires
+│   ├── routes/              # Endpoints REST
+│   ├── runtime/             # Runtime (ToolRegistry, Prompts, AgentPlugins)
+│   ├── skills/              # Skills intégrées (rédaction, recherche, mémoire)
+│   ├── utils/               # Sandbox, validation, crypto
+│   └── workflows/           # Moteur de workflows documentaires
+├── src/                     # Interface utilisateur React
+│   ├── components/          # Composants UI (éditeur, panels, visualiseurs)
+│   ├── context/             # États partagés
+│   ├── hooks/               # Hooks React
+│   ├── services/            # Clients HTTP vers le backend
+│   └── views/               # Vues principales
+└── supabase/                # Schémas SQL
 ```
 
 ---
 
 ## 🤝 Contribuer
 
-Les contributions sont les bienvenues ! Veuillez consulter notre document de directives [CONTRIBUTING.md](file:///c:/Users/Mayss/Desktop/Jarvis-os-ori/CONTRIBUTING.md) pour connaître notre workflow Git, nos règles de commit et de standards de développement.
+Les contributions sont les bienvenues ! Consultez [CONTRIBUTING.md](CONTRIBUTING.md) pour le workflow et les standards.
 
 ---
 
 ## 📄 Licence
 
-> ⚠️ À compléter : Ce projet ne contient aucun fichier LICENSE officiel à la racine du dépôt. La licence MIT est appliquée par défaut pour les contributions et la distribution de Jarvis-OS.
+Ce projet est distribué sous licence MIT.

@@ -60,8 +60,12 @@ const EXECUTABLE_AGENT_TOOLS = new Set([
   "search_in_files",
   "analyze_project_file",
   "write_project_file",
+  "modify_project_file",
   "apply_patch",
   "patch_project_file",
+  "rename_project_file",
+  "delete_project_file",
+  "create_project_directory",
   "verify_file",
   "verify_typecheck",
   "verify_lint",
@@ -616,12 +620,12 @@ export class AgentExecutor {
     ])];
     const findings = this.extractFindings(resultText);
     const completion = toolExecution.workspace.completionReport(toolExecution.touchedFiles);
-    const writeRequired = ["coder", "test", "docs", "refactor"].includes(task.role)
+    const writeRequired = ["writer", "formatter", "proofreader", "translator", "summarizer"].includes(task.role)
       // Une sous-tâche explicitement orientée lecture/analyse n'exige pas d'écriture.
       // On détecte cela par l'absence totale de mot-clé d'écriture dans le titre/description
       // ET par la présence de mots-clés d'analyse.
       && !this.isAnalysisOnlyTask(task);
-    const readEvidenceRequired = ["review", "security", "architect"].includes(task.role);
+    const readEvidenceRequired = ["researcher", "planner"].includes(task.role);
     const planningOnly = this.isPlanningOnly(resultText);
     const declaredFailure = this.resultParser.detectFailure(resultText);
     const errors = [

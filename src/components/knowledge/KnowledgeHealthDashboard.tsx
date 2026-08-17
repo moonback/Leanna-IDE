@@ -54,23 +54,49 @@ interface HealthData {
   };
 }
 
+interface DocumentsData {
+  extractor: { extracted: number; watching: boolean };
+  documentCount: number;
+  documents: {
+    id: string;
+    fileName: string;
+    mimeType: string;
+    summary: string;
+    keywords: string[];
+    tags: string[];
+    uploadedAt: string;
+    textLength: number;
+  }[];
+}
+
 export function KnowledgeHealthDashboard() {
   const { success, error: toastError } = useToast();
   const [data, setData] = useState<HealthData | null>(null);
+  const [docsData, setDocsData] = useState<DocumentsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [reindexing, setReindexing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'memory' | 'dependencies'>('overview');
+  const [reextracting, setReextracting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'memory' | 'documents' | 'dependencies'>('overview');
 
   const fetchHealth = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/knowledge/health');
-      if (!res.ok) throw new Error('Erreur HTTP ' + res.status);
-      const json = await res.json();
+      const [healthRes, docsRes] = await Promise.all([
+        fetch('/api/knowledge/health'),
+        fetch('/api/knowledge/documents'),
+      ]);
+      if (!healthRes.ok) throw new Error('Erreur HTTP ' + healthRes.status);
+      const json = await healthRes.json();
       if (json.status === 'success') {
         setData(json);
       } else {
         throw new Error(json.error || 'Statut invalide');
+      }
+      if (docsRes.ok) {
+        const docsJson = await docsRes.json();
+        if (docsJson.status === 'success') {
+          setDocsData(docsJson);
+        }
       }
     } catch (err: any) {
       toastError('Impossible de charger le statut du Knowledge System');
@@ -95,6 +121,21 @@ export function KnowledgeHealthDashboard() {
       toastError('Erreur lors de la réindexation du projet');
     } finally {
       setReindexing(false);
+    }
+  };
+
+  const handleReextract = async () => {
+    setReextracting(true);
+    try {
+      const res = await fetch('/api/knowledge/documents/reextract', { method: 'POST' });
+      if (!res.ok) throw new Error('Échec ré-extraction');
+      const json = await res.json();
+      success(`Documents ré-extraits : ${json.stats?.totalExtracted ?? 0} documents, ${json.stats?.totalWords ?? 0} mots`);
+      await fetchHealth();
+    } catch (err: any) {
+      toastError('Erreur lors de la ré-extraction des documents');
+    } finally {
+      setReextracting(false);
     }
   };
 
@@ -301,25 +342,37 @@ export function KnowledgeHealthDashboard() {
           </div>
         </div>
 
-        {/* Card 4: Search Engine Status */}
+        {/* Card 4: Documents Extraits */}
         <div className="p-4 rounded-2xl border space-y-3" style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-              Moteur Recherche
+              Documents Extraits
             </span>
             <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">
-              <Cpu className="w-4 h-4" />
+              <FileCode className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-black text-cyan-400">BM25 + TF-IDF</div>
+            <div className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>
+              {docsData?.documentCount ?? 0} <span className="text-xs font-normal text-muted">documents</span>
+            </div>
             <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-              Index inversé dynamique (lazy & dirty invalidation)
+              {docsData?.extractor?.watching ? (
+                <span className="text-emerald-400">⚡ Extraction temps réel active</span>
+              ) : (
+                <span className="text-amber-400">En attente d'activation</span>
+              )}
             </p>
           </div>
           <div className="pt-2 border-t text-[11px] flex justify-between" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
-            <span>Stop-words : FR + EN</span>
-            <span>Mode : Ultra-rapide</span>
+            <span>Auto-scan : {docsData?.extractor?.watching ? 'ON' : 'OFF'}</span>
+            <button
+              onClick={handleReextract}
+              disabled={reextracting}
+              className="text-cyan-400 hover:underline font-medium"
+            >
+              {reextracting ? '...' : 'Ré-extraire'}
+            </button>
           </div>
         </div>
       </div>
@@ -346,6 +399,16 @@ export function KnowledgeHealthDashboard() {
             }`}
           >
             Project Memory ({pm.totalFacts})
+          </button>
+          <button
+            onClick={() => setActiveTab('documents')}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === 'documents'
+                ? 'bg-white/10 text-white shadow-sm'
+                : 'text-muted hover:text-white hover:bg-white/5'
+            }`}
+          >
+            Documents ({docsData?.documentCount ?? 0})
           </button>
           {dg.cycleCount > 0 && (
             <button
@@ -426,7 +489,91 @@ export function KnowledgeHealthDashboard() {
           </div>
         )}
 
-        {/* Tab 3: Cycles */}
+        {/* Tab 3: Documents extraits */}
+        {activeTab === 'documents' && (
+          <div className="p-4 rounded-2xl border space-y-3" style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <FileCode className="w-4 h-4 text-cyan-400" />
+                Documents Extraits Automatiquement du Workspace
+              </h3>
+              <button
+                onClick={handleReextract}
+                disabled={reextracting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+                style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+              >
+                <RefreshCw className={`w-3 h-3 ${reextracting ? 'animate-spin' : ''}`} />
+                {reextracting ? 'Extraction...' : 'Ré-extraire tout'}
+              </button>
+            </div>
+
+            {docsData && docsData.documents.length > 0 ? (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {docsData.documents.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="p-3 rounded-xl border transition-colors hover:border-cyan-500/30"
+                    style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)' }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                            {doc.fileName}
+                          </span>
+                          <span
+                            className="px-1.5 py-0.5 rounded text-[9px] font-mono flex-shrink-0"
+                            style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' }}
+                          >
+                            {doc.mimeType.split('/')[1] || doc.mimeType}
+                          </span>
+                        </div>
+                        <p className="text-[10px] mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                          {doc.summary}
+                        </p>
+                      </div>
+                      <span className="text-[9px] flex-shrink-0 font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                        {(doc.textLength / 1000).toFixed(1)}k
+                      </span>
+                    </div>
+                    {doc.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {doc.tags.slice(0, 5).map((tag, i) => (
+                          <span
+                            key={i}
+                            className="px-1.5 py-0.5 rounded text-[9px]"
+                            style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)', color: 'var(--accent-primary)' }}
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <FileCode className="w-10 h-10 mx-auto mb-2 opacity-30" style={{ color: 'var(--text-muted)' }} />
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Aucun document extrait. Cliquez sur "Ré-extraire tout" ou attendez le prochain scan automatique.
+                </p>
+              </div>
+            )}
+
+            <div className="pt-3 border-t text-[10px] flex items-center gap-4" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+              <span>
+                Formats supportés : <code>.md</code> <code>.txt</code> <code>.rst</code> <code>.adoc</code> <code>.tex</code> <code>.yaml</code> <code>.csv</code>
+              </span>
+              <span className="ml-auto">
+                {docsData?.extractor?.watching ? '🟢 Surveillance active' : '🔴 Surveillance inactive'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 4: Cycles */}
         {activeTab === 'dependencies' && dg.cycleCount > 0 && (
           <div className="p-4 rounded-2xl border space-y-3 bg-amber-500/5 border-amber-500/20">
             <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
