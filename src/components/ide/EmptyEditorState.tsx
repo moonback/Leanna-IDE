@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 import {
   Plus, X, FolderOpen, FileText,
-  MessageSquare,
+  MessageSquare, FolderPlus,
   Code2, GitBranch, BrainCircuit,
   Circle, Search,
 } from 'lucide-react';
@@ -739,6 +739,7 @@ function CapabilitiesModal({ onClose, aiName }: CapabilitiesModalProps) {
 interface EmptyEditorStateProps {
   onOpenFile: (path: string) => void;
   onCreateFile: () => void;
+  onCreateFolder: () => void;
   onShowSettings: () => void;
   onOpenSearch?: () => void;
   onOpenChat?: () => void;
@@ -747,6 +748,7 @@ interface EmptyEditorStateProps {
 export const EmptyEditorState = React.memo(function EmptyEditorState({
   onOpenFile,
   onCreateFile,
+  onCreateFolder,
   onShowSettings,
   onOpenChat,
 }: EmptyEditorStateProps) {
@@ -841,6 +843,9 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     });
   }, []);
 
+  // Toggle fichier / dossier pour la carte "Nouveau"
+  const [createMode, setCreateMode] = useState<'file' | 'folder'>('file');
+
   // Handler Chat IA : connecte l'assistant si nécessaire, puis ouvre le panneau chat
   const handleOpenChat = useCallback(() => {
     if (!connected) {
@@ -854,10 +859,10 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   // Raccourcis pour les actions
   const actions = useMemo(
     () => [
-      { label: 'Nouveau fichier', desc: 'Créer un fichier dans le projet actif', icon: Plus, onClick: onCreateFile, shortcut: `${MOD}+N`, id: 'new-file' },
+      { label: createMode === 'file' ? 'Nouveau fichier' : 'Nouveau dossier', desc: createMode === 'file' ? 'Créer un fichier dans le projet actif' : 'Créer un dossier dans le projet actif', icon: createMode === 'file' ? Plus : FolderPlus, onClick: createMode === 'file' ? onCreateFile : onCreateFolder, shortcut: `${MOD}+N`, id: 'new-file' },
       { label: 'Chat IA', desc: `Discuter avec ${profile.aiName || 'l\'agent'}`, icon: MessageSquare, onClick: handleOpenChat, shortcut: `${MOD}+L`, id: 'chat-ia' },
     ],
-    [onCreateFile, handleOpenChat, profile.aiName]
+    [onCreateFile, onCreateFolder, createMode, handleOpenChat, profile.aiName]
   );
 
   // Liens rapides
@@ -1048,6 +1053,39 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                           left: autoOpenChat ? '15px' : '2px',
                           backgroundColor: autoOpenChat ? '#fff' : 'var(--text-muted)',
                           boxShadow: autoOpenChat ? '0 0 4px rgba(56,189,248,0.4)' : 'none',
+                        }}
+                      />
+                    </button>
+                  </div>
+                )}
+
+                {/* Toggle fichier / dossier — uniquement sur la carte Nouveau */}
+                {id === 'new-file' && (
+                  <div
+                    className="flex items-center justify-between w-full mt-2 pt-2.5"
+                    style={{ borderTop: '1px solid var(--border-base)' }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      Dossier
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); setCreateMode(prev => prev === 'file' ? 'folder' : 'file'); }}
+                      className="relative w-[28px] h-[14px] rounded-full transition-colors duration-200"
+                      style={{
+                        backgroundColor: createMode === 'folder' ? 'var(--accent-primary)' : 'var(--bg-ctrl)',
+                        border: `1px solid ${createMode === 'folder' ? 'var(--accent-primary)' : 'var(--border-base)'}`,
+                      }}
+                      aria-label={createMode === 'folder' ? 'Passer en mode fichier' : 'Passer en mode dossier'}
+                      aria-pressed={createMode === 'folder'}
+                    >
+                      <div
+                        className="absolute top-[1.5px] w-[9px] h-[9px] rounded-full transition-all duration-200"
+                        style={{
+                          left: createMode === 'folder' ? '15px' : '2px',
+                          backgroundColor: createMode === 'folder' ? '#fff' : 'var(--text-muted)',
+                          boxShadow: createMode === 'folder' ? '0 0 4px rgba(56,189,248,0.4)' : 'none',
                         }}
                       />
                     </button>

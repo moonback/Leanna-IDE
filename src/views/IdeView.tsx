@@ -789,6 +789,7 @@ export default function IdeView() {
                         <EmptyEditorState
                                                   onOpenFile={openFileAt}
                                                   onCreateFile={() => setModalState({ type: 'create-file', dir: fileSystem.currentDir })}
+                                                  onCreateFolder={() => setModalState({ type: 'create-folder', dir: fileSystem.currentDir })}
                                                   onShowSettings={() => setShowSettingsPanel(true)}
                                                   onOpenSearch={() => setShowGlobalSearch(true)}
                                                   onOpenChat={() => setShowChat(true)}
