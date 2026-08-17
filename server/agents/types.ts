@@ -4,21 +4,34 @@ import { z } from "zod";
 // Types du système d'agents multi-rôles
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Rôles d'agents spécialisés disponibles */
-export const AGENT_ROLES = ["coder", "test", "docs", "refactor", "security", "review", "architect"] as const;
+/** Rôles d'agents spécialisés disponibles — orientés rédaction de documents */
+export const AGENT_ROLES = ["writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner"] as const;
 export type AgentRole = (typeof AGENT_ROLES)[number];
 
 /** Alias contrôlés acceptés aux frontières LLM. Aucun rôle n'est inventé. */
 const AGENT_ROLE_ALIASES: Readonly<Record<string, AgentRole>> = {
-  analyse: "review",
-  analyze: "review",
-  analysis: "review",
-  audit: "review",
-  investigation: "review",
-  diagnostic: "review",
-  code: "coder",
-  edit: "coder",
-  modify: "coder",
+  redacteur: "writer",
+  rédacteur: "writer",
+  write: "writer",
+  redaction: "writer",
+  rédaction: "writer",
+  format: "formatter",
+  mise_en_forme: "formatter",
+  structure: "formatter",
+  recherche: "researcher",
+  research: "researcher",
+  correcteur: "proofreader",
+  correction: "proofreader",
+  relecture: "proofreader",
+  traduction: "translator",
+  translate: "translator",
+  synthese: "summarizer",
+  synthèse: "summarizer",
+  resume: "summarizer",
+  résumé: "summarizer",
+  plan: "planner",
+  outline: "planner",
+  planification: "planner",
 };
 
 /** Normalise seulement les alias approuvés, puis laisse le schéma strict rejeter le reste. */
@@ -143,12 +156,12 @@ export interface OrchestrationPlan {
 // ─── Zod Schemas pour validation ──────────────────────────────────────────────
 
 const strictAgentRoleSchema = z.enum(
-  ["coder", "test", "docs", "refactor", "security", "review", "architect"],
+  ["writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner"],
   {
     errorMap: (_issue, ctx) => ({
       message:
         `Rôle invalide : "${ctx.data}". ` +
-        `Un seul rôle autorisé par tâche, parmi : coder, test, docs, refactor, security, review, architect.`,
+        `Un seul rôle autorisé par tâche, parmi : writer, formatter, researcher, proofreader, translator, summarizer, planner.`,
     }),
   }
 );
@@ -157,7 +170,15 @@ const strictAgentRoleSchema = z.enum(
 export const agentRoleSchema = z
   .union([
     strictAgentRoleSchema,
-    z.enum(["analyse", "analyze", "analysis", "audit", "investigation", "diagnostic", "code", "edit", "modify"]),
+    z.enum([
+      "redacteur", "rédacteur", "write", "redaction", "rédaction",
+      "format", "mise_en_forme", "structure",
+      "recherche", "research",
+      "correcteur", "correction", "relecture",
+      "traduction", "translate",
+      "synthese", "synthèse", "resume", "résumé",
+      "plan", "outline", "planification",
+    ]),
   ])
   .transform((value): AgentRole => normalizeAgentRole(value) as AgentRole);
 

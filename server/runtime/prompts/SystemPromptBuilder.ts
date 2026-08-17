@@ -186,28 +186,28 @@ export class SystemPromptBuilder {
    */
   private buildFilteredAgentsPrompt(allowedRoles: string[], _renderOpts: any): string {
     const ALL_ROLES: Record<string, { description: string; write: boolean }> = {
-      coder:     { description: "Modifications de fichiers demandées par l'utilisateur", write: true },
-      test:      { description: "Tests unitaires, d'intégration et E2E", write: true },
-      docs:      { description: "Documentation technique", write: true },
-      refactor:  { description: "Refactoring (pas de changement de comportement)", write: true },
-      security:  { description: "Audit de sécurité", write: false },
-      review:    { description: "Revue de code", write: false },
-      architect: { description: "Architecture et coordination", write: false },
+      writer:      { description: "Rédaction de documents (README, guides, articles, rapports)", write: true },
+      formatter:   { description: "Mise en forme et formatage Markdown", write: true },
+      researcher:  { description: "Recherche et collecte d'informations", write: false },
+      proofreader: { description: "Correction orthographique, grammaticale et stylistique", write: true },
+      translator:  { description: "Traduction et localisation", write: true },
+      summarizer:  { description: "Résumés et synthèses", write: true },
+      planner:     { description: "Plans et structures de documents", write: false },
     };
 
     const lines: string[] = [];
     lines.push("# Système Multi-Agents (restreint)");
     lines.push("");
-    lines.push("Tu fais partie du système multi-agents Jarvis-OS.");
+    lines.push("Tu fais partie du système multi-agents Jarvis-OS, spécialisé dans la rédaction de documents.");
     lines.push(`**Agents activés :** ${allowedRoles.join(", ")}`);
     lines.push("");
 
-    // Si coder est actif, garder la règle de délégation obligatoire
-    if (allowedRoles.includes("coder")) {
-      lines.push("## ⚠️ RÈGLE — MODIFICATIONS DE FICHIERS");
+    // Si writer est actif, garder la règle de délégation obligatoire
+    if (allowedRoles.includes("writer")) {
+      lines.push("## ⚠️ RÈGLE — RÉDACTION DE DOCUMENTS");
       lines.push("");
-      lines.push("Toute modification de code DOIT être déléguée à l'agent `coder` via `agent_delegate`.");
-      lines.push("Tu ne dois JAMAIS appeler `write_project_file`, `modify_project_file` ou `patch_project_file` directement.");
+      lines.push("Toute rédaction de document DOIT être déléguée à l'agent `writer` via `agent_delegate`.");
+      lines.push("Pour les corrections, utilise `proofreader`. Pour la traduction, utilise `translator`.");
       lines.push("");
     }
 

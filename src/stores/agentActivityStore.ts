@@ -46,25 +46,25 @@ function notify() {
 
 function getAgentForTool(tool: string): string {
   const TOOL_TO_AGENT: Record<string, string> = {
-    read_project_file: 'code', write_project_file: 'code', modify_project_file: 'code',
-    patch_project_file: 'code', analyze_project_file: 'code', search_in_files: 'code',
-    read_file_outline: 'code', open_project_file: 'code',
-    list_project_files: 'files', create_project_directory: 'files',
-    rename_project_file: 'files', delete_project_file: 'files', get_workspace_info: 'files',
-    git_status: 'git', git_diff: 'git', git_stage: 'git', git_unstage: 'git',
-    git_commit: 'git', git_push: 'git', git_pull: 'git', git_branches: 'git',
-    git_switch_branch: 'git', git_log: 'git',
-    system_execute_command: 'terminal', system_open: 'terminal', system_notify: 'terminal',
-    automation_navigate: 'web', automation_click: 'web', automation_type: 'web',
-    automation_extract: 'web', automation_search: 'web', automation_snapshot: 'web',
-    save_memory: 'memory', search_memory: 'memory', search_history: 'memory',
-    get_conversation_context: 'memory',
-    reasoning_delegate_task: 'reasoning', reasoning_think: 'reasoning',
-    reasoning_list_strategies: 'reasoning',
-    mission_create: 'mission', mission_status: 'mission', mission_list: 'mission',
-    agent_delegate: 'reasoning', agent_orchestrate: 'reasoning',
+    read_project_file: 'writer', write_project_file: 'writer', modify_project_file: 'writer',
+    patch_project_file: 'writer', analyze_project_file: 'researcher', search_in_files: 'researcher',
+    read_file_outline: 'planner', open_project_file: 'writer',
+    list_project_files: 'researcher', create_project_directory: 'writer',
+    rename_project_file: 'writer', delete_project_file: 'writer', get_workspace_info: 'researcher',
+    git_status: 'writer', git_diff: 'writer', git_stage: 'writer', git_unstage: 'writer',
+    git_commit: 'writer', git_push: 'writer', git_pull: 'writer', git_branches: 'writer',
+    git_switch_branch: 'writer', git_log: 'writer',
+    system_execute_command: 'writer', system_open: 'writer', system_notify: 'writer',
+    automation_navigate: 'researcher', automation_click: 'researcher', automation_type: 'researcher',
+    automation_extract: 'researcher', automation_search: 'researcher', automation_snapshot: 'researcher',
+    save_memory: 'planner', search_memory: 'researcher', search_history: 'researcher',
+    get_conversation_context: 'researcher',
+    reasoning_delegate_task: 'planner', reasoning_think: 'planner',
+    reasoning_list_strategies: 'planner',
+    mission_create: 'planner', mission_status: 'planner', mission_list: 'planner',
+    agent_delegate: 'planner', agent_orchestrate: 'planner',
   };
-  return TOOL_TO_AGENT[tool] ?? 'code';
+  return TOOL_TO_AGENT[tool] ?? 'writer';
 }
 
 function formatToolLabel(tool: string): string {

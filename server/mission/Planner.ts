@@ -294,12 +294,12 @@ RÉPONDS EN JSON STRICT:
       return makePlan(baseSteps);
     }
 
-    if (text.includes("refactor") || text.includes("refacto") || text.includes("nettoyer") || text.includes("réorganiser")) {
+    if (text.includes("refactor") || text.includes("refacto") || text.includes("nettoyer") || text.includes("réorganiser") || text.includes("restructurer")) {
       return makePlan([
-        { t: "Auditer le code cible", d: `Lire et comprendre la structure actuelle à refactorer`, sc: ["Structure actuelle comprise", "Points de douleur listés"], p: "high", deps: [] },
-        { t: "Planifier le découpage", d: "Définir les modules/classes/fonctions de sortie", sc: ["Nouvelle structure décidée"], p: "high", deps: ["Auditer le code cible"] },
-        { t: "Appliquer le refactor", d: "Déplacer et renommer sans changer le comportement", sc: ["Aucun changement sémantique non désiré"], p: "high", deps: ["Planifier le découpage"] },
-        { t: "Valider", d: "Vérifier compilation + tests", sc: ["Compilation OK", "Tous les tests passent"], p: "high", deps: ["Appliquer le refactor"] },
+        { t: "Auditer le document cible", d: `Lire et comprendre la structure actuelle à réorganiser`, sc: ["Structure actuelle comprise", "Points de douleur listés"], p: "high", deps: [] },
+        { t: "Planifier la restructuration", d: "Définir les sections et sous-sections de sortie", sc: ["Nouvelle structure décidée"], p: "high", deps: ["Auditer le document cible"] },
+        { t: "Appliquer la restructuration", d: "Réorganiser le contenu selon le nouveau plan", sc: ["Contenu réorganisé sans perte d'information"], p: "high", deps: ["Planifier la restructuration"] },
+        { t: "Valider", d: "Vérifier cohérence et complétude", sc: ["Aucune information perdue", "Structure logique"], p: "high", deps: ["Appliquer la restructuration"] },
       ]);
     }
 

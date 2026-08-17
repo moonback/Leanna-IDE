@@ -616,12 +616,12 @@ export class AgentExecutor {
     ])];
     const findings = this.extractFindings(resultText);
     const completion = toolExecution.workspace.completionReport(toolExecution.touchedFiles);
-    const writeRequired = ["coder", "test", "docs", "refactor"].includes(task.role)
+    const writeRequired = ["writer", "formatter", "proofreader", "translator", "summarizer"].includes(task.role)
       // Une sous-tâche explicitement orientée lecture/analyse n'exige pas d'écriture.
       // On détecte cela par l'absence totale de mot-clé d'écriture dans le titre/description
       // ET par la présence de mots-clés d'analyse.
       && !this.isAnalysisOnlyTask(task);
-    const readEvidenceRequired = ["review", "security", "architect"].includes(task.role);
+    const readEvidenceRequired = ["researcher", "planner"].includes(task.role);
     const planningOnly = this.isPlanningOnly(resultText);
     const declaredFailure = this.resultParser.detectFailure(resultText);
     const errors = [

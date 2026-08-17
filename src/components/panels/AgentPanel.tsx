@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Users, Bot, FlaskConical, FileText, RefreshCw, Shield, Eye,
-  Building2, Loader2, CheckCircle2, XCircle, Clock,
+  Users, Bot, FileText,
+  Loader2, CheckCircle2, XCircle, Clock,
   ChevronRight, Trash2, Code, GitBranch, Globe,
-  Brain, Database, Target, Activity, ArrowRight, Compass,
+  Brain, Database, Target, Activity, ArrowRight,
+  PenTool, AlignLeft, Search, SpellCheck, Languages, ListTree,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel';
 import { IconButton } from '../ui/IconButton';
@@ -26,12 +27,13 @@ const ROLE_META: Record<string, {
   label: string;
   description: string;
 }> = {
-  test:     { icon: FlaskConical, color: '#4ade80', label: 'Tests',        description: 'Tests unitaires & intégration' },
-  docs:     { icon: FileText,     color: '#60a5fa', label: 'Docs',         description: 'Documentation technique' },
-  refactor: { icon: RefreshCw,    color: '#fbbf24', label: 'Refactor',     description: 'Refactoring iso-fonctionnel' },
-  security: { icon: Shield,       color: '#f87171', label: 'Sécurité',     description: 'Audit de vulnérabilités' },
-  review:   { icon: Eye,          color: '#a78bfa', label: 'Review',       description: 'Code review & qualité' },
-  architect:{ icon: Building2,    color: '#f97316', label: 'Architecture', description: 'Analyse architecturale' },
+  writer:      { icon: PenTool,    color: '#60a5fa', label: 'Rédacteur',    description: 'Rédaction de documents' },
+  formatter:   { icon: AlignLeft,  color: '#4ade80', label: 'Mise en forme',description: 'Formatage & structure' },
+  researcher:  { icon: Search,     color: '#a78bfa', label: 'Recherche',    description: 'Collecte & synthèse' },
+  proofreader: { icon: SpellCheck,  color: '#fbbf24', label: 'Correcteur',  description: 'Orthographe & grammaire' },
+  translator:  { icon: Languages,  color: '#f87171', label: 'Traducteur',   description: 'Traduction & localisation' },
+  summarizer:  { icon: FileText,   color: '#fb923c', label: 'Synthèse',     description: 'Résumés & condensés' },
+  planner:     { icon: ListTree,   color: '#2dd4bf', label: 'Planificateur',description: 'Plans & outlines' },
   code:     { icon: Code,         color: '#60a5fa', label: 'Code',         description: 'Lecture/écriture de fichiers' },
   files:    { icon: FileText,     color: '#4ade80', label: 'Fichiers',     description: 'Gestion de fichiers' },
   git:      { icon: GitBranch,    color: '#f472b6', label: 'Git',          description: 'Contrôle de version' },
@@ -50,13 +52,13 @@ function getRoleMeta(role: string) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const AGENT_ROSTER: { id: AgentRole; label: string; desc: string; icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>; color: string }[] = [
-  { id: 'coder',     label: 'Coder',      desc: 'Modifications de fichiers',     icon: Code,        color: '#60a5fa' },
-  { id: 'test',      label: 'Test',       desc: 'Tests unitaires & E2E',         icon: FlaskConical,color: '#4ade80' },
-  { id: 'docs',      label: 'Docs',       desc: 'Documentation technique',       icon: FileText,    color: '#a78bfa' },
-  { id: 'refactor',  label: 'Refactor',   desc: 'Refactoring du code',           icon: RefreshCw,   color: '#fbbf24' },
-  { id: 'security',  label: 'Security',   desc: 'Audit de sécurité',             icon: Shield,      color: '#f87171' },
-  { id: 'review',    label: 'Review',     desc: 'Revue de code',                 icon: Eye,         color: '#fb923c' },
-  { id: 'architect', label: 'Architect',  desc: 'Architecture & coordination',   icon: Compass,     color: '#2dd4bf' },
+  { id: 'writer',      label: 'Rédacteur',      desc: 'Rédaction de documents',           icon: PenTool,    color: '#60a5fa' },
+  { id: 'formatter',   label: 'Mise en Forme',  desc: 'Formatage & structure Markdown',   icon: AlignLeft,  color: '#4ade80' },
+  { id: 'researcher',  label: 'Recherche',      desc: 'Collecte & synthèse d\'infos',     icon: Search,     color: '#a78bfa' },
+  { id: 'proofreader', label: 'Correcteur',     desc: 'Orthographe, grammaire, style',    icon: SpellCheck,  color: '#fbbf24' },
+  { id: 'translator',  label: 'Traducteur',     desc: 'Traduction & localisation',        icon: Languages,  color: '#f87171' },
+  { id: 'summarizer',  label: 'Synthèse',       desc: 'Résumés & condensés',              icon: FileText,   color: '#fb923c' },
+  { id: 'planner',     label: 'Planificateur',  desc: 'Plans & outlines de documents',    icon: ListTree,   color: '#2dd4bf' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════

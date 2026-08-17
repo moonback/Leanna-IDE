@@ -1,17 +1,17 @@
 import { motion } from 'motion/react';
-import { Bot, Code2, TestTube2, FileText, RefreshCw, Shield, Eye, Compass } from 'lucide-react';
+import { Bot, PenTool, AlignLeft, Search, SpellCheck, Languages, FileText, ListTree } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext';
 import type { AgentRole } from '../../context/UserProfileContext';
 import { Section, Field, ToggleSwitch, SectionDivider } from './SettingsPrimitives';
 
 const AGENT_ROLES: { id: AgentRole; label: string; desc: string; icon: typeof Bot; color: string }[] = [
-  { id: 'coder',    label: 'Coder',     desc: 'Modifications de fichiers',       icon: Code2,      color: '#60a5fa' },
-  { id: 'test',     label: 'Test',      desc: 'Tests unitaires & E2E',           icon: TestTube2,  color: '#4ade80' },
-  { id: 'docs',     label: 'Docs',      desc: 'Documentation technique',         icon: FileText,   color: '#a78bfa' },
-  { id: 'refactor', label: 'Refactor',  desc: 'Refactoring du code',             icon: RefreshCw,  color: '#fbbf24' },
-  { id: 'security', label: 'Security',  desc: 'Audit de sécurité',               icon: Shield,     color: '#f87171' },
-  { id: 'review',   label: 'Review',    desc: 'Revue de code',                   icon: Eye,        color: '#fb923c' },
-  { id: 'architect',label: 'Architect', desc: 'Architecture & coordination',     icon: Compass,    color: '#2dd4bf' },
+  { id: 'writer',      label: 'Rédacteur',      desc: 'Rédaction de documents',           icon: PenTool,    color: '#60a5fa' },
+  { id: 'formatter',   label: 'Mise en Forme',  desc: 'Formatage & structure Markdown',   icon: AlignLeft,  color: '#4ade80' },
+  { id: 'researcher',  label: 'Recherche',      desc: 'Collecte & synthèse d\'infos',     icon: Search,     color: '#a78bfa' },
+  { id: 'proofreader', label: 'Correcteur',     desc: 'Orthographe, grammaire, style',    icon: SpellCheck,  color: '#fbbf24' },
+  { id: 'translator',  label: 'Traducteur',     desc: 'Traduction & localisation',        icon: Languages,  color: '#f87171' },
+  { id: 'summarizer',  label: 'Synthèse',       desc: 'Résumés & condensés',              icon: FileText,   color: '#fb923c' },
+  { id: 'planner',     label: 'Planificateur',  desc: 'Plans & outlines de documents',    icon: ListTree,   color: '#2dd4bf' },
 ];
 
 export function AgentsSection() {
@@ -169,8 +169,8 @@ export function AgentsSection() {
               color: 'var(--text-muted)',
             }}
           >
-            <strong style={{ color: 'var(--text-primary)' }}>💡 Conseil :</strong> Désactiver le <em>Coder</em> permet à l'assistant de modifier les fichiers directement sans passer par un agent.
-            Les agents <em>Security</em> et <em>Review</em> sont en lecture seule.
+            <strong style={{ color: 'var(--text-primary)' }}>💡 Conseil :</strong> Chaque agent est spécialisé dans un aspect de la rédaction.
+            Le <em>Planificateur</em> structure, le <em>Rédacteur</em> écrit, le <em>Correcteur</em> relit, le <em>Traducteur</em> adapte.
           </div>
         </>
       )}

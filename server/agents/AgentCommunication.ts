@@ -155,39 +155,36 @@ export interface DelegationCapability {
 
 /** Matrice de délégation : quels agents peuvent déléguer à qui */
 export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {
-  coder: [
-    { targetRole: "test", taskTypes: ["unit-test", "regression-test"], reason: "Tests après modification de code" },
-    { targetRole: "docs", taskTypes: ["code-documentation"], reason: "Documentation du code modifié" },
-    { targetRole: "review", taskTypes: ["code-quality-check"], reason: "Revue qualité après modification" },
+  writer: [
+    { targetRole: "proofreader", taskTypes: ["relecture", "correction"], reason: "Relecture après rédaction" },
+    { targetRole: "formatter", taskTypes: ["mise-en-forme", "formatage"], reason: "Mise en forme du document rédigé" },
+    { targetRole: "summarizer", taskTypes: ["resume", "synthese"], reason: "Création d'un résumé exécutif" },
   ],
-  architect: [
-    { targetRole: "coder", taskTypes: ["implement-design", "code-change"], reason: "Implémentation de changements selon le design" },
-    { targetRole: "refactor", taskTypes: ["code-restructure", "split-module"], reason: "Implémentation de changements architecturaux" },
-    { targetRole: "docs", taskTypes: ["architecture-doc", "design-doc"], reason: "Documentation des décisions architecturales" },
-    { targetRole: "security", taskTypes: ["security-review"], reason: "Validation sécurité des choix d'architecture" },
+  formatter: [
+    { targetRole: "proofreader", taskTypes: ["verification-format"], reason: "Vérification de la cohérence du formatage" },
+    { targetRole: "writer", taskTypes: ["contenu-manquant"], reason: "Signaler les sections vides nécessitant du contenu" },
   ],
-  refactor: [
-    { targetRole: "test", taskTypes: ["regression-test", "refactor-verification"], reason: "Vérification que le refactoring n'a pas cassé de fonctionnalités" },
-    { targetRole: "review", taskTypes: ["code-quality-check"], reason: "Revue qualité du code refactoré" },
+  researcher: [
+    { targetRole: "writer", taskTypes: ["redaction-findings"], reason: "Rédaction à partir des résultats de recherche" },
+    { targetRole: "planner", taskTypes: ["structuration-recherche"], reason: "Structuration des findings en plan" },
+    { targetRole: "summarizer", taskTypes: ["synthese-sources"], reason: "Synthèse des sources collectées" },
   ],
-  test: [
-    { targetRole: "refactor", taskTypes: ["test-code-cleanup"], reason: "Amélioration de la qualité du code de test" },
-    { targetRole: "docs", taskTypes: ["test-documentation"], reason: "Documentation des scénarios de test" },
+  proofreader: [
+    { targetRole: "writer", taskTypes: ["reformulation", "reecriture"], reason: "Réécriture de passages problématiques" },
+    { targetRole: "translator", taskTypes: ["verification-traduction"], reason: "Vérification de la qualité d'une traduction" },
   ],
-  docs: [
-    { targetRole: "architect", taskTypes: ["architecture-validation"], reason: "Validation de la cohérence architecturale de la doc" },
-    { targetRole: "review", taskTypes: ["doc-review"], reason: "Revue de la qualité de la documentation" },
+  translator: [
+    { targetRole: "proofreader", taskTypes: ["relecture-traduction"], reason: "Relecture de la traduction dans la langue cible" },
+    { targetRole: "formatter", taskTypes: ["formatage-traduction"], reason: "Remise en forme du document traduit" },
   ],
-  security: [
-    { targetRole: "coder", taskTypes: ["security-fix"], reason: "Implémentation des corrections de sécurité" },
-    { targetRole: "refactor", taskTypes: ["security-fix"], reason: "Implémentation des corrections de sécurité" },
-    { targetRole: "test", taskTypes: ["security-test"], reason: "Tests de validation des correctifs de sécurité" },
+  summarizer: [
+    { targetRole: "proofreader", taskTypes: ["relecture-resume"], reason: "Relecture du résumé produit" },
+    { targetRole: "writer", taskTypes: ["developpement-point"], reason: "Développer un point du résumé si nécessaire" },
   ],
-  review: [
-    { targetRole: "coder", taskTypes: ["code-fix", "quality-improvement"], reason: "Implémentation des corrections et améliorations" },
-    { targetRole: "refactor", taskTypes: ["quality-improvement"], reason: "Implémentation des améliorations de qualité" },
-    { targetRole: "test", taskTypes: ["coverage-improvement"], reason: "Amélioration de la couverture de test" },
-    { targetRole: "docs", taskTypes: ["doc-improvement"], reason: "Amélioration de la documentation" },
+  planner: [
+    { targetRole: "writer", taskTypes: ["redaction-section", "redaction-document"], reason: "Rédaction selon le plan établi" },
+    { targetRole: "researcher", taskTypes: ["recherche-complementaire"], reason: "Recherche complémentaire pour un point du plan" },
+    { targetRole: "formatter", taskTypes: ["mise-en-forme-plan"], reason: "Formatage du plan en document structuré" },
   ],
 };
 
@@ -207,38 +204,35 @@ export interface CollaborationPattern {
 /** Patterns de collaboration prédéfinis */
 export const COLLABORATION_PATTERNS: CollaborationPattern[] = [
   {
-    name: "refactor-with-safety",
-    description: "Refactoring sécurisé avec tests avant/après",
-    participants: ["test", "refactor", "review"],
+    name: "document-complet",
+    description: "Création complète d'un document : planification → rédaction → correction → mise en forme",
+    participants: ["planner", "writer", "proofreader", "formatter"],
     workflow: [
-      { step: 1, agent: "test", action: "Générer tests de régression" },
-      { step: 2, agent: "test", action: "Exécuter tests (baseline)", dependsOn: [1] },
-      { step: 3, agent: "refactor", action: "Effectuer refactoring", dependsOn: [2] },
-      { step: 4, agent: "test", action: "Re-exécuter tests (validation)", dependsOn: [3] },
-      { step: 5, agent: "review", action: "Revue qualité du code refactoré", dependsOn: [4] },
+      { step: 1, agent: "planner", action: "Créer le plan et la structure du document" },
+      { step: 2, agent: "writer", action: "Rédiger le contenu selon le plan", dependsOn: [1] },
+      { step: 3, agent: "proofreader", action: "Relecture et correction orthographique/grammaticale", dependsOn: [2] },
+      { step: 4, agent: "formatter", action: "Mise en forme finale et formatage Markdown", dependsOn: [3] },
     ],
   },
   {
-    name: "security-audit-full",
-    description: "Audit de sécurité complet avec correction et validation",
-    participants: ["security", "refactor", "test"],
+    name: "traduction-verifiee",
+    description: "Traduction d'un document avec relecture de qualité",
+    participants: ["writer", "translator", "proofreader"],
     workflow: [
-      { step: 1, agent: "security", action: "Audit de sécurité complet" },
-      { step: 2, agent: "refactor", action: "Implémenter les corrections", dependsOn: [1] },
-      { step: 3, agent: "test", action: "Tests de sécurité", dependsOn: [2] },
-      { step: 4, agent: "security", action: "Validation finale", dependsOn: [3] },
+      { step: 1, agent: "writer", action: "Préparer et nettoyer le texte source" },
+      { step: 2, agent: "translator", action: "Traduire le document", dependsOn: [1] },
+      { step: 3, agent: "proofreader", action: "Relecture de la traduction", dependsOn: [2] },
     ],
   },
   {
-    name: "new-feature-complete",
-    description: "Développement complet d'une nouvelle fonctionnalité",
-    participants: ["architect", "refactor", "test", "docs", "review"],
+    name: "recherche-redaction",
+    description: "Recherche approfondie puis rédaction documentée",
+    participants: ["researcher", "planner", "writer", "proofreader"],
     workflow: [
-      { step: 1, agent: "architect", action: "Design architectural" },
-      { step: 2, agent: "refactor", action: "Implémentation du code", dependsOn: [1] },
-      { step: 3, agent: "test", action: "Tests unitaires et d'intégration", dependsOn: [2] },
-      { step: 4, agent: "docs", action: "Documentation technique", dependsOn: [2] },
-      { step: 5, agent: "review", action: "Revue de code finale", dependsOn: [3, 4] },
+      { step: 1, agent: "researcher", action: "Recherche et collecte d'informations" },
+      { step: 2, agent: "planner", action: "Structurer les findings en plan", dependsOn: [1] },
+      { step: 3, agent: "writer", action: "Rédiger le document à partir de la recherche", dependsOn: [2] },
+      { step: 4, agent: "proofreader", action: "Relecture et vérification des sources", dependsOn: [3] },
     ],
   },
 ];
@@ -258,9 +252,9 @@ export const agentMessageSchema = z.object({
     "event",
     "broadcast",
   ]),
-  from: z.enum(["coder", "test", "docs", "refactor", "security", "review", "architect"]),
+  from: z.enum(["writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner"]),
   to: z.union([
-    z.enum(["coder", "test", "docs", "refactor", "security", "review", "architect"]),
+    z.enum(["writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner"]),
     z.literal("broadcast"),
   ]),
   priority: z.enum(["low", "medium", "high", "critical"]),

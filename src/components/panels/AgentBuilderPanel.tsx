@@ -18,29 +18,27 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const AVAILABLE_TOOLS = [
-  { id: 'read_project_file', label: 'Lire fichier', category: 'code' },
-  { id: 'write_project_file', label: 'Écrire fichier', category: 'code' },
-  { id: 'apply_patch', label: 'Appliquer un patch', category: 'code' },
-  { id: 'search_in_files', label: 'Chercher dans fichiers', category: 'code' },
-  { id: 'list_project_files', label: 'Lister fichiers', category: 'files' },
-  { id: 'system_execute_command', label: 'Exécuter commande', category: 'terminal' },
-  { id: 'git_status', label: 'Git status', category: 'git' },
-  { id: 'git_commit', label: 'Git commit', category: 'git' },
-  { id: 'git_push', label: 'Git push', category: 'git' },
+  { id: 'read_project_file', label: 'Lire fichier', category: 'lecture' },
+  { id: 'write_project_file', label: 'Écrire fichier', category: 'ecriture' },
+  { id: 'apply_patch', label: 'Appliquer un patch', category: 'ecriture' },
+  { id: 'search_in_files', label: 'Chercher dans fichiers', category: 'lecture' },
+  { id: 'list_project_files', label: 'Lister fichiers', category: 'lecture' },
+  { id: 'read_file_outline', label: 'Plan du fichier', category: 'lecture' },
+  { id: 'system_execute_command', label: 'Exécuter commande', category: 'systeme' },
   { id: 'automation_navigate', label: 'Naviguer web', category: 'web' },
   { id: 'automation_extract', label: 'Extraire web', category: 'web' },
-  { id: 'save_memory', label: 'Sauver mémoire', category: 'memory' },
-  { id: 'search_memory', label: 'Chercher mémoire', category: 'memory' },
-  { id: 'reasoning_think', label: 'Réfléchir', category: 'reasoning' },
+  { id: 'save_memory', label: 'Sauver mémoire', category: 'memoire' },
+  { id: 'search_memory', label: 'Chercher mémoire', category: 'memoire' },
+  { id: 'reasoning_think', label: 'Réfléchir', category: 'reflexion' },
   { id: 'agent_delegate', label: 'Déléguer tâche', category: 'agents' },
 ];
 
 const CAPABILITY_PRESETS = [
-  { id: 'code-rw', label: 'Lecture/Écriture code', tools: ['read_project_file', 'write_project_file', 'apply_patch', 'search_in_files'] },
-  { id: 'git-ops', label: 'Opérations Git', tools: ['git_status', 'git_commit', 'git_push'] },
-  { id: 'web-scrape', label: 'Web scraping', tools: ['automation_navigate', 'automation_extract'] },
-  { id: 'memory', label: 'Mémoire', tools: ['save_memory', 'search_memory'] },
-  { id: 'full-dev', label: 'Développeur complet', tools: ['read_project_file', 'write_project_file', 'apply_patch', 'search_in_files', 'list_project_files', 'system_execute_command', 'git_status', 'git_commit'] },
+  { id: 'redaction', label: 'Rédaction complète', tools: ['read_project_file', 'write_project_file', 'apply_patch', 'search_in_files', 'list_project_files'] },
+  { id: 'lecture-seule', label: 'Lecture seule (recherche/analyse)', tools: ['read_project_file', 'search_in_files', 'list_project_files', 'read_file_outline'] },
+  { id: 'web-research', label: 'Recherche web', tools: ['automation_navigate', 'automation_extract', 'search_memory'] },
+  { id: 'planification', label: 'Planification', tools: ['read_project_file', 'list_project_files', 'read_file_outline', 'reasoning_think'] },
+  { id: 'redacteur-complet', label: 'Rédacteur complet', tools: ['read_project_file', 'write_project_file', 'apply_patch', 'search_in_files', 'list_project_files', 'read_file_outline', 'reasoning_think', 'agent_delegate'] },
 ];
 
 const AVATAR_OPTIONS = ['🤖', '🧠', '⚡', '🔧', '🎯', '🛡️', '📝', '🔍', '🚀', '💡', '🎨', '🏗️', '📊', '🔬', '🌐', '🗂️'];
