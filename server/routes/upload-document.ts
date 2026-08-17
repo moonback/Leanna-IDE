@@ -5,6 +5,7 @@ import { withGeminiRetry } from '../utils/geminiKeyPool';
 import { ProfileConfig } from '../prompts/systemInstruction';
 import { scanPromptInjection } from '../utils/promptInjectionGuard';
 import { createLogger } from '../utils/logger';
+import { getDocumentStore } from '../knowledge/DocumentStore';
 
 const log = createLogger('UploadDocumentRoute');
 
@@ -165,6 +166,22 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
         uploadedAt: new Date().toISOString(),
       });
       if (documentContextStore.length > 5) documentContextStore.shift();
+
+      // Persister dans le DocumentStore pour l'analyse inter-documents
+      try {
+        const docStore = getDocumentStore();
+        docStore.addDocument({
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+          summary,
+          extractedText: extractedText.slice(0, 30_000),
+          uploadedAt: new Date().toISOString(),
+          originalTextLength: extractedText.length,
+          tags: [],
+        });
+      } catch (persistErr: any) {
+        log.warn('DocumentStore persistence warning:', persistErr.message);
+      }
 
       res.json({
         summary,

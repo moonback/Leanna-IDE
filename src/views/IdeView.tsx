@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspens
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.Editor })));
 // Panels - lazy loaded
 const KnowledgeDashboard = lazy(() => import('../components/panels/KnowledgeDashboard').then(m => ({ default: m.KnowledgeDashboard })));
+const DocumentPanel = lazy(() => import('../components/panels/DocumentPanel').then(m => ({ default: m.DocumentPanel })));
 const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel').then(m => ({ default: m.SandboxPanel })));
 const VisionPanel = lazy(() => import('../components/panels/VisionPanel').then(m => ({ default: m.VisionPanel })));
 import { Plus, X } from 'lucide-react';
@@ -137,6 +138,7 @@ export default function IdeView() {
   const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
   const [showKnowledge, setShowKnowledge] = useState(false);
+  const [showDocuments, setShowDocuments] = useState(false);
   const [showCheckpoints, setShowCheckpoints] = useState(false);
   const [showSandbox, setShowSandbox] = useState(false);
   const [sandboxView, setSandboxView] = useState<'controls' | 'diff'>('controls');
@@ -684,6 +686,7 @@ export default function IdeView() {
         showFleet={showFleet}
         showMissions={showMissions}
         showKnowledge={showKnowledge}
+        showDocuments={showDocuments}
         showSystemHealth={showSystemHealth}
         showMcp={showMcp}
         previewUrl={previewUrl}
@@ -716,6 +719,7 @@ export default function IdeView() {
           setShowKnowledge(v => !v);
           if (!showKnowledge) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); }
         }}
+        onToggleDocuments={() => setShowDocuments(v => !v)}
         onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
         onToggleMcp={() => setShowMcp(v => !v)}
         onToggleVision={() => setVisionEnabled(v => !v)}
@@ -893,6 +897,10 @@ export default function IdeView() {
                       ) : showKnowledge ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement du dashboard…</div></div>}>
                           <KnowledgeDashboard onClose={() => setShowKnowledge(false)} />
+                        </Suspense>
+                      ) : showDocuments ? (
+                        <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement…</div></div>}>
+                          <DocumentPanel />
                         </Suspense>
                       ) : showSettingsPanel ? (
                         <SettingsPanel

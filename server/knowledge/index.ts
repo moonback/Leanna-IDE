@@ -113,3 +113,12 @@ export {
   type MissionLearningInput,
 } from "./LearningEngine";
 
+// Sprint 11 — DocumentStore (analyse inter-documents)
+export {
+  DocumentStore,
+  getDocumentStore,
+  type StoredDocument,
+  type DocumentLink,
+  type DocumentStoreData,
+} from "./DocumentStore";
+

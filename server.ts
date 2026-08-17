@@ -52,6 +52,7 @@ import { createWorkspaceRouter } from "./server/routes/workspace";
 import { createSelfRootRouter } from "./server/routes/self-root";
 import safeguardsRouter from "./server/routes/safeguards";
 import { createUploadDocumentRouter } from "./server/routes/upload-document";
+import { createDocumentsRouter } from "./server/routes/documents";
 import skillsRouter from "./server/routes/skills";
 import mcpRouter from "./server/routes/mcp";
 import memoriesRouter from "./server/routes/memories";
@@ -465,6 +466,7 @@ async function startServer() {
   app.use("/api/safeguards", safeguardsRouter);
 
   app.use("/api/upload-document", createUploadDocumentRouter(() => currentProfile));
+  app.use("/api/documents", createDocumentsRouter(() => currentProfile));
   app.use("/api/skills", skillsRouter);
   app.use("/api/mcp", mcpRouter);
   app.use("/api/memories", memoriesRouter);

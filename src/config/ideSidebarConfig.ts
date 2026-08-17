@@ -15,7 +15,7 @@ import {
   GitBranch, Camera, Monitor,
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Cable, ShieldCheck, Container, Bot, Crosshair, Database,
-  GitBranchPlus, Activity, Wrench, Code2, Users,
+  GitBranchPlus, Activity, Wrench, Code2, Users, FileStack,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Github } from 'lucide-react';
@@ -186,6 +186,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Knowledge System',
             stateKey: 'showKnowledge',
             actionKey: 'onToggleKnowledge',
+          },
+          {
+            id: 'documents',
+            type: 'button',
+            icon: FileStack,
+            label: 'Documents (analyse croisée)',
+            stateKey: 'showDocuments',
+            actionKey: 'onToggleDocuments',
           },
           {
             id: 'system-health',
