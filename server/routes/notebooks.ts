@@ -186,6 +186,78 @@ export function createNotebooksRouter(): Router {
     }
   });
 
+  // POST /api/notebooks/:id/sources/upload-multi — Upload plusieurs fichiers simultanément
+  router.post("/:id/sources/upload-multi", upload.array("files", 20), async (req: Request, res: Response) => {
+    try {
+      const notebookId = req.params.id;
+      const notebook = notebookManager.getNotebook(notebookId);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      const files = req.files as Express.Multer.File[] | undefined;
+      if (!files || files.length === 0) {
+        res.status(400).json({ error: "Aucun fichier fourni." });
+        return;
+      }
+
+      // Ingérer chaque fichier (séquentiellement pour éviter les rate limits API)
+      const results: Array<{
+        filename: string;
+        status: "success" | "error";
+        source?: any;
+        error?: string;
+      }> = [];
+
+      for (const file of files) {
+        try {
+          const source = await sourceIngester.ingestFromBuffer(
+            file.buffer,
+            file.originalname,
+            file.mimetype,
+            notebookId
+          );
+          notebookManager.addSource(notebookId, source);
+
+          results.push({
+            filename: file.originalname,
+            status: "success",
+            source: {
+              id: source.id,
+              title: source.title,
+              type: source.type,
+              summary: source.summary,
+              keywords: source.keywords,
+              wordCount: source.wordCount,
+              chunksCount: source.chunks.length,
+              language: source.language,
+            },
+          });
+        } catch (e: any) {
+          results.push({
+            filename: file.originalname,
+            status: "error",
+            error: e.message,
+          });
+        }
+      }
+
+      const successCount = results.filter(r => r.status === "success").length;
+      const errorCount = results.filter(r => r.status === "error").length;
+
+      res.json({
+        status: errorCount === 0 ? "success" : (successCount > 0 ? "partial" : "error"),
+        total: files.length,
+        successCount,
+        errorCount,
+        results,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // POST /api/notebooks/:id/sources/url — Ingère une URL comme source
   router.post("/:id/sources/url", async (req: Request, res: Response) => {
     try {

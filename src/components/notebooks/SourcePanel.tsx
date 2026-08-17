@@ -1,13 +1,13 @@
 /**
  * SourcePanel — Gestion des sources d'un notebook
  *
- * Upload de fichiers, ingestion d'URLs, ajout de texte.
+ * Upload de fichiers (multi-fichier avec drag & drop), ingestion d'URLs, ajout de texte.
  */
 
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Upload, Globe, FileText, Trash2, Loader2, Type,
+  Upload, Globe, FileText, Trash2, Loader2, Type, CheckCircle2, XCircle,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 
@@ -30,10 +30,19 @@ interface Props {
   onRefresh: () => void;
 }
 
+/** Statut d'upload par fichier (pour le feedback visuel) */
+interface UploadFileStatus {
+  name: string;
+  status: 'pending' | 'uploading' | 'success' | 'error';
+  error?: string;
+}
+
 const TYPE_ICONS: Record<string, string> = {
   pdf: '📕', text: '📄', markdown: '📝', url: '🌐',
   html: '🌍', youtube: '📺', audio: '🎵', docx: '📘',
 };
+
+const ACCEPTED_EXTENSIONS = '.pdf,.txt,.md,.html,.docx,.doc,.rtf,.csv,.json,.yaml,.yml';
 
 export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
   const { success, error: toastError } = useToast();
@@ -43,31 +52,119 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
   const [url, setUrl] = useState('');
   const [textTitle, setTextTitle] = useState('');
   const [textContent, setTextContent] = useState('');
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadQueue, setUploadQueue] = useState<UploadFileStatus[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleUpload = useCallback(async (file: File) => {
+  // ─── Multi-file upload ──────────────────────────────────────────────────────
+
+  const handleMultiUpload = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+
     setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch(`/api/notebooks/${notebookId}/sources/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Upload failed' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
+    setUploadQueue(files.map(f => ({ name: f.name, status: 'pending' })));
+
+    if (files.length === 1) {
+      // Single file → use existing endpoint for backward compat
+      const file = files[0];
+      setUploadQueue([{ name: file.name, status: 'uploading' }]);
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch(`/api/notebooks/${notebookId}/sources/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({ error: 'Upload failed' }));
+          throw new Error(d.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        setUploadQueue([{ name: file.name, status: 'success' }]);
+        success(`Source "${data.source.title}" ajoutée (${data.source.wordCount} mots, ${data.source.chunksCount} chunks)`);
+        onRefresh();
+      } catch (e: any) {
+        setUploadQueue([{ name: file.name, status: 'error', error: e.message }]);
+        toastError(e.message);
       }
-      const data = await res.json();
-      success(`Source "${data.source.title}" ajoutée (${data.source.wordCount} mots, ${data.source.chunksCount} chunks)`);
-      onRefresh();
-    } catch (e: any) {
-      toastError(e.message);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+    } else {
+      // Multi-file → use batch endpoint
+      setUploadQueue(files.map(f => ({ name: f.name, status: 'uploading' })));
+      try {
+        const formData = new FormData();
+        for (const file of files) {
+          formData.append('files', file);
+        }
+        const res = await fetch(`/api/notebooks/${notebookId}/sources/upload-multi`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({ error: 'Upload failed' }));
+          throw new Error(d.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+
+        // Mettre à jour les statuts individuels
+        setUploadQueue(data.results.map((r: any) => ({
+          name: r.filename,
+          status: r.status,
+          error: r.error,
+        })));
+
+        if (data.successCount > 0) {
+          success(`${data.successCount}/${data.total} source(s) ajoutée(s)`);
+          onRefresh();
+        }
+        if (data.errorCount > 0) {
+          toastError(`${data.errorCount} fichier(s) en erreur`);
+        }
+      } catch (e: any) {
+        setUploadQueue(files.map(f => ({ name: f.name, status: 'error', error: e.message })));
+        toastError(e.message);
+      }
     }
+
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    // Effacer la queue après 4s
+    setTimeout(() => setUploadQueue([]), 4000);
   }, [notebookId, success, toastError, onRefresh]);
+
+  // ─── Drag & Drop handlers ──────────────────────────────────────────────────
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length > 0) {
+      handleMultiUpload(droppedFiles);
+    }
+  }, [handleMultiUpload]);
+
+  // ─── File input change (supports multiple) ─────────────────────────────────
+
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      handleMultiUpload(files);
+    }
+  }, [handleMultiUpload]);
 
   const handleUrlIngest = useCallback(async () => {
     if (!url.trim()) return;
@@ -129,7 +226,68 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
   }, [notebookId, success, toastError, onRefresh]);
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar p-5 lg:p-7 space-y-4">
+    <div
+      className="h-full overflow-y-auto custom-scrollbar p-5 lg:p-7 space-y-4 relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag & Drop Overlay */}
+      <AnimatePresence>
+        {dragOver && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-2xl"
+            style={{
+              backgroundColor: 'rgba(var(--accent-primary-rgb, 99, 102, 241), 0.08)',
+              border: '2px dashed var(--accent-primary)',
+              backdropFilter: 'blur(2px)',
+            }}
+          >
+            <Upload className="w-10 h-10" style={{ color: 'var(--accent-primary)' }} />
+            <p className="text-sm font-semibold" style={{ color: 'var(--accent-primary)' }}>
+              Déposez vos fichiers ici
+            </p>
+            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              PDF, texte, Markdown, HTML, DOCX, CSV, JSON, YAML
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Upload progress queue */}
+      <AnimatePresence>
+        {uploadQueue.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-3 rounded-xl border space-y-1.5"
+              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
+              <p className="text-[10px] font-medium" style={{ color: 'var(--text-dimmed)' }}>
+                Upload {uploadQueue.filter(f => f.status === 'success').length}/{uploadQueue.length}
+              </p>
+              {uploadQueue.map((f, i) => (
+                <div key={i} className="flex items-center gap-2 text-[10px]">
+                  {f.status === 'pending' && <Loader2 className="w-3 h-3 opacity-30" />}
+                  {f.status === 'uploading' && <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--accent-primary)' }} />}
+                  {f.status === 'success' && <CheckCircle2 className="w-3 h-3" style={{ color: 'var(--color-success, #22c55e)' }} />}
+                  {f.status === 'error' && <XCircle className="w-3 h-3" style={{ color: 'var(--color-error, #ef4444)' }} />}
+                  <span className="truncate flex-1" style={{ color: f.status === 'error' ? 'var(--color-error, #ef4444)' : 'var(--text-primary)' }}>
+                    {f.name}
+                  </span>
+                  {f.error && <span className="text-[9px] opacity-60 truncate max-w-[120px]">{f.error}</span>}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Actions */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
@@ -144,8 +302,9 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.txt,.md,.html,.docx,.doc,.csv,.json,.yaml,.yml"
-          onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); }}
+          multiple
+          accept={ACCEPTED_EXTENSIONS}
+          onChange={handleFileInputChange}
           className="hidden"
         />
 
@@ -247,13 +406,17 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
 
       {/* Sources List */}
       {sources.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-4">
+        <div
+          className="flex flex-col items-center justify-center py-12 gap-4 rounded-2xl border-2 border-dashed transition-colors"
+          style={{ borderColor: dragOver ? 'var(--accent-primary)' : 'var(--border-base)' }}
+        >
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'var(--bg-panel)' }}>
             <FileText className="w-7 h-7" style={{ color: 'var(--text-dimmed)' }} />
           </div>
           <p className="text-xs text-center max-w-xs" style={{ color: 'var(--text-dimmed)' }}>
-            Ajoutez des sources (PDF, URLs, textes) pour alimenter votre notebook.
-            L'IA pourra ensuite répondre à vos questions en citant ces documents.
+            Glissez-déposez vos fichiers ici, ou utilisez les boutons ci-dessus.
+            <br />
+            <span className="opacity-60">PDF, texte, Markdown, HTML, DOCX, CSV, JSON, YAML</span>
           </p>
         </div>
       ) : (
