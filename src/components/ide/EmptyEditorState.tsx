@@ -5,7 +5,8 @@ import {
   Plus, X, FolderOpen, FileText,
   MessageSquare, FolderPlus,
   Code2, GitBranch, BrainCircuit,
-  Circle, Search,
+  Circle, Search, ChevronRight, Trash2,
+  Command,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState';
@@ -65,7 +66,7 @@ function resolveMode(
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
     <kbd
-      className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1 text-[9px] font-mono font-medium"
+      className="inline-flex items-center justify-center h-[19px] min-w-[19px] px-1.5 text-[9.5px] font-mono font-medium tracking-wide"
       style={{
         color: 'var(--text-muted)',
         backgroundColor: 'var(--bg-input)',
@@ -79,6 +80,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Fond de particules ──────────────────────────────────────────────────
+// (moteur inchangé — c'est déjà la partie la plus soignée du composant)
 
 const BASE_PARTICLE_DENSITY = 0.000055; // particules par pixel²
 const MIN_PARTICLES = 14;
@@ -103,8 +105,6 @@ const ParticleField = React.memo(function ParticleField({
 }: ParticleFieldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: -9999, y: -9999, active: false });
-  // Garde en mémoire l'état "connected" précédent pour détecter le
-  // passage disconnected → connected (déclencheur de l'explosion).
   const prevConnectedRef = useRef(connected);
 
   useEffect(() => {
@@ -113,13 +113,12 @@ const ParticleField = React.memo(function ParticleField({
     const ctx = canvas.getContext('2d')!;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    // L'agent vient tout juste de se connecter : on déclenche le "crash".
     const burstActive = connected && !prevConnectedRef.current;
     prevConnectedRef.current = connected;
 
     type Particle = {
       x: number; y: number; vx: number; vy: number;
-      phase: number; z: number; // z: 0 (loin) → 1 (proche)
+      phase: number; z: number;
     };
     let particles: Particle[] = [];
 
@@ -132,8 +131,6 @@ const ParticleField = React.memo(function ParticleField({
       particles = Array.from({ length: count }, () => {
         const z = 0.35 + Math.random() * 0.65;
         if (burst) {
-          // Naissance groupée près du centre, projection radiale
-          // à haute vitesse → effet d'éclatement / collision.
           const angle = Math.random() * Math.PI * 2;
           const startDist = Math.random() * Math.min(w, h) * 0.12;
           const speed = (2.6 + Math.random() * 2.6) * z;
@@ -171,9 +168,6 @@ const ParticleField = React.memo(function ParticleField({
     };
     resize();
 
-    // Les redimensionnements ultérieurs ne doivent jamais redéclencher
-    // l'explosion : seule la toute première résolution (au montage /
-    // à la reconnexion) peut être un burst.
     const roResize = () => {
       const parent = canvas.parentElement;
       if (!parent) return;
@@ -203,12 +197,10 @@ const ParticleField = React.memo(function ParticleField({
     let time = 0;
     let rafId: number;
 
-    // Cursor glow — position lissée avec inertie
     let smoothMouseX = -9999;
     let smoothMouseY = -9999;
-    let cursorGlowAlpha = 0; // fade in/out progressif
+    let cursorGlowAlpha = 0;
 
-    // Smooth color interpolation: [r, g, b]
     let smoothR = 56, smoothG = 189, smoothB = 248;
 
     function parseColor(rgb: string): [number, number, number] {
@@ -226,14 +218,13 @@ const ParticleField = React.memo(function ParticleField({
       const inputAmp = getInputAmplitude();
       const outputAmp = getOutputAmplitude();
       const rawAudio = Math.max(inputAmp, outputAmp);
-      // Attaque rapide, relâchement lent
       smoothAudio += (rawAudio - smoothAudio) * (rawAudio > smoothAudio ? 0.75 : 0.12);
 
       const mode = resolveMode(connected, isBusy, inputAmp, outputAmp);
       if (isBusy && activeTool) currentToolColor = toolColor(activeTool);
 
-      // Paramètres par mode
-      let targetSpeed = BASE_SPEED;      let connDist = 120;
+      let targetSpeed = BASE_SPEED;
+      let connDist = 120;
       let lineAlpha = 0.20;
       let dotR = 1.8;
       let haloR = 5;
@@ -285,7 +276,6 @@ const ParticleField = React.memo(function ParticleField({
           break;
       }
 
-      // Interpolation douce vers la couleur cible
       const lerpRate = 0.04;
       const [tr, tg, tb] = parseColor(targetColor);
       smoothR += (tr - smoothR) * lerpRate;
@@ -296,7 +286,6 @@ const ParticleField = React.memo(function ParticleField({
       smoothSpeed += (targetSpeed - smoothSpeed) * 0.18;
       ctx.clearRect(0, 0, w, h);
 
-      // Fond radial ambiant coloré (suit la couleur interpolée)
       const ambientAlpha = mode === 'disconnected' ? 0.03 : 0.07 + smoothAudio * 0.08;
       const ambient = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.65);
       ambient.addColorStop(0, `rgba(${primaryColor}, ${ambientAlpha})`);
@@ -304,10 +293,8 @@ const ParticleField = React.memo(function ParticleField({
       ctx.fillStyle = ambient;
       ctx.fillRect(0, 0, w, h);
 
-      // ── Effet de "crash" à l'activation de l'agent ──
       const burstProgress = burstActive ? Math.min(time / BURST_DURATION, 1) : 1;
       if (burstActive && time < BURST_DURATION) {
-        // Flash bref au centre
         if (time < 0.35) {
           const flashAlpha = (1 - time / 0.35) * 0.38;
           const flash = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.42);
@@ -316,7 +303,6 @@ const ParticleField = React.memo(function ParticleField({
           ctx.fillStyle = flash;
           ctx.fillRect(0, 0, w, h);
         }
-        // Onde de choc qui se propage puis s'estompe
         const ringRadius = burstProgress * Math.max(w, h) * 0.6;
         const ringAlpha = (1 - burstProgress) * 0.55;
         ctx.beginPath();
@@ -329,27 +315,21 @@ const ParticleField = React.memo(function ParticleField({
       const mouse = mouseRef.current;
       const mouseRadius = 90;
 
-      // ── Cursor Glow volumétrique avec inertie ──
       if (mouse.active) {
-        // Inertie : la lumière glisse derrière le curseur
         const lerpMouse = 0.08;
         if (smoothMouseX < -9000) {
-          // Premier frame où la souris est active : pas de lerp, snap direct
           smoothMouseX = mouse.x;
           smoothMouseY = mouse.y;
         } else {
           smoothMouseX += (mouse.x - smoothMouseX) * lerpMouse;
           smoothMouseY += (mouse.y - smoothMouseY) * lerpMouse;
         }
-        // Fade-in progressif
         cursorGlowAlpha += (1 - cursorGlowAlpha) * 0.12;
       } else {
-        // Fade-out quand la souris quitte le canvas
         cursorGlowAlpha += (0 - cursorGlowAlpha) * 0.06;
       }
 
       if (cursorGlowAlpha > 0.005 && smoothMouseX > -9000) {
-        // Intensité et rayon de base selon le mode
         let glowIntensity = 0.22;
         let glowRadius = 520;
         switch (mode) {
@@ -377,7 +357,6 @@ const ParticleField = React.memo(function ParticleField({
 
         const baseAlpha = glowIntensity * cursorGlowAlpha;
 
-        // ── Grande nappe de fond : couvre une large zone, très douce ──
         const bgNappeR = glowRadius * 1.8;
         const bgNappe = ctx.createRadialGradient(
           smoothMouseX, smoothMouseY, 0,
@@ -390,7 +369,6 @@ const ParticleField = React.memo(function ParticleField({
         ctx.fillStyle = bgNappe;
         ctx.fillRect(0, 0, w, h);
 
-        // ── Lobes nuageux : 7 volumes qui ondulent indépendamment ──
         const lobes = [
           { ox: 0,    oy: 0,     rMul: 1.0,  aMul: 0.85, phase: 0,   spd: 0.5 },
           { ox: 0.55, oy: -0.35, rMul: 0.78, aMul: 0.6,  phase: 1.1, spd: 0.65 },
@@ -402,9 +380,8 @@ const ParticleField = React.memo(function ParticleField({
         ];
 
         for (const lobe of lobes) {
-          // Chaque lobe dérive avec sa propre fréquence
           const breathe = 1 + 0.22 * Math.sin(time * lobe.spd * 1.4 + lobe.phase);
-          const wobble = 0.45; // amplitude relative du déplacement
+          const wobble = 0.45;
           const driftX = Math.sin(time * lobe.spd + lobe.phase) * glowRadius * wobble * lobe.ox
                        + Math.cos(time * lobe.spd * 0.7 + lobe.phase * 1.3) * glowRadius * 0.12;
           const driftY = Math.cos(time * lobe.spd * 0.85 + lobe.phase + 1.0) * glowRadius * wobble * lobe.oy
@@ -426,7 +403,6 @@ const ParticleField = React.memo(function ParticleField({
           ctx.fillRect(0, 0, w, h);
         }
 
-        // ── Filaments secondaires : petits éclats qui tournent autour ──
         const filamentCount = 4;
         for (let i = 0; i < filamentCount; i++) {
           const angle = (Math.PI * 2 / filamentCount) * i + time * 0.3;
@@ -444,7 +420,6 @@ const ParticleField = React.memo(function ParticleField({
           ctx.fillRect(0, 0, w, h);
         }
 
-        // ── Noyau chaud : source lumineuse visible au centre ──
         const coreR = glowRadius * 0.22;
         const coreAlpha = baseAlpha * 1.6;
         const coreGrad = ctx.createRadialGradient(
@@ -459,7 +434,6 @@ const ParticleField = React.memo(function ParticleField({
         ctx.fillRect(0, 0, w, h);
       }
 
-      // Déplacement des particules
       for (const p of particles) {
         if (orbitStrength > 0) {
           const dx = p.x - cx;
@@ -472,7 +446,6 @@ const ParticleField = React.memo(function ParticleField({
           p.vx += (cx - p.x) * convergence * 0.0003;
           p.vy += (cy - p.y) * convergence * 0.0003;
         }
-        // Répulsion douce autour du curseur
         if (mouse.active) {
           const dx = p.x - mouse.x;
           const dy = p.y - mouse.y;
@@ -495,7 +468,6 @@ const ParticleField = React.memo(function ParticleField({
         if (p.y <= 0 || p.y >= h) { p.vy *= -1; p.y = Math.max(0, Math.min(h, p.y)); }
       }
 
-      // Connexions
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
@@ -509,7 +481,6 @@ const ParticleField = React.memo(function ParticleField({
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
             if (mode === 'working') {
-              // Dégradé bicolore sur les connexions : outil → idle
               const grad = ctx.createLinearGradient(
                 particles[i].x, particles[i].y,
                 particles[j].x, particles[j].y,
@@ -526,7 +497,6 @@ const ParticleField = React.memo(function ParticleField({
         }
       }
 
-      // Points et halos
       for (const p of particles) {
         const pulse = 1 + 0.12 * Math.sin(time * 1.6 + p.phase);
         const r = dotR * pulse * p.z;
@@ -576,7 +546,7 @@ function useRecentFiles(): [RecentFile[], (files: RecentFile[]) => void, () => v
       const stored = localStorage.getItem('jarvis_recent_files');
       if (stored) {
         const parsed = JSON.parse(stored) as RecentFile[];
-        setFiles(parsed.slice(0, 3));
+        setFiles(parsed.slice(0, 4));
       }
     } catch {
       // ignore
@@ -584,7 +554,7 @@ function useRecentFiles(): [RecentFile[], (files: RecentFile[]) => void, () => v
   }, []);
 
   const updateFiles = useCallback((newFiles: RecentFile[]) => {
-    setFiles(newFiles.slice(0, 3));
+    setFiles(newFiles.slice(0, 4));
     localStorage.setItem('jarvis_recent_files', JSON.stringify(newFiles));
   }, []);
 
@@ -632,97 +602,84 @@ function CapabilitiesModal({ onClose, aiName }: CapabilitiesModalProps) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={onClose}
     >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/65 backdrop-blur-md" />
       <motion.div
-        className="relative w-full max-w-md max-h-[75vh] overflow-hidden flex flex-col"
+        className="relative w-full max-w-sm max-h-[75vh] overflow-hidden flex flex-col"
         style={{
           background: 'var(--bg-secondary)',
           border: '1px solid var(--border-base)',
           borderRadius: 'var(--radius-xl)',
           boxShadow: 'var(--shadow-xl)',
         }}
-        initial={{ scale: 0.96, y: 8, opacity: 0 }}
+        initial={{ scale: 0.97, y: 10, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
-        exit={{ scale: 0.96, y: 8, opacity: 0 }}
-        transition={{ duration: 0.18 }}
+        exit={{ scale: 0.97, y: 10, opacity: 0 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div
-          className="flex items-center justify-between px-5 py-3.5 border-b"
+          className="flex items-center justify-between px-5 py-4 border-b"
           style={{ borderColor: 'var(--border-base)' }}
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
             <div
-              className="w-7 h-7 flex items-center justify-center"
+              className="w-8 h-8 flex items-center justify-center"
               style={{
                 backgroundColor: 'var(--accent-subtle)',
                 borderRadius: 'var(--radius-md)',
               }}
             >
-              <BrainCircuit className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
+              <BrainCircuit className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
             </div>
             <div>
-              <h2 className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Capacités IA
+              <h2 className="text-[13px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                Capacités
               </h2>
-              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                Modules de {aiName}
+              <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                Modules actifs de {aiName}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="w-7 h-7 flex items-center justify-center transition-colors"
-            style={{
-              color: 'var(--ctrl-icon)',
-              borderRadius: 'var(--radius-md)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--ctrl-hover)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
+            style={{ color: 'var(--ctrl-icon)', borderRadius: 'var(--radius-md)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--ctrl-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-3 py-2.5">
-          {capabilities.map(({ icon: Icon, label, desc }) => (
+        <div className="flex-1 overflow-y-auto px-2.5 py-2">
+          {capabilities.map(({ icon: Icon, label, desc }, i) => (
             <div
               key={label}
-              className="flex items-start gap-2.5 px-2.5 py-2.5 transition-colors"
-              style={{ borderRadius: 'var(--radius-md)' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--ctrl-hover)';
+              className="flex items-start gap-3 px-3 py-3 transition-colors"
+              style={{
+                borderRadius: 'var(--radius-md)',
+                borderTop: i === 0 ? 'none' : '1px solid transparent',
               }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--ctrl-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
             >
               <div
-                className="w-7 h-7 flex items-center justify-center flex-shrink-0 mt-0.5"
-                style={{
-                  backgroundColor: 'var(--bg-input)',
-                  borderRadius: 'var(--radius-md)',
-                }}
+                className="w-8 h-8 flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: 'var(--bg-input)', borderRadius: 'var(--radius-md)' }}
               >
-                <Icon size={12} style={{ color: 'var(--ctrl-icon)' }} />
+                <Icon size={13} style={{ color: 'var(--ctrl-icon)' }} />
               </div>
-              <div className="min-w-0">
-                <span className="text-[11px] font-medium block" style={{ color: 'var(--text-primary)' }}>
+              <div className="min-w-0 pt-0.5">
+                <span className="text-[11.5px] font-medium block mb-0.5" style={{ color: 'var(--text-primary)' }}>
                   {label}
                 </span>
-                <span className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                <span className="text-[10.5px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                   {desc}
                 </span>
               </div>
@@ -759,16 +716,13 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const { theme } = useTheme();
   const disconnectedBg = theme === 'dark' ? disconnectedBgDark : disconnectedBgLight;
 
-  // États locaux
   const [showCapabilities, setShowCapabilities] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSystem, setShowSystem] = useState(false);
 
-  // Données externes
   const [recentFiles, setRecentFiles, clearRecentFiles] = useRecentFiles();
   const gitInfo = useGitInfo();
 
-  // Greeting mémorisé
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Bonjour';
@@ -776,7 +730,6 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     return 'Bonsoir';
   }, []);
 
-  // Gestion des raccourcis clavier
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
@@ -794,7 +747,6 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     return () => window.removeEventListener('keydown', handler);
   }, [onCreateFile, onShowSettings]);
 
-  // Ouverture d'un fichier récent
   const handleOpenRecent = useCallback(
     async (filePath: string) => {
       try {
@@ -805,21 +757,18 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
           { headers }
         );
         if (!response.ok) {
-          // Le fichier n'existe plus : on le retire de la liste
           const updated = recentFiles.filter((f) => f.path !== filePath);
           setRecentFiles(updated);
           return;
         }
         onOpenFile(filePath);
       } catch {
-        // En cas d'erreur réseau, on tente d'ouvrir quand même (l'éditeur gèrera)
         onOpenFile(filePath);
       }
     },
     [recentFiles, setRecentFiles, onOpenFile]
   );
 
-  // Gestionnaires des modales (mémorisés)
   const openCapabilities = useCallback(() => setShowCapabilities(true), []);
   const closeCapabilities = useCallback(() => setShowCapabilities(false), []);
   const openShortcuts = useCallback(() => setShowShortcuts(true), []);
@@ -827,7 +776,6 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const openSystem = useCallback(() => setShowSystem(true), []);
   const closeSystem = useCallback(() => setShowSystem(false), []);
 
-  // Toggle : ouvrir automatiquement le panneau chat à la connexion
   const [autoOpenChat, setAutoOpenChat] = useState<boolean>(() => {
     try {
       const stored = localStorage.getItem('jarvis:autoOpenChat');
@@ -843,10 +791,11 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     });
   }, []);
 
-  // Toggle fichier / dossier pour la carte "Nouveau"
   const [createMode, setCreateMode] = useState<'file' | 'folder'>('file');
+  const toggleCreateMode = useCallback(() => {
+    setCreateMode((prev) => (prev === 'file' ? 'folder' : 'file'));
+  }, []);
 
-  // Handler Chat IA : connecte l'assistant si nécessaire, puis ouvre le panneau chat
   const handleOpenChat = useCallback(() => {
     if (!connected) {
       connect([], 'full');
@@ -856,19 +805,9 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     }
   }, [connected, connect, onOpenChat, autoOpenChat]);
 
-  // Raccourcis pour les actions
-  const actions = useMemo(
-    () => [
-      { label: createMode === 'file' ? 'Nouveau fichier' : 'Nouveau dossier', desc: createMode === 'file' ? 'Créer un fichier dans le projet actif' : 'Créer un dossier dans le projet actif', icon: createMode === 'file' ? Plus : FolderPlus, onClick: createMode === 'file' ? onCreateFile : onCreateFolder, shortcut: `${MOD}+N`, id: 'new-file' },
-      { label: 'Chat IA', desc: `Discuter avec ${profile.aiName || 'l\'agent'}`, icon: MessageSquare, onClick: handleOpenChat, shortcut: `${MOD}+L`, id: 'chat-ia' },
-    ],
-    [onCreateFile, onCreateFolder, createMode, handleOpenChat, profile.aiName]
-  );
-
-  // Liens rapides
   const quickLinks = useMemo(
     () => [
-      { label: 'Capacités IA', onClick: openCapabilities },
+      { label: 'Capacités', onClick: openCapabilities },
       { label: 'Raccourcis', onClick: openShortcuts },
       { label: 'Système', onClick: openSystem },
     ],
@@ -877,11 +816,10 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
   return (
     <div
-      className="flex flex-1 flex-col items-center justify-center overflow-y-auto py-10 relative"
+      className="flex flex-1 flex-col overflow-y-auto relative"
       style={{ backgroundColor: 'var(--bg-base)' }}
     >
-      {/* Fond : image statique si déconnecté, particules si connecté */}
-      {/* Fond image — toujours visible, opacité réduite pour ne pas rivaliser avec le contenu */}
+      {/* ── Fond ── */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -889,18 +827,16 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          opacity: 0.35,
+          opacity: 0.28,
         }}
       />
-      {/* Overlay gradient : assombrit les bords, focus sur le centre */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse 60% 55% at 50% 45%, transparent 0%, var(--bg-base) 100%)',
+          background: 'radial-gradient(ellipse 65% 60% at 30% 40%, transparent 0%, var(--bg-base) 100%)',
         }}
       />
 
-      {/* Particules + glow par-dessus l'image quand l'agent est actif */}
       {connected && (
         <>
           <ParticleField
@@ -914,250 +850,260 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             className="absolute inset-0 pointer-events-none"
             style={{
               background:
-                'radial-gradient(ellipse 50% 40% at 50% 38%, var(--accent-subtle) 0%, transparent 70%)',
+                'radial-gradient(ellipse 45% 35% at 32% 34%, var(--accent-subtle) 0%, transparent 70%)',
             }}
           />
         </>
       )}
 
+      {/* ── Barre méta supérieure : statut, workspace, git ── */}
       <motion.div
-        className="w-full max-w-[680px] px-8 py-10 relative z-10"
-        style={{
-          backgroundColor: 'var(--bg-panel)',
-          border: '1px solid var(--border-base)',
-          borderRadius: 'var(--radius-2xl)',
-          boxShadow: 'var(--shadow-xl)',
-          backdropFilter: 'blur(22px)',
-        }}
-        initial={{ opacity: 0, y: 8 }}
+        className="relative z-10 flex items-center gap-4 px-8 pt-6 pb-2 text-[10.5px] font-mono"
+        initial={{ opacity: 0, y: -4 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, ease: 'easeOut' }}
+        transition={{ duration: 0.3 }}
       >
-        {/* ── Header : statut + salutation ── */}
-        <motion.div
-          className="text-center mb-8"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.05 }}
-        >
-          <div className="flex items-center justify-center mb-4">
-            <div
-              className="flex items-center gap-2 px-3 py-1.5"
-              style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border-base)',
-                borderRadius: 'var(--radius-full)',
-              }}
-            >
-              <span
-                className="w-[6px] h-[6px] rounded-full"
-                style={{
-                  backgroundColor: connected ? 'var(--color-success)' : 'var(--color-warning)',
-                  boxShadow: connected
-                    ? '0 0 6px var(--color-success)'
-                    : '0 0 6px var(--color-warning)',
-                }}
-              />
-              <span
-                className="text-[10px] font-mono uppercase tracking-[0.12em]"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                {profile.aiName || 'Leanna'} · {connected ? 'en ligne' : 'hors ligne'}
-              </span>
-            </div>
-          </div>
-          <h1
-            className="text-[24px] font-semibold tracking-tight"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {profile.userName ? `${greeting}, ${profile.userName}` : greeting}
-          </h1>
-        </motion.div>
+        <span className="flex items-center gap-1.5">
+          <span
+            className="w-[6px] h-[6px] rounded-full flex-shrink-0"
+            style={{
+              backgroundColor: connected ? 'var(--color-success)' : 'var(--color-warning)',
+              boxShadow: connected ? '0 0 6px var(--color-success)' : '0 0 6px var(--color-warning)',
+            }}
+          />
+          <span style={{ color: 'var(--text-muted)' }}>
+            {connected ? 'en ligne' : 'hors ligne'}
+          </span>
+        </span>
 
-        {/* Cartes d'action */}
-        <motion.div
-          className="grid grid-cols-2 gap-3 mb-5"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.12 }}
-        >
-          {actions.map(({ label, desc, icon: Icon, onClick, shortcut, id }) => (
-            <div key={label} className="flex">
+        {ws.workspace && (
+          <>
+            <span className="w-px h-3" style={{ backgroundColor: 'var(--border-base)' }} />
+            <span className="flex items-center gap-1.5" style={{ color: 'var(--text-dimmed)' }}>
+              <FolderOpen size={11} />
+              {ws.workspace.path.split(/[/\\]/).pop()}
+            </span>
+          </>
+        )}
+
+        {gitInfo && (
+          <>
+            <span className="w-px h-3" style={{ backgroundColor: 'var(--border-base)' }} />
+            <span className="flex items-center gap-1.5" style={{ color: 'var(--text-dimmed)' }}>
+              <GitBranch size={11} />
+              {gitInfo.branch}
+            </span>
+          </>
+        )}
+
+        <span className="ml-auto flex items-center gap-3">
+          {quickLinks.map(({ label, onClick }, idx) => (
+            <React.Fragment key={label}>
+              {idx > 0 && <span className="w-px h-3" style={{ backgroundColor: 'var(--border-base)' }} />}
               <button
                 onClick={onClick}
-                disabled={!onClick}
-                className="group flex flex-col items-start gap-3 p-4 text-left transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none w-full justify-between"
+                className="transition-colors"
+                style={{ color: 'var(--text-dimmed)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-dimmed)'; }}
+              >
+                {label}
+              </button>
+            </React.Fragment>
+          ))}
+        </span>
+      </motion.div>
+
+      {/* ── Corps principal ── */}
+      <div className="relative z-10 flex-1 flex flex-col justify-center px-8 py-10">
+        <div className="w-full max-w-[560px] mx-auto md:mx-0 md:ml-[8%]">
+
+          {/* Salutation — grande, ancrée à gauche, asymétrique */}
+          <motion.h1
+            className="text-[34px] leading-[1.08] font-semibold tracking-[-0.02em] mb-1.5"
+            style={{ color: 'var(--text-primary)' }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.05 }}
+          >
+            {profile.userName ? `${greeting}, ${profile.userName}.` : `${greeting}.`}
+          </motion.h1>
+          <motion.p
+            className="text-[13px] mb-9"
+            style={{ color: 'var(--text-muted)' }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.1 }}
+          >
+            {profile.aiName || 'Leanna'} est {connected ? 'prête à travailler avec vous' : 'en attente de connexion'}.
+          </motion.p>
+
+          {/* ── Actions primaires ── */}
+          <motion.div
+            className="flex flex-col gap-2.5 mb-8"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.15 }}
+          >
+            {/* Chat IA — action mise en avant */}
+            <div className="flex">
+              <button
+                onClick={handleOpenChat}
+                className="group relative flex items-center gap-3.5 flex-1 px-4 py-3.5 text-left transition-all duration-200 overflow-hidden"
+                style={{
+                  backgroundColor: 'var(--accent-primary)',
+                  borderRadius: 'var(--radius-lg)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.filter = 'brightness(1.06)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.filter = 'brightness(1)'; }}
+              >
+                <div
+                  className="w-9 h-9 flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 'var(--radius-md)' }}
+                >
+                  <MessageSquare size={15} className="text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12.5px] font-semibold text-white">
+                    Discuter avec {profile.aiName || 'l\'agent'}
+                  </div>
+                  <div className="text-[10.5px] text-white/70 truncate">
+                    Ouvrir la session vocale et texte
+                  </div>
+                </div>
+                <Kbd>{MOD}+L</Kbd>
+                <ChevronRight size={14} className="text-white/50 flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleAutoOpenChat(); }}
+                title={autoOpenChat ? 'Ouverture auto du panneau : activée' : 'Ouverture auto du panneau : désactivée'}
+                className="ml-2 w-[42px] flex items-center justify-center flex-shrink-0 transition-colors"
                 style={{
                   backgroundColor: 'var(--bg-secondary)',
                   border: '1px solid var(--border-base)',
-                  borderRadius: 'var(--radius-xl)',
+                  borderRadius: 'var(--radius-lg)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-base)'; }}
+              >
+                <span
+                  className="w-[7px] h-[7px] rounded-full transition-colors"
+                  style={{ backgroundColor: autoOpenChat ? 'var(--accent-primary)' : 'var(--text-dimmed)' }}
+                />
+              </button>
+            </div>
+
+            {/* Nouveau fichier / dossier — action secondaire */}
+            <div className="flex">
+              <button
+                onClick={createMode === 'file' ? onCreateFile : onCreateFolder}
+                className="group flex items-center gap-3.5 flex-1 px-4 py-3.5 text-left transition-all duration-200"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-base)',
+                  borderRadius: 'var(--radius-lg)',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = 'var(--accent-primary)';
                   e.currentTarget.style.backgroundColor = 'var(--bg-panel)';
-                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(56,189,248,0.08), var(--shadow-sm)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.borderColor = 'var(--border-base)';
                   e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.transform = 'none';
                 }}
               >
-                <div className="flex items-center justify-between w-full">
-                  <div
-                    className="w-9 h-9 flex items-center justify-center"
-                    style={{
-                      backgroundColor: 'var(--accent-subtle)',
-                      borderRadius: 'var(--radius-md)',
-                    }}
-                  >
-                    <Icon size={15} style={{ color: 'var(--accent-primary)' }} />
-                  </div>
-                  {shortcut && <Kbd>{shortcut}</Kbd>}
+                <div
+                  className="w-9 h-9 flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: 'var(--accent-subtle)', borderRadius: 'var(--radius-md)' }}
+                >
+                  {createMode === 'file' ? (
+                    <Plus size={15} style={{ color: 'var(--accent-primary)' }} />
+                  ) : (
+                    <FolderPlus size={15} style={{ color: 'var(--accent-primary)' }} />
+                  )}
                 </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    {label}
-                  </span>
-                  <span className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                    {desc}
-                  </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {createMode === 'file' ? 'Nouveau fichier' : 'Nouveau dossier'}
+                  </div>
+                  <div className="text-[10.5px] truncate" style={{ color: 'var(--text-muted)' }}>
+                    Dans le projet actif
+                  </div>
                 </div>
-
-                {/* Toggle intégré — uniquement sur la carte Chat IA */}
-                {id === 'chat-ia' && (
-                  <div
-                    className="flex items-center justify-between w-full mt-2 pt-2.5"
-                    style={{ borderTop: '1px solid var(--border-base)' }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                      Ouvrir le panneau
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleAutoOpenChat(); }}
-                      className="relative w-[28px] h-[14px] rounded-full transition-colors duration-200"
-                      style={{
-                        backgroundColor: autoOpenChat ? 'var(--accent-primary)' : 'var(--bg-ctrl)',
-                        border: `1px solid ${autoOpenChat ? 'var(--accent-primary)' : 'var(--border-base)'}`,
-                      }}
-                      aria-label={autoOpenChat ? 'Désactiver ouverture auto du panneau chat' : 'Activer ouverture auto du panneau chat'}
-                      aria-pressed={autoOpenChat}
-                    >
-                      <div
-                        className="absolute top-[1.5px] w-[9px] h-[9px] rounded-full transition-all duration-200"
-                        style={{
-                          left: autoOpenChat ? '15px' : '2px',
-                          backgroundColor: autoOpenChat ? '#fff' : 'var(--text-muted)',
-                          boxShadow: autoOpenChat ? '0 0 4px rgba(56,189,248,0.4)' : 'none',
-                        }}
-                      />
-                    </button>
-                  </div>
-                )}
-
-                {/* Toggle fichier / dossier — uniquement sur la carte Nouveau */}
-                {id === 'new-file' && (
-                  <div
-                    className="flex items-center justify-between w-full mt-2 pt-2.5"
-                    style={{ borderTop: '1px solid var(--border-base)' }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                      Dossier
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); setCreateMode(prev => prev === 'file' ? 'folder' : 'file'); }}
-                      className="relative w-[28px] h-[14px] rounded-full transition-colors duration-200"
-                      style={{
-                        backgroundColor: createMode === 'folder' ? 'var(--accent-primary)' : 'var(--bg-ctrl)',
-                        border: `1px solid ${createMode === 'folder' ? 'var(--accent-primary)' : 'var(--border-base)'}`,
-                      }}
-                      aria-label={createMode === 'folder' ? 'Passer en mode fichier' : 'Passer en mode dossier'}
-                      aria-pressed={createMode === 'folder'}
-                    >
-                      <div
-                        className="absolute top-[1.5px] w-[9px] h-[9px] rounded-full transition-all duration-200"
-                        style={{
-                          left: createMode === 'folder' ? '15px' : '2px',
-                          backgroundColor: createMode === 'folder' ? '#fff' : 'var(--text-muted)',
-                          boxShadow: createMode === 'folder' ? '0 0 4px rgba(56,189,248,0.4)' : 'none',
-                        }}
-                      />
-                    </button>
-                  </div>
-                )}
+                <Kbd>{MOD}+N</Kbd>
               </button>
-            </div>
-          ))}
-        </motion.div>
-
-        {/* Fichiers récents */}
-        {recentFiles.length > 0 && (
-          <motion.div className="mb-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.18 }}>
-            <div className="flex items-center justify-between mb-2.5 px-0.5">
-              <span
-                className="text-[9px] font-mono uppercase tracking-[0.14em] font-semibold"
-                style={{ color: 'var(--text-dimmed)' }}
-              >
-                Récents
-              </span>
               <button
-                onClick={clearRecentFiles}
-                className="text-[9px] px-1.5 py-0.5 transition-colors"
+                onClick={toggleCreateMode}
+                title={createMode === 'file' ? 'Basculer sur dossier' : 'Basculer sur fichier'}
+                className="ml-2 w-[42px] flex items-center justify-center flex-shrink-0 transition-all"
                 style={{
-                  color: 'var(--text-dimmed)',
-                  borderRadius: 'var(--radius-sm)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = 'var(--text-muted)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = 'var(--text-dimmed)';
-                }}
-              >
-                Effacer
-              </button>
-            </div>
-            <div
-              className="overflow-hidden"
-              style={{
                   backgroundColor: 'var(--bg-secondary)',
                   border: '1px solid var(--border-base)',
-                  borderRadius: 'var(--radius-xl)',
+                  borderRadius: 'var(--radius-lg)',
+                  color: 'var(--ctrl-icon)',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-base)'; }}
               >
-              {recentFiles.map(({ path, language }, index) => {
-                const fileName = path.split(/[/\\]/).pop() || path;
-                const dirPath = path.split(/[/\\]/).slice(-3, -1).join('/');
-                return (
-                  <button
-                    key={path}
-                    onClick={() => handleOpenRecent(path)}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left transition-all duration-150 group"
-                    style={{ borderTop: index === 0 ? 'none' : '1px solid var(--border-base)' }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--ctrl-hover)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    <FileText size={12} style={{ color: 'var(--ctrl-icon)' }} className="flex-shrink-0" />
-                    <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                      {fileName}
-                    </span>
-                    <span className="text-[9px] font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>
-                      {dirPath}
-                    </span>
-                    <span className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+                {createMode === 'file' ? <FolderPlus size={13} /> : <FileText size={13} />}
+              </button>
+            </div>
+          </motion.div>
+
+          {/* ── Fichiers récents ── */}
+          {recentFiles.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.2 }}
+            >
+              <div className="flex items-center justify-between mb-2 px-0.5">
+                <span
+                  className="text-[9.5px] font-mono uppercase tracking-[0.14em] font-semibold"
+                  style={{ color: 'var(--text-dimmed)' }}
+                >
+                  Récents
+                </span>
+                <button
+                  onClick={clearRecentFiles}
+                  className="flex items-center gap-1 text-[9.5px] px-1.5 py-0.5 transition-colors"
+                  style={{ color: 'var(--text-dimmed)', borderRadius: 'var(--radius-sm)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-dimmed)'; }}
+                >
+                  <Trash2 size={9} />
+                  Effacer
+                </button>
+              </div>
+              <div className="flex flex-col gap-1">
+                {recentFiles.map(({ path, language }, index) => {
+                  const fileName = path.split(/[/\\]/).pop() || path;
+                  const dirPath = path.split(/[/\\]/).slice(-3, -1).join('/');
+                  return (
+                    <button
+                      key={path}
+                      onClick={() => handleOpenRecent(path)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all duration-150 group"
+                      style={{ borderRadius: 'var(--radius-md)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--ctrl-hover)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                    >
+                      <span
+                        className="text-[9px] font-mono w-3 flex-shrink-0 text-right"
+                        style={{ color: 'var(--text-dimmed)' }}
+                      >
+                        {index + 1}
+                      </span>
+                      <FileText size={12} style={{ color: 'var(--ctrl-icon)' }} className="flex-shrink-0" />
+                      <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                        {fileName}
+                      </span>
+                      <span className="text-[9px] font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>
+                        {dirPath}
+                      </span>
                       {language && (
                         <span
-                          className="text-[9px] font-mono px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="ml-auto text-[9px] font-mono px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                           style={{
                             backgroundColor: 'var(--bg-input)',
                             color: 'var(--text-muted)',
@@ -1167,88 +1113,28 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                           {language}
                         </span>
                       )}
-                      {index < 5 && <Kbd>{index + 1}</Kbd>}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
 
-        {/* Barre d'état workspace / git */}
-        <motion.div
-          className="flex items-center text-[10px] font-mono overflow-hidden mb-4"
-          style={{
-            borderRadius: 'var(--radius-lg)',
-            backgroundColor: 'var(--bg-secondary)',
-            border: '1px solid var(--border-base)',
-          }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.25 }}
-        >
-          {ws.workspace && (
-            <span className="flex items-center gap-1.5 px-2.5 py-[7px]" style={{ color: 'var(--text-secondary)' }}>
-              <FolderOpen size={10} style={{ color: 'var(--ctrl-icon)' }} />
-              {ws.workspace.path.split(/[/\\]/).pop()}
-            </span>
-          )}
-          {gitInfo && (
-            <span
-              className="flex items-center gap-1.5 px-2.5 py-[7px]"
-              style={{
-                color: 'var(--text-secondary)',
-                borderLeft: '1px solid var(--border-base)',
-              }}
-            >
-              <GitBranch size={10} style={{ color: 'var(--ctrl-icon)' }} />
-              {gitInfo.branch}
-            </span>
-          )}
-          <span
-            className="flex items-center gap-1.5 px-2.5 py-[7px] ml-auto"
-            style={{
-              color: connected ? 'var(--color-success)' : 'var(--color-warning)',
-              borderLeft: '1px solid var(--border-base)',
-            }}
+          {/* ── Astuce palette de commandes ── */}
+          <motion.div
+            className="flex items-center gap-2 mt-8 text-[10.5px]"
+            style={{ color: 'var(--text-dimmed)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
           >
-            <Circle size={6} fill="currentColor" strokeWidth={0} />
-            <span style={{ color: 'var(--text-muted)' }}>
-              {connected ? 'en ligne' : 'hors ligne'}
+            <Command size={11} />
+            <span>
+              Astuce&nbsp;: <Kbd>{MOD}+,</Kbd> ouvre les réglages à tout moment.
             </span>
-          </span>
-        </motion.div>
-
-        {/* Liens rapides */}
-        <motion.div
-          className="flex items-center justify-center gap-3"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-        >
-          {quickLinks.map(({ label, onClick }, idx) => (
-            <React.Fragment key={label}>
-              {idx > 0 && (
-                <span className="w-px h-3" style={{ backgroundColor: 'var(--border-base)' }} />
-              )}
-              <button
-                onClick={onClick}
-                className="text-[10px] font-medium transition-colors"
-                style={{ color: 'var(--text-dimmed)' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = 'var(--accent-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = 'var(--text-dimmed)';
-                }}
-              >
-                {label}
-              </button>
-            </React.Fragment>
-          ))}
-        </motion.div>
-      </motion.div>
+          </motion.div>
+        </div>
+      </div>
 
       {/* Modales */}
       <AnimatePresence>
