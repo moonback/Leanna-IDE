@@ -4,6 +4,7 @@ import {
   Shield, Terminal, Upload, Zap,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { ViewHeader } from '../components/ui/ViewHeader';
 
 function Card({ icon: Icon, title, children }: { icon: typeof Cpu; title: string; children: ReactNode }) {
   return (
@@ -32,20 +33,12 @@ function Kbd({ children }: { children: ReactNode }) {
 export default function HelpView() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
-      <header className="flex flex-shrink-0 items-center gap-4 border-b px-5 py-3 lg:px-7" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--accent-subtle)' }}>
-            <CircleHelp className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Centre d'aide</h1>
-              <span className="rounded-full px-2 py-0.5 text-[9px] font-medium" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>Documentation complète</span>
-            </div>
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Tout ce qu'il faut savoir pour utiliser Jarvis OS efficacement</p>
-          </div>
-        </div>
-      </header>
+      <ViewHeader
+        icon={CircleHelp}
+        title="Centre d'aide"
+        badge="Documentation complète"
+        description="Tout ce qu'il faut savoir pour utiliser Jarvis OS efficacement"
+      />
 
       <main className="custom-scrollbar flex-1 overflow-y-auto p-5 lg:p-7">
         <div className="mx-auto max-w-6xl grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

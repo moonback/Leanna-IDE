@@ -4,6 +4,7 @@ import {
   ExternalLink, RefreshCw, Loader2, BookOpen, GitCommit,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { ViewHeader } from '../components/ui/ViewHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -248,53 +249,39 @@ export default function GitHubView() {
   // ─── Main render ──────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--bg-main)' }}>
+    <div className="flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
       {/* ── Header ─────────────────────────────────────────── */}
-      <div
-        className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
-        style={{ borderColor: 'var(--border-base)' }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)' }}
-          >
-            <Github size={20} style={{ color: 'var(--accent-primary)' }} />
-          </div>
-          <div>
-            <h1 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-              {repoInfo.full_name}
-            </h1>
-            <p className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
-              {repoInfo.remoteUrl}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={refresh}
-            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-            title="Rafraîchir"
-            aria-label="Rafraîchir"
-          >
-            {loading
-              ? <Loader2 size={16} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
-              : <RefreshCw size={16} style={{ color: 'var(--text-muted)' }} />
-            }
-          </button>
-          {githubUrl && (
+      <ViewHeader
+        icon={Github}
+        title={repoInfo.full_name}
+        description={repoInfo.remoteUrl}
+        actions={
+          <>
             <button
-              onClick={() => openExternal(githubUrl)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors hover:opacity-80"
-              style={{ backgroundColor: 'rgba(14,165,233,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(14,165,233,0.2)' }}
-              aria-label="Ouvrir sur GitHub"
+              onClick={refresh}
+              className="rounded-lg p-2 transition-colors hover:bg-white/10"
+              title="Rafraîchir"
+              aria-label="Rafraîchir"
             >
-              <ExternalLink size={14} />
-              Ouvrir sur GitHub
+              {loading
+                ? <Loader2 size={16} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
+                : <RefreshCw size={16} style={{ color: 'var(--text-muted)' }} />
+              }
             </button>
-          )}
-        </div>
-      </div>
+            {githubUrl && (
+              <button
+                onClick={() => openExternal(githubUrl)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-opacity hover:opacity-80"
+                style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--border-base)' }}
+                aria-label="Ouvrir sur GitHub"
+              >
+                <ExternalLink size={14} />
+                Ouvrir sur GitHub
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* ── Tabs ───────────────────────────────────────────── */}
       <div

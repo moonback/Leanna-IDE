@@ -11,6 +11,7 @@ import {
   Search, Grid3X3, List, SortAsc, SortDesc, Sparkles,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
+import { ViewHeader } from '../ui/ViewHeader';
 
 interface NotebookSummary {
   id: string;
@@ -139,44 +140,22 @@ export function NotebookList({ onSelectNotebook }: Props) {
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       {/* Header */}
-      <header
-        className="flex flex-shrink-0 items-center gap-4 border-b px-5 py-4 lg:px-7"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <div
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl"
-            style={{ backgroundColor: 'var(--accent-subtle)' }}
+      <ViewHeader
+        icon={BookOpen}
+        title="Notebooks"
+        badge="AI Research"
+        description="Collections de sources avec chat IA, résumés et génération"
+        actions={
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-semibold transition-all active:scale-95 hover:opacity-90 shadow-sm"
+            style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
           >
-            <BookOpen className="h-5 w-5" style={{ color: 'var(--accent-primary)' }} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-                Notebooks
-              </h1>
-              <span
-                className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
-                style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
-              >
-                AI Research
-              </span>
-            </div>
-            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Collections de sources avec chat IA, résumés et génération
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setShowCreateForm(true)}
-          className="ml-auto flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 hover:opacity-90 shadow-sm"
-          style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
-        >
-          <Plus className="w-4 h-4" />
-          Nouveau
-        </button>
-      </header>
+            <Plus className="w-3.5 h-3.5" />
+            Nouveau
+          </button>
+        }
+      />
 
       {/* Search & Filters Bar */}
       {notebooks.length > 0 && (

@@ -281,9 +281,9 @@ export default function SettingsView() {
 
         {/* Header toolbar */}
         <header
-          className="flex flex-shrink-0 items-center justify-between px-6 py-3"
+          className="flex flex-shrink-0 items-center justify-between px-5 py-3 lg:px-7"
           style={{
-            backgroundColor: 'var(--bg-base)',
+            backgroundColor: 'var(--bg-panel)',
             borderBottom: '1px solid var(--border-base)',
           }}
         >

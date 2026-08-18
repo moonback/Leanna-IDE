@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Code, Plus, Trash2, RefreshCw, FileCode, X, Search, Layers3, Clock3 } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
+import { ViewHeader } from '../components/ui/ViewHeader';
 
 interface SnippetSummary {
   name: string;
@@ -138,35 +139,29 @@ export default function ListsView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
-      <header className="flex flex-shrink-0 items-center gap-4 border-b px-5 py-3 lg:px-7" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--accent-subtle)' }}>
-            <Code className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Snippets</h1>
-              <span className="rounded-full px-2 py-0.5 text-[9px] font-medium" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>Bibliothèque</span>
+      <ViewHeader
+        icon={Code}
+        title="Snippets"
+        badge="Bibliothèque"
+        description="Tes blocs de code réutilisables, centralisés dans Jarvis"
+        actions={
+          <>
+            <div className="hidden items-center gap-1.5 rounded-lg border px-3 py-2 sm:flex" style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)' }}>
+              <Layers3 className="h-3.5 w-3.5" style={{ color: 'var(--accent-primary)' }} />
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{snippets.length} snippet{snippets.length > 1 ? 's' : ''}</span>
             </div>
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Tes blocs de code réutilisables, centralisés dans Jarvis</p>
-          </div>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <div className="hidden items-center gap-1.5 rounded-lg border px-3 py-2 sm:flex" style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)' }}>
-            <Layers3 className="h-3.5 w-3.5" style={{ color: 'var(--accent-primary)' }} />
-            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{snippets.length} snippet{snippets.length > 1 ? 's' : ''}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[10px] font-semibold shadow-sm transition-opacity hover:opacity-90"
-            style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Nouveau snippet
-          </button>
-        </div>
-      </header>
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[10px] font-semibold shadow-sm transition-opacity hover:opacity-90"
+              style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nouveau snippet
+            </button>
+          </>
+        }
+      />
 
       <div className="custom-scrollbar flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-[1500px] flex-col gap-5 px-5 py-5 lg:px-7 lg:py-6">

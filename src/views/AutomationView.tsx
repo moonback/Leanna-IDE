@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Play, Pause, Trash2, Zap, Clock, GitBranch } from 'lucide-react';
 import { clsx } from 'clsx';
 import { WorkflowsPanel, WorkflowViewModel } from '../components/panels/WorkflowsPanel';
+import { ViewHeader } from '../components/ui/ViewHeader';
 
 interface ScheduledTask {
   id: string;
@@ -83,46 +84,38 @@ export default function AutomationView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
-      <header className="flex flex-shrink-0 items-center justify-between gap-4 border-b px-5 py-3 lg:px-7" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--accent-subtle)' }}>
-            <Zap className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
+      <ViewHeader
+        icon={Zap}
+        title="Automatisations & Workflows"
+        badge="Low-Code"
+        description="Crée et surveille tes workflows visuels et tâches planifiées"
+        actions={
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--bg-ctrl)] border border-[var(--border-base)]">
+            <button
+              onClick={() => setActiveTab('workflows')}
+              className={clsx(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                activeTab === 'workflows'
+                  ? 'bg-[var(--bg-panel)] text-[var(--accent-primary)] shadow-sm border border-[var(--border-base)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              )}
+            >
+              <GitBranch className="w-3.5 h-3.5" /> Workflows visuels ({workflows.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('tasks')}
+              className={clsx(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                activeTab === 'tasks'
+                  ? 'bg-[var(--bg-panel)] text-[var(--accent-primary)] shadow-sm border border-[var(--border-base)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              )}
+            >
+              <Zap className="w-3.5 h-3.5" /> Tâches ({tasks.length})
+            </button>
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Automatisations & Workflows</h1>
-              <span className="rounded-full px-2 py-0.5 text-[9px] font-medium" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>Low-Code</span>
-            </div>
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Crée et surveille tes workflows visuels et tâches planifiées</p>
-          </div>
-        </div>
-
-        {/* Navigation Onglets */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--bg-ctrl)] border border-[var(--border-base)]">
-          <button
-            onClick={() => setActiveTab('workflows')}
-            className={clsx(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
-              activeTab === 'workflows'
-                ? 'bg-[var(--bg-panel)] text-[var(--accent-primary)] shadow-sm border border-[var(--border-base)]'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-            )}
-          >
-            <GitBranch className="w-3.5 h-3.5" /> Workflows visuels ({workflows.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('tasks')}
-            className={clsx(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
-              activeTab === 'tasks'
-                ? 'bg-[var(--bg-panel)] text-[var(--accent-primary)] shadow-sm border border-[var(--border-base)]'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-            )}
-          >
-            <Zap className="w-3.5 h-3.5" /> Tâches ({tasks.length})
-          </button>
-        </div>
-      </header>
+        }
+      />
 
       <main className="custom-scrollbar flex-1 overflow-y-auto p-5 lg:p-7">
         {activeTab === 'workflows' ? (

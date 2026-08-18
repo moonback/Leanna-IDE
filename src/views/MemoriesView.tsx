@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrainCircuit, Search, Trash2, RefreshCw } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
+import { ViewHeader } from '../components/ui/ViewHeader';
 
 interface Memory { id: string; content: string; created_at: string; }
 
@@ -58,32 +59,26 @@ export default function MemoriesView() {
       style={{ backgroundColor: 'var(--bg-base)' }}
     >
       {/* Header */}
-      <header className="flex flex-shrink-0 items-center gap-4 border-b px-5 py-3 lg:px-7" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--accent-subtle)' }}>
-            <BrainCircuit className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Mémoire</h1>
-              <span className="rounded-full px-2 py-0.5 text-[9px] font-medium" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>Mémoire active</span>
-            </div>
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Les informations importantes retenues par Jarvis</p>
-          </div>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <span className="hidden text-[10px] sm:inline" style={{ color: 'var(--text-muted)' }}>{memories.length} {memories.length === 1 ? 'entrée' : 'entrées'}</span>
-          <button
-            type="button"
-            onClick={load}
-            className="rounded-lg p-2 transition-colors hover:bg-white/10"
-            style={{ color: 'var(--text-muted)' }}
-            aria-label="Rafraîchir les souvenirs"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </header>
+      <ViewHeader
+        icon={BrainCircuit}
+        title="Mémoire"
+        badge="Mémoire active"
+        description="Les informations importantes retenues par Jarvis"
+        actions={
+          <>
+            <span className="hidden text-[10px] sm:inline" style={{ color: 'var(--text-muted)' }}>{memories.length} {memories.length === 1 ? 'entrée' : 'entrées'}</span>
+            <button
+              type="button"
+              onClick={load}
+              className="rounded-lg p-2 transition-colors hover:bg-white/10"
+              style={{ color: 'var(--text-muted)' }}
+              aria-label="Rafraîchir les souvenirs"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </>
+        }
+      />
 
       {/* Search */}
       <div className="px-8 py-4 flex-shrink-0">

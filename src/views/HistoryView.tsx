@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { History, Search, Trash2, RefreshCw, MessageSquare, User, Cpu } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
+import { ViewHeader } from '../components/ui/ViewHeader';
 
 interface Conversation {
   id: string;
@@ -104,32 +105,26 @@ export default function HistoryView() {
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       {/* Header */}
-      <header className="flex flex-shrink-0 items-center gap-4 border-b px-5 py-3 lg:px-7" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--accent-subtle)' }}>
-            <History className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Historique</h1>
-              <span className="rounded-full px-2 py-0.5 text-[9px] font-medium" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>Persistant</span>
-            </div>
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Toutes vos conversations passées avec Jarvis</p>
-          </div>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <span className="hidden text-[10px] sm:inline" style={{ color: 'var(--text-muted)' }}>{conversations.length} conversation{conversations.length !== 1 ? 's' : ''}</span>
-          <button
-            type="button"
-            onClick={load}
-            className="rounded-lg p-2 transition-colors hover:bg-white/10"
-            style={{ color: 'var(--text-muted)' }}
-            aria-label="Rafraîchir"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </header>
+      <ViewHeader
+        icon={History}
+        title="Historique"
+        badge="Persistant"
+        description="Toutes vos conversations passées avec Jarvis"
+        actions={
+          <>
+            <span className="hidden text-[10px] sm:inline" style={{ color: 'var(--text-muted)' }}>{conversations.length} conversation{conversations.length !== 1 ? 's' : ''}</span>
+            <button
+              type="button"
+              onClick={load}
+              className="rounded-lg p-2 transition-colors hover:bg-white/10"
+              style={{ color: 'var(--text-muted)' }}
+              aria-label="Rafraîchir"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </>
+        }
+      />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left — Conversations list */}

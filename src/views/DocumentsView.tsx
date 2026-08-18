@@ -16,6 +16,7 @@ import {
   Loader2, X, Globe, FileType, CheckCircle2, AlertCircle,
 } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
+import { ViewHeader } from '../components/ui/ViewHeader';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -117,35 +118,12 @@ export default function DocumentsView() {
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       {/* Header */}
-      <header
-        className="flex flex-shrink-0 items-center gap-4 border-b px-5 py-3 lg:px-7"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <div
-            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
-            style={{ backgroundColor: 'var(--accent-subtle)' }}
-          >
-            <FileText className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                Knowledge System
-              </h1>
-              <span
-                className="rounded-full px-2 py-0.5 text-[9px] font-medium"
-                style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
-              >
-                Documents
-              </span>
-            </div>
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-              Gérez vos documents, faits extraits et relations
-            </p>
-          </div>
-        </div>
-      </header>
+      <ViewHeader
+        icon={FileText}
+        title="Knowledge System"
+        badge="Documents"
+        description="Gérez vos documents, faits extraits et relations"
+      />
 
       {/* Tabs */}
       <div
