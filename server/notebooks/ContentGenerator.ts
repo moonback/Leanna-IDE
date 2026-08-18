@@ -387,16 +387,43 @@ Génère le plan en Markdown.`;
 Crée une carte mentale (mindmap) structurée qui organise visuellement les concepts des sources suivantes.
 
 INSTRUCTIONS :
-- Identifie le THÈME CENTRAL qui relie toutes les sources
-- Crée 4-6 BRANCHES PRINCIPALES (catégories/thèmes majeurs)
-- Chaque branche a 3-5 SOUS-BRANCHES (concepts, détails)
-- Ajoute des CONNEXIONS entre branches quand des liens existent
+- Identifie le THÈME CENTRAL qui relie toutes les sources (nom court, 1-3 mots)
+- Crée 4-6 BRANCHES PRINCIPALES équilibrées (catégories/thèmes majeurs, noms courts)
+- Chaque branche principale a 2-4 SOUS-BRANCHES (concepts clés, 2-4 mots max)
+- Ajoute au plus 2 FEUILLES par sous-branche, uniquement lorsqu'elles apportent une information utile
+- Limite le diagramme à 35 NŒUDS au total pour conserver une carte aérée et lisible
+- Utilise 3 niveaux de profondeur uniquement pour les idées les plus importantes ; évite les chaînes de nœuds inutiles
+- Répartis les branches de façon équilibrée : aucune branche ne doit contenir plus de 6 descendants
+- Les noms de nœuds doivent être COURTS et CONCIS (pas de phrases longues)
 - Utilise le format Mermaid mindmap pour la représentation visuelle
 - Après le diagramme Mermaid, ajoute une section textuelle détaillée
 
 FORMAT ATTENDU :
-1. Un bloc \`\`\`mermaid avec le mindmap
-2. Une section "## Détails par branche" qui développe chaque nœud
+1. Un bloc \`\`\`mermaid avec le mindmap en utilisant l'indentation pour la hiérarchie
+
+EXEMPLE DE STRUCTURE MERMAID :
+\`\`\`mermaid
+mindmap
+  root((Thème Central))
+    Branche 1
+      Sous-branche 1A
+        Détail 1
+        Détail 2
+      Sous-branche 1B
+        Détail 3
+    Branche 2
+      Sous-branche 2A
+        Détail 4
+        Détail 5
+      Sous-branche 2B
+\`\`\`
+
+2. Une section "## Détails par branche" qui développe chaque nœud avec des explications
+
+IMPORTANT :
+- Garde les labels COURTS (2-5 mots max par nœud)
+- Assure-toi d'avoir au moins 3 niveaux de profondeur sur chaque branche
+- Le résultat doit former un ARBRE large et profond, pas un simple schéma plat
 
 SOURCES :
 ${context}

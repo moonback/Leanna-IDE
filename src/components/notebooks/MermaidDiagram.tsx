@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useRef, useState, memo } from 'react';
+import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import mermaid from 'mermaid';
 
 interface Props {
@@ -24,8 +25,8 @@ function initMermaid() {
     fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: 12,
     mindmap: {
-      padding: 16,
-      useMaxWidth: true,
+      padding: 24,
+      useMaxWidth: false,
     },
     flowchart: {
       useMaxWidth: true,
@@ -41,7 +42,14 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [rendering, setRendering] = useState(true);
+  const [zoom, setZoom] = useState(0.85);
+  const [expanded, setExpanded] = useState(false);
   const uniqueId = useRef(`mermaid-${id || Math.random().toString(36).slice(2, 10)}`);
+  const isMindmap = /^\s*mindmap\b/m.test(code);
+
+  useEffect(() => {
+    setZoom(isMindmap ? 0.85 : 1);
+  }, [code, isMindmap]);
 
   useEffect(() => {
     if (!code.trim()) return;
@@ -110,12 +118,55 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
     );
   }
 
+  if (!isMindmap) {
+    return (
+      <div
+        ref={containerRef}
+        className="w-full overflow-x-auto rounded-xl p-4"
+        style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+    );
+  }
+
+  const updateZoom = (change: number) => {
+    setZoom((current) => Math.min(1.5, Math.max(0.55, Number((current + change).toFixed(2)))));
+  };
+
   return (
     <div
       ref={containerRef}
-      className="w-full overflow-x-auto rounded-xl p-4"
+      className={expanded ? 'fixed inset-4 z-50 flex flex-col rounded-2xl shadow-2xl' : 'w-full rounded-xl'}
       style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    >
+      <div className="flex items-center justify-between gap-3 px-3 py-2 border-b" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>Carte mentale interactive</p>
+          <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>Utilisez le zoom et faites défiler pour explorer les branches.</p>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button onClick={() => updateZoom(-0.1)} disabled={zoom <= 0.55} className="p-1.5 rounded-md hover:bg-white/5 disabled:opacity-30" title="Réduire le zoom" aria-label="Réduire le zoom">
+            <ZoomOut className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+          </button>
+          <span className="w-10 text-center text-[9px] font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>{Math.round(zoom * 100)}%</span>
+          <button onClick={() => updateZoom(0.1)} disabled={zoom >= 1.5} className="p-1.5 rounded-md hover:bg-white/5 disabled:opacity-30" title="Agrandir le zoom" aria-label="Agrandir le zoom">
+            <ZoomIn className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+          </button>
+          <button onClick={() => setZoom(0.85)} className="p-1.5 rounded-md hover:bg-white/5" title="Réinitialiser le zoom" aria-label="Réinitialiser le zoom">
+            <RotateCcw className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+          </button>
+          <button onClick={() => setExpanded((current) => !current)} className="p-1.5 rounded-md hover:bg-white/5" title={expanded ? 'Réduire la carte' : 'Agrandir la carte'} aria-label={expanded ? 'Réduire la carte' : 'Agrandir la carte'}>
+            {expanded ? <Minimize2 className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /> : <Maximize2 className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />}
+          </button>
+        </div>
+      </div>
+      <div className={`overflow-auto custom-scrollbar p-4 ${expanded ? 'flex-1' : 'max-h-[65vh]'}`}>
+        <div
+          className="w-max min-w-full origin-top-left"
+          style={{ zoom }}
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </div>
+    </div>
   );
 });

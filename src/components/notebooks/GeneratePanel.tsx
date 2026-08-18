@@ -692,7 +692,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
 
         {/* Selected document view */}
         {selectedDoc && !streamingText ? (
-          <div className="space-y-5 max-w-3xl">
+          <div className={`space-y-5 ${selectedDoc.type === 'mindmap' ? 'max-w-none' : 'max-w-3xl'}`}>
             {/* Document header — sticky */}
             <div className="flex items-start gap-3 pb-4 border-b sticky top-0 z-10 pt-1" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}>
               <div className="min-w-0 flex-1">
