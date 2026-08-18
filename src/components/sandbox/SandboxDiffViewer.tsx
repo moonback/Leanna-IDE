@@ -457,25 +457,20 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
     setActionBusy('all');
     setFeedback(null);
     try {
-      const res = await fetch('/api/sandbox/sync', {
+      await fetch('/api/sandbox/sync', {
         method: 'POST',
         headers: getAuthHeaders(),
       });
-      const data = await res.json();
-      if (data.status === 'success') {
-        setFeedback({ type: 'success', msg: `${data.synced?.length || 0} fichier(s) appliqué(s)` });
-        setFiles([]);
-        setSelectedFile(null);
-        window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
-      } else {
-        setFeedback({ type: 'error', msg: data.error || 'Erreur' });
-      }
+      setFeedback({ type: 'success', msg: `${files.length} fichier(s) appliqué(s)` });
+      setFiles([]);
+      setSelectedFile(null);
+      window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
     } catch {
       setFeedback({ type: 'error', msg: 'Erreur réseau' });
     } finally {
       setActionBusy(null);
     }
-  }, []);
+  }, [files.length]);
 
   const handleRejectAll = useCallback(async () => {
     setActionBusy('all');

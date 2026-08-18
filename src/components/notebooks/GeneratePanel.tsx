@@ -221,11 +221,11 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
   const openReportModal = useCallback(() => {
     setShowReportModal(true);
     setModalSelectedType(null);
-    // Charger les suggestions automatiquement à l'ouverture
-    if (suggestions.length === 0) {
+    // Charger les suggestions seulement la première fois (pas de refresh auto)
+    if (suggestions.length === 0 && !loadingSuggestions) {
       loadSuggestions();
     }
-  }, [loadSuggestions, suggestions.length]);
+  }, [loadSuggestions, suggestions.length, loadingSuggestions]);
 
   // Lancer la génération depuis le modal
   const handleModalGenerate = useCallback((type: string) => {
@@ -693,8 +693,8 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
         {/* Selected document view */}
         {selectedDoc && !streamingText ? (
           <div className="space-y-5 max-w-3xl">
-            {/* Document header */}
-            <div className="flex items-start gap-3 pb-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
+            {/* Document header — sticky */}
+            <div className="flex items-start gap-3 pb-4 border-b sticky top-0 z-10 pt-1" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span
@@ -878,6 +878,17 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
                         {suggestions.length} suggestions
                       </span>
                     )}
+                    {!loadingSuggestions && (
+                      <button
+                        onClick={loadSuggestions}
+                        className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5 active:scale-95"
+                        style={{ border: '1px solid var(--border-base)', color: '#f59e0b' }}
+                        title="Demander de nouvelles suggestions"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        {suggestions.length > 0 ? 'Rafraîchir' : 'Obtenir des suggestions'}
+                      </button>
+                    )}
                   </div>
 
                   {loadingSuggestions && (
@@ -891,7 +902,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
                   )}
 
                   {!loadingSuggestions && suggestions.length > 0 && (
-                    <div className="grid grid-cols-1 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {suggestions.map((suggestion, idx) => {
                         const docType = REPORT_TYPES.find(t => t.key === suggestion.type) || DOC_TYPES.find(t => t.key === suggestion.type);
                         const SugIcon = docType?.icon || Sparkles;
@@ -941,7 +952,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
 
                   {!loadingSuggestions && suggestions.length === 0 && (
                     <p className="text-[10px] py-3 text-center" style={{ color: 'var(--text-dimmed)' }}>
-                      Aucune suggestion disponible. Choisissez un type ci-dessous.
+                      Cliquez sur "Obtenir des suggestions" pour que l'IA analyse vos sources.
                     </p>
                   )}
                 </div>
