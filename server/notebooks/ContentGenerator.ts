@@ -139,20 +139,46 @@ export class ContentGenerator {
    */
   async generateAudioOverview(
     notebookId: string,
-    options: { language?: string; duration?: 'short' | 'medium' | 'long' } = {}
+    options: {
+      language?: string;
+      duration?: 'short' | 'medium' | 'long';
+      sourceIds?: string[];
+      tone?: 'casual' | 'academic' | 'humorous' | 'professional';
+      customInstructions?: string;
+    } = {}
   ): Promise<AudioOverview> {
     const notebook = notebookManager.getNotebook(notebookId);
     if (!notebook) throw new Error("Notebook introuvable.");
     if (notebook.sources.length === 0) throw new Error("Aucune source dans ce notebook.");
 
-    const lang = options.language || notebook.sources[0]?.language || "fr";
+    // Filtrage des sources si spécifié
+    const sources = options.sourceIds && options.sourceIds.length > 0
+      ? notebook.sources.filter(s => options.sourceIds!.includes(s.id))
+      : notebook.sources;
+
+    if (sources.length === 0) throw new Error("Aucune source sélectionnée.");
+
+    const lang = options.language || sources[0]?.language || "fr";
     const duration = options.duration || "medium";
     const durationMinutes = duration === "short" ? 5 : duration === "medium" ? 10 : 15;
+    const tone = options.tone || "casual";
+
+    // Mapping des tons
+    const toneInstructions: Record<string, string> = {
+      casual: "Ton : décontracté mais informatif, comme un podcast de vulgarisation entre amis",
+      academic: "Ton : académique et rigoureux, comme une conférence universitaire en dialogue",
+      humorous: "Ton : drôle et léger avec des blagues et analogies amusantes, tout en restant informatif",
+      professional: "Ton : professionnel et structuré, comme un briefing entre collègues experts",
+    };
 
     // Contexte condensé des sources
-    const sourcesContext = notebook.sources.map(s =>
+    const sourcesContext = sources.map(s =>
       `## ${s.title}\n${s.summary}\n\nPoints clés :\n${s.keywords.join(", ")}`
     ).join("\n\n---\n\n");
+
+    const customPart = options.customInstructions
+      ? `\n- Instructions supplémentaires de l'utilisateur : ${options.customInstructions}`
+      : "";
 
     const prompt = `Tu es un scénariste de podcast éducatif. Génère un script de conversation entre deux hôtes (Alex et Sam) qui discutent du contenu des documents suivants.
 
@@ -161,17 +187,17 @@ ${sourcesContext}
 
 INSTRUCTIONS :
 - Durée cible : ~${durationMinutes} minutes de conversation (environ ${durationMinutes * 150} mots)
-- Ton : décontracté mais informatif, comme un podcast de vulgarisation
+- ${toneInstructions[tone]}
 - Alex pose des questions, fait des analogies. Sam explique en profondeur.
 - Commencer par une introduction engageante du sujet
 - Couvrir les points clés de TOUTES les sources
 - Terminer par un résumé et les points à retenir
 - Langue : ${lang === "fr" ? "français" : "anglais"}
-- Format : dialogue avec "Alex:" et "Sam:" comme préfixes
+- Format : dialogue avec "Alex:" et "Sam:" comme préfixes${customPart}
 
 Génère le script complet du podcast.`;
 
-    log.info(`🎙️ Génération Audio Overview pour "${notebook.title}" (~${durationMinutes}min)`);
+    log.info(`🎙️ Génération Audio Overview pour "${notebook.title}" (~${durationMinutes}min, ton=${tone})`);
 
     const overview: AudioOverview = {
       id: randomUUID(),

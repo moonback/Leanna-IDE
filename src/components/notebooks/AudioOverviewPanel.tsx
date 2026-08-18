@@ -1,12 +1,20 @@
 /**
  * AudioOverviewPanel — Génération et lecture de podcasts IA
  *
- * UI améliorée avec meilleur layout, animations, et feedback visuel.
+ * Fonctionnalités :
+ * - Génération de script conversationnel (Alex & Sam)
+ * - Lecture TTS avec voix distinctes (streaming SSE)
+ * - Sélection des sources à inclure
+ * - Personnalisation du ton et instructions custom
+ * - Téléchargement en .md, suppression, régénération
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, Play, Loader2, Clock, Users, Radio, Pause, Download, Trash2, RefreshCw } from 'lucide-react';
+import {
+  Mic, Play, Loader2, Clock, Users, Radio, Pause, Download,
+  Trash2, RefreshCw, Volume2, Square, Settings2, FileText, CheckSquare
+} from 'lucide-react';
 import { useToast } from '../ui/Toast';
 
 interface AudioOverview {
@@ -18,18 +26,62 @@ interface AudioOverview {
   createdAt: string;
 }
 
+interface Source {
+  id: string;
+  title: string;
+}
+
 interface Props {
   notebookId: string;
   overviews: AudioOverview[];
+  sources: Source[];
   onRefresh: () => void;
 }
 
-export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) {
+type Tone = 'casual' | 'academic' | 'humorous' | 'professional';
+
+export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }: Props) {
   const { success, error: toastError } = useToast();
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [selectedOverview, setSelectedOverview] = useState<AudioOverview | null>(null);
   const [duration, setDuration] = useState<'short' | 'medium' | 'long'>('medium');
+
+  // Options avancées
+  const [showOptions, setShowOptions] = useState(false);
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
+  const [tone, setTone] = useState<Tone>('casual');
+  const [customInstructions, setCustomInstructions] = useState('');
+
+  // TTS Playback
+  const [playing, setPlaying] = useState(false);
+  const [ttsLoading, setTtsLoading] = useState(false);
+  const [currentLineIndex, setCurrentLineIndex] = useState(-1);
+  const [ttsProgress, setTtsProgress] = useState(0);
+  const [ttsTotalLines, setTtsTotalLines] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioQueueRef = useRef<{ audio: string; index: number }[]>([]);
+  const playingRef = useRef(false);
+  const nextStartTimeRef = useRef(0);
+
+  // Initialiser la sélection de sources avec toutes les sources
+  useEffect(() => {
+    if (selectedSourceIds.length === 0 && sources.length > 0) {
+      setSelectedSourceIds(sources.map(s => s.id));
+    }
+  }, [sources]);
+
+  const toggleSource = (sourceId: string) => {
+    setSelectedSourceIds(prev =>
+      prev.includes(sourceId)
+        ? prev.filter(id => id !== sourceId)
+        : [...prev, sourceId]
+    );
+  };
+
+  const selectAllSources = () => setSelectedSourceIds(sources.map(s => s.id));
+  const deselectAllSources = () => setSelectedSourceIds([]);
 
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
@@ -37,7 +89,12 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
       const res = await fetch(`/api/notebooks/${notebookId}/audio-overview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duration }),
+        body: JSON.stringify({
+          duration,
+          sourceIds: selectedSourceIds.length < sources.length ? selectedSourceIds : undefined,
+          tone: tone !== 'casual' ? tone : undefined,
+          customInstructions: customInstructions.trim() || undefined,
+        }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({ error: 'Erreur' }));
@@ -56,7 +113,7 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
     } finally {
       setGenerating(false);
     }
-  }, [notebookId, duration, success, toastError, onRefresh]);
+  }, [notebookId, duration, selectedSourceIds, sources.length, tone, customInstructions, success, toastError, onRefresh]);
 
   const handleDownloadToWorkspace = useCallback(async () => {
     if (!selectedOverview) return;
@@ -99,16 +156,161 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
 
   const handleRegenerate = useCallback(async () => {
     if (!selectedOverview) return;
-    // Supprimer l'ancien puis régénérer
     try {
       await fetch(`/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}`, {
         method: 'DELETE',
       });
     } catch {}
     setSelectedOverview(null);
-    // Lancer la génération
     handleGenerate();
   }, [notebookId, selectedOverview, handleGenerate]);
+
+  // ─── TTS Playback ──────────────────────────────────────────────────────────
+
+  const getAudioContext = useCallback(() => {
+    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+      const AC = window.AudioContext || (window as any).webkitAudioContext;
+      audioCtxRef.current = new AC({ sampleRate: 24000 });
+    }
+    return audioCtxRef.current;
+  }, []);
+
+  const playAudioChunk = useCallback((base64Audio: string) => {
+    const audioCtx = getAudioContext();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    try {
+      const binaryStr = atob(base64Audio);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+      const pcm16 = new Int16Array(bytes.buffer);
+      const float32 = new Float32Array(pcm16.length);
+      for (let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768.0;
+
+      const audioBuffer = audioCtx.createBuffer(1, float32.length, 24000);
+      audioBuffer.getChannelData(0).set(float32);
+
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioCtx.destination);
+
+      const now = audioCtx.currentTime;
+      const startTime = Math.max(now, nextStartTimeRef.current);
+      source.start(startTime);
+      nextStartTimeRef.current = startTime + audioBuffer.duration;
+    } catch (err) {
+      console.error('[TTS] Erreur lecture audio:', err);
+    }
+  }, [getAudioContext]);
+
+  const handlePlayTTS = useCallback(async () => {
+    if (!selectedOverview) return;
+
+    setTtsLoading(true);
+    setPlaying(true);
+    playingRef.current = true;
+    setCurrentLineIndex(0);
+    setTtsProgress(0);
+    nextStartTimeRef.current = 0;
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      const res = await fetch(
+        `/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}/tts`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+          signal: controller.signal,
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("Pas de stream");
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!playingRef.current) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+
+        for (const event of events) {
+          if (!event.trim()) continue;
+
+          const lines = event.split('\n');
+          let eventType = '';
+          let data = '';
+
+          for (const line of lines) {
+            if (line.startsWith('event: ')) eventType = line.slice(7);
+            if (line.startsWith('data: ')) data = line.slice(6);
+          }
+
+          if (eventType === 'start') {
+            const parsed = JSON.parse(data);
+            setTtsTotalLines(parsed.total);
+            setTtsLoading(false);
+          } else if (eventType === 'chunk') {
+            const parsed = JSON.parse(data);
+            setCurrentLineIndex(parsed.index);
+            setTtsProgress(prev => prev + 1);
+            playAudioChunk(parsed.audio);
+          } else if (eventType === 'done') {
+            // Fini
+          } else if (eventType === 'error') {
+            const parsed = JSON.parse(data);
+            toastError(parsed.error);
+          }
+        }
+      }
+    } catch (e: any) {
+      if (e.name !== 'AbortError') {
+        toastError(`Erreur TTS: ${e.message}`);
+      }
+    } finally {
+      setTtsLoading(false);
+      setPlaying(false);
+      playingRef.current = false;
+      abortControllerRef.current = null;
+    }
+  }, [notebookId, selectedOverview, playAudioChunk, toastError]);
+
+  const handleStopTTS = useCallback(() => {
+    playingRef.current = false;
+    setPlaying(false);
+    setCurrentLineIndex(-1);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    // Stop tout l'audio en cours
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+    nextStartTimeRef.current = 0;
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      if (audioCtxRef.current) audioCtxRef.current.close().catch(() => {});
+    };
+  }, []);
 
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -140,15 +342,10 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
                 Audio Overview
               </p>
               <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
-                Script de podcast IA
+                Podcast IA avec lecture audio
               </p>
             </div>
           </div>
-
-          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-            Génère un script conversationnel : deux hôtes discutent du contenu de vos sources
-            dans un format engageant et accessible.
-          </p>
 
           {/* Duration selector */}
           <div className="space-y-2">
@@ -176,9 +373,119 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
             </div>
           </div>
 
+          {/* Options toggle */}
+          <button
+            onClick={() => setShowOptions(!showOptions)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-medium transition-all"
+            style={{
+              backgroundColor: showOptions ? 'var(--accent-subtle)' : 'var(--bg-base)',
+              color: showOptions ? 'var(--accent-primary)' : 'var(--text-muted)',
+              border: `1px solid ${showOptions ? 'var(--accent-primary)' : 'var(--border-base)'}`,
+            }}
+          >
+            <Settings2 className="w-3.5 h-3.5" />
+            Options avancées
+          </button>
+
+          {/* Advanced options */}
+          <AnimatePresence>
+            {showOptions && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="space-y-3 overflow-hidden"
+              >
+                {/* Tone selector */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Ton</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {([
+                      { key: 'casual' as Tone, label: '😊 Décontracté' },
+                      { key: 'academic' as Tone, label: '🎓 Académique' },
+                      { key: 'humorous' as Tone, label: '😄 Humoristique' },
+                      { key: 'professional' as Tone, label: '💼 Professionnel' },
+                    ]).map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => setTone(opt.key)}
+                        className="px-2 py-1.5 rounded-lg text-[9px] font-medium transition-all"
+                        style={{
+                          backgroundColor: tone === opt.key ? 'var(--accent-subtle)' : 'var(--bg-base)',
+                          color: tone === opt.key ? 'var(--accent-primary)' : 'var(--text-muted)',
+                          border: `1px solid ${tone === opt.key ? 'var(--accent-primary)' : 'var(--border-base)'}`,
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Source selector */}
+                {sources.length > 1 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                        Sources ({selectedSourceIds.length}/{sources.length})
+                      </p>
+                      <button
+                        onClick={selectedSourceIds.length === sources.length ? deselectAllSources : selectAllSources}
+                        className="text-[9px] font-medium"
+                        style={{ color: 'var(--accent-primary)' }}
+                      >
+                        {selectedSourceIds.length === sources.length ? 'Aucune' : 'Toutes'}
+                      </button>
+                    </div>
+                    <div className="max-h-28 overflow-y-auto custom-scrollbar space-y-1">
+                      {sources.map(src => (
+                        <button
+                          key={src.id}
+                          onClick={() => toggleSource(src.id)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[9px] transition-all"
+                          style={{
+                            backgroundColor: selectedSourceIds.includes(src.id) ? 'var(--accent-subtle)' : 'transparent',
+                            color: selectedSourceIds.includes(src.id) ? 'var(--accent-primary)' : 'var(--text-muted)',
+                          }}
+                        >
+                          <CheckSquare
+                            className="w-3 h-3 flex-shrink-0"
+                            style={{
+                              opacity: selectedSourceIds.includes(src.id) ? 1 : 0.3,
+                            }}
+                          />
+                          <span className="truncate">{src.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom instructions */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                    Instructions personnalisées
+                  </p>
+                  <textarea
+                    value={customInstructions}
+                    onChange={(e) => setCustomInstructions(e.target.value)}
+                    placeholder="Ex: Insiste sur les aspects pratiques, ajoute des exemples concrets..."
+                    className="w-full px-3 py-2 rounded-lg text-[10px] resize-none leading-relaxed"
+                    style={{
+                      backgroundColor: 'var(--bg-base)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border-base)',
+                    }}
+                    rows={2}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <button
             onClick={handleGenerate}
-            disabled={generating}
+            disabled={generating || selectedSourceIds.length === 0}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-bold transition-all active:scale-95 disabled:opacity-50 shadow-sm"
             style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
           >
@@ -239,7 +546,6 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
                       </div>
                     </div>
                   </button>
-                  {/* Delete button on hover */}
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDelete(ov.id); }}
                     className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10"
@@ -280,54 +586,109 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
                   <span>{new Date(selectedOverview.createdAt).toLocaleDateString('fr-FR')}</span>
                 </p>
               </div>
-              <button
-                onClick={handleDownloadToWorkspace}
-                disabled={downloading}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
-                style={{
-                  backgroundColor: 'var(--accent-subtle)',
-                  color: 'var(--accent-primary)',
-                  border: '1px solid var(--accent-primary)',
-                }}
-                title="Sauvegarder le script en .md dans le workspace"
-              >
-                {downloading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <div className="flex items-center gap-1.5">
+                {/* Play TTS */}
+                {playing ? (
+                  <button
+                    onClick={handleStopTTS}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all active:scale-95"
+                    style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      color: '#ef4444',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                    }}
+                    title="Arrêter la lecture"
+                  >
+                    <Square className="w-3.5 h-3.5" />
+                    Stop
+                  </button>
                 ) : (
-                  <Download className="w-3.5 h-3.5" />
+                  <button
+                    onClick={handlePlayTTS}
+                    disabled={ttsLoading}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
+                    style={{
+                      backgroundColor: '#10b98120',
+                      color: '#10b981',
+                      border: '1px solid #10b98140',
+                    }}
+                    title="Écouter le podcast (TTS)"
+                  >
+                    {ttsLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Volume2 className="w-3.5 h-3.5" />
+                    )}
+                    Écouter
+                  </button>
                 )}
-                Télécharger .md
-              </button>
-              <button
-                onClick={handleRegenerate}
-                disabled={generating}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
-                style={{
-                  backgroundColor: 'var(--bg-base)',
-                  color: 'var(--text-muted)',
-                  border: '1px solid var(--border-base)',
-                }}
-                title="Régénérer ce podcast"
-              >
-                {generating ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-3.5 h-3.5" />
-                )}
-              </button>
-              <button
-                onClick={() => handleDelete(selectedOverview.id)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95"
-                style={{
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                  color: '#ef4444',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                }}
-                title="Supprimer ce podcast"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+                {/* Download */}
+                <button
+                  onClick={handleDownloadToWorkspace}
+                  disabled={downloading}
+                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
+                  style={{
+                    backgroundColor: 'var(--accent-subtle)',
+                    color: 'var(--accent-primary)',
+                    border: '1px solid var(--accent-primary)',
+                  }}
+                  title="Sauvegarder le script en .md"
+                >
+                  {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                </button>
+                {/* Regenerate */}
+                <button
+                  onClick={handleRegenerate}
+                  disabled={generating}
+                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
+                  style={{
+                    backgroundColor: 'var(--bg-base)',
+                    color: 'var(--text-muted)',
+                    border: '1px solid var(--border-base)',
+                  }}
+                  title="Régénérer"
+                >
+                  {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                </button>
+                {/* Delete */}
+                <button
+                  onClick={() => handleDelete(selectedOverview.id)}
+                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95"
+                  style={{
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    color: '#ef4444',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                  }}
+                  title="Supprimer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
+
+            {/* TTS Progress bar */}
+            {playing && ttsTotalLines > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
+                style={{ backgroundColor: '#10b98110', border: '1px solid #10b98130' }}
+              >
+                <Volume2 className="w-4 h-4 animate-pulse" style={{ color: '#10b981' }} />
+                <div className="flex-1">
+                  <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: '#10b981' }}
+                      animate={{ width: `${(ttsProgress / ttsTotalLines) * 100}%` }}
+                    />
+                  </div>
+                </div>
+                <span className="text-[9px] font-medium" style={{ color: '#10b981' }}>
+                  {ttsProgress}/{ttsTotalLines}
+                </span>
+              </motion.div>
+            )}
 
             {/* Script as chat bubbles */}
             <div className="space-y-4">
@@ -338,6 +699,7 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
                 if (isAlex || isSam) {
                   const speaker = isAlex ? 'Alex' : 'Sam';
                   const text = line.replace(/^(Alex|Sam)\s*:\s*/i, '');
+                  const isCurrentLine = playing && currentLineIndex === i;
                   return (
                     <motion.div
                       key={i}
@@ -347,11 +709,11 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
                       className={`flex gap-3 ${isSam ? 'flex-row-reverse' : ''}`}
                     >
                       <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 shadow-sm"
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 shadow-sm ${isCurrentLine ? 'animate-pulse' : ''}`}
                         style={{
                           backgroundColor: isAlex ? '#60a5fa20' : '#34d39920',
                           color: isAlex ? '#60a5fa' : '#34d399',
-                          border: `1.5px solid ${isAlex ? '#60a5fa40' : '#34d39940'}`,
+                          border: `1.5px solid ${isCurrentLine ? (isAlex ? '#60a5fa' : '#34d399') : (isAlex ? '#60a5fa40' : '#34d39940')}`,
                         }}
                       >
                         {speaker[0]}
@@ -361,8 +723,12 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
                           {speaker}
                         </p>
                         <div
-                          className={`p-3.5 rounded-2xl text-xs leading-relaxed ${isAlex ? 'rounded-tl-md' : 'rounded-tr-md'}`}
-                          style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                          className={`p-3.5 rounded-2xl text-xs leading-relaxed ${isAlex ? 'rounded-tl-md' : 'rounded-tr-md'} transition-all`}
+                          style={{
+                            backgroundColor: isCurrentLine ? (isAlex ? '#60a5fa10' : '#34d39910') : 'var(--bg-panel)',
+                            border: `1px solid ${isCurrentLine ? (isAlex ? '#60a5fa40' : '#34d39940') : 'var(--border-base)'}`,
+                            color: 'var(--text-primary)',
+                          }}
                         >
                           {text}
                         </div>
@@ -394,8 +760,8 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
                 Audio Overview
               </p>
               <p className="text-xs max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                Générez un podcast IA pour obtenir un script conversationnel
-                où deux hôtes discutent du contenu de vos sources.
+                Générez un podcast IA : deux hôtes discutent de vos sources.
+                Écoutez-le en TTS ou téléchargez le script en Markdown.
               </p>
             </div>
           </div>

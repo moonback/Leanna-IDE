@@ -835,11 +835,102 @@ export function createNotebooksRouter(): Router {
   // POST /api/notebooks/:id/audio-overview — Générer un podcast
   router.post("/:id/audio-overview", async (req: Request, res: Response) => {
     try {
-      const { language, duration } = req.body;
-      const overview = await contentGenerator.generateAudioOverview(req.params.id, { language, duration });
+      const { language, duration, sourceIds, tone, customInstructions } = req.body;
+      const overview = await contentGenerator.generateAudioOverview(req.params.id, {
+        language, duration, sourceIds, tone, customInstructions,
+      });
       res.json({ status: "success", overview });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/notebooks/:id/audio-overviews/:overviewId/tts — Générer l'audio TTS du podcast (SSE streaming)
+  router.post("/:id/audio-overviews/:overviewId/tts", async (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      const overview = notebook.audioOverviews?.find((o: any) => o.id === req.params.overviewId);
+      if (!overview || overview.status !== "ready") {
+        res.status(404).json({ error: "Audio overview introuvable ou pas prêt." });
+        return;
+      }
+
+      const { generateSpeech } = await import("../utils/geminiTTS");
+
+      // Voix naturelles Kokoro pour les deux hôtes
+      // ff_siwis = voix féminine française (Alex)
+      // am_adam = voix masculine anglaise naturelle (Sam) — ou af_jessica pour féminine
+      const alexVoice = req.body.alexVoice || "ff_siwis";
+      const samVoice = req.body.samVoice || "am_adam";
+
+      // Découper le script en répliques
+      const lines = overview.script.split("\n").filter((l: string) => l.trim());
+      const dialogueLines: { speaker: string; text: string }[] = [];
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        const isAlex = trimmed.startsWith("Alex:") || trimmed.startsWith("Alex :");
+        const isSam = trimmed.startsWith("Sam:") || trimmed.startsWith("Sam :");
+
+        if (isAlex) {
+          dialogueLines.push({ speaker: "alex", text: trimmed.replace(/^Alex\s*:\s*/i, "") });
+        } else if (isSam) {
+          dialogueLines.push({ speaker: "sam", text: trimmed.replace(/^Sam\s*:\s*/i, "") });
+        } else if (trimmed) {
+          // Narration / didascalie — on la donne à Alex par défaut
+          dialogueLines.push({ speaker: "alex", text: trimmed });
+        }
+      }
+
+      if (dialogueLines.length === 0) {
+        res.status(400).json({ error: "Le script ne contient aucune réplique." });
+        return;
+      }
+
+      // Headers SSE
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+
+      res.write(`event: start\ndata: ${JSON.stringify({ total: dialogueLines.length })}\n\n`);
+
+      for (let i = 0; i < dialogueLines.length; i++) {
+        const { speaker, text } = dialogueLines[i];
+        const voice = speaker === "alex" ? alexVoice : samVoice;
+
+        try {
+          const audioBase64 = await generateSpeech(text, { voiceName: voice });
+          if (audioBase64) {
+            res.write(`event: chunk\ndata: ${JSON.stringify({
+              index: i,
+              speaker,
+              text,
+              audio: audioBase64,
+            })}\n\n`);
+          } else {
+            res.write(`event: skip\ndata: ${JSON.stringify({ index: i, speaker, reason: "no audio" })}\n\n`);
+          }
+        } catch (ttsErr: any) {
+          res.write(`event: skip\ndata: ${JSON.stringify({ index: i, speaker, reason: ttsErr.message })}\n\n`);
+        }
+      }
+
+      res.write(`event: done\ndata: ${JSON.stringify({ totalGenerated: dialogueLines.length })}\n\n`);
+      res.end();
+    } catch (e: any) {
+      if (res.headersSent) {
+        res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ error: e.message });
+      }
     }
   });
 
