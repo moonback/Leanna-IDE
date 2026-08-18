@@ -6,6 +6,7 @@ const DocumentPanel = lazy(() => import('../components/panels/DocumentPanel').th
 const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel').then(m => ({ default: m.SandboxPanel })));
 const VisionPanel = lazy(() => import('../components/panels/VisionPanel').then(m => ({ default: m.VisionPanel })));
 const DocumentsView = lazy(() => import('./DocumentsView'));
+const NotebooksView = lazy(() => import('./NotebooksView'));
 import { X } from 'lucide-react';
 import { IdeModal, type ModalMode } from '../components/ide/IdeModal';
 import { ContextMenu, type ContextTarget, type ClipboardEntry } from '../components/ide/ContextMenu';
@@ -133,6 +134,7 @@ export default function IdeView() {
   const [showMissions, setShowMissions] = useState(false);
   const [showKnowledge, setShowKnowledge] = useState(false);
   const [showDocuments, setShowDocuments] = useState(false);
+  const [showNotebooks, setShowNotebooks] = useState(false);
   const [showSandbox, setShowSandbox] = useState(false);
   const [sandboxView, setSandboxView] = useState<'controls' | 'diff'>('controls');
   const [selectedSandboxDiffFile, setSelectedSandboxDiffFile] = useState<string | null>(null);
@@ -557,6 +559,7 @@ export default function IdeView() {
         showMissions={showMissions}
         showKnowledge={showKnowledge}
         showDocuments={showDocuments}
+        showNotebooks={showNotebooks}
         showSystemHealth={showSystemHealth}
         showMcp={showMcp}
         assistantConnected={connected}
@@ -569,7 +572,7 @@ export default function IdeView() {
         onToggleSearch={() => setShowGlobalSearch(v => !v)}
         onToggleSettings={() => {
           setShowSettingsPanel(v => !v);
-          if (!showSettingsPanel) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); }
+          if (!showSettingsPanel) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); setShowNotebooks(false); }
         }}
         onToggleRunMenu={() => setShowRunMenu(v => !v)}
         onToggleSandbox={toggleSandbox}
@@ -582,7 +585,11 @@ export default function IdeView() {
         onToggleMissions={() => setShowMissions(v => !v)}
         onToggleKnowledge={() => {
           setShowKnowledge(v => !v);
-          if (!showKnowledge) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); }
+          if (!showKnowledge) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowNotebooks(false); }
+        }}
+        onToggleNotebooks={() => {
+          setShowNotebooks(v => !v);
+          if (!showNotebooks) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); }
         }}
         onToggleDocuments={() => setShowDocuments(v => !v)}
         onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
@@ -603,22 +610,22 @@ export default function IdeView() {
         showHelp={showHelp}
         onToggleHelp={() => {
           setShowHelp(v => !v);
-          if (!showHelp) { setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowMemory(false); }
+          if (!showHelp) { setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowNotebooks(false); setShowMemory(false); }
         }}
         showHistory={showHistory}
         onToggleHistory={() => {
           setShowHistory(v => !v);
-          if (!showHistory) { setShowHelp(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowMemory(false); }
+          if (!showHistory) { setShowHelp(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowNotebooks(false); setShowMemory(false); }
         }}
         showAutomation={showAutomation}
         onToggleAutomation={() => {
           setShowAutomation(v => !v);
-          if (!showAutomation) { setShowHelp(false); setShowHistory(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowMemory(false); }
+          if (!showAutomation) { setShowHelp(false); setShowHistory(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowNotebooks(false); setShowMemory(false); }
         }}
         showMemory={showMemory}
         onToggleMemory={() => {
           setShowMemory(v => !v);
-          if (!showMemory) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); }
+          if (!showMemory) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowNotebooks(false); }
         }}
       />
 
@@ -649,7 +656,7 @@ export default function IdeView() {
       {/* Editor Area */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0 relative">
         {/* Tab Bar — masqué quand un panneau plein-écran est actif */}
-        {!showSandbox && !showHistory && !showAutomation && !showMemory && !showHelp && !showSettingsPanel && !showKnowledge && (
+        {!showSandbox && !showHistory && !showAutomation && !showMemory && !showHelp && !showSettingsPanel && !showKnowledge && !showNotebooks && (
           <EditorTabs
             openFiles={fileSystem.openFiles}
             activePath={fileSystem.activePath}
@@ -750,6 +757,10 @@ export default function IdeView() {
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement du dashboard…</div></div>}>
                           <DocumentsView />
                         </Suspense>
+                      ) : showNotebooks ? (
+                        <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement des notebooks…</div></div>}>
+                          <NotebooksView />
+                        </Suspense>
                       ) : showDocuments ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement…</div></div>}>
                           <DocumentPanel />
@@ -793,6 +804,10 @@ export default function IdeView() {
                                                   onShowSettings={() => setShowSettingsPanel(true)}
                                                   onOpenSearch={() => setShowGlobalSearch(true)}
                                                   onOpenChat={() => setShowChat(true)}
+                                                  onOpenNotebooks={() => {
+                                                    setShowNotebooks(true);
+                                                    setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false);
+                                                  }}
                                                 />
                       )}
                     </div>

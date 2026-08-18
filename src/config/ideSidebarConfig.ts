@@ -16,7 +16,7 @@ import {
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Cable, Container, Bot, Crosshair, Database,
   Activity, Wrench, Code2, Users, FileStack,
-  Wand2,
+  Wand2, BookOpen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -136,6 +136,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Knowledge System',
             stateKey: 'showKnowledge',
             actionKey: 'onToggleKnowledge',
+          },
+          {
+            id: 'notebooks-panel',
+            type: 'button',
+            icon: BookOpen,
+            label: 'Notebooks RAG',
+            stateKey: 'showNotebooks',
+            actionKey: 'onToggleNotebooks',
           },
           {
             id: 'documents',

@@ -169,6 +169,8 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
         onToggleAutomation={props.onToggleAutomation ?? noop}
         showMemory={props.showMemory ?? false}
         onToggleMemory={props.onToggleMemory ?? noop}
+        showNotebooks={props.showNotebooks ?? false}
+        onToggleNotebooks={props.onToggleNotebooks ?? noop}
       />
 
       {/* ═══ FOOTER ═══ */}
@@ -281,6 +283,8 @@ function GlobalNavSection({
   onToggleAutomation,
   showMemory,
   onToggleMemory,
+  showNotebooks,
+  onToggleNotebooks,
 }: {
   context: SidebarContext;
   currentPath: string;
@@ -291,6 +295,8 @@ function GlobalNavSection({
   onToggleAutomation: () => void;
   showMemory: boolean;
   onToggleMemory: () => void;
+  showNotebooks: boolean;
+  onToggleNotebooks: () => void;
 }) {
   const [submenuOpen, setSubmenuOpen] = useState(false);
   const submenuRef = useRef<HTMLDivElement>(null);
@@ -312,7 +318,7 @@ function GlobalNavSection({
     { id: 'memories', path: '/memories', icon: BrainCircuit, label: 'Mémoires', active: showMemory, onClick: onToggleMemory },
     { id: 'automation', path: '/automation', icon: Zap, label: 'Tâches', active: showAutomation, onClick: onToggleAutomation },
     { id: 'documents', path: '/documents', icon: FileText, label: 'Documents', active: currentPath === '/documents', onClick: () => navigate('/documents') },
-    { id: 'notebooks', path: '/notebooks', icon: BookOpen, label: 'Notebooks', active: currentPath === '/notebooks', onClick: () => navigate('/notebooks') },
+    { id: 'notebooks', path: '/notebooks', icon: BookOpen, label: 'Notebooks', active: showNotebooks, onClick: onToggleNotebooks },
   ];
 
   const anyActive = subItems.some(item =>

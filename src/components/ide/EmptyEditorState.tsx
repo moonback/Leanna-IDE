@@ -9,7 +9,6 @@ import {
   Command, BookOpen,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState';
 import { useLiveAPIContext } from '../../context/LiveAPIContext';
 import { useProfile } from '../../context/UserProfileContext';
@@ -701,6 +700,7 @@ interface EmptyEditorStateProps {
   onShowSettings: () => void;
   onOpenSearch?: () => void;
   onOpenChat?: () => void;
+  onOpenNotebooks?: () => void;
 }
 
 export const EmptyEditorState = React.memo(function EmptyEditorState({
@@ -709,9 +709,9 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   onCreateFolder,
   onShowSettings,
   onOpenChat,
+  onOpenNotebooks,
 }: EmptyEditorStateProps) {
   const ws = useWorkspaceState();
-  const navigate = useNavigate();
   const { connected, isBusy, getInputAmplitude, getOutputAmplitude, connect } =
     useLiveAPIContext();
   const { profile } = useProfile();
@@ -1053,7 +1053,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
             {/* Notebooks — accès rapide */}
             <button
-              onClick={() => navigate('/notebooks')}
+              onClick={() => onOpenNotebooks?.()}
               className="group flex items-center gap-3.5 w-full px-4 py-3.5 text-left transition-all duration-200"
               style={{
                 backgroundColor: 'var(--bg-secondary)',

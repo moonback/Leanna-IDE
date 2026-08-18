@@ -24,6 +24,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     showMissions: props.showMissions ?? false,
     showKnowledge: props.showKnowledge ?? false,
     showDocuments: props.showDocuments ?? false,
+    showNotebooks: props.showNotebooks ?? false,
     showSystemHealth: props.showSystemHealth ?? false,
     showMcp: props.showMcp ?? false,
     showFleet: props.showFleet ?? false,
@@ -34,7 +35,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.showSettings, props.showRunMenu,
     props.showSandbox, props.showWorkflow, props.showSkillsMonitor,
     props.showChat, props.showAgents, props.showAgentBuilder, props.showMissions,
-    props.showKnowledge, props.showDocuments, props.showSystemHealth, props.showMcp,
+    props.showKnowledge, props.showDocuments, props.showNotebooks, props.showSystemHealth, props.showMcp,
     props.showFleet, props.visionEnabled,
     props.screenShareEnabled,
   ]);
@@ -52,6 +53,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     onToggleAgentBuilder: props.onToggleAgentBuilder ?? noop,
     onToggleMissions: props.onToggleMissions ?? noop,
     onToggleKnowledge: props.onToggleKnowledge ?? noop,
+    onToggleNotebooks: props.onToggleNotebooks ?? noop,
     onToggleDocuments: props.onToggleDocuments ?? noop,
     onToggleSystemHealth: props.onToggleSystemHealth ?? noop,
     onToggleMcp: props.onToggleMcp ?? noop,
@@ -63,7 +65,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.onToggleSettings, props.onToggleRunMenu,
     props.onToggleSandbox, props.onToggleWorkflow, props.onToggleSkillsMonitor,
     props.onToggleChat, props.onToggleAgents, props.onToggleAgentBuilder, props.onToggleMissions,
-    props.onToggleKnowledge, props.onToggleDocuments, props.onToggleSystemHealth, props.onToggleMcp,
+    props.onToggleKnowledge, props.onToggleNotebooks, props.onToggleDocuments, props.onToggleSystemHealth, props.onToggleMcp,
     props.onToggleFleet, props.onToggleVision, props.onToggleScreenShare,
   ]);
 
