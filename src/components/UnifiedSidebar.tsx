@@ -37,6 +37,7 @@ import {
 import { motion } from 'motion/react';
 
 import { useTheme } from '../context/ThemeContext';
+import { useProfile } from '../context/UserProfileContext';
 import { SidebarSection, SidebarSeparator } from './ide/sidebar/SidebarSection';
 import { SidebarItem } from './ide/sidebar/SidebarItem';
 import { sidebarSections } from '../config/ideSidebarConfig';
@@ -65,6 +66,7 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme();
+  const { profile } = useProfile();
   const { context } = props;
 
   const assistantMenuRef = useRef<HTMLDivElement>(null);
@@ -77,8 +79,8 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
 
   // ── AI Menu items (memoized) ──
   const aiMenuItems = useMemo(
-    () => buildAIMenuItems(props.assistantConnected ?? false),
-    [props.assistantConnected]
+    () => buildAIMenuItems(props.assistantConnected ?? false, profile.agents.enabled),
+    [props.assistantConnected, profile.agents.enabled]
   );
 
   // ── Close assistant menu on outside click ──
