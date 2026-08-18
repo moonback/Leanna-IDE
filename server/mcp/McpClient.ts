@@ -530,11 +530,23 @@ export class McpClient extends EventEmitter {
     // Fermer le process stdio
     if (this.process) {
       try {
-        this.process.kill('SIGTERM');
-        // Force kill après 3s
-        setTimeout(() => {
-          try { this.process?.kill('SIGKILL'); } catch { /* ignore */ }
-        }, 3000);
+        if (process.platform === 'win32') {
+          // Sur Windows, SIGTERM n'est pas fiable — utiliser taskkill pour tuer l'arbre
+          const pid = this.process.pid;
+          if (pid) {
+            try {
+              const { execSync } = require('child_process');
+              execSync(`taskkill /PID ${pid} /T /F`, { stdio: 'ignore', windowsHide: true });
+            } catch { /* ignore — process déjà mort */ }
+          }
+        } else {
+          this.process.kill('SIGTERM');
+          // Force kill après 3s
+          const proc = this.process;
+          setTimeout(() => {
+            try { proc?.kill('SIGKILL'); } catch { /* ignore */ }
+          }, 3000);
+        }
       } catch { /* ignore */ }
       this.process = null;
     }

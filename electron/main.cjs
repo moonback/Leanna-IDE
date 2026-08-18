@@ -255,25 +255,51 @@ app.on('window-all-closed', function () {
 // l'arrêt propre des timers, sessions Gemini et WebSocket avant de quitter.
 // Cela évite les MaxListenersExceededWarning et sessions zombies après
 // plusieurs redémarrages en développement.
+
+let isShuttingDown = false;
+
 app.on('before-quit', function (event) {
+  if (isShuttingDown) return; // Éviter les appels multiples
   const shutdown = process.__jarvisShutdown;
   if (typeof shutdown !== 'function') return; // dev mode : server.ts non chargé ici
 
+  isShuttingDown = true;
   event.preventDefault();
   log('[Lifecycle] before-quit : déclenchement du graceful shutdown...');
 
-  const done = shutdown('before-quit').then(function () {
+  shutdown('before-quit').then(function () {
     log('[Lifecycle] Shutdown complet, fermeture Electron.');
-    app.exit(0);
   }).catch(function (err) {
     log('[Lifecycle] Erreur shutdown:', err && err.message ? err.message : String(err));
-    app.exit(1);
+  }).finally(function () {
+    // Tuer tous les processus enfants restants sur Windows
+    killChildProcesses();
+    app.exit(0);
   });
 
-  // Sécurité : forcer la fermeture après 3s si le shutdown n'aboutit pas
+  // Sécurité : forcer la fermeture après 5s si le shutdown n'aboutit pas
   setTimeout(function () {
-    log('[Lifecycle] Timeout shutdown (3s), forçage fermeture.');
+    log('[Lifecycle] Timeout shutdown (5s), forçage fermeture.');
+    killChildProcesses();
     app.exit(0);
-  }, 3000);
+  }, 5000);
 });
+
+// Sur Windows, app.exit() ne tue pas toujours les child processes (MCP, etc.)
+// On utilise taskkill pour nettoyer l'arbre de processus.
+function killChildProcesses() {
+  if (process.platform !== 'win32') return;
+  try {
+    const { execSync } = require('child_process');
+    const pid = process.pid;
+    log('[Lifecycle] Nettoyage processus enfants (PID parent:', pid, ')...');
+    // /T = kill process tree, /F = force
+    execSync('taskkill /PID ' + pid + ' /T /F', {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+  } catch (_) {
+    // Erreur attendue : taskkill échoue quand le process est déjà en train de mourir
+  }
+}
 
