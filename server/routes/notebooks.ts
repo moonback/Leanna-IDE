@@ -7,8 +7,11 @@
 
 import { Router, Request, Response } from "express";
 import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { notebookManager, sourceIngester, groundedChat, contentGenerator, embeddingStore } from "../notebooks";
 import type { GeneratedDocType } from "../notebooks/types";
+import { getProjectRoot } from "../utils/pathUtils";
 
 // Configuration multer
 const upload = multer({
@@ -849,6 +852,105 @@ export function createNotebooksRouter(): Router {
         return;
       }
       res.json({ status: "success", overviews: notebook.audioOverviews });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // DELETE /api/notebooks/:id/audio-overviews/:overviewId — Supprimer un audio overview
+  router.delete("/:id/audio-overviews/:overviewId", (req: Request, res: Response) => {
+    try {
+      const success = notebookManager.deleteAudioOverview(req.params.id, req.params.overviewId);
+      if (!success) {
+        res.status(404).json({ error: "Audio overview introuvable." });
+        return;
+      }
+      res.json({ status: "success", message: "Audio overview supprimé." });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/notebooks/:id/audio-overviews/:overviewId/export — Exporter le script audio en Markdown
+  router.get("/:id/audio-overviews/:overviewId/export", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      const overview = notebook.audioOverviews?.find((o: any) => o.id === req.params.overviewId);
+      if (!overview) {
+        res.status(404).json({ error: "Audio overview introuvable." });
+        return;
+      }
+
+      // Construire le Markdown
+      const lines: string[] = [];
+      lines.push(`# 🎙️ ${overview.title}`);
+      lines.push("");
+      lines.push(`> Exporté le ${new Date().toLocaleString("fr-FR")}`);
+      lines.push(`> Durée estimée : ${Math.floor(overview.estimatedDuration / 60)}:${(overview.estimatedDuration % 60).toString().padStart(2, "0")}`);
+      lines.push("");
+      lines.push("---");
+      lines.push("");
+
+      // Formater le script
+      const scriptLines = overview.script.split("\n");
+      for (const line of scriptLines) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          lines.push("");
+          continue;
+        }
+
+        const isAlex = trimmed.startsWith("Alex:") || trimmed.startsWith("Alex :");
+        const isSam = trimmed.startsWith("Sam:") || trimmed.startsWith("Sam :");
+
+        if (isAlex) {
+          const text = trimmed.replace(/^Alex\s*:\s*/i, "");
+          lines.push(`**🧑 Alex :** ${text}`);
+          lines.push("");
+        } else if (isSam) {
+          const text = trimmed.replace(/^Sam\s*:\s*/i, "");
+          lines.push(`**🤖 Sam :** ${text}`);
+          lines.push("");
+        } else {
+          lines.push(`*${trimmed}*`);
+          lines.push("");
+        }
+      }
+
+      lines.push("---");
+      lines.push("");
+      lines.push(`*Script généré le ${new Date(overview.createdAt).toLocaleString("fr-FR")}*`);
+
+      const markdown = lines.join("\n");
+
+      const saveToWorkspace = req.query.save === "true";
+
+      if (saveToWorkspace) {
+        // Sauvegarder dans le workspace
+        const projectRoot = getProjectRoot();
+
+        const filename = `audio-script-${overview.title.replace(/[^a-zA-Z0-9àâäéèêëïîôùûüÿçÀÂÄÉÈÊËÏÎÔÙÛÜŸÇ ]/g, "-").replace(/\s+/g, "-").replace(/-+/g, "-").slice(0, 50)}.md`;
+        const filePath = path.join(projectRoot, filename);
+        fs.writeFileSync(filePath, markdown, "utf-8");
+
+        res.json({
+          status: "success",
+          message: `Script sauvegardé dans le workspace`,
+          filePath: filename,
+          markdown,
+        });
+      } else {
+        // Téléchargement direct
+        const filename = `audio-script-${overview.title.replace(/[^a-zA-Z0-9]/g, "-").slice(0, 40)}-${Date.now()}.md`;
+        res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.send(markdown);
+      }
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }

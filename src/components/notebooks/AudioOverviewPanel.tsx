@@ -6,7 +6,7 @@
 
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, Play, Loader2, Clock, Users, Radio, Pause } from 'lucide-react';
+import { Mic, Play, Loader2, Clock, Users, Radio, Pause, Download, Trash2, RefreshCw } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 
 interface AudioOverview {
@@ -27,6 +27,7 @@ interface Props {
 export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) {
   const { success, error: toastError } = useToast();
   const [generating, setGenerating] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [selectedOverview, setSelectedOverview] = useState<AudioOverview | null>(null);
   const [duration, setDuration] = useState<'short' | 'medium' | 'long'>('medium');
 
@@ -56,6 +57,58 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
       setGenerating(false);
     }
   }, [notebookId, duration, success, toastError, onRefresh]);
+
+  const handleDownloadToWorkspace = useCallback(async () => {
+    if (!selectedOverview) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(
+        `/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}/export?save=true`
+      );
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: 'Erreur' }));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      success(`Script sauvegardé : ${data.filePath}`);
+    } catch (e: any) {
+      toastError(e.message);
+    } finally {
+      setDownloading(false);
+    }
+  }, [notebookId, selectedOverview, success, toastError]);
+
+  const handleDelete = useCallback(async (overviewId: string) => {
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/audio-overviews/${overviewId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: 'Erreur' }));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+      success('Audio overview supprimé');
+      if (selectedOverview?.id === overviewId) {
+        setSelectedOverview(null);
+      }
+      onRefresh();
+    } catch (e: any) {
+      toastError(e.message);
+    }
+  }, [notebookId, selectedOverview, success, toastError, onRefresh]);
+
+  const handleRegenerate = useCallback(async () => {
+    if (!selectedOverview) return;
+    // Supprimer l'ancien puis régénérer
+    try {
+      await fetch(`/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}`, {
+        method: 'DELETE',
+      });
+    } catch {}
+    setSelectedOverview(null);
+    // Lancer la génération
+    handleGenerate();
+  }, [notebookId, selectedOverview, handleGenerate]);
 
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -151,38 +204,51 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
             </p>
             <AnimatePresence initial={false}>
               {overviews.map(ov => (
-                <motion.button
+                <motion.div
                   key={ov.id}
                   layout
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  onClick={() => setSelectedOverview(ov)}
-                  className={`w-full p-3.5 rounded-xl border text-left transition-all hover:shadow-sm ${selectedOverview?.id === ov.id ? 'ring-1 ring-[var(--accent-primary)]' : ''}`}
-                  style={{ borderColor: selectedOverview?.id === ov.id ? 'var(--accent-primary)' : 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+                  className="relative group"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: 'var(--accent-subtle)' }}
-                    >
-                      <Play className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                        {ov.title}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[9px] flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}>
-                          <Clock className="w-2.5 h-2.5" />
-                          {formatDuration(ov.estimatedDuration)}
-                        </span>
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${ov.status === 'ready' ? 'bg-green-500/10 text-green-400' : ov.status === 'error' ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
-                          {ov.status === 'ready' ? '● Prêt' : ov.status === 'error' ? '● Erreur' : '● En cours'}
-                        </span>
+                  <button
+                    onClick={() => setSelectedOverview(ov)}
+                    className={`w-full p-3.5 rounded-xl border text-left transition-all hover:shadow-sm ${selectedOverview?.id === ov.id ? 'ring-1 ring-[var(--accent-primary)]' : ''}`}
+                    style={{ borderColor: selectedOverview?.id === ov.id ? 'var(--accent-primary)' : 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: 'var(--accent-subtle)' }}
+                      >
+                        <Play className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                          {ov.title}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[9px] flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}>
+                            <Clock className="w-2.5 h-2.5" />
+                            {formatDuration(ov.estimatedDuration)}
+                          </span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${ov.status === 'ready' ? 'bg-green-500/10 text-green-400' : ov.status === 'error' ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
+                            {ov.status === 'ready' ? '● Prêt' : ov.status === 'error' ? '● Erreur' : '● En cours'}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </motion.button>
+                  </button>
+                  {/* Delete button on hover */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(ov.id); }}
+                    className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10"
+                    style={{ color: '#ef4444' }}
+                    title="Supprimer"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </motion.div>
               ))}
             </AnimatePresence>
           </div>
@@ -201,7 +267,7 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
               >
                 <Users className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                   {selectedOverview.title}
                 </h2>
@@ -214,6 +280,53 @@ export function AudioOverviewPanel({ notebookId, overviews, onRefresh }: Props) 
                   <span>{new Date(selectedOverview.createdAt).toLocaleDateString('fr-FR')}</span>
                 </p>
               </div>
+              <button
+                onClick={handleDownloadToWorkspace}
+                disabled={downloading}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--accent-subtle)',
+                  color: 'var(--accent-primary)',
+                  border: '1px solid var(--accent-primary)',
+                }}
+                title="Sauvegarder le script en .md dans le workspace"
+              >
+                {downloading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5" />
+                )}
+                Télécharger .md
+              </button>
+              <button
+                onClick={handleRegenerate}
+                disabled={generating}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--bg-base)',
+                  color: 'var(--text-muted)',
+                  border: '1px solid var(--border-base)',
+                }}
+                title="Régénérer ce podcast"
+              >
+                {generating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+              </button>
+              <button
+                onClick={() => handleDelete(selectedOverview.id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95"
+                style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  color: '#ef4444',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                }}
+                title="Supprimer ce podcast"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             </div>
 
             {/* Script as chat bubbles */}

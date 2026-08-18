@@ -296,6 +296,19 @@ export class NotebookManager {
     this.persist(notebook);
   }
 
+  deleteAudioOverview(notebookId: string, overviewId: string): boolean {
+    const notebook = this.notebooks.get(notebookId);
+    if (!notebook) return false;
+
+    const index = notebook.audioOverviews.findIndex(o => o.id === overviewId);
+    if (index === -1) return false;
+
+    notebook.audioOverviews.splice(index, 1);
+    notebook.updatedAt = new Date().toISOString();
+    this.persist(notebook);
+    return true;
+  }
+
   // ─── Stats ───────────────────────────────────────────────────────────────
 
   getStats(): {
