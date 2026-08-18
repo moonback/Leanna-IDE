@@ -13,7 +13,7 @@ import { randomUUID } from "crypto";
 import { createLogger } from "../utils/logger";
 import { generateText } from "../utils/textGeneration";
 import { notebookManager } from "./NotebookManager";
-import type { GeneratedDocument, GeneratedDocType, AudioOverview } from "./types";
+import type { GeneratedDocument, GeneratedDocType, AudioOverview, ReportSuggestion } from "./types";
 
 const log = createLogger("ContentGenerator");
 
@@ -86,6 +86,50 @@ export class ContentGenerator {
         title = "Glossaire";
         prompt = this.buildGlossaryPrompt(sourcesContext, lang);
         break;
+      case "full-report":
+        title = "Rapport complet";
+        prompt = this.buildFullReportPrompt(sourcesContext, lang);
+        break;
+      case "report-business":
+        title = "Business Plan";
+        prompt = this.buildReportPrompt("business", sourcesContext, lang);
+        break;
+      case "report-market":
+        title = "Étude de marché";
+        prompt = this.buildReportPrompt("market", sourcesContext, lang);
+        break;
+      case "report-technical":
+        title = "Rapport technique";
+        prompt = this.buildReportPrompt("technical", sourcesContext, lang);
+        break;
+      case "report-competitive":
+        title = "Analyse concurrentielle";
+        prompt = this.buildReportPrompt("competitive", sourcesContext, lang);
+        break;
+      case "report-financial":
+        title = "Rapport financier";
+        prompt = this.buildReportPrompt("financial", sourcesContext, lang);
+        break;
+      case "report-marketing":
+        title = "Plan marketing";
+        prompt = this.buildReportPrompt("marketing", sourcesContext, lang);
+        break;
+      case "report-product":
+        title = "Rapport produit";
+        prompt = this.buildReportPrompt("product", sourcesContext, lang);
+        break;
+      case "report-risk":
+        title = "Analyse des risques";
+        prompt = this.buildReportPrompt("risk", sourcesContext, lang);
+        break;
+      case "report-executive":
+        title = "Synthèse exécutive";
+        prompt = this.buildReportPrompt("executive", sourcesContext, lang);
+        break;
+      case "report-project":
+        title = "Rapport de projet";
+        prompt = this.buildReportPrompt("project", sourcesContext, lang);
+        break;
       default:
         throw new Error(`Type non supporté: ${type}`);
     }
@@ -99,13 +143,16 @@ export class ContentGenerator {
 
     let generatedText = "";
 
+    // Plus de tokens pour les rapports
+    const maxTokens = (type === "full-report" || type.startsWith("report-")) ? 16384 : 8192;
+
     if (options.onChunk) {
       // Mode streaming
       const { generateTextStream } = await import("../utils/textGeneration");
       generatedText = await generateTextStream({
         prompt,
         temperature: 0.5,
-        maxOutputTokens: 8192,
+        maxOutputTokens: maxTokens,
         onChunk: options.onChunk,
       });
     } else {
@@ -113,7 +160,7 @@ export class ContentGenerator {
       const result = await generateText({
         prompt,
         temperature: 0.5,
-        maxOutputTokens: 8192,
+        maxOutputTokens: maxTokens,
       });
       generatedText = result.text;
     }
@@ -420,6 +467,602 @@ ${context}
 
 Génère le glossaire complet en Markdown.`;
   }
+
+  private buildFullReportPrompt(context: string, lang: string): string {
+    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
+    return `${langInstruction}
+
+Tu es un analyste expert. Génère un RAPPORT COMPLET et professionnel basé sur l'ensemble des sources fournies.
+
+Le rapport doit être exhaustif et structuré comme un vrai document professionnel. Il doit inclure :
+
+## Structure attendue :
+
+### 1. 📋 Résumé exécutif (Executive Summary)
+- Synthèse en 3-5 paragraphes des points clés
+- Conclusions principales
+- Recommandations prioritaires
+
+### 2. 📊 Contexte et périmètre
+- Contexte du sujet / projet / domaine
+- Périmètre d'analyse (ce qui est couvert et ce qui ne l'est pas)
+- Méthodologie d'analyse
+
+### 3. 🔍 Analyse détaillée
+- Analyse approfondie de chaque thématique identifiée dans les sources
+- Données et faits clés extraits
+- Comparaisons et mises en perspective
+- Forces et faiblesses identifiées
+
+### 4. 📈 Constats et observations
+- Tendances identifiées
+- Points de convergence et divergence entre les sources
+- Risques et opportunités
+
+### 5. 💡 Recommandations
+- Recommandations actionables (priorisées : court/moyen/long terme)
+- Conditions de succès
+- Points d'attention et risques associés
+
+### 6. 📎 Annexes
+- Glossaire des termes clés
+- Références aux sources
+- Tableau récapitulatif
+
+RÈGLES :
+- Être factuel et s'appuyer exclusivement sur le contenu des sources
+- Citer les sources quand c'est pertinent
+- Utiliser des tableaux, listes et mise en forme Markdown riche
+- Viser 2000-4000 mots pour un rapport substantiel
+- Ton professionnel et analytique
+- Inclure des insights et connections que les sources ne font pas explicitement
+
+SOURCES :
+${context}
+
+Génère le rapport complet en Markdown.`;
+  }
+
+  /**
+   * Génère un prompt spécialisé par type de rapport
+   */
+  private buildReportPrompt(reportType: string, context: string, lang: string): string {
+    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
+
+    const reportPrompts: Record<string, { title: string; structure: string }> = {
+      business: {
+        title: "Business Plan",
+        structure: `## Structure attendue :
+
+### 1. 📋 Résumé exécutif
+- Vision et mission du projet
+- Proposition de valeur unique
+- Objectifs à court et long terme
+
+### 2. 🎯 Problème & Solution
+- Problème identifié et sa magnitude
+- Solution proposée
+- Avantage concurrentiel
+
+### 3. 📊 Modèle économique
+- Sources de revenus
+- Structure de coûts
+- Pricing et marges
+- Projections de rentabilité
+
+### 4. 👥 Marché cible
+- Segments de clientèle
+- Taille du marché adressable (TAM, SAM, SOM)
+- Personas et besoins
+
+### 5. 🚀 Stratégie de mise en marché
+- Canaux d'acquisition
+- Partenariats clés
+- Roadmap de lancement
+
+### 6. ⚠️ Risques et mitigation
+- Risques principaux identifiés
+- Plans de contingence
+- Hypothèses à valider
+
+### 7. 📈 Métriques de succès
+- KPIs de suivi
+- Jalons et objectifs chiffrés`,
+      },
+      market: {
+        title: "Étude de marché",
+        structure: `## Structure attendue :
+
+### 1. 📋 Synthèse de l'étude
+- Conclusions clés
+- Opportunités majeures identifiées
+
+### 2. 📊 Taille et dynamique du marché
+- Taille actuelle et projections de croissance
+- Tendances structurelles
+- Facteurs de croissance et freins
+
+### 3. 👥 Segmentation
+- Segments de marché identifiés
+- Profils types (personas)
+- Besoins et attentes par segment
+- Comportements d'achat
+
+### 4. 🏢 Paysage concurrentiel
+- Acteurs principaux et parts de marché
+- Positionnement des concurrents
+- Barrières à l'entrée
+
+### 5. 💡 Opportunités et menaces
+- Niches non exploitées
+- Évolutions réglementaires
+- Disruptions potentielles
+
+### 6. 🎯 Recommandations de positionnement
+- Positionnement optimal
+- Différenciation recommandée
+- Stratégie d'entrée`,
+      },
+      technical: {
+        title: "Rapport technique",
+        structure: `## Structure attendue :
+
+### 1. 📋 Résumé technique
+- Objectif du document
+- Décisions techniques clés
+- Stack et architecture retenue
+
+### 2. 🏗️ Architecture
+- Architecture globale (schéma)
+- Composants principaux et responsabilités
+- Flux de données
+- Intégrations
+
+### 3. ⚙️ Choix techniques
+- Technologies retenues et justification
+- Alternatives évaluées et raisons du rejet
+- Trade-offs acceptés
+
+### 4. 📐 Spécifications
+- Modèle de données
+- APIs et interfaces
+- Contraintes de performance
+- Exigences de sécurité
+
+### 5. 🚀 Plan d'implémentation
+- Phases de développement
+- Dépendances techniques
+- Risques techniques et mitigation
+
+### 6. 📊 Métriques et monitoring
+- KPIs techniques
+- Stratégie de monitoring
+- Seuils d'alerte`,
+      },
+      competitive: {
+        title: "Analyse concurrentielle",
+        structure: `## Structure attendue :
+
+### 1. 📋 Vue d'ensemble du paysage concurrentiel
+- Nombre et types de concurrents
+- Dynamique du marché
+
+### 2. 🏢 Profil des concurrents
+Pour chaque concurrent identifié :
+- Positionnement et proposition de valeur
+- Forces et faiblesses
+- Pricing et modèle économique
+- Parts de marché estimées
+
+### 3. 📊 Matrice comparative
+- Tableau comparatif multi-critères
+- Scoring par dimension
+
+### 4. 🎯 Analyse de positionnement
+- Carte de positionnement (axes différenciants)
+- Espaces non occupés
+- Facteurs clés de succès du marché
+
+### 5. 💡 Avantages concurrentiels
+- Avantages identifiés vs chaque concurrent
+- Vulnérabilités à couvrir
+- Stratégie de différenciation recommandée
+
+### 6. 📈 Recommandations stratégiques
+- Quick wins
+- Investissements stratégiques
+- Veille à maintenir`,
+      },
+      financial: {
+        title: "Rapport financier",
+        structure: `## Structure attendue :
+
+### 1. 📋 Synthèse financière
+- Chiffres clés
+- Rentabilité et viabilité
+
+### 2. 💰 Structure de revenus
+- Sources de revenus détaillées
+- Projections à 12/24/36 mois
+- Hypothèses de croissance
+
+### 3. 📉 Structure de coûts
+- Coûts fixes et variables
+- Coûts d'acquisition client (CAC)
+- Burn rate
+
+### 4. 📊 Projections financières
+- Compte de résultat prévisionnel
+- Seuil de rentabilité (break-even)
+- Trésorerie prévisionnelle
+
+### 5. 📈 Métriques financières
+- LTV (Lifetime Value)
+- Ratio LTV/CAC
+- Marge brute et nette
+- MRR/ARR si applicable
+
+### 6. ⚠️ Sensibilité et risques
+- Scénarios (optimiste, réaliste, pessimiste)
+- Variables de sensibilité
+- Besoins de financement`,
+      },
+      marketing: {
+        title: "Plan marketing",
+        structure: `## Structure attendue :
+
+### 1. 📋 Résumé du plan
+- Objectifs marketing
+- Budget et timeline
+
+### 2. 🎯 Cibles et personas
+- Segments prioritaires
+- Personas détaillés
+- Parcours client (customer journey)
+
+### 3. 💬 Messaging et positionnement
+- Proposition de valeur
+- Messages clés par persona
+- Ton et personnalité de marque
+
+### 4. 📢 Stratégie d'acquisition
+- Canaux organiques (SEO, content, social)
+- Canaux payants (Ads, partnerships)
+- Stratégie de conversion
+
+### 5. 📊 Funnel et métriques
+- Funnel d'acquisition
+- KPIs par étape
+- Objectifs chiffrés
+
+### 6. 🗓️ Plan d'action
+- Actions à 30/60/90 jours
+- Ressources nécessaires
+- Budget par canal`,
+      },
+      product: {
+        title: "Rapport produit",
+        structure: `## Structure attendue :
+
+### 1. 📋 Vision produit
+- Vision à long terme
+- Problèmes résolus
+- Proposition de valeur
+
+### 2. 🎯 Fonctionnalités
+- Fonctionnalités core identifiées
+- Priorisation (MoSCoW ou RICE)
+- MVP vs versions futures
+
+### 3. 👥 Utilisateurs
+- Personas utilisateurs
+- Jobs-to-be-done
+- Parcours utilisateur clés
+
+### 4. 🗺️ Roadmap
+- Phase 1 (MVP) : scope et timeline
+- Phase 2 : enrichissements
+- Phase 3 : scale
+
+### 5. 📐 Spécifications UX
+- Principes d'expérience
+- Flows critiques
+- Contraintes d'accessibilité
+
+### 6. 📊 Métriques produit
+- North Star metric
+- KPIs de suivi
+- Critères de succès par feature`,
+      },
+      risk: {
+        title: "Analyse des risques",
+        structure: `## Structure attendue :
+
+### 1. 📋 Synthèse des risques
+- Nombre de risques identifiés par catégorie
+- Niveau de risque global
+
+### 2. ⚠️ Inventaire des risques
+Pour chaque risque :
+- Description et impact potentiel
+- Probabilité (faible/moyenne/élevée)
+- Sévérité (faible/moyenne/critique)
+- Score de risque
+
+### 3. 📊 Matrice de risques
+- Matrice probabilité × impact
+- Classification par priorité
+- Risques critiques nécessitant une action immédiate
+
+### 4. 🛡️ Plans de mitigation
+- Actions préventives par risque
+- Plans de contingence
+- Responsables et délais
+
+### 5. 📈 Suivi et monitoring
+- Indicateurs d'alerte précoce
+- Fréquence de réévaluation
+- Processus d'escalade
+
+### 6. 💡 Recommandations
+- Actions prioritaires
+- Investissements de protection
+- Acceptation de risque résiduel`,
+      },
+      executive: {
+        title: "Synthèse exécutive",
+        structure: `## Structure attendue :
+
+### 1. 🎯 L'essentiel en 30 secondes
+- 3-5 bullet points des conclusions majeures
+- Décision requise (si applicable)
+
+### 2. 📊 Contexte
+- Situation actuelle (2-3 phrases)
+- Enjeux clés
+
+### 3. 💡 Conclusions et recommandations
+- Recommandation principale
+- Alternatives considérées
+- Risques de l'inaction
+
+### 4. 📈 Impact attendu
+- Bénéfices quantifiés
+- Timeline de réalisation
+- Ressources nécessaires
+
+### 5. ➡️ Prochaines étapes
+- Actions immédiates
+- Responsables
+- Points de décision
+
+RÈGLE SPÉCIALE : Ce document doit être CONCIS (max 2 pages). Chaque mot compte. Prioriser la clarté et l'impact.`,
+      },
+      project: {
+        title: "Rapport de projet",
+        structure: `## Structure attendue :
+
+### 1. 📋 Résumé du projet
+- Objectif du projet
+- Statut global (sur les rails / à risque / en retard)
+- Faits marquants
+
+### 2. 📊 Avancement
+- Progression globale (%)
+- Livrables complétés
+- Livrables en cours
+- Livrables à venir
+
+### 3. 🗓️ Timeline et jalons
+- Jalons atteints
+- Prochains jalons
+- Écarts par rapport au planning initial
+
+### 4. ⚠️ Risques et blocages
+- Problèmes actuels
+- Risques identifiés
+- Actions correctives en cours
+
+### 5. 👥 Ressources
+- Équipe et rôles
+- Charge de travail
+- Besoins non couverts
+
+### 6. ➡️ Prochaines étapes
+- Actions prioritaires pour la prochaine période
+- Décisions à prendre
+- Dépendances externes`,
+      },
+    };
+
+    const reportConfig = reportPrompts[reportType];
+    if (!reportConfig) {
+      return this.buildFullReportPrompt(context, lang);
+    }
+
+    return `${langInstruction}
+
+Tu es un expert en rédaction de rapports professionnels. Génère un **${reportConfig.title}** complet et structuré basé sur les sources fournies.
+
+${reportConfig.structure}
+
+RÈGLES :
+- S'appuyer EXCLUSIVEMENT sur le contenu des sources fournies
+- Être factuel, précis et professionnel
+- Utiliser des tableaux, listes et mise en forme Markdown riche
+- Viser 2000-4000 mots pour un rapport substantiel
+- Ton professionnel et analytique
+- Si des informations manquent dans les sources, le signaler clairement avec [Information non disponible dans les sources]
+- Inclure des insights et connexions entre les différentes sources
+
+SOURCES :
+${context}
+
+Génère le ${reportConfig.title} complet en Markdown.`;
+  }
+
+  // ─── Suggestions intelligentes de rapports ──────────────────────────────────
+
+  /**
+   * Analyse les sources d'un notebook et suggère les rapports les plus pertinents à générer.
+   */
+  async suggestReports(notebookId: string): Promise<ReportSuggestion[]> {
+    const notebook = notebookManager.getNotebook(notebookId);
+    if (!notebook) throw new Error("Notebook introuvable.");
+    if (notebook.sources.length === 0) return [];
+
+    const sourcesInfo = notebook.sources.map(s => ({
+      id: s.id,
+      title: s.title,
+      summary: s.summary,
+      keywords: s.keywords,
+      wordCount: s.wordCount,
+      type: s.type,
+      language: s.language,
+    }));
+
+    const alreadyGenerated = notebook.generatedDocuments.map(d => d.type);
+
+    const prompt = `Tu es un assistant qui analyse des documents et recommande des rapports à générer.
+
+Voici les sources disponibles dans un notebook :
+${sourcesInfo.map((s, i) => `${i + 1}. "${s.title}" (${s.type}, ${s.wordCount} mots) — ${s.summary}\n   Mots-clés: ${s.keywords.join(", ")}`).join("\n\n")}
+
+Documents déjà générés : ${alreadyGenerated.length > 0 ? alreadyGenerated.join(", ") : "aucun"}
+
+Types de rapports disponibles :
+- "report-business" : Business Plan (vision, modèle économique, stratégie, projections)
+- "report-market" : Étude de marché (taille, segments, tendances, concurrence)
+- "report-technical" : Rapport technique (architecture, choix technos, spécifications)
+- "report-competitive" : Analyse concurrentielle (positionnement, benchmark, différenciation)
+- "report-financial" : Rapport financier (projections, coûts, rentabilité, KPIs)
+- "report-marketing" : Plan marketing (acquisition, canaux, messaging, personas)
+- "report-product" : Rapport produit (roadmap, fonctionnalités, priorisation, UX)
+- "report-risk" : Analyse des risques (identification, probabilité, mitigation)
+- "report-executive" : Synthèse exécutive (résumé décisionnel pour dirigeants)
+- "report-project" : Rapport de projet (avancement, livrables, jalons, blocages)
+- "full-report" : Rapport complet généraliste (résumé exécutif, analyse, recommandations)
+
+INSTRUCTIONS :
+- Analyse le contenu et la nature des sources
+- Suggère les 3-5 rapports les PLUS PERTINENTS par rapport au contenu réel des sources
+- Par exemple : si les sources parlent d'un MVP et de fonctionnalités → suggère business plan, rapport produit, étude de marché
+- Ne suggère PAS un rapport qui n'a pas de sens par rapport aux sources
+- Priorise par pertinence
+- Explique POURQUOI chaque rapport serait utile pour ces sources spécifiques
+
+Réponds UNIQUEMENT en JSON valide avec ce format exact :
+[
+  {
+    "type": "report-business",
+    "title": "Titre descriptif personnalisé du rapport",
+    "description": "Ce que le rapport contiendra spécifiquement pour ces sources",
+    "reason": "Pourquoi ce rapport est pertinent pour ces sources",
+    "relevance": 95,
+    "recommendedSourceIds": ["id1", "id2"]
+  }
+]
+
+Génère entre 3 et 5 suggestions, triées par pertinence décroissante.`;
+
+    try {
+      const result = await generateText({
+        prompt,
+        temperature: 0.3,
+        maxOutputTokens: 4096,
+      });
+
+      // Parser le JSON de la réponse
+      let suggestions: ReportSuggestion[] = [];
+      const jsonMatch = result.text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        suggestions = JSON.parse(jsonMatch[0]);
+        // Valider et nettoyer
+        suggestions = suggestions
+          .filter(s => s.type && s.title && s.description && s.reason)
+          .map(s => ({
+            ...s,
+            relevance: Math.min(100, Math.max(0, s.relevance || 50)),
+            recommendedSourceIds: (s.recommendedSourceIds || []).filter(
+              id => notebook.sources.some(src => src.id === id)
+            ),
+          }));
+      }
+
+      log.info(`💡 ${suggestions.length} suggestions de rapports pour "${notebook.title}"`);
+      return suggestions;
+    } catch (e: any) {
+      log.error(`Erreur suggestions rapports: ${e.message}`);
+      // Fallback : suggestions basiques basées sur les sources
+      return this.getDefaultSuggestions(notebook.sources, alreadyGenerated);
+    }
+  }
+
+  /**
+   * Suggestions par défaut si l'appel IA échoue
+   */
+  private getDefaultSuggestions(sources: any[], alreadyGenerated: string[]): ReportSuggestion[] {
+    const suggestions: ReportSuggestion[] = [];
+    const sourceIds = sources.map(s => s.id);
+
+    if (!alreadyGenerated.includes("report-business")) {
+      suggestions.push({
+        type: "report-business",
+        title: "Business Plan",
+        description: "Vision, modèle économique, stratégie et projections",
+        reason: "Un business plan structure vos idées et valide la viabilité de votre projet",
+        relevance: 90,
+        recommendedSourceIds: sourceIds,
+      });
+    }
+
+    if (!alreadyGenerated.includes("report-product")) {
+      suggestions.push({
+        type: "report-product",
+        title: "Rapport produit",
+        description: "Roadmap, fonctionnalités prioritaires et parcours utilisateurs",
+        reason: "Clarifie la vision produit et priorise les développements",
+        relevance: 85,
+        recommendedSourceIds: sourceIds,
+      });
+    }
+
+    if (!alreadyGenerated.includes("report-market")) {
+      suggestions.push({
+        type: "report-market",
+        title: "Étude de marché",
+        description: "Taille du marché, segments, tendances et concurrence",
+        reason: "Valide le potentiel marché et identifie les opportunités",
+        relevance: 80,
+        recommendedSourceIds: sourceIds,
+      });
+    }
+
+    if (!alreadyGenerated.includes("report-executive")) {
+      suggestions.push({
+        type: "report-executive",
+        title: "Synthèse exécutive",
+        description: "Résumé décisionnel concis pour les parties prenantes",
+        reason: "Permet de communiquer rapidement les points essentiels",
+        relevance: 75,
+        recommendedSourceIds: sourceIds,
+      });
+    }
+
+    if (!alreadyGenerated.includes("report-risk")) {
+      suggestions.push({
+        type: "report-risk",
+        title: "Analyse des risques",
+        description: "Risques identifiés, probabilité et plans de mitigation",
+        reason: "Anticipe les problèmes et prépare des plans de contingence",
+        relevance: 70,
+        recommendedSourceIds: sourceIds,
+      });
+    }
+
+    return suggestions.slice(0, 5);
+  }
 }
+
 
 export const contentGenerator = new ContentGenerator();

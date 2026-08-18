@@ -1,8 +1,8 @@
-/**
- * Routes API — Notebooks (concurrent NotebookLM)
+﻿/**
+ * Routes API â€” Notebooks (concurrent NotebookLM)
  *
- * Endpoints pour gérer les notebooks, sources, chat groundé,
- * génération de contenu et audio overviews.
+ * Endpoints pour gÃ©rer les notebooks, sources, chat groundÃ©,
+ * gÃ©nÃ©ration de contenu et audio overviews.
  */
 
 import { Router, Request, Response } from "express";
@@ -13,7 +13,7 @@ import { notebookManager, sourceIngester, groundedChat, contentGenerator, embedd
 import { backupService } from "../notebooks/BackupService";
 import { sourceProcessingQueue } from "../notebooks/ProcessingQueue";
 import { chatResponseCache, ragSearchCache } from "../notebooks/ResponseCache";
-import type { GeneratedDocType } from "../notebooks/types";
+import type { GeneratedDocType, ReportSuggestion } from "../notebooks/types";
 import { getProjectRoot } from "../utils/pathUtils";
 import { getSandboxRoot } from "../utils/sandbox";
 
@@ -31,7 +31,7 @@ const upload = multer({
     ) {
       cb(null, true);
     } else {
-      cb(new Error(`Type non supporté: ${file.mimetype}`));
+      cb(new Error(`Type non supportÃ©: ${file.mimetype}`));
     }
   },
 });
@@ -39,11 +39,11 @@ const upload = multer({
 export function createNotebooksRouter(): Router {
   const router = Router();
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // NOTEBOOKS CRUD
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  // GET /api/notebooks — Liste tous les notebooks
+  // GET /api/notebooks â€” Liste tous les notebooks
   router.get("/", (_req: Request, res: Response) => {
     try {
       const notebooks = notebookManager.getAllNotebooks();
@@ -64,7 +64,7 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // POST /api/notebooks — Crée un nouveau notebook
+  // POST /api/notebooks â€” CrÃ©e un nouveau notebook
   router.post("/", (req: Request, res: Response) => {
     try {
       const { title, description } = req.body;
@@ -79,7 +79,7 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // GET /api/notebooks/:id — Détail d'un notebook
+  // GET /api/notebooks/:id â€” DÃ©tail d'un notebook
   router.get("/:id", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -109,7 +109,7 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // PATCH /api/notebooks/:id — Mise à jour d'un notebook
+  // PATCH /api/notebooks/:id â€” Mise Ã  jour d'un notebook
   router.patch("/:id", (req: Request, res: Response) => {
     try {
       const { title, description, color, icon } = req.body;
@@ -124,7 +124,7 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // DELETE /api/notebooks/:id — Supprime un notebook
+  // DELETE /api/notebooks/:id â€” Supprime un notebook
   router.delete("/:id", (req: Request, res: Response) => {
     try {
       const success = notebookManager.deleteNotebook(req.params.id);
@@ -132,13 +132,13 @@ export function createNotebooksRouter(): Router {
         res.status(404).json({ error: "Notebook introuvable." });
         return;
       }
-      res.json({ status: "success", message: "Notebook supprimé." });
+      res.json({ status: "success", message: "Notebook supprimÃ©." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // GET /api/notebooks/stats — Statistiques globales
+  // GET /api/notebooks/stats â€” Statistiques globales
   router.get("/stats/global", (_req: Request, res: Response) => {
     try {
       const stats = notebookManager.getStats();
@@ -148,11 +148,11 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // SOURCES
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  // POST /api/notebooks/:id/sources/upload — Upload un fichier comme source
+  // POST /api/notebooks/:id/sources/upload â€” Upload un fichier comme source
   router.post("/:id/sources/upload", upload.single("file"), async (req: Request, res: Response) => {
     try {
       const notebookId = req.params.id;
@@ -193,7 +193,7 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // POST /api/notebooks/:id/sources/upload-multi — Upload plusieurs fichiers simultanément
+  // POST /api/notebooks/:id/sources/upload-multi â€” Upload plusieurs fichiers simultanÃ©ment
   router.post("/:id/sources/upload-multi", upload.array("files", 20), async (req: Request, res: Response) => {
     try {
       const notebookId = req.params.id;
@@ -209,7 +209,7 @@ export function createNotebooksRouter(): Router {
         return;
       }
 
-      // Ingérer chaque fichier (séquentiellement pour éviter les rate limits API)
+      // IngÃ©rer chaque fichier (sÃ©quentiellement pour Ã©viter les rate limits API)
       const results: Array<{
         filename: string;
         status: "success" | "error";
@@ -265,7 +265,7 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // POST /api/notebooks/:id/sources/upload-queued — Upload via la queue de processing (non-bloquant)
+  // POST /api/notebooks/:id/sources/upload-queued â€” Upload via la queue de processing (non-bloquant)
   router.post("/:id/sources/upload-queued", upload.array("files", 20), (req: Request, res: Response) => {
     try {
       const notebookId = req.params.id;
@@ -305,7 +305,7 @@ export function createNotebooksRouter(): Router {
 
       res.json({
         status: "success",
-        message: `${taskIds.length} fichier(s) ajouté(s) à la queue de processing.`,
+        message: `${taskIds.length} fichier(s) ajoutÃ©(s) Ã  la queue de processing.`,
         taskIds,
         queueStats: sourceProcessingQueue.getStats(),
       });
@@ -314,7 +314,7 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // POST /api/notebooks/:id/sources/url — Ingère une URL comme source
+  // POST /api/notebooks/:id/sources/url â€” IngÃ¨re une URL comme source
   router.post("/:id/sources/url", async (req: Request, res: Response) => {
     try {
       const notebookId = req.params.id;
@@ -351,7 +351,7 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // POST /api/notebooks/:id/sources/text — Ajoute du texte brut comme source
+  // POST /api/notebooks/:id/sources/text â€” Ajoute du texte brut comme source
   router.post("/:id/sources/text", async (req: Request, res: Response) => {
     try {
       const notebookId = req.params.id;
@@ -370,7 +370,7 @@ export function createNotebooksRouter(): Router {
       const buffer = Buffer.from(content, "utf-8");
       const source = await sourceIngester.ingestFromBuffer(
         buffer,
-        title || "Note collée",
+        title || "Note collÃ©e",
         "text/plain",
         notebookId
       );
@@ -393,7 +393,7 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // DELETE /api/notebooks/:id/sources/:sourceId — Supprime une source
+  // DELETE /api/notebooks/:id/sources/:sourceId â€” Supprime une source
   router.delete("/:id/sources/:sourceId", (req: Request, res: Response) => {
     try {
       const success = notebookManager.removeSource(req.params.id, req.params.sourceId);
@@ -401,13 +401,13 @@ export function createNotebooksRouter(): Router {
         res.status(404).json({ error: "Source introuvable." });
         return;
       }
-      res.json({ status: "success", message: "Source supprimée." });
+      res.json({ status: "success", message: "Source supprimÃ©e." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // POST /api/notebooks/:id/sources/:sourceId/reindex — Re-indexer une source
+  // POST /api/notebooks/:id/sources/:sourceId/reindex â€” Re-indexer une source
   router.post("/:id/sources/:sourceId/reindex", async (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -441,7 +441,7 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // GET /api/notebooks/:id/sources/:sourceId/content — Contenu brut d'une source
+  // GET /api/notebooks/:id/sources/:sourceId/content â€” Contenu brut d'une source
   router.get("/:id/sources/:sourceId/content", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -455,14 +455,14 @@ export function createNotebooksRouter(): Router {
         return;
       }
       // Return the raw content (stored in source or reconstructed from chunks)
-      const content = (source as any).rawContent || source.summary || "Contenu non disponible en aperçu.";
+      const content = (source as any).rawContent || source.summary || "Contenu non disponible en aperÃ§u.";
       res.json({ status: "success", content });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // POST /api/notebooks/:id/sources/:sourceId/tags — Ajouter un tag
+  // POST /api/notebooks/:id/sources/:sourceId/tags â€” Ajouter un tag
   router.post("/:id/sources/:sourceId/tags", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -491,7 +491,7 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // DELETE /api/notebooks/:id/sources/:sourceId/tags — Supprimer un tag
+  // DELETE /api/notebooks/:id/sources/:sourceId/tags â€” Supprimer un tag
   router.delete("/:id/sources/:sourceId/tags", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -514,11 +514,11 @@ export function createNotebooksRouter(): Router {
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // RÉSUMÉ GLOBAL DES SOURCES
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // RÃ‰SUMÃ‰ GLOBAL DES SOURCES
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  // GET /api/notebooks/:id/sources-summary — Résumé synthétique de toutes les sources
+  // GET /api/notebooks/:id/sources-summary â€” RÃ©sumÃ© synthÃ©tique de toutes les sources
   router.get("/:id/sources-summary", async (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -531,7 +531,7 @@ export function createNotebooksRouter(): Router {
         return;
       }
 
-      // Vérifier si le résumé est en cache et à jour
+      // VÃ©rifier si le rÃ©sumÃ© est en cache et Ã  jour
       const cached = (notebook as any)._sourcesSummaryCache as { hash: string; summary: string } | undefined;
       const currentHash = notebook.sources.map(s => s.id).sort().join("|");
 
@@ -540,29 +540,29 @@ export function createNotebooksRouter(): Router {
         return;
       }
 
-      // Construire le contexte à partir des résumés individuels de chaque source
+      // Construire le contexte Ã  partir des rÃ©sumÃ©s individuels de chaque source
       const sourcesContext = notebook.sources.map(s =>
-        `### 📄 ${s.title} (${s.type})\n**Résumé :** ${s.summary}\n**Mots-clés :** ${s.keywords.join(", ")}\n**Volume :** ${s.wordCount} mots`
+        `### ðŸ“„ ${s.title} (${s.type})\n**RÃ©sumÃ© :** ${s.summary}\n**Mots-clÃ©s :** ${s.keywords.join(", ")}\n**Volume :** ${s.wordCount} mots`
       ).join("\n\n");
 
       const lang = notebook.sources[0]?.language || "fr";
-      const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
+      const langInstruction = lang === "fr" ? "RÃ©ponds en franÃ§ais." : "Reply in English.";
 
       const prompt = `${langInstruction}
 
-Tu es un assistant de synthèse documentaire. Génère un résumé global et structuré qui combine les informations de TOUTES les sources ci-dessous en un encart cohérent.
+Tu es un assistant de synthÃ¨se documentaire. GÃ©nÃ¨re un rÃ©sumÃ© global et structurÃ© qui combine les informations de TOUTES les sources ci-dessous en un encart cohÃ©rent.
 
-Le résumé doit :
-- Être un paragraphe de synthèse (3-6 phrases) qui capture l'essence de l'ensemble des sources
-- Suivi de bullet-points des points clés (max 8 points)
-- Terminer avec les thèmes/mots-clés transversaux
+Le rÃ©sumÃ© doit :
+- ÃŠtre un paragraphe de synthÃ¨se (3-6 phrases) qui capture l'essence de l'ensemble des sources
+- Suivi de bullet-points des points clÃ©s (max 8 points)
+- Terminer avec les thÃ¨mes/mots-clÃ©s transversaux
 
 Format Markdown court et lisible (pas de titres # principaux, utilise ** pour le gras et - pour les listes).
 
 SOURCES (${notebook.sources.length}) :
 ${sourcesContext}
 
-Génère le résumé global maintenant.`;
+GÃ©nÃ¨re le rÃ©sumÃ© global maintenant.`;
 
       const { generateText: genText } = await import("../utils/textGeneration");
       const result = await genText({
@@ -581,7 +581,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // DELETE /api/notebooks/:id/sources-summary — Invalide le cache du résumé (force recalcul)
+  // DELETE /api/notebooks/:id/sources-summary â€” Invalide le cache du rÃ©sumÃ© (force recalcul)
   router.delete("/:id/sources-summary", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -591,17 +591,17 @@ Génère le résumé global maintenant.`;
       }
       delete (notebook as any)._sourcesSummaryCache;
       notebookManager.persistNotebook(req.params.id);
-      res.json({ status: "success", message: "Cache du résumé invalidé." });
+      res.json({ status: "success", message: "Cache du rÃ©sumÃ© invalidÃ©." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CHAT GROUNDÉ (Q&A avec citations)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // CHAT GROUNDÃ‰ (Q&A avec citations)
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  // POST /api/notebooks/:id/chat — Poser une question
+  // POST /api/notebooks/:id/chat â€” Poser une question
   router.post("/:id/chat", async (req: Request, res: Response) => {
     try {
       const { question } = req.body;
@@ -617,7 +617,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // POST /api/notebooks/:id/chat/stream — Poser une question (SSE streaming)
+  // POST /api/notebooks/:id/chat/stream â€” Poser une question (SSE streaming)
   router.post("/:id/chat/stream", async (req: Request, res: Response) => {
     try {
       const { question, threadId } = req.body;
@@ -636,7 +636,7 @@ Génère le résumé global maintenant.`;
       // Envoyer un event "start" pour confirmer la connexion
       res.write(`event: start\ndata: ${JSON.stringify({ status: "streaming" })}\n\n`);
 
-      // Stream la réponse chunk par chunk
+      // Stream la rÃ©ponse chunk par chunk
       const message = await groundedChat.askStream(
         req.params.id,
         question.trim(),
@@ -651,7 +651,7 @@ Génère le résumé global maintenant.`;
         if (notebook?.chatThreads) {
           const thread = notebook.chatThreads.find((t: any) => t.id === threadId);
           if (thread) {
-            // Ajouter la question utilisateur et la réponse
+            // Ajouter la question utilisateur et la rÃ©ponse
             thread.messages.push({
               id: `msg-${Date.now()}-u`,
               role: 'user',
@@ -660,7 +660,7 @@ Génère le résumé global maintenant.`;
               timestamp: new Date().toISOString(),
             });
             thread.messages.push(message);
-            // Mettre à jour le titre du thread si c'est le premier message
+            // Mettre Ã  jour le titre du thread si c'est le premier message
             if (thread.messages.length <= 2) {
               thread.title = question.trim().slice(0, 50) + (question.length > 50 ? '...' : '');
             }
@@ -669,7 +669,7 @@ Génère le résumé global maintenant.`;
         }
       }
 
-      // Générer les follow-ups en parallèle
+      // GÃ©nÃ©rer les follow-ups en parallÃ¨le
       let followUps: string[] = [];
       try {
         followUps = await groundedChat.generateFollowUps(req.params.id);
@@ -679,7 +679,7 @@ Génère le résumé global maintenant.`;
       res.write(`event: done\ndata: ${JSON.stringify({ message, followUps })}\n\n`);
       res.end();
     } catch (e: any) {
-      // Si les headers SSE sont déjà envoyés, envoyer l'erreur en event
+      // Si les headers SSE sont dÃ©jÃ  envoyÃ©s, envoyer l'erreur en event
       if (res.headersSent) {
         res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`);
         res.end();
@@ -689,7 +689,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/:id/chat/follow-ups — Questions de suivi contextuelles
+  // GET /api/notebooks/:id/chat/follow-ups â€” Questions de suivi contextuelles
   router.get("/:id/chat/follow-ups", async (req: Request, res: Response) => {
     try {
       const followUps = await groundedChat.generateFollowUps(req.params.id);
@@ -699,7 +699,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // POST /api/notebooks/:id/chat/deep-dive — Mode exploration approfondie (SSE)
+  // POST /api/notebooks/:id/chat/deep-dive â€” Mode exploration approfondie (SSE)
   router.post("/:id/chat/deep-dive", async (req: Request, res: Response) => {
     try {
       const { question } = req.body;
@@ -725,7 +725,7 @@ Génère le résumé global maintenant.`;
         }
       );
 
-      // Follow-ups après deep dive
+      // Follow-ups aprÃ¨s deep dive
       let followUps: string[] = [];
       try {
         followUps = await groundedChat.generateFollowUps(req.params.id);
@@ -743,7 +743,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/:id/chat/history — Historique du chat
+  // GET /api/notebooks/:id/chat/history â€” Historique du chat
   router.get("/:id/chat/history", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -763,7 +763,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/:id/chat/threads — Liste des threads
+  // GET /api/notebooks/:id/chat/threads â€” Liste des threads
   router.get("/:id/chat/threads", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -782,7 +782,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // POST /api/notebooks/:id/chat/threads — Créer un thread
+  // POST /api/notebooks/:id/chat/threads â€” CrÃ©er un thread
   router.post("/:id/chat/threads", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -808,7 +808,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // DELETE /api/notebooks/:id/chat/threads/:threadId — Supprimer un thread
+  // DELETE /api/notebooks/:id/chat/threads/:threadId â€” Supprimer un thread
   router.delete("/:id/chat/threads/:threadId", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -827,28 +827,28 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // POST /api/notebooks/:id/chat/feedback — Feedback thumbs up/down
+  // POST /api/notebooks/:id/chat/feedback â€” Feedback thumbs up/down
   router.post("/:id/chat/feedback", (req: Request, res: Response) => {
     try {
       const { messageId, feedback } = req.body;
-      // Store feedback (for now just acknowledge — could persist for analytics)
+      // Store feedback (for now just acknowledge â€” could persist for analytics)
       res.json({ status: "success", messageId, feedback });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // DELETE /api/notebooks/:id/chat/history — Effacer l'historique
+  // DELETE /api/notebooks/:id/chat/history â€” Effacer l'historique
   router.delete("/:id/chat/history", (req: Request, res: Response) => {
     try {
       notebookManager.clearChatHistory(req.params.id);
-      res.json({ status: "success", message: "Historique effacé." });
+      res.json({ status: "success", message: "Historique effacÃ©." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // GET /api/notebooks/:id/chat/suggestions — Questions suggérées
+  // GET /api/notebooks/:id/chat/suggestions â€” Questions suggÃ©rÃ©es
   router.get("/:id/chat/suggestions", async (req: Request, res: Response) => {
     try {
       const suggestions = await groundedChat.suggestQuestions(req.params.id);
@@ -858,7 +858,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/:id/chat/export — Exporter la conversation en Markdown
+  // GET /api/notebooks/:id/chat/export â€” Exporter la conversation en Markdown
   router.get("/:id/chat/export", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -868,7 +868,7 @@ Génère le résumé global maintenant.`;
       }
 
       if (notebook.chatHistory.length === 0) {
-        res.status(400).json({ error: "Aucun message à exporter." });
+        res.status(400).json({ error: "Aucun message Ã  exporter." });
         return;
       }
 
@@ -876,19 +876,19 @@ Génère le résumé global maintenant.`;
 
       // Construire le Markdown
       const lines: string[] = [];
-      lines.push(`# Chat — ${notebook.title}`);
-      lines.push(`> Exporté le ${new Date().toLocaleString("fr-FR")}`);
+      lines.push(`# Chat â€” ${notebook.title}`);
+      lines.push(`> ExportÃ© le ${new Date().toLocaleString("fr-FR")}`);
       lines.push(`> ${notebook.chatHistory.length} messages\n`);
       lines.push("---\n");
 
       for (const msg of notebook.chatHistory) {
-        const role = msg.role === "user" ? "🧑 **Utilisateur**" : "🤖 **Assistant**";
+        const role = msg.role === "user" ? "ðŸ§‘ **Utilisateur**" : "ðŸ¤– **Assistant**";
         const time = new Date(msg.timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-        lines.push(`### ${role} — ${time}\n`);
+        lines.push(`### ${role} â€” ${time}\n`);
         lines.push(msg.content);
 
         if (msg.citations.length > 0) {
-          lines.push("\n<details><summary>📚 Citations</summary>\n");
+          lines.push("\n<details><summary>ðŸ“š Citations</summary>\n");
           for (const cit of msg.citations) {
             lines.push(`- **${cit.sourceTitle}** (pertinence: ${(cit.relevance * 100).toFixed(0)}%)`);
             lines.push(`  > ${cit.excerpt}\n`);
@@ -906,7 +906,7 @@ Génère le résumé global maintenant.`;
         res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
         res.send(markdown);
       } else {
-        // JSON fallback (le frontend peut convertir en PDF côté client)
+        // JSON fallback (le frontend peut convertir en PDF cÃ´tÃ© client)
         res.json({ status: "success", markdown, title: notebook.title });
       }
     } catch (e: any) {
@@ -914,7 +914,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/:id/chat/chunk/:chunkId — Récupérer le contenu complet d'un chunk (pour hover citations)
+  // GET /api/notebooks/:id/chat/chunk/:chunkId â€” RÃ©cupÃ©rer le contenu complet d'un chunk (pour hover citations)
   router.get("/:id/chat/chunk/:chunkId", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -950,7 +950,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // POST /api/notebooks/:id/chat/compare — Comparer des sources entre elles (SSE)
+  // POST /api/notebooks/:id/chat/compare â€” Comparer des sources entre elles (SSE)
   router.post("/:id/chat/compare", async (req: Request, res: Response) => {
     try {
       const { sourceIds } = req.body;
@@ -993,7 +993,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // POST /api/notebooks/:id/chat/insights — Extraire les insights des sources (SSE)
+  // POST /api/notebooks/:id/chat/insights â€” Extraire les insights des sources (SSE)
   router.post("/:id/chat/insights", async (req: Request, res: Response) => {
     try {
       // Headers SSE
@@ -1029,11 +1029,11 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // NOTES
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  // POST /api/notebooks/:id/notes — Créer une note
+  // POST /api/notebooks/:id/notes â€” CrÃ©er une note
   router.post("/:id/notes", (req: Request, res: Response) => {
     try {
       const { title, content } = req.body;
@@ -1052,7 +1052,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // PATCH /api/notebooks/:id/notes/:noteId — Modifier une note
+  // PATCH /api/notebooks/:id/notes/:noteId â€” Modifier une note
   router.patch("/:id/notes/:noteId", (req: Request, res: Response) => {
     try {
       const { title, content, pinned } = req.body;
@@ -1067,7 +1067,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // DELETE /api/notebooks/:id/notes/:noteId — Supprimer une note
+  // DELETE /api/notebooks/:id/notes/:noteId â€” Supprimer une note
   router.delete("/:id/notes/:noteId", (req: Request, res: Response) => {
     try {
       const success = notebookManager.deleteNote(req.params.id, req.params.noteId);
@@ -1075,25 +1075,25 @@ Génère le résumé global maintenant.`;
         res.status(404).json({ error: "Note introuvable." });
         return;
       }
-      res.json({ status: "success", message: "Note supprimée." });
+      res.json({ status: "success", message: "Note supprimÃ©e." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // GÉNÉRATION DE CONTENU
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // GÃ‰NÃ‰RATION DE CONTENU
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  // POST /api/notebooks/:id/generate — Générer un document dérivé
+  // POST /api/notebooks/:id/generate â€” GÃ©nÃ©rer un document dÃ©rivÃ©
   router.post("/:id/generate", async (req: Request, res: Response) => {
     try {
       const { type, sourceIds, language, customInstructions } = req.body;
-      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary"];
+      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary", "full-report", "report-business", "report-market", "report-technical", "report-competitive", "report-financial", "report-marketing", "report-product", "report-risk", "report-executive", "report-project"];
 
       if (!type || !validTypes.includes(type)) {
         res.status(400).json({
-          error: `Le champ 'type' doit être l'un de: ${validTypes.join(", ")}`,
+          error: `Le champ 'type' doit Ãªtre l'un de: ${validTypes.join(", ")}`,
         });
         return;
       }
@@ -1105,15 +1105,15 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // POST /api/notebooks/:id/generate/stream — Générer un document dérivé (SSE streaming)
+  // POST /api/notebooks/:id/generate/stream â€” GÃ©nÃ©rer un document dÃ©rivÃ© (SSE streaming)
   router.post("/:id/generate/stream", async (req: Request, res: Response) => {
     try {
       const { type, sourceIds, language, customInstructions } = req.body;
-      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary"];
+      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary", "full-report", "report-business", "report-market", "report-technical", "report-competitive", "report-financial", "report-marketing", "report-product", "report-risk", "report-executive", "report-project"];
 
       if (!type || !validTypes.includes(type)) {
         res.status(400).json({
-          error: `Le champ 'type' doit être l'un de: ${validTypes.join(", ")}`,
+          error: `Le champ 'type' doit Ãªtre l'un de: ${validTypes.join(", ")}`,
         });
         return;
       }
@@ -1148,7 +1148,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/:id/generated — Liste des documents générés
+  // GET /api/notebooks/:id/generated â€” Liste des documents gÃ©nÃ©rÃ©s
   router.get("/:id/generated", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -1162,7 +1162,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // DELETE /api/notebooks/:id/generated/:docId — Supprimer un document généré
+  // DELETE /api/notebooks/:id/generated/:docId â€” Supprimer un document gÃ©nÃ©rÃ©
   router.delete("/:id/generated/:docId", (req: Request, res: Response) => {
     try {
       const success = notebookManager.deleteGeneratedDocument(req.params.id, req.params.docId);
@@ -1170,17 +1170,27 @@ Génère le résumé global maintenant.`;
         res.status(404).json({ error: "Document introuvable." });
         return;
       }
-      res.json({ status: "success", message: "Document supprimé." });
+      res.json({ status: "success", message: "Document supprimÃ©." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // AUDIO OVERVIEW (Podcast)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // GET /api/notebooks/:id/report-suggestions â€” Suggestions de rapports basÃ©es sur les sources
+  router.get("/:id/report-suggestions", async (req: Request, res: Response) => {
+    try {
+      const suggestions: ReportSuggestion[] = await contentGenerator.suggestReports(req.params.id);
+      res.json({ status: "success", suggestions });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
 
-  // POST /api/notebooks/:id/audio-overview — Générer un podcast
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // AUDIO OVERVIEW (Podcast)
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+  // POST /api/notebooks/:id/audio-overview â€” GÃ©nÃ©rer un podcast
   router.post("/:id/audio-overview", async (req: Request, res: Response) => {
     try {
       const { language, duration, sourceIds, tone, customInstructions } = req.body;
@@ -1193,7 +1203,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // POST /api/notebooks/:id/audio-overviews/:overviewId/tts — Générer l'audio TTS du podcast (SSE streaming)
+  // POST /api/notebooks/:id/audio-overviews/:overviewId/tts â€” GÃ©nÃ©rer l'audio TTS du podcast (SSE streaming)
   router.post("/:id/audio-overviews/:overviewId/tts", async (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -1204,19 +1214,19 @@ Génère le résumé global maintenant.`;
 
       const overview = notebook.audioOverviews?.find((o: any) => o.id === req.params.overviewId);
       if (!overview || overview.status !== "ready") {
-        res.status(404).json({ error: "Audio overview introuvable ou pas prêt." });
+        res.status(404).json({ error: "Audio overview introuvable ou pas prÃªt." });
         return;
       }
 
       const { generateSpeech } = await import("../utils/geminiTTS");
 
-      // Voix naturelles Kokoro pour les deux hôtes
-      // ff_siwis = voix féminine française (Alex)
-      // am_adam = voix masculine anglaise naturelle (Sam) — ou af_jessica pour féminine
+      // Voix naturelles Kokoro pour les deux hÃ´tes
+      // ff_siwis = voix fÃ©minine franÃ§aise (Alex)
+      // am_adam = voix masculine anglaise naturelle (Sam) â€” ou af_jessica pour fÃ©minine
       const alexVoice = req.body.alexVoice || "ff_siwis";
       const samVoice = req.body.samVoice || "am_adam";
 
-      // Découper le script en répliques
+      // DÃ©couper le script en rÃ©pliques
       const lines = overview.script.split("\n").filter((l: string) => l.trim());
       const dialogueLines: { speaker: string; text: string }[] = [];
 
@@ -1230,13 +1240,13 @@ Génère le résumé global maintenant.`;
         } else if (isSam) {
           dialogueLines.push({ speaker: "sam", text: trimmed.replace(/^Sam\s*:\s*/i, "") });
         } else if (trimmed) {
-          // Narration / didascalie — on la donne à Alex par défaut
+          // Narration / didascalie â€” on la donne Ã  Alex par dÃ©faut
           dialogueLines.push({ speaker: "alex", text: trimmed });
         }
       }
 
       if (dialogueLines.length === 0) {
-        res.status(400).json({ error: "Le script ne contient aucune réplique." });
+        res.status(400).json({ error: "Le script ne contient aucune rÃ©plique." });
         return;
       }
 
@@ -1282,7 +1292,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/:id/audio-overviews — Liste des audio overviews
+  // GET /api/notebooks/:id/audio-overviews â€” Liste des audio overviews
   router.get("/:id/audio-overviews", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -1296,7 +1306,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // DELETE /api/notebooks/:id/audio-overviews/:overviewId — Supprimer un audio overview
+  // DELETE /api/notebooks/:id/audio-overviews/:overviewId â€” Supprimer un audio overview
   router.delete("/:id/audio-overviews/:overviewId", (req: Request, res: Response) => {
     try {
       const success = notebookManager.deleteAudioOverview(req.params.id, req.params.overviewId);
@@ -1304,13 +1314,13 @@ Génère le résumé global maintenant.`;
         res.status(404).json({ error: "Audio overview introuvable." });
         return;
       }
-      res.json({ status: "success", message: "Audio overview supprimé." });
+      res.json({ status: "success", message: "Audio overview supprimÃ©." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // GET /api/notebooks/:id/audio-overviews/:overviewId/export — Exporter le script audio en Markdown
+  // GET /api/notebooks/:id/audio-overviews/:overviewId/export â€” Exporter le script audio en Markdown
   router.get("/:id/audio-overviews/:overviewId/export", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -1327,10 +1337,10 @@ Génère le résumé global maintenant.`;
 
       // Construire le Markdown
       const lines: string[] = [];
-      lines.push(`# 🎙️ ${overview.title}`);
+      lines.push(`# ðŸŽ™ï¸ ${overview.title}`);
       lines.push("");
-      lines.push(`> Exporté le ${new Date().toLocaleString("fr-FR")}`);
-      lines.push(`> Durée estimée : ${Math.floor(overview.estimatedDuration / 60)}:${(overview.estimatedDuration % 60).toString().padStart(2, "0")}`);
+      lines.push(`> ExportÃ© le ${new Date().toLocaleString("fr-FR")}`);
+      lines.push(`> DurÃ©e estimÃ©e : ${Math.floor(overview.estimatedDuration / 60)}:${(overview.estimatedDuration % 60).toString().padStart(2, "0")}`);
       lines.push("");
       lines.push("---");
       lines.push("");
@@ -1349,11 +1359,11 @@ Génère le résumé global maintenant.`;
 
         if (isAlex) {
           const text = trimmed.replace(/^Alex\s*:\s*/i, "");
-          lines.push(`**🧑 Alex :** ${text}`);
+          lines.push(`**ðŸ§‘ Alex :** ${text}`);
           lines.push("");
         } else if (isSam) {
           const text = trimmed.replace(/^Sam\s*:\s*/i, "");
-          lines.push(`**🤖 Sam :** ${text}`);
+          lines.push(`**ðŸ¤– Sam :** ${text}`);
           lines.push("");
         } else {
           lines.push(`*${trimmed}*`);
@@ -1363,7 +1373,7 @@ Génère le résumé global maintenant.`;
 
       lines.push("---");
       lines.push("");
-      lines.push(`*Script généré le ${new Date(overview.createdAt).toLocaleString("fr-FR")}*`);
+      lines.push(`*Script gÃ©nÃ©rÃ© le ${new Date(overview.createdAt).toLocaleString("fr-FR")}*`);
 
       const markdown = lines.join("\n");
 
@@ -1371,24 +1381,24 @@ Génère le résumé global maintenant.`;
       const saveToSandbox = req.query.save === "sandbox";
 
       if (saveToWorkspace) {
-        // Déterminer le répertoire cible
+        // DÃ©terminer le rÃ©pertoire cible
         const targetRoot = saveToSandbox ? getSandboxRoot() : getProjectRoot();
 
-        const filename = `audio-script-${overview.title.replace(/[^a-zA-Z0-9àâäéèêëïîôùûüÿçÀÂÄÉÈÊËÏÎÔÙÛÜŸÇ ]/g, "-").replace(/\s+/g, "-").replace(/-+/g, "-").slice(0, 50)}.md`;
+        const filename = `audio-script-${overview.title.replace(/[^a-zA-Z0-9Ã Ã¢Ã¤Ã©Ã¨ÃªÃ«Ã¯Ã®Ã´Ã¹Ã»Ã¼Ã¿Ã§Ã€Ã‚Ã„Ã‰ÃˆÃŠÃ‹ÃÃŽÃ”Ã™Ã›ÃœÅ¸Ã‡ ]/g, "-").replace(/\s+/g, "-").replace(/-+/g, "-").slice(0, 50)}.md`;
         const filePath = path.join(targetRoot, filename);
-        // Créer le répertoire si nécessaire (sandbox peut ne pas exister)
+        // CrÃ©er le rÃ©pertoire si nÃ©cessaire (sandbox peut ne pas exister)
         fs.mkdirSync(path.dirname(filePath), { recursive: true });
         fs.writeFileSync(filePath, markdown, "utf-8");
 
         res.json({
           status: "success",
-          message: saveToSandbox ? `Script audio sauvegardé dans la sandbox` : `Script sauvegardé dans le workspace`,
+          message: saveToSandbox ? `Script audio sauvegardÃ© dans la sandbox` : `Script sauvegardÃ© dans le workspace`,
           filePath: filename,
           destination: saveToSandbox ? "sandbox" : "workspace",
           markdown,
         });
       } else {
-        // Téléchargement direct
+        // TÃ©lÃ©chargement direct
         const filename = `audio-script-${overview.title.replace(/[^a-zA-Z0-9]/g, "-").slice(0, 40)}-${Date.now()}.md`;
         res.setHeader("Content-Type", "text/markdown; charset=utf-8");
         res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -1399,11 +1409,11 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // EMBEDDINGS (gestion des vecteurs)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  // POST /api/notebooks/:id/embeddings/reindex — Re-vectoriser toutes les sources
+  // POST /api/notebooks/:id/embeddings/reindex â€” Re-vectoriser toutes les sources
   router.post("/:id/embeddings/reindex", async (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -1424,7 +1434,7 @@ Génère le résumé global maintenant.`;
 
       res.json({
         status: "success",
-        message: `${totalIndexed} chunks vectorisés sur ${notebook.sources.reduce((acc, s) => acc + s.chunks.length, 0)} total.`,
+        message: `${totalIndexed} chunks vectorisÃ©s sur ${notebook.sources.reduce((acc, s) => acc + s.chunks.length, 0)} total.`,
         indexed: totalIndexed,
       });
     } catch (e: any) {
@@ -1432,7 +1442,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/:id/embeddings/stats — Stats des embeddings
+  // GET /api/notebooks/:id/embeddings/stats â€” Stats des embeddings
   router.get("/:id/embeddings/stats", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
@@ -1458,7 +1468,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/embeddings/memory — Stats mémoire globales des embeddings
+  // GET /api/notebooks/embeddings/memory â€” Stats mÃ©moire globales des embeddings
   router.get("/embeddings/memory", (_req: Request, res: Response) => {
     try {
       const memStats = embeddingStore.getMemoryStats();
@@ -1468,16 +1478,16 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // BACKUP (sauvegarde & restauration)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  // POST /api/notebooks/backup/run — Lancer un backup manuel
+  // POST /api/notebooks/backup/run â€” Lancer un backup manuel
   router.post("/backup/run", async (_req: Request, res: Response) => {
     try {
       const metadata = await backupService.runBackup();
       if (!metadata) {
-        res.json({ status: "success", message: "Aucune modification à sauvegarder." });
+        res.json({ status: "success", message: "Aucune modification Ã  sauvegarder." });
         return;
       }
       res.json({ status: "success", backup: metadata });
@@ -1486,7 +1496,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/backup/list — Lister les backups disponibles
+  // GET /api/notebooks/backup/list â€” Lister les backups disponibles
   router.get("/backup/list", (_req: Request, res: Response) => {
     try {
       const backups = backupService.listBackups();
@@ -1496,7 +1506,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // POST /api/notebooks/backup/restore — Restaurer depuis un backup
+  // POST /api/notebooks/backup/restore â€” Restaurer depuis un backup
   router.post("/backup/restore", (req: Request, res: Response) => {
     try {
       const { backupId, notebookId } = req.body;
@@ -1512,7 +1522,7 @@ Génère le résumé global maintenant.`;
           res.status(404).json({ error: "Backup ou notebook introuvable." });
           return;
         }
-        res.json({ status: "success", message: `Notebook ${notebookId} restauré.` });
+        res.json({ status: "success", message: `Notebook ${notebookId} restaurÃ©.` });
       } else {
         // Restaurer tous les notebooks du backup
         const result = backupService.restoreAll(backupId);
@@ -1523,7 +1533,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/backup/config — Configuration des backups
+  // GET /api/notebooks/backup/config â€” Configuration des backups
   router.get("/backup/config", (_req: Request, res: Response) => {
     try {
       res.json({ status: "success", config: backupService.getConfig() });
@@ -1532,7 +1542,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // PATCH /api/notebooks/backup/config — Modifier la configuration
+  // PATCH /api/notebooks/backup/config â€” Modifier la configuration
   router.patch("/backup/config", (req: Request, res: Response) => {
     try {
       const { intervalMs, maxBackups, enabled } = req.body;
@@ -1543,11 +1553,11 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // QUEUE (file d'attente de processing)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  // GET /api/notebooks/queue/stats — Statistiques de la queue
+  // GET /api/notebooks/queue/stats â€” Statistiques de la queue
   router.get("/queue/stats", (_req: Request, res: Response) => {
     try {
       const stats = sourceProcessingQueue.getStats();
@@ -1557,7 +1567,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/queue/pending — Tâches en attente
+  // GET /api/notebooks/queue/pending â€” TÃ¢ches en attente
   router.get("/queue/pending", (_req: Request, res: Response) => {
     try {
       const pending = sourceProcessingQueue.getPending().map(t => ({
@@ -1575,7 +1585,7 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/queue/processing — Tâches en cours
+  // GET /api/notebooks/queue/processing â€” TÃ¢ches en cours
   router.get("/queue/processing", (_req: Request, res: Response) => {
     try {
       const processing = sourceProcessingQueue.getProcessing().map(t => ({
@@ -1593,12 +1603,12 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // GET /api/notebooks/queue/task/:taskId — Statut d'une tâche
+  // GET /api/notebooks/queue/task/:taskId â€” Statut d'une tÃ¢che
   router.get("/queue/task/:taskId", (req: Request, res: Response) => {
     try {
       const task = sourceProcessingQueue.getTask(req.params.taskId);
       if (!task) {
-        res.status(404).json({ error: "Tâche introuvable." });
+        res.status(404).json({ error: "TÃ¢che introuvable." });
         return;
       }
       res.json({
@@ -1622,35 +1632,35 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // DELETE /api/notebooks/queue/task/:taskId — Annuler une tâche
+  // DELETE /api/notebooks/queue/task/:taskId â€” Annuler une tÃ¢che
   router.delete("/queue/task/:taskId", (req: Request, res: Response) => {
     try {
       const success = sourceProcessingQueue.cancel(req.params.taskId);
       if (!success) {
-        res.status(404).json({ error: "Tâche introuvable ou déjà en cours." });
+        res.status(404).json({ error: "TÃ¢che introuvable ou dÃ©jÃ  en cours." });
         return;
       }
-      res.json({ status: "success", message: "Tâche annulée." });
+      res.json({ status: "success", message: "TÃ¢che annulÃ©e." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // DELETE /api/notebooks/queue/clear — Vider la queue
+  // DELETE /api/notebooks/queue/clear â€” Vider la queue
   router.delete("/queue/clear", (_req: Request, res: Response) => {
     try {
       sourceProcessingQueue.clear();
-      res.json({ status: "success", message: "Queue vidée." });
+      res.json({ status: "success", message: "Queue vidÃ©e." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CACHE (statistiques & contrôle)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // CACHE (statistiques & contrÃ´le)
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  // GET /api/notebooks/cache/stats — Statistiques du cache
+  // GET /api/notebooks/cache/stats â€” Statistiques du cache
   router.get("/cache/stats", (_req: Request, res: Response) => {
     try {
       const chatStats = chatResponseCache.getStats();
@@ -1665,18 +1675,18 @@ Génère le résumé global maintenant.`;
     }
   });
 
-  // DELETE /api/notebooks/cache/clear — Vider le cache
+  // DELETE /api/notebooks/cache/clear â€” Vider le cache
   router.delete("/cache/clear", (_req: Request, res: Response) => {
     try {
       chatResponseCache.clear();
       ragSearchCache.clear();
-      res.json({ status: "success", message: "Cache vidé." });
+      res.json({ status: "success", message: "Cache vidÃ©." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // DELETE /api/notebooks/cache/:notebookId — Invalider le cache d'un notebook
+  // DELETE /api/notebooks/cache/:notebookId â€” Invalider le cache d'un notebook
   router.delete("/cache/:notebookId", (req: Request, res: Response) => {
     try {
       const chatInvalidated = chatResponseCache.invalidateNotebook(req.params.notebookId);

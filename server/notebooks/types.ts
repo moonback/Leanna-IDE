@@ -122,7 +122,21 @@ export interface ChatThread {
 
 // ─── Documents générés ───────────────────────────────────────────────────────
 
-export type GeneratedDocType = 'summary' | 'faq' | 'study-guide' | 'briefing' | 'timeline' | 'outline' | 'mindmap' | 'swot' | 'glossary';
+export type GeneratedDocType = 'summary' | 'faq' | 'study-guide' | 'briefing' | 'timeline' | 'outline' | 'mindmap' | 'swot' | 'glossary' | 'full-report' | 'report-business' | 'report-market' | 'report-technical' | 'report-competitive' | 'report-financial' | 'report-marketing' | 'report-product' | 'report-risk' | 'report-executive' | 'report-project';
+
+// ─── Suggestions de rapports ─────────────────────────────────────────────────
+
+export interface ReportSuggestion {
+  type: GeneratedDocType;
+  title: string;
+  description: string;
+  /** Pourquoi ce rapport est pertinent pour ces sources */
+  reason: string;
+  /** Score de pertinence 0-100 */
+  relevance: number;
+  /** Sources recommandées pour ce rapport */
+  recommendedSourceIds: string[];
+}
 
 export interface GeneratedDocument {
   id: string;
