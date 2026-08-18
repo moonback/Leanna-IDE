@@ -375,30 +375,37 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Charger l'historique et les threads
+  // Charger la liste des threads (une seule fois)
   useEffect(() => {
     (async () => {
       try {
-        // Load threads list
         const threadsRes = await fetch(`/api/notebooks/${notebookId}/chat/threads`);
         if (threadsRes.ok) {
           const data = await threadsRes.json();
           setThreads(data.threads || []);
-          if (data.threads?.length > 0 && !activeThreadId) {
-            setActiveThreadId(data.threads[0].id);
-          }
         }
+      } catch { /* ignore */ }
+    })();
+  }, [notebookId]);
 
-        // Load current thread history
+  // Charger l'historique du thread actif (ou conversation principale si null)
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingHistory(true);
+
+    (async () => {
+      try {
         const threadParam = activeThreadId ? `?threadId=${activeThreadId}` : '';
         const res = await fetch(`/api/notebooks/${notebookId}/chat/history${threadParam}`);
-        if (res.ok) {
+        if (res.ok && !cancelled) {
           const data = await res.json();
           setMessages(data.messages || []);
         }
       } catch { /* ignore */ }
-      setLoadingHistory(false);
+      if (!cancelled) setLoadingHistory(false);
     })();
+
+    return () => { cancelled = true; };
   }, [notebookId, activeThreadId]);
 
   // Charger les suggestions
@@ -653,13 +660,16 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     } catch { /* ignore */ }
   }, [notebookId, threads.length]);
 
-  const handleSwitchThread = useCallback((threadId: string) => {
+  const handleSwitchThread = useCallback((threadId: string | null) => {
+    if (threadId === activeThreadId) {
+      setShowThreadList(false);
+      return;
+    }
     setActiveThreadId(threadId);
     setShowThreadList(false);
-    setMessages([]);
-    setLoadingHistory(true);
     setFollowUps([]);
-  }, []);
+    setStreamingText('');
+  }, [activeThreadId]);
 
   const handleDeleteThread = useCallback(async (threadId: string) => {
     try {
@@ -1217,15 +1227,31 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
               >
                 <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                  {/* Main conversation option */}
+                  <div
+                    className={`flex items-center gap-2 px-4 py-2.5 transition-colors hover:bg-[var(--accent-subtle)] cursor-pointer border-b ${activeThreadId === null ? 'bg-[var(--accent-subtle)]' : ''}`}
+                    style={{ borderColor: 'var(--border-base)' }}
+                    onClick={() => handleSwitchThread(null)}
+                  >
+                    <MessageCircle className="w-3 h-3 flex-shrink-0" style={{ color: activeThreadId === null ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
+                    <span
+                      className="flex-1 text-[11px] font-medium"
+                      style={{ color: activeThreadId === null ? 'var(--accent-primary)' : 'var(--text-primary)' }}
+                    >
+                      Conversation principale
+                    </span>
+                  </div>
+
+                  {/* Thread list */}
                   {threads.length === 0 ? (
                     <p className="px-4 py-3 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
-                      Aucune conversation. Commencez à poser des questions.
+                      Pas de conversations supplémentaires.
                     </p>
                   ) : (
                     threads.map(thread => (
                       <div
                         key={thread.id}
-                        className={`flex items-center gap-2 px-4 py-2.5 transition-colors hover:bg-[var(--accent-subtle)] cursor-pointer ${thread.id === activeThreadId ? 'bg-[var(--accent-subtle)]' : ''}`}
+                        className={`group flex items-center gap-2 px-4 py-2.5 transition-colors hover:bg-[var(--accent-subtle)] cursor-pointer ${thread.id === activeThreadId ? 'bg-[var(--accent-subtle)]' : ''}`}
                         onClick={() => handleSwitchThread(thread.id)}
                       >
                         <MessageCircle className="w-3 h-3 flex-shrink-0" style={{ color: thread.id === activeThreadId ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />

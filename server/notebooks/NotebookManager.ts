@@ -74,6 +74,12 @@ export class NotebookManager {
     fs.writeFileSync(filePath, JSON.stringify(notebook, null, 2), "utf-8");
   }
 
+  /** Public persist — save a notebook to disk (used by routes for direct mutations) */
+  persistNotebook(notebookId: string): void {
+    const notebook = this.notebooks.get(notebookId);
+    if (notebook) this.persist(notebook);
+  }
+
   private remove(id: string): void {
     const filePath = getNotebookPath(id);
     if (fs.existsSync(filePath)) {

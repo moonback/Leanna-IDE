@@ -67,6 +67,8 @@ export interface Notebook {
   audioOverviews: AudioOverview[];
   /** Historique de chat */
   chatHistory: ChatMessage[];
+  /** Threads de conversation */
+  chatThreads?: ChatThread[];
   /** Date de création */
   createdAt: string;
   /** Dernière modification */
@@ -109,6 +111,13 @@ export interface ChatMessage {
   /** Citations (uniquement pour les messages assistant) */
   citations: Citation[];
   timestamp: string;
+}
+
+export interface ChatThread {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
 }
 
 // ─── Documents générés ───────────────────────────────────────────────────────

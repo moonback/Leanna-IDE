@@ -355,6 +355,113 @@ export function createNotebooksRouter(): Router {
     }
   });
 
+  // POST /api/notebooks/:id/sources/:sourceId/reindex — Re-indexer une source
+  router.post("/:id/sources/:sourceId/reindex", async (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+      const source = notebook.sources.find(s => s.id === req.params.sourceId);
+      if (!source) {
+        res.status(404).json({ error: "Source introuvable." });
+        return;
+      }
+
+      // Re-index: remove old embeddings and re-embed the chunks
+      const { embeddingStore } = await import("../notebooks/EmbeddingStore.js");
+      embeddingStore.removeSource(req.params.sourceId, req.params.id);
+
+      // Re-embed all chunks of this source
+      const chunks = source.chunks || [];
+      if (chunks.length > 0) {
+        await embeddingStore.indexChunks(
+          chunks.map((c: any) => ({ id: c.id, content: c.content })),
+          req.params.sourceId,
+          req.params.id
+        );
+      }
+
+      res.json({ status: "success", chunksCount: chunks.length });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/notebooks/:id/sources/:sourceId/content — Contenu brut d'une source
+  router.get("/:id/sources/:sourceId/content", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+      const source = notebook.sources.find(s => s.id === req.params.sourceId);
+      if (!source) {
+        res.status(404).json({ error: "Source introuvable." });
+        return;
+      }
+      // Return the raw content (stored in source or reconstructed from chunks)
+      const content = (source as any).rawContent || source.summary || "Contenu non disponible en aperçu.";
+      res.json({ status: "success", content });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/notebooks/:id/sources/:sourceId/tags — Ajouter un tag
+  router.post("/:id/sources/:sourceId/tags", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+      const source = notebook.sources.find(s => s.id === req.params.sourceId);
+      if (!source) {
+        res.status(404).json({ error: "Source introuvable." });
+        return;
+      }
+      const { tag } = req.body;
+      if (!tag || typeof tag !== "string") {
+        res.status(400).json({ error: "Le champ 'tag' est requis." });
+        return;
+      }
+      if (!source.keywords.includes(tag.trim())) {
+        source.keywords.push(tag.trim());
+        notebook.updatedAt = new Date().toISOString();
+        notebookManager.persistNotebook(req.params.id);
+      }
+      res.json({ status: "success", keywords: source.keywords });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // DELETE /api/notebooks/:id/sources/:sourceId/tags — Supprimer un tag
+  router.delete("/:id/sources/:sourceId/tags", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+      const source = notebook.sources.find(s => s.id === req.params.sourceId);
+      if (!source) {
+        res.status(404).json({ error: "Source introuvable." });
+        return;
+      }
+      const { tag } = req.body;
+      source.keywords = source.keywords.filter(k => k !== tag);
+      notebook.updatedAt = new Date().toISOString();
+      notebookManager.persistNotebook(req.params.id);
+      res.json({ status: "success", keywords: source.keywords });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ═══════════════════════════════════════════════════════════════════════════
   // CHAT GROUNDÉ (Q&A avec citations)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -378,7 +485,7 @@ export function createNotebooksRouter(): Router {
   // POST /api/notebooks/:id/chat/stream — Poser une question (SSE streaming)
   router.post("/:id/chat/stream", async (req: Request, res: Response) => {
     try {
-      const { question } = req.body;
+      const { question, threadId } = req.body;
       if (!question || typeof question !== "string") {
         res.status(400).json({ error: "Le champ 'question' est requis." });
         return;
@@ -402,6 +509,30 @@ export function createNotebooksRouter(): Router {
           res.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
         }
       );
+
+      // Si un threadId est fourni, sauvegarder aussi dans le thread
+      if (threadId) {
+        const notebook = notebookManager.getNotebook(req.params.id);
+        if (notebook?.chatThreads) {
+          const thread = notebook.chatThreads.find((t: any) => t.id === threadId);
+          if (thread) {
+            // Ajouter la question utilisateur et la réponse
+            thread.messages.push({
+              id: `msg-${Date.now()}-u`,
+              role: 'user',
+              content: question.trim(),
+              citations: [],
+              timestamp: new Date().toISOString(),
+            });
+            thread.messages.push(message);
+            // Mettre à jour le titre du thread si c'est le premier message
+            if (thread.messages.length <= 2) {
+              thread.title = question.trim().slice(0, 50) + (question.length > 50 ? '...' : '');
+            }
+            notebookManager.persistNotebook(req.params.id);
+          }
+        }
+      }
 
       // Générer les follow-ups en parallèle
       let followUps: string[] = [];
@@ -485,7 +616,88 @@ export function createNotebooksRouter(): Router {
         res.status(404).json({ error: "Notebook introuvable." });
         return;
       }
-      res.json({ status: "success", messages: notebook.chatHistory });
+      const threadId = req.query.threadId as string | undefined;
+      if (threadId && notebook.chatThreads) {
+        const thread = notebook.chatThreads.find((t: any) => t.id === threadId);
+        res.json({ status: "success", messages: thread?.messages || [] });
+      } else {
+        res.json({ status: "success", messages: notebook.chatHistory });
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/notebooks/:id/chat/threads — Liste des threads
+  router.get("/:id/chat/threads", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+      const threads = (notebook.chatThreads || []).map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        createdAt: t.createdAt,
+      }));
+      res.json({ status: "success", threads });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/notebooks/:id/chat/threads — Créer un thread
+  router.post("/:id/chat/threads", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+      if (!notebook.chatThreads) notebook.chatThreads = [];
+
+      const thread = {
+        id: `thread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        title: req.body.title || `Conversation ${notebook.chatThreads.length + 1}`,
+        messages: [],
+        createdAt: new Date().toISOString(),
+      };
+      notebook.chatThreads.push(thread);
+      notebook.updatedAt = new Date().toISOString();
+      notebookManager.persistNotebook(req.params.id);
+
+      res.json({ status: "success", thread: { id: thread.id, title: thread.title, createdAt: thread.createdAt } });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // DELETE /api/notebooks/:id/chat/threads/:threadId — Supprimer un thread
+  router.delete("/:id/chat/threads/:threadId", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+      if (notebook.chatThreads) {
+        notebook.chatThreads = notebook.chatThreads.filter((t: any) => t.id !== req.params.threadId);
+        notebook.updatedAt = new Date().toISOString();
+        notebookManager.persistNotebook(req.params.id);
+      }
+      res.json({ status: "success" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/notebooks/:id/chat/feedback — Feedback thumbs up/down
+  router.post("/:id/chat/feedback", (req: Request, res: Response) => {
+    try {
+      const { messageId, feedback } = req.body;
+      // Store feedback (for now just acknowledge — could persist for analytics)
+      res.json({ status: "success", messageId, feedback });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
