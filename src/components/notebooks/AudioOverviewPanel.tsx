@@ -12,8 +12,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Mic, Play, Loader2, Clock, Users, Radio, Pause, Download,
-  Trash2, RefreshCw, Volume2, Square, Settings2, FileText, CheckSquare
+  Mic, Play, Loader2, Clock, Users, Radio, Pause, Square,
+  Trash2, RefreshCw, Volume2, Settings2, FileText, CheckSquare
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 
@@ -115,19 +115,19 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }
     }
   }, [notebookId, duration, selectedSourceIds, sources.length, tone, customInstructions, success, toastError, onRefresh]);
 
-  const handleDownloadToWorkspace = useCallback(async () => {
+  const handleSaveToSandbox = useCallback(async () => {
     if (!selectedOverview) return;
     setDownloading(true);
     try {
       const res = await fetch(
-        `/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}/export?save=true`
+        `/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}/export?save=sandbox`
       );
       if (!res.ok) {
         const d = await res.json().catch(() => ({ error: 'Erreur' }));
         throw new Error(d.error || `HTTP ${res.status}`);
       }
       const data = await res.json();
-      success(`Script sauvegardé : ${data.filePath}`);
+      success(`Script audio sauvegardé dans la sandbox : ${data.filePath}`);
     } catch (e: any) {
       toastError(e.message);
     } finally {
@@ -622,19 +622,19 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }
                     Écouter
                   </button>
                 )}
-                {/* Download */}
+                {/* Save to Sandbox */}
                 <button
-                  onClick={handleDownloadToWorkspace}
+                  onClick={handleSaveToSandbox}
                   disabled={downloading}
                   className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
                   style={{
-                    backgroundColor: 'var(--accent-subtle)',
-                    color: 'var(--accent-primary)',
-                    border: '1px solid var(--accent-primary)',
+                    backgroundColor: '#f59e0b10',
+                    color: '#f59e0b',
+                    border: '1px solid #f59e0b40',
                   }}
-                  title="Sauvegarder le script en .md"
+                  title="Enregistrer dans la sandbox"
                 >
-                  {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
                 </button>
                 {/* Regenerate */}
                 <button

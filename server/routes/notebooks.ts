@@ -12,6 +12,7 @@ import fs from "fs";
 import { notebookManager, sourceIngester, groundedChat, contentGenerator, embeddingStore } from "../notebooks";
 import type { GeneratedDocType } from "../notebooks/types";
 import { getProjectRoot } from "../utils/pathUtils";
+import { getSandboxRoot } from "../utils/sandbox";
 
 // Configuration multer
 const upload = multer({
@@ -1019,20 +1020,24 @@ export function createNotebooksRouter(): Router {
 
       const markdown = lines.join("\n");
 
-      const saveToWorkspace = req.query.save === "true";
+      const saveToWorkspace = req.query.save === "true" || req.query.save === "sandbox";
+      const saveToSandbox = req.query.save === "sandbox";
 
       if (saveToWorkspace) {
-        // Sauvegarder dans le workspace
-        const projectRoot = getProjectRoot();
+        // Déterminer le répertoire cible
+        const targetRoot = saveToSandbox ? getSandboxRoot() : getProjectRoot();
 
         const filename = `audio-script-${overview.title.replace(/[^a-zA-Z0-9àâäéèêëïîôùûüÿçÀÂÄÉÈÊËÏÎÔÙÛÜŸÇ ]/g, "-").replace(/\s+/g, "-").replace(/-+/g, "-").slice(0, 50)}.md`;
-        const filePath = path.join(projectRoot, filename);
+        const filePath = path.join(targetRoot, filename);
+        // Créer le répertoire si nécessaire (sandbox peut ne pas exister)
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
         fs.writeFileSync(filePath, markdown, "utf-8");
 
         res.json({
           status: "success",
-          message: `Script sauvegardé dans le workspace`,
+          message: saveToSandbox ? `Script audio sauvegardé dans la sandbox` : `Script sauvegardé dans le workspace`,
           filePath: filename,
+          destination: saveToSandbox ? "sandbox" : "workspace",
           markdown,
         });
       } else {
