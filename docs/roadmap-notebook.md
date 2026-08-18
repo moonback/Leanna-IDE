@@ -12,7 +12,7 @@
 | Pratique | État actuel | Cible |
 |----------|-------------|-------|
 | Séparation logique/UI | Logique dans les composants | Extraire dans des hooks custom (`useNotebookChat`, `useNotebookSources`) |
-| Types partagés | Interfaces dupliquées entre fichiers | Fichier `types/notebook.ts` centralisé |
+| Types partagés | ~~Interfaces dupliquées entre fichiers~~ | ✅ Fichier `types/notebook.ts` centralisé |
 | State management | `useState` local partout | Zustand store dédié `useNotebookStore` |
 | Error boundaries | Aucun | Wrapper par onglet pour éviter les crashs globaux |
 | Lazy loading | Tous les onglets chargés | `React.lazy()` par onglet (Chat, Generate, Audio) |
@@ -65,9 +65,9 @@
 ### 🔴 Critique
 
 - [ ] **Conversations multiples** — Pouvoir créer plusieurs threads de chat dans un même notebook
-- [ ] **Retry / Regenerate** — Bouton pour régénérer une réponse de l'assistant
-- [ ] **Edit du message utilisateur** — Pouvoir modifier un message envoyé et régénérer la suite
-- [ ] **Copy to clipboard** — Bouton copier sur chaque réponse (code blocks inclus)
+- [x] **Retry / Regenerate** — Bouton pour régénérer une réponse de l'assistant ✅
+- [x] **Edit du message utilisateur** — Pouvoir modifier un message envoyé et régénérer la suite ✅
+- [x] **Copy to clipboard** — Bouton copier sur chaque réponse (code blocks inclus) ✅
 
 ### 🟠 Important
 
@@ -75,7 +75,7 @@
 - [ ] **Historique des conversations** — Liste des threads passés avec recherche
 - [ ] **Réponses avec images** — Support des diagrammes générés (déjà Mermaid, ajouter PlantUML, graphviz)
 - [ ] **Feedback thumbs up/down** — Permettre de noter les réponses pour améliorer le RAG
-- [ ] **Streaming cancel** — Bouton stop pendant le streaming d'une réponse
+- [x] **Streaming cancel** — Bouton stop pendant le streaming d'une réponse ✅
 - [ ] **Contexte de conversation** — Afficher combien de tokens restent dans la fenêtre de contexte
 
 ### 🟡 Nice-to-have
@@ -95,7 +95,7 @@
 
 - [ ] **Éditeur rich-text** — Remplacer le textarea basique par un éditeur (Tiptap ou Lexical) avec formatage
 - [ ] **Lier notes et sources** — Associer une note à une ou plusieurs sources spécifiques
-- [ ] **Tri et filtres** — Trier par date, recherche full-text dans les notes
+- [x] **Tri et filtres** — Trier par date, recherche full-text dans les notes ✅
 
 ### 🟠 Important
 
@@ -164,7 +164,7 @@
 
 - [ ] **Responsive mobile** — Adapter les notebooks pour tablette/mobile (navigation bottom tabs)
 - [ ] **Loading states** — Skeletons cohérents pour chaque onglet au lieu de simples spinners
-- [ ] **Raccourcis clavier** — `Ctrl+1-5` pour les onglets, `Ctrl+N` nouvelle note, `Ctrl+Enter` envoyer
+- [x] **Raccourcis clavier** — `Ctrl+1-5` pour les onglets, `Ctrl+N` nouvelle note, `Ctrl+Enter` envoyer ✅
 
 ### 🟠 Important
 

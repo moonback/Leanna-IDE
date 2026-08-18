@@ -4,9 +4,9 @@
  * UI améliorée avec meilleur layout, compteur de caractères, et animations plus fluides.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Pin, Trash2, Edit3, Save, X, StickyNote, Clock } from 'lucide-react';
+import { Plus, Pin, Trash2, Edit3, Save, X, StickyNote, Clock, Search, ArrowUpDown } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 
 interface NoteItem {
@@ -41,6 +41,8 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'alpha'>('newest');
 
   const handleCreate = useCallback(async () => {
     if (!title.trim()) return;
@@ -114,19 +116,44 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
     setContent('');
   };
 
-  // Trier : pinnées d'abord, puis par date
-  const sorted = [...notes].sort((a, b) => {
-    if (a.pinned && !b.pinned) return -1;
-    if (!a.pinned && b.pinned) return 1;
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-  });
+  // Trier et filtrer
+  const sorted = useMemo(() => {
+    let filtered = [...notes];
+
+    // Filter by search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(n =>
+        n.title.toLowerCase().includes(q) ||
+        n.content.toLowerCase().includes(q)
+      );
+    }
+
+    // Sort: pinned always first
+    filtered.sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+
+      switch (sortOrder) {
+        case 'oldest':
+          return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        case 'alpha':
+          return a.title.localeCompare(b.title, 'fr');
+        case 'newest':
+        default:
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      }
+    });
+
+    return filtered;
+  }, [notes, searchQuery, sortOrder]);
 
   const pinnedCount = notes.filter(n => n.pinned).length;
 
   return (
     <div className="h-full overflow-y-auto custom-scrollbar p-5 lg:p-7 space-y-5">
       {/* Header with stats */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <button
           onClick={() => { setShowForm(true); setEditingId(null); setTitle(''); setContent(''); }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 shadow-sm"
@@ -136,7 +163,31 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
           Nouvelle note
         </button>
 
-        <div className="ml-auto flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+        {/* Search */}
+        <div className="flex-1 min-w-[180px] relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--text-dimmed)' }} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Rechercher dans les notes..."
+            className="w-full pl-9 pr-3 py-2 rounded-xl text-[11px] outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
+            style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+          />
+        </div>
+
+        {/* Sort */}
+        <button
+          onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : prev === 'oldest' ? 'alpha' : 'newest')}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-medium border transition-all hover:bg-white/5"
+          style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+          title="Changer l'ordre de tri"
+        >
+          <ArrowUpDown className="w-3 h-3" />
+          {sortOrder === 'newest' ? 'Récentes' : sortOrder === 'oldest' ? 'Anciennes' : 'A → Z'}
+        </button>
+
+        <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
           {pinnedCount > 0 && (
             <span className="flex items-center gap-1">
               <Pin className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} />

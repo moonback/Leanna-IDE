@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, Loader2, Lightbulb, BookOpen, Trash2, Quote, Telescope, Download,
   MessageCircle, ArrowDown, GitCompare, Zap, StickyNote, Volume2, Square,
+  Copy, Check, RefreshCw, Pencil, StopCircle,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -353,7 +354,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const [hoveredCitation, setHoveredCitation] = useState<{ citation: Citation; fullContent: string; x: number; y: number } | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const chunkCache = useRef<Map<string, string>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -466,6 +471,60 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     };
   }, []);
 
+  // ─── Copy to Clipboard ────────────────────────────────────────────────────
+
+  const handleCopy = useCallback(async (msgId: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMsgId(msgId);
+      setTimeout(() => setCopiedMsgId(null), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = content;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedMsgId(msgId);
+      setTimeout(() => setCopiedMsgId(null), 2000);
+    }
+  }, []);
+
+  // ─── Edit User Message (start/cancel only — submit defined after handleSend) ─
+
+  const handleEditStart = useCallback((msgId: string, content: string) => {
+    setEditingMsgId(msgId);
+    setEditingContent(content);
+  }, []);
+
+  const handleEditCancel = useCallback(() => {
+    setEditingMsgId(null);
+    setEditingContent('');
+  }, []);
+
+  // ─── Stop Streaming ───────────────────────────────────────────────────────
+
+  const handleStopStreaming = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setLoading(false);
+    if (streamingText) {
+      // Save the partial response as a message
+      setMessages(prev => [...prev, {
+        id: `partial-${Date.now()}`,
+        role: 'assistant',
+        content: streamingText + '\n\n*(réponse interrompue)*',
+        citations: [],
+        timestamp: new Date().toISOString(),
+      }]);
+      setStreamingText('');
+    }
+    setDeepDiveProgress('');
+  }, [streamingText]);
+
   // Auto-resize textarea
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
@@ -496,10 +555,12 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     setMessages(prev => [...prev, tempUserMsg]);
 
     try {
+      abortRef.current = new AbortController();
       const res = await fetch(`/api/notebooks/${notebookId}/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: q }),
+        signal: abortRef.current.signal,
       });
 
       if (!res.ok) {
@@ -560,6 +621,36 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       inputRef.current?.focus();
     }
   }, [input, loading, notebookId, toastError]);
+
+  // ─── Retry / Regenerate (must be after handleSend) ─────────────────────────
+
+  const handleRetry = useCallback(async (msgId: string) => {
+    const msgIndex = messages.findIndex(m => m.id === msgId);
+    if (msgIndex < 1) return;
+
+    const userMsg = messages[msgIndex - 1];
+    if (userMsg.role !== 'user') return;
+
+    // Remove the assistant answer and resend the question
+    setMessages(prev => prev.filter((_, i) => i !== msgIndex));
+    setTimeout(() => handleSend(userMsg.content), 50);
+  }, [messages, handleSend]);
+
+  // ─── Edit Submit (must be after handleSend) ────────────────────────────────
+
+  const handleEditSubmit = useCallback((msgId: string) => {
+    const newContent = editingContent.trim();
+    if (!newContent) return;
+
+    const msgIndex = messages.findIndex(m => m.id === msgId);
+    if (msgIndex < 0) return;
+
+    // Remove this message and all subsequent messages, then resend
+    setMessages(prev => prev.slice(0, msgIndex));
+    setEditingMsgId(null);
+    setEditingContent('');
+    setTimeout(() => handleSend(newContent), 50);
+  }, [editingContent, messages, handleSend]);
 
   // ─── Deep Dive ─────────────────────────────────────────────────────────────
 
@@ -986,43 +1077,115 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                       : '0 1px 6px rgba(0,0,0,0.04), 0 0 0 0.5px var(--border-base)',
                   }}
                 >
-                  {msg.role === 'assistant' ? (
+                  {/* Message content — with edit mode for user messages */}
+                  {msg.role === 'user' && editingMsgId === msg.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={editingContent}
+                        onChange={(e) => setEditingContent(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg text-xs bg-white/10 border border-white/20 outline-none resize-none text-white placeholder-white/50"
+                        rows={3}
+                        autoFocus
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEditSubmit(msg.id)}
+                          disabled={!editingContent.trim()}
+                          className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-white/20 hover:bg-white/30 transition-colors disabled:opacity-40"
+                        >
+                          Renvoyer
+                        </button>
+                        <button
+                          onClick={handleEditCancel}
+                          className="px-3 py-1.5 rounded-lg text-[10px] font-medium hover:bg-white/10 transition-colors opacity-70"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  ) : msg.role === 'assistant' ? (
                     renderMessageContent(msg.content)
                   ) : (
                     <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                   )}
 
-                  {/* Timestamp + Save to notes + TTS */}
-                  <div className="flex items-center gap-2 mt-2">
-                    <p className="text-[9px] opacity-40">
-                      {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                    {msg.role === 'assistant' && (
-                      <>
+                  {/* Actions bar */}
+                  {editingMsgId !== msg.id && (
+                    <div className="flex items-center gap-2 mt-2.5 pt-1">
+                      <p className="text-[9px] opacity-40">
+                        {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+
+                      {/* Separator dot */}
+                      <span className="text-[6px] opacity-20">•</span>
+
+                      {msg.role === 'assistant' && (
+                        <>
+                          {/* Copy */}
+                          <button
+                            onClick={() => handleCopy(msg.id, msg.content)}
+                            className={`flex items-center gap-1 text-[9px] transition-all ${copiedMsgId === msg.id ? 'opacity-100' : 'opacity-40 hover:opacity-100'}`}
+                            style={{ color: copiedMsgId === msg.id ? '#10b981' : undefined }}
+                            title="Copier la réponse"
+                          >
+                            {copiedMsgId === msg.id ? (
+                              <Check className="w-3 h-3" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                            <span>{copiedMsgId === msg.id ? 'Copié' : 'Copier'}</span>
+                          </button>
+
+                          {/* Retry */}
+                          <button
+                            onClick={() => handleRetry(msg.id)}
+                            disabled={loading}
+                            className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity disabled:opacity-20"
+                            title="Régénérer la réponse"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            <span>Retry</span>
+                          </button>
+
+                          {/* TTS */}
+                          <button
+                            onClick={() => handleTTS(msg.id, msg.content)}
+                            className={`flex items-center gap-1 text-[9px] transition-opacity ${speakingMsgId === msg.id ? 'opacity-100' : 'opacity-40 hover:opacity-100'}`}
+                            style={{ color: speakingMsgId === msg.id ? 'var(--accent-primary)' : undefined }}
+                            title={speakingMsgId === msg.id ? 'Arrêter la lecture' : 'Lire à voix haute'}
+                          >
+                            {speakingMsgId === msg.id ? (
+                              <Square className="w-3 h-3" />
+                            ) : (
+                              <Volume2 className="w-3 h-3" />
+                            )}
+                            <span>{speakingMsgId === msg.id ? 'Stop' : 'Écouter'}</span>
+                          </button>
+
+                          {/* Save to notes */}
+                          <button
+                            onClick={() => handleSaveToNote(msg)}
+                            className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
+                            title="Sauvegarder dans les notes"
+                          >
+                            <StickyNote className="w-3 h-3" />
+                            <span>Note</span>
+                          </button>
+                        </>
+                      )}
+
+                      {msg.role === 'user' && (
                         <button
-                          onClick={() => handleTTS(msg.id, msg.content)}
-                          className={`flex items-center gap-1 text-[9px] transition-opacity ${speakingMsgId === msg.id ? 'opacity-100' : 'opacity-40 hover:opacity-100'}`}
-                          style={{ color: speakingMsgId === msg.id ? 'var(--accent-primary)' : undefined }}
-                          title={speakingMsgId === msg.id ? 'Arrêter la lecture' : 'Lire à voix haute'}
-                        >
-                          {speakingMsgId === msg.id ? (
-                            <Square className="w-3 h-3" />
-                          ) : (
-                            <Volume2 className="w-3 h-3" />
-                          )}
-                          <span>{speakingMsgId === msg.id ? 'Stop' : 'Écouter'}</span>
-                        </button>
-                        <button
-                          onClick={() => handleSaveToNote(msg)}
+                          onClick={() => handleEditStart(msg.id, msg.content)}
                           className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
-                          title="Sauvegarder dans les notes"
+                          title="Modifier et renvoyer"
                         >
-                          <StickyNote className="w-3 h-3" />
-                          <span>Note</span>
+                          <Pencil className="w-3 h-3" />
+                          <span>Modifier</span>
                         </button>
-                      </>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Citations */}
                   {msg.citations.length > 0 && (
@@ -1093,6 +1256,29 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                   {renderMessageContent(streamingText)}
                   <span className="inline-block w-2 h-4 ml-0.5 animate-pulse rounded-sm" style={{ backgroundColor: 'var(--accent-primary)' }} />
                 </div>
+              </motion.div>
+            )}
+
+            {/* Stop streaming button */}
+            {loading && (streamingText || deepDiveProgress) && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex justify-center"
+              >
+                <button
+                  onClick={handleStopStreaming}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-medium transition-all hover:scale-105 active:scale-95"
+                  style={{
+                    backgroundColor: 'var(--bg-panel)',
+                    border: '1px solid var(--border-base)',
+                    color: 'var(--text-secondary)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                  }}
+                >
+                  <StopCircle className="w-3.5 h-3.5" style={{ color: '#ef4444' }} />
+                  Arrêter la génération
+                </button>
               </motion.div>
             )}
 

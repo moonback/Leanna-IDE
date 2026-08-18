@@ -63,6 +63,22 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
   useEffect(() => { loadNotebook(); }, [loadNotebook]);
 
+  // Keyboard shortcuts for tabs (Ctrl+1-5)
+  useEffect(() => {
+    const tabKeys: Tab[] = ['sources', 'chat', 'notes', 'generate', 'audio'];
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+        const num = parseInt(e.key);
+        if (num >= 1 && num <= 5) {
+          e.preventDefault();
+          setActiveTab(tabKeys[num - 1]);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   if (loading || !notebook) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3" style={{ backgroundColor: 'var(--bg-base)' }}>
@@ -131,7 +147,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         className="relative flex items-center gap-0.5 px-5 py-1.5 flex-shrink-0 border-b overflow-x-auto lg:px-7"
         style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
       >
-        {tabs.map(({ key, icon: Icon, label, badge }) => (
+        {tabs.map(({ key, icon: Icon, label, badge }, idx) => (
           <button
             key={key}
             ref={(el) => { if (el) tabsRef.current.set(key, el); }}
@@ -140,6 +156,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             style={{
               color: activeTab === key ? 'var(--accent-primary)' : 'var(--text-muted)',
             }}
+            title={`${label} (Ctrl+${idx + 1})`}
           >
             {/* Active background indicator */}
             {activeTab === key && (
