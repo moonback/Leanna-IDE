@@ -572,7 +572,7 @@ export default function IdeView() {
         onToggleSearch={() => setShowGlobalSearch(v => !v)}
         onToggleSettings={() => {
           setShowSettingsPanel(v => !v);
-          if (!showSettingsPanel) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); setShowNotebooks(false); }
+          if (!showSettingsPanel) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); setShowNotebooks(false); setShowMemory(false); }
         }}
         onToggleRunMenu={() => setShowRunMenu(v => !v)}
         onToggleSandbox={toggleSandbox}
@@ -585,11 +585,11 @@ export default function IdeView() {
         onToggleMissions={() => setShowMissions(v => !v)}
         onToggleKnowledge={() => {
           setShowKnowledge(v => !v);
-          if (!showKnowledge) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowNotebooks(false); }
+          if (!showKnowledge) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowNotebooks(false); setShowMemory(false); }
         }}
         onToggleNotebooks={() => {
           setShowNotebooks(v => !v);
-          if (!showNotebooks) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); }
+          if (!showNotebooks) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowMemory(false); }
         }}
         onToggleDocuments={() => setShowDocuments(v => !v)}
         onToggleSystemHealth={() => setShowSystemHealth(v => !v)}

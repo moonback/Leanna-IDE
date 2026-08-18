@@ -313,6 +313,11 @@ function GlobalNavSection({
     return () => document.removeEventListener('mousedown', handler);
   }, [submenuOpen]);
 
+  // Close submenu when route changes (global context) or active panel changes (IDE context)
+  useEffect(() => {
+    setSubmenuOpen(false);
+  }, [currentPath, showHistory, showAutomation, showMemory, showNotebooks]);
+
   const subItems = [
     { id: 'history', path: '/history', icon: History, label: 'Historique', active: showHistory, onClick: onToggleHistory },
     { id: 'memories', path: '/memories', icon: BrainCircuit, label: 'Mémoires', active: showMemory, onClick: onToggleMemory },

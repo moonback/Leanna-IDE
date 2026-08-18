@@ -101,6 +101,12 @@ function SubmenuItem({ id, icon, label, children, state, actions }: SubmenuItemP
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Close flyout when any panel state changes (user navigated elsewhere)
+  const activeKey = children.find(c => c.stateKey && Boolean(state[c.stateKey]))?.stateKey || '';
+  useEffect(() => {
+    setOpen(false);
+  }, [activeKey]);
+
   // Compute active children info
   const anyChildActive = children.some(
     (child) => child.stateKey && Boolean(state[child.stateKey])
