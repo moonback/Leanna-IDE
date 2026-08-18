@@ -74,6 +74,18 @@ export class ContentGenerator {
         title = "Plan structuré";
         prompt = this.buildOutlinePrompt(sourcesContext, lang);
         break;
+      case "mindmap":
+        title = "Carte mentale";
+        prompt = this.buildMindmapPrompt(sourcesContext, lang);
+        break;
+      case "swot":
+        title = "Analyse SWOT";
+        prompt = this.buildSWOTPrompt(sourcesContext, lang);
+        break;
+      case "glossary":
+        title = "Glossaire";
+        prompt = this.buildGlossaryPrompt(sourcesContext, lang);
+        break;
       default:
         throw new Error(`Type non supporté: ${type}`);
     }
@@ -273,6 +285,94 @@ SOURCES :
 ${context}
 
 Génère le plan en Markdown.`;
+  }
+
+  private buildMindmapPrompt(context: string, lang: string): string {
+    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
+    return `${langInstruction}
+
+Crée une carte mentale (mindmap) structurée qui organise visuellement les concepts des sources suivantes.
+
+INSTRUCTIONS :
+- Identifie le THÈME CENTRAL qui relie toutes les sources
+- Crée 4-6 BRANCHES PRINCIPALES (catégories/thèmes majeurs)
+- Chaque branche a 3-5 SOUS-BRANCHES (concepts, détails)
+- Ajoute des CONNEXIONS entre branches quand des liens existent
+- Utilise le format Mermaid mindmap pour la représentation visuelle
+- Après le diagramme Mermaid, ajoute une section textuelle détaillée
+
+FORMAT ATTENDU :
+1. Un bloc \`\`\`mermaid avec le mindmap
+2. Une section "## Détails par branche" qui développe chaque nœud
+
+SOURCES :
+${context}
+
+Génère la carte mentale complète.`;
+  }
+
+  private buildSWOTPrompt(context: string, lang: string): string {
+    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
+    return `${langInstruction}
+
+Réalise une analyse SWOT (Forces, Faiblesses, Opportunités, Menaces) complète basée sur les sources suivantes.
+
+INSTRUCTIONS :
+- Identifie le SUJET principal de l'analyse (entreprise, projet, technologie, concept)
+- Pour chaque quadrant, liste 5-8 éléments avec une brève explication
+- Appuie chaque point sur des éléments concrets des sources
+- Ajoute une section "Recommandations stratégiques" à la fin
+- Inclus une matrice de priorisation si pertinent
+
+FORMAT :
+## 📊 Analyse SWOT — [Sujet]
+
+### 💪 Forces (Strengths)
+- ...
+
+### ⚠️ Faiblesses (Weaknesses)
+- ...
+
+### 🚀 Opportunités (Opportunities)
+- ...
+
+### 🔴 Menaces (Threats)
+- ...
+
+### 🎯 Recommandations stratégiques
+- ...
+
+SOURCES :
+${context}
+
+Génère l'analyse SWOT complète en Markdown.`;
+  }
+
+  private buildGlossaryPrompt(context: string, lang: string): string {
+    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
+    return `${langInstruction}
+
+Extrais et définis TOUS les termes techniques, acronymes, concepts spécialisés et jargon présents dans les sources suivantes.
+
+INSTRUCTIONS :
+- Organise alphabétiquement
+- Pour chaque terme : définition concise (1-2 phrases) + contexte d'usage
+- Identifie les ACRONYMES et donne leur forme complète
+- Regroupe les termes par CATÉGORIE/DOMAINE si > 20 termes
+- Ajoute des renvois entre termes liés (ex: "Voir aussi : X, Y")
+- Inclus des exemples d'usage quand c'est utile pour la compréhension
+
+FORMAT :
+## 📖 Glossaire
+
+### [Catégorie]
+
+**Terme** — Définition. _Contexte ou exemple._ → Voir aussi : terme lié
+
+SOURCES :
+${context}
+
+Génère le glossaire complet en Markdown.`;
   }
 }
 

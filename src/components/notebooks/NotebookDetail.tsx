@@ -181,7 +181,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             className="h-full"
           >
             {activeTab === 'sources' && <SourcePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} />}
-            {activeTab === 'chat' && <NotebookChat notebookId={notebookId} hasSources={notebook.sources.length > 0} />}
+            {activeTab === 'chat' && <NotebookChat notebookId={notebookId} hasSources={notebook.sources.length > 0} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} />}
             {activeTab === 'notes' && <NotesPanel notebookId={notebookId} notes={notebook.notes} onRefresh={loadNotebook} />}
             {activeTab === 'generate' && <GeneratePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} />}
             {activeTab === 'audio' && <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} onRefresh={loadNotebook} />}

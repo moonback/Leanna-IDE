@@ -9,9 +9,10 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, Loader2, Lightbulb, BookOpen, Trash2, Quote, Telescope, Download,
-  MessageCircle, ArrowDown,
+  MessageCircle, ArrowDown, GitCompare, Zap,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
+import { MermaidDiagram } from './MermaidDiagram';
 
 interface Citation {
   sourceId: string;
@@ -32,6 +33,7 @@ interface ChatMessage {
 interface Props {
   notebookId: string;
   hasSources: boolean;
+  sources?: { id: string; title: string }[];
 }
 
 /** Simple markdown-like rendering for chat messages */
@@ -44,8 +46,14 @@ function renderMessageContent(content: string): JSX.Element {
       {parts.map((part, i) => {
         if (part.startsWith('```')) {
           const lines = part.slice(3, -3).split('\n');
-          const lang = lines[0]?.trim() || '';
-          const code = (lang ? lines.slice(1) : lines).join('\n');
+          const lang = lines[0]?.trim().toLowerCase() || '';
+          const code = (lang ? lines.slice(1) : lines).join('\n').trim();
+
+          // Render Mermaid diagrams
+          if (lang === 'mermaid') {
+            return <MermaidDiagram key={i} code={code} id={`chat-${i}`} />;
+          }
+
           return (
             <pre
               key={i}
@@ -103,7 +111,7 @@ function renderInlineMarkdown(text: string): string {
   return text;
 }
 
-export function NotebookChat({ notebookId, hasSources }: Props) {
+export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const { error: toastError } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -352,6 +360,149 @@ export function NotebookChat({ notebookId, hasSources }: Props) {
       setFollowUps([]);
     } catch { /* ignore */ }
   }, [notebookId]);
+
+  // ─── Compare Sources ───────────────────────────────────────────────────────
+
+  const handleCompare = useCallback(async () => {
+    if (loading || sources.length < 2) return;
+
+    setLoading(true);
+    setFollowUps([]);
+    setStreamingText('');
+
+    const tempUserMsg: ChatMessage = {
+      id: `temp-${Date.now()}`,
+      role: 'user',
+      content: `🔄 Comparer les sources : ${sources.map(s => `"${s.title}"`).join(", ")}`,
+      citations: [],
+      timestamp: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, tempUserMsg]);
+
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/chat/compare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceIds: sources.map(s => s.id) }),
+      });
+
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: 'Erreur' }));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("Pas de body stream");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) continue;
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.text) {
+                accumulated += parsed.text;
+                setStreamingText(accumulated);
+              } else if (parsed.message) {
+                setStreamingText('');
+                setMessages(prev => [...prev, parsed.message]);
+                if (parsed.followUps) setFollowUps(parsed.followUps);
+              }
+            } catch { /* skip */ }
+          }
+        }
+      }
+    } catch (e: any) {
+      toastError(e.message);
+      setStreamingText('');
+    } finally {
+      setLoading(false);
+      setStreamingText('');
+    }
+  }, [loading, notebookId, sources, toastError]);
+
+  // ─── Extract Insights ──────────────────────────────────────────────────────
+
+  const handleInsights = useCallback(async () => {
+    if (loading) return;
+
+    setLoading(true);
+    setFollowUps([]);
+    setStreamingText('');
+
+    const tempUserMsg: ChatMessage = {
+      id: `temp-${Date.now()}`,
+      role: 'user',
+      content: '💡 Extraction d\'insights — analyse approfondie des sources',
+      citations: [],
+      timestamp: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, tempUserMsg]);
+
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/chat/insights`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: 'Erreur' }));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("Pas de body stream");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) continue;
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.text) {
+                accumulated += parsed.text;
+                setStreamingText(accumulated);
+              } else if (parsed.message) {
+                setStreamingText('');
+                setMessages(prev => [...prev, parsed.message]);
+                if (parsed.followUps) setFollowUps(parsed.followUps);
+              }
+            } catch { /* skip */ }
+          }
+        }
+      }
+    } catch (e: any) {
+      toastError(e.message);
+      setStreamingText('');
+    } finally {
+      setLoading(false);
+      setStreamingText('');
+    }
+  }, [loading, notebookId, toastError]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -745,6 +896,28 @@ export function NotebookChat({ notebookId, hasSources }: Props) {
           >
             <Telescope className="w-4 h-4" />
           </button>
+
+          <button
+            onClick={handleInsights}
+            disabled={loading}
+            className="p-3 rounded-xl border transition-all active:scale-95 disabled:opacity-30 hover:bg-white/5"
+            style={{ borderColor: 'var(--border-base)', color: '#f59e0b' }}
+            title="Extraire les insights clés"
+          >
+            <Zap className="w-4 h-4" />
+          </button>
+
+          {sources.length >= 2 && (
+            <button
+              onClick={handleCompare}
+              disabled={loading}
+              className="p-3 rounded-xl border transition-all active:scale-95 disabled:opacity-30 hover:bg-white/5"
+              style={{ borderColor: 'var(--border-base)', color: '#8b5cf6' }}
+              title="Comparer les sources"
+            >
+              <GitCompare className="w-4 h-4" />
+            </button>
+          )}
 
           <button
             onClick={() => handleSend()}

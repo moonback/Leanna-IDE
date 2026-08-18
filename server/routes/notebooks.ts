@@ -599,6 +599,85 @@ export function createNotebooksRouter(): Router {
     }
   });
 
+  // POST /api/notebooks/:id/chat/compare — Comparer des sources entre elles (SSE)
+  router.post("/:id/chat/compare", async (req: Request, res: Response) => {
+    try {
+      const { sourceIds } = req.body;
+      if (!sourceIds || !Array.isArray(sourceIds) || sourceIds.length < 2) {
+        res.status(400).json({ error: "Au moins 2 sourceIds sont requis." });
+        return;
+      }
+
+      // Headers SSE
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+
+      res.write(`event: start\ndata: ${JSON.stringify({ mode: "compare" })}\n\n`);
+
+      const message = await groundedChat.compareSources(
+        req.params.id,
+        sourceIds,
+        (chunk: string) => {
+          res.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
+        }
+      );
+
+      let followUps: string[] = [];
+      try {
+        followUps = await groundedChat.generateFollowUps(req.params.id);
+      } catch { /* ignore */ }
+
+      res.write(`event: done\ndata: ${JSON.stringify({ message, followUps })}\n\n`);
+      res.end();
+    } catch (e: any) {
+      if (res.headersSent) {
+        res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  });
+
+  // POST /api/notebooks/:id/chat/insights — Extraire les insights des sources (SSE)
+  router.post("/:id/chat/insights", async (req: Request, res: Response) => {
+    try {
+      // Headers SSE
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+
+      res.write(`event: start\ndata: ${JSON.stringify({ mode: "insights" })}\n\n`);
+
+      const message = await groundedChat.extractInsights(
+        req.params.id,
+        (chunk: string) => {
+          res.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
+        }
+      );
+
+      let followUps: string[] = [];
+      try {
+        followUps = await groundedChat.generateFollowUps(req.params.id);
+      } catch { /* ignore */ }
+
+      res.write(`event: done\ndata: ${JSON.stringify({ message, followUps })}\n\n`);
+      res.end();
+    } catch (e: any) {
+      if (res.headersSent) {
+        res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  });
+
   // ═══════════════════════════════════════════════════════════════════════════
   // NOTES
   // ═══════════════════════════════════════════════════════════════════════════
@@ -659,7 +738,7 @@ export function createNotebooksRouter(): Router {
   router.post("/:id/generate", async (req: Request, res: Response) => {
     try {
       const { type, sourceIds, language } = req.body;
-      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline"];
+      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary"];
 
       if (!type || !validTypes.includes(type)) {
         res.status(400).json({

@@ -11,6 +11,7 @@ import {
   Loader2, Trash2, Copy, CheckCircle2, ChevronRight,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
+import { MermaidDiagram } from './MermaidDiagram';
 
 interface SourceItem {
   id: string;
@@ -40,55 +41,91 @@ const DOC_TYPES = [
   { key: 'briefing', label: 'Briefing', icon: Briefcase, desc: 'Document exécutif concis', color: '#f59e0b' },
   { key: 'timeline', label: 'Chronologie', icon: Clock, desc: 'Événements et jalons', color: '#ef4444' },
   { key: 'outline', label: 'Plan', icon: List, desc: 'Structure hiérarchique', color: '#06b6d4' },
+  { key: 'mindmap', label: 'Carte mentale', icon: Sparkles, desc: 'Mindmap visuelle Mermaid', color: '#ec4899' },
+  { key: 'swot', label: 'Analyse SWOT', icon: Briefcase, desc: 'Forces, Faiblesses, Opportunités, Menaces', color: '#14b8a6' },
+  { key: 'glossary', label: 'Glossaire', icon: HelpCircle, desc: 'Termes techniques définis', color: '#6366f1' },
 ];
 
-/** Render markdown-like content */
+/** Render markdown-like content with Mermaid diagram support */
 function renderGeneratedContent(content: string): JSX.Element {
-  const lines = content.split('\n');
+  // Split by code blocks (including mermaid)
+  const parts = content.split(/(```[\s\S]*?```)/g);
 
   return (
     <div className="space-y-2">
-      {lines.map((line, i) => {
-        if (!line.trim()) return <div key={i} className="h-2" />;
+      {parts.map((part, i) => {
+        // Handle code blocks
+        if (part.startsWith('```')) {
+          const lines = part.slice(3, -3).split('\n');
+          const lang = lines[0]?.trim().toLowerCase() || '';
+          const code = (lang ? lines.slice(1) : lines).join('\n').trim();
 
-        // Headers
-        if (line.startsWith('### ')) return <h4 key={i} className="text-xs font-bold mt-4 mb-1" style={{ color: 'var(--text-primary)' }}>{line.slice(4)}</h4>;
-        if (line.startsWith('## ')) return <h3 key={i} className="text-sm font-bold mt-5 mb-1.5" style={{ color: 'var(--text-primary)' }}>{line.slice(3)}</h3>;
-        if (line.startsWith('# ')) return <h2 key={i} className="text-base font-bold mt-6 mb-2" style={{ color: 'var(--text-primary)' }}>{line.slice(2)}</h2>;
+          // Render Mermaid diagrams visually
+          if (lang === 'mermaid') {
+            return <MermaidDiagram key={i} code={code} id={`gen-${i}`} />;
+          }
 
-        // Horizontal rule
-        if (line.match(/^---+$/)) return <hr key={i} className="my-4" style={{ borderColor: 'var(--border-base)' }} />;
-
-        // Blockquote
-        if (line.startsWith('> ')) {
+          // Regular code block
           return (
-            <blockquote key={i} className="pl-3 py-1 text-xs leading-relaxed italic border-l-2" style={{ borderColor: 'var(--accent-primary)', color: 'var(--text-muted)' }}>
-              {line.slice(2)}
-            </blockquote>
+            <pre
+              key={i}
+              className="px-4 py-3 rounded-xl text-[11px] overflow-x-auto font-mono"
+              style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+            >
+              <code>{code}</code>
+            </pre>
           );
         }
 
-        // Lists
-        if (line.match(/^[\-\*]\s/)) {
-          return (
-            <div key={i} className="flex gap-2 pl-2">
-              <span className="text-[10px] mt-0.5 opacity-50">•</span>
-              <span className="text-xs leading-relaxed flex-1" style={{ color: 'var(--text-primary)' }}>{line.slice(2)}</span>
-            </div>
-          );
-        }
-        if (line.match(/^\d+\.\s/)) {
-          const num = line.match(/^(\d+)\./)?.[1];
-          return (
-            <div key={i} className="flex gap-2 pl-2">
-              <span className="text-[10px] mt-0.5 opacity-60 font-semibold min-w-[16px]" style={{ color: 'var(--accent-primary)' }}>{num}.</span>
-              <span className="text-xs leading-relaxed flex-1" style={{ color: 'var(--text-primary)' }}>{line.replace(/^\d+\.\s/, '')}</span>
-            </div>
-          );
-        }
+        // Process non-code content line by line
+        const lines = part.split('\n');
 
-        // Regular text
-        return <p key={i} className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>{line}</p>;
+        return (
+          <div key={i} className="space-y-2">
+            {lines.map((line, j) => {
+              if (!line.trim()) return <div key={j} className="h-2" />;
+
+              // Headers
+              if (line.startsWith('### ')) return <h4 key={j} className="text-xs font-bold mt-4 mb-1" style={{ color: 'var(--text-primary)' }}>{line.slice(4)}</h4>;
+              if (line.startsWith('## ')) return <h3 key={j} className="text-sm font-bold mt-5 mb-1.5" style={{ color: 'var(--text-primary)' }}>{line.slice(3)}</h3>;
+              if (line.startsWith('# ')) return <h2 key={j} className="text-base font-bold mt-6 mb-2" style={{ color: 'var(--text-primary)' }}>{line.slice(2)}</h2>;
+
+              // Horizontal rule
+              if (line.match(/^---+$/)) return <hr key={j} className="my-4" style={{ borderColor: 'var(--border-base)' }} />;
+
+              // Blockquote
+              if (line.startsWith('> ')) {
+                return (
+                  <blockquote key={j} className="pl-3 py-1 text-xs leading-relaxed italic border-l-2" style={{ borderColor: 'var(--accent-primary)', color: 'var(--text-muted)' }}>
+                    {line.slice(2)}
+                  </blockquote>
+                );
+              }
+
+              // Lists
+              if (line.match(/^[\-\*]\s/)) {
+                return (
+                  <div key={j} className="flex gap-2 pl-2">
+                    <span className="text-[10px] mt-0.5 opacity-50">•</span>
+                    <span className="text-xs leading-relaxed flex-1" style={{ color: 'var(--text-primary)' }}>{line.slice(2)}</span>
+                  </div>
+                );
+              }
+              if (line.match(/^\d+\.\s/)) {
+                const num = line.match(/^(\d+)\./)?.[1];
+                return (
+                  <div key={j} className="flex gap-2 pl-2">
+                    <span className="text-[10px] mt-0.5 opacity-60 font-semibold min-w-[16px]" style={{ color: 'var(--accent-primary)' }}>{num}.</span>
+                    <span className="text-xs leading-relaxed flex-1" style={{ color: 'var(--text-primary)' }}>{line.replace(/^\d+\.\s/, '')}</span>
+                  </div>
+                );
+              }
+
+              // Regular text
+              return <p key={j} className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>{line}</p>;
+            })}
+          </div>
+        );
       })}
     </div>
   );

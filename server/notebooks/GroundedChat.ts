@@ -409,6 +409,165 @@ Fournis une réponse approfondie et structurée. Cite avec [SOURCE N].`;
     return this.ask(notebookId, question);
   }
 
+  // ─── Compare Sources ──────────────────────────────────────────────────────
+
+  /**
+   * Compare 2+ sources entre elles : similitudes, différences, contradictions.
+   */
+  async compareSources(
+    notebookId: string,
+    sourceIds: string[],
+    onChunk?: (chunk: string) => void
+  ): Promise<ChatMessage> {
+    const notebook = notebookManager.getNotebook(notebookId);
+    if (!notebook) throw new Error("Notebook introuvable.");
+
+    const sources = notebook.sources.filter(s => sourceIds.includes(s.id));
+    if (sources.length < 2) throw new Error("Au moins 2 sources sont nécessaires pour une comparaison.");
+
+    // Sauvegarder le message utilisateur
+    const userMsg = this.buildMessage("user", `🔄 Comparer : ${sources.map(s => `"${s.title}"`).join(" vs ")}`, []);
+    notebookManager.addChatMessage(notebookId, userMsg);
+
+    // Construire le contexte de chaque source
+    const sourcesContext = sources.map(s =>
+      `═══ SOURCE : "${s.title}" ═══\nRésumé : ${s.summary}\n\nContenu clé :\n${s.chunks.slice(0, 6).map(c => c.content).join("\n\n")}`
+    ).join("\n\n────────────────────────────\n\n");
+
+    const prompt = `Tu es un analyste expert en comparaison documentaire. Compare les sources suivantes de manière détaillée et structurée.
+
+${sourcesContext}
+
+ANALYSE DEMANDÉE :
+
+## 🔄 Comparaison : ${sources.map(s => `"${s.title}"`).join(" vs ")}
+
+Structure ta réponse avec :
+
+### 📌 Points communs
+Les idées, faits ou concepts partagés par les sources.
+
+### ⚡ Différences clés
+Les divergences d'approche, de perspective ou de contenu.
+
+### ⚠️ Contradictions
+Les points où les sources se contredisent (si applicable).
+
+### 🎯 Synthèse comparative
+Un tableau ou résumé qui met en perspective les forces/limites de chaque source.
+
+### 💡 Complémentarité
+Comment ces sources se complètent mutuellement.
+
+Cite les sources avec leur nom entre guillemets. Sois précis et factuel.`;
+
+    let responseText = "";
+    try {
+      if (onChunk) {
+        const { generateTextStream } = await import("../utils/textGeneration");
+        responseText = await generateTextStream({
+          prompt,
+          temperature: 0.4,
+          maxOutputTokens: 6144,
+          onChunk,
+        });
+      } else {
+        const result = await generateText({
+          prompt,
+          temperature: 0.4,
+          maxOutputTokens: 6144,
+        });
+        responseText = result.text;
+      }
+    } catch (e: any) {
+      log.error(`Erreur comparaison sources: ${e.message}`);
+      responseText = "Erreur lors de la comparaison. Veuillez réessayer.";
+    }
+
+    const assistantMsg = this.buildMessage("assistant", responseText, []);
+    notebookManager.addChatMessage(notebookId, assistantMsg);
+    return assistantMsg;
+  }
+
+  // ─── Extract Insights ─────────────────────────────────────────────────────
+
+  /**
+   * Extrait les insights clés, tendances, et patterns des sources du notebook.
+   */
+  async extractInsights(
+    notebookId: string,
+    onChunk?: (chunk: string) => void
+  ): Promise<ChatMessage> {
+    const notebook = notebookManager.getNotebook(notebookId);
+    if (!notebook) throw new Error("Notebook introuvable.");
+    if (notebook.sources.length === 0) throw new Error("Aucune source disponible.");
+
+    // Sauvegarder le message utilisateur
+    const userMsg = this.buildMessage("user", "💡 Extraction d'insights — analyse approfondie des sources", []);
+    notebookManager.addChatMessage(notebookId, userMsg);
+
+    // Construire le contexte enrichi
+    const sourcesContext = notebook.sources.map(s =>
+      `## ${s.title}\nRésumé : ${s.summary}\nMots-clés : ${s.keywords.join(", ")}\n\nExtraits :\n${s.chunks.slice(0, 4).map(c => c.content).join("\n\n")}`
+    ).join("\n\n---\n\n");
+
+    const prompt = `Tu es un analyste de recherche senior. Analyse en profondeur les sources suivantes et extrais des insights de haut niveau.
+
+SOURCES :
+${sourcesContext}
+
+ANALYSE DEMANDÉE — Structure ta réponse exactement ainsi :
+
+## 💡 Insights clés
+
+### 🔑 Findings principaux
+Les découvertes ou informations les plus importantes (5-8 points, classés par importance).
+
+### 📈 Tendances identifiées
+Les patterns, évolutions ou tendances qui émergent de l'ensemble des sources.
+
+### 🔗 Connexions cachées
+Les liens non évidents entre différentes sources ou concepts qui apportent une compréhension plus profonde.
+
+### ⚠️ Points de vigilance
+Les risques, limites, biais ou zones d'ombre dans les sources.
+
+### 🎯 Conclusions actionables
+Ce qu'un décideur devrait retenir et les actions recommandées.
+
+### ❓ Questions ouvertes
+Les questions que les sources soulèvent mais ne répondent pas (pistes de recherche future).
+
+Sois analytique, rigoureux et surprenant dans tes connexions. Chaque insight doit apporter une valeur au-delà de la simple lecture des sources.`;
+
+    let responseText = "";
+    try {
+      if (onChunk) {
+        const { generateTextStream } = await import("../utils/textGeneration");
+        responseText = await generateTextStream({
+          prompt,
+          temperature: 0.5,
+          maxOutputTokens: 6144,
+          onChunk,
+        });
+      } else {
+        const result = await generateText({
+          prompt,
+          temperature: 0.5,
+          maxOutputTokens: 6144,
+        });
+        responseText = result.text;
+      }
+    } catch (e: any) {
+      log.error(`Erreur extraction insights: ${e.message}`);
+      responseText = "Erreur lors de l'extraction des insights. Veuillez réessayer.";
+    }
+
+    const assistantMsg = this.buildMessage("assistant", responseText, []);
+    notebookManager.addChatMessage(notebookId, assistantMsg);
+    return assistantMsg;
+  }
+
   /**
    * Suggère des questions pertinentes basées sur le contenu des sources.
    */

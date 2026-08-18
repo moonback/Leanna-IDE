@@ -113,7 +113,7 @@ export interface ChatMessage {
 
 // ─── Documents générés ───────────────────────────────────────────────────────
 
-export type GeneratedDocType = 'summary' | 'faq' | 'study-guide' | 'briefing' | 'timeline' | 'outline';
+export type GeneratedDocType = 'summary' | 'faq' | 'study-guide' | 'briefing' | 'timeline' | 'outline' | 'mindmap' | 'swot' | 'glossary';
 
 export interface GeneratedDocument {
   id: string;
