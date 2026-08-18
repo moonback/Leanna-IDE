@@ -10,7 +10,7 @@ import { useState, useCallback } from 'react';
 import { NotebookList } from '../components/notebooks/NotebookList';
 import { NotebookDetail } from '../components/notebooks/NotebookDetail';
 
-export default function NotebooksView() {
+export default function NotebooksView({ onClose }: { onClose?: () => void }) {
   const [selectedNotebookId, setSelectedNotebookId] = useState<string | null>(null);
 
   const handleBack = useCallback(() => setSelectedNotebookId(null), []);
@@ -19,5 +19,5 @@ export default function NotebooksView() {
     return <NotebookDetail notebookId={selectedNotebookId} onBack={handleBack} />;
   }
 
-  return <NotebookList onSelectNotebook={setSelectedNotebookId} />;
+  return <NotebookList onSelectNotebook={setSelectedNotebookId} onClose={onClose} />;
 }

@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   BookOpen, Plus, Loader2, Trash2, Clock, FileText, MessageSquare,
-  Search, Grid3X3, List, SortAsc, SortDesc, Sparkles,
+  Search, Grid3X3, List, SortAsc, SortDesc, Sparkles, X,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { ViewHeader } from '../ui/ViewHeader';
@@ -27,6 +27,7 @@ interface NotebookSummary {
 
 interface Props {
   onSelectNotebook: (id: string) => void;
+  onClose?: () => void;
 }
 
 type ViewMode = 'grid' | 'list';
@@ -43,7 +44,7 @@ function timeAgo(dateStr: string): string {
   return 'maintenant';
 }
 
-export function NotebookList({ onSelectNotebook }: Props) {
+export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const { success, error: toastError } = useToast();
   const [notebooks, setNotebooks] = useState<NotebookSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -146,14 +147,27 @@ export function NotebookList({ onSelectNotebook }: Props) {
         badge="AI Research"
         description="Collections de sources avec chat IA, résumés et génération"
         actions={
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-semibold transition-all active:scale-95 hover:opacity-90 shadow-sm"
-            style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Nouveau
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-semibold transition-all active:scale-95 hover:opacity-90 shadow-sm"
+              style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Nouveau
+            </button>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="p-2 rounded-lg transition-colors hover:bg-[var(--ctrl-hover)]"
+                style={{ color: 'var(--text-muted)' }}
+                aria-label="Fermer"
+                title="Fermer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         }
       />
 
