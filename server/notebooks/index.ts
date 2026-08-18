@@ -11,4 +11,7 @@ export { embeddingStore } from "./EmbeddingStore";
 export { ragEngine } from "./RAGEngine";
 export { groundedChat } from "./GroundedChat";
 export { contentGenerator } from "./ContentGenerator";
+export { backupService } from "./BackupService";
+export { sourceProcessingQueue } from "./ProcessingQueue";
+export { chatResponseCache, ragSearchCache } from "./ResponseCache";
 export type * from "./types";

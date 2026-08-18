@@ -10,6 +10,9 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { notebookManager, sourceIngester, groundedChat, contentGenerator, embeddingStore } from "../notebooks";
+import { backupService } from "../notebooks/BackupService";
+import { sourceProcessingQueue } from "../notebooks/ProcessingQueue";
+import { chatResponseCache, ragSearchCache } from "../notebooks/ResponseCache";
 import type { GeneratedDocType } from "../notebooks/types";
 import { getProjectRoot } from "../utils/pathUtils";
 import { getSandboxRoot } from "../utils/sandbox";
@@ -256,6 +259,55 @@ export function createNotebooksRouter(): Router {
         successCount,
         errorCount,
         results,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/notebooks/:id/sources/upload-queued — Upload via la queue de processing (non-bloquant)
+  router.post("/:id/sources/upload-queued", upload.array("files", 20), (req: Request, res: Response) => {
+    try {
+      const notebookId = req.params.id;
+      const notebook = notebookManager.getNotebook(notebookId);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      const files = req.files as Express.Multer.File[] | undefined;
+      if (!files || files.length === 0) {
+        res.status(400).json({ error: "Aucun fichier fourni." });
+        return;
+      }
+
+      const priority = (req.body.priority as "urgent" | "normal" | "low") || "normal";
+      const taskIds: string[] = [];
+
+      for (const file of files) {
+        const taskId = `src-${notebookId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const task = sourceProcessingQueue.enqueue(
+          taskId,
+          "source-ingest",
+          {
+            notebookId,
+            fileName: file.originalname,
+            mimeType: file.mimetype,
+            buffer: file.buffer,
+          },
+          { priority }
+        );
+
+        if (task) {
+          taskIds.push(task.id);
+        }
+      }
+
+      res.json({
+        status: "success",
+        message: `${taskIds.length} fichier(s) ajouté(s) à la queue de processing.`,
+        taskIds,
+        queueStats: sourceProcessingQueue.getStats(),
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -1323,5 +1375,238 @@ export function createNotebooksRouter(): Router {
     }
   });
 
+  // GET /api/notebooks/embeddings/memory — Stats mémoire globales des embeddings
+  router.get("/embeddings/memory", (_req: Request, res: Response) => {
+    try {
+      const memStats = embeddingStore.getMemoryStats();
+      res.json({ status: "success", memory: memStats });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // BACKUP (sauvegarde & restauration)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // POST /api/notebooks/backup/run — Lancer un backup manuel
+  router.post("/backup/run", async (_req: Request, res: Response) => {
+    try {
+      const metadata = await backupService.runBackup();
+      if (!metadata) {
+        res.json({ status: "success", message: "Aucune modification à sauvegarder." });
+        return;
+      }
+      res.json({ status: "success", backup: metadata });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/notebooks/backup/list — Lister les backups disponibles
+  router.get("/backup/list", (_req: Request, res: Response) => {
+    try {
+      const backups = backupService.listBackups();
+      res.json({ status: "success", backups });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/notebooks/backup/restore — Restaurer depuis un backup
+  router.post("/backup/restore", (req: Request, res: Response) => {
+    try {
+      const { backupId, notebookId } = req.body;
+      if (!backupId || typeof backupId !== "string") {
+        res.status(400).json({ error: "Le champ 'backupId' est requis." });
+        return;
+      }
+
+      if (notebookId) {
+        // Restaurer un seul notebook
+        const success = backupService.restoreNotebook(backupId, notebookId);
+        if (!success) {
+          res.status(404).json({ error: "Backup ou notebook introuvable." });
+          return;
+        }
+        res.json({ status: "success", message: `Notebook ${notebookId} restauré.` });
+      } else {
+        // Restaurer tous les notebooks du backup
+        const result = backupService.restoreAll(backupId);
+        res.json({ status: "success", ...result });
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/notebooks/backup/config — Configuration des backups
+  router.get("/backup/config", (_req: Request, res: Response) => {
+    try {
+      res.json({ status: "success", config: backupService.getConfig() });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // PATCH /api/notebooks/backup/config — Modifier la configuration
+  router.patch("/backup/config", (req: Request, res: Response) => {
+    try {
+      const { intervalMs, maxBackups, enabled } = req.body;
+      backupService.updateConfig({ intervalMs, maxBackups, enabled });
+      res.json({ status: "success", config: backupService.getConfig() });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // QUEUE (file d'attente de processing)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // GET /api/notebooks/queue/stats — Statistiques de la queue
+  router.get("/queue/stats", (_req: Request, res: Response) => {
+    try {
+      const stats = sourceProcessingQueue.getStats();
+      res.json({ status: "success", stats });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/notebooks/queue/pending — Tâches en attente
+  router.get("/queue/pending", (_req: Request, res: Response) => {
+    try {
+      const pending = sourceProcessingQueue.getPending().map(t => ({
+        id: t.id,
+        type: t.type,
+        priority: t.priority,
+        status: t.status,
+        attempts: t.attempts,
+        createdAt: t.createdAt,
+        progress: t.progress,
+      }));
+      res.json({ status: "success", tasks: pending });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/notebooks/queue/processing — Tâches en cours
+  router.get("/queue/processing", (_req: Request, res: Response) => {
+    try {
+      const processing = sourceProcessingQueue.getProcessing().map(t => ({
+        id: t.id,
+        type: t.type,
+        priority: t.priority,
+        status: t.status,
+        attempts: t.attempts,
+        startedAt: t.startedAt,
+        progress: t.progress,
+      }));
+      res.json({ status: "success", tasks: processing });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/notebooks/queue/task/:taskId — Statut d'une tâche
+  router.get("/queue/task/:taskId", (req: Request, res: Response) => {
+    try {
+      const task = sourceProcessingQueue.getTask(req.params.taskId);
+      if (!task) {
+        res.status(404).json({ error: "Tâche introuvable." });
+        return;
+      }
+      res.json({
+        status: "success",
+        task: {
+          id: task.id,
+          type: task.type,
+          priority: task.priority,
+          status: task.status,
+          attempts: task.attempts,
+          maxAttempts: task.maxAttempts,
+          progress: task.progress,
+          error: task.error,
+          createdAt: task.createdAt,
+          startedAt: task.startedAt,
+          completedAt: task.completedAt,
+        },
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // DELETE /api/notebooks/queue/task/:taskId — Annuler une tâche
+  router.delete("/queue/task/:taskId", (req: Request, res: Response) => {
+    try {
+      const success = sourceProcessingQueue.cancel(req.params.taskId);
+      if (!success) {
+        res.status(404).json({ error: "Tâche introuvable ou déjà en cours." });
+        return;
+      }
+      res.json({ status: "success", message: "Tâche annulée." });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // DELETE /api/notebooks/queue/clear — Vider la queue
+  router.delete("/queue/clear", (_req: Request, res: Response) => {
+    try {
+      sourceProcessingQueue.clear();
+      res.json({ status: "success", message: "Queue vidée." });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CACHE (statistiques & contrôle)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // GET /api/notebooks/cache/stats — Statistiques du cache
+  router.get("/cache/stats", (_req: Request, res: Response) => {
+    try {
+      const chatStats = chatResponseCache.getStats();
+      const ragStats = ragSearchCache.getStats();
+      res.json({
+        status: "success",
+        chat: chatStats,
+        rag: ragStats,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // DELETE /api/notebooks/cache/clear — Vider le cache
+  router.delete("/cache/clear", (_req: Request, res: Response) => {
+    try {
+      chatResponseCache.clear();
+      ragSearchCache.clear();
+      res.json({ status: "success", message: "Cache vidé." });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // DELETE /api/notebooks/cache/:notebookId — Invalider le cache d'un notebook
+  router.delete("/cache/:notebookId", (req: Request, res: Response) => {
+    try {
+      const chatInvalidated = chatResponseCache.invalidateNotebook(req.params.notebookId);
+      const ragInvalidated = ragSearchCache.invalidateNotebook(req.params.notebookId);
+      res.json({
+        status: "success",
+        invalidated: { chat: chatInvalidated, rag: ragInvalidated },
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   return router;
 }
+
