@@ -9,7 +9,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, Loader2, Lightbulb, BookOpen, Trash2, Quote, Telescope, Download,
-  MessageCircle, ArrowDown, GitCompare, Zap, StickyNote,
+  MessageCircle, ArrowDown, GitCompare, Zap, StickyNote, Volume2, Square,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -36,13 +36,13 @@ interface Props {
   sources?: { id: string; title: string }[];
 }
 
-/** Simple markdown-like rendering for chat messages */
+/** Rich markdown rendering for chat messages */
 function renderMessageContent(content: string): JSX.Element {
   // Split by code blocks first
   const parts = content.split(/(```[\s\S]*?```)/g);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {parts.map((part, i) => {
         if (part.startsWith('```')) {
           const lines = part.slice(3, -3).split('\n');
@@ -55,60 +55,288 @@ function renderMessageContent(content: string): JSX.Element {
           }
 
           return (
-            <pre
-              key={i}
-              className="px-3 py-2.5 rounded-lg text-[11px] overflow-x-auto font-mono"
-              style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
-            >
-              <code>{code}</code>
-            </pre>
+            <div key={i} className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-base)' }}>
+              {/* Code block header with language tag */}
+              {lang && (
+                <div
+                  className="flex items-center justify-between px-3 py-1.5"
+                  style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-base)' }}
+                >
+                  <span className="text-[9px] font-mono font-medium uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                    {lang}
+                  </span>
+                </div>
+              )}
+              <pre
+                className="px-4 py-3 text-[11px] overflow-x-auto font-mono leading-relaxed"
+                style={{ backgroundColor: 'var(--bg-base)', margin: 0 }}
+              >
+                <code style={{ color: 'var(--text-secondary)' }}>{code}</code>
+              </pre>
+            </div>
           );
         }
 
-        // Process inline markdown
-        return (
-          <div key={i} className="space-y-1.5">
-            {part.split('\n').map((line, j) => {
-              if (!line.trim()) return <div key={j} className="h-1.5" />;
+        // Process block-level markdown
+        const lines = part.split('\n');
+        const blocks: JSX.Element[] = [];
+        let blockIdx = 0;
+        let inBlockquote = false;
+        let blockquoteLines: string[] = [];
+        let inTable = false;
+        let tableRows: string[] = [];
 
-              // Headers
-              if (line.startsWith('### ')) return <p key={j} className="text-xs font-bold mt-2">{line.slice(4)}</p>;
-              if (line.startsWith('## ')) return <p key={j} className="text-[13px] font-bold mt-2">{line.slice(3)}</p>;
-              if (line.startsWith('# ')) return <p key={j} className="text-sm font-bold mt-2">{line.slice(2)}</p>;
+        const flushBlockquote = () => {
+          if (blockquoteLines.length > 0) {
+            blocks.push(
+              <blockquote
+                key={`bq-${blockIdx++}`}
+                className="pl-3 py-1.5 my-1 rounded-r-lg"
+                style={{
+                  borderLeft: '3px solid var(--accent-primary)',
+                  backgroundColor: 'var(--accent-subtle)',
+                }}
+              >
+                {blockquoteLines.map((line, j) => (
+                  <p key={j} className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    {renderInlineMarkdown(line)}
+                  </p>
+                ))}
+              </blockquote>
+            );
+            blockquoteLines = [];
+          }
+          inBlockquote = false;
+        };
 
-              // Lists
-              if (line.match(/^[\-\*]\s/)) {
-                return (
-                  <div key={j} className="flex gap-2 pl-1">
-                    <span className="text-[10px] mt-0.5 opacity-40">•</span>
-                    <span className="text-xs leading-relaxed flex-1">{renderInlineMarkdown(line.slice(2))}</span>
-                  </div>
-                );
-              }
-              if (line.match(/^\d+\.\s/)) {
-                const num = line.match(/^(\d+)\./)?.[1];
-                return (
-                  <div key={j} className="flex gap-2 pl-1">
-                    <span className="text-[10px] mt-0.5 opacity-50 font-medium min-w-[14px]">{num}.</span>
-                    <span className="text-xs leading-relaxed flex-1">{renderInlineMarkdown(line.replace(/^\d+\.\s/, ''))}</span>
-                  </div>
-                );
-              }
+        const flushTable = () => {
+          if (tableRows.length > 0) {
+            const headerRow = tableRows[0].split('|').filter(c => c.trim());
+            const dataRows = tableRows.slice(2).map(row => row.split('|').filter(c => c.trim()));
 
-              // Regular paragraph
-              return <p key={j} className="text-xs leading-relaxed">{renderInlineMarkdown(line)}</p>;
-            })}
-          </div>
-        );
+            blocks.push(
+              <div key={`tbl-${blockIdx++}`} className="overflow-x-auto my-2 rounded-lg" style={{ border: '1px solid var(--border-base)' }}>
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                      {headerRow.map((cell, ci) => (
+                        <th key={ci} className="px-3 py-2 text-left font-semibold" style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--border-base)' }}>
+                          {cell.trim()}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dataRows.map((row, ri) => (
+                      <tr key={ri} style={{ borderBottom: ri < dataRows.length - 1 ? '1px solid var(--border-base)' : 'none' }}>
+                        {row.map((cell, ci) => (
+                          <td key={ci} className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>
+                            {renderInlineMarkdown(cell.trim())}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+            tableRows = [];
+          }
+          inTable = false;
+        };
+
+        for (let j = 0; j < lines.length; j++) {
+          const line = lines[j];
+
+          // Table detection
+          if (line.includes('|') && line.trim().startsWith('|')) {
+            if (!inTable) {
+              flushBlockquote();
+              inTable = true;
+            }
+            tableRows.push(line);
+            continue;
+          } else if (inTable) {
+            flushTable();
+          }
+
+          // Blockquote
+          if (line.startsWith('>')) {
+            if (!inBlockquote) {
+              inBlockquote = true;
+            }
+            blockquoteLines.push(line.replace(/^>\s?/, ''));
+            continue;
+          } else if (inBlockquote) {
+            flushBlockquote();
+          }
+
+          // Empty line
+          if (!line.trim()) {
+            blocks.push(<div key={`sp-${blockIdx++}`} className="h-2" />);
+            continue;
+          }
+
+          // Horizontal rule
+          if (line.match(/^(-{3,}|\*{3,}|_{3,})$/)) {
+            blocks.push(
+              <hr key={`hr-${blockIdx++}`} className="my-3 border-none" style={{ height: '1px', backgroundColor: 'var(--border-base)' }} />
+            );
+            continue;
+          }
+
+          // Headers
+          if (line.startsWith('#### ')) {
+            blocks.push(
+              <h4 key={`h4-${blockIdx++}`} className="text-[11px] font-bold mt-3 mb-1" style={{ color: 'var(--text-primary)' }}>
+                {renderInlineMarkdown(line.slice(5))}
+              </h4>
+            );
+            continue;
+          }
+          if (line.startsWith('### ')) {
+            blocks.push(
+              <h3 key={`h3-${blockIdx++}`} className="text-xs font-bold mt-3 mb-1" style={{ color: 'var(--text-primary)' }}>
+                {renderInlineMarkdown(line.slice(4))}
+              </h3>
+            );
+            continue;
+          }
+          if (line.startsWith('## ')) {
+            blocks.push(
+              <h2 key={`h2-${blockIdx++}`} className="text-[13px] font-bold mt-4 mb-1.5" style={{ color: 'var(--text-primary)' }}>
+                {renderInlineMarkdown(line.slice(3))}
+              </h2>
+            );
+            continue;
+          }
+          if (line.startsWith('# ')) {
+            blocks.push(
+              <h1 key={`h1-${blockIdx++}`} className="text-sm font-bold mt-4 mb-1.5" style={{ color: 'var(--text-primary)' }}>
+                {renderInlineMarkdown(line.slice(2))}
+              </h1>
+            );
+            continue;
+          }
+
+          // Unordered lists
+          if (line.match(/^[\-\*]\s/)) {
+            blocks.push(
+              <div key={`ul-${blockIdx++}`} className="flex gap-2.5 pl-2 my-0.5">
+                <span
+                  className="mt-[7px] w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: 'var(--accent-primary)', opacity: 0.7 }}
+                />
+                <span className="text-xs leading-relaxed flex-1" style={{ color: 'var(--text-secondary)' }}>
+                  {renderInlineMarkdown(line.slice(2))}
+                </span>
+              </div>
+            );
+            continue;
+          }
+
+          // Ordered lists
+          if (line.match(/^\d+\.\s/)) {
+            const num = line.match(/^(\d+)\./)?.[1];
+            blocks.push(
+              <div key={`ol-${blockIdx++}`} className="flex gap-2.5 pl-2 my-0.5">
+                <span
+                  className="text-[10px] font-bold min-w-[16px] mt-[2px] flex-shrink-0 text-center rounded"
+                  style={{ color: 'var(--accent-primary)' }}
+                >
+                  {num}
+                </span>
+                <span className="text-xs leading-relaxed flex-1" style={{ color: 'var(--text-secondary)' }}>
+                  {renderInlineMarkdown(line.replace(/^\d+\.\s/, ''))}
+                </span>
+              </div>
+            );
+            continue;
+          }
+
+          // Regular paragraph
+          blocks.push(
+            <p key={`p-${blockIdx++}`} className="text-xs leading-[1.7]" style={{ color: 'var(--text-secondary)' }}>
+              {renderInlineMarkdown(line)}
+            </p>
+          );
+        }
+
+        // Flush remaining
+        if (inBlockquote) flushBlockquote();
+        if (inTable) flushTable();
+
+        return <div key={i}>{blocks}</div>;
       })}
     </div>
   );
 }
 
-function renderInlineMarkdown(text: string): string {
-  // Simple: just return text. A full implementation would parse **bold**, *italic*, `code`
-  // but for now we keep it lightweight
-  return text;
+/** Render inline markdown: **bold**, *italic*, `code`, [links](url) */
+function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
+  const tokens: (string | JSX.Element)[] = [];
+  // Regex to match inline elements
+  const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\[(.+?)\]\((.+?)\))/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let keyIdx = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    // Push text before this match
+    if (match.index > lastIndex) {
+      tokens.push(text.slice(lastIndex, match.index));
+    }
+
+    if (match[1]) {
+      // **bold**
+      tokens.push(
+        <strong key={`b-${keyIdx++}`} className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+          {match[2]}
+        </strong>
+      );
+    } else if (match[3]) {
+      // *italic*
+      tokens.push(
+        <em key={`i-${keyIdx++}`} className="italic" style={{ color: 'var(--text-secondary)' }}>
+          {match[4]}
+        </em>
+      );
+    } else if (match[5]) {
+      // `inline code`
+      tokens.push(
+        <code
+          key={`c-${keyIdx++}`}
+          className="px-1.5 py-0.5 rounded text-[10px] font-mono"
+          style={{ backgroundColor: 'rgba(0,0,0,0.15)', border: '1px solid var(--border-base)' }}
+        >
+          {match[6]}
+        </code>
+      );
+    } else if (match[7]) {
+      // [text](url)
+      tokens.push(
+        <a
+          key={`a-${keyIdx++}`}
+          href={match[9]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:opacity-80 transition-opacity"
+          style={{ color: 'var(--accent-primary)' }}
+        >
+          {match[8]}
+        </a>
+      );
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Push remaining text
+  if (lastIndex < text.length) {
+    tokens.push(text.slice(lastIndex));
+  }
+
+  return tokens.length > 0 ? tokens : [text];
 }
 
 export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
@@ -124,6 +352,8 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const [showCitations, setShowCitations] = useState<string | null>(null);
   const [hoveredCitation, setHoveredCitation] = useState<{ citation: Citation; fullContent: string; x: number; y: number } | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const chunkCache = useRef<Map<string, string>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -172,6 +402,68 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  // ─── TTS — Text-to-Speech ─────────────────────────────────────────────────
+
+  const handleTTS = useCallback((msgId: string, content: string) => {
+    // If already speaking this message, stop it
+    if (speakingMsgId === msgId) {
+      window.speechSynthesis.cancel();
+      setSpeakingMsgId(null);
+      speechRef.current = null;
+      return;
+    }
+
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
+
+    // Strip markdown syntax for cleaner speech
+    const cleanText = content
+      .replace(/```[\s\S]*?```/g, ' bloc de code. ')
+      .replace(/#{1,4}\s/g, '')
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/\*(.+?)\*/g, '$1')
+      .replace(/`(.+?)`/g, '$1')
+      .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+      .replace(/^[\-\*]\s/gm, '')
+      .replace(/^\d+\.\s/gm, '')
+      .replace(/^>\s?/gm, '')
+      .replace(/\|/g, ' ')
+      .replace(/-{3,}/g, '')
+      .replace(/\n{2,}/g, '. ')
+      .replace(/\n/g, ' ')
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'fr-FR';
+    utterance.rate = 1;
+    utterance.pitch = 1;
+
+    // Try to pick a French voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const frVoice = voices.find(v => v.lang.startsWith('fr'));
+    if (frVoice) utterance.voice = frVoice;
+
+    utterance.onend = () => {
+      setSpeakingMsgId(null);
+      speechRef.current = null;
+    };
+    utterance.onerror = () => {
+      setSpeakingMsgId(null);
+      speechRef.current = null;
+    };
+
+    speechRef.current = utterance;
+    setSpeakingMsgId(msgId);
+    window.speechSynthesis.speak(utterance);
+  }, [speakingMsgId]);
+
+  // Cleanup TTS on unmount
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
   }, []);
 
   // Auto-resize textarea
@@ -684,12 +976,14 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] p-4 rounded-2xl ${msg.role === 'user' ? 'rounded-br-md' : 'rounded-bl-md'}`}
+                  className={`max-w-[85%] ${msg.role === 'user' ? 'px-4 py-3 rounded-2xl rounded-br-md' : 'px-5 py-4 rounded-2xl rounded-bl-md'}`}
                   style={{
                     backgroundColor: msg.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-panel)',
                     color: msg.role === 'user' ? '#fff' : 'var(--text-primary)',
                     border: msg.role === 'assistant' ? '1px solid var(--border-base)' : 'none',
-                    boxShadow: msg.role === 'user' ? '0 2px 8px rgba(var(--accent-primary-rgb, 99,102,241), 0.2)' : '0 1px 3px rgba(0,0,0,0.05)',
+                    boxShadow: msg.role === 'user'
+                      ? '0 2px 8px rgba(99,102,241,0.2)'
+                      : '0 1px 6px rgba(0,0,0,0.04), 0 0 0 0.5px var(--border-base)',
                   }}
                 >
                   {msg.role === 'assistant' ? (
@@ -698,20 +992,35 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                     <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                   )}
 
-                  {/* Timestamp + Save to notes */}
+                  {/* Timestamp + Save to notes + TTS */}
                   <div className="flex items-center gap-2 mt-2">
                     <p className="text-[9px] opacity-40">
                       {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                     {msg.role === 'assistant' && (
-                      <button
-                        onClick={() => handleSaveToNote(msg)}
-                        className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
-                        title="Sauvegarder dans les notes"
-                      >
-                        <StickyNote className="w-3 h-3" />
-                        <span>Note</span>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleTTS(msg.id, msg.content)}
+                          className={`flex items-center gap-1 text-[9px] transition-opacity ${speakingMsgId === msg.id ? 'opacity-100' : 'opacity-40 hover:opacity-100'}`}
+                          style={{ color: speakingMsgId === msg.id ? 'var(--accent-primary)' : undefined }}
+                          title={speakingMsgId === msg.id ? 'Arrêter la lecture' : 'Lire à voix haute'}
+                        >
+                          {speakingMsgId === msg.id ? (
+                            <Square className="w-3 h-3" />
+                          ) : (
+                            <Volume2 className="w-3 h-3" />
+                          )}
+                          <span>{speakingMsgId === msg.id ? 'Stop' : 'Écouter'}</span>
+                        </button>
+                        <button
+                          onClick={() => handleSaveToNote(msg)}
+                          className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
+                          title="Sauvegarder dans les notes"
+                        >
+                          <StickyNote className="w-3 h-3" />
+                          <span>Note</span>
+                        </button>
+                      </>
                     )}
                   </div>
 
@@ -773,11 +1082,12 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 className="flex justify-start"
               >
                 <div
-                  className="max-w-[80%] p-4 rounded-2xl rounded-bl-md"
+                  className="max-w-[85%] px-5 py-4 rounded-2xl rounded-bl-md"
                   style={{
                     backgroundColor: 'var(--bg-panel)',
                     color: 'var(--text-primary)',
                     border: '1px solid var(--border-base)',
+                    boxShadow: '0 1px 6px rgba(0,0,0,0.04), 0 0 0 0.5px var(--border-base)',
                   }}
                 >
                   {renderMessageContent(streamingText)}
@@ -905,98 +1215,115 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Input area */}
+      {/* Input area — refined professional design */}
       <div
-        className="flex-shrink-0 border-t p-4 lg:px-7"
+        className="flex-shrink-0 border-t px-4 py-3 lg:px-6"
         style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
       >
-        <div className="flex items-end gap-2.5">
-          <div className="flex-1 relative">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder="Posez une question sur vos sources..."
-              rows={1}
-              className="w-full px-4 py-3 rounded-xl text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
-              style={{
-                backgroundColor: 'var(--bg-input)',
-                border: '1px solid var(--border-base)',
-                color: 'var(--text-primary)',
-                minHeight: '44px',
-                maxHeight: '120px',
-              }}
-            />
-          </div>
+        {/* Main input container */}
+        <div
+          className="relative flex items-end gap-0 rounded-2xl transition-all"
+          style={{
+            backgroundColor: 'var(--bg-input)',
+            border: '1px solid var(--border-base)',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+          }}
+        >
+          {/* Textarea */}
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Posez une question sur vos sources..."
+            rows={1}
+            className="flex-1 px-4 py-3 bg-transparent text-xs outline-none resize-none placeholder:text-[var(--text-dimmed)]"
+            style={{
+              color: 'var(--text-primary)',
+              minHeight: '44px',
+              maxHeight: '120px',
+            }}
+          />
 
-          <button
-            onClick={() => handleDeepDive()}
-            disabled={!input.trim() || loading}
-            className="p-3 rounded-xl border transition-all active:scale-95 disabled:opacity-30 hover:bg-white/5"
-            style={{ borderColor: 'var(--border-base)', color: 'var(--accent-primary)' }}
-            title="Deep Dive — exploration approfondie"
-          >
-            <Telescope className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={handleInsights}
-            disabled={loading}
-            className="p-3 rounded-xl border transition-all active:scale-95 disabled:opacity-30 hover:bg-white/5"
-            style={{ borderColor: 'var(--border-base)', color: '#f59e0b' }}
-            title="Extraire les insights clés"
-          >
-            <Zap className="w-4 h-4" />
-          </button>
-
-          {sources.length >= 2 && (
+          {/* Inline action buttons — right side of input */}
+          <div className="flex items-center gap-1 px-2 py-2 flex-shrink-0">
             <button
-              onClick={handleCompare}
-              disabled={loading}
-              className="p-3 rounded-xl border transition-all active:scale-95 disabled:opacity-30 hover:bg-white/5"
-              style={{ borderColor: 'var(--border-base)', color: '#8b5cf6' }}
-              title="Comparer les sources"
+              onClick={() => handleDeepDive()}
+              disabled={!input.trim() || loading}
+              className="p-2 rounded-lg transition-all active:scale-90 disabled:opacity-25 hover:bg-[var(--accent-subtle)]"
+              style={{ color: 'var(--accent-primary)' }}
+              title="Deep Dive — exploration approfondie"
             >
-              <GitCompare className="w-4 h-4" />
+              <Telescope className="w-4 h-4" />
             </button>
-          )}
 
-          <button
-            onClick={() => handleSend()}
-            disabled={!input.trim() || loading}
-            className="p-3 rounded-xl transition-all active:scale-95 disabled:opacity-30 shadow-sm"
-            style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          </button>
+            <button
+              onClick={handleInsights}
+              disabled={loading}
+              className="p-2 rounded-lg transition-all active:scale-90 disabled:opacity-25 hover:bg-amber-500/10"
+              style={{ color: '#f59e0b' }}
+              title="Extraire les insights clés"
+            >
+              <Zap className="w-4 h-4" />
+            </button>
+
+            {sources.length >= 2 && (
+              <button
+                onClick={handleCompare}
+                disabled={loading}
+                className="p-2 rounded-lg transition-all active:scale-90 disabled:opacity-25 hover:bg-violet-500/10"
+                style={{ color: '#8b5cf6' }}
+                title="Comparer les sources"
+              >
+                <GitCompare className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Separator */}
+            <div className="w-px h-5 mx-1" style={{ backgroundColor: 'var(--border-base)' }} />
+
+            {/* Send button */}
+            <button
+              onClick={() => handleSend()}
+              disabled={!input.trim() || loading}
+              className="p-2.5 rounded-xl transition-all active:scale-90 disabled:opacity-30 shadow-sm"
+              style={{
+                backgroundColor: input.trim() && !loading ? 'var(--accent-primary)' : 'var(--bg-ctrl)',
+                color: input.trim() && !loading ? '#fff' : 'var(--text-dimmed)',
+              }}
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom bar — hints + secondary actions */}
+        <div className="flex items-center justify-between mt-2 px-1">
+          <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+            Entrée pour envoyer • Shift+Entrée pour un saut de ligne
+          </p>
 
           {messages.length > 0 && (
-            <>
+            <div className="flex items-center gap-1">
               <button
                 onClick={handleExport}
-                className="p-3 rounded-xl border transition-all hover:bg-white/5 active:scale-95"
-                style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+                className="p-1.5 rounded-md transition-all hover:bg-[var(--accent-subtle)] active:scale-90"
+                style={{ color: 'var(--text-muted)' }}
                 title="Exporter en Markdown"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={handleClear}
-                className="p-3 rounded-xl border transition-all hover:bg-red-500/10 active:scale-95"
-                style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+                className="p-1.5 rounded-md transition-all hover:bg-red-500/10 active:scale-90"
+                style={{ color: 'var(--text-muted)' }}
                 title="Effacer l'historique"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
-            </>
+            </div>
           )}
         </div>
-
-        {/* Keyboard hint */}
-        <p className="text-[9px] mt-2 text-center" style={{ color: 'var(--text-dimmed)' }}>
-          Entrée pour envoyer • Shift+Entrée pour un saut de ligne
-        </p>
       </div>
     </div>
   );
