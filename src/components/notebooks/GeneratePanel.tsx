@@ -341,133 +341,168 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
     <div className="h-full flex flex-col lg:flex-row">
       {/* Left panel: Controls + document list */}
       <div
-        className="w-full lg:w-80 flex-shrink-0 border-b lg:border-b-0 lg:border-r overflow-y-auto custom-scrollbar p-5 space-y-4"
-        style={{ borderColor: 'var(--border-base)' }}
+        className="w-full lg:w-[300px] flex-shrink-0 border-b lg:border-b-0 lg:border-r overflow-y-auto custom-scrollbar p-4 lg:p-5 space-y-4"
+        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
       >
-        {/* Source filter */}
-        {sources.length > 1 && (
-          <div className="space-y-2">
+        {/* Quick config bar */}
+        <div className="flex items-center gap-2">
+          {/* Source filter toggle */}
+          {sources.length > 1 && (
             <button
               onClick={() => setShowSourceFilter(!showSourceFilter)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg border text-[11px] font-medium transition-all hover:border-[var(--border-focus)]"
-              style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)' }}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-medium border transition-all ${showSourceFilter ? 'ring-1 ring-[var(--accent-primary)]' : 'hover:bg-white/5'}`}
+              style={{ borderColor: 'var(--border-base)', color: selectedSourceIds.length > 0 ? 'var(--accent-primary)' : 'var(--text-muted)' }}
             >
-              <span className="flex items-center gap-2">
-                <Filter className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                Sources ({selectedSourceIds.length === 0 ? 'toutes' : `${selectedSourceIds.length}/${sources.length}`})
-              </span>
-              {showSourceFilter ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              <Filter className="w-3 h-3" />
+              {selectedSourceIds.length > 0 ? `${selectedSourceIds.length} src` : 'Sources'}
             </button>
+          )}
 
-            <AnimatePresence>
-              {showSourceFilter && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="space-y-1 px-1">
-                    {sources.map(src => (
-                      <label
-                        key={src.id}
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedSourceIds.length === 0 || selectedSourceIds.includes(src.id)}
-                          onChange={() => toggleSourceSelection(src.id)}
-                          className="w-3.5 h-3.5 rounded accent-[var(--accent-primary)]"
-                        />
-                        <span className="text-[11px] truncate" style={{ color: 'var(--text-primary)' }}>{src.title}</span>
-                      </label>
-                    ))}
-                    {selectedSourceIds.length > 0 && (
-                      <button
-                        onClick={() => setSelectedSourceIds([])}
-                        className="text-[10px] px-2.5 py-1 w-full text-left hover:underline"
-                        style={{ color: 'var(--accent-primary)' }}
-                      >
-                        Réinitialiser (toutes)
-                      </button>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
-
-        {/* Custom instructions */}
-        <div className="space-y-2">
+          {/* Custom prompt toggle */}
           <button
             onClick={() => setShowCustomPrompt(!showCustomPrompt)}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg border text-[11px] font-medium transition-all hover:border-[var(--border-focus)]"
-            style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)' }}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-medium border transition-all ${showCustomPrompt ? 'ring-1 ring-[#f59e0b]' : 'hover:bg-white/5'}`}
+            style={{ borderColor: 'var(--border-base)', color: customInstructions.trim() ? '#f59e0b' : 'var(--text-muted)' }}
           >
-            <span className="flex items-center gap-2">
-              <PenLine className="w-3.5 h-3.5" style={{ color: '#f59e0b' }} />
-              Instructions personnalisées
-              {customInstructions.trim() && <span className="w-2 h-2 rounded-full bg-green-400" />}
-            </span>
-            {showCustomPrompt ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            <PenLine className="w-3 h-3" />
+            Prompt
+            {customInstructions.trim() && <span className="w-1.5 h-1.5 rounded-full bg-green-400" />}
           </button>
 
-          <AnimatePresence>
-            {showCustomPrompt && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <textarea
-                  value={customInstructions}
-                  onChange={e => setCustomInstructions(e.target.value)}
-                  placeholder="Ex: Concentre-toi sur les aspects techniques. Utilise un ton formel. Ajoute des exemples concrets..."
-                  rows={3}
-                  className="w-full px-3 py-2.5 rounded-lg text-[11px] outline-none resize-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
-                  style={{
-                    backgroundColor: 'var(--bg-input)',
-                    border: '1px solid var(--border-base)',
-                    color: 'var(--text-primary)',
-                  }}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Source count */}
+          <span className="ml-auto text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+            {sources.length} source{sources.length !== 1 ? 's' : ''}
+          </span>
         </div>
 
-        {/* Generate buttons */}
-        <div className="space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
-            Générer un document
-          </p>
-          <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
-            {DOC_TYPES.map(({ key, label, icon: Icon, desc, color }) => (
-              <button
-                key={key}
-                onClick={() => handleGenerate(key)}
-                disabled={generating || sources.length === 0}
-                className="w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all hover:border-[var(--border-focus)] hover:shadow-sm disabled:opacity-40 active:scale-[0.98]"
-                style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+        {/* Source filter dropdown */}
+        <AnimatePresence>
+          {showSourceFilter && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div
+                className="p-2.5 rounded-xl space-y-1"
+                style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
               >
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${color}15` }}
+                {sources.map(src => (
+                  <label
+                    key={src.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedSourceIds.length === 0 || selectedSourceIds.includes(src.id)}
+                      onChange={() => toggleSourceSelection(src.id)}
+                      className="w-3 h-3 rounded accent-[var(--accent-primary)]"
+                    />
+                    <span className="text-[10px] truncate" style={{ color: 'var(--text-primary)' }}>{src.title}</span>
+                  </label>
+                ))}
+                {selectedSourceIds.length > 0 && (
+                  <button
+                    onClick={() => setSelectedSourceIds([])}
+                    className="text-[9px] px-2 py-1 w-full text-left hover:underline"
+                    style={{ color: 'var(--accent-primary)' }}
+                  >
+                    Réinitialiser (toutes)
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Custom instructions dropdown */}
+        <AnimatePresence>
+          {showCustomPrompt && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <textarea
+                value={customInstructions}
+                onChange={e => setCustomInstructions(e.target.value)}
+                placeholder="Ex: Ton formel, focus technique, ajoute des exemples..."
+                rows={2}
+                className="w-full px-3 py-2.5 rounded-xl text-[10px] outline-none resize-none transition-all focus:ring-1 focus:ring-[#f59e0b]"
+                style={{
+                  backgroundColor: 'var(--bg-panel)',
+                  border: '1px solid var(--border-base)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Generate buttons — redesigned grid */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+              Générer
+            </p>
+            {generating && (
+              <span className="flex items-center gap-1.5 text-[9px] font-medium" style={{ color: 'var(--accent-primary)' }}>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                En cours...
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 lg:grid-cols-1 gap-1.5">
+            {DOC_TYPES.map(({ key, label, icon: Icon, desc, color }) => {
+              const isActive = generatingType === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => handleGenerate(key)}
+                  disabled={generating || sources.length === 0}
+                  className={`relative w-full flex flex-col lg:flex-row items-center lg:items-center gap-1.5 lg:gap-3 p-2.5 lg:p-3 rounded-xl border text-center lg:text-left transition-all disabled:opacity-40 active:scale-[0.97] ${isActive ? 'ring-2' : 'hover:shadow-sm hover:-translate-y-0.5'}`}
+                  style={{
+                    borderColor: isActive ? color : 'var(--border-base)',
+                    backgroundColor: isActive ? `${color}08` : 'var(--bg-panel)',
+                    boxShadow: isActive ? `0 0 12px ${color}15` : undefined,
+                  }}
                 >
-                  {generatingType === key ? (
-                    <Loader2 className="w-4 h-4 animate-spin" style={{ color }} />
-                  ) : (
-                    <Icon className="w-4 h-4" style={{ color }} />
+                  {/* Icon */}
+                  <div
+                    className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: `${color}12`, border: `1px solid ${color}25` }}
+                  >
+                    {isActive ? (
+                      <Loader2 className="w-4 h-4 animate-spin" style={{ color }} />
+                    ) : (
+                      <Icon className="w-4 h-4" style={{ color }} />
+                    )}
+                  </div>
+
+                  {/* Text */}
+                  <div className="min-w-0 lg:flex-1">
+                    <p className="text-[10px] lg:text-[11px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                      {label}
+                    </p>
+                    <p className="text-[8px] lg:text-[9px] mt-0.5 leading-tight hidden lg:block" style={{ color: 'var(--text-dimmed)' }}>
+                      {desc}
+                    </p>
+                  </div>
+
+                  {/* Active indicator */}
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeGenType"
+                      className="absolute inset-0 rounded-xl pointer-events-none"
+                      style={{ border: `2px solid ${color}`, opacity: 0.5 }}
+                    />
                   )}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</p>
-                  <p className="text-[9px] mt-0.5 hidden lg:block" style={{ color: 'var(--text-dimmed)' }}>{desc}</p>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -480,49 +515,63 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
 
         {/* Generated docs list */}
         {generatedDocs.length > 0 && (
-          <div className="space-y-2 pt-3 border-t" style={{ borderColor: 'var(--border-base)' }}>
-            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
-              Documents ({generatedDocs.length})
-            </p>
-            {generatedDocs.map(doc => {
-              const docType = DOC_TYPES.find(t => t.key === doc.type);
-              const DocIcon = docType?.icon || Sparkles;
-              return (
-                <motion.div
-                  key={doc.id}
-                  layout
-                  onClick={() => { setSelectedDoc(doc); setStreamingText(''); }}
-                  className={`group cursor-pointer p-3 rounded-xl border transition-all hover:shadow-sm ${selectedDoc?.id === doc.id ? 'ring-1 ring-[var(--accent-primary)]' : ''}`}
-                  style={{ borderColor: selectedDoc?.id === doc.id ? 'var(--accent-primary)' : 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: `${docType?.color || '#6b7280'}15` }}
-                    >
-                      <DocIcon className="w-3 h-3" style={{ color: docType?.color || 'var(--accent-primary)' }} />
+          <div className="space-y-2 pt-4 border-t" style={{ borderColor: 'var(--border-base)' }}>
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                Historique
+              </p>
+              <span className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+                {generatedDocs.length}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {generatedDocs.map(doc => {
+                const docType = DOC_TYPES.find(t => t.key === doc.type);
+                const DocIcon = docType?.icon || Sparkles;
+                const isSelected = selectedDoc?.id === doc.id;
+                return (
+                  <motion.div
+                    key={doc.id}
+                    layout
+                    onClick={() => { setSelectedDoc(doc); setStreamingText(''); }}
+                    className={`group cursor-pointer p-2.5 rounded-xl border transition-all hover:shadow-sm ${isSelected ? 'shadow-sm' : ''}`}
+                    style={{
+                      borderColor: isSelected ? docType?.color || 'var(--accent-primary)' : 'var(--border-base)',
+                      backgroundColor: isSelected ? `${docType?.color || 'var(--accent-primary)'}08` : 'var(--bg-panel)',
+                    }}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: `${docType?.color || '#6b7280'}15` }}
+                      >
+                        <DocIcon className="w-3.5 h-3.5" style={{ color: docType?.color || 'var(--accent-primary)' }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                          {doc.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[8px] font-medium" style={{ color: docType?.color || 'var(--text-dimmed)' }}>
+                            {docType?.label || doc.type}
+                          </span>
+                          <span className="text-[8px]" style={{ color: 'var(--text-dimmed)' }}>•</span>
+                          <span className="text-[8px]" style={{ color: 'var(--text-dimmed)' }}>
+                            {new Date(doc.createdAt).toLocaleDateString('fr')}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
+                        className="p-1 opacity-0 group-hover:opacity-100 rounded hover:bg-red-500/10 transition-all"
+                      >
+                        <Trash2 className="w-3 h-3" style={{ color: '#ef4444' }} />
+                      </button>
                     </div>
-                    <p className="text-[11px] font-medium truncate flex-1" style={{ color: 'var(--text-primary)' }}>
-                      {doc.title}
-                    </p>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
-                      className="p-1 opacity-0 group-hover:opacity-100 rounded hover:bg-red-500/10 transition-all"
-                    >
-                      <Trash2 className="w-3 h-3" style={{ color: 'var(--color-error)' }} />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1 pl-7">
-                    <span className="text-[9px] font-medium capitalize" style={{ color: docType?.color || 'var(--text-dimmed)' }}>
-                      {docType?.label || doc.type}
-                    </span>
-                    <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
-                      {new Date(doc.createdAt).toLocaleDateString('fr')}
-                    </span>
-                  </div>
-                </motion.div>
-              );
-            })}
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -616,23 +665,59 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
             {renderGeneratedContent(selectedDoc.content)}
           </div>
         ) : !streamingText && (
-          /* Empty state */
-          <div className="h-full flex flex-col items-center justify-center gap-4">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: 'var(--accent-subtle)' }}
-            >
-              <Sparkles className="w-6 h-6" style={{ color: 'var(--accent-primary)' }} />
+          /* Empty state — professional landing */
+          <div className="h-full flex flex-col items-center justify-center gap-6 px-8">
+            <div className="relative">
+              <div
+                className="w-20 h-20 rounded-3xl flex items-center justify-center"
+                style={{ backgroundColor: 'var(--accent-subtle)' }}
+              >
+                <Sparkles className="w-8 h-8" style={{ color: 'var(--accent-primary)' }} />
+              </div>
+              <div
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow-md"
+                style={{ backgroundColor: 'var(--bg-panel)', border: '2px solid var(--accent-primary)' }}
+              >
+                <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>AI</span>
+              </div>
             </div>
-            <div className="text-center space-y-1.5">
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                Générez du contenu dérivé
-              </p>
-              <p className="text-xs max-w-md leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                Choisissez un type de document à gauche. Le contenu sera généré en temps réel à partir de vos sources.
-                Vous pouvez filtrer les sources et ajouter des instructions personnalisées.
+
+            <div className="text-center space-y-2 max-w-sm">
+              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                Génération intelligente
+              </h3>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                Transformez vos sources en documents structurés. Résumés, FAQ, guides d'étude, chronologies et plus encore.
               </p>
             </div>
+
+            {/* Feature highlights */}
+            <div className="grid grid-cols-3 gap-3 w-full max-w-sm">
+              {[
+                { emoji: '⚡', label: 'Streaming', sub: 'Temps réel' },
+                { emoji: '🎯', label: 'Sources', sub: 'Ciblé' },
+                { emoji: '📝', label: 'Custom', sub: 'Instructions' },
+              ].map(f => (
+                <div
+                  key={f.label}
+                  className="flex flex-col items-center gap-1 p-3 rounded-xl"
+                  style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+                >
+                  <span className="text-base">{f.emoji}</span>
+                  <span className="text-[9px] font-semibold" style={{ color: 'var(--text-primary)' }}>{f.label}</span>
+                  <span className="text-[8px]" style={{ color: 'var(--text-dimmed)' }}>{f.sub}</span>
+                </div>
+              ))}
+            </div>
+
+            {sources.length === 0 && (
+              <p
+                className="text-[10px] px-4 py-2 rounded-lg"
+                style={{ backgroundColor: '#f59e0b10', color: '#f59e0b', border: '1px solid #f59e0b30' }}
+              >
+                ⚠️ Ajoutez des sources dans l'onglet Sources pour commencer
+              </p>
+            )}
           </div>
         )}
       </div>
