@@ -52,7 +52,7 @@ const NAV_GROUPS = [
     label: 'Sécurité & Connaissances',
     items: [
       { id: 'knowledge-settings', icon: Database, label: 'Knowledge System', keywords: 'graphe index mémoire faits dépendances santé codebase réindexer' },
-      { id: 'selfroot-settings', icon: Shield, label: 'Self-Root', keywords: 'workspace projet verrouillé périmètre auto-référentiel git branche' },
+      { id: 'selfroot-settings', icon: Shield, label: 'Self-Root', keywords: 'workspace projet verrouillé périmètre auto-référentiel branche' },
       { id: 'safeguards-settings', icon: ShieldCheck, label: 'Garde-fous', keywords: 'checkpoint rollback validation build test protection critique' },
       { id: 'audit-settings', icon: Database, label: 'Journal système', keywords: 'audit logs historique opérations traçabilité' },
     ],
@@ -95,7 +95,6 @@ export default function SettingsView() {
           temperature: profile.temperature, topP: profile.topP,
           textProvider: profile.textProvider, openrouterModel: profile.openrouterModel,
           agents: profile.agents,
-          gitEnabled: profile.gitEnabled,
           reasoningEnabled: profile.reasoningEnabled,
           customSystemPrompt: profile.customSystemPrompt,
         }),

@@ -16,17 +16,6 @@ export function BehaviorSection() {
           <ChipGroup options={RESPONSE_STYLES} value={profile.responseStyle} onChange={v => setField('responseStyle', v)} />
         </Field>
 
-        <SectionDivider label="Intégrations" />
-
-        <Field label="Git" hint="Désactivez si le projet n'a pas de dépôt git (évite les erreurs 'fatal: not a git repository')">
-          <ToggleSwitch
-            value={profile.gitEnabled}
-            onChange={v => setField('gitEnabled', v)}
-            label="Intégration Git"
-            hint={profile.gitEnabled ? 'Checkpoints, commits et branches actifs' : 'Git désactivé — pas de checkpoints ni de commandes git'}
-          />
-        </Field>
-
         <SectionDivider label="Raisonnement" />
 
         <Field label="Raisonnement structuré" hint="Chain of Thought, Tree of Thought, décomposition… Désactivez pour des réponses plus directes et rapides">

@@ -37,7 +37,6 @@ import memoryRouter from "./server/routes/memory";
 import { supervisor } from "./server/autonomy";
 import impactRouter from "./server/routes/impact";
 import understandingRouter from "./server/routes/understanding";
-import { createGitRouter } from "./server/routes/git";
 import { createGithubRouter } from "./server/routes/github";
 import { createAgentsRouter } from "./server/routes/agents";
 import workflowsRouter from "./server/routes/workflows";
@@ -496,7 +495,11 @@ async function startServer() {
   app.use("/api/automation", automationRouter);
   app.use("/api/workflows", workflowsRouter);
   app.use("/api/custom-skills", customSkillsRouter);
-  app.use("/api/git", createGitRouter(skillManager, () => currentProfile));
+  // Git désactivé — toutes les routes retournent 404
+  // app.use("/api/git", createGitRouter(skillManager, () => currentProfile));
+  app.use("/api/git", (_req, res) => {
+    res.status(404).json({ status: "disabled", error: "Git est entièrement désactivé." });
+  });
   app.use("/api/github", createGithubRouter(skillManager));
   app.use("/api/agents", createAgentsRouter(skillManager));
 
@@ -1871,10 +1874,8 @@ async function startServer() {
         filteredDeclarations = filteredDeclarations.filter(d => !AGENT_TOOLS.has(d.name));
       }
 
-      // ── Filtrage Git si désactivé ──
-      if (currentProfile.gitEnabled === false) {
-        filteredDeclarations = filteredDeclarations.filter(d => !d.name.startsWith('git_'));
-      }
+      // ── Filtrage Git — toujours désactivé ──
+      filteredDeclarations = filteredDeclarations.filter(d => !d.name.startsWith('git_'));
 
       // ── Filtrage Reasoning si désactivé ──
       if (currentProfile.reasoningEnabled === false) {
@@ -1884,8 +1885,7 @@ async function startServer() {
       const tools = filteredDeclarations.length > 0 ? [{ functionDeclarations: filteredDeclarations }] : undefined;
 
       // Log tool loading
-      const gitStatus = currentProfile.gitEnabled === false ? ', git: OFF' : '';
-      console.log(`[TokenOptimizer] 🔧 Outils chargés: ${filteredDeclarations.length}/${declarations.length} (mode: ${sessionMode}${requestedSkills ? ', skills: ' + requestedSkills.join(',') : ''}, agents: ${agentsEnabled ? 'ON' : 'OFF'}${gitStatus})`);
+      console.log(`[TokenOptimizer] 🔧 Outils chargés: ${filteredDeclarations.length}/${declarations.length} (mode: ${sessionMode}${requestedSkills ? ', skills: ' + requestedSkills.join(',') : ''}, agents: ${agentsEnabled ? 'ON' : 'OFF'}, git: OFF)`);
       console.log(`[TokenOptimizer]    Outils: ${filteredDeclarations.map(d => d.name).join(', ')}`);
 
       if (scoringInfo && scoringInfo.scored.length > 0) {
@@ -2838,12 +2838,12 @@ async function startServer() {
               }
             }
 
-            // ── Git guard: block git tools when gitEnabled === false ──
-            if (call.name.startsWith('git_') && currentProfile.gitEnabled === false) {
+            // ── Git guard: toujours bloqué — git désactivé ──
+            if (call.name.startsWith('git_')) {
               functionResponses.push({
                 id: call.id,
                 name: call.name,
-                response: { error: "Git est désactivé pour ce projet (gitEnabled: false dans le profil). Ce projet n'a pas de dépôt git initialisé." }
+                response: { error: "Git est entièrement désactivé." }
               });
               clientWs.send(JSON.stringify({ tool_used: call.name, info: '[BLOQUÉ - Git désactivé]' }));
               continue;

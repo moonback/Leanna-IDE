@@ -567,22 +567,8 @@ function useRecentFiles(): [RecentFile[], (files: RecentFile[]) => void, () => v
 }
 
 function useGitInfo() {
-  const [info, setInfo] = useState<GitInfo | null>(null);
-
-  useEffect(() => {
-    const token = localStorage.getItem('jarvis_api_token');
-    const headers: Record<string, string> = token ? { 'x-jarvis-token': token } : {};
-    fetch('/api/git/status', { headers })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.status === 'success') {
-          setInfo({ branch: data.branch, summary: data.summary });
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  return info;
+  // Git désactivé — ne fait plus d'appel réseau
+  return null;
 }
 
 // ─── Modale des capacités ──────────────────────────────────────────────
