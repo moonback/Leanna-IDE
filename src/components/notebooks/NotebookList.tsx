@@ -331,8 +331,8 @@ export function NotebookList({ onSelectNotebook }: Props) {
             ))}
           </div>
         ) : notebooks.length === 0 ? (
-          /* Empty state — premier notebook */
-          <div className="flex flex-col items-center justify-center py-20 gap-5">
+          /* Empty state — premier notebook avec onboarding */
+          <div className="flex flex-col items-center justify-center py-16 gap-6 max-w-xl mx-auto">
             <div
               className="w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg"
               style={{ backgroundColor: 'var(--accent-subtle)' }}
@@ -345,16 +345,36 @@ export function NotebookList({ onSelectNotebook }: Props) {
               </p>
               <p className="text-xs max-w-md leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                 Créez votre premier notebook pour commencer. Ajoutez des sources (PDF, URLs, textes)
-                puis posez des questions — l'IA répondra en citant vos documents avec des références précises.
+                puis posez des questions — l'IA répondra en citant vos documents.
               </p>
             </div>
+
+            {/* Feature highlights */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
+              {[
+                { icon: '📚', title: 'Sources', desc: 'PDF, URLs, texte, Markdown, audio' },
+                { icon: '💬', title: 'Chat IA', desc: 'Questions avec citations précises' },
+                { icon: '🎙️', title: 'Podcast', desc: 'Générez un audio overview' },
+              ].map((feat) => (
+                <div
+                  key={feat.title}
+                  className="p-4 rounded-xl text-center space-y-1.5"
+                  style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+                >
+                  <span className="text-xl">{feat.icon}</span>
+                  <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{feat.title}</p>
+                  <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{feat.desc}</p>
+                </div>
+              ))}
+            </div>
+
             <button
               onClick={() => setShowCreateForm(true)}
               className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 shadow-md hover:shadow-lg"
               style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
             >
               <Plus className="w-4 h-4" />
-              Créer un notebook
+              Créer mon premier notebook
             </button>
           </div>
         ) : filteredNotebooks.length === 0 ? (

@@ -8,9 +8,10 @@ import { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus, Pin, Trash2, Edit3, Save, X, StickyNote, Clock, Search, ArrowUpDown,
-  Download, FileText, Layout, ListChecks, BookOpen,
+  Download, FileText, Layout, ListChecks, BookOpen, Grid3X3, List, Link2,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
+import { NotesCanvas } from './NotesCanvas';
 
 interface NoteItem {
   id: string;
@@ -47,6 +48,7 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'alpha'>('newest');
   const [showTemplates, setShowTemplates] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'canvas'>('list');
 
   // ─── Note Templates ────────────────────────────────────────────────────────
 
@@ -220,8 +222,29 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
 
   const pinnedCount = notes.filter(n => n.pinned).length;
 
+  // ─── Backlinks detection ──────────────────────────────────────────────────
+
+  const backlinks = useMemo(() => {
+    const links: Record<string, string[]> = {};
+    notes.forEach(note => {
+      links[note.id] = [];
+      notes.forEach(other => {
+        if (note.id === other.id) return;
+        // Check if this note's title is mentioned in the other's content
+        if (other.content.toLowerCase().includes(note.title.toLowerCase()) && note.title.length > 2) {
+          links[note.id].push(other.id);
+        }
+      });
+    });
+    return links;
+  }, [notes]);
+
+  const getNoteTitle = useCallback((id: string) => {
+    return notes.find(n => n.id === id)?.title || 'Note inconnue';
+  }, [notes]);
+
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar p-5 lg:p-7 space-y-5">
+    <div className={`h-full ${viewMode === 'canvas' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto custom-scrollbar'} p-5 lg:p-7 space-y-5`}>
       {/* Header with stats */}
       <div className="flex items-center gap-3 flex-wrap">
         <button
@@ -313,6 +336,32 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
           )}
           <span>{notes.length} note{notes.length !== 1 ? 's' : ''}</span>
         </div>
+
+        {/* View mode toggle */}
+        <div className="flex items-center rounded-lg overflow-hidden border" style={{ borderColor: 'var(--border-base)' }}>
+          <button
+            onClick={() => setViewMode('list')}
+            className="p-1.5 transition-colors"
+            style={{
+              backgroundColor: viewMode === 'list' ? 'var(--accent-subtle)' : 'transparent',
+              color: viewMode === 'list' ? 'var(--accent-primary)' : 'var(--text-dimmed)',
+            }}
+            title="Vue liste"
+          >
+            <List className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setViewMode('canvas')}
+            className="p-1.5 transition-colors"
+            style={{
+              backgroundColor: viewMode === 'canvas' ? 'var(--accent-subtle)' : 'transparent',
+              color: viewMode === 'canvas' ? 'var(--accent-primary)' : 'var(--text-dimmed)',
+            }}
+            title="Vue canvas"
+          >
+            <Grid3X3 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Create/Edit Form */}
@@ -384,6 +433,13 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
         )}
       </AnimatePresence>
 
+      {/* Canvas View */}
+      {viewMode === 'canvas' && notes.length > 0 ? (
+        <div className="flex-1 min-h-0 -mx-5 -mb-5 lg:-mx-7 lg:-mb-7">
+          <NotesCanvas notes={notes} onSelectNote={(id) => { const note = notes.find(n => n.id === id); if (note) startEdit(note); }} />
+        </div>
+      ) : (
+      <>
       {/* Notes List */}
       {sorted.length === 0 && !showForm ? (
         <div className="flex flex-col items-center justify-center py-14 gap-4">
@@ -444,6 +500,16 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
                           {note.content.length} car.
                         </span>
                       )}
+                      {backlinks[note.id]?.length > 0 && (
+                        <span
+                          className="flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded-full"
+                          style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                          title={`Mentionné dans : ${backlinks[note.id].map(id => getNoteTitle(id)).join(', ')}`}
+                        >
+                          <Link2 className="w-2.5 h-2.5" />
+                          {backlinks[note.id].length}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -476,6 +542,8 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
             ))}
           </AnimatePresence>
         </div>
+      )}
+      </>
       )}
     </div>
   );

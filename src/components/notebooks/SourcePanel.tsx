@@ -9,7 +9,7 @@ import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Upload, Globe, FileText, Trash2, Loader2, Type, CheckCircle2, XCircle,
-  Search, Eye,
+  Search, Eye, RefreshCw, Tag, ClipboardPaste, BarChart3,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 
@@ -64,6 +64,9 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
   const [expandedSource, setExpandedSource] = useState<string | null>(null);
   const [sourcePreview, setSourcePreview] = useState<Record<string, string>>({});
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [reindexingId, setReindexingId] = useState<string | null>(null);
+  const [showClipboardForm, setShowClipboardForm] = useState(false);
+  const [tagInput, setTagInput] = useState<{ sourceId: string; value: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Filtered sources
@@ -236,6 +239,76 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
     }
   }, [expandedSource, sourcePreview, notebookId]);
 
+  // ─── Re-index source ──────────────────────────────────────────────────────
+
+  const handleReindex = useCallback(async (sourceId: string) => {
+    setReindexingId(sourceId);
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/reindex`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: 'Erreur' }));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      success(`Re-indexé : ${data.chunksCount || '?'} chunks générés`);
+      onRefresh();
+    } catch (e: any) {
+      toastError(e.message);
+    } finally {
+      setReindexingId(null);
+    }
+  }, [notebookId, success, toastError, onRefresh]);
+
+  // ─── Add tag to source ────────────────────────────────────────────────────
+
+  const handleAddTag = useCallback(async (sourceId: string, tag: string) => {
+    if (!tag.trim()) return;
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: tag.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      setTagInput(null);
+      onRefresh();
+    } catch {
+      toastError('Erreur lors de l\'ajout du tag');
+    }
+  }, [notebookId, toastError, onRefresh]);
+
+  const handleRemoveTag = useCallback(async (sourceId: string, tag: string) => {
+    try {
+      await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/tags`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag }),
+      });
+      onRefresh();
+    } catch { /* ignore */ }
+  }, [notebookId, onRefresh]);
+
+  // ─── Paste from clipboard ─────────────────────────────────────────────────
+
+  const handleClipboardPaste = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) {
+        toastError('Le presse-papier est vide');
+        return;
+      }
+      setTextContent(text);
+      setTextTitle('Collé depuis le presse-papier');
+      setShowTextForm(true);
+      setShowClipboardForm(false);
+      success('Contenu collé — vérifiez et validez');
+    } catch {
+      toastError('Impossible d\'accéder au presse-papier. Autorisez l\'accès dans le navigateur.');
+    }
+  }, [toastError, success]);
+
   // Stats
   const totalWords = sources.reduce((acc, s) => acc + s.wordCount, 0);
   const totalChunks = sources.reduce((acc, s) => acc + s.chunksCount, 0);
@@ -359,6 +432,16 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
         >
           <Type className="w-3.5 h-3.5" />
           Texte
+        </button>
+
+        <button
+          onClick={handleClipboardPaste}
+          className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium border transition-all hover:bg-white/5"
+          style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+          title="Coller depuis le presse-papier"
+        >
+          <ClipboardPaste className="w-3.5 h-3.5" />
+          Coller
         </button>
 
         {/* Stats */}
@@ -593,14 +676,16 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
                     </span>
                   </div>
 
-                  {/* Keywords */}
+                  {/* Keywords + Tags */}
                   {source.keywords.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {source.keywords.slice(0, 6).map((kw: string) => (
                         <span
                           key={kw}
-                          className="text-[9px] px-2 py-0.5 rounded-full font-medium"
+                          className="text-[9px] px-2 py-0.5 rounded-full font-medium cursor-pointer transition-all hover:line-through hover:opacity-50"
                           style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)', border: '1px solid var(--border-base)' }}
+                          onClick={() => handleRemoveTag(source.id, kw)}
+                          title="Cliquer pour retirer"
                         >
                           {kw}
                         </span>
@@ -609,6 +694,33 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
                         <span className="text-[9px] px-2 py-0.5 rounded-full" style={{ color: 'var(--text-dimmed)' }}>
                           +{source.keywords.length - 6}
                         </span>
+                      )}
+                      {/* Add tag inline */}
+                      {tagInput?.sourceId === source.id ? (
+                        <form
+                          onSubmit={(e) => { e.preventDefault(); handleAddTag(source.id, tagInput.value); }}
+                          className="inline-flex"
+                        >
+                          <input
+                            type="text"
+                            value={tagInput.value}
+                            onChange={(e) => setTagInput({ sourceId: source.id, value: e.target.value })}
+                            placeholder="tag..."
+                            autoFocus
+                            onBlur={() => setTagInput(null)}
+                            className="text-[9px] px-2 py-0.5 rounded-full w-16 outline-none"
+                            style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }}
+                          />
+                        </form>
+                      ) : (
+                        <button
+                          onClick={() => setTagInput({ sourceId: source.id, value: '' })}
+                          className="text-[9px] px-2 py-0.5 rounded-full font-medium transition-all hover:bg-[var(--accent-subtle)]"
+                          style={{ color: 'var(--text-dimmed)', border: '1px dashed var(--border-base)' }}
+                          title="Ajouter un tag"
+                        >
+                          + tag
+                        </button>
                       )}
                     </div>
                   )}
@@ -622,6 +734,14 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
                     title="Voir le contenu"
                   >
                     <Eye className="w-3.5 h-3.5" style={{ color: expandedSource === source.id ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
+                  </button>
+                  <button
+                    onClick={() => handleReindex(source.id)}
+                    disabled={reindexingId === source.id}
+                    className="p-1.5 rounded-lg hover:bg-[var(--accent-subtle)] transition-colors disabled:opacity-40"
+                    title="Re-indexer la source"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${reindexingId === source.id ? 'animate-spin' : ''}`} style={{ color: 'var(--accent-primary)' }} />
                   </button>
                   <button
                     onClick={() => handleDelete(source.id)}

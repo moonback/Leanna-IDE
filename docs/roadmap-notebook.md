@@ -46,14 +46,14 @@
 ### 🟠 Important
 
 - [ ] **Recherche dans les sources** — Barre de recherche full-text à travers toutes les sources du notebook
-- [ ] **Tags et catégories** — Permettre d'organiser les sources par tags custom
+- [x] **Tags et catégories** — Permettre d'organiser les sources par tags custom ✅
 - [ ] **Sources depuis Google Drive / OneDrive / Notion** — Connecteurs pour import direct
 - [ ] **Détection de doublons** — Alerter si une source similaire existe déjà (hash ou similarité sémantique)
-- [ ] **Re-processing** — Bouton pour re-indexer une source (utile après mise à jour du modèle d'embeddings)
+- [x] **Re-processing** — Bouton pour re-indexer une source (utile après mise à jour du modèle d'embeddings) ✅
 
 ### 🟡 Nice-to-have
 
-- [ ] **Source depuis clipboard** — Coller du texte directement comme source
+- [x] **Source depuis clipboard** — Coller du texte directement comme source ✅
 - [ ] **Source audio/vidéo** — Transcription automatique via Whisper avant indexation
 - [ ] **Statistiques par source** — Nombre de fois citée dans le chat, pertinence moyenne
 - [ ] **Export de la bibliographie** — Exporter les métadonnées des sources en BibTeX/APA
@@ -106,8 +106,8 @@
 
 ### 🟡 Nice-to-have
 
-- [ ] **Canvas / Whiteboard** — Vue spatiale des notes (type Obsidian canvas)
-- [ ] **Backlinks** — Détection automatique des liens entre notes
+- [x] **Canvas / Whiteboard** — Vue spatiale des notes (type Obsidian canvas) ✅
+- [x] **Backlinks** — Détection automatique des liens entre notes ✅
 - [ ] **Versioning** — Historique des modifications d'une note
 
 ---
@@ -170,7 +170,7 @@
 
 - [ ] **Thème par notebook** — Couleur accent personnalisable par notebook (déjà le champ `color`)
 - [ ] **Barre de progression globale** — Indicateur du nombre de sources indexées / en cours
-- [ ] **Onboarding** — Guide interactif pour les nouveaux utilisateurs (tooltip tour)
+- [x] **Onboarding** — Guide interactif pour les nouveaux utilisateurs (tooltip tour) ✅
 - [ ] **Mode split-view** — Afficher deux onglets côte à côte (ex: Sources + Chat)
 - [x] **Breadcrumb navigation** — Fil d'Ariane pour la navigation Notebooks > Mon Notebook > Chat ✅
 

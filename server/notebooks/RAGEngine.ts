@@ -286,22 +286,18 @@ Si la question est trop simple pour être décomposée :
       source: c.source.title,
     }));
 
-    const prompt = `Tu es un système de re-ranking de recherche. Évalue la pertinence de chaque passage par rapport à la question.
+    const prompt = `Tu es un système de re-ranking. Score chaque passage de 0 à 10 selon sa pertinence pour la question.
 
 QUESTION : "${query}"
 
 PASSAGES :
 ${passages.map(p => `[${p.index}] (${p.source}) ${p.text}`).join("\n\n")}
 
-Pour chaque passage, attribue un score de pertinence de 0 à 10 :
-- 0 = totalement hors sujet
-- 3 = tangentiellement lié
-- 5 = partiellement pertinent
-- 7 = pertinent
-- 10 = répond directement à la question
+Scoring :
+- 0 = hors sujet, 5 = partiellement pertinent, 10 = répond directement
 
-Réponds UNIQUEMENT en JSON strict, un tableau de scores dans l'ordre des passages :
-[score_0, score_1, score_2, ...]`;
+Réponds UNIQUEMENT avec un tableau JSON de nombres, rien d'autre. Exemple : [7, 3, 9, 5]
+Réponse :`;
 
     const result = await generateText({
       prompt,
@@ -310,26 +306,57 @@ Réponds UNIQUEMENT en JSON strict, un tableau de scores dans l'ordre des passag
       forceProvider: 'openrouter',
     });
 
-    // Parser les scores — regex robuste acceptant chiffres, décimaux, négatifs, espaces, retours chariot
-    const jsonMatch = result.text.match(/\[[\d\s,.\-\r\n]+\]/);
-    if (!jsonMatch) {
-      // Fallback : essayer d'extraire des nombres individuels du texte
-      const numbersInText = result.text.match(/\d+(?:\.\d+)?/g);
+    // Parser les scores — multiple stratégies de fallback
+    const text = result.text.trim();
+
+    // Stratégie 1 : regex pour un tableau JSON (avec possibles retours à la ligne, espaces)
+    const jsonMatch = text.match(/\[[\d\s,.\-\r\n]+\]/);
+
+    // Stratégie 2 : chercher dans un code block markdown
+    const codeBlockMatch = text.match(/```(?:json)?\s*\n?\s*(\[[\d\s,.\-\r\n]+\])\s*\n?```/);
+
+    // Stratégie 3 : le texte entier est le tableau (LLM bien obéissant)
+    const directArrayMatch = text.startsWith('[') ? text.match(/^\[[\d\s,.\-\r\n]+\]/) : null;
+
+    const matchedJson = jsonMatch?.[0] || codeBlockMatch?.[1] || directArrayMatch?.[0];
+
+    if (!matchedJson) {
+      // Stratégie 4 : extraire tous les nombres du texte
+      const numbersInText = text.match(/\b\d+(?:\.\d+)?\b/g);
       if (numbersInText && numbersInText.length >= candidates.length * 0.5) {
         const fallbackScores = numbersInText.slice(0, candidates.length).map(Number);
         log.debug(`Re-ranking: fallback extraction de ${fallbackScores.length} scores depuis le texte brut`);
         return this.applyRerankScores(candidates, fallbackScores);
       }
+
+      // Stratégie 5 : chercher des patterns "index: score" ou "Passage X: Y"
+      const indexScorePattern = /(?:\[?\d+\]?|passage\s*\d+)\s*[:=\-–]\s*(\d+(?:\.\d+)?)/gi;
+      const indexScores: number[] = [];
+      let m;
+      while ((m = indexScorePattern.exec(text)) !== null) {
+        indexScores.push(Number(m[1]));
+      }
+      if (indexScores.length >= candidates.length * 0.5) {
+        log.debug(`Re-ranking: extraction par pattern index:score de ${indexScores.length} scores`);
+        return this.applyRerankScores(candidates, indexScores);
+      }
+
       log.warn("Re-ranking: impossible de parser la réponse LLM, utilisation des scores originaux");
       return candidates;
     }
 
     let scores: number[];
     try {
-      scores = JSON.parse(jsonMatch[0]);
+      scores = JSON.parse(matchedJson);
     } catch {
-      log.warn("Re-ranking: JSON.parse échoué sur le tableau extrait");
-      return candidates;
+      // Essayer de nettoyer le JSON (virgules trailing, etc.)
+      const cleaned = matchedJson.replace(/,\s*\]/, ']').replace(/\n/g, '');
+      try {
+        scores = JSON.parse(cleaned);
+      } catch {
+        log.warn("Re-ranking: JSON.parse échoué sur le tableau extrait");
+        return candidates;
+      }
     }
     if (!Array.isArray(scores) || scores.length === 0) {
       return candidates;

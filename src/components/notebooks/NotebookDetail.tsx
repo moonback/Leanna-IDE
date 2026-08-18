@@ -74,6 +74,16 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           e.preventDefault();
           setActiveTab(tabKeys[num - 1]);
         }
+        // Ctrl+N → go to notes tab
+        if (e.key === 'n') {
+          e.preventDefault();
+          setActiveTab('notes');
+        }
+        // Ctrl+F → focus on chat
+        if (e.key === 'f') {
+          e.preventDefault();
+          setActiveTab('chat');
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
