@@ -9,7 +9,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, Loader2, Lightbulb, BookOpen, Trash2, Quote, Telescope, Download,
-  MessageCircle, ArrowDown, GitCompare, Zap,
+  MessageCircle, ArrowDown, GitCompare, Zap, StickyNote,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -112,7 +112,7 @@ function renderInlineMarkdown(text: string): string {
 }
 
 export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
-  const { error: toastError } = useToast();
+  const { error: toastError, success: toastSuccess } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -566,6 +566,37 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     }
   }, [notebookId, toastError]);
 
+  // ─── Save message to notes ─────────────────────────────────────────────────
+
+  const handleSaveToNote = useCallback(async (msg: ChatMessage) => {
+    // Trouver la question utilisateur correspondante (message précédent)
+    const msgIndex = messages.findIndex(m => m.id === msg.id);
+    const userMsg = msgIndex > 0 ? messages[msgIndex - 1] : null;
+    const title = userMsg?.role === 'user'
+      ? userMsg.content.slice(0, 80).replace(/[\n\r]/g, ' ')
+      : `Note du chat — ${new Date(msg.timestamp).toLocaleDateString('fr')}`;
+
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          content: msg.content,
+        }),
+      });
+
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: 'Erreur' }));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+
+      toastSuccess('Sauvegardé dans les notes');
+    } catch (e: any) {
+      toastError(`Erreur : ${e.message}`);
+    }
+  }, [messages, notebookId, toastError, toastSuccess]);
+
   // ─── Empty state: no sources ───────────────────────────────────────────────
 
   if (!hasSources) {
@@ -667,10 +698,22 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                     <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                   )}
 
-                  {/* Timestamp */}
-                  <p className="text-[9px] mt-2 opacity-40">
-                    {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
+                  {/* Timestamp + Save to notes */}
+                  <div className="flex items-center gap-2 mt-2">
+                    <p className="text-[9px] opacity-40">
+                      {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    {msg.role === 'assistant' && (
+                      <button
+                        onClick={() => handleSaveToNote(msg)}
+                        className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
+                        title="Sauvegarder dans les notes"
+                      >
+                        <StickyNote className="w-3 h-3" />
+                        <span>Note</span>
+                      </button>
+                    )}
+                  </div>
 
                   {/* Citations */}
                   {msg.citations.length > 0 && (
