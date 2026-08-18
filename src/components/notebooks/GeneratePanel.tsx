@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Sparkles, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List,
   Loader2, Trash2, Copy, CheckCircle2, Download, RefreshCw, ChevronDown,
-  ChevronUp, Filter, PenLine, Brain, Target, BookOpen,
+  ChevronUp, Filter, PenLine, Brain, Target, BookOpen, FolderInput,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -302,6 +302,35 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
     URL.revokeObjectURL(url);
   }, []);
 
+  const handleImportToWorkspace = useCallback(async (doc: GeneratedDoc) => {
+    const filename = doc.title
+      .replace(/[^a-zA-Z0-9àáâãäéèêëïîôùûüÿç\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .toLowerCase();
+    const filePath = `docs/generated/${filename}.md`;
+
+    try {
+      const token = localStorage.getItem('jarvis_api_token');
+      const res = await fetch('/api/ide/file', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'x-jarvis-token': token } : {}),
+        },
+        body: JSON.stringify({ path: filePath, content: doc.content }),
+      });
+
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: 'Erreur' }));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+
+      success(`Importé dans le workspace : ${filePath}`);
+    } catch (e: any) {
+      toastError(`Erreur import : ${e.message}`);
+    }
+  }, [success, toastError]);
+
   const toggleSourceSelection = useCallback((sourceId: string) => {
     setSelectedSourceIds(prev =>
       prev.includes(sourceId) ? prev.filter(id => id !== sourceId) : [...prev, sourceId]
@@ -547,6 +576,14 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
 
               {/* Action buttons */}
               <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  onClick={() => handleImportToWorkspace(selectedDoc)}
+                  className="p-2 rounded-lg border transition-all hover:bg-white/5 active:scale-95"
+                  style={{ borderColor: 'var(--border-base)', color: 'var(--accent-primary)' }}
+                  title="Importer dans le workspace"
+                >
+                  <FolderInput className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={handleRegenerate}
                   disabled={generating}
