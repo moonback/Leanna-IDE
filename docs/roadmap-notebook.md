@@ -169,9 +169,9 @@
 ### 🟠 Important
 
 - [ ] **Thème par notebook** — Couleur accent personnalisable par notebook (déjà le champ `color`)
-- [ ] **Barre de progression globale** — Indicateur du nombre de sources indexées / en cours
+- [x] **Barre de progression globale** — Indicateur du nombre de sources indexées / en cours ✅
 - [x] **Onboarding** — Guide interactif pour les nouveaux utilisateurs (tooltip tour) ✅
-- [ ] **Mode split-view** — Afficher deux onglets côte à côte (ex: Sources + Chat)
+- [x] **Mode split-view** — Afficher deux onglets côte à côte (ex: Sources + Chat) ✅
 - [x] **Breadcrumb navigation** — Fil d'Ariane pour la navigation Notebooks > Mon Notebook > Chat ✅
 
 ### 🟡 Nice-to-have

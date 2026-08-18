@@ -5,7 +5,7 @@
  * UI/UX améliorée avec meilleur feedback, cards plus riches, et animations fluides.
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Upload, Globe, FileText, Trash2, Loader2, Type, CheckCircle2, XCircle,
@@ -30,6 +30,8 @@ interface Props {
   notebookId: string;
   sources: SourceItem[];
   onRefresh: () => void;
+  /** Reports upload progress to parent (total files, completed count, active boolean) */
+  onUploadProgress?: (state: { total: number; done: number; active: boolean }) => void;
 }
 
 interface UploadFileStatus {
@@ -50,7 +52,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 const ACCEPTED_EXTENSIONS = '.pdf,.txt,.md,.html,.docx,.doc,.rtf,.csv,.json,.yaml,.yml';
 
-export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
+export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress }: Props) {
   const { success, error: toastError } = useToast();
   const [uploading, setUploading] = useState(false);
   const [showUrlForm, setShowUrlForm] = useState(false);
@@ -68,6 +70,13 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
   const [showClipboardForm, setShowClipboardForm] = useState(false);
   const [tagInput, setTagInput] = useState<{ sourceId: string; value: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Report upload progress to parent
+  useEffect(() => {
+    if (!onUploadProgress) return;
+    const done = uploadQueue.filter(f => f.status === 'success').length;
+    onUploadProgress({ total: uploadQueue.length, done, active: uploading });
+  }, [uploadQueue, uploading, onUploadProgress]);
 
   // Filtered sources
   const filteredSources = sources.filter(s => {

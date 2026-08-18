@@ -3,6 +3,7 @@
  *
  * Onglets : Sources | Chat | Notes | Générer | Audio
  * Avec indicateur animé sur le tab actif et transition de contenu.
+ * Supporte un mode split-view pour afficher deux onglets côte à côte.
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -10,6 +11,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft, FileText, MessageSquare, StickyNote, Sparkles, Mic,
   Loader2, RefreshCw, Settings, ChevronRight, BookOpen,
+  Columns2, X,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { SourcePanel } from './SourcePanel';
@@ -46,6 +48,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [notebook, setNotebook] = useState<NotebookData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('sources');
+  const [splitView, setSplitView] = useState(false);
+  const [splitTab, setSplitTab] = useState<Tab>('chat');
+  const [indexingProgress, setIndexingProgress] = useState<{ total: number; done: number; active: boolean }>({ total: 0, done: 0, active: false });
   const tabsRef = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   const loadNotebook = useCallback(async () => {
@@ -84,11 +89,42 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           e.preventDefault();
           setActiveTab('chat');
         }
+        // Ctrl+\ → toggle split-view
+        if (e.key === '\\') {
+          e.preventDefault();
+          setSplitView(v => {
+            if (!v) {
+              // Open split with a sensible default second tab
+              setSplitTab(tabKeys.find(t => t !== activeTab) ?? 'chat');
+            }
+            return !v;
+          });
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [activeTab]);
+
+  /** Toggle split-view: opens the given tab as the second pane, or closes split if already active */
+  const handleSplitToggle = useCallback(() => {
+    if (splitView) {
+      setSplitView(false);
+    } else {
+      // Default the second pane to 'chat' unless active tab is already chat
+      setSplitTab(activeTab === 'chat' ? 'sources' : 'chat');
+      setSplitView(true);
+    }
+  }, [splitView, activeTab]);
+
+  // If primary tab matches split tab, auto-swap to avoid duplicate
+  useEffect(() => {
+    if (splitView && activeTab === splitTab) {
+      const tabKeys: Tab[] = ['sources', 'chat', 'notes', 'generate', 'audio'];
+      const alt = tabKeys.find(t => t !== activeTab);
+      if (alt) setSplitTab(alt);
+    }
+  }, [activeTab, splitTab, splitView]);
 
   if (loading || !notebook) {
     return (
@@ -123,6 +159,25 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     { key: 'generate', icon: Sparkles, label: 'Générer' },
     { key: 'audio', icon: Mic, label: 'Audio' },
   ];
+
+  /** Renders the content for a given tab */
+  const renderTabContent = (tab: Tab) => {
+    switch (tab) {
+      case 'sources':
+        return <SourcePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onUploadProgress={setIndexingProgress} />;
+      case 'chat':
+        return <NotebookChat notebookId={notebookId} hasSources={notebook.sources.length > 0} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} />;
+      case 'notes':
+        return <NotesPanel notebookId={notebookId} notes={notebook.notes} onRefresh={loadNotebook} />;
+      case 'generate':
+        return <GeneratePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} />;
+      case 'audio':
+        return <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} onRefresh={loadNotebook} />;
+    }
+  };
+
+  /** Available tabs for the split-view second pane (exclude the primary active tab) */
+  const splitTabOptions = tabs.filter(t => t.key !== activeTab);
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
@@ -182,6 +237,16 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
         <div className="flex items-center gap-1">
           <button
+            onClick={handleSplitToggle}
+            className="p-2 rounded-lg transition-all hover:bg-white/5 active:scale-95"
+            style={{ color: splitView ? 'var(--accent-primary)' : 'var(--text-muted)' }}
+            title={splitView ? 'Fermer le split-view' : 'Mode split-view (Ctrl+\\)'}
+            aria-label={splitView ? 'Fermer le split-view' : 'Ouvrir le split-view'}
+            aria-pressed={splitView}
+          >
+            <Columns2 className="w-3.5 h-3.5" />
+          </button>
+          <button
             onClick={loadNotebook}
             className="p-2 rounded-lg transition-all hover:bg-white/5 active:scale-95"
             style={{ color: 'var(--text-muted)' }}
@@ -236,24 +301,120 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         ))}
       </div>
 
-      {/* Content with crossfade */}
-      <div className="flex-1 overflow-hidden">
-        <AnimatePresence mode="wait">
+      {/* Global indexing progress bar */}
+      <AnimatePresence>
+        {indexingProgress.active && indexingProgress.total > 0 && (
           <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.15 }}
-            className="h-full"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="flex-shrink-0 overflow-hidden"
           >
-            {activeTab === 'sources' && <SourcePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} />}
-            {activeTab === 'chat' && <NotebookChat notebookId={notebookId} hasSources={notebook.sources.length > 0} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} />}
-            {activeTab === 'notes' && <NotesPanel notebookId={notebookId} notes={notebook.notes} onRefresh={loadNotebook} />}
-            {activeTab === 'generate' && <GeneratePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} />}
-            {activeTab === 'audio' && <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} onRefresh={loadNotebook} />}
+            <div
+              className="flex items-center gap-3 px-5 py-2 lg:px-7"
+              style={{ backgroundColor: 'var(--bg-panel)', borderBottom: '1px solid var(--border-base)' }}
+            >
+              <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                    Indexation des sources…
+                  </span>
+                  <span className="text-[10px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                    {indexingProgress.done}/{indexingProgress.total}
+                  </span>
+                </div>
+                <div className="w-full h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ backgroundColor: 'var(--accent-primary)' }}
+                    initial={{ width: '0%' }}
+                    animate={{ width: `${indexingProgress.total > 0 ? (indexingProgress.done / indexingProgress.total) * 100 : 0}%` }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                  />
+                </div>
+              </div>
+            </div>
           </motion.div>
-        </AnimatePresence>
+        )}
+      </AnimatePresence>
+
+      {/* Content — single or split-view */}
+      <div className="flex-1 overflow-hidden flex">
+        {/* Primary pane */}
+        <div className={`flex-1 min-w-0 overflow-hidden ${splitView ? 'border-r' : ''}`} style={splitView ? { borderColor: 'var(--border-base)' } : undefined}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+              className="h-full"
+            >
+              {renderTabContent(activeTab)}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Split-view secondary pane */}
+        {splitView && (
+          <motion.div
+            initial={{ opacity: 0, width: 0 }}
+            animate={{ opacity: 1, width: '50%' }}
+            exit={{ opacity: 0, width: 0 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col min-w-0 overflow-hidden"
+            style={{ backgroundColor: 'var(--bg-base)' }}
+          >
+            {/* Secondary pane tab selector */}
+            <div
+              className="flex items-center gap-0.5 px-3 py-1.5 flex-shrink-0 border-b overflow-x-auto"
+              style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+            >
+              {splitTabOptions.map(({ key, icon: Icon, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setSplitTab(key)}
+                  className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap"
+                  style={{
+                    color: splitTab === key ? 'var(--accent-primary)' : 'var(--text-muted)',
+                    backgroundColor: splitTab === key ? 'var(--accent-subtle)' : 'transparent',
+                  }}
+                >
+                  <Icon className="w-3 h-3" />
+                  {label}
+                </button>
+              ))}
+              <button
+                onClick={() => setSplitView(false)}
+                className="ml-auto p-1.5 rounded-lg transition-all hover:bg-white/5 active:scale-95"
+                style={{ color: 'var(--text-muted)' }}
+                title="Fermer le panneau"
+                aria-label="Fermer le split-view"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Secondary pane content */}
+            <div className="flex-1 overflow-hidden">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={splitTab}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.15 }}
+                  className="h-full"
+                >
+                  {renderTabContent(splitTab)}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
       </div>
     </div>
   );
