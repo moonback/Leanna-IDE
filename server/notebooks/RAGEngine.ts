@@ -149,17 +149,24 @@ export class RAGEngine {
 
     // Construire les candidats triés
     let candidates: RAGSearchResult[] = [];
+    const allScores = Array.from(fusedScores.values());
+    const maxFusedScore = Math.max(...allScores, 0.001); // Éviter division par 0
+
     for (const [chunkId, score] of fusedScores) {
-      if (score < minRelevance * 0.5) continue; // Seuil souple pré-rerank
       const entry = chunkMap.get(chunkId);
       if (!entry) continue;
+      // Normaliser les scores RRF dans [0, 1] pour que le filtre minRelevance ait du sens
+      const normalizedScore = semanticResults.size > 0 ? score / maxFusedScore : score;
       candidates.push({
         chunk: entry.chunk,
         source: entry.source,
-        relevance: Math.min(score, 1.0),
+        relevance: Math.min(normalizedScore, 1.0),
       });
     }
     candidates.sort((a, b) => b.relevance - a.relevance);
+    // Pré-filtre souple : garder les top candidats pour le re-ranking + ceux au-dessus du seuil
+    const preFilterThreshold = minRelevance * 0.3;
+    candidates = candidates.filter((c, idx) => c.relevance >= preFilterThreshold || idx < RERANK_TOP_K);
 
     // ── Étape 4 : Re-ranking LLM ──────────────────────────────────────────
     const topCandidates = candidates.slice(0, RERANK_TOP_K);
@@ -228,7 +235,7 @@ Si la question est trop simple pour être décomposée :
         prompt,
         temperature: 0.3,
         maxOutputTokens: 256,
-        thinkingBudget: 0,
+        forceProvider: 'openrouter',
       });
 
       // Parser la réponse JSON
@@ -300,25 +307,47 @@ Réponds UNIQUEMENT en JSON strict, un tableau de scores dans l'ordre des passag
       prompt,
       temperature: 0.0,
       maxOutputTokens: 256,
-      thinkingBudget: 0, // Pas besoin de chain-of-thought
+      forceProvider: 'openrouter',
     });
 
-    // Parser les scores
-    const jsonMatch = result.text.match(/\[[\d\s,.\n]+\]/);
+    // Parser les scores — regex robuste acceptant chiffres, décimaux, négatifs, espaces, retours chariot
+    const jsonMatch = result.text.match(/\[[\d\s,.\-\r\n]+\]/);
     if (!jsonMatch) {
-      log.warn("Re-ranking: impossible de parser la réponse LLM");
+      // Fallback : essayer d'extraire des nombres individuels du texte
+      const numbersInText = result.text.match(/\d+(?:\.\d+)?/g);
+      if (numbersInText && numbersInText.length >= candidates.length * 0.5) {
+        const fallbackScores = numbersInText.slice(0, candidates.length).map(Number);
+        log.debug(`Re-ranking: fallback extraction de ${fallbackScores.length} scores depuis le texte brut`);
+        return this.applyRerankScores(candidates, fallbackScores);
+      }
+      log.warn("Re-ranking: impossible de parser la réponse LLM, utilisation des scores originaux");
       return candidates;
     }
 
-    const scores: number[] = JSON.parse(jsonMatch[0]);
+    let scores: number[];
+    try {
+      scores = JSON.parse(jsonMatch[0]);
+    } catch {
+      log.warn("Re-ranking: JSON.parse échoué sur le tableau extrait");
+      return candidates;
+    }
     if (!Array.isArray(scores) || scores.length === 0) {
       return candidates;
     }
 
-    // Appliquer les scores LLM (normaliser à 0-1 et combiner avec le score initial)
+    return this.applyRerankScores(candidates, scores);
+  }
+
+  /**
+   * Applique les scores de re-ranking aux candidats et retrie par pertinence.
+   */
+  private applyRerankScores(candidates: RAGSearchResult[], scores: number[]): RAGSearchResult[] {
     const reranked: RAGSearchResult[] = [];
     for (let i = 0; i < candidates.length; i++) {
-      const llmScore = (scores[i] ?? 5) / 10; // Normaliser 0-10 → 0-1
+      const rawScore = scores[i] ?? 5;
+      // Clamp entre 0 et 10 pour gérer les scores aberrants
+      const clampedScore = Math.max(0, Math.min(10, rawScore));
+      const llmScore = clampedScore / 10; // Normaliser 0-10 → 0-1
       const originalScore = candidates[i].relevance;
 
       // Score final : combinaison du score hybride et du score LLM

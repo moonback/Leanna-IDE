@@ -58,6 +58,8 @@ export interface GenerateTextOptions {
   thinkingBudget?: number;
   /** For Gemini: if you need to pass multimodal parts directly */
   geminiParts?: any[];
+  /** Force a specific provider for this call, ignoring profile setting */
+  forceProvider?: 'gemini' | 'openrouter';
 }
 
 export interface GenerateTextResult {
@@ -71,7 +73,7 @@ export interface GenerateTextResult {
  * Automatically respects the user's profile textProvider setting.
  */
 export async function generateText(options: GenerateTextOptions): Promise<GenerateTextResult> {
-  const provider = _profile.textProvider || 'gemini';
+  const provider = options.forceProvider || _profile.textProvider || 'gemini';
 
   if (provider === 'openrouter') {
     return generateWithOpenRouter(options);
