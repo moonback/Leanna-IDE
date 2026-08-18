@@ -6,7 +6,10 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Pin, Trash2, Edit3, Save, X, StickyNote, Clock, Search, ArrowUpDown } from 'lucide-react';
+import {
+  Plus, Pin, Trash2, Edit3, Save, X, StickyNote, Clock, Search, ArrowUpDown,
+  Download, FileText, Layout, ListChecks, BookOpen,
+} from 'lucide-react';
 import { useToast } from '../ui/Toast';
 
 interface NoteItem {
@@ -43,6 +46,73 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
   const [content, setContent] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'alpha'>('newest');
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  // ─── Note Templates ────────────────────────────────────────────────────────
+
+  const templates = useMemo(() => [
+    {
+      id: 'cornell',
+      label: 'Méthode Cornell',
+      icon: Layout,
+      color: '#3b82f6',
+      title: 'Notes Cornell — ',
+      content: `## Questions / Indices\n\n- \n- \n\n## Notes principales\n\n\n\n## Résumé\n\n`,
+    },
+    {
+      id: 'resume',
+      label: 'Résumé',
+      icon: FileText,
+      color: '#10b981',
+      title: 'Résumé — ',
+      content: `## Points clés\n\n1. \n2. \n3. \n\n## Détails\n\n\n\n## Conclusion\n\n`,
+    },
+    {
+      id: 'todo',
+      label: 'To-do / Actions',
+      icon: ListChecks,
+      color: '#f59e0b',
+      title: 'Actions — ',
+      content: `## À faire\n\n- [ ] \n- [ ] \n- [ ] \n\n## En cours\n\n- [ ] \n\n## Terminé\n\n- [x] \n`,
+    },
+    {
+      id: 'meeting',
+      label: 'Compte-rendu',
+      icon: BookOpen,
+      color: '#8b5cf6',
+      title: 'Réunion — ',
+      content: `## Participants\n\n- \n\n## Ordre du jour\n\n1. \n\n## Décisions\n\n- \n\n## Actions à suivre\n\n- [ ] \n\n## Prochaine réunion\n\n`,
+    },
+  ], []);
+
+  const applyTemplate = useCallback((template: typeof templates[0]) => {
+    setTitle(template.title);
+    setContent(template.content);
+    setShowForm(true);
+    setShowTemplates(false);
+    setEditingId(null);
+  }, []);
+
+  // ─── Export all notes ─────────────────────────────────────────────────────
+
+  const handleExportAll = useCallback(() => {
+    if (notes.length === 0) return;
+
+    const markdown = notes
+      .map(note => `# ${note.title}\n\n${note.content}\n\n---\n`)
+      .join('\n');
+
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `notes-export-${new Date().toISOString().slice(0, 10)}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    success('Notes exportées en Markdown');
+  }, [notes, success]);
 
   const handleCreate = useCallback(async () => {
     if (!title.trim()) return;
@@ -163,6 +233,40 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
           Nouvelle note
         </button>
 
+        {/* Templates dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowTemplates(!showTemplates)}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
+            style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+          >
+            <Layout className="w-3.5 h-3.5" />
+            Templates
+          </button>
+          <AnimatePresence>
+            {showTemplates && (
+              <motion.div
+                initial={{ opacity: 0, y: 4, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                className="absolute top-full left-0 mt-1 z-30 w-52 rounded-xl overflow-hidden shadow-xl"
+                style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+              >
+                {templates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    onClick={() => applyTemplate(tpl)}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-[11px] transition-colors hover:bg-[var(--accent-subtle)]"
+                  >
+                    <tpl.icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: tpl.color }} />
+                    <span style={{ color: 'var(--text-primary)' }}>{tpl.label}</span>
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Search */}
         <div className="flex-1 min-w-[180px] relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--text-dimmed)' }} />
@@ -186,6 +290,19 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
           <ArrowUpDown className="w-3 h-3" />
           {sortOrder === 'newest' ? 'Récentes' : sortOrder === 'oldest' ? 'Anciennes' : 'A → Z'}
         </button>
+
+        {/* Export */}
+        {notes.length > 0 && (
+          <button
+            onClick={handleExportAll}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-medium border transition-all hover:bg-white/5 active:scale-95"
+            style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+            title="Exporter toutes les notes en Markdown"
+          >
+            <Download className="w-3 h-3" />
+            Export
+          </button>
+        )}
 
         <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
           {pinnedCount > 0 && (

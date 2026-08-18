@@ -5,12 +5,13 @@
  * deep dive, rendu markdown, et UX amélioré.
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, Loader2, Lightbulb, BookOpen, Trash2, Quote, Telescope, Download,
   MessageCircle, ArrowDown, GitCompare, Zap, StickyNote, Volume2, Square,
-  Copy, Check, RefreshCw, Pencil, StopCircle,
+  Copy, Check, RefreshCw, Pencil, StopCircle, ThumbsUp, ThumbsDown,
+  Mic, MicOff, Filter, X, MessageSquarePlus, ChevronDown,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -357,18 +358,40 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, 'up' | 'down'>>({});
+  const [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const [showSourceFilter, setShowSourceFilter] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [personality, setPersonality] = useState<string>('default');
+  const [showPersonalityMenu, setShowPersonalityMenu] = useState(false);
+  const [threads, setThreads] = useState<{ id: string; title: string; createdAt: string }[]>([]);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [showThreadList, setShowThreadList] = useState(false);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const recognitionRef = useRef<any>(null);
   const chunkCache = useRef<Map<string, string>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Charger l'historique
+  // Charger l'historique et les threads
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/api/notebooks/${notebookId}/chat/history`);
+        // Load threads list
+        const threadsRes = await fetch(`/api/notebooks/${notebookId}/chat/threads`);
+        if (threadsRes.ok) {
+          const data = await threadsRes.json();
+          setThreads(data.threads || []);
+          if (data.threads?.length > 0 && !activeThreadId) {
+            setActiveThreadId(data.threads[0].id);
+          }
+        }
+
+        // Load current thread history
+        const threadParam = activeThreadId ? `?threadId=${activeThreadId}` : '';
+        const res = await fetch(`/api/notebooks/${notebookId}/chat/history${threadParam}`);
         if (res.ok) {
           const data = await res.json();
           setMessages(data.messages || []);
@@ -376,7 +399,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       } catch { /* ignore */ }
       setLoadingHistory(false);
     })();
-  }, [notebookId]);
+  }, [notebookId, activeThreadId]);
 
   // Charger les suggestions
   useEffect(() => {
@@ -525,6 +548,164 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     setDeepDiveProgress('');
   }, [streamingText]);
 
+  // ─── Feedback (thumbs up/down) ────────────────────────────────────────────
+
+  const handleFeedback = useCallback(async (msgId: string, type: 'up' | 'down') => {
+    // Toggle: if same feedback, remove it
+    const current = feedbackMap[msgId];
+    const newType = current === type ? undefined : type;
+
+    setFeedbackMap(prev => {
+      const next = { ...prev };
+      if (newType) next[msgId] = newType;
+      else delete next[msgId];
+      return next;
+    });
+
+    // Send to backend (fire & forget)
+    try {
+      await fetch(`/api/notebooks/${notebookId}/chat/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId: msgId, feedback: newType || null }),
+      });
+    } catch { /* silent */ }
+  }, [feedbackMap, notebookId]);
+
+  // ─── Voice Input (Web Speech API) ─────────────────────────────────────────
+
+  const handleVoiceInput = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toastError('La reconnaissance vocale n\'est pas supportée par ce navigateur');
+      return;
+    }
+
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'fr-FR';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0].transcript)
+        .join('');
+      setInput(transcript);
+      // Auto-resize textarea
+      if (inputRef.current) {
+        inputRef.current.style.height = 'auto';
+        inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + 'px';
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    setIsListening(true);
+    recognition.start();
+  }, [isListening, toastError]);
+
+  // ─── Source Filter ────────────────────────────────────────────────────────
+
+  const toggleSourceFilter = useCallback((sourceId: string) => {
+    setSelectedSources(prev =>
+      prev.includes(sourceId)
+        ? prev.filter(id => id !== sourceId)
+        : [...prev, sourceId]
+    );
+  }, []);
+
+  const clearSourceFilter = useCallback(() => {
+    setSelectedSources([]);
+    setShowSourceFilter(false);
+  }, []);
+
+  // ─── Thread Management ────────────────────────────────────────────────────
+
+  const handleNewThread = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/chat/threads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: `Conversation ${threads.length + 1}` }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setThreads(prev => [data.thread, ...prev]);
+        setActiveThreadId(data.thread.id);
+        setMessages([]);
+        setFollowUps([]);
+      }
+    } catch { /* ignore */ }
+  }, [notebookId, threads.length]);
+
+  const handleSwitchThread = useCallback((threadId: string) => {
+    setActiveThreadId(threadId);
+    setShowThreadList(false);
+    setMessages([]);
+    setLoadingHistory(true);
+    setFollowUps([]);
+  }, []);
+
+  const handleDeleteThread = useCallback(async (threadId: string) => {
+    try {
+      await fetch(`/api/notebooks/${notebookId}/chat/threads/${threadId}`, { method: 'DELETE' });
+      setThreads(prev => prev.filter(t => t.id !== threadId));
+      if (activeThreadId === threadId) {
+        const remaining = threads.filter(t => t.id !== threadId);
+        if (remaining.length > 0) {
+          setActiveThreadId(remaining[0].id);
+        } else {
+          setActiveThreadId(null);
+          setMessages([]);
+        }
+      }
+    } catch { /* ignore */ }
+  }, [notebookId, activeThreadId, threads]);
+
+  // ─── Slash Commands ───────────────────────────────────────────────────────
+
+  const slashCommands = useMemo(() => [
+    { cmd: '/résume', desc: 'Résumer les sources', prompt: 'Résume les sources principales de ce notebook' },
+    { cmd: '/compare', desc: 'Comparer les sources', prompt: 'Compare les sources entre elles en identifiant les points communs et divergences' },
+    { cmd: '/quiz', desc: 'Générer un quiz', prompt: 'Génère un quiz de 10 questions avec réponses basé sur les sources' },
+    { cmd: '/insights', desc: 'Extraire les insights', prompt: 'Extrais les insights et conclusions clés des sources' },
+    { cmd: '/glossaire', desc: 'Créer un glossaire', prompt: 'Crée un glossaire des termes importants trouvés dans les sources' },
+    { cmd: '/plan', desc: 'Plan de révision', prompt: 'Crée un plan de révision structuré basé sur les sources' },
+  ], []);
+
+  const showSlashMenu = input.startsWith('/') && !input.includes(' ');
+  const filteredSlashCommands = showSlashMenu
+    ? slashCommands.filter(c => c.cmd.startsWith(input.toLowerCase()))
+    : [];
+
+  // ─── Personalities / Tone ─────────────────────────────────────────────────
+
+  const personalities = useMemo(() => [
+    { id: 'default', label: 'Standard', emoji: '🤖', desc: 'Réponses équilibrées et claires' },
+    { id: 'academic', label: 'Académique', emoji: '🎓', desc: 'Ton formel, citations, rigueur scientifique' },
+    { id: 'simple', label: 'Vulgarisateur', emoji: '💡', desc: 'Explications simples, analogies, accessible' },
+    { id: 'concise', label: 'Concis', emoji: '⚡', desc: 'Réponses courtes et directes, bullet points' },
+    { id: 'detailed', label: 'Détaillé', emoji: '📖', desc: 'Analyses approfondies, exemples multiples' },
+    { id: 'creative', label: 'Créatif', emoji: '🎨', desc: 'Ton engageant, métaphores, storytelling' },
+  ], []);
+
+  const currentPersonality = personalities.find(p => p.id === personality) || personalities[0];
+
   // Auto-resize textarea
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
@@ -559,7 +740,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       const res = await fetch(`/api/notebooks/${notebookId}/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({ question: q, sourceIds: selectedSources.length > 0 ? selectedSources : undefined, personality: personality !== 'default' ? personality : undefined, threadId: activeThreadId || undefined }),
         signal: abortRef.current.signal,
       });
 
@@ -1006,6 +1187,94 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
   return (
     <div className="h-full flex flex-col">
+      {/* Thread bar */}
+      <div
+        className="flex items-center gap-2 px-4 py-2 border-b flex-shrink-0 lg:px-6"
+        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
+      >
+        {/* Thread selector */}
+        <div className="relative flex-1 min-w-0">
+          <button
+            onClick={() => setShowThreadList(!showThreadList)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all hover:bg-white/5 max-w-[250px]"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+            <span className="truncate">
+              {threads.find(t => t.id === activeThreadId)?.title || 'Conversation principale'}
+            </span>
+            <ChevronDown className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
+          </button>
+
+          {/* Thread dropdown */}
+          <AnimatePresence>
+            {showThreadList && (
+              <motion.div
+                initial={{ opacity: 0, y: 4, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                className="absolute top-full left-0 mt-1 z-40 w-72 rounded-xl overflow-hidden shadow-xl"
+                style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+              >
+                <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                  {threads.length === 0 ? (
+                    <p className="px-4 py-3 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                      Aucune conversation. Commencez à poser des questions.
+                    </p>
+                  ) : (
+                    threads.map(thread => (
+                      <div
+                        key={thread.id}
+                        className={`flex items-center gap-2 px-4 py-2.5 transition-colors hover:bg-[var(--accent-subtle)] cursor-pointer ${thread.id === activeThreadId ? 'bg-[var(--accent-subtle)]' : ''}`}
+                        onClick={() => handleSwitchThread(thread.id)}
+                      >
+                        <MessageCircle className="w-3 h-3 flex-shrink-0" style={{ color: thread.id === activeThreadId ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
+                        <span
+                          className="flex-1 text-[11px] font-medium truncate"
+                          style={{ color: thread.id === activeThreadId ? 'var(--accent-primary)' : 'var(--text-primary)' }}
+                        >
+                          {thread.title}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteThread(thread.id); }}
+                          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/10 transition-all"
+                          style={{ color: 'var(--text-dimmed)' }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Token counter (estimated) */}
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-medium"
+          style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-dimmed)' }}
+          title="Estimation des tokens utilisés dans cette conversation"
+        >
+          <span style={{ color: messages.length > 40 ? '#ef4444' : messages.length > 20 ? '#f59e0b' : 'var(--text-dimmed)' }}>
+            ~{Math.round(messages.reduce((acc, m) => acc + m.content.length / 4, 0)).toLocaleString()}
+          </span>
+          <span>tokens</span>
+        </div>
+
+        {/* New thread button */}
+        <button
+          onClick={handleNewThread}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all hover:bg-[var(--accent-subtle)] active:scale-95"
+          style={{ color: 'var(--accent-primary)', border: '1px solid var(--border-base)' }}
+          title="Nouvelle conversation"
+        >
+          <MessageSquarePlus className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Nouveau</span>
+        </button>
+      </div>
+
       {/* Messages area */}
       <div
         ref={scrollContainerRef}
@@ -1170,6 +1439,27 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                           >
                             <StickyNote className="w-3 h-3" />
                             <span>Note</span>
+                          </button>
+
+                          {/* Separator */}
+                          <span className="text-[6px] opacity-20">•</span>
+
+                          {/* Feedback thumbs */}
+                          <button
+                            onClick={() => handleFeedback(msg.id, 'up')}
+                            className={`p-1 rounded transition-all ${feedbackMap[msg.id] === 'up' ? 'opacity-100' : 'opacity-30 hover:opacity-80'}`}
+                            style={{ color: feedbackMap[msg.id] === 'up' ? '#10b981' : undefined }}
+                            title="Bonne réponse"
+                          >
+                            <ThumbsUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(msg.id, 'down')}
+                            className={`p-1 rounded transition-all ${feedbackMap[msg.id] === 'down' ? 'opacity-100' : 'opacity-30 hover:opacity-80'}`}
+                            style={{ color: feedbackMap[msg.id] === 'down' ? '#ef4444' : undefined }}
+                            title="Mauvaise réponse"
+                          >
+                            <ThumbsDown className="w-3 h-3" />
                           </button>
                         </>
                       )}
@@ -1406,24 +1696,130 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         className="flex-shrink-0 border-t px-4 py-3 lg:px-6"
         style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
       >
+        {/* Source filter bar */}
+        {showSourceFilter && sources.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="mb-2 overflow-hidden"
+          >
+            <div
+              className="flex items-center gap-2 p-2.5 rounded-xl flex-wrap"
+              style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
+            >
+              <span className="text-[9px] font-semibold flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+                Sources actives :
+              </span>
+              {sources.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => toggleSourceFilter(s.id)}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all active:scale-95 ${
+                    selectedSources.includes(s.id) || selectedSources.length === 0
+                      ? 'ring-1 ring-[var(--accent-primary)]'
+                      : 'opacity-40'
+                  }`}
+                  style={{
+                    backgroundColor: selectedSources.includes(s.id) ? 'var(--accent-subtle)' : 'var(--bg-panel)',
+                    color: selectedSources.includes(s.id) ? 'var(--accent-primary)' : 'var(--text-muted)',
+                    border: '1px solid var(--border-base)',
+                  }}
+                >
+                  {s.title.length > 25 ? s.title.slice(0, 25) + '…' : s.title}
+                </button>
+              ))}
+              {selectedSources.length > 0 && (
+                <button
+                  onClick={clearSourceFilter}
+                  className="px-2 py-1 rounded-lg text-[9px] font-medium transition-all hover:bg-red-500/10"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <X className="w-3 h-3 inline mr-0.5" />
+                  Reset
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Slash command menu */}
+        <AnimatePresence>
+          {showSlashMenu && filteredSlashCommands.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              className="mb-2 rounded-xl overflow-hidden"
+              style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+            >
+              {filteredSlashCommands.map((cmd) => (
+                <button
+                  key={cmd.cmd}
+                  onClick={() => { setInput(''); handleSend(cmd.prompt); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[var(--accent-subtle)]"
+                >
+                  <code className="text-[11px] font-mono font-semibold" style={{ color: 'var(--accent-primary)' }}>
+                    {cmd.cmd}
+                  </code>
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    {cmd.desc}
+                  </span>
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Main input container */}
         <div
           className="relative flex items-end gap-0 rounded-2xl transition-all"
           style={{
             backgroundColor: 'var(--bg-input)',
-            border: '1px solid var(--border-base)',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+            border: isListening ? '1px solid var(--accent-primary)' : '1px solid var(--border-base)',
+            boxShadow: isListening ? '0 0 0 2px var(--accent-subtle)' : '0 1px 4px rgba(0,0,0,0.04)',
           }}
         >
+          {/* Left actions — voice + filter */}
+          <div className="flex items-center gap-0.5 pl-2 py-2 flex-shrink-0">
+            <button
+              onClick={handleVoiceInput}
+              className={`p-2 rounded-lg transition-all active:scale-90 ${isListening ? 'animate-pulse' : ''}`}
+              style={{ color: isListening ? '#ef4444' : 'var(--text-dimmed)' }}
+              title={isListening ? 'Arrêter l\'écoute' : 'Dictée vocale'}
+            >
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
+
+            {sources.length > 1 && (
+              <button
+                onClick={() => setShowSourceFilter(!showSourceFilter)}
+                className={`p-2 rounded-lg transition-all active:scale-90 ${showSourceFilter || selectedSources.length > 0 ? '' : 'opacity-50 hover:opacity-100'}`}
+                style={{ color: selectedSources.length > 0 ? 'var(--accent-primary)' : 'var(--text-dimmed)' }}
+                title="Filtrer les sources"
+              >
+                <Filter className="w-4 h-4" />
+                {selectedSources.length > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full text-[8px] font-bold flex items-center justify-center"
+                    style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                  >
+                    {selectedSources.length}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+
           {/* Textarea */}
           <textarea
             ref={inputRef}
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Posez une question sur vos sources..."
+            placeholder={isListening ? '🎙️ Parlez maintenant...' : 'Posez une question sur vos sources... (/ pour les commandes)'}
             rows={1}
-            className="flex-1 px-4 py-3 bg-transparent text-xs outline-none resize-none placeholder:text-[var(--text-dimmed)]"
+            className="flex-1 px-3 py-3 bg-transparent text-xs outline-none resize-none placeholder:text-[var(--text-dimmed)]"
             style={{
               color: 'var(--text-primary)',
               minHeight: '44px',
@@ -1431,7 +1827,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
             }}
           />
 
-          {/* Inline action buttons — right side of input */}
+          {/* Right action buttons */}
           <div className="flex items-center gap-1 px-2 py-2 flex-shrink-0">
             <button
               onClick={() => handleDeepDive()}
@@ -1483,32 +1879,85 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
           </div>
         </div>
 
-        {/* Bottom bar — hints + secondary actions */}
+        {/* Bottom bar — hints + personality + secondary actions */}
         <div className="flex items-center justify-between mt-2 px-1">
-          <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
-            Entrée pour envoyer • Shift+Entrée pour un saut de ligne
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+              Entrée pour envoyer • / commandes
+              {selectedSources.length > 0 && (
+                <span style={{ color: 'var(--accent-primary)' }}> • {selectedSources.length} source{selectedSources.length > 1 ? 's' : ''}</span>
+              )}
+            </p>
 
-          {messages.length > 0 && (
-            <div className="flex items-center gap-1">
+            {/* Personality selector */}
+            <div className="relative">
               <button
-                onClick={handleExport}
-                className="p-1.5 rounded-md transition-all hover:bg-[var(--accent-subtle)] active:scale-90"
-                style={{ color: 'var(--text-muted)' }}
-                title="Exporter en Markdown"
+                onClick={() => setShowPersonalityMenu(!showPersonalityMenu)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-medium transition-all hover:bg-[var(--accent-subtle)]"
+                style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
               >
-                <Download className="w-3.5 h-3.5" />
+                <span>{currentPersonality.emoji}</span>
+                <span>{currentPersonality.label}</span>
               </button>
-              <button
-                onClick={handleClear}
-                className="p-1.5 rounded-md transition-all hover:bg-red-500/10 active:scale-90"
-                style={{ color: 'var(--text-muted)' }}
-                title="Effacer l'historique"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+
+              <AnimatePresence>
+                {showPersonalityMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                    className="absolute bottom-full left-0 mb-1 z-40 w-56 rounded-xl overflow-hidden shadow-xl"
+                    style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+                  >
+                    <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-base)' }}>
+                      <p className="text-[9px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Ton de l'assistant</p>
+                    </div>
+                    {personalities.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => { setPersonality(p.id); setShowPersonalityMenu(false); }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--accent-subtle)] ${personality === p.id ? 'bg-[var(--accent-subtle)]' : ''}`}
+                      >
+                        <span className="text-sm">{p.emoji}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-medium" style={{ color: personality === p.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                            {p.label}
+                          </p>
+                          <p className="text-[9px] truncate" style={{ color: 'var(--text-dimmed)' }}>{p.desc}</p>
+                        </div>
+                        {personality === p.id && (
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--accent-primary)' }} />
+                        )}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          )}
+          </div>
+
+          <div className="flex items-center gap-1">
+            {messages.length > 0 && (
+              <>
+                <button
+                  onClick={handleExport}
+                  className="p-1.5 rounded-md transition-all hover:bg-[var(--accent-subtle)] active:scale-90"
+                  style={{ color: 'var(--text-muted)' }}
+                  title="Exporter en Markdown"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={handleClear}
+                  className="p-1.5 rounded-md transition-all hover:bg-red-500/10 active:scale-90"
+                  style={{ color: 'var(--text-muted)' }}
+                  title="Effacer l'historique"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

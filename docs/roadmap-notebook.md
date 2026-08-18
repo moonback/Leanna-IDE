@@ -39,7 +39,7 @@
 
 ### 🔴 Critique
 
-- [ ] **Preview des sources** — Pouvoir lire/visualiser le contenu d'une source directement dans le panel (lecteur PDF intégré, rendu markdown, iframe pour les URL)
+- [x] **Preview des sources** — Pouvoir lire/visualiser le contenu d'une source directement dans le panel ✅
 - [ ] **Drag & drop multi-fichiers** — Améliorer l'UX d'upload avec progress bar par fichier et retry automatique
 - [ ] **Gestion d'erreurs** — Afficher clairement pourquoi un parsing a échoué (fichier corrompu, trop lourd, format non supporté)
 
@@ -64,27 +64,27 @@
 
 ### 🔴 Critique
 
-- [ ] **Conversations multiples** — Pouvoir créer plusieurs threads de chat dans un même notebook
+- [x] **Conversations multiples** — Pouvoir créer plusieurs threads de chat dans un même notebook ✅
 - [x] **Retry / Regenerate** — Bouton pour régénérer une réponse de l'assistant ✅
 - [x] **Edit du message utilisateur** — Pouvoir modifier un message envoyé et régénérer la suite ✅
 - [x] **Copy to clipboard** — Bouton copier sur chaque réponse (code blocks inclus) ✅
 
 ### 🟠 Important
 
-- [ ] **Mode focus sur sources** — Sélectionner manuellement quelles sources utiliser pour une question
+- [x] **Mode focus sur sources** — Sélectionner manuellement quelles sources utiliser pour une question ✅
 - [ ] **Historique des conversations** — Liste des threads passés avec recherche
 - [ ] **Réponses avec images** — Support des diagrammes générés (déjà Mermaid, ajouter PlantUML, graphviz)
-- [ ] **Feedback thumbs up/down** — Permettre de noter les réponses pour améliorer le RAG
+- [x] **Feedback thumbs up/down** — Permettre de noter les réponses pour améliorer le RAG ✅
 - [x] **Streaming cancel** — Bouton stop pendant le streaming d'une réponse ✅
-- [ ] **Contexte de conversation** — Afficher combien de tokens restent dans la fenêtre de contexte
+- [x] **Contexte de conversation** — Afficher combien de tokens restent dans la fenêtre de contexte ✅
 
 ### 🟡 Nice-to-have
 
 - [ ] **Mode examen** — L'assistant pose des questions à l'utilisateur (quiz interactif)
 - [ ] **Partage de conversation** — Générer un lien partageable ou exporter en PDF
-- [ ] **Personnalités** — Choisir le ton de l'assistant (académique, vulgarisateur, concis, détaillé)
-- [ ] **Plugins de chat** — Permettre des commandes slash (`/résume`, `/compare`, `/quiz`)
-- [ ] **Voice input** — Reconnaissance vocale pour dicter les questions (Web Speech API)
+- [x] **Personnalités** — Choisir le ton de l'assistant (académique, vulgarisateur, concis, détaillé) ✅
+- [x] **Plugins de chat** — Permettre des commandes slash (`/résume`, `/compare`, `/quiz`) ✅
+- [x] **Voice input** — Reconnaissance vocale pour dicter les questions (Web Speech API) ✅
 - [ ] **Annotations inline** — Surligner du texte dans une réponse pour ajouter un commentaire
 
 ---
@@ -99,9 +99,9 @@
 
 ### 🟠 Important
 
-- [ ] **Notes auto-générées** — Créer des notes automatiquement à partir des highlights du chat
-- [ ] **Templates de notes** — Modèles prédéfinis (Cornell, résumé, to-do, meeting notes)
-- [ ] **Export multiple** — Exporter toutes les notes en un seul fichier Markdown/PDF
+- [x] **Notes auto-générées** — Créer des notes automatiquement à partir des highlights du chat ✅
+- [x] **Templates de notes** — Modèles prédéfinis (Cornell, résumé, to-do, meeting notes) ✅
+- [x] **Export multiple** — Exporter toutes les notes en un seul fichier Markdown/PDF ✅
 - [ ] **Collaboration** — Notes partagées entre utilisateurs (si multi-user un jour)
 
 ### 🟡 Nice-to-have
@@ -140,8 +140,8 @@
 ### 🔴 Critique
 
 - [ ] **Qualité vocale** — Utiliser une API TTS premium (ElevenLabs, Azure TTS) au lieu du navigateur
-- [ ] **Player amélioré** — Contrôles play/pause/seek, vitesse variable, barre de progression
-- [ ] **Download audio** — Télécharger le fichier MP3/WAV généré
+- [x] **Player amélioré** — Contrôles play/pause/seek, vitesse variable, barre de progression ✅
+- [x] **Download audio** — Télécharger le fichier MP3/WAV généré ✅
 
 ### 🟠 Important
 
@@ -163,7 +163,7 @@
 ### 🔴 Critique
 
 - [ ] **Responsive mobile** — Adapter les notebooks pour tablette/mobile (navigation bottom tabs)
-- [ ] **Loading states** — Skeletons cohérents pour chaque onglet au lieu de simples spinners
+- [x] **Loading states** — Skeletons cohérents pour chaque onglet au lieu de simples spinners ✅
 - [x] **Raccourcis clavier** — `Ctrl+1-5` pour les onglets, `Ctrl+N` nouvelle note, `Ctrl+Enter` envoyer ✅
 
 ### 🟠 Important
@@ -172,7 +172,7 @@
 - [ ] **Barre de progression globale** — Indicateur du nombre de sources indexées / en cours
 - [ ] **Onboarding** — Guide interactif pour les nouveaux utilisateurs (tooltip tour)
 - [ ] **Mode split-view** — Afficher deux onglets côte à côte (ex: Sources + Chat)
-- [ ] **Breadcrumb navigation** — Fil d'Ariane pour la navigation Notebooks > Mon Notebook > Chat
+- [x] **Breadcrumb navigation** — Fil d'Ariane pour la navigation Notebooks > Mon Notebook > Chat ✅
 
 ### 🟡 Nice-to-have
 

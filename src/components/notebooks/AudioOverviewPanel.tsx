@@ -59,6 +59,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }
   const [currentLineIndex, setCurrentLineIndex] = useState(-1);
   const [ttsProgress, setTtsProgress] = useState(0);
   const [ttsTotalLines, setTtsTotalLines] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const abortControllerRef = useRef<AbortController | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<{ audio: string; index: number }[]>([]);
@@ -193,16 +194,17 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }
 
       const source = audioCtx.createBufferSource();
       source.buffer = audioBuffer;
+      source.playbackRate.value = playbackSpeed;
       source.connect(audioCtx.destination);
 
       const now = audioCtx.currentTime;
       const startTime = Math.max(now, nextStartTimeRef.current);
       source.start(startTime);
-      nextStartTimeRef.current = startTime + audioBuffer.duration;
+      nextStartTimeRef.current = startTime + (audioBuffer.duration / playbackSpeed);
     } catch (err) {
       console.error('[TTS] Erreur lecture audio:', err);
     }
-  }, [getAudioContext]);
+  }, [getAudioContext, playbackSpeed]);
 
   const handlePlayTTS = useCallback(async () => {
     if (!selectedOverview) return;
@@ -317,6 +319,30 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const handleDownloadScript = useCallback(() => {
+    if (!selectedOverview) return;
+    const blob = new Blob([`# ${selectedOverview.title}\n\n${selectedOverview.script}`], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedOverview.title.replace(/[^a-zA-Z0-9]/g, '-')}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    success('Script téléchargé');
+  }, [selectedOverview, success]);
+
+  const cycleSpeed = useCallback(() => {
+    setPlaybackSpeed(prev => {
+      if (prev === 1) return 1.25;
+      if (prev === 1.25) return 1.5;
+      if (prev === 1.5) return 1.75;
+      if (prev === 1.75) return 2;
+      return 1;
+    });
+  }, []);
 
   return (
     <div className="h-full flex flex-col lg:flex-row">
@@ -674,7 +700,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }
                 className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
                 style={{ backgroundColor: '#10b98110', border: '1px solid #10b98130' }}
               >
-                <Volume2 className="w-4 h-4 animate-pulse" style={{ color: '#10b981' }} />
+                <Volume2 className="w-4 h-4 animate-pulse flex-shrink-0" style={{ color: '#10b981' }} />
                 <div className="flex-1">
                   <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
                     <motion.div
@@ -684,10 +710,40 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }
                     />
                   </div>
                 </div>
-                <span className="text-[9px] font-medium" style={{ color: '#10b981' }}>
+                <span className="text-[9px] font-medium flex-shrink-0" style={{ color: '#10b981' }}>
                   {ttsProgress}/{ttsTotalLines}
                 </span>
+                <button
+                  onClick={cycleSpeed}
+                  className="px-2 py-0.5 rounded text-[9px] font-bold flex-shrink-0 transition-colors hover:bg-white/10"
+                  style={{ color: '#10b981', border: '1px solid #10b98140' }}
+                  title="Changer la vitesse"
+                >
+                  {playbackSpeed}x
+                </button>
               </motion.div>
+            )}
+
+            {/* Speed + Download bar (when not playing) */}
+            {!playing && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={cycleSpeed}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-medium border transition-all hover:bg-white/5"
+                  style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+                  title="Vitesse de lecture"
+                >
+                  ⚡ {playbackSpeed}x
+                </button>
+                <button
+                  onClick={handleDownloadScript}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-medium border transition-all hover:bg-white/5"
+                  style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+                  title="Télécharger le script"
+                >
+                  📥 Script .md
+                </button>
+              </div>
             )}
 
             {/* Script as chat bubbles */}

@@ -309,9 +309,26 @@ export function NotebookList({ onSelectNotebook }: Props) {
       {/* Notebook Grid / List */}
       <div className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-7">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Chargement...</p>
+          <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4' : 'space-y-3 max-w-2xl'}`}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="p-5 rounded-2xl border animate-pulse"
+                style={{ borderColor: 'var(--border-base)' }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 rounded-xl" style={{ backgroundColor: 'var(--border-base)' }} />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-3/4 rounded" style={{ backgroundColor: 'var(--border-base)' }} />
+                    <div className="h-3 w-full rounded" style={{ backgroundColor: 'var(--border-base)' }} />
+                    <div className="flex gap-3 pt-2">
+                      <div className="h-3 w-16 rounded" style={{ backgroundColor: 'var(--border-base)' }} />
+                      <div className="h-3 w-12 rounded" style={{ backgroundColor: 'var(--border-base)' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : notebooks.length === 0 ? (
           /* Empty state — premier notebook */

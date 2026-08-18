@@ -62,6 +62,8 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
   const [uploadQueue, setUploadQueue] = useState<UploadFileStatus[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSource, setExpandedSource] = useState<string | null>(null);
+  const [sourcePreview, setSourcePreview] = useState<Record<string, string>>({});
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Filtered sources
@@ -205,6 +207,34 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
       onRefresh();
     } catch { toastError('Impossible de supprimer'); }
   }, [notebookId, success, toastError, onRefresh]);
+
+  // ─── Preview source content ────────────────────────────────────────────────
+
+  const handleTogglePreview = useCallback(async (sourceId: string) => {
+    if (expandedSource === sourceId) {
+      setExpandedSource(null);
+      return;
+    }
+    setExpandedSource(sourceId);
+
+    // Fetch content if not cached
+    if (!sourcePreview[sourceId]) {
+      setLoadingPreview(true);
+      try {
+        const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/content`);
+        if (res.ok) {
+          const data = await res.json();
+          setSourcePreview(prev => ({ ...prev, [sourceId]: data.content || data.text || 'Contenu non disponible' }));
+        } else {
+          setSourcePreview(prev => ({ ...prev, [sourceId]: 'Impossible de charger le contenu' }));
+        }
+      } catch {
+        setSourcePreview(prev => ({ ...prev, [sourceId]: 'Erreur de chargement' }));
+      } finally {
+        setLoadingPreview(false);
+      }
+    }
+  }, [expandedSource, sourcePreview, notebookId]);
 
   // Stats
   const totalWords = sources.reduce((acc, s) => acc + s.wordCount, 0);
@@ -524,18 +554,29 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
                     {source.summary}
                   </p>
 
-                  {/* Expanded summary */}
+                  {/* Expanded content preview */}
                   <AnimatePresence>
                     {expandedSource === source.id && (
-                      <motion.p
+                      <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="text-[11px] mt-1 leading-relaxed overflow-hidden"
-                        style={{ color: 'var(--text-muted)' }}
+                        className="overflow-hidden"
                       >
-                        {source.summary}
-                      </motion.p>
+                        <div
+                          className="mt-2 p-3 rounded-xl text-[11px] leading-relaxed max-h-60 overflow-y-auto custom-scrollbar whitespace-pre-wrap"
+                          style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-secondary)' }}
+                        >
+                          {loadingPreview ? (
+                            <div className="flex items-center gap-2" style={{ color: 'var(--text-dimmed)' }}>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Chargement du contenu...</span>
+                            </div>
+                          ) : (
+                            sourcePreview[source.id] || source.summary
+                          )}
+                        </div>
+                      </motion.div>
                     )}
                   </AnimatePresence>
 
@@ -576,11 +617,11 @@ export function SourcePanel({ notebookId, sources, onRefresh }: Props) {
                 {/* Actions */}
                 <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all self-start">
                   <button
-                    onClick={() => setExpandedSource(expandedSource === source.id ? null : source.id)}
+                    onClick={() => handleTogglePreview(source.id)}
                     className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
-                    title="Voir plus"
+                    title="Voir le contenu"
                   >
-                    <Eye className="w-3.5 h-3.5" style={{ color: 'var(--text-dimmed)' }} />
+                    <Eye className="w-3.5 h-3.5" style={{ color: expandedSource === source.id ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
                   </button>
                   <button
                     onClick={() => handleDelete(source.id)}

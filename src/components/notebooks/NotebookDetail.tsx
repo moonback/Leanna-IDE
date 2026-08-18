@@ -9,7 +9,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft, FileText, MessageSquare, StickyNote, Sparkles, Mic,
-  Loader2, RefreshCw, Settings,
+  Loader2, RefreshCw, Settings, ChevronRight, BookOpen,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { SourcePanel } from './SourcePanel';
@@ -17,6 +17,7 @@ import { NotebookChat } from './NotebookChat';
 import { NotesPanel } from './NotesPanel';
 import { GeneratePanel } from './GeneratePanel';
 import { AudioOverviewPanel } from './AudioOverviewPanel';
+import { SourcesPanelSkeleton, ChatPanelSkeleton, NotesPanelSkeleton } from '../ui/Skeleton';
 
 interface NotebookData {
   id: string;
@@ -81,9 +82,26 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
   if (loading || !notebook) {
     return (
-      <div className="h-full flex flex-col items-center justify-center gap-3" style={{ backgroundColor: 'var(--bg-base)' }}>
-        <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Chargement du notebook...</p>
+      <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+        {/* Skeleton header */}
+        <div className="flex items-center gap-3 border-b px-5 py-3.5" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
+          <div className="w-8 h-8 rounded-lg animate-pulse" style={{ backgroundColor: 'var(--border-base)' }} />
+          <div className="w-9 h-9 rounded-xl animate-pulse" style={{ backgroundColor: 'var(--border-base)' }} />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3.5 w-40 rounded animate-pulse" style={{ backgroundColor: 'var(--border-base)' }} />
+            <div className="h-2.5 w-56 rounded animate-pulse" style={{ backgroundColor: 'var(--border-base)' }} />
+          </div>
+        </div>
+        {/* Skeleton tabs */}
+        <div className="flex items-center gap-2 px-5 py-2 border-b" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-8 w-20 rounded-lg animate-pulse" style={{ backgroundColor: 'var(--border-base)' }} />
+          ))}
+        </div>
+        {/* Skeleton content */}
+        <div className="flex-1">
+          <SourcesPanelSkeleton />
+        </div>
       </div>
     );
   }
@@ -98,6 +116,28 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+      {/* Breadcrumb */}
+      <div
+        className="flex items-center gap-1.5 px-5 py-1.5 text-[10px] border-b lg:px-7"
+        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
+      >
+        <button
+          onClick={onBack}
+          className="hover:underline transition-colors"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          Notebooks
+        </button>
+        <ChevronRight className="w-3 h-3" style={{ color: 'var(--text-dimmed)' }} />
+        <span className="font-medium truncate max-w-[200px]" style={{ color: 'var(--text-primary)' }}>
+          {notebook.title}
+        </span>
+        <ChevronRight className="w-3 h-3" style={{ color: 'var(--text-dimmed)' }} />
+        <span style={{ color: 'var(--accent-primary)' }}>
+          {tabs.find(t => t.key === activeTab)?.label}
+        </span>
+      </div>
+
       {/* Header */}
       <header
         className="flex flex-shrink-0 items-center gap-3 border-b px-5 py-3.5 lg:px-7"
