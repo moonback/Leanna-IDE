@@ -737,7 +737,7 @@ export function createNotebooksRouter(): Router {
   // POST /api/notebooks/:id/generate — Générer un document dérivé
   router.post("/:id/generate", async (req: Request, res: Response) => {
     try {
-      const { type, sourceIds, language } = req.body;
+      const { type, sourceIds, language, customInstructions } = req.body;
       const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary"];
 
       if (!type || !validTypes.includes(type)) {
@@ -747,10 +747,53 @@ export function createNotebooksRouter(): Router {
         return;
       }
 
-      const doc = await contentGenerator.generate(req.params.id, type, { sourceIds, language });
+      const doc = await contentGenerator.generate(req.params.id, type, { sourceIds, language, customInstructions });
       res.json({ status: "success", document: doc });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/notebooks/:id/generate/stream — Générer un document dérivé (SSE streaming)
+  router.post("/:id/generate/stream", async (req: Request, res: Response) => {
+    try {
+      const { type, sourceIds, language, customInstructions } = req.body;
+      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary"];
+
+      if (!type || !validTypes.includes(type)) {
+        res.status(400).json({
+          error: `Le champ 'type' doit être l'un de: ${validTypes.join(", ")}`,
+        });
+        return;
+      }
+
+      // Headers SSE
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+
+      res.write(`event: start\ndata: ${JSON.stringify({ type, status: "generating" })}\n\n`);
+
+      const doc = await contentGenerator.generate(req.params.id, type, {
+        sourceIds,
+        language,
+        customInstructions,
+        onChunk: (chunk: string) => {
+          res.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
+        },
+      });
+
+      res.write(`event: done\ndata: ${JSON.stringify({ document: doc })}\n\n`);
+      res.end();
+    } catch (e: any) {
+      if (res.headersSent) {
+        res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ error: e.message });
+      }
     }
   });
 

@@ -27,7 +27,7 @@ export class ContentGenerator {
   async generate(
     notebookId: string,
     type: GeneratedDocType,
-    options: { sourceIds?: string[]; language?: string } = {}
+    options: { sourceIds?: string[]; language?: string; customInstructions?: string; onChunk?: (chunk: string) => void } = {}
   ): Promise<GeneratedDocument> {
     const notebook = notebookManager.getNotebook(notebookId);
     if (!notebook) throw new Error("Notebook introuvable.");
@@ -90,26 +90,46 @@ export class ContentGenerator {
         throw new Error(`Type non supporté: ${type}`);
     }
 
+    // Ajouter les instructions personnalisées au prompt si fournies
+    if (options.customInstructions?.trim()) {
+      prompt += `\n\n═══ INSTRUCTIONS SUPPLÉMENTAIRES DE L'UTILISATEUR ═══\n${options.customInstructions.trim()}`;
+    }
+
     log.info(`📝 Génération ${type} pour notebook "${notebook.title}" (${sources.length} sources)`);
 
-    const result = await generateText({
-      prompt,
-      temperature: 0.5,
-      maxOutputTokens: 8192,
-    });
+    let generatedText = "";
+
+    if (options.onChunk) {
+      // Mode streaming
+      const { generateTextStream } = await import("../utils/textGeneration");
+      generatedText = await generateTextStream({
+        prompt,
+        temperature: 0.5,
+        maxOutputTokens: 8192,
+        onChunk: options.onChunk,
+      });
+    } else {
+      // Mode classique
+      const result = await generateText({
+        prompt,
+        temperature: 0.5,
+        maxOutputTokens: 8192,
+      });
+      generatedText = result.text;
+    }
 
     const doc: GeneratedDocument = {
       id: randomUUID(),
       notebookId,
       type,
       title,
-      content: result.text,
+      content: generatedText,
       sourceIds: sources.map(s => s.id),
       createdAt: new Date().toISOString(),
     };
 
     notebookManager.addGeneratedDocument(notebookId, doc);
-    log.info(`✅ Document généré: "${title}" (${result.text.length} chars)`);
+    log.info(`✅ Document généré: "${title}" (${generatedText.length} chars)`);
 
     return doc;
   }
