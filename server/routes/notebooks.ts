@@ -515,6 +515,89 @@ export function createNotebooksRouter(): Router {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // RÉSUMÉ GLOBAL DES SOURCES
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // GET /api/notebooks/:id/sources-summary — Résumé synthétique de toutes les sources
+  router.get("/:id/sources-summary", async (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+      if (notebook.sources.length === 0) {
+        res.json({ status: "success", summary: null, message: "Aucune source." });
+        return;
+      }
+
+      // Vérifier si le résumé est en cache et à jour
+      const cached = (notebook as any)._sourcesSummaryCache as { hash: string; summary: string } | undefined;
+      const currentHash = notebook.sources.map(s => s.id).sort().join("|");
+
+      if (cached && cached.hash === currentHash) {
+        res.json({ status: "success", summary: cached.summary, cached: true });
+        return;
+      }
+
+      // Construire le contexte à partir des résumés individuels de chaque source
+      const sourcesContext = notebook.sources.map(s =>
+        `### 📄 ${s.title} (${s.type})\n**Résumé :** ${s.summary}\n**Mots-clés :** ${s.keywords.join(", ")}\n**Volume :** ${s.wordCount} mots`
+      ).join("\n\n");
+
+      const lang = notebook.sources[0]?.language || "fr";
+      const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
+
+      const prompt = `${langInstruction}
+
+Tu es un assistant de synthèse documentaire. Génère un résumé global et structuré qui combine les informations de TOUTES les sources ci-dessous en un encart cohérent.
+
+Le résumé doit :
+- Être un paragraphe de synthèse (3-6 phrases) qui capture l'essence de l'ensemble des sources
+- Suivi de bullet-points des points clés (max 8 points)
+- Terminer avec les thèmes/mots-clés transversaux
+
+Format Markdown court et lisible (pas de titres # principaux, utilise ** pour le gras et - pour les listes).
+
+SOURCES (${notebook.sources.length}) :
+${sourcesContext}
+
+Génère le résumé global maintenant.`;
+
+      const { generateText: genText } = await import("../utils/textGeneration");
+      const result = await genText({
+        prompt,
+        temperature: 0.3,
+        maxOutputTokens: 1024,
+      });
+
+      // Mettre en cache dans le notebook
+      (notebook as any)._sourcesSummaryCache = { hash: currentHash, summary: result.text };
+      notebookManager.persistNotebook(req.params.id);
+
+      res.json({ status: "success", summary: result.text, cached: false });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // DELETE /api/notebooks/:id/sources-summary — Invalide le cache du résumé (force recalcul)
+  router.delete("/:id/sources-summary", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+      delete (notebook as any)._sourcesSummaryCache;
+      notebookManager.persistNotebook(req.params.id);
+      res.json({ status: "success", message: "Cache du résumé invalidé." });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // CHAT GROUNDÉ (Q&A avec citations)
   // ═══════════════════════════════════════════════════════════════════════════
 
