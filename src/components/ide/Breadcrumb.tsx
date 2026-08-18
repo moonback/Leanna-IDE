@@ -1,53 +1,75 @@
-import React from 'react';
-import { ChevronRight, Home } from 'lucide-react';
+/**
+ * Breadcrumb — Fil d'Ariane pour la navigation de fichiers.
+ * Affiche le chemin du fichier actif avec navigation cliquable.
+ */
+
+import React, { useMemo } from 'react';
+import { ChevronRight, FolderOpen, FileText } from 'lucide-react';
 
 interface BreadcrumbProps {
-  path: string;           // ex: "src/components/ide"
-  onNavigate: (path: string) => void;
+  /** Chemin du fichier actif */
+  filePath: string | null;
+  /** Handler au clic sur un segment */
+  onNavigate?: (path: string) => void;
+  /** Afficher le statut de sauvegarde */
+  dirty?: boolean;
 }
 
-/**
- * Breadcrumb cliquable dans l'en-tête de l'explorateur.
- * "workspace / src / components / ide"
- */
-export function Breadcrumb({ path, onNavigate }: BreadcrumbProps) {
-  const segments = path === '.' ? [] : path.split('/');
+export function Breadcrumb({ filePath, onNavigate, dirty }: BreadcrumbProps) {
+  const segments = useMemo(() => {
+    if (!filePath) return [];
+    return filePath.split(/[/\\]/).filter(Boolean);
+  }, [filePath]);
+
+  if (!filePath || segments.length === 0) {
+    return (
+      <div className="breadcrumb px-3 py-1.5">
+        <span className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+          Aucun fichier ouvert
+        </span>
+      </div>
+    );
+  }
+
+  const fileName = segments[segments.length - 1];
+  const pathSegments = segments.slice(Math.max(0, segments.length - 4), -1);
 
   return (
-    <nav
-      className="flex min-w-0 items-center gap-0.5 text-xs"
-      aria-label="Chemin courant"
-    >
-      {/* Racine */}
-      <button
-        className="flex items-center gap-1 rounded px-1 py-0.5 transition hover:bg-white/10"
-        style={{ color: 'var(--text-muted)' }}
-        onClick={() => onNavigate('.')}
-        title="workspace"
-      >
-        <Home size={11} />
-      </button>
+    <nav className="breadcrumb px-3 py-1.5" aria-label="Fil d'Ariane">
+      {/* Folder icon */}
+      <FolderOpen size={11} style={{ color: 'var(--text-dimmed)' }} className="flex-shrink-0" />
 
-      {segments.map((seg, i) => {
-        const segPath = segments.slice(0, i + 1).join('/');
-        const isLast  = i === segments.length - 1;
+      {/* Intermediate path segments */}
+      {pathSegments.map((segment, i) => {
+        const fullPath = segments.slice(0, segments.indexOf(segment) + 1).join('/');
         return (
-          <React.Fragment key={segPath}>
-            <ChevronRight size={10} style={{ color: 'var(--border-strong, #444)', flexShrink: 0 }} />
+          <React.Fragment key={i}>
+            <ChevronRight size={9} className="breadcrumb-separator flex-shrink-0" />
             <button
-              className="max-w-[80px] truncate rounded px-1 py-0.5 transition hover:bg-white/10"
-              style={{
-                color: isLast ? 'var(--text-primary)' : 'var(--text-muted)',
-                fontWeight: isLast ? 500 : 400,
-              }}
-              onClick={() => onNavigate(segPath)}
-              title={segPath}
+              type="button"
+              className="breadcrumb-item"
+              onClick={() => onNavigate?.(fullPath)}
+              title={fullPath}
             >
-              {seg}
+              {segment}
             </button>
           </React.Fragment>
         );
       })}
+
+      {/* Current file */}
+      <ChevronRight size={9} className="breadcrumb-separator flex-shrink-0" />
+      <span className="breadcrumb-current inline-flex items-center gap-1.5">
+        <FileText size={10} className="flex-shrink-0" />
+        {fileName}
+        {dirty && (
+          <span
+            className="w-[5px] h-[5px] rounded-full flex-shrink-0"
+            style={{ backgroundColor: 'var(--color-warning)' }}
+            title="Modifications non sauvegardées"
+          />
+        )}
+      </span>
     </nav>
   );
 }

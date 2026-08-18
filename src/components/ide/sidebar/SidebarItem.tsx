@@ -14,11 +14,17 @@ interface SidebarItemProps {
   dot?: string;
   /** Show a small chevron indicating a submenu */
   hasSubmenu?: boolean;
+  /** Show label text (for expanded sidebar mode) */
+  expanded?: boolean;
+  /** Label to show in expanded mode (defaults to title) */
+  label?: string;
+  /** Keyboard shortcut to display */
+  shortcut?: string;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmenu }: SidebarItemProps) {
+export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmenu, expanded, label, shortcut }: SidebarItemProps) {
   const [hovered, setHovered] = useState(false);
   const [ripple, setRipple] = useState(false);
   const rippleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -32,7 +38,8 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
 
   return (
     <div
-      className="relative w-full h-[44px] flex items-center justify-center"
+      className="relative w-full flex items-center"
+      style={{ height: expanded ? '40px' : '44px' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -69,7 +76,7 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
         type="button"
         onClick={handleClick}
         whileTap={{ scale: 0.92 }}
-        className="w-[36px] h-[36px] flex items-center justify-center rounded-[12px] relative overflow-hidden"
+        className={`flex items-center relative overflow-hidden ${expanded ? 'w-full px-3 gap-2.5 rounded-lg h-[34px]' : 'w-[36px] h-[36px] justify-center rounded-[12px] mx-auto'}`}
         style={{
           backgroundColor: active ? 'var(--bg-panel)' : 'transparent',
           border: active ? '1px solid var(--accent-primary)' : '1px solid transparent',
@@ -99,9 +106,10 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
         <motion.div
           animate={active ? { scale: [1, 1.08, 1] } : { scale: 1 }}
           transition={active ? { duration: 0.28, ease: 'easeOut' } : { duration: 0.2 }}
+          className="flex-shrink-0"
         >
           <Icon
-            size={17}
+            size={expanded ? 15 : 17}
             style={{
               color: active
                 ? 'var(--accent-primary)'
@@ -118,12 +126,40 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
           />
         </motion.div>
 
+        {/* Expanded mode: label text */}
+        {expanded && (
+          <span
+            className="text-[11px] font-medium truncate flex-1 text-left sidebar-item-label"
+            style={{
+              color: active ? 'var(--accent-primary)' : hovered ? 'var(--text-primary)' : 'var(--text-secondary)',
+              opacity: 1,
+              maxWidth: '150px',
+            }}
+          >
+            {label || title.split('(')[0].trim()}
+          </span>
+        )}
+
+        {/* Expanded mode: shortcut */}
+        {expanded && shortcut && (
+          <kbd
+            className="text-[9px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+            style={{
+              backgroundColor: 'var(--bg-input)',
+              color: 'var(--text-dimmed)',
+              border: '1px solid var(--border-base)',
+            }}
+          >
+            {shortcut}
+          </kbd>
+        )}
+
         {/* Dot indicator */}
         {dot && (
           <motion.div
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="absolute top-[5px] right-[5px] w-[6px] h-[6px] rounded-full"
+            className={`absolute ${expanded ? 'top-[3px] right-[8px]' : 'top-[5px] right-[5px]'} w-[6px] h-[6px] rounded-full`}
             style={{
               backgroundColor: dot,
               boxShadow: `0 0 6px ${dot}80`,
@@ -132,7 +168,7 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
         )}
 
         {/* Submenu chevron */}
-        {hasSubmenu && (
+        {hasSubmenu && !expanded && (
           <div className="absolute bottom-[3px] right-[3px]">
             <ChevronRight
               size={8}
@@ -143,6 +179,16 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
               }}
             />
           </div>
+        )}
+        {hasSubmenu && expanded && (
+          <ChevronRight
+            size={11}
+            className="flex-shrink-0"
+            style={{
+              color: active ? 'var(--accent-primary)' : 'var(--text-dimmed)',
+              opacity: hovered || active ? 1 : 0.5,
+            }}
+          />
         )}
       </motion.button>
     </div>

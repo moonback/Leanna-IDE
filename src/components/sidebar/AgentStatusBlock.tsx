@@ -1,16 +1,20 @@
 /**
  * AgentStatusBlock — Section agent IA de la sidebar.
- * Inclut le status indicator, le flyout menu, et le mode toggle.
+ * Design cohérent avec le reste de la sidebar :
+ * - Icône principale : connecter (si off) / ouvrir chat (si on)
+ * - Bouton chevron visible (▾) : ouvre le menu de contrôle IA
  */
 
 import { useCallback, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Mic, MicOff, Power, Sparkles, MessageCircle } from 'lucide-react';
+import {
+  Mic, MicOff, Power, Sparkles, MessageCircle,
+  BrainCircuit, WifiOff, ChevronDown,
+} from 'lucide-react';
 
-import { SidebarItem, SidebarStatusIndicator } from '../ide/sidebar/SidebarItem';
+import { SidebarItem } from '../ide/sidebar/SidebarItem';
 import { FlyoutMenu, FlyoutHeader, FlyoutItem, FlyoutSeparator } from '../ide/sidebar/FlyoutMenu';
 import { SidebarSeparator } from '../ide/sidebar/SidebarSection';
-import { ModeToggleButton } from './ModeToggleButton';
 import type { AIMenuItem, IDEPanelState, IDEPanelActions } from './types';
 
 interface AgentStatusBlockProps {
@@ -48,7 +52,7 @@ export function AgentStatusBlock({
   onDisconnectAssistant,
   onMuteToggle,
 }: AgentStatusBlockProps) {
-  // Keyboard handler : Escape ferme le flyout
+  // Escape closes flyout
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && assistantMenuOpen) {
       setAssistantMenuOpen(false);
@@ -61,81 +65,93 @@ export function AgentStatusBlock({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [assistantMenuOpen, handleKeyDown]);
 
-  // Helper pour accéder au state en tant que record (pour les clés dynamiques du config)
   const stateRecord = state as unknown as Record<string, boolean | string | null>;
   const actionsRecord = actions as unknown as Record<string, () => void>;
 
+  // Status dot color
+  const statusDot = assistantConnected
+    ? assistantWorking
+      ? 'var(--accent-primary)'
+      : assistantMuted
+        ? 'var(--color-warning)'
+        : 'var(--color-success)'
+    : undefined;
+
+  // Main click: connect or open chat
+  const handleMainClick = useCallback(() => {
+    if (!assistantConnected) {
+      onConnectAssistant();
+    } else {
+      onToggleChat();
+    }
+  }, [assistantConnected, onConnectAssistant, onToggleChat]);
+
+  // Menu toggle
+  const toggleMenu = useCallback(() => {
+    setAssistantMenuOpen(!assistantMenuOpen);
+  }, [assistantMenuOpen, setAssistantMenuOpen]);
+
   return (
     <>
-      {/* Quick chat toggle when connected */}
-      {assistantConnected && (
-        <SidebarItem
-          icon={MessageCircle}
-          active={state.showChat}
-          onClick={onToggleChat}
-          title="Chat IA (Ctrl+L)"
-        />
-      )}
+      <SidebarSeparator thin />
 
-      {/* Agent status indicator + flyout menu */}
       <div
-        className="relative w-full flex flex-col items-center"
+        className="relative w-full"
         ref={assistantMenuRef}
         role="group"
-        aria-label="Statut de l'agent IA"
+        aria-label="Agent IA"
       >
-        <div className="relative w-full h-[48px] flex flex-col items-center justify-center gap-1">
-          <SidebarStatusIndicator
-            connected={assistantConnected}
-            working={assistantWorking}
-            muted={assistantMuted}
-            onClick={() => !assistantConnected && onConnectAssistant()}
-            onContextMenu={() => assistantConnected && setAssistantMenuOpen(!assistantMenuOpen)}
-            onMuteToggle={onMuteToggle}
+        {/* ── Main row: icon + optional menu trigger ── */}
+        <div
+          className="relative w-full flex items-center justify-center"
+          onContextMenu={(e) => {
+            e.preventDefault();
+            if (assistantConnected) toggleMenu();
+          }}
+        >
+          {/* Principal action button */}
+          <SidebarItem
+            icon={assistantConnected ? BrainCircuit : WifiOff}
+            active={assistantConnected && (state.showChat || assistantWorking)}
+            onClick={handleMainClick}
+            title={assistantConnected ? 'Chat IA (Ctrl+L) · Clic droit : menu' : 'Connecter l\'agent IA'}
+            dot={statusDot}
+            hasSubmenu={assistantConnected}
           />
 
-          {/* Status label under icon */}
-          <AnimatePresence mode="wait">
-            {!assistantConnected ? (
-              <motion.span
-                key="label-off"
-                className="text-[6.5px] uppercase tracking-[0.14em] font-bold pointer-events-none"
-                style={{ color: 'var(--accent-primary)', opacity: 0.7 }}
-                initial={{ opacity: 0, y: 2 }}
-                animate={{ opacity: [0.4, 0.85, 0.4], y: 0 }}
-                exit={{ opacity: 0, y: -2 }}
-                transition={{ opacity: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' }, y: { duration: 0.15 } }}
-              >
-                Activer
-              </motion.span>
-            ) : assistantWorking ? (
-              <motion.span
-                key="label-working"
-                className="text-[6.5px] uppercase tracking-[0.14em] font-bold pointer-events-none"
-                style={{ color: 'var(--accent-primary)' }}
-                initial={{ opacity: 0, y: 2 }}
-                animate={{ opacity: [0.6, 1, 0.6], y: 0 }}
-                exit={{ opacity: 0, y: -2 }}
-                transition={{ opacity: { duration: 1.1, repeat: Infinity, ease: 'easeInOut' }, y: { duration: 0.15 } }}
-              >
-                En cours
-              </motion.span>
-            ) : (
-              <motion.span
-                key="label-on"
-                className="text-[6.5px] uppercase tracking-[0.14em] font-bold pointer-events-none"
-                style={{ color: 'var(--color-success)', opacity: 0.75 }}
-                initial={{ opacity: 0, y: 2 }}
-                animate={{ opacity: 0.75, y: 0 }}
-                exit={{ opacity: 0, y: -2 }}
-                transition={{ duration: 0.15 }}
-              >
-                En ligne
-              </motion.span>
-            )}
-          </AnimatePresence>
+          {/* Visible menu chevron — only when connected */}
+          {assistantConnected && (
+            <button
+              type="button"
+              onClick={toggleMenu}
+              className="absolute top-[6px] right-[4px] w-[14px] h-[14px] flex items-center justify-center rounded-sm transition-all"
+              style={{
+                color: assistantMenuOpen ? 'var(--accent-primary)' : 'var(--text-dimmed)',
+                backgroundColor: assistantMenuOpen ? 'var(--accent-subtle)' : 'transparent',
+                opacity: assistantMenuOpen ? 1 : 0.6,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--accent-primary)'; }}
+              onMouseLeave={(e) => { if (!assistantMenuOpen) { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.color = 'var(--text-dimmed)'; }}}
+              aria-label="Menu de contrôle IA"
+              aria-expanded={assistantMenuOpen}
+              aria-haspopup="menu"
+            >
+              <ChevronDown size={9} />
+            </button>
+          )}
+
+          {/* Working pulse */}
+          {assistantConnected && assistantWorking && (
+            <motion.div
+              className="absolute bottom-[1px] left-1/2 -translate-x-1/2 w-[14px] h-[2px] rounded-full"
+              style={{ backgroundColor: 'var(--accent-primary)' }}
+              animate={{ opacity: [0.3, 1, 0.3], scaleX: [0.5, 1, 0.5] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          )}
         </div>
 
+        {/* ── Flyout menu ── */}
         <AnimatePresence mode="wait">
           {assistantMenuOpen && (
             <FlyoutMenu align="bottom">
@@ -147,6 +163,15 @@ export function AgentStatusBlock({
               </FlyoutHeader>
 
               <div role="menu" aria-label="Options de l'agent IA">
+                <FlyoutItem
+                  icon={MessageCircle}
+                  label="Chat"
+                  active={state.showChat}
+                  onClick={() => { onToggleChat(); setAssistantMenuOpen(false); }}
+                />
+
+                <FlyoutSeparator />
+
                 {aiMenuItems.map((item) => (
                   <FlyoutItem
                     key={item.id}
@@ -165,6 +190,7 @@ export function AgentStatusBlock({
               </div>
 
               <FlyoutSeparator />
+
               <FlyoutItem
                 icon={assistantMuted ? MicOff : Mic}
                 label={assistantMuted ? 'Réactiver le micro' : 'Couper le micro'}
@@ -172,8 +198,17 @@ export function AgentStatusBlock({
                 onClick={() => { setAssistantMenuOpen(false); onMuteToggle(); }}
               />
               <FlyoutItem
+                icon={Sparkles}
+                label={mode === 'full' ? 'Mode : Complet' : 'Mode : Question'}
+                active={false}
+                onClick={() => { onToggleMode(); setAssistantMenuOpen(false); }}
+              />
+
+              <FlyoutSeparator />
+
+              <FlyoutItem
                 icon={Power}
-                label="Déconnecter l'agent"
+                label="Déconnecter"
                 active={false}
                 onClick={() => { setAssistantMenuOpen(false); onDisconnectAssistant(); }}
               />
@@ -181,11 +216,6 @@ export function AgentStatusBlock({
           )}
         </AnimatePresence>
       </div>
-
-      <SidebarSeparator thin />
-
-      {/* Mode toggle — bouton visuel full vs ask */}
-      <ModeToggleButton mode={mode} onToggle={onToggleMode} />
     </>
   );
 }

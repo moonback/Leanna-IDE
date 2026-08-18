@@ -901,3 +901,222 @@ body {
   70% { box-shadow: 0 0 0 8px transparent; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
+
+/* ═══════════════════════════════════════════════
+   REDUCED MOTION — Accessibilité
+   Neutralise les animations non essentielles.
+═══════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin,
+  .animate-pulse,
+  .animate-ping,
+  .animate-bounce {
+    animation: none !important;
+  }
+
+  .pulse-ring {
+    animation: none !important;
+    box-shadow: 0 0 0 2px var(--accent-subtle) !important;
+  }
+
+  .jarvis-ring {
+    box-shadow: 0 0 12px var(--orb-glow-active) !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   AGENT STATUS TOKENS — États sémantiques IA
+═══════════════════════════════════════════════ */
+:root[data-theme="dark"] {
+  --status-idle-color:     var(--text-muted);
+  --status-idle-bg:        var(--bg-input);
+  --status-running-color:  var(--accent-primary);
+  --status-running-bg:     var(--accent-subtle);
+  --status-success-color:  var(--color-success);
+  --status-success-bg:     color-mix(in srgb, var(--color-success) 10%, transparent);
+  --status-error-color:    var(--color-error);
+  --status-error-bg:       color-mix(in srgb, var(--color-error) 10%, transparent);
+  --status-waiting-color:  var(--color-info);
+  --status-waiting-bg:     color-mix(in srgb, var(--color-info) 10%, transparent);
+}
+
+:root[data-theme="light"] {
+  --status-idle-color:     var(--text-muted);
+  --status-idle-bg:        var(--bg-input);
+  --status-running-color:  var(--accent-primary);
+  --status-running-bg:     var(--accent-subtle);
+  --status-success-color:  var(--color-success);
+  --status-success-bg:     color-mix(in srgb, var(--color-success) 8%, transparent);
+  --status-error-color:    var(--color-error);
+  --status-error-bg:       color-mix(in srgb, var(--color-error) 8%, transparent);
+  --status-waiting-color:  var(--color-info);
+  --status-waiting-bg:     color-mix(in srgb, var(--color-info) 8%, transparent);
+}
+
+/* ═══════════════════════════════════════════════
+   SIDEBAR EXPANDABLE — Mode étendu avec labels
+═══════════════════════════════════════════════ */
+.sidebar-expanded {
+  width: 220px !important;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sidebar-collapsed {
+  width: 48px !important;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sidebar-item-label {
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity 0.2s ease 0.05s, max-width 0.25s ease;
+}
+
+.sidebar-expanded .sidebar-item-label {
+  opacity: 1;
+  max-width: 150px;
+}
+
+/* ═══════════════════════════════════════════════
+   PANEL TRANSITIONS — Ouverture/fermeture fluide
+═══════════════════════════════════════════════ */
+.panel-enter {
+  animation: panel-slide-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes panel-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.panel-exit {
+  animation: panel-slide-out 0.15s ease-in forwards;
+}
+
+@keyframes panel-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   FOCUS IMPROVEMENTS — Meilleure visibilité
+═══════════════════════════════════════════════ */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 4px var(--accent-subtle);
+}
+
+/* ═══════════════════════════════════════════════
+   DENSITY MODES — Compact / Balanced / Comfortable
+═══════════════════════════════════════════════ */
+[data-density="compact"] {
+  --density-spacing: 0.75;
+  --density-font-scale: 0.95;
+}
+
+[data-density="balanced"] {
+  --density-spacing: 1;
+  --density-font-scale: 1;
+}
+
+[data-density="comfortable"] {
+  --density-spacing: 1.25;
+  --density-font-scale: 1.05;
+}
+
+/* Apply density to common elements */
+[data-density="compact"] .sidebar-item-height { height: 38px; }
+[data-density="balanced"] .sidebar-item-height { height: 44px; }
+[data-density="comfortable"] .sidebar-item-height { height: 50px; }
+
+/* ═══════════════════════════════════════════════
+   AI CONNECTION STATE — État de connexion IA
+═══════════════════════════════════════════════ */
+.ai-disconnected-banner {
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-panel));
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.ai-connected-indicator {
+  background: var(--status-running-bg);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 25%, transparent);
+  border-radius: var(--radius-lg);
+}
+
+/* ═══════════════════════════════════════════════
+   INTERACTIVE FEEDBACK — Hover & Press states
+═══════════════════════════════════════════════ */
+.interactive-surface {
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.interactive-surface:hover {
+  background-color: var(--ctrl-hover);
+  border-color: var(--border-strong);
+}
+
+.interactive-surface:active {
+  transform: scale(0.98);
+}
+
+/* ═══════════════════════════════════════════════
+   BREADCRUMB — Fil d'Ariane
+═══════════════════════════════════════════════ */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+}
+
+.breadcrumb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+  cursor: pointer;
+}
+
+.breadcrumb-item:hover {
+  color: var(--accent-primary);
+}
+
+.breadcrumb-separator {
+  color: var(--text-dimmed);
+  flex-shrink: 0;
+}
+
+.breadcrumb-current {
+  color: var(--text-primary);
+  font-weight: 500;
+}
