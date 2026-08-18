@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.4.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-0.5.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/node-%3E%3D22.12.0-brightgreen" alt="Node.js" />
   <img src="https://img.shields.io/badge/electron-43-blueviolet" alt="Electron" />
   <img src="https://img.shields.io/badge/react-19-61dafb" alt="React" />
@@ -108,12 +108,24 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
 
 ### 📓 Notebooks RAG (style NotebookLM)
 
-- **Sources multiples** : Upload fichiers (PDF, DOCX, MD, HTML, CSV, JSON, YAML), ingestion d'URLs, texte collé
-- **Recherche hybride** : Embeddings sémantiques (Gemini) + TF-IDF lexical + Reciprocal Rank Fusion + Re-ranking LLM (OpenRouter)
+- **Sources multiples** : Upload fichiers (PDF, DOCX, MD, HTML, CSV, JSON, YAML), ingestion d'URLs, texte collé, paste depuis le presse-papier
+- **Recherche hybride** : Embeddings sémantiques (Gemini) + TF-IDF lexical + Reciprocal Rank Fusion + Re-ranking LLM (5 stratégies de parsing)
 - **Chat groundé** : Questions/réponses avec citations précises et score de pertinence
+- **Conversations multiples** : Threads de chat séparés par notebook, switch instantané, titrage automatique
 - **Deep Dive** : Mode exploration approfondie multi-étapes
 - **Comparaison de sources** : Analyse des similitudes, différences et contradictions entre 2+ sources
 - **Extraction d'insights** : Détection automatique des tendances, connexions cachées et points de vigilance
+- **Mode Focus Sources** : Sélectionner quelles sources utiliser pour une question spécifique
+- **Personnalités IA** : 6 tons disponibles (Standard, Académique, Vulgarisateur, Concis, Détaillé, Créatif)
+- **Commandes slash** : `/résume`, `/compare`, `/quiz`, `/insights`, `/glossaire`, `/plan`
+- **Voice Input** : Dictée vocale via Web Speech API (français)
+- **TTS** : Lecture audio des réponses avec contrôle play/stop
+- **Retry / Regenerate** : Régénérer une réponse en un clic
+- **Edit & Resend** : Modifier un message utilisateur et relancer la conversation
+- **Copy to clipboard** : Copier n'importe quelle réponse
+- **Feedback** : Thumbs up/down pour noter la qualité des réponses
+- **Stop streaming** : Arrêter la génération en cours avec sauvegarde partielle
+- **Token counter** : Estimation en temps réel des tokens utilisés par conversation
 - **Sauvegarde en notes** : Enregistrer une réponse du chat directement dans les notes du notebook
 - **Génération de contenu** :
   - Résumé synthétique
@@ -125,14 +137,34 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
   - Carte mentale (rendu Mermaid visuel)
   - Analyse SWOT (forces, faiblesses, opportunités, menaces)
   - Glossaire (termes techniques, acronymes)
-- **Génération en streaming** : Contenu affiché en temps réel pendant la génération
+- **Génération en streaming** : Contenu affiché en temps réel avec design pro
 - **Filtrage de sources** : Sélection des sources spécifiques pour la génération
-- **Instructions personnalisées** : Prompt custom pour guider le style et le focus de la génération
-- **Import au workspace** : Exporter un document généré directement dans le projet (docs/generated/)
+- **Instructions personnalisées** : Prompt custom pour guider le style et le focus
+- **Import au workspace** : Exporter un document généré directement dans le projet
 - **Export Markdown** : Télécharger tout document en fichier .md
 - **Régénérer** : Relancer la génération si le résultat ne convient pas
 - **Audio Overview** : Script de podcast IA (deux hôtes discutent de vos sources)
-- **Notes** : Prise de notes avec épinglage et organisation
+  - Vitesse de lecture variable (1x → 2x)
+  - Progression synchronisée (karaoké)
+  - Download du script en Markdown
+  - Personnalisation du ton et instructions custom
+- **Notes avancées** :
+  - Templates (Cornell, Résumé, To-do, Compte-rendu)
+  - Recherche full-text et tri (récentes, anciennes, A→Z)
+  - Export de toutes les notes en Markdown
+  - Épinglage et organisation
+  - **Vue Canvas** : Espace 2D pour organiser visuellement les notes (drag & drop, zoom, pan)
+  - **Backlinks** : Détection automatique des mentions entre notes avec liens visuels
+- **Sources** :
+  - Preview du contenu inline
+  - Re-indexing (re-embed après mise à jour du modèle)
+  - Tags custom (ajout/suppression inline)
+  - Paste depuis le presse-papier
+- **UX** :
+  - Skeletons de loading cohérents
+  - Breadcrumb navigation (Notebooks > Titre > Onglet)
+  - Raccourcis clavier (Ctrl+1-5 onglets, Ctrl+N notes, Ctrl+F chat)
+  - Formatage riche des réponses (bold, italic, code, tables, blockquotes, liens)
 
 ### 🧠 Moteur de Connaissances
 
@@ -149,6 +181,14 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
 - Tâches planifiées (cron-like) avec déclencheurs
 - Missions autonomes avec planification IA
 - Exécution parallèle ou séquentielle avec dépendances
+
+### 🏗️ Infrastructure Backend
+
+- **Rate limiting ciblé** : Limiteurs dédiés pour chat (30 req/min), embeddings (50/5min), polling (relaxé), auth (strict)
+- **Gestion mémoire intelligente** : LRU éviction des embeddings par notebook, lazy loading depuis le disque, limite configurable (50K vecteurs/~50MB)
+- **Backup automatique** : Sauvegarde incrémentale toutes les 30 min, rotation (10 backups max), restauration par notebook ou globale
+- **Queue de processing** : File d'attente pour l'ingestion de sources (concurrence ×2, retry exponentiel, priorités, annulation)
+- **Cache intelligent** : Cache LRU avec TTL + matching par similarité Jaccard pour les questions proches, invalidation auto quand les sources changent
 
 ### 🔌 Passerelle MCP
 
@@ -275,19 +315,20 @@ Jarvis-OS/
 │   ├── knowledge/             # Indexation, graphe, recherche sémantique
 │   ├── mcp/                   # Bridge MCP (stdio/SSE)
 │   ├── mission/               # Planificateur de missions autonomes
-│   ├── notebooks/             # RAG Engine, EmbeddingStore, GroundedChat, ContentGenerator
+│   ├── notebooks/             # RAG Engine, EmbeddingStore, GroundedChat, ContentGenerator, BackupService, ProcessingQueue, ResponseCache
 │   ├── prompts/               # Instructions système (SystemPromptBuilder)
-│   ├── routes/                # 32 fichiers de routes REST
+│   ├── routes/                # 32 fichiers de routes REST (incl. threads, tags, reindex, feedback)
 │   ├── runtime/               # ToolRegistry, AgentPlugins, SkillManagerV2
 │   ├── skills/                # 20+ skills IA (codebase, git, memory, automation...)
 │   ├── utils/                 # Logger, crypto, sandbox, validation, key pool
 │   └── workflows/             # Moteur de workflows documentaires
 ├── src/                       # Frontend React
-│   ├── components/            # 50+ composants (IDE, notebooks, panels, sidebar, UI)
+│   ├── components/            # 60+ composants (IDE, notebooks, panels, sidebar, UI, Skeleton, Canvas)
 │   ├── config/                # Configuration sidebar, thèmes
 │   ├── context/               # Providers (Theme, Profile, LiveAPI, ScreenShare)
 │   ├── hooks/                 # Hooks (useLiveAPI, useProfile, useTheme...)
 │   ├── services/              # Clients HTTP
+│   ├── types/                 # Types centralisés (notebook.ts)
 │   └── views/                 # 10 vues (IDE, Notebooks, Memories, Settings, etc.)
 ├── server-bootstrap.ts        # Point d'entrée serveur (env, crypto, validation)
 ├── index.html                 # Shell HTML Vite
@@ -299,7 +340,7 @@ Jarvis-OS/
 
 ## 🌐 API Backend
 
-32 groupes de routes REST disponibles :
+35 groupes de routes REST disponibles :
 
 | Route | Description |
 |-------|-------------|
@@ -319,6 +360,9 @@ Jarvis-OS/
 | `/api/mcp` | Gestion des serveurs MCP |
 | `/api/memories` | Mémoire long terme |
 | `/api/notebooks` | Notebooks RAG (sources, chat, génération, audio) |
+| `/api/notebooks/backup` | Backup & restauration automatique des notebooks |
+| `/api/notebooks/queue` | File d'attente de processing des sources |
+| `/api/notebooks/cache` | Statistiques & contrôle du cache intelligent |
 | `/api/profile` | Profil utilisateur, préférences IA |
 | `/api/safeguards` | Garde-fous de sécurité |
 | `/api/sandbox` | Environnement sandbox isolé |
@@ -361,10 +405,12 @@ L'IA dispose de 20+ skills regroupées par domaine :
 - **Authentification** : Token `x-jarvis-token` sur tous les endpoints API
 - **Chiffrement** : Clés API et secrets chiffrés au repos (AES)
 - **Sandbox** : Modifications IA isolées, validation manuelle avant merge
-- **Rate limiting** : Protection contre les abus (express-rate-limit)
+- **Rate limiting** : Protection multi-couche (global strict, polling relaxé, auth brute-force, notebook chat/embedding dédié)
 - **Audit trail** : Journalisation de toutes les actions sensibles
 - **Circuit breaker** : Protection côté client contre les cascades d'erreurs réseau
 - **Injection guards** : Protection contre l'injection de prompts
+- **Backup & Recovery** : Sauvegarde automatique incrémentale avec restauration granulaire
+- **Memory management** : Éviction LRU pour prévenir les fuites mémoire sur les embeddings
 
 ---
 
