@@ -3,7 +3,6 @@ import {
   LoaderCircle,
   Hash,
   AlertTriangle,
-  GitFork,
   BrainCircuit,
   FileText,
   RefreshCcw,
@@ -65,85 +64,12 @@ export const StatusBar = memo(function StatusBar({
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetCode, setResetCode] = useState('');
   const resetInputRef = useRef<HTMLInputElement | null>(null);
-
-  const [gitBranch, setGitBranch] = useState<string | null>(null);
-  const [showBranchPicker, setShowBranchPicker] = useState(false);
-  const [branches, setBranches] = useState<Array<{ name: string; current: boolean }>>([]);
-  const [branchLoading, setBranchLoading] = useState(false);
-  const [branchSwitching, setBranchSwitching] = useState<string | null>(null);
   
   const [mcpStatus, setMcpStatus] = useState<'ok' | 'error' | 'loading'>('loading');
   const [sandboxActive, setSandboxActive] = useState(false);
 
   const modifierKey = getModifierKey();
   const sandboxLabel = sandboxActive ? 'Sandbox' : 'Sandbox';
-
-  // ── Git ────────────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    let cancelled = false;
-    const fetchBranch = async () => {
-      try {
-        const token = localStorage.getItem('jarvis_api_token');
-        const headers: Record<string, string> = token ? { 'x-jarvis-token': token } : {};
-        const res = await fetch('/api/git/status', { headers });
-        const data = await res.json();
-        if (!cancelled && data.status === 'success' && data.branch) {
-          setGitBranch(data.branch);
-        }
-      } catch {
-        /* silent */
-      }
-    };
-    fetchBranch();
-    const interval = setInterval(fetchBranch, 15000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
-
-  const loadBranches = useCallback(async () => {
-    setBranchLoading(true);
-    try {
-      const token = localStorage.getItem('jarvis_api_token');
-      const headers: Record<string, string> = token ? { 'x-jarvis-token': token } : {};
-      const res = await fetch('/api/git/branches', { headers });
-      const data = await res.json();
-      if (data.status === 'success' && data.branches) {
-        setBranches(data.branches);
-      }
-    } catch {
-      /* silent */
-    } finally {
-      setBranchLoading(false);
-    }
-  }, []);
-
-  const switchBranch = useCallback(async (branchName: string) => {
-    setBranchSwitching(branchName);
-    try {
-      const token = localStorage.getItem('jarvis_api_token');
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...(token ? { 'x-jarvis-token': token } : {}),
-      };
-      const res = await fetch('/api/git/switch', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ branch: branchName }),
-      });
-      const data = await res.json();
-      if (data.status === 'success') {
-        setGitBranch(branchName);
-        setShowBranchPicker(false);
-      }
-    } catch {
-      /* silent */
-    } finally {
-      setBranchSwitching(null);
-    }
-  }, []);
 
   // ── MCP ────────────────────────────────────────────────────────────────────
 
@@ -253,64 +179,8 @@ export const StatusBar = memo(function StatusBar({
           boxShadow: '0 -1px 4px rgba(0,0,0,0.04)',
         }}
       >
-        {/* ─── Zone gauche : Git · Sandbox · Build · AI ─────────────────── */}
+        {/* ─── Zone gauche : Sandbox · Build · AI ─────────────────── */}
         <div className="flex items-center gap-3">
-          {/* Branch */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                if (!showBranchPicker) loadBranches();
-                setShowBranchPicker((prev) => !prev);
-              }}
-              className="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium transition-colors duration-150 hover:bg-[var(--bg-hover,rgba(128,128,128,0.12))] active:scale-[0.97]"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              <GitFork size={12} strokeWidth={2} style={{ color: 'var(--accent-primary)' }} />
-              <span className="truncate max-w-[120px]">{gitBranch || '…'}</span>
-            </button>
-
-            {showBranchPicker && (
-              <div
-                className="absolute bottom-full left-0 mb-2 w-48 max-h-60 overflow-y-auto rounded-lg border shadow-lg z-50"
-                style={{
-                  backgroundColor: 'var(--bg-ctrl)',
-                  borderColor: 'var(--border-base)',
-                  boxShadow: '0 4px 12px var(--bg-shadow)',
-                }}
-              >
-                {branchLoading ? (
-                  <div className="p-3 text-center text-xs text-[var(--text-muted)] flex items-center gap-2 justify-center">
-                    <LoaderCircle size={10} className="animate-spin" />
-                    Chargement...
-                  </div>
-                ) : branches.length === 0 ? (
-                  <div className="p-3 text-center text-xs text-[var(--text-muted)]">Aucune branche.</div>
-                ) : (
-                  branches.map((b) => (
-                    <button
-                      key={b.name}
-                      onClick={() => switchBranch(b.name)}
-                      disabled={b.current || branchSwitching === b.name}
-                      className="flex items-center w-full px-3 py-1.5 text-left text-[10px] transition-colors hover:bg-gray-100/10 disabled:opacity-60 disabled:cursor-not-allowed"
-                      style={{ color: b.current ? 'var(--accent-primary)' : 'var(--text-primary)' }}
-                    >
-                      {branchSwitching === b.name ? (
-                        <LoaderCircle size={10} className="animate-spin mr-2" />
-                      ) : (
-                        <GitFork size={10} className="mr-2" style={{ opacity: b.current ? 1 : 0.4 }} />
-                      )}
-                      <span className="truncate">{b.name}</span>
-                      {b.current && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[var(--accent-primary)]" />}
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Séparateur */}
-          <div className="w-px h-4 bg-[var(--border-base)] opacity-40" />
-
           {/* Sandbox — dot + label */}
           <button
             type="button"

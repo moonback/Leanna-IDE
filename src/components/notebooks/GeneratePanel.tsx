@@ -10,12 +10,13 @@
  * - Rendu Mermaid pour les diagrammes
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, JSX } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Sparkles, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List,
-  Loader2, Trash2, Copy, CheckCircle2, Download, RefreshCw, ChevronDown,
-  ChevronUp, Filter, PenLine, Brain, Target, BookOpen, FolderInput,
+  Loader2, Trash2, Copy, CheckCircle2, Download, RefreshCw,
+  Filter, PenLine, Brain, Target, BookOpen, FolderInput,
+  FileBarChart, Lightbulb, Zap, X, ArrowRight,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -42,6 +43,7 @@ interface Props {
 }
 
 const DOC_TYPES = [
+  { key: 'full-report', label: 'Rapport complet', icon: FileBarChart, desc: 'Rapport pro : résumé exécutif, analyse, recommandations', color: '#dc2626' },
   { key: 'summary', label: 'Résumé', icon: FileText, desc: 'Synthèse structurée des sources', color: '#3b82f6' },
   { key: 'faq', label: 'FAQ', icon: HelpCircle, desc: '15-20 questions/réponses', color: '#8b5cf6' },
   { key: 'study-guide', label: 'Guide d\'étude', icon: GraduationCap, desc: 'Concepts, quiz, résumé', color: '#10b981' },
@@ -51,6 +53,20 @@ const DOC_TYPES = [
   { key: 'mindmap', label: 'Carte mentale', icon: Brain, desc: 'Mindmap visuelle Mermaid', color: '#ec4899' },
   { key: 'swot', label: 'Analyse SWOT', icon: Target, desc: 'Forces, Faiblesses, Opportunités, Menaces', color: '#14b8a6' },
   { key: 'glossary', label: 'Glossaire', icon: BookOpen, desc: 'Termes techniques définis', color: '#6366f1' },
+];
+
+/** Types de RAPPORTS disponibles dans le modal */
+const REPORT_TYPES = [
+  { key: 'report-business', label: 'Business Plan', icon: Briefcase, desc: 'Vision, modèle économique, stratégie et projections', color: '#f59e0b' },
+  { key: 'report-market', label: 'Étude de marché', icon: Target, desc: 'Taille du marché, segments, tendances, concurrence', color: '#14b8a6' },
+  { key: 'report-technical', label: 'Rapport technique', icon: FileBarChart, desc: 'Architecture, choix techniques, spécifications', color: '#3b82f6' },
+  { key: 'report-competitive', label: 'Analyse concurrentielle', icon: Target, desc: 'Positionnement, forces/faiblesses des concurrents', color: '#8b5cf6' },
+  { key: 'report-financial', label: 'Rapport financier', icon: FileBarChart, desc: 'Projections, coûts, rentabilité, KPIs', color: '#10b981' },
+  { key: 'report-marketing', label: 'Plan marketing', icon: Sparkles, desc: 'Stratégie d\'acquisition, canaux, messaging', color: '#ec4899' },
+  { key: 'report-product', label: 'Rapport produit', icon: List, desc: 'Roadmap, fonctionnalités, priorisation, UX', color: '#06b6d4' },
+  { key: 'report-risk', label: 'Analyse des risques', icon: Target, desc: 'Risques identifiés, probabilité, mitigation', color: '#ef4444' },
+  { key: 'report-executive', label: 'Synthèse exécutive', icon: Briefcase, desc: 'Résumé décisionnel pour dirigeants', color: '#dc2626' },
+  { key: 'report-project', label: 'Rapport de projet', icon: Clock, desc: 'Avancement, livrables, jalons, blocages', color: '#6366f1' },
 ];
 
 /** Render markdown-like content with Mermaid diagram support */
@@ -157,6 +173,14 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
   const [customInstructions, setCustomInstructions] = useState('');
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
 
+  // Suggestions
+  const [suggestions, setSuggestions] = useState<{ type: string; title: string; description: string; reason: string; relevance: number; recommendedSourceIds: string[] }[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
+  // Modal rapport complet
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [modalSelectedType, setModalSelectedType] = useState<string | null>(null);
+
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Charger les docs générés
@@ -178,6 +202,40 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight;
     }
   }, [streamingText]);
+
+  // Charger les suggestions de rapports
+  const loadSuggestions = useCallback(async () => {
+    if (sources.length === 0) return;
+    setLoadingSuggestions(true);
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/report-suggestions`);
+      if (res.ok) {
+        const data = await res.json();
+        setSuggestions(data.suggestions || []);
+      }
+    } catch { /* ignore */ }
+    finally { setLoadingSuggestions(false); }
+  }, [notebookId, sources.length]);
+
+  // Ouvrir le modal "Rapport complet"
+  const openReportModal = useCallback(() => {
+    setShowReportModal(true);
+    setModalSelectedType(null);
+    // Charger les suggestions seulement la première fois (pas de refresh auto)
+    if (suggestions.length === 0 && !loadingSuggestions) {
+      loadSuggestions();
+    }
+  }, [loadSuggestions, suggestions.length, loadingSuggestions]);
+
+  // Lancer la génération depuis le modal
+  const handleModalGenerate = useCallback((type: string) => {
+    setShowReportModal(false);
+    // Petite tempo pour laisser le modal se fermer
+    setTimeout(() => {
+      // On re-dispatch vers handleGenerate via le state
+      setModalSelectedType(type);
+    }, 100);
+  }, []);
 
   // ─── Génération en streaming ────────────────────────────────────────────
 
@@ -258,6 +316,14 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
   }, [notebookId, sources, selectedSourceIds, customInstructions, success, toastError]);
 
   // ─── Régénérer ──────────────────────────────────────────────────────────
+
+  // Trigger generation from modal selection
+  useEffect(() => {
+    if (modalSelectedType) {
+      handleGenerate(modalSelectedType);
+      setModalSelectedType(null);
+    }
+  }, [modalSelectedType, handleGenerate]);
 
   const handleRegenerate = useCallback(async () => {
     if (!selectedDoc) return;
@@ -455,8 +521,37 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
             )}
           </div>
 
+          {/* Bouton principal — Rapport complet (ouvre le modal) */}
+          <button
+            onClick={openReportModal}
+            disabled={generating || sources.length === 0}
+            className="w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all disabled:opacity-40 active:scale-[0.97] hover:shadow-md hover:-translate-y-0.5"
+            style={{
+              borderColor: '#dc262640',
+              backgroundColor: '#dc262608',
+              boxShadow: '0 2px 12px #dc262610',
+            }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: '#dc262615', border: '1px solid #dc262630' }}
+            >
+              <FileBarChart className="w-5 h-5" style={{ color: '#dc2626' }} />
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>
+                📊 Rapport complet
+              </p>
+              <p className="text-[9px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Choisir un type • Suggestions IA incluses
+              </p>
+            </div>
+            <ArrowRight className="w-4 h-4 flex-shrink-0" style={{ color: '#dc2626' }} />
+          </button>
+
+          {/* Types rapides */}
           <div className="grid grid-cols-3 lg:grid-cols-1 gap-1.5">
-            {DOC_TYPES.map(({ key, label, icon: Icon, desc, color }) => {
+            {DOC_TYPES.filter(t => t.key !== 'full-report').map(({ key, label, icon: Icon, desc, color }) => {
               const isActive = generatingType === key;
               return (
                 <button
@@ -526,7 +621,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
             </div>
             <div className="space-y-1.5">
               {generatedDocs.map(doc => {
-                const docType = DOC_TYPES.find(t => t.key === doc.type);
+                const docType = DOC_TYPES.find(t => t.key === doc.type) || REPORT_TYPES.find(t => t.key === doc.type);
                 const DocIcon = docType?.icon || Sparkles;
                 const isSelected = selectedDoc?.id === doc.id;
                 return (
@@ -597,19 +692,19 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
 
         {/* Selected document view */}
         {selectedDoc && !streamingText ? (
-          <div className="space-y-5 max-w-3xl">
-            {/* Document header */}
-            <div className="flex items-start gap-3 pb-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
+          <div className={`space-y-5 ${selectedDoc.type === 'mindmap' ? 'max-w-none' : 'max-w-3xl'}`}>
+            {/* Document header — sticky */}
+            <div className="flex items-start gap-3 pb-4 border-b sticky top-0 z-10 pt-1" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span
                     className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase"
                     style={{
-                      backgroundColor: `${DOC_TYPES.find(t => t.key === selectedDoc.type)?.color || '#6b7280'}15`,
-                      color: DOC_TYPES.find(t => t.key === selectedDoc.type)?.color || 'var(--text-dimmed)',
+                      backgroundColor: `${(DOC_TYPES.find(t => t.key === selectedDoc.type) || REPORT_TYPES.find(t => t.key === selectedDoc.type))?.color || '#6b7280'}15`,
+                      color: (DOC_TYPES.find(t => t.key === selectedDoc.type) || REPORT_TYPES.find(t => t.key === selectedDoc.type))?.color || 'var(--text-dimmed)',
                     }}
                   >
-                    {DOC_TYPES.find(t => t.key === selectedDoc.type)?.label || selectedDoc.type}
+                    {(DOC_TYPES.find(t => t.key === selectedDoc.type) || REPORT_TYPES.find(t => t.key === selectedDoc.type))?.label || selectedDoc.type}
                   </span>
                   <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
                     {new Date(selectedDoc.createdAt).toLocaleString('fr-FR')}
@@ -721,6 +816,201 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
           </div>
         )}
       </div>
+
+      {/* ═══ MODAL RAPPORT COMPLET ═══ */}
+      <AnimatePresence>
+        {showReportModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+            onClick={(e) => { if (e.target === e.currentTarget) setShowReportModal(false); }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="w-full max-w-7xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden"
+              style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+            >
+              {/* Modal header */}
+              <div className="flex items-center gap-3 px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border-base)' }}>
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: '#dc262612', border: '1px solid #dc262625' }}
+                >
+                  <FileBarChart className="w-5 h-5" style={{ color: '#dc2626' }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                    Générer un rapport
+                  </h2>
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    Choisissez un type ou suivez les suggestions basées sur vos {sources.length} source{sources.length > 1 ? 's' : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowReportModal(false)}
+                  className="p-2 rounded-lg transition-all hover:bg-white/5 active:scale-95"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal content — scrollable */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+
+                {/* Suggestions IA */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Lightbulb className="w-4 h-4" style={{ color: '#f59e0b' }} />
+                    <h3 className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                      Suggestions pour vos sources
+                    </h3>
+                    {loadingSuggestions && <Loader2 className="w-3 h-3 animate-spin" style={{ color: '#f59e0b' }} />}
+                    {!loadingSuggestions && suggestions.length > 0 && (
+                      <span className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#f59e0b15', color: '#f59e0b' }}>
+                        {suggestions.length} suggestions
+                      </span>
+                    )}
+                    {!loadingSuggestions && (
+                      <button
+                        onClick={loadSuggestions}
+                        className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5 active:scale-95"
+                        style={{ border: '1px solid var(--border-base)', color: '#f59e0b' }}
+                        title="Demander de nouvelles suggestions"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        {suggestions.length > 0 ? 'Rafraîchir' : 'Obtenir des suggestions'}
+                      </button>
+                    )}
+                  </div>
+
+                  {loadingSuggestions && (
+                    <div className="flex items-center gap-3 p-4 rounded-xl" style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}>
+                      <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#f59e0b' }} />
+                      <div>
+                        <p className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>Analyse de vos sources en cours…</p>
+                        <p className="text-[9px] mt-0.5" style={{ color: 'var(--text-dimmed)' }}>L'IA identifie les rapports les plus pertinents</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!loadingSuggestions && suggestions.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {suggestions.map((suggestion, idx) => {
+                        const docType = REPORT_TYPES.find(t => t.key === suggestion.type) || DOC_TYPES.find(t => t.key === suggestion.type);
+                        const SugIcon = docType?.icon || Sparkles;
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              if (suggestion.recommendedSourceIds?.length > 0) {
+                                setSelectedSourceIds(suggestion.recommendedSourceIds);
+                              }
+                              handleModalGenerate(suggestion.type);
+                            }}
+                            className="w-full flex items-start gap-3 p-3.5 rounded-xl border transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] text-left group"
+                            style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+                          >
+                            <div
+                              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: `${docType?.color || '#6b7280'}12`, border: `1px solid ${docType?.color || '#6b7280'}25` }}
+                            >
+                              <SugIcon className="w-4 h-4" style={{ color: docType?.color || '#6b7280' }} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                  {suggestion.title}
+                                </p>
+                                <span
+                                  className="text-[8px] px-1.5 py-0.5 rounded-full font-bold"
+                                  style={{ backgroundColor: `${docType?.color || '#6b7280'}15`, color: docType?.color || '#6b7280' }}
+                                >
+                                  {suggestion.relevance}% pertinent
+                                </span>
+                              </div>
+                              <p className="text-[10px] mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                                {suggestion.reason}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1">
+                              <span className="text-[9px] font-medium" style={{ color: 'var(--accent-primary)' }}>Générer</span>
+                              <Zap className="w-3.5 h-3.5" style={{ color: '#f59e0b' }} />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {!loadingSuggestions && suggestions.length === 0 && (
+                    <p className="text-[10px] py-3 text-center" style={{ color: 'var(--text-dimmed)' }}>
+                      Cliquez sur "Obtenir des suggestions" pour que l'IA analyse vos sources.
+                    </p>
+                  )}
+                </div>
+
+                {/* Séparateur */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
+                  <span className="text-[9px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                    ou choisir un type de rapport
+                  </span>
+                  <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
+                </div>
+
+                {/* Grille de tous les types */}
+                <div className="grid grid-cols-2 gap-2">
+                  {REPORT_TYPES.map(({ key, label, icon: Icon, desc, color }) => (
+                    <button
+                      key={key}
+                      onClick={() => handleModalGenerate(key)}
+                      className="flex items-start gap-3 p-3 rounded-xl border transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] text-left group"
+                      style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+                    >
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                        style={{ backgroundColor: `${color}12`, border: `1px solid ${color}25` }}
+                      >
+                        <Icon className="w-4 h-4" style={{ color }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {label}
+                        </p>
+                        <p className="text-[8px] mt-0.5 leading-tight" style={{ color: 'var(--text-dimmed)' }}>
+                          {desc}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Modal footer */}
+              <div className="flex items-center justify-between px-6 py-3 border-t flex-shrink-0" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}>
+                <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                  {sources.length} source{sources.length > 1 ? 's' : ''} disponible{sources.length > 1 ? 's' : ''} • Le rapport sera généré en streaming
+                </p>
+                <button
+                  onClick={() => setShowReportModal(false)}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  Annuler
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

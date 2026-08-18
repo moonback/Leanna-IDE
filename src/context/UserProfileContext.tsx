@@ -41,8 +41,6 @@ export interface UserProfile {
   compactPrompt: boolean;  // Utiliser le system prompt compact (−40% tokens)
   // Agent system
   agents:        AgentsConfig;  // Configuration du système multi-agents
-  // Git
-  gitEnabled:    boolean;  // Activer/désactiver les opérations git
   // Reasoning
   reasoningEnabled: boolean;  // Activer/désactiver le raisonnement structuré (CoT, etc.)
   // Custom system prompt
@@ -76,8 +74,6 @@ const DEFAULT_PROFILE: UserProfile = {
     enabled: true,
     allowedRoles: ['writer', 'formatter', 'researcher', 'proofreader', 'translator', 'summarizer', 'planner'],
   },
-  // Git
-  gitEnabled: true,
   // Reasoning
   reasoningEnabled: true,
   // Custom system prompt

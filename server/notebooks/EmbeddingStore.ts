@@ -73,7 +73,13 @@ export class EmbeddingStore {
   private queryCache: Map<string, number[]> = new Map();
   private readonly queryCacheMaxSize = 100;
 
-  constructor() {
+  /** Limite mémoire : nombre max de vecteurs en RAM (0 = illimité) */
+  private maxVectorsInMemory: number;
+  /** Notebooks chargés en mémoire (pour eviction LRU) */
+  private loadedNotebooks: Map<string, { accessedAt: number; vectorCount: number }> = new Map();
+
+  constructor(options?: { maxVectorsInMemory?: number }) {
+    this.maxVectorsInMemory = options?.maxVectorsInMemory ?? 50_000; // ~50K vecteurs × 256 dims × 4B ≈ 50MB
     this.loadIndex();
   }
 
@@ -95,9 +101,17 @@ export class EmbeddingStore {
           // Accepter les embeddings du modèle actuel ET avec la bonne dimensionalité
           if (index.dimensions === EMBEDDING_DIMENSIONS) {
             if (index.model === EMBEDDING_MODEL) {
+              const notebookId = file.replace(".json", "");
+              let count = 0;
               for (const entry of index.entries) {
                 this.vectors.set(entry.chunkId, entry);
+                count++;
               }
+              // Tracker le notebook chargé pour le LRU
+              this.loadedNotebooks.set(notebookId, {
+                accessedAt: Date.now(),
+                vectorCount: count,
+              });
             } else {
               // Ancien modèle (ex: text-embedding-004) — ignorer, sera réindexé
               skippedLegacy++;
@@ -105,10 +119,115 @@ export class EmbeddingStore {
           }
         } catch { /* skip corrupted files */ }
       }
+
+      // Vérifier la limite mémoire au chargement initial
+      this.enforceMemoryLimit();
+
       log.info(`✅ ${this.vectors.size} embeddings chargés depuis le disque${skippedLegacy > 0 ? ` (${skippedLegacy} fichier(s) legacy ignorés, réindexation nécessaire)` : ''}`);
     } catch (e: any) {
       log.warn(`Impossible de charger les embeddings: ${e.message}`);
     }
+  }
+
+  /**
+   * Éviction LRU des notebooks les moins récemment accédés
+   * quand la mémoire dépasse le seuil configuré.
+   */
+  private enforceMemoryLimit(): void {
+    if (this.maxVectorsInMemory <= 0) return; // Illimité
+    if (this.vectors.size <= this.maxVectorsInMemory) return;
+
+    // Trier les notebooks par dernier accès (plus ancien en premier)
+    const sorted = [...this.loadedNotebooks.entries()]
+      .sort((a, b) => a[1].accessedAt - b[1].accessedAt);
+
+    let evicted = 0;
+    for (const [notebookId, _meta] of sorted) {
+      if (this.vectors.size <= this.maxVectorsInMemory * 0.8) break; // Libérer 20% supplémentaires
+
+      // Éviction : supprimer les vecteurs de ce notebook de la RAM
+      const toDelete: string[] = [];
+      for (const [chunkId, entry] of this.vectors) {
+        if (entry.notebookId === notebookId) {
+          toDelete.push(chunkId);
+        }
+      }
+      for (const id of toDelete) {
+        this.vectors.delete(id);
+      }
+
+      this.loadedNotebooks.delete(notebookId);
+      evicted += toDelete.length;
+      log.debug(`♻️ Éviction mémoire: notebook ${notebookId.slice(0, 8)} (${toDelete.length} vecteurs)`);
+    }
+
+    if (evicted > 0) {
+      log.info(`♻️ Mémoire libérée: ${evicted} vecteurs évincés (reste: ${this.vectors.size})`);
+    }
+  }
+
+  /**
+   * Charge les embeddings d'un notebook en mémoire (lazy loading).
+   * Appelé automatiquement lors d'une recherche si le notebook n'est pas en RAM.
+   */
+  private ensureNotebookLoaded(notebookId: string): void {
+    if (this.loadedNotebooks.has(notebookId)) {
+      // Mettre à jour le timestamp d'accès (LRU)
+      const meta = this.loadedNotebooks.get(notebookId)!;
+      meta.accessedAt = Date.now();
+      return;
+    }
+
+    // Charger depuis le disque
+    const filePath = this.getIndexPath(notebookId);
+    if (!fs.existsSync(filePath)) return;
+
+    try {
+      const raw = fs.readFileSync(filePath, "utf-8");
+      const index: EmbeddingIndex = JSON.parse(raw);
+
+      if (index.dimensions !== EMBEDDING_DIMENSIONS || index.model !== EMBEDDING_MODEL) return;
+
+      let count = 0;
+      for (const entry of index.entries) {
+        if (!this.vectors.has(entry.chunkId)) {
+          this.vectors.set(entry.chunkId, entry);
+          count++;
+        }
+      }
+
+      this.loadedNotebooks.set(notebookId, {
+        accessedAt: Date.now(),
+        vectorCount: count,
+      });
+
+      // Vérifier la limite mémoire après chargement
+      this.enforceMemoryLimit();
+
+      log.debug(`📥 Notebook ${notebookId.slice(0, 8)} chargé en mémoire (${count} vecteurs)`);
+    } catch (e: any) {
+      log.warn(`Erreur chargement notebook ${notebookId}: ${e.message}`);
+    }
+  }
+
+  /**
+   * Retourne les statistiques mémoire du store.
+   */
+  getMemoryStats(): {
+    vectorsInMemory: number;
+    maxVectors: number;
+    usagePercent: number;
+    loadedNotebooks: number;
+    estimatedMemoryMB: number;
+  } {
+    const estimatedBytes = this.vectors.size * EMBEDDING_DIMENSIONS * 4; // 4 bytes per float32
+    return {
+      vectorsInMemory: this.vectors.size,
+      maxVectors: this.maxVectorsInMemory,
+      usagePercent: this.maxVectorsInMemory > 0 ? (this.vectors.size / this.maxVectorsInMemory) * 100 : 0,
+      loadedNotebooks: this.loadedNotebooks.size,
+      estimatedMemoryMB: Math.round(estimatedBytes / (1024 * 1024) * 100) / 100,
+    };
   }
 
   private persistNotebook(notebookId: string): void {
@@ -304,6 +423,11 @@ export class EmbeddingStore {
     const minSimilarity = options.minSimilarity ?? 0.3;
 
     if (queryVector.length === 0) return [];
+
+    // Lazy load : s'assurer que le notebook est en mémoire
+    if (options.notebookId) {
+      this.ensureNotebookLoaded(options.notebookId);
+    }
 
     const results: { chunkId: string; sourceId: string; similarity: number }[] = [];
 

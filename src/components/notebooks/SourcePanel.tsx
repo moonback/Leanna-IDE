@@ -5,13 +5,14 @@
  * UI/UX améliorée avec meilleur feedback, cards plus riches, et animations fluides.
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Upload, Globe, FileText, Trash2, Loader2, Type, CheckCircle2, XCircle,
   Search, Eye, RefreshCw, Tag, ClipboardPaste, BarChart3,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
+import { SourcesSummaryCard } from './SourcesSummaryCard';
 
 interface SourceItem {
   id: string;
@@ -322,6 +323,12 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress }
   const totalWords = sources.reduce((acc, s) => acc + s.wordCount, 0);
   const totalChunks = sources.reduce((acc, s) => acc + s.chunksCount, 0);
 
+  // Hash des sources pour détecter les changements (ajout/suppression)
+  const sourcesHash = useMemo(
+    () => sources.map(s => s.id).sort().join('|'),
+    [sources]
+  );
+
   return (
     <div
       className="h-full overflow-y-auto custom-scrollbar p-5 lg:p-7 space-y-4 relative"
@@ -582,6 +589,13 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress }
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Résumé global des sources */}
+      <SourcesSummaryCard
+        notebookId={notebookId}
+        sourcesCount={sources.length}
+        sourcesHash={sourcesHash}
+      />
 
       {/* Sources List */}
       {sources.length === 0 ? (

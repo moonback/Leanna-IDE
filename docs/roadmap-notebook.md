@@ -186,15 +186,15 @@
 
 ### 🔴 Critique
 
-- [ ] **Rate limiting** — Protéger les endpoints d'embedding et de chat contre les abus
-- [ ] **Gestion de la mémoire** — Limiter la taille des embeddings en RAM, pagination des chunks
-- [ ] **Backup automatique** — Sauvegarder les notebooks périodiquement (JSON + embeddings)
+- [x] **Rate limiting** — Protéger les endpoints d'embedding et de chat contre les abus ✅
+- [x] **Gestion de la mémoire** — Limiter la taille des embeddings en RAM, pagination des chunks ✅
+- [x] **Backup automatique** — Sauvegarder les notebooks périodiquement (JSON + embeddings) ✅
 
 ### 🟠 Important
 
-- [ ] **Queue de processing** — File d'attente pour le traitement des sources (Bull/BullMQ)
+- [x] **Queue de processing** — File d'attente pour le traitement des sources (in-memory avec retry & concurrence) ✅
 - [ ] **Multi-model support** — Switcher entre OpenAI, Claude, Gemini, Ollama local pour le chat
-- [ ] **Caching intelligent** — Cache des réponses pour les questions fréquentes/similaires
+- [x] **Caching intelligent** — Cache des réponses pour les questions fréquentes/similaires ✅
 - [ ] **Webhooks** — Notifier des services externes quand un notebook est mis à jour
 
 ### 🟡 Nice-to-have

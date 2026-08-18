@@ -128,7 +128,8 @@ import './index.css';
         .then((res) => {
           if (res.ok || (res.status >= 400 && res.status < 500)) CB.recordSuccess();
           else CB.recordFailure();
-          return res;
+          // Clone immédiatement pour que les appels dédupliqués puissent lire le body
+          return res.clone();
         })
         .catch((err) => {
           if (isNetworkError(err)) CB.recordFailure();
@@ -136,7 +137,8 @@ import './index.css';
         })
         .finally(() => { inflight.delete(key); });
       inflight.set(key, { promise });
-      return promise;
+      // Retourner un clone distinct pour cet appel aussi
+      return promise.then((r) => r.clone());
     }
 
     return _originalFetch.call(window, input, resolvedInit).catch((err) => {

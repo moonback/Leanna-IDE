@@ -759,7 +759,7 @@ export default function IdeView() {
                         </Suspense>
                       ) : showNotebooks ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement des notebooks…</div></div>}>
-                          <NotebooksView />
+                          <NotebooksView onClose={() => setShowNotebooks(false)} />
                         </Suspense>
                       ) : showDocuments ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement…</div></div>}>

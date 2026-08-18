@@ -37,7 +37,6 @@ import memoryRouter from "./server/routes/memory";
 import { supervisor } from "./server/autonomy";
 import impactRouter from "./server/routes/impact";
 import understandingRouter from "./server/routes/understanding";
-import { createGitRouter } from "./server/routes/git";
 import { createGithubRouter } from "./server/routes/github";
 import { createAgentsRouter } from "./server/routes/agents";
 import workflowsRouter from "./server/routes/workflows";
@@ -60,9 +59,47 @@ import listsRouter from "./server/routes/lists";
 import automationRouter from "./server/routes/automation";
 import { createNotebooksRouter } from "./server/routes/notebooks";
 import { notebookManager } from "./server/notebooks";
+import { backupService } from "./server/notebooks/BackupService";
+import { sourceProcessingQueue } from "./server/notebooks/ProcessingQueue";
+import { chatResponseCache, ragSearchCache } from "./server/notebooks/ResponseCache";
+import { sourceIngester } from "./server/notebooks/SourceIngester";
 
 // Charger les clés Gemini
 loadGeminiKeys().catch(e => console.error('[GeminiKeyPool] Erreur au chargement initial:', e));
+
+// ─── Notebooks Infrastructure ─────────────────────────────────────────────────
+
+// Démarrer le service de backup automatique des notebooks
+backupService.start();
+
+// Configurer le handler de la queue de processing des sources
+sourceProcessingQueue.setHandler(async (task, onProgress) => {
+  const { notebookId, fileName, mimeType, buffer } = task.payload;
+  onProgress(10);
+
+  const source = await sourceIngester.ingestFromBuffer(
+    Buffer.from(buffer),
+    fileName,
+    mimeType,
+    notebookId
+  );
+  onProgress(70);
+
+  notebookManager.addSource(notebookId, source);
+  onProgress(90);
+
+  // Invalider le cache pour ce notebook (nouvelles sources = réponses périmées)
+  chatResponseCache.invalidateNotebook(notebookId);
+  ragSearchCache.invalidateNotebook(notebookId);
+  onProgress(100);
+
+  return {
+    sourceId: source.id,
+    title: source.title,
+    chunksCount: source.chunks.length,
+    wordCount: source.wordCount,
+  };
+});
 
 // ─── Gestionnaires d'erreurs globaux (Audit §1) ──────────────────────────────
 process.on('unhandledRejection', (reason, promise) => {
@@ -458,7 +495,11 @@ async function startServer() {
   app.use("/api/automation", automationRouter);
   app.use("/api/workflows", workflowsRouter);
   app.use("/api/custom-skills", customSkillsRouter);
-  app.use("/api/git", createGitRouter(skillManager, () => currentProfile));
+  // Git désactivé — toutes les routes retournent 404
+  // app.use("/api/git", createGitRouter(skillManager, () => currentProfile));
+  app.use("/api/git", (_req, res) => {
+    res.status(404).json({ status: "disabled", error: "Git est entièrement désactivé." });
+  });
   app.use("/api/github", createGithubRouter(skillManager));
   app.use("/api/agents", createAgentsRouter(skillManager));
 
@@ -488,6 +529,33 @@ async function startServer() {
   app.use("/api/knowledge", memoryRouter);
   app.use("/api/knowledge", impactRouter);
   app.use("/api/knowledge", understandingRouter);
+
+  // Rate limiter spécifique pour les notebooks (chat/embedding = coûteux en API)
+  const notebookChatLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: isDev ? 1_000_000 : 30, // 30 requêtes chat/min en production
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: skipForLocal,
+    keyGenerator: (req) => `nb-chat-${req.ip}`,
+    message: { error: "Trop de requêtes chat. Veuillez ralentir." },
+  });
+
+  const notebookEmbeddingLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: isDev ? 1_000_000 : 50, // 50 requêtes embedding/5min en production
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: skipForLocal,
+    keyGenerator: (req) => `nb-emb-${req.ip}`,
+    message: { error: "Trop de requêtes d'embedding. Veuillez patienter." },
+  });
+
+  // Appliquer les limiteurs ciblés sur les routes coûteuses
+  app.use("/api/notebooks/:id/chat", notebookChatLimiter);
+  app.use("/api/notebooks/:id/embeddings/reindex", notebookEmbeddingLimiter);
+  app.use("/api/notebooks/:id/sources/upload", notebookEmbeddingLimiter);
+
   app.use("/api/notebooks", createNotebooksRouter());
   // ── Fin routeurs modulaires ───────────────────────────────────────────────
 
@@ -1806,10 +1874,8 @@ async function startServer() {
         filteredDeclarations = filteredDeclarations.filter(d => !AGENT_TOOLS.has(d.name));
       }
 
-      // ── Filtrage Git si désactivé ──
-      if (currentProfile.gitEnabled === false) {
-        filteredDeclarations = filteredDeclarations.filter(d => !d.name.startsWith('git_'));
-      }
+      // ── Filtrage Git — toujours désactivé ──
+      filteredDeclarations = filteredDeclarations.filter(d => !d.name.startsWith('git_'));
 
       // ── Filtrage Reasoning si désactivé ──
       if (currentProfile.reasoningEnabled === false) {
@@ -1819,8 +1885,7 @@ async function startServer() {
       const tools = filteredDeclarations.length > 0 ? [{ functionDeclarations: filteredDeclarations }] : undefined;
 
       // Log tool loading
-      const gitStatus = currentProfile.gitEnabled === false ? ', git: OFF' : '';
-      console.log(`[TokenOptimizer] 🔧 Outils chargés: ${filteredDeclarations.length}/${declarations.length} (mode: ${sessionMode}${requestedSkills ? ', skills: ' + requestedSkills.join(',') : ''}, agents: ${agentsEnabled ? 'ON' : 'OFF'}${gitStatus})`);
+      console.log(`[TokenOptimizer] 🔧 Outils chargés: ${filteredDeclarations.length}/${declarations.length} (mode: ${sessionMode}${requestedSkills ? ', skills: ' + requestedSkills.join(',') : ''}, agents: ${agentsEnabled ? 'ON' : 'OFF'}, git: OFF)`);
       console.log(`[TokenOptimizer]    Outils: ${filteredDeclarations.map(d => d.name).join(', ')}`);
 
       if (scoringInfo && scoringInfo.scored.length > 0) {
@@ -2773,12 +2838,12 @@ async function startServer() {
               }
             }
 
-            // ── Git guard: block git tools when gitEnabled === false ──
-            if (call.name.startsWith('git_') && currentProfile.gitEnabled === false) {
+            // ── Git guard: toujours bloqué — git désactivé ──
+            if (call.name.startsWith('git_')) {
               functionResponses.push({
                 id: call.id,
                 name: call.name,
-                response: { error: "Git est désactivé pour ce projet (gitEnabled: false dans le profil). Ce projet n'a pas de dépôt git initialisé." }
+                response: { error: "Git est entièrement désactivé." }
               });
               clientWs.send(JSON.stringify({ tool_used: call.name, info: '[BLOQUÉ - Git désactivé]' }));
               continue;
