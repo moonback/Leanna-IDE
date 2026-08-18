@@ -58,11 +58,11 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
 |--------|-------------|
 | **Frontend** | React 19, React Router 7, Tailwind CSS 4, Monaco Editor, Motion (animations), Lucide React |
 | **Backend** | Node.js, Express 4, WebSocket (ws), multer |
-| **IA** | Google Gemini (SDK `@google/genai`), OpenRouter (optionnel), embeddings `gemini-embedding-001` |
+| **IA** | Google Gemini (SDK `@google/genai`), OpenRouter (multi-modèles), embeddings `gemini-embedding-001` |
 | **Desktop** | Electron 43, electron-builder (NSIS Windows) |
 | **Bundling** | Vite 6, esbuild, tsx |
 | **Persistance** | Système de fichiers JSON, Supabase (optionnel) |
-| **Autres** | pdf-parse, puppeteer (scraping), marked (Markdown), react-window (virtualisation) |
+| **Autres** | pdf-parse, puppeteer (scraping), marked (Markdown), mermaid (diagrammes), react-window (virtualisation) |
 
 ---
 
@@ -109,10 +109,28 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
 ### 📓 Notebooks RAG (style NotebookLM)
 
 - **Sources multiples** : Upload fichiers (PDF, DOCX, MD, HTML, CSV, JSON, YAML), ingestion d'URLs, texte collé
-- **Recherche hybride** : Embeddings sémantiques (Gemini) + TF-IDF lexical + Reciprocal Rank Fusion + Re-ranking LLM
+- **Recherche hybride** : Embeddings sémantiques (Gemini) + TF-IDF lexical + Reciprocal Rank Fusion + Re-ranking LLM (OpenRouter)
 - **Chat groundé** : Questions/réponses avec citations précises et score de pertinence
 - **Deep Dive** : Mode exploration approfondie multi-étapes
-- **Génération de contenu** : Résumé, FAQ, guide d'étude, briefing, chronologie, plan structuré
+- **Comparaison de sources** : Analyse des similitudes, différences et contradictions entre 2+ sources
+- **Extraction d'insights** : Détection automatique des tendances, connexions cachées et points de vigilance
+- **Sauvegarde en notes** : Enregistrer une réponse du chat directement dans les notes du notebook
+- **Génération de contenu** :
+  - Résumé synthétique
+  - FAQ (15-20 Q&R)
+  - Guide d'étude (concepts, quiz, auto-évaluation)
+  - Briefing exécutif
+  - Chronologie
+  - Plan structuré
+  - Carte mentale (rendu Mermaid visuel)
+  - Analyse SWOT (forces, faiblesses, opportunités, menaces)
+  - Glossaire (termes techniques, acronymes)
+- **Génération en streaming** : Contenu affiché en temps réel pendant la génération
+- **Filtrage de sources** : Sélection des sources spécifiques pour la génération
+- **Instructions personnalisées** : Prompt custom pour guider le style et le focus de la génération
+- **Import au workspace** : Exporter un document généré directement dans le projet (docs/generated/)
+- **Export Markdown** : Télécharger tout document en fichier .md
+- **Régénérer** : Relancer la génération si le résultat ne convient pas
 - **Audio Overview** : Script de podcast IA (deux hôtes discutent de vos sources)
 - **Notes** : Prise de notes avec épinglage et organisation
 
