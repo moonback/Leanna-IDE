@@ -124,27 +124,27 @@ export const sidebarSections: SidebarSectionConfig[] = [
     label: 'Données & Outils',
     items: [
       {
+        id: 'knowledge',
+        type: 'button',
+        icon: Database,
+        label: 'Knowledge System',
+        stateKey: 'showKnowledge',
+        actionKey: 'onToggleKnowledge',
+      },
+      {
+        id: 'notebooks-panel',
+        type: 'button',
+        icon: BookOpen,
+        label: 'Notebooks RAG',
+        stateKey: 'showNotebooks',
+        actionKey: 'onToggleNotebooks',
+      },
+      {
         id: 'tools-menu',
         type: 'submenu',
         icon: Wrench,
-        label: 'Données & Outils',
+        label: 'Autres outils',
         children: [
-          {
-            id: 'knowledge',
-            type: 'button',
-            icon: Database,
-            label: 'Knowledge System',
-            stateKey: 'showKnowledge',
-            actionKey: 'onToggleKnowledge',
-          },
-          {
-            id: 'notebooks-panel',
-            type: 'button',
-            icon: BookOpen,
-            label: 'Notebooks RAG',
-            stateKey: 'showNotebooks',
-            actionKey: 'onToggleNotebooks',
-          },
           {
             id: 'documents',
             type: 'button',
