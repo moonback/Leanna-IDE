@@ -11,7 +11,7 @@ import {
   Send, Loader2, Lightbulb, BookOpen, Trash2, Quote, Telescope, Download,
   MessageCircle, ArrowDown, GitCompare, Zap, StickyNote, Volume2, Square,
   Copy, Check, RefreshCw, Pencil, StopCircle, ThumbsUp, ThumbsDown,
-  Mic, MicOff, Filter, X, MessageSquarePlus, ChevronDown,
+  Filter, X, MessageSquarePlus, ChevronDown,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -361,7 +361,6 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const [feedbackMap, setFeedbackMap] = useState<Record<string, 'up' | 'down'>>({});
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [showSourceFilter, setShowSourceFilter] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [personality, setPersonality] = useState<string>('default');
   const [showPersonalityMenu, setShowPersonalityMenu] = useState(false);
   const [threads, setThreads] = useState<{ id: string; title: string; createdAt: string }[]>([]);
@@ -369,7 +368,6 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const [showThreadList, setShowThreadList] = useState(false);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const recognitionRef = useRef<any>(null);
   const chunkCache = useRef<Map<string, string>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -578,53 +576,6 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       });
     } catch { /* silent */ }
   }, [feedbackMap, notebookId]);
-
-  // ─── Voice Input (Web Speech API) ─────────────────────────────────────────
-
-  const handleVoiceInput = useCallback(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      toastError('La reconnaissance vocale n\'est pas supportée par ce navigateur');
-      return;
-    }
-
-    if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'fr-FR';
-    recognition.continuous = false;
-    recognition.interimResults = true;
-
-    recognition.onresult = (event: any) => {
-      const transcript = Array.from(event.results)
-        .map((result: any) => result[0].transcript)
-        .join('');
-      setInput(transcript);
-      // Auto-resize textarea
-      if (inputRef.current) {
-        inputRef.current.style.height = 'auto';
-        inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + 'px';
-      }
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-      recognitionRef.current = null;
-    };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-      recognitionRef.current = null;
-    };
-
-    recognitionRef.current = recognition;
-    setIsListening(true);
-    recognition.start();
-  }, [isListening, toastError]);
 
   // ─── Source Filter ────────────────────────────────────────────────────────
 
@@ -1802,21 +1753,12 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
           className="relative flex items-end gap-0 rounded-2xl transition-all"
           style={{
             backgroundColor: 'var(--bg-input)',
-            border: isListening ? '1px solid var(--accent-primary)' : '1px solid var(--border-base)',
-            boxShadow: isListening ? '0 0 0 2px var(--accent-subtle)' : '0 1px 4px rgba(0,0,0,0.04)',
+            border: '1px solid var(--border-base)',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
           }}
         >
-          {/* Left actions — voice + filter */}
+          {/* Left actions — filter */}
           <div className="flex items-center gap-0.5 pl-2 py-2 flex-shrink-0">
-            <button
-              onClick={handleVoiceInput}
-              className={`p-2 rounded-lg transition-all active:scale-90 ${isListening ? 'animate-pulse' : ''}`}
-              style={{ color: isListening ? '#ef4444' : 'var(--text-dimmed)' }}
-              title={isListening ? 'Arrêter l\'écoute' : 'Dictée vocale'}
-            >
-              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </button>
-
             {sources.length > 1 && (
               <button
                 onClick={() => setShowSourceFilter(!showSourceFilter)}
@@ -1843,7 +1785,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={isListening ? '🎙️ Parlez maintenant...' : 'Posez une question sur vos sources... (/ pour les commandes)'}
+            placeholder={'Posez une question sur vos sources... (/ pour les commandes)'}
             rows={1}
             className="flex-1 px-3 py-3 bg-transparent text-xs outline-none resize-none placeholder:text-[var(--text-dimmed)]"
             style={{
