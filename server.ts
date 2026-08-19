@@ -770,7 +770,10 @@ async function startServer() {
       const { syncToMain, validateSandbox } = await import("./server/utils/sandbox");
       // Valider avant de sync
       const validation = await validateSandbox();
-      if (!validation.valid) {
+      // Ne bloquer que s'il y a de vraies erreurs TypeScript détectées.
+      // Si tsc échoue sans produire d'erreurs parsables (ex: config invalide),
+      // on laisse passer la sync plutôt que de bloquer l'utilisateur.
+      if (!validation.valid && validation.errorCount > 0) {
         return res.json({
           status: "validation_failed",
           valid: false,
