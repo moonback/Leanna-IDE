@@ -594,8 +594,17 @@ export default function IdeView() {
           if (!showKnowledge) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowNotebooks(false); setShowMemory(false); }
         }}
         onToggleNotebooks={() => {
-          setShowNotebooks(v => !v);
-          if (!showNotebooks) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowMemory(false); }
+          setShowNotebooks(v => {
+            if (!v) {
+              // Ouverture des notebooks → fermer l'explorer automatiquement
+              setShowExplorer(false);
+              setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowMemory(false);
+            } else {
+              // Fermeture des notebooks → réouvrir l'explorer
+              setShowExplorer(true);
+            }
+            return !v;
+          });
         }}
         onToggleDocuments={() => setShowDocuments(v => !v)}
         onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
@@ -765,7 +774,7 @@ export default function IdeView() {
                         </Suspense>
                       ) : showNotebooks ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement des notebooks…</div></div>}>
-                          <NotebooksView onClose={() => setShowNotebooks(false)} />
+                          <NotebooksView onClose={() => { setShowNotebooks(false); setShowExplorer(true); }} />
                         </Suspense>
                       ) : showDocuments ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement…</div></div>}>
@@ -814,6 +823,7 @@ export default function IdeView() {
                                                   onOpenChat={() => setShowChat(true)}
                                                   onOpenNotebooks={() => {
                                                     setShowNotebooks(true);
+                                                    setShowExplorer(false);
                                                     setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false);
                                                   }}
                                                 />
