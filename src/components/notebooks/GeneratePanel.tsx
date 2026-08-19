@@ -55,6 +55,7 @@ const DOC_TYPES = [
   { key: 'infographic', label: 'Infographie', icon: Lightbulb, desc: 'Visuel professionnel généré par IA', color: '#f97316' },
   { key: 'swot', label: 'Analyse SWOT', icon: Target, desc: 'Forces, Faiblesses, Opportunités, Menaces', color: '#14b8a6' },
   { key: 'glossary', label: 'Glossaire', icon: BookOpen, desc: 'Termes techniques définis', color: '#6366f1' },
+  { key: 'roadmap', label: 'Roadmap', icon: Zap, desc: 'Roadmap projet auto-générée (business plan, étude de marché)', color: '#f97316' },
 ];
 
 /** Types de RAPPORTS disponibles dans le modal */

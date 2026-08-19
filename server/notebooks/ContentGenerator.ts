@@ -134,6 +134,10 @@ export class ContentGenerator {
         title = "Infographie";
         // Cas spécial : génération d'image
         return this.generateInfographic(notebookId, sourcesContext, sources, lang, options);
+      case "roadmap":
+        title = `🗺️ Roadmap — ${notebook.title}`;
+        prompt = this.buildRoadmapPrompt(notebook.title, notebook.description, sourcesContext, lang);
+        break;
       default:
         throw new Error(`Type non supporté: ${type}`);
     }
@@ -618,6 +622,65 @@ SOURCES :
 ${context}
 
 Génère le glossaire complet en Markdown.`;
+  }
+
+  private buildRoadmapPrompt(title: string, description: string, sourcesContext: string, lang: string): string {
+    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
+    return `${langInstruction}
+
+Tu es un consultant stratégique expert. On travaille sur un projet avec les informations suivantes :
+
+TITRE DU PROJET : ${title}
+DESCRIPTION : ${description || "(Pas de description fournie)"}
+
+SOURCES DISPONIBLES :
+${sourcesContext}
+
+Génère une **ROADMAP COMPLÈTE** et détaillée pour ce projet, enrichie par les sources. Elle doit inclure :
+
+## Structure attendue :
+
+### 📋 1. Résumé du projet
+- Vision et objectif principal
+- Public cible
+- Proposition de valeur
+
+### 📊 2. Étude de marché
+- Analyse du marché basée sur les sources
+- Segments identifiés
+- Concurrents et positionnement
+- Tendances du secteur
+
+### 💼 3. Business Plan
+- Modèle économique
+- Sources de revenus
+- Structure de coûts
+- Objectifs financiers à 6/12/24 mois
+
+### 🎯 4. Roadmap de développement
+- **Phase 1 — Validation (Mois 1-2)** : Recherche, validation, premiers retours
+- **Phase 2 — MVP (Mois 2-4)** : Produit minimum viable
+- **Phase 3 — Lancement (Mois 4-6)** : Go-to-market, premiers utilisateurs
+- **Phase 4 — Croissance (Mois 6-12)** : Scaling, optimisation
+
+### 📢 5. Stratégie marketing & acquisition
+- Canaux recommandés
+- Actions prioritaires
+- Budget indicatif
+
+### ⚠️ 6. Risques et points d'attention
+- Risques principaux
+- Hypothèses à valider
+- Plans de contingence
+
+### ✅ 7. Prochaines actions immédiates
+- 5-10 actions concrètes priorisées par impact
+
+RÈGLES :
+- Adapte au contexte du projet
+- Sois concret et actionnable
+- Format Markdown riche avec emojis
+- Vise 1500-2500 mots`;
   }
 
   private buildFullReportPrompt(context: string, lang: string): string {
@@ -1213,6 +1276,106 @@ Génère entre 3 et 5 suggestions, triées par pertinence décroissante.`;
     }
 
     return suggestions.slice(0, 5);
+  }
+
+  // ─── Roadmap automatique à la création ───────────────────────────────────
+
+  /**
+   * Génère une roadmap complète pour un notebook nouvellement créé,
+   * basée uniquement sur le titre et la description du projet.
+   * Inclut : étapes clés, business plan, étude de marché, etc.
+   */
+  async generateRoadmap(
+    notebookId: string,
+    title: string,
+    description: string
+  ): Promise<GeneratedDocument | null> {
+    try {
+      const prompt = `Tu es un consultant stratégique expert. On vient de créer un nouveau projet/notebook avec les informations suivantes :
+
+TITRE DU PROJET : ${title}
+DESCRIPTION : ${description || "(Pas de description fournie)"}
+
+Génère une **ROADMAP COMPLÈTE** et détaillée pour ce projet. Cette roadmap doit servir de guide structuré pour avancer étape par étape. Elle doit inclure :
+
+## Structure attendue :
+
+### 📋 1. Résumé du projet
+- Vision et objectif principal
+- Public cible
+- Proposition de valeur
+
+### 📊 2. Étude de marché (à compléter)
+- Questions clés à explorer
+- Segments à analyser
+- Concurrents à identifier
+- Tendances du secteur à surveiller
+
+### 💼 3. Business Plan (grandes lignes)
+- Modèle économique envisagé
+- Sources de revenus potentielles
+- Structure de coûts prévisionnelle
+- Objectifs financiers à 6/12/24 mois
+
+### 🎯 4. Roadmap de développement
+- **Phase 1 — Validation (Mois 1-2)** : Recherche, validation de l'idée, premiers retours
+- **Phase 2 — MVP (Mois 2-4)** : Développement du produit minimum viable
+- **Phase 3 — Lancement (Mois 4-6)** : Go-to-market, premiers utilisateurs
+- **Phase 4 — Croissance (Mois 6-12)** : Scaling, optimisation, expansion
+
+### 📢 5. Stratégie marketing & acquisition
+- Canaux recommandés
+- Actions prioritaires
+- Budget indicatif
+
+### ⚠️ 6. Risques et points d'attention
+- Risques principaux identifiés
+- Hypothèses à valider en priorité
+- Plan B envisageable
+
+### ✅ 7. Prochaines actions immédiates
+- Liste de 5-10 actions concrètes à faire dès maintenant
+- Priorisées par impact
+
+---
+
+⚡ **NOTE** : Cette roadmap a été auto-générée par l'IA à la création du notebook. Ajoutez des sources (PDF, URLs, documents) au notebook pour affiner et enrichir cette roadmap avec des données réelles de votre marché.
+
+RÈGLES :
+- Adapte la roadmap au contexte du projet (tech, service, produit physique, etc.)
+- Sois concret et actionnable, pas générique
+- Utilise le titre et la description pour personnaliser chaque section
+- Réponds en français
+- Format Markdown riche avec emojis pour la lisibilité
+- Vise 1500-2500 mots`;
+
+      log.info(`🗺️ Génération roadmap automatique pour "${title}" (notebook: ${notebookId})`);
+
+      const { generateText } = await import("../utils/textGeneration");
+      const result = await generateText({
+        prompt,
+        temperature: 0.6,
+        maxOutputTokens: 8192,
+      });
+
+      const doc: GeneratedDocument = {
+        id: randomUUID(),
+        notebookId,
+        type: "roadmap" as GeneratedDocType,
+        title: `🗺️ Roadmap — ${title}`,
+        content: result.text,
+        sourceIds: [],
+        createdAt: new Date().toISOString(),
+      };
+
+      notebookManager.addGeneratedDocument(notebookId, doc);
+      log.info(`✅ Roadmap auto-générée pour "${title}" (${result.text.length} chars)`);
+
+      return doc;
+    } catch (e: any) {
+      log.error(`❌ Erreur génération roadmap pour "${title}": ${e.message}`);
+      return null;
+    }
   }
 }
 

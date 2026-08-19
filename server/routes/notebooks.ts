@@ -74,6 +74,10 @@ export function createNotebooksRouter(): Router {
         return;
       }
       const notebook = notebookManager.createNotebook(title.trim(), description || "");
+
+      // Lancer la génération automatique de la roadmap IA en arrière-plan
+      contentGenerator.generateRoadmap(notebook.id, title.trim(), description || "").catch(() => {});
+
       res.json({ status: "success", notebook });
     } catch (e: any) {
       res.status(500).json({ error: e.message });

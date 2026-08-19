@@ -56,6 +56,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortBy>('updatedAt');
   const [sortDesc, setSortDesc] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const loadNotebooks = useCallback(async () => {
     setLoading(true);
@@ -125,18 +126,24 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
     }
   }, [newTitle, newDescription, success, toastError, loadNotebooks]);
 
-  const handleDelete = useCallback(async (id: string, e: React.MouseEvent) => {
+  const handleDeleteClick = useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Supprimer ce notebook et toutes ses sources ?')) return;
+    setDeleteTarget(id);
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return;
     try {
-      const res = await fetch(`/api/notebooks/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/notebooks/${deleteTarget}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       success('Notebook supprimé');
-      setNotebooks(prev => prev.filter(n => n.id !== id));
+      setNotebooks(prev => prev.filter(n => n.id !== deleteTarget));
     } catch {
       toastError('Impossible de supprimer');
+    } finally {
+      setDeleteTarget(null);
     }
-  }, [success, toastError]);
+  }, [deleteTarget, success, toastError]);
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
@@ -434,7 +441,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                       )}
                     </div>
                     <button
-                      onClick={(e) => handleDelete(nb.id, e)}
+                      onClick={(e) => handleDeleteClick(nb.id, e)}
                       className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/10"
                       title="Supprimer"
                     >
@@ -507,7 +514,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                     </span>
                   </div>
                   <button
-                    onClick={(e) => handleDelete(nb.id, e)}
+                    onClick={(e) => handleDeleteClick(nb.id, e)}
                     className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/10"
                   >
                     <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
@@ -518,6 +525,68 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
           </div>
         )}
       </div>
+
+      {/* Modal de confirmation de suppression */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setDeleteTarget(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 10 }}
+              transition={{ duration: 0.2 }}
+              onClick={e => e.stopPropagation()}
+              className="w-full max-w-sm rounded-2xl border p-6 shadow-2xl"
+              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: 'rgba(239,68,68,0.1)' }}
+                >
+                  <Trash2 className="w-5 h-5" style={{ color: 'var(--color-error)' }} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Supprimer le notebook
+                  </p>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    Cette action est irréversible
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs leading-relaxed mb-5" style={{ color: 'var(--text-muted)' }}>
+                Supprimer ce notebook et toutes ses sources ? Les données ne pourront pas être récupérées.
+              </p>
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-white/5"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 hover:opacity-90"
+                  style={{ backgroundColor: 'var(--color-error, #ef4444)', color: '#fff' }}
+                >
+                  Supprimer
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
