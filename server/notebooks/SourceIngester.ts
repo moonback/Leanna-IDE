@@ -57,10 +57,19 @@ export class SourceIngester {
 
     let rawText = "";
     let sourceType: SourceType = "text";
+    let imageBase64: string | undefined;
+    let imageMimeType: string | undefined;
+    let rawHtml: string | undefined;
 
     if (mimeType === "application/pdf") {
       rawText = await this.extractPDF(buffer);
       sourceType = "pdf";
+    } else if (mimeType.startsWith("image/")) {
+      // Image file — store as base64 and attempt vision-based description
+      sourceType = "image";
+      imageBase64 = buffer.toString("base64");
+      imageMimeType = mimeType;
+      rawText = await this.describeImage(buffer, mimeType, filename);
     } else if (mimeType === "text/plain") {
       rawText = buffer.toString("utf-8");
       sourceType = "text";
@@ -68,7 +77,8 @@ export class SourceIngester {
       rawText = buffer.toString("utf-8");
       sourceType = "markdown";
     } else if (mimeType === "text/html") {
-      rawText = this.stripHTML(buffer.toString("utf-8"));
+      rawHtml = buffer.toString("utf-8");
+      rawText = this.stripHTML(rawHtml);
       sourceType = "html";
     } else {
       // Essayer de lire comme texte
@@ -80,7 +90,20 @@ export class SourceIngester {
       throw new Error("Impossible d'extraire du texte depuis ce fichier.");
     }
 
-    return this.buildSource(rawText, filename, sourceType, filename, notebookId);
+    const source = await this.buildSource(rawText, filename, sourceType, filename, notebookId);
+
+    // Attach image data to the source for rendering in the viewer
+    if (imageBase64 && imageMimeType) {
+      (source as any).imageBase64 = imageBase64;
+      (source as any).imageMimeType = imageMimeType;
+    }
+
+    // Attach raw HTML for visual rendering in the viewer
+    if (rawHtml) {
+      source.rawHtml = rawHtml;
+    }
+
+    return source;
   }
 
   // ─── Ingestion depuis une URL ────────────────────────────────────────────
@@ -576,6 +599,48 @@ export class SourceIngester {
       return overlap.slice(-300);
     }
     return overlap;
+  }
+
+  // ─── Description d'image via Vision API ─────────────────────────────────
+
+  private async describeImage(buffer: Buffer, mimeType: string, filename: string): Promise<string> {
+    const base64 = buffer.toString("base64");
+    const sizeKB = Math.round(buffer.length / 1024);
+
+    const prompt = `Décris cette image en détail. Extrais tout le texte visible (OCR) et décris les éléments visuels importants (graphiques, diagrammes, photos, etc.).
+
+Réponds en structurant ainsi :
+1. **Description générale** : Ce que montre l'image (1-2 phrases)
+2. **Texte visible** : Tout texte lisible dans l'image (fidèlement reproduit)
+3. **Éléments visuels** : Couleurs, formes, diagrammes, graphiques, logos, personnes, etc.
+4. **Contexte probable** : À quoi sert cette image (documentation, screenshot, schéma, photo, etc.)
+
+Sois exhaustif et précis sur le texte visible.`;
+
+    try {
+      // Use geminiParts for multimodal Gemini call (vision)
+      const result = await generateText({
+        prompt,
+        temperature: 0.2,
+        maxOutputTokens: 2048,
+        geminiParts: [
+          { text: prompt },
+          { inlineData: { mimeType, data: base64 } },
+        ],
+        forceProvider: "gemini",
+      });
+
+      const description = result.text.trim();
+      if (description) {
+        log.info(`🖼️ Image décrite avec succès: "${filename}" (${sizeKB} KB)`);
+        return `[Image: ${filename} — ${sizeKB} KB]\n\n${description}`;
+      }
+    } catch (e: any) {
+      log.warn(`⚠️ Vision API indisponible pour "${filename}": ${e.message}`);
+    }
+
+    // Fallback: description basique sans vision
+    return `[Image: ${filename}]\nType: ${mimeType}\nTaille: ${sizeKB} KB\n\nImage importée. L'analyse visuelle n'a pas pu être effectuée (API Vision non disponible ou erreur). L'image est consultable dans la visionneuse de sources.`;
   }
 
   // ─── Extraction PDF ──────────────────────────────────────────────────────

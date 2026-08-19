@@ -7,7 +7,7 @@
 
 // ─── Source (document ingéré dans un notebook) ───────────────────────────────
 
-export type SourceType = 'pdf' | 'text' | 'markdown' | 'url' | 'audio' | 'youtube' | 'docx' | 'html';
+export type SourceType = 'pdf' | 'text' | 'markdown' | 'url' | 'audio' | 'youtube' | 'docx' | 'html' | 'image';
 
 export interface SourceChunk {
   id: string;
@@ -35,6 +35,8 @@ export interface Source {
   origin: string;
   /** Texte brut extrait */
   rawText: string;
+  /** HTML brut original (pour sources HTML uniquement) */
+  rawHtml?: string;
   /** Résumé automatique généré */
   summary: string;
   /** Mots-clés extraits */

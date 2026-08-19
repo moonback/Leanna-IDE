@@ -26,18 +26,21 @@ interface Props {
 
 const TYPE_ICONS: Record<string, string> = {
   pdf: '📕', text: '📄', markdown: '📝', url: '🌐',
-  html: '🌍', youtube: '📺', audio: '🎵', docx: '📘',
+  html: '🌍', youtube: '📺', audio: '🎵', docx: '📘', image: '🖼️',
 };
 
 const TYPE_COLORS: Record<string, string> = {
   pdf: '#ef4444', text: '#6b7280', markdown: '#8b5cf6', url: '#3b82f6',
-  html: '#06b6d4', youtube: '#ef4444', audio: '#f59e0b', docx: '#2563eb',
+  html: '#06b6d4', youtube: '#ef4444', audio: '#f59e0b', docx: '#2563eb', image: '#10b981',
 };
 
 export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imageData, setImageData] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [htmlData, setHtmlData] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'visual' | 'text'>('visual');
 
   const fetchContent = useCallback(async () => {
     setLoading(true);
@@ -47,6 +50,17 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
       if (!res.ok) throw new Error('Impossible de charger le contenu');
       const data = await res.json();
       setContent(data.content || data.text || 'Contenu non disponible');
+      // If it's an image source, store the image data
+      if (data.type === 'image' && data.imageBase64) {
+        setImageData({ base64: data.imageBase64, mimeType: data.imageMimeType || 'image/png' });
+        setHtmlData(null);
+      } else if (data.type === 'html' && data.rawHtml) {
+        setHtmlData(data.rawHtml);
+        setImageData(null);
+      } else {
+        setImageData(null);
+        setHtmlData(null);
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -110,6 +124,31 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Toggle view mode for HTML sources */}
+          {htmlData && (
+            <div className="flex items-center rounded-lg overflow-hidden border mr-2" style={{ borderColor: 'var(--border-base)' }}>
+              <button
+                onClick={() => setViewMode('visual')}
+                className="px-2.5 py-1.5 text-[10px] font-semibold transition-colors"
+                style={{
+                  backgroundColor: viewMode === 'visual' ? 'var(--accent-primary)' : 'transparent',
+                  color: viewMode === 'visual' ? '#fff' : 'var(--text-muted)',
+                }}
+              >
+                🌍 Visuel
+              </button>
+              <button
+                onClick={() => setViewMode('text')}
+                className="px-2.5 py-1.5 text-[10px] font-semibold transition-colors"
+                style={{
+                  backgroundColor: viewMode === 'text' ? 'var(--accent-primary)' : 'transparent',
+                  color: viewMode === 'text' ? '#fff' : 'var(--text-muted)',
+                }}
+              >
+                📄 Texte
+              </button>
+            </div>
+          )}
           <button
             onClick={fetchContent}
             className="p-2 rounded-lg transition-colors hover:bg-white/5"
@@ -161,6 +200,73 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
             >
               Réessayer
             </button>
+          </div>
+        ) : imageData ? (
+          <div className="space-y-4">
+            {/* Image display */}
+            <div
+              className="rounded-2xl overflow-hidden border shadow-sm"
+              style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+            >
+              <img
+                src={`data:${imageData.mimeType};base64,${imageData.base64}`}
+                alt={source?.title || 'Image source'}
+                className="w-full h-auto"
+                style={{ maxHeight: '600px', objectFit: 'contain' }}
+              />
+            </div>
+
+            {/* Download button */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = `data:${imageData.mimeType};base64,${imageData.base64}`;
+                  link.download = source?.title || 'image.png';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95"
+                style={{
+                  backgroundColor: '#10b98120',
+                  color: '#10b981',
+                  border: '1px solid #10b98140',
+                }}
+              >
+                📥 Télécharger l'image
+              </button>
+            </div>
+
+            {/* AI description */}
+            {content && (
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-dimmed)' }}>
+                  🤖 Description IA
+                </p>
+                <div
+                  className="prose prose-sm max-w-none text-[13px] leading-relaxed whitespace-pre-wrap p-4 rounded-xl border"
+                  style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)' }}
+                >
+                  {content}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : htmlData && viewMode === 'visual' ? (
+          <div className="h-full flex flex-col gap-3">
+            <div
+              className="flex-1 rounded-2xl overflow-hidden border shadow-sm"
+              style={{ borderColor: 'var(--border-base)', backgroundColor: '#fff' }}
+            >
+              <iframe
+                srcDoc={htmlData}
+                title={source?.title || 'HTML source'}
+                className="w-full h-full border-0"
+                sandbox="allow-same-origin"
+                style={{ minHeight: '500px' }}
+              />
+            </div>
           </div>
         ) : (
           <div

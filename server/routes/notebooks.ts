@@ -22,10 +22,11 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
   fileFilter: (_req, file, cb) => {
-    const allowed = /\.(pdf|txt|md|html|docx|doc|rtf|csv|json|yaml|yml)$/i;
+    const allowed = /\.(pdf|txt|md|html|docx|doc|rtf|csv|json|yaml|yml|png|jpg|jpeg|gif|webp|bmp|svg)$/i;
     if (
       file.originalname.match(allowed) ||
       file.mimetype.startsWith("text/") ||
+      file.mimetype.startsWith("image/") ||
       file.mimetype === "application/pdf" ||
       file.mimetype === "application/json"
     ) {
@@ -454,6 +455,28 @@ export function createNotebooksRouter(): Router {
         res.status(404).json({ error: "Source introuvable." });
         return;
       }
+      // For image sources, return both the description text and the image data
+      if (source.type === "image") {
+        const imageBase64 = (source as any).imageBase64 || "";
+        const imageMimeType = (source as any).imageMimeType || "image/png";
+        const content = source.rawText
+          || (source.chunks && source.chunks.length > 0
+            ? source.chunks.sort((a, b) => a.index - b.index).map(c => c.content).join("\n\n")
+            : source.summary || "Contenu non disponible.");
+        res.json({ status: "success", content, type: "image", imageBase64, imageMimeType });
+        return;
+      }
+
+      // For HTML sources, return both stripped text and raw HTML for visual rendering
+      if (source.type === "html" && (source as any).rawHtml) {
+        const content = source.rawText
+          || (source.chunks && source.chunks.length > 0
+            ? source.chunks.sort((a, b) => a.index - b.index).map(c => c.content).join("\n\n")
+            : source.summary || "Contenu non disponible.");
+        res.json({ status: "success", content, type: "html", rawHtml: (source as any).rawHtml });
+        return;
+      }
+
       // Return the raw content (stored in source or reconstructed from chunks)
       const content = source.rawText
         || (source.chunks && source.chunks.length > 0

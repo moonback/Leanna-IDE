@@ -48,15 +48,15 @@ interface UploadFileStatus {
 
 const TYPE_ICONS: Record<string, string> = {
   pdf: '📕', text: '📄', markdown: '📝', url: '🌐',
-  html: '🌍', youtube: '📺', audio: '🎵', docx: '📘',
+  html: '🌍', youtube: '📺', audio: '🎵', docx: '📘', image: '🖼️',
 };
 
 const TYPE_COLORS: Record<string, string> = {
   pdf: '#ef4444', text: '#6b7280', markdown: '#8b5cf6', url: '#3b82f6',
-  html: '#06b6d4', youtube: '#ef4444', audio: '#f59e0b', docx: '#2563eb',
+  html: '#06b6d4', youtube: '#ef4444', audio: '#f59e0b', docx: '#2563eb', image: '#10b981',
 };
 
-const ACCEPTED_EXTENSIONS = '.pdf,.txt,.md,.html,.docx,.doc,.rtf,.csv,.json,.yaml,.yml';
+const ACCEPTED_EXTENSIONS = '.pdf,.txt,.md,.html,.docx,.doc,.rtf,.csv,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg';
 
 export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, compact = false, onSelectSource, selectedSourceId }: Props) {
   const { success, error: toastError } = useToast();
@@ -366,14 +366,24 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
           ) : (
             <div className="space-y-1">
               {filteredSources.map((source) => (
-                <button key={source.id} type="button" onClick={() => onSelectSource?.(source.id)} className="notebook-source-row group w-full text-left" data-active={selectedSourceId === source.id}>
-                  <span className="notebook-source-icon" style={{ color: TYPE_COLORS[source.type] || 'var(--text-muted)' }}>{TYPE_ICONS[source.type] || '📎'}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-[var(--text-primary)]">{source.title}</span>
-                    <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{source.wordCount?.toLocaleString()} Mots · {source.chunksCount} passages</span>
-                  </span>
-                  <span className="h-2 w-2 rounded-full bg-[var(--accent-primary)] opacity-0 transition-opacity group-data-[active=true]:opacity-100" />
-                </button>
+                <div key={source.id} className="notebook-source-row group w-full flex items-center" data-active={selectedSourceId === source.id}>
+                  <button type="button" onClick={() => onSelectSource?.(source.id)} className="flex items-center gap-2 flex-1 min-w-0 text-left py-0">
+                    <span className="notebook-source-icon" style={{ color: TYPE_COLORS[source.type] || 'var(--text-muted)' }}>{TYPE_ICONS[source.type] || '📎'}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-[var(--text-primary)]">{source.title}</span>
+                      <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{source.wordCount?.toLocaleString()} Mots · {source.chunksCount} passages</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(source.id); }}
+                    className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 flex-shrink-0"
+                    title="Supprimer cette source"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                  </button>
+                  <span className="h-2 w-2 rounded-full bg-[var(--accent-primary)] opacity-0 transition-opacity group-data-[active=true]:opacity-100 flex-shrink-0" />
+                </div>
               ))}
             </div>
           )}
@@ -413,7 +423,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
               Déposez vos fichiers ici
             </p>
             <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              PDF, texte, Markdown, HTML, DOCX, CSV, JSON, YAML
+              PDF, texte, Markdown, HTML, DOCX, CSV, JSON, YAML, Images (PNG, JPG, WebP)
             </p>
           </motion.div>
         )}
