@@ -455,7 +455,10 @@ export function createNotebooksRouter(): Router {
         return;
       }
       // Return the raw content (stored in source or reconstructed from chunks)
-      const content = (source as any).rawContent || source.summary || "Contenu non disponible en aperÃ§u.";
+      const content = source.rawText
+        || (source.chunks && source.chunks.length > 0
+          ? source.chunks.sort((a, b) => a.index - b.index).map(c => c.content).join("\n\n")
+          : source.summary || "Contenu non disponible.");
       res.json({ status: "success", content });
     } catch (e: any) {
       res.status(500).json({ error: e.message });

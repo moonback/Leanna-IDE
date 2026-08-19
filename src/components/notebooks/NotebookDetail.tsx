@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { SourcePanel } from './SourcePanel';
+import { SourceViewer } from './SourceViewer';
 import { NotebookChat } from './NotebookChat';
 import { NotesPanel } from './NotesPanel';
 import { GeneratePanel } from './GeneratePanel';
@@ -51,6 +52,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [splitView, setSplitView] = useState(false);
   const [splitTab, setSplitTab] = useState<Tab>('chat');
   const [indexingProgress, setIndexingProgress] = useState<{ total: number; done: number; active: boolean }>({ total: 0, done: 0, active: false });
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const tabsRef = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   const loadNotebook = useCallback(async () => {
@@ -287,23 +289,41 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
       <div className="notebook-shell flex-1 overflow-hidden">
         <aside className="notebook-source-rail hidden min-w-0 lg:flex">
-          <SourcePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onUploadProgress={setIndexingProgress} compact />
+          <SourcePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onUploadProgress={setIndexingProgress} compact onSelectSource={(id) => setSelectedSourceId(id === selectedSourceId ? null : id)} selectedSourceId={selectedSourceId} />
         </aside>
 
         <main className="notebook-main min-w-0">
           <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-              className="h-full"
-            >
-              {activeTab === 'sources' ? (
-                <SourcePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onUploadProgress={setIndexingProgress} />
-              ) : renderTabContent(activeTab)}
-            </motion.div>
+            {selectedSourceId ? (
+              <motion.div
+                key={`source-viewer-${selectedSourceId}`}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+                className="h-full"
+              >
+                <SourceViewer
+                  notebookId={notebookId}
+                  sourceId={selectedSourceId}
+                  source={notebook.sources.find((s: any) => s.id === selectedSourceId)}
+                  onClose={() => setSelectedSourceId(null)}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+                className="h-full"
+              >
+                {activeTab === 'sources' ? (
+                  <SourcePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onUploadProgress={setIndexingProgress} />
+                ) : renderTabContent(activeTab)}
+              </motion.div>
+            )}
           </AnimatePresence>
         </main>
 

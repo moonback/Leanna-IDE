@@ -34,6 +34,10 @@ interface Props {
   /** Reports upload progress to parent (total files, completed count, active boolean) */
   onUploadProgress?: (state: { total: number; done: number; active: boolean }) => void;
   compact?: boolean;
+  /** Called when a source is clicked in compact mode — opens it in the main panel */
+  onSelectSource?: (sourceId: string) => void;
+  /** Currently selected source ID (for highlighting in compact mode) */
+  selectedSourceId?: string | null;
 }
 
 interface UploadFileStatus {
@@ -54,7 +58,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 const ACCEPTED_EXTENSIONS = '.pdf,.txt,.md,.html,.docx,.doc,.rtf,.csv,.json,.yaml,.yml';
 
-export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, compact = false }: Props) {
+export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, compact = false, onSelectSource, selectedSourceId }: Props) {
   const { success, error: toastError } = useToast();
   const [uploading, setUploading] = useState(false);
   const [showUrlForm, setShowUrlForm] = useState(false);
@@ -340,33 +344,33 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
           </div>
           <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="notebook-primary-small">
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            Add
+            Ajouter
           </button>
           <input ref={fileInputRef} type="file" accept={ACCEPTED_EXTENSIONS} multiple onChange={handleFileInputChange} className="hidden" />
         </div>
         <div className="px-4 pb-3">
           <div className="notebook-search-field">
             <Search className="h-4 w-4" />
-            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search sources" />
+            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Rechercher dans les sources" />
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-2 pb-4">
           {sources.length === 0 ? (
             <div className="mx-3 mt-8 rounded-[var(--notebook-radius-lg)] bg-[var(--notebook-surface)] p-5 text-center">
               <FileText className="mx-auto mb-3 h-6 w-6 text-[var(--accent-primary)]" />
-              <p className="text-sm font-medium text-[var(--text-primary)]">No sources yet</p>
-              <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">Add PDFs, websites, documents or text to build this notebook.</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">Aucune source pour le moment</p>
+              <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">Ajoutez des PDF, des sites web, des documents ou du texte pour constituer ce carnet.</p>
             </div>
           ) : filteredSources.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">No source matches your search.</p>
+            <p className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">Aucune source ne correspond à votre recherche.</p>
           ) : (
             <div className="space-y-1">
               {filteredSources.map((source) => (
-                <button key={source.id} type="button" onClick={() => handleTogglePreview(source.id)} className="notebook-source-row group w-full text-left" data-active={expandedSource === source.id}>
+                <button key={source.id} type="button" onClick={() => onSelectSource?.(source.id)} className="notebook-source-row group w-full text-left" data-active={selectedSourceId === source.id}>
                   <span className="notebook-source-icon" style={{ color: TYPE_COLORS[source.type] || 'var(--text-muted)' }}>{TYPE_ICONS[source.type] || '📎'}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-[var(--text-primary)]">{source.title}</span>
-                    <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{source.wordCount?.toLocaleString()} words · {source.chunksCount} passages</span>
+                    <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{source.wordCount?.toLocaleString()} Mots · {source.chunksCount} passages</span>
                   </span>
                   <span className="h-2 w-2 rounded-full bg-[var(--accent-primary)] opacity-0 transition-opacity group-data-[active=true]:opacity-100" />
                 </button>
