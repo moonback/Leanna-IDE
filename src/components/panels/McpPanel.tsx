@@ -94,6 +94,8 @@ export function McpPanel() {
   const [form, setForm] = useState<NewServerForm>(EMPTY_FORM);
   const [expandedServers, setExpandedServers] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
+  const [jsonMode, setJsonMode] = useState(false);
+  const [jsonInput, setJsonInput] = useState('');
   const [activeTab, setActiveTab] = useState<TabId>('servers');
   const [metrics, setMetrics] = useState<McpMetric[]>([]);
   const [metricsSummary, setMetricsSummary] = useState<McpMetricsSummary>({});
@@ -246,6 +248,117 @@ export function McpPanel() {
     }
   };
 
+  const handleAddFromJson = async () => {
+    const raw = jsonInput.trim();
+    if (!raw) {
+      setError('Collez un JSON de configuration MCP');
+      return;
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      setError('JSON invalide — vérifiez la syntaxe');
+      return;
+    }
+
+    // Support both formats:
+    // 1. { "mcpServers": { "id": { ... } } }
+    // 2. { "id": { "command": ..., "args": [...] } }
+    let serversObj: Record<string, any> = {};
+
+    if (parsed.mcpServers && typeof parsed.mcpServers === 'object') {
+      serversObj = parsed.mcpServers;
+    } else if (parsed.command || parsed.url || parsed.args) {
+      // Single server without ID wrapper — ask for an id
+      setError('JSON d\'un seul serveur détecté — enveloppez-le : { "mon-serveur": { ... } }');
+      return;
+    } else {
+      // Assume it's { "id": { config } } format
+      const keys = Object.keys(parsed);
+      if (keys.length === 0) {
+        setError('Aucun serveur trouvé dans le JSON');
+        return;
+      }
+      // Validate at least one looks like a server config
+      const first = parsed[keys[0]];
+      if (typeof first === 'object' && (first.command || first.url || first.args)) {
+        serversObj = parsed;
+      } else {
+        setError('Format non reconnu — attendu : { "mcpServers": { ... } } ou { "id": { "command": ... } }');
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    let addedCount = 0;
+    let lastError: string | null = null;
+
+    for (const [id, config] of Object.entries(serversObj)) {
+      if (typeof config !== 'object' || config === null) continue;
+
+      const cfg = config as any;
+      const isDisabled = cfg.disabled === true;
+      const transport = cfg.url ? 'sse' : 'stdio';
+
+      const body: any = {
+        id: id.trim().replace(/\s+/g, '-').toLowerCase(),
+        name: cfg.name || id,
+        transport,
+      };
+
+      if (transport === 'stdio') {
+        body.command = cfg.command || '';
+        body.args = Array.isArray(cfg.args) ? cfg.args : [];
+      } else {
+        body.url = cfg.url || '';
+      }
+
+      if (cfg.env && typeof cfg.env === 'object') {
+        body.env = cfg.env;
+      }
+
+      if (cfg.description) body.description = cfg.description;
+      if (cfg.timeout) body.timeout = cfg.timeout;
+      if (cfg.maxRetries !== undefined) body.maxRetries = cfg.maxRetries;
+      if (isDisabled) body.disabled = true;
+      if (cfg.autoApprove) body.autoApprove = cfg.autoApprove;
+
+      try {
+        const res = await fetch(`${apiBase}/servers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Jarvis-Token': localStorage.getItem('jarvis_api_token') || '' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (data.error) {
+          lastError = `${id}: ${data.error}`;
+        } else {
+          addedCount++;
+        }
+      } catch (e: any) {
+        lastError = `${id}: ${e.message}`;
+      }
+    }
+
+    setSubmitting(false);
+
+    if (addedCount > 0) {
+      setJsonInput('');
+      setShowAddForm(false);
+      setJsonMode(false);
+      fetchServers();
+    }
+
+    if (lastError) {
+      setError(addedCount > 0
+        ? `${addedCount} ajouté(s), erreur: ${lastError}`
+        : lastError
+      );
+    }
+  };
+
   const statusIcon = (status: McpServer['status']) => {
     switch (status) {
       case 'ready': return <CheckCircle2 size={13} style={{ color: theme.success }} />;
@@ -370,138 +483,216 @@ export function McpPanel() {
       {/* ── Add Server Form ── */}
       <AnimatePresence>
         {showAddForm && (
-          <motion.form
+          <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
             style={{ borderBottom: `1px solid ${theme.border}` }}
-            onSubmit={handleAdd}
           >
             <div className="p-4 space-y-2.5">
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  style={inputStyle}
-                  placeholder="id (ex: my-server)"
-                  value={form.id}
-                  onChange={e => setForm({ ...form, id: e.target.value })}
-                  required
-                />
-                <input
-                  style={inputStyle}
-                  placeholder="Nom affiché"
-                  value={form.name}
-                  onChange={e => setForm({ ...form, name: e.target.value })}
-                  required
-                />
+              {/* ── Mode toggle: Formulaire / JSON ── */}
+              <div className="flex items-center gap-2" style={{ fontSize: 10, color: theme.textFaint }}>
+                <button
+                  type="button"
+                  onClick={() => setJsonMode(false)}
+                  style={{
+                    fontSize: 10,
+                    fontWeight: !jsonMode ? 600 : 400,
+                    color: !jsonMode ? theme.accent : theme.textFaint,
+                    background: !jsonMode ? theme.accentDim : 'none',
+                    border: `1px solid ${!jsonMode ? theme.accent : theme.border}`,
+                    borderRadius: 3,
+                    padding: '3px 8px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  formulaire
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setJsonMode(true)}
+                  style={{
+                    fontSize: 10,
+                    fontWeight: jsonMode ? 600 : 400,
+                    color: jsonMode ? theme.accent : theme.textFaint,
+                    background: jsonMode ? theme.accentDim : 'none',
+                    border: `1px solid ${jsonMode ? theme.accent : theme.border}`,
+                    borderRadius: 3,
+                    padding: '3px 8px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  coller JSON
+                </button>
               </div>
 
-              <div className="flex gap-4" style={{ fontSize: 11, color: theme.textDim }}>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio" name="transport" value="stdio"
-                    checked={form.transport === 'stdio'}
-                    onChange={() => setForm({ ...form, transport: 'stdio' })}
-                    style={{ accentColor: theme.accent }}
-                  />
-                  <Terminal size={11} /> stdio
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio" name="transport" value="sse"
-                    checked={form.transport === 'sse'}
-                    onChange={() => setForm({ ...form, transport: 'sse' })}
-                    style={{ accentColor: theme.accent }}
-                  />
-                  <Globe size={11} /> sse
-                </label>
-              </div>
-
-              {form.transport === 'stdio' ? (
+              {jsonMode ? (
+                /* ── JSON paste mode ── */
                 <>
-                  <input
-                    style={inputStyle}
-                    placeholder="commande (uvx, npx, node...)"
-                    value={form.command}
-                    onChange={e => setForm({ ...form, command: e.target.value })}
-                    required
+                  <textarea
+                    style={{
+                      ...inputStyle,
+                      minHeight: 140,
+                      resize: 'vertical',
+                      lineHeight: 1.4,
+                    }}
+                    placeholder={`Collez votre JSON MCP ici, ex:\n{\n  "mcpServers": {\n    "mon-serveur": {\n      "command": "uvx",\n      "args": ["package@latest"],\n      "env": { "KEY": "val" }\n    }\n  }\n}`}
+                    value={jsonInput}
+                    onChange={e => setJsonInput(e.target.value)}
+                    spellCheck={false}
                   />
-                  <input
-                    style={inputStyle}
-                    placeholder="arguments (séparés par espaces)"
-                    value={form.args}
-                    onChange={e => setForm({ ...form, args: e.target.value })}
-                  />
+                  <p style={{ fontSize: 10, color: theme.textGhost, lineHeight: 1.4 }}>
+                    Formats acceptés : <code style={{ color: theme.textFaint }}>{'{ "mcpServers": { ... } }'}</code> ou <code style={{ color: theme.textFaint }}>{'{ "id": { "command": ... } }'}</code>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleAddFromJson}
+                    disabled={submitting}
+                    className="w-full rounded disabled:opacity-50"
+                    style={{
+                      padding: '7px 0',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      letterSpacing: 0.5,
+                      backgroundColor: theme.accent,
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 3,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {submitting ? 'import...' : 'importer depuis JSON'}
+                  </button>
                 </>
               ) : (
-                <input
-                  style={inputStyle}
-                  placeholder="url endpoint SSE"
-                  value={form.url}
-                  onChange={e => setForm({ ...form, url: e.target.value })}
-                  required
-                />
+                /* ── Classic form mode ── */
+                <form onSubmit={handleAdd} className="space-y-2.5">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      style={inputStyle}
+                      placeholder="id (ex: my-server)"
+                      value={form.id}
+                      onChange={e => setForm({ ...form, id: e.target.value })}
+                      required
+                    />
+                    <input
+                      style={inputStyle}
+                      placeholder="Nom affiché"
+                      value={form.name}
+                      onChange={e => setForm({ ...form, name: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="flex gap-4" style={{ fontSize: 11, color: theme.textDim }}>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio" name="transport" value="stdio"
+                        checked={form.transport === 'stdio'}
+                        onChange={() => setForm({ ...form, transport: 'stdio' })}
+                        style={{ accentColor: theme.accent }}
+                      />
+                      <Terminal size={11} /> stdio
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio" name="transport" value="sse"
+                        checked={form.transport === 'sse'}
+                        onChange={() => setForm({ ...form, transport: 'sse' })}
+                        style={{ accentColor: theme.accent }}
+                      />
+                      <Globe size={11} /> sse
+                    </label>
+                  </div>
+
+                  {form.transport === 'stdio' ? (
+                    <>
+                      <input
+                        style={inputStyle}
+                        placeholder="commande (uvx, npx, node...)"
+                        value={form.command}
+                        onChange={e => setForm({ ...form, command: e.target.value })}
+                        required
+                      />
+                      <input
+                        style={inputStyle}
+                        placeholder="arguments (séparés par espaces)"
+                        value={form.args}
+                        onChange={e => setForm({ ...form, args: e.target.value })}
+                      />
+                    </>
+                  ) : (
+                    <input
+                      style={inputStyle}
+                      placeholder="url endpoint SSE"
+                      value={form.url}
+                      onChange={e => setForm({ ...form, url: e.target.value })}
+                      required
+                    />
+                  )}
+
+                  <input
+                    style={inputStyle}
+                    placeholder={'env (JSON: {"KEY": "val"})'}
+                    value={form.env}
+                    onChange={e => setForm({ ...form, env: e.target.value })}
+                  />
+
+                  <input
+                    style={inputStyle}
+                    placeholder="description (optionnel)"
+                    value={form.description}
+                    onChange={e => setForm({ ...form, description: e.target.value })}
+                  />
+
+                  {/* ── Paramètres avancés ── */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      style={inputStyle}
+                      placeholder="tags (csv)"
+                      value={form.tags}
+                      onChange={e => setForm({ ...form, tags: e.target.value })}
+                      title="Tags séparés par virgule (ex: docs,api)"
+                    />
+                    <input
+                      style={inputStyle}
+                      placeholder="timeout (ms)"
+                      value={form.timeout}
+                      onChange={e => setForm({ ...form, timeout: e.target.value })}
+                      title="Timeout en millisecondes (défaut: 30000)"
+                    />
+                    <input
+                      style={inputStyle}
+                      placeholder="retries (0-10)"
+                      value={form.maxRetries}
+                      onChange={e => setForm({ ...form, maxRetries: e.target.value })}
+                      title="Nombre max de reconnexions (défaut: 5, 0=désactivé)"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full rounded disabled:opacity-50"
+                    style={{
+                      padding: '7px 0',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      letterSpacing: 0.5,
+                      backgroundColor: theme.accent,
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 3,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {submitting ? 'connexion...' : 'ajouter et connecter'}
+                  </button>
+                </form>
               )}
-
-              <input
-                style={inputStyle}
-                placeholder={'env (JSON: {"KEY": "val"})'}
-                value={form.env}
-                onChange={e => setForm({ ...form, env: e.target.value })}
-              />
-
-              <input
-                style={inputStyle}
-                placeholder="description (optionnel)"
-                value={form.description}
-                onChange={e => setForm({ ...form, description: e.target.value })}
-              />
-
-              {/* ── Paramètres avancés ── */}
-              <div className="grid grid-cols-3 gap-2">
-                <input
-                  style={inputStyle}
-                  placeholder="tags (csv)"
-                  value={form.tags}
-                  onChange={e => setForm({ ...form, tags: e.target.value })}
-                  title="Tags séparés par virgule (ex: docs,api)"
-                />
-                <input
-                  style={inputStyle}
-                  placeholder="timeout (ms)"
-                  value={form.timeout}
-                  onChange={e => setForm({ ...form, timeout: e.target.value })}
-                  title="Timeout en millisecondes (défaut: 30000)"
-                />
-                <input
-                  style={inputStyle}
-                  placeholder="retries (0-10)"
-                  value={form.maxRetries}
-                  onChange={e => setForm({ ...form, maxRetries: e.target.value })}
-                  title="Nombre max de reconnexions (défaut: 5, 0=désactivé)"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full rounded disabled:opacity-50"
-                style={{
-                  padding: '7px 0',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: 0.5,
-                  backgroundColor: theme.accent,
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 3,
-                  cursor: 'pointer',
-                }}
-              >
-                {submitting ? 'connexion...' : 'ajouter et connecter'}
-              </button>
             </div>
-          </motion.form>
+          </motion.div>
         )}
       </AnimatePresence>
 
