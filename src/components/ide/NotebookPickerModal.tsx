@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, BookOpen, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, BookOpen, Loader2, CheckCircle2, AlertCircle, FileCheck } from 'lucide-react';
 
 interface NotebookLight {
   id: string;
@@ -18,12 +18,15 @@ interface NotebookPickerModalProps {
 
 /**
  * Modal permettant de choisir un notebook dans lequel importer un fichier.
+ * Indique si le fichier est déjà présent dans un notebook.
  */
 export function NotebookPickerModal({ filePath, fileName, onClose }: NotebookPickerModalProps) {
   const [notebooks, setNotebooks] = useState<NotebookLight[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  // Set of notebook IDs that already contain this file
+  const [alreadyIn, setAlreadyIn] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     (async () => {
@@ -31,7 +34,24 @@ export function NotebookPickerModal({ filePath, fileName, onClose }: NotebookPic
         const res = await fetch('/api/notebooks');
         const data = await res.json();
         if (data.status === 'success') {
-          setNotebooks(data.notebooks ?? []);
+          const nbs: NotebookLight[] = data.notebooks ?? [];
+          setNotebooks(nbs);
+
+          // Check each notebook for existing source with same filename
+          const checks = await Promise.allSettled(
+            nbs.map(nb => fetch(`/api/notebooks/${nb.id}`).then(r => r.json()))
+          );
+          const presentIn = new Set<string>();
+          checks.forEach((result, idx) => {
+            if (result.status === 'fulfilled' && result.value.status === 'success') {
+              const sources: Array<{ title: string; origin: string }> = result.value.notebook?.sources ?? [];
+              const match = sources.some(
+                s => s.title === fileName || s.origin === filePath || s.origin === fileName
+              );
+              if (match) presentIn.add(nbs[idx].id);
+            }
+          });
+          setAlreadyIn(presentIn);
         }
       } catch {
         setFeedback({ type: 'error', msg: 'Impossible de charger les notebooks' });
@@ -39,7 +59,7 @@ export function NotebookPickerModal({ filePath, fileName, onClose }: NotebookPic
         setLoading(false);
       }
     })();
-  }, []);
+  }, [filePath, fileName]);
 
   const handleImport = useCallback(async (notebookId: string) => {
     setImporting(notebookId);
@@ -79,6 +99,7 @@ export function NotebookPickerModal({ filePath, fileName, onClose }: NotebookPic
 
       if (uploadData.status === 'success') {
         setFeedback({ type: 'success', msg: `${fileName} importé dans le notebook` });
+        setAlreadyIn(prev => new Set([...prev, notebookId]));
         setTimeout(onClose, 1200);
       } else {
         setFeedback({ type: 'error', msg: uploadData.error || 'Erreur lors de l\'import' });
@@ -160,34 +181,50 @@ export function NotebookPickerModal({ filePath, fileName, onClose }: NotebookPic
           </div>
         ) : (
           <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1">
-            {notebooks.map(nb => (
-              <button
-                key={nb.id}
-                onClick={() => handleImport(nb.id)}
-                disabled={importing !== null}
-                className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/10 disabled:opacity-50"
-                style={{ borderColor: 'var(--border-base)' }}
-              >
-                <span
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-base flex-shrink-0"
-                  style={{ backgroundColor: `${nb.color}22`, color: nb.color || 'var(--accent-primary)' }}
+            {notebooks.map(nb => {
+              const isPresent = alreadyIn.has(nb.id);
+              return (
+                <button
+                  key={nb.id}
+                  onClick={() => !isPresent && handleImport(nb.id)}
+                  disabled={importing !== null || isPresent}
+                  className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/10 disabled:opacity-60 disabled:cursor-default"
+                  style={{ borderColor: 'var(--border-base)' }}
+                  title={isPresent ? 'Ce fichier est déjà présent dans ce notebook' : `Importer dans ${nb.title}`}
                 >
-                  {nb.icon || '📓'}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                    {nb.title}
+                  <span
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-base flex-shrink-0"
+                    style={{ backgroundColor: `${nb.color}22`, color: nb.color || 'var(--accent-primary)' }}
+                  >
+                    {nb.icon || '📓'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                      {nb.title}
+                    </div>
+                    <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      {nb.sourcesCount} source{nb.sourcesCount !== 1 ? 's' : ''}
+                      {nb.description ? ` · ${nb.description}` : ''}
+                    </div>
                   </div>
-                  <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                    {nb.sourcesCount} source{nb.sourcesCount !== 1 ? 's' : ''}
-                    {nb.description ? ` · ${nb.description}` : ''}
-                  </div>
-                </div>
-                {importing === nb.id && (
-                  <Loader2 size={14} className="animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-                )}
-              </button>
-            ))}
+                  {isPresent && (
+                    <span
+                      className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md flex-shrink-0"
+                      style={{
+                        backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
+                        color: 'var(--accent-primary)',
+                      }}
+                    >
+                      <FileCheck size={11} />
+                      Déjà présent
+                    </span>
+                  )}
+                  {importing === nb.id && (
+                    <Loader2 size={14} className="animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 

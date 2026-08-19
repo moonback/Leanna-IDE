@@ -425,8 +425,8 @@ const FileExplorer = memo(function FileExplorer({
   // Sync expansion with rc-tree
   const expandedKeys = useMemo(() => Array.from(expandedDirs), [expandedDirs]);
 
-  const handleTreeExpand = useCallback((expandedKeys: string[]) => {
-    expandedKeys.forEach(key => onToggleDirectory(key));
+  const handleTreeExpand = useCallback((keys: React.Key[]) => {
+    keys.forEach(key => onToggleDirectory(String(key)));
   }, [onToggleDirectory]);
 
   // Count files
@@ -681,7 +681,6 @@ const FileExplorer = memo(function FileExplorer({
           <Tree
             treeData={treeData}
             height={600}
-            width={260}
             itemHeight={26}
             virtual
             showLine
