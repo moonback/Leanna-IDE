@@ -32,6 +32,7 @@ export interface UserProfile {
   textProvider:     AIProvider;   // Provider pour le texte/chat (gemini ou openrouter)
   openrouterModel:  string;       // Modèle OpenRouter sélectionné
   openrouterApiKey: string;       // Clé API OpenRouter (stockée localement)
+  openrouterImageModel: string;   // Modèle OpenRouter pour la génération d'images/infographies
   // Appearance (kept here so Settings is the single source of truth)
   theme:         'dark' | 'light';
   accentColor:   string;
@@ -65,6 +66,7 @@ const DEFAULT_PROFILE: UserProfile = {
   textProvider:     'gemini',
   openrouterModel:  'google/gemini-2.5-flash',
   openrouterApiKey: '',
+  openrouterImageModel: 'google/gemini-2.5-flash-image',
   theme:         'light',
   accentColor:   '#0ea5e9',
   floatingOrb:   false,

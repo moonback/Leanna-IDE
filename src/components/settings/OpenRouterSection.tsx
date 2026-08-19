@@ -31,6 +31,18 @@ export const OPENROUTER_MODELS = [
   { id: 'inclusionai/ling-3.0-flash:free',                   name: 'Ling 3.0 Flash',         provider: 'InclusionAI', free: true, desc: 'MoE 124B-A5B, rapide et multilingue, 262K contexte' },
 ];
 
+// ─── Modèles de génération d'images disponibles via OpenRouter ────────────────
+
+export const OPENROUTER_IMAGE_MODELS = [
+  { id: 'google/gemini-2.5-flash-image',       name: 'Gemini 2.5 Flash Image',    free: true,  desc: 'Google — génération d\'images rapide et gratuite' },
+  { id: 'google/gemini-2.5-pro-image',         name: 'Gemini 2.5 Pro Image',      free: false, desc: 'Google — qualité supérieure, détails fins' },
+  { id: 'bytedance-seed/seedream-4.5',         name: 'SeedReam 4.5',              free: true,  desc: 'ByteDance — haute qualité, rapide' },
+  { id: 'black-forest-labs/flux-schnell',      name: 'FLUX Schnell',              free: true,  desc: 'Black Forest Labs — ultra-rapide, léger' },
+  { id: 'black-forest-labs/flux-1.1-pro',      name: 'FLUX 1.1 Pro',              free: false, desc: 'Black Forest Labs — qualité pro' },
+  { id: 'stabilityai/stable-diffusion-xl',     name: 'Stable Diffusion XL',       free: false, desc: 'Stability AI — SDXL, polyvalent' },
+  { id: 'openai/dall-e-3',                     name: 'DALL·E 3',                  free: false, desc: 'OpenAI — compréhension textuelle avancée' },
+];
+
 export function OpenRouterSection() {
   const { profile, setField } = useProfile();
   const [testing, setTesting] = useState(false);
@@ -220,6 +232,56 @@ export function OpenRouterSection() {
           💡 <strong>Note :</strong> La voix Live utilise toujours Gemini. Le provider texte contrôle les requêtes de chat écrites et l'analyse de code.
         </p>
       </div>
+
+      {/* Image Model for Infographics */}
+      <Field label="🖼️ Modèle d'infographie" hint="Modèle OpenRouter utilisé pour la génération d'images/infographies dans les notebooks.">
+        <div className="grid grid-cols-1 gap-1.5 max-h-[200px] overflow-y-auto custom-scrollbar pr-1">
+          {OPENROUTER_IMAGE_MODELS.map(model => {
+            const active = profile.openrouterImageModel === model.id;
+            return (
+              <motion.button
+                key={model.id}
+                type="button"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setField('openrouterImageModel', model.id)}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-200"
+                style={{
+                  backgroundColor: active ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
+                  border: `1.5px solid ${active ? 'var(--accent-primary)' : 'var(--border-base)'}`,
+                  boxShadow: active ? '0 0 0 2px color-mix(in srgb, var(--accent-primary) 10%, transparent)' : 'none',
+                }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold truncate" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                      {model.name}
+                    </span>
+                    {model.free && (
+                      <span className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
+                        style={{ backgroundColor: 'color-mix(in srgb, #4ade80 15%, transparent)', color: '#4ade80' }}>
+                        <Zap size={8} /> GRATUIT
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[9px] mt-0.5 block" style={{ color: 'var(--text-dimmed)' }}>{model.desc}</span>
+                </div>
+                {active && <Check size={14} style={{ color: 'var(--accent-primary)' }} />}
+              </motion.button>
+            );
+          })}
+        </div>
+        <input
+          type="text"
+          value={profile.openrouterImageModel}
+          onChange={e => setField('openrouterImageModel', e.target.value)}
+          placeholder="ex: google/gemini-2.5-flash-image"
+          className="mt-2 w-full rounded-lg px-3 py-2 text-[11px] font-mono outline-none transition-all duration-200"
+          style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+          onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; }}
+          onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-base)'; }}
+        />
+      </Field>
     </Section>
   );
 }

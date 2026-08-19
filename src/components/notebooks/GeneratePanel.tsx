@@ -19,6 +19,7 @@ import {
   FileBarChart, Lightbulb, Zap, X, ArrowRight,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
+import { useProfile } from '../../context/UserProfileContext';
 import { MermaidDiagram } from './MermaidDiagram';
 
 interface SourceItem {
@@ -269,6 +270,7 @@ function renderBoldItalic(text: string): (string | JSX.Element)[] {
 
 export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
   const { success, error: toastError } = useToast();
+  const { profile } = useProfile();
   const [generating, setGenerating] = useState(false);
   const [generatingType, setGeneratingType] = useState<string | null>(null);
   const [generatedDocs, setGeneratedDocs] = useState<GeneratedDoc[]>([]);
@@ -379,6 +381,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
           type,
           sourceIds,
           customInstructions: finalInstructions,
+          imageModel: profile.openrouterImageModel || undefined,
         }),
       });
 

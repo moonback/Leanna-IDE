@@ -27,7 +27,7 @@ export class ContentGenerator {
   async generate(
     notebookId: string,
     type: GeneratedDocType,
-    options: { sourceIds?: string[]; language?: string; customInstructions?: string; onChunk?: (chunk: string) => void } = {}
+    options: { sourceIds?: string[]; language?: string; customInstructions?: string; onChunk?: (chunk: string) => void; imageModel?: string } = {}
   ): Promise<GeneratedDocument> {
     const notebook = notebookManager.getNotebook(notebookId);
     if (!notebook) throw new Error("Notebook introuvable.");
@@ -195,7 +195,7 @@ export class ContentGenerator {
     sourcesContext: string,
     sources: any[],
     lang: string,
-    options: { sourceIds?: string[]; customInstructions?: string; onChunk?: (chunk: string) => void }
+    options: { sourceIds?: string[]; customInstructions?: string; onChunk?: (chunk: string) => void; imageModel?: string }
   ): Promise<GeneratedDocument> {
     const { generateImage } = await import("../utils/imageGeneration");
     const { generateText } = await import("../utils/textGeneration");
@@ -243,6 +243,7 @@ Réponds UNIQUEMENT avec le prompt pour le générateur d'images, sans explicati
 
     // Étape 2 : Générer l'image
     const imageResult = await generateImage(imagePrompt, {
+      model: options.imageModel || undefined,
       style: "infographic",
       resolution: "2K",
       aspectRatio,

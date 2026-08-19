@@ -94,6 +94,7 @@ export default function SettingsView() {
           language: profile.language, responseStyle: profile.responseStyle,
           temperature: profile.temperature, topP: profile.topP,
           textProvider: profile.textProvider, openrouterModel: profile.openrouterModel,
+          openrouterImageModel: profile.openrouterImageModel,
           agents: profile.agents,
           reasoningEnabled: profile.reasoningEnabled,
           customSystemPrompt: profile.customSystemPrompt,

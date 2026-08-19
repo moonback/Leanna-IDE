@@ -1091,7 +1091,7 @@ GÃ©nÃ¨re le rÃ©sumÃ© global maintenant.`;
   // POST /api/notebooks/:id/generate â€” GÃ©nÃ©rer un document dÃ©rivÃ©
   router.post("/:id/generate", async (req: Request, res: Response) => {
     try {
-      const { type, sourceIds, language, customInstructions } = req.body;
+      const { type, sourceIds, language, customInstructions, imageModel } = req.body;
       const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary", "infographic", "full-report", "report-business", "report-market", "report-technical", "report-competitive", "report-financial", "report-marketing", "report-product", "report-risk", "report-executive", "report-project"];
 
       if (!type || !validTypes.includes(type)) {
@@ -1101,7 +1101,7 @@ GÃ©nÃ¨re le rÃ©sumÃ© global maintenant.`;
         return;
       }
 
-      const doc = await contentGenerator.generate(req.params.id, type, { sourceIds, language, customInstructions });
+      const doc = await contentGenerator.generate(req.params.id, type, { sourceIds, language, customInstructions, imageModel });
       res.json({ status: "success", document: doc });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -1111,7 +1111,7 @@ GÃ©nÃ¨re le rÃ©sumÃ© global maintenant.`;
   // POST /api/notebooks/:id/generate/stream â€” GÃ©nÃ©rer un document dÃ©rivÃ© (SSE streaming)
   router.post("/:id/generate/stream", async (req: Request, res: Response) => {
     try {
-      const { type, sourceIds, language, customInstructions } = req.body;
+      const { type, sourceIds, language, customInstructions, imageModel } = req.body;
       const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary", "infographic", "full-report", "report-business", "report-market", "report-technical", "report-competitive", "report-financial", "report-marketing", "report-product", "report-risk", "report-executive", "report-project"];
 
       if (!type || !validTypes.includes(type)) {
@@ -1134,6 +1134,7 @@ GÃ©nÃ¨re le rÃ©sumÃ© global maintenant.`;
         sourceIds,
         language,
         customInstructions,
+        imageModel,
         onChunk: (chunk: string) => {
           res.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
         },
