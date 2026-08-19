@@ -250,8 +250,7 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false }: Pr
       <div className="h-full overflow-y-auto custom-scrollbar px-4 pb-4">
         {compactNotes.length === 0 ? (
           <div className="rounded-[var(--notebook-radius-lg)] bg-[var(--notebook-surface)] p-5 text-sm text-[var(--text-muted)]">
-            Save useful AI answers as notes and they will appear here.
-          </div>
+Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtront ici.          </div>
         ) : (
           <div className="space-y-3">
             {compactNotes.map(note => (

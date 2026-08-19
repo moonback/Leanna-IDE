@@ -220,6 +220,12 @@ Jarvis OS est un **environnement de développement IA** tout-en-un, conçu comme
 <p align="center">
   <img src="assets/Screen/ide.PNG" alt="IDE View" width="90%" />
 </p>
+<p align="center">
+  <img src="assets/Screen/ide1.PNG" alt="IDE View" width="90%" />
+</p>
+<p align="center">
+  <img src="assets/Screen/ide2.PNG" alt="IDE View" width="90%" />
+</p>
 
 ---
 
