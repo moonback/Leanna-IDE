@@ -100,6 +100,8 @@ export function NotebookPickerModal({ filePath, fileName, onClose }: NotebookPic
       if (uploadData.status === 'success') {
         setFeedback({ type: 'success', msg: `${fileName} importé dans le notebook` });
         setAlreadyIn(prev => new Set([...prev, notebookId]));
+        // Dispatch event so that NotebookDetail (or any listener) refreshes its sources
+        window.dispatchEvent(new CustomEvent('notebook-sources-changed', { detail: { notebookId } }));
         setTimeout(onClose, 1200);
       } else {
         setFeedback({ type: 'error', msg: uploadData.error || 'Erreur lors de l\'import' });

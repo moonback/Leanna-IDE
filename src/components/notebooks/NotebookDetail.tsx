@@ -71,6 +71,18 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
   useEffect(() => { loadNotebook(); }, [loadNotebook]);
 
+  // Listen for external source changes (e.g. import from IDE file explorer)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.notebookId || detail.notebookId === notebookId) {
+        loadNotebook();
+      }
+    };
+    window.addEventListener('notebook-sources-changed', handler);
+    return () => window.removeEventListener('notebook-sources-changed', handler);
+  }, [notebookId, loadNotebook]);
+
   // Keyboard shortcuts for tabs (Ctrl+1-5)
   useEffect(() => {
     const tabKeys: Tab[] = ['sources', 'chat', 'notes', 'generate', 'audio'];
