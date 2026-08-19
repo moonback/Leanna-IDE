@@ -130,6 +130,10 @@ export class ContentGenerator {
         title = "Rapport de projet";
         prompt = this.buildReportPrompt("project", sourcesContext, lang);
         break;
+      case "infographic":
+        title = "Infographie";
+        // Cas spécial : génération d'image
+        return this.generateInfographic(notebookId, sourcesContext, sources, lang, options);
       default:
         throw new Error(`Type non supporté: ${type}`);
     }
@@ -177,6 +181,119 @@ export class ContentGenerator {
 
     notebookManager.addGeneratedDocument(notebookId, doc);
     log.info(`✅ Document généré: "${title}" (${generatedText.length} chars)`);
+
+    return doc;
+  }
+
+  /**
+   * Génère une infographie à partir des sources du notebook.
+   * Utilise l'API OpenRouter Image pour créer un visuel professionnel.
+   * Sauvegarde le PNG directement dans la sandbox.
+   */
+  private async generateInfographic(
+    notebookId: string,
+    sourcesContext: string,
+    sources: any[],
+    lang: string,
+    options: { sourceIds?: string[]; customInstructions?: string; onChunk?: (chunk: string) => void }
+  ): Promise<GeneratedDocument> {
+    const { generateImage } = await import("../utils/imageGeneration");
+    const { generateText } = await import("../utils/textGeneration");
+    const { getSandboxRoot } = await import("../utils/sandbox");
+    const fs = await import("fs");
+    const path = await import("path");
+
+    // Étape 1 : Générer un prompt d'infographie intelligent à partir des sources
+    if (options.onChunk) {
+      options.onChunk("🎨 Analyse des sources pour créer l'infographie...\n\n");
+    }
+
+    const promptResult = await generateText({
+      prompt: `Analyse le contenu suivant et génère un prompt concis (en anglais, max 200 mots) pour créer une infographie professionnelle qui résume visuellement les points clés.
+
+Le prompt doit décrire :
+- Le titre principal de l'infographie
+- Les 3-5 sections/blocs principaux avec leurs données clés
+- Le style visuel souhaité (couleurs, icônes, mise en page)
+- Les chiffres/statistiques importants à mettre en avant
+
+SOURCES :
+${sourcesContext.slice(0, 4000)}
+
+${options.customInstructions ? `INSTRUCTIONS UTILISATEUR : ${options.customInstructions}` : ""}
+
+Réponds UNIQUEMENT avec le prompt pour le générateur d'images, sans explication supplémentaire.`,
+      temperature: 0.7,
+      maxOutputTokens: 500,
+    });
+
+    const imagePrompt = promptResult.text.trim();
+
+    if (options.onChunk) {
+      options.onChunk(`📐 Prompt de l'infographie :\n> ${imagePrompt.slice(0, 200)}...\n\n`);
+      options.onChunk("🖼️ Génération de l'image en cours...\n\n");
+    }
+
+    // Étape 2 : Générer l'image
+    const imageResult = await generateImage(imagePrompt, {
+      style: "infographic",
+      resolution: "2K",
+      aspectRatio: "9:16", // Format portrait pour infographie
+      quality: "high",
+    });
+
+    if (!imageResult) {
+      throw new Error("Échec de la génération de l'infographie. Vérifiez votre clé OpenRouter.");
+    }
+
+    // Étape 3 : Sauvegarder le PNG dans la sandbox
+    const sandboxRoot = getSandboxRoot();
+    const infographicsDir = path.join(sandboxRoot, "infographies");
+    if (!fs.existsSync(infographicsDir)) {
+      fs.mkdirSync(infographicsDir, { recursive: true });
+    }
+
+    const timestamp = Date.now();
+    const filename = `infographie-${timestamp}.png`;
+    const filePath = path.join(infographicsDir, filename);
+    const relativePath = `infographies/${filename}`;
+
+    // Écrire le fichier PNG binaire
+    const imageBuffer = Buffer.from(imageResult.imageBase64, "base64");
+    fs.writeFileSync(filePath, imageBuffer);
+
+    log.info(`📁 Infographie sauvegardée: ${filePath} (${Math.round(imageBuffer.length / 1024)}KB)`);
+
+    if (options.onChunk) {
+      options.onChunk(`✅ Infographie sauvegardée dans la sandbox : ${relativePath}\n\n`);
+      options.onChunk(`![Infographie](data:${imageResult.mediaType};base64,${imageResult.imageBase64})\n`);
+    }
+
+    // Étape 4 : Stocker les métadonnées (le content contient le chemin + la base64 pour affichage)
+    const content = JSON.stringify({
+      type: "infographic-image",
+      filePath: relativePath,
+      fullPath: filePath,
+      mediaType: imageResult.mediaType,
+      imageBase64: imageResult.imageBase64,
+      model: imageResult.model,
+      prompt: imagePrompt,
+      cost: imageResult.cost,
+      sizeKB: Math.round(imageBuffer.length / 1024),
+    });
+
+    const doc: GeneratedDocument = {
+      id: randomUUID(),
+      notebookId,
+      type: "infographic",
+      title: "Infographie",
+      content,
+      sourceIds: sources.map((s: any) => s.id),
+      createdAt: new Date().toISOString(),
+    };
+
+    notebookManager.addGeneratedDocument(notebookId, doc);
+    log.info(`✅ Infographie générée (${imageResult.model}) → ${relativePath}`);
 
     return doc;
   }

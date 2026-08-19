@@ -101,8 +101,11 @@ export function useFileSystem() {
       return;
     }
 
+    // Fichiers binaires (images) : on les ouvre sans lire le contenu texte
+    const isBinary = /\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|pdf)$/i.test(filePath);
+
     try {
-      const content = await ideApi.readFile(filePath);
+      const content = isBinary ? '' : await ideApi.readFile(filePath);
       const newFile: OpenFile = {
         path: filePath,
         content,

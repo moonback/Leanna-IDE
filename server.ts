@@ -432,7 +432,7 @@ async function startServer() {
     return getDefaultWorkspaceRoot();
   }
 
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
 
   // Compression des réponses API IDE pour améliorer les performances
   app.use('/api/ide', compression());
@@ -1057,6 +1057,36 @@ async function startServer() {
     }
 
     res.json({ path: requestedPath, content: await fs.promises.readFile(absolutePath, 'utf-8') });
+  });
+
+  // GET /api/ide/file-raw — Servir un fichier binaire brut (images PNG, JPG, etc.)
+  app.get("/api/ide/file-raw", requireAuth, async (req, res) => {
+    const requestedPath = typeof req.query.path === 'string' ? req.query.path : '';
+    if (!requestedPath) return res.status(400).json({ error: 'Le chemin du fichier est requis.' });
+
+    const resolved = resolveRequestedPath(requestedPath);
+    if (!resolved || !resolved.ok) {
+      const errorResult = resolved as { status: number; error: string };
+      return res.status(errorResult.status || 403).json({ error: errorResult.error || 'Chemin hors du workspace.' });
+    }
+    const absolutePath = resolved.absolutePath;
+
+    try {
+      const stat = await fs.promises.stat(absolutePath);
+      if (!stat.isFile()) return res.status(404).json({ error: 'Fichier introuvable.' });
+    } catch {
+      return res.status(404).json({ error: 'Fichier introuvable.' });
+    }
+
+    const ext = requestedPath.split('.').pop()?.toLowerCase() || '';
+    const mimeTypes: Record<string, string> = {
+      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+      bmp: 'image/bmp', ico: 'image/x-icon',
+    };
+    res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(await fs.promises.readFile(absolutePath));
   });
 
   app.post("/api/ide/file", requireAuth, async (req, res) => {

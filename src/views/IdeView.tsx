@@ -38,6 +38,7 @@ import { LiveSkillsMonitor } from '../components/ide/LiveSkillsMonitor';
 import { WorkflowPanel } from '../components/ide/WorkflowPanel';
 import { McpPanel } from '../components/panels/McpPanel';
 import { MarkdownPreview } from '../components/ide/MarkdownPreview';
+import { ImagePreview } from '../components/ide/ImagePreview';
 import { EmptyEditorState } from '../components/ide/EmptyEditorState';
 import { SelfEditBanner } from '../components/ide/SelfEditBanner';
 import { SandboxDiffViewer } from '../components/sandbox/SandboxDiffViewer';
@@ -789,6 +790,8 @@ export default function IdeView() {
                       ) : activeFile ? (
                                               markdownPreview && activeFile.language === 'markdown' ? (
                                                 <MarkdownPreview content={activeFile.content} />
+                                              ) : /\.(png|jpg|jpeg|gif|webp|bmp|ico)$/i.test(activeFile.path) ? (
+                                                <ImagePreview filePath={activeFile.path} />
                                               ) : (
                                                 <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement de l'éditeur…</div></div>}>
                                                   <MonacoEditor

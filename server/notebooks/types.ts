@@ -122,7 +122,7 @@ export interface ChatThread {
 
 // ─── Documents générés ───────────────────────────────────────────────────────
 
-export type GeneratedDocType = 'summary' | 'faq' | 'study-guide' | 'briefing' | 'timeline' | 'outline' | 'mindmap' | 'swot' | 'glossary' | 'full-report' | 'report-business' | 'report-market' | 'report-technical' | 'report-competitive' | 'report-financial' | 'report-marketing' | 'report-product' | 'report-risk' | 'report-executive' | 'report-project';
+export type GeneratedDocType = 'summary' | 'faq' | 'study-guide' | 'briefing' | 'timeline' | 'outline' | 'mindmap' | 'swot' | 'glossary' | 'infographic' | 'full-report' | 'report-business' | 'report-market' | 'report-technical' | 'report-competitive' | 'report-financial' | 'report-marketing' | 'report-product' | 'report-risk' | 'report-executive' | 'report-project';
 
 // ─── Suggestions de rapports ─────────────────────────────────────────────────
 

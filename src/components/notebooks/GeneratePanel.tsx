@@ -51,6 +51,7 @@ const DOC_TYPES = [
   { key: 'timeline', label: 'Chronologie', icon: Clock, desc: 'Événements et jalons', color: '#ef4444' },
   { key: 'outline', label: 'Plan', icon: List, desc: 'Structure hiérarchique', color: '#06b6d4' },
   { key: 'mindmap', label: 'Carte mentale', icon: Brain, desc: 'Mindmap visuelle Mermaid', color: '#ec4899' },
+  { key: 'infographic', label: 'Infographie', icon: Lightbulb, desc: 'Visuel professionnel généré par IA', color: '#f97316' },
   { key: 'swot', label: 'Analyse SWOT', icon: Target, desc: 'Forces, Faiblesses, Opportunités, Menaces', color: '#14b8a6' },
   { key: 'glossary', label: 'Glossaire', icon: BookOpen, desc: 'Termes techniques définis', color: '#6366f1' },
 ];
@@ -101,6 +102,16 @@ function renderGeneratedContent(content: string): JSX.Element {
           <div key={i} className="space-y-1.5">
             {lines.map((line, j) => {
               if (!line.trim()) return <div key={j} className="h-1.5" />;
+              // Image markdown (inline base64 ou URL)
+              const imgMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+              if (imgMatch) {
+                return (
+                  <div key={j} className="my-3 rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border-base)' }}>
+                    <img src={imgMatch[2]} alt={imgMatch[1] || 'Image générée'} className="w-full h-auto max-h-[600px] object-contain" style={{ backgroundColor: 'var(--bg-base)' }} />
+                    {imgMatch[1] && <p className="text-[9px] text-center py-1.5 opacity-60">{imgMatch[1]}</p>}
+                  </div>
+                );
+              }
               if (line.startsWith('#### ')) return <h5 key={j} className="text-[11px] font-bold mt-3 mb-0.5" style={{ color: 'var(--text-primary)' }}>{line.slice(5)}</h5>;
               if (line.startsWith('### ')) return <h4 key={j} className="text-xs font-bold mt-4 mb-1" style={{ color: 'var(--text-primary)' }}>{line.slice(4)}</h4>;
               if (line.startsWith('## ')) return <h3 key={j} className="text-sm font-bold mt-5 mb-1.5" style={{ color: 'var(--text-primary)' }}>{line.slice(3)}</h3>;
@@ -135,6 +146,106 @@ function renderGeneratedContent(content: string): JSX.Element {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** Render infographic content — affiche l'image PNG directement */
+function renderInfographicContent(content: string): JSX.Element {
+  // Le contenu est soit du JSON (nouveau format), soit du markdown (ancien format)
+  let imageSrc = '';
+  let prompt = '';
+  let model = '';
+  let filePath = '';
+  let sizeKB = 0;
+
+  try {
+    const data = JSON.parse(content);
+    if (data.type === 'infographic-image') {
+      imageSrc = `data:${data.mediaType};base64,${data.imageBase64}`;
+      prompt = data.prompt || '';
+      model = data.model || '';
+      filePath = data.filePath || '';
+      sizeKB = data.sizeKB || 0;
+    }
+  } catch {
+    // Fallback : ancien format markdown
+    const imgMatch = content.match(/!\[[^\]]*\]\((data:image\/[^;]+;base64,[^)]+)\)/);
+    if (imgMatch) imageSrc = imgMatch[1];
+    const promptMatch = content.match(/\*\*Prompt\*\*\s*:\s*(.+)/);
+    if (promptMatch) prompt = promptMatch[1];
+    const modelMatch = content.match(/\*\*Modèle utilisé\*\*\s*:\s*(.+)/);
+    if (modelMatch) model = modelMatch[1];
+  }
+
+  if (!imageSrc) {
+    return <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Aucune image trouvée dans le contenu.</p>;
+  }
+
+  const handleDownload = () => {
+    const link = document.createElement('a');
+    link.href = imageSrc;
+    link.download = filePath ? filePath.split('/').pop()! : `infographie-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Image affichée en plein */}
+      <div
+        className="rounded-2xl overflow-hidden border shadow-sm"
+        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+      >
+        <img
+          src={imageSrc}
+          alt="Infographie générée"
+          className="w-full h-auto"
+          style={{ maxHeight: '800px', objectFit: 'contain' }}
+        />
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={handleDownload}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95"
+          style={{
+            backgroundColor: '#f9731620',
+            color: '#f97316',
+            border: '1px solid #f9731640',
+          }}
+        >
+          📥 Télécharger PNG
+        </button>
+        {filePath && (
+          <span className="text-[9px] px-2 py-1 rounded-md" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
+            📁 {filePath}
+          </span>
+        )}
+        {sizeKB > 0 && (
+          <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+            {sizeKB} KB
+          </span>
+        )}
+      </div>
+
+      {/* Metadata */}
+      {(prompt || model) && (
+        <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: 'var(--border-base)' }}>
+          {model && (
+            <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="font-semibold">Modèle :</span> {model}
+            </p>
+          )}
+          {prompt && (
+            <p className="text-[9px] leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="font-semibold">Prompt :</span> {prompt.slice(0, 200)}{prompt.length > 200 ? '...' : ''}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -685,7 +796,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
                 {streamingText.length} caractères
               </span>
             </div>
-            {renderGeneratedContent(streamingText)}
+            {generatingType === 'infographic' && streamingText.includes('data:image/') 
+              ? renderInfographicContent(streamingText)
+              : renderGeneratedContent(streamingText)
+            }
             <span className="inline-block w-2 h-4 animate-pulse rounded-sm" style={{ backgroundColor: 'var(--accent-primary)' }} />
           </div>
         )}
@@ -757,7 +871,11 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
             </div>
 
             {/* Document content */}
-            {renderGeneratedContent(selectedDoc.content)}
+            {selectedDoc.type === 'infographic' ? (
+              renderInfographicContent(selectedDoc.content)
+            ) : (
+              renderGeneratedContent(selectedDoc.content)
+            )}
           </div>
         ) : !streamingText && (
           /* Empty state — professional landing */

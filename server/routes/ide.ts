@@ -57,6 +57,46 @@ router.get('/file', async (req: Request, res: Response) => {
   res.json({ path: requestedPath, content: await fs.promises.readFile(absolutePath, 'utf-8') });
 });
 
+// GET /api/ide/file-raw — Servir un fichier binaire brut (images, etc.)
+router.get('/file-raw', async (req: Request, res: Response) => {
+  const requestedPath = typeof req.query.path === 'string' ? req.query.path : '';
+  if (!requestedPath) return res.status(400).json({ error: 'Le chemin du fichier est requis.' });
+
+  const resolved = resolveRequestedPath(req, requestedPath);
+  if (!resolved || !resolved.ok) {
+    const errorResult = resolved as { status: number; error: string };
+    return res.status(errorResult.status || 403).json({ error: errorResult.error || 'Chemin hors du workspace.' });
+  }
+  const absolutePath = resolved.absolutePath;
+
+  try {
+    const stat = await fs.promises.stat(absolutePath);
+    if (!stat.isFile()) return res.status(404).json({ error: 'Fichier introuvable.' });
+  } catch {
+    return res.status(404).json({ error: 'Fichier introuvable.' });
+  }
+
+  // Déterminer le Content-Type selon l'extension
+  const ext = requestedPath.split('.').pop()?.toLowerCase() || '';
+  const mimeTypes: Record<string, string> = {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
+    bmp: 'image/bmp',
+    ico: 'image/x-icon',
+    pdf: 'application/pdf',
+  };
+  const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  const buffer = await fs.promises.readFile(absolutePath);
+  res.send(buffer);
+});
+
 // POST /api/ide/file (save)
 router.post('/file', async (req: Request, res: Response) => {
   const { path: requestedPath, content } = req.body as { path?: string; content?: string };
