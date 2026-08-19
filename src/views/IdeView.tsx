@@ -928,6 +928,7 @@ export default function IdeView() {
           y={contextMenu.y}
           activeFilePath={fileSystem.activePath}
           clipboardEntry={clipboardEntry}
+          assistantConnected={connected}
           onAction={handleContextAction}
           onClose={() => setContextMenu(null)}
         />

@@ -32,6 +32,8 @@ interface ContextMenuProps {
   activeFilePath?: string | null;
   /** Contenu du presse-papier interne (couper/copier) */
   clipboardEntry?: ClipboardEntry | null;
+  /** Indique si l'assistant IA est connecté */
+  assistantConnected?: boolean;
   onAction: (id: string, target: ContextTarget) => void;
   onClose: () => void;
 }
@@ -80,7 +82,7 @@ function getActions(
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function ContextMenu({ target, x, y, activeFilePath, clipboardEntry, onAction, onClose }: ContextMenuProps) {
+export function ContextMenu({ target, x, y, activeFilePath, clipboardEntry, assistantConnected = true, onAction, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Fermer sur clic extérieur ou Escape
@@ -141,23 +143,32 @@ export function ContextMenu({ target, x, y, activeFilePath, clipboardEntry, onAc
         </div>
       )}
 
-      {actions.map(action => (
-        <React.Fragment key={action.id}>
-          {action.dividerBefore && (
-            <div className="my-1 border-t" style={{ borderColor: 'var(--border-base)' }} />
-          )}
-          <button
-            className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm transition hover:bg-white/10"
-            style={{ color: action.danger ? '#f87171' : 'var(--text-primary)' }}
-            onClick={() => { onAction(action.id, target); onClose(); }}
-          >
-            <span style={{ color: action.danger ? '#f87171' : 'var(--text-muted)' }}>
-              {action.icon}
-            </span>
-            {action.label}
-          </button>
-        </React.Fragment>
-      ))}
+      {actions.map(action => {
+        const disabled = action.id === 'send-to-ai' && !assistantConnected;
+        return (
+          <React.Fragment key={action.id}>
+            {action.dividerBefore && (
+              <div className="my-1 border-t" style={{ borderColor: 'var(--border-base)' }} />
+            )}
+            <button
+              className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm transition hover:bg-white/10"
+              style={{
+                color: action.danger ? '#f87171' : disabled ? 'var(--text-muted)' : 'var(--text-primary)',
+                opacity: disabled ? 0.4 : 1,
+                cursor: disabled ? 'not-allowed' : 'pointer',
+              }}
+              disabled={disabled}
+              title={disabled ? 'Assistant non connecté' : undefined}
+              onClick={() => { if (!disabled) { onAction(action.id, target); onClose(); } }}
+            >
+              <span style={{ color: action.danger ? '#f87171' : 'var(--text-muted)' }}>
+                {action.icon}
+              </span>
+              {action.label}
+            </button>
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }
