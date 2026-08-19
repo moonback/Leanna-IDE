@@ -10,7 +10,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft, FileText, MessageSquare, StickyNote, Sparkles, Mic,
-  Loader2, RefreshCw, Settings, ChevronRight, BookOpen,
+  Loader2, RefreshCw, BookOpen,
   Columns2, X,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
@@ -19,7 +19,7 @@ import { NotebookChat } from './NotebookChat';
 import { NotesPanel } from './NotesPanel';
 import { GeneratePanel } from './GeneratePanel';
 import { AudioOverviewPanel } from './AudioOverviewPanel';
-import { SourcesPanelSkeleton, ChatPanelSkeleton, NotesPanelSkeleton } from '../ui/Skeleton';
+import { SourcesPanelSkeleton } from '../ui/Skeleton';
 
 interface NotebookData {
   id: string;
@@ -179,129 +179,92 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   /** Available tabs for the split-view second pane (exclude the primary active tab) */
   const splitTabOptions = tabs.filter(t => t.key !== activeTab);
 
+  const primaryNav = tabs.filter(t => ['chat', 'notes', 'sources'].includes(t.key));
+  const secondaryNav = tabs.filter(t => ['generate', 'audio'].includes(t.key));
+
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
-      {/* Breadcrumb */}
-      <div
-        className="flex items-center gap-1.5 px-5 py-1.5 text-[10px] border-b lg:px-7"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
-      >
-        <button
-          onClick={onBack}
-          className="hover:underline transition-colors"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          Notebooks
-        </button>
-        <ChevronRight className="w-3 h-3" style={{ color: 'var(--text-dimmed)' }} />
-        <span className="font-medium truncate max-w-[200px]" style={{ color: 'var(--text-primary)' }}>
-          {notebook.title}
-        </span>
-        <ChevronRight className="w-3 h-3" style={{ color: 'var(--text-dimmed)' }} />
-        <span style={{ color: 'var(--accent-primary)' }}>
-          {tabs.find(t => t.key === activeTab)?.label}
-        </span>
-      </div>
-
-      {/* Header */}
-      <header
-        className="flex flex-shrink-0 items-center gap-3 border-b px-5 py-3.5 lg:px-7"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-      >
-        <button
-          onClick={onBack}
-          className="p-2 rounded-lg transition-all hover:bg-white/5 active:scale-95"
-          style={{ color: 'var(--text-muted)' }}
-          title="Retour aux notebooks"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-
-        <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 shadow-sm"
-          style={{ backgroundColor: `${notebook.color}20`, border: `1px solid ${notebook.color}30` }}
-        >
-          {notebook.icon}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <h1 className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
-            {notebook.title}
-          </h1>
-          {notebook.description && (
-            <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {notebook.description}
+    <div className="notebook-workspace h-full flex flex-col overflow-hidden">
+      <header className="notebook-header flex-shrink-0">
+        <div className="flex min-w-0 items-center gap-4">
+          <button
+            onClick={onBack}
+            className="notebook-icon-button"
+            title="Retour aux notebooks"
+            aria-label="Retour aux notebooks"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[var(--notebook-radius-md)] text-lg"
+            style={{ backgroundColor: `${notebook.color}18`, color: notebook.color }}
+            aria-hidden="true"
+          >
+            {notebook.icon || <BookOpen className="h-5 w-5" />}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="notebook-title truncate">{notebook.title}</h1>
+              {indexingProgress.active && (
+                <span className="notebook-pill">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Indexing {indexingProgress.done}/{indexingProgress.total}
+                </span>
+              )}
+            </div>
+            <p className="notebook-subtitle truncate">
+              {notebook.description || `${notebook.sources.length} source${notebook.sources.length > 1 ? 's' : ''} · ${notebook.notes.length} note${notebook.notes.length > 1 ? 's' : ''} · AI knowledge workspace`}
             </p>
-          )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={handleSplitToggle}
-            className="p-2 rounded-lg transition-all hover:bg-white/5 active:scale-95"
-            style={{ color: splitView ? 'var(--accent-primary)' : 'var(--text-muted)' }}
-            title={splitView ? 'Fermer le split-view' : 'Mode split-view (Ctrl+\\)'}
-            aria-label={splitView ? 'Fermer le split-view' : 'Ouvrir le split-view'}
-            aria-pressed={splitView}
-          >
-            <Columns2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={loadNotebook}
-            className="p-2 rounded-lg transition-all hover:bg-white/5 active:scale-95"
-            style={{ color: 'var(--text-muted)' }}
-            title="Actualiser"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
+        <div className="flex items-center gap-2">
+          <nav className="notebook-segmented hidden md:flex" aria-label="Notebook workspace">
+            {primaryNav.map(({ key, icon: Icon, label, badge }, idx) => (
+              <button
+                key={key}
+                ref={(el) => { if (el) tabsRef.current.set(key, el); }}
+                onClick={() => setActiveTab(key)}
+                className="notebook-segment"
+                data-active={activeTab === key}
+                title={`${label} (Ctrl+${idx + 1})`}
+              >
+                <Icon className="h-4 w-4" />
+                <span>{label}</span>
+                {badge !== undefined && <span className="notebook-count">{badge}</span>}
+              </button>
+            ))}
+          </nav>
+
+          <div className="notebook-actions">
+            {secondaryNav.map(({ key, icon: Icon, label }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className="notebook-ghost-button"
+                data-active={activeTab === key}
+                title={label}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="hidden xl:inline">{label}</span>
+              </button>
+            ))}
+            <button
+              onClick={handleSplitToggle}
+              className="notebook-icon-button hidden lg:flex"
+              data-active={splitView}
+              title={splitView ? 'Fermer le split-view' : 'Mode split-view (Ctrl+\\)'}
+              aria-label={splitView ? 'Fermer le split-view' : 'Ouvrir le split-view'}
+              aria-pressed={splitView}
+            >
+              <Columns2 className="h-4 w-4" />
+            </button>
+            <button onClick={loadNotebook} className="notebook-icon-button" title="Actualiser" aria-label="Actualiser">
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Tabs with animated indicator */}
-      <div
-        className="relative flex items-center gap-0.5 px-5 py-1.5 flex-shrink-0 border-b overflow-x-auto lg:px-7"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-      >
-        {tabs.map(({ key, icon: Icon, label, badge }, idx) => (
-          <button
-            key={key}
-            ref={(el) => { if (el) tabsRef.current.set(key, el); }}
-            onClick={() => setActiveTab(key)}
-            className="relative flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap"
-            style={{
-              color: activeTab === key ? 'var(--accent-primary)' : 'var(--text-muted)',
-            }}
-            title={`${label} (Ctrl+${idx + 1})`}
-          >
-            {/* Active background indicator */}
-            {activeTab === key && (
-              <motion.div
-                layoutId="activeTabBg"
-                className="absolute inset-0 rounded-lg"
-                style={{ backgroundColor: 'var(--accent-subtle)' }}
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              />
-            )}
-            <span className="relative flex items-center gap-1.5">
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-              {badge !== undefined && badge > 0 && (
-                <span
-                  className="px-1.5 py-0.5 rounded-full text-[9px] font-bold min-w-[18px] text-center"
-                  style={{
-                    backgroundColor: activeTab === key ? 'var(--accent-primary)' : 'var(--bg-base)',
-                    color: activeTab === key ? '#fff' : 'var(--text-dimmed)',
-                  }}
-                >
-                  {badge}
-                </span>
-              )}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* Global indexing progress bar */}
       <AnimatePresence>
         {indexingProgress.active && indexingProgress.total > 0 && (
           <motion.div
@@ -309,111 +272,66 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="flex-shrink-0 overflow-hidden"
+            className="flex-shrink-0 overflow-hidden border-b border-[var(--notebook-border)] bg-[var(--notebook-surface)] px-6 py-2"
           >
-            <div
-              className="flex items-center gap-3 px-5 py-2 lg:px-7"
-              style={{ backgroundColor: 'var(--bg-panel)', borderBottom: '1px solid var(--border-base)' }}
-            >
-              <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-medium" style={{ color: 'var(--text-primary)' }}>
-                    Indexation des sources…
-                  </span>
-                  <span className="text-[10px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                    {indexingProgress.done}/{indexingProgress.total}
-                  </span>
-                </div>
-                <div className="w-full h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ backgroundColor: 'var(--accent-primary)' }}
-                    initial={{ width: '0%' }}
-                    animate={{ width: `${indexingProgress.total > 0 ? (indexingProgress.done / indexingProgress.total) * 100 : 0}%` }}
-                    transition={{ duration: 0.3, ease: 'easeOut' }}
-                  />
-                </div>
+            <div className="mx-auto flex max-w-5xl items-center gap-3 text-sm text-[var(--text-secondary)]">
+              <Loader2 className="h-4 w-4 animate-spin text-[var(--accent-primary)]" />
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--notebook-surface-muted)]">
+                <motion.div className="h-full rounded-full bg-[var(--accent-primary)]" animate={{ width: `${(indexingProgress.done / indexingProgress.total) * 100}%` }} />
               </div>
+              <span>{indexingProgress.done}/{indexingProgress.total}</span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Content — single or split-view */}
-      <div className="flex-1 overflow-hidden flex">
-        {/* Primary pane */}
-        <div className={`flex-1 min-w-0 overflow-hidden ${splitView ? 'border-r' : ''}`} style={splitView ? { borderColor: 'var(--border-base)' } : undefined}>
+      <div className="notebook-shell flex-1 overflow-hidden">
+        <aside className="notebook-source-rail hidden min-w-0 lg:flex">
+          <SourcePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onUploadProgress={setIndexingProgress} compact />
+        </aside>
+
+        <main className="notebook-main min-w-0">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 4 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.15 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
               className="h-full"
             >
-              {renderTabContent(activeTab)}
+              {activeTab === 'sources' ? (
+                <SourcePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onUploadProgress={setIndexingProgress} />
+              ) : renderTabContent(activeTab)}
             </motion.div>
           </AnimatePresence>
-        </div>
+        </main>
 
-        {/* Split-view secondary pane */}
+        <aside className="notebook-context-rail hidden min-w-0 2xl:flex">
+          <div className="flex items-center justify-between px-5 py-4">
+            <div>
+              <p className="notebook-eyebrow">Knowledge</p>
+              <h2 className="text-sm font-semibold text-[var(--text-primary)]">Notes rapides</h2>
+            </div>
+            <button onClick={() => setActiveTab('notes')} className="notebook-ghost-button">Ouvrir</button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <NotesPanel notebookId={notebookId} notes={notebook.notes.slice(0, 6)} onRefresh={loadNotebook} compact />
+          </div>
+        </aside>
+
         {splitView && (
-          <motion.div
-            initial={{ opacity: 0, width: 0 }}
-            animate={{ opacity: 1, width: '50%' }}
-            exit={{ opacity: 0, width: 0 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="flex flex-col min-w-0 overflow-hidden"
-            style={{ backgroundColor: 'var(--bg-base)' }}
-          >
-            {/* Secondary pane tab selector */}
-            <div
-              className="flex items-center gap-0.5 px-3 py-1.5 flex-shrink-0 border-b overflow-x-auto"
-              style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-            >
+          <motion.aside className="notebook-context-rail min-w-[360px] max-w-[50%]" initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: '42%' }} exit={{ opacity: 0, width: 0 }}>
+            <div className="flex items-center gap-2 border-b border-[var(--notebook-border)] px-3 py-3">
               {splitTabOptions.map(({ key, icon: Icon, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setSplitTab(key)}
-                  className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap"
-                  style={{
-                    color: splitTab === key ? 'var(--accent-primary)' : 'var(--text-muted)',
-                    backgroundColor: splitTab === key ? 'var(--accent-subtle)' : 'transparent',
-                  }}
-                >
-                  <Icon className="w-3 h-3" />
-                  {label}
+                <button key={key} onClick={() => setSplitTab(key)} className="notebook-segment" data-active={splitTab === key}>
+                  <Icon className="h-4 w-4" />{label}
                 </button>
               ))}
-              <button
-                onClick={() => setSplitView(false)}
-                className="ml-auto p-1.5 rounded-lg transition-all hover:bg-white/5 active:scale-95"
-                style={{ color: 'var(--text-muted)' }}
-                title="Fermer le panneau"
-                aria-label="Fermer le split-view"
-              >
-                <X className="w-3 h-3" />
-              </button>
+              <button onClick={() => setSplitView(false)} className="notebook-icon-button ml-auto" aria-label="Fermer le panneau"><X className="h-4 w-4" /></button>
             </div>
-
-            {/* Secondary pane content */}
-            <div className="flex-1 overflow-hidden">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={splitTab}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.15 }}
-                  className="h-full"
-                >
-                  {renderTabContent(splitTab)}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </motion.div>
+            <div className="min-h-0 flex-1 overflow-hidden">{renderTabContent(splitTab)}</div>
+          </motion.aside>
         )}
       </div>
     </div>

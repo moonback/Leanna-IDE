@@ -26,6 +26,7 @@ interface Props {
   notebookId: string;
   notes: NoteItem[];
   onRefresh: () => void;
+  compact?: boolean;
 }
 
 function timeAgo(dateStr: string): string {
@@ -39,7 +40,7 @@ function timeAgo(dateStr: string): string {
   return 'now';
 }
 
-export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
+export function NotesPanel({ notebookId, notes, onRefresh, compact = false }: Props) {
   const { success, error: toastError } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -242,6 +243,34 @@ export function NotesPanel({ notebookId, notes, onRefresh }: Props) {
   const getNoteTitle = useCallback((id: string) => {
     return notes.find(n => n.id === id)?.title || 'Note inconnue';
   }, [notes]);
+
+  if (compact) {
+    const compactNotes = sorted.slice(0, 6);
+    return (
+      <div className="h-full overflow-y-auto custom-scrollbar px-4 pb-4">
+        {compactNotes.length === 0 ? (
+          <div className="rounded-[var(--notebook-radius-lg)] bg-[var(--notebook-surface)] p-5 text-sm text-[var(--text-muted)]">
+            Save useful AI answers as notes and they will appear here.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {compactNotes.map(note => (
+              <article key={note.id} className="notebook-note-card">
+                <div className="flex items-start gap-2">
+                  {note.pinned && <Pin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--accent-primary)]" />}
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-sm font-semibold text-[var(--text-primary)]">{note.title}</h3>
+                    <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{note.content}</p>
+                    <p className="mt-3 text-xs text-[var(--text-muted)]">{timeAgo(note.updatedAt || note.createdAt)}</p>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={`h-full ${viewMode === 'canvas' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto custom-scrollbar'} p-5 lg:p-7 space-y-5`}>
