@@ -57,7 +57,7 @@ function renderMessageContent(content: string): JSX.Element {
           }
 
           return (
-            <div key={i} className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-base)' }}>
+            <div key={i} className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--notebook-border)' }}>
               {/* Code block header with language tag */}
               {lang && (
                 <div
@@ -1234,11 +1234,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-transparent">
       {/* Thread bar */}
       <div
-        className="flex items-center gap-2 px-4 py-2 border-b flex-shrink-0 lg:px-6"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
+        className="mx-auto flex w-full max-w-4xl flex-shrink-0 items-center gap-2 px-5 py-4 lg:px-8"
+        style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
       >
         {/* Thread selector */}
         <div className="relative flex-1 min-w-0">
@@ -1343,7 +1343,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-7 space-y-5 relative"
+        className="relative flex-1 overflow-y-auto custom-scrollbar px-5 py-6 lg:px-8"
       >
         {loadingHistory ? (
           <div className="flex justify-center py-8">
@@ -1397,17 +1397,17 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`mx-auto mb-8 flex w-full max-w-4xl ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[85%] ${msg.role === 'user' ? 'px-4 py-3 rounded-2xl rounded-br-md' : 'px-5 py-4 rounded-2xl rounded-bl-md'}`}
+                  className={`${msg.role === 'user' ? 'max-w-[72%] rounded-[var(--notebook-radius-lg)] px-4 py-3' : 'w-full max-w-[820px] rounded-[var(--notebook-radius-lg)] px-6 py-5'}`}
                   style={{
-                    backgroundColor: msg.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-panel)',
+                    backgroundColor: msg.role === 'user' ? 'var(--accent-primary)' : 'var(--notebook-surface-elevated)',
                     color: msg.role === 'user' ? '#fff' : 'var(--text-primary)',
-                    border: msg.role === 'assistant' ? '1px solid var(--border-base)' : 'none',
+                    border: msg.role === 'assistant' ? '1px solid var(--notebook-border)' : 'none',
                     boxShadow: msg.role === 'user'
-                      ? '0 2px 8px rgba(99,102,241,0.2)'
-                      : '0 1px 6px rgba(0,0,0,0.04), 0 0 0 0.5px var(--border-base)',
+                      ? 'none'
+                      : 'none',
                   }}
                 >
                   {/* Message content — with edit mode for user messages */}
@@ -1768,8 +1768,8 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
       {/* Input area — refined professional design */}
       <div
-        className="flex-shrink-0 border-t px-4 py-3 lg:px-6"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+        className="flex-shrink-0 px-5 pb-5 pt-3 lg:px-8"
+        style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
       >
         {/* Source filter bar */}
         {showSourceFilter && sources.length > 0 && (
@@ -1848,11 +1848,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
         {/* Main input container */}
         <div
-          className="relative flex items-end gap-0 rounded-2xl transition-all"
+          className="relative mx-auto flex max-w-4xl items-end gap-0 rounded-[26px] transition-all"
           style={{
-            backgroundColor: 'var(--bg-input)',
+            backgroundColor: 'var(--notebook-surface-elevated)',
             border: '1px solid var(--border-base)',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+            boxShadow: '0 18px 60px rgba(0,0,0,0.12)',
           }}
         >
           {/* Left actions — filter */}
@@ -1885,10 +1885,10 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
             onKeyDown={handleKeyDown}
             placeholder={'Posez une question sur vos sources... (/ pour les commandes)'}
             rows={1}
-            className="flex-1 px-3 py-3 bg-transparent text-xs outline-none resize-none placeholder:text-[var(--text-dimmed)]"
+            className="flex-1 bg-transparent px-4 py-4 text-sm leading-6 outline-none resize-none placeholder:text-[var(--text-dimmed)]"
             style={{
               color: 'var(--text-primary)',
-              minHeight: '44px',
+              minHeight: '58px',
               maxHeight: '120px',
             }}
           />

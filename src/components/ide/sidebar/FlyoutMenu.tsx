@@ -14,17 +14,17 @@ export function FlyoutMenu({ children, align = 'center' }: FlyoutMenuProps) {
       initial={{ opacity: 0, x: -12, scale: 0.92 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: -12, scale: 0.92 }}
-      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
       className="absolute left-full ml-2 flex flex-col z-50 overflow-hidden"
       style={{
         ...(align === 'bottom' ? { bottom: 0 } : { top: '50%', transform: 'translateY(-50%)' }),
         minWidth: '220px',
-        backgroundColor: 'var(--bg-ctrl)',
-        border: '1px solid var(--border-strong)',
-        borderRadius: '16px',
-        boxShadow: '0 18px 40px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.12)',
-        backdropFilter: 'blur(24px) saturate(1.4)',
-        WebkitBackdropFilter: 'blur(24px) saturate(1.4)',
+        backgroundColor: 'var(--ide-panel-bg)',
+        border: '1px solid var(--ide-shell-border)',
+        borderRadius: '18px',
+        boxShadow: '0 18px 48px rgba(0,0,0,0.18)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
       }}
     >
       {children}
@@ -38,7 +38,7 @@ export function FlyoutHeader({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="px-4 pt-3 pb-2.5 flex items-center justify-between select-none"
-      style={{ borderBottom: '1px solid var(--border-base)' }}
+      style={{ borderBottom: '1px solid var(--ide-shell-border)' }}
     >
       <span
         className="text-[9.5px] font-bold uppercase tracking-[0.15em]"
@@ -69,14 +69,14 @@ export function FlyoutItem({ icon: Icon, label, active, onClick, danger, mono, d
       className={`group flex items-center gap-3 px-3 py-2 text-left w-full transition duration-[250ms] ${mono ? 'font-mono text-[11px]' : 'text-[11.5px]'}`}
       style={{
         color: danger ? 'var(--color-error)' : active ? 'var(--text-primary)' : 'var(--text-secondary)',
-        backgroundColor: active ? 'var(--nav-active-bg)' : 'transparent',
+        backgroundColor: active ? 'var(--ide-sidebar-active)' : 'transparent',
         margin: '0.25rem 0.25rem',
         width: 'calc(100% - 0.5rem)',
         borderRadius: '12px',
       }}
       onClick={onClick}
       onMouseEnter={(e) => {
-        if (!active) e.currentTarget.style.backgroundColor = 'var(--ctrl-hover)';
+        if (!active) e.currentTarget.style.backgroundColor = 'var(--ide-sidebar-hover)';
       }}
       onMouseLeave={(e) => {
         if (!active) e.currentTarget.style.backgroundColor = 'transparent';
@@ -90,7 +90,7 @@ export function FlyoutItem({ icon: Icon, label, active, onClick, danger, mono, d
             ? 'color-mix(in srgb, var(--color-error) 12%, transparent)'
             : active
               ? 'var(--accent-subtle)'
-              : 'var(--bg-input)',
+              : 'var(--ide-sidebar-item-bg)' ,
         }}
       >
         <Icon
@@ -101,7 +101,7 @@ export function FlyoutItem({ icon: Icon, label, active, onClick, danger, mono, d
               : active
                 ? 'var(--accent-primary)'
                 : 'var(--text-muted)',
-            filter: active ? 'drop-shadow(0 0 4px var(--accent-glow))' : 'none',
+            filter: 'none',
             transition: 'filter 0.25s ease',
           }}
         />
@@ -121,7 +121,7 @@ export function FlyoutItem({ icon: Icon, label, active, onClick, danger, mono, d
           className="w-[6px] h-[6px] rounded-full flex-shrink-0"
           style={{
             backgroundColor: 'var(--accent-primary)',
-            boxShadow: '0 0 8px var(--accent-glow)',
+            boxShadow: 'none',
           }}
         />
       )}
