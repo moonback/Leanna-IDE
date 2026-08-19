@@ -39,22 +39,17 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
   return (
     <div
       className="relative w-full flex items-center"
-      style={{ height: expanded ? '40px' : '44px' }}
+      style={{ height: expanded ? '42px' : '46px' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Active indicator bar — glowing left edge */}
+      {/* Active indicator bar — calm left edge */}
       {active && (
         <motion.div
           layoutId="sidebar-indicator"
-          className="absolute left-0 rounded-r"
-          style={{
-            width: '3px',
-            height: '22px',
-            backgroundColor: 'var(--accent-primary)',
-            boxShadow: '0 0 10px var(--accent-primary), 0 0 20px var(--accent-glow)',
-          }}
-          transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+          className="absolute left-0 rounded-r-full"
+          style={{ width: '3px', height: '24px', backgroundColor: 'var(--accent-primary)' }}
+          transition={{ type: 'spring', stiffness: 500, damping: 34 }}
         />
       )}
 
@@ -62,12 +57,12 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
       <AnimatePresence>
         {hovered && !active && (
           <motion.div
-            className="absolute inset-y-[4px] inset-x-[6px] rounded-lg pointer-events-none"
+            className="absolute inset-y-[4px] inset-x-[7px] rounded-[14px] pointer-events-none"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            style={{ backgroundColor: 'var(--ctrl-hover)' }}
+            style={{ backgroundColor: 'var(--ide-sidebar-hover)' }}
           />
         )}
       </AnimatePresence>
@@ -76,13 +71,11 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
         type="button"
         onClick={handleClick}
         whileTap={{ scale: 0.92 }}
-        className={`flex items-center relative overflow-hidden ${expanded ? 'w-full px-3 gap-2.5 rounded-lg h-[34px]' : 'w-[36px] h-[36px] justify-center rounded-[12px] mx-auto'}`}
+        className={`flex items-center relative overflow-hidden ${expanded ? 'w-full px-3 gap-2.5 rounded-[14px] h-[36px]' : 'w-[40px] h-[40px] justify-center rounded-[15px] mx-auto'}`}
         style={{
-          backgroundColor: active ? 'var(--bg-panel)' : 'transparent',
-          border: active ? '1px solid var(--accent-primary)' : '1px solid transparent',
-          boxShadow: active
-            ? '0 0 0 1px rgba(56,189,248,0.12), 0 8px 20px rgba(56,189,248,0.08)'
-            : 'none',
+          backgroundColor: active ? 'var(--ide-sidebar-active)' : 'transparent',
+          border: active ? '1px solid var(--ide-shell-border)' : '1px solid transparent',
+          boxShadow: 'none',
           transition: 'background-color 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease',
         }}
         aria-label={title}
@@ -104,8 +97,8 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
         </AnimatePresence>
 
         <motion.div
-          animate={active ? { scale: [1, 1.08, 1] } : { scale: 1 }}
-          transition={active ? { duration: 0.28, ease: 'easeOut' } : { duration: 0.2 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
           className="flex-shrink-0"
         >
           <Icon
@@ -116,11 +109,7 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
                 : hovered
                   ? 'var(--ctrl-icon-hover)'
                   : 'var(--ctrl-icon)',
-              filter: active
-                ? 'drop-shadow(0 0 5px var(--accent-glow))'
-                : hovered
-                  ? 'drop-shadow(0 0 3px var(--accent-glow))'
-                  : 'none',
+              filter: 'none',
               transition: 'color 0.15s ease, filter 0.2s ease',
             }}
           />
@@ -162,7 +151,7 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
             className={`absolute ${expanded ? 'top-[3px] right-[8px]' : 'top-[5px] right-[5px]'} w-[6px] h-[6px] rounded-full`}
             style={{
               backgroundColor: dot,
-              boxShadow: `0 0 6px ${dot}80`,
+              boxShadow: 'none',
             }}
           />
         )}
@@ -227,7 +216,7 @@ export function SidebarStatusIndicator({
       <motion.button
         whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.9 }}
-        className="flex items-center justify-center w-[42px] h-[42px] rounded-[14px] relative overflow-hidden"
+        className="jarvis-ai-status flex items-center justify-center w-[42px] h-[42px] rounded-[16px] relative overflow-hidden"
         style={{
           backgroundColor: 'var(--nav-active-bg)',
           border: '1px solid var(--accent-primary)',
@@ -293,7 +282,7 @@ export function SidebarStatusIndicator({
     <motion.button
       whileHover={{ scale: 1.12 }}
       whileTap={{ scale: 0.88 }}
-      className="flex items-center justify-center w-[42px] h-[42px] rounded-[16px] relative overflow-hidden"
+      className="jarvis-ai-status flex items-center justify-center w-[42px] h-[42px] rounded-[16px] relative overflow-hidden"
       style={{
         background: hovered
           ? 'linear-gradient(135deg, rgba(56,189,248,0.22) 0%, rgba(168,85,247,0.18) 50%, rgba(56,189,248,0.22) 100%)'

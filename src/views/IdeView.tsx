@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 // Monaco Editor - lazy loaded to reduce initial bundle
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.Editor })));
 // Panels - lazy loaded
@@ -29,7 +29,6 @@ import { useFileSystem } from '../hooks/useFileSystem';
 import { useIdeSettings } from '../hooks/useIdeSettings';
 import { useEditorActions } from '../hooks/useEditorActions';
 import { useLiveAPIContext } from '../context/LiveAPIContext';
-import { ideApi } from '../services/ideApi';
 import { useScreenShare } from '../context/ScreenShareContext';
 import { useSandboxWatcher } from '../hooks/useSandboxWatcher';
 import { AgentProgressBar } from '../components/ide/AgentProgressBar';
@@ -82,19 +81,18 @@ export default function IdeView() {
 
     // Reconnect after mode change: wait until status is idle then reconnect
     useEffect(() => {
-    if (pendingReconnectMode && !connected) {
-      const timer = setTimeout(() => {
-        connect([], pendingReconnectMode);
-        setPendingReconnectMode(null);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
+    if (!pendingReconnectMode || connected) return undefined;
+    const timer = setTimeout(() => {
+      connect([], pendingReconnectMode);
+      setPendingReconnectMode(null);
+    }, 100);
+    return () => clearTimeout(timer);
   }, [pendingReconnectMode, connected, connect]);
 
   // Custom hooks for logic separation
   const fileSystem = useFileSystem();
   const { settings: ideSettings, updateSetting } = useIdeSettings(profile.theme);
-  const { editorRef, monacoRef, editorPathRef, formatDocument, navigateToPosition, applySettingsToEditor, pushContentToEditor } = useEditorActions();
+  const { editorRef, monacoRef, editorPathRef, formatDocument, navigateToPosition, applySettingsToEditor } = useEditorActions();
 
   // ── Sandbox Watcher — dispatcher les événements de fichiers en temps réel ──
   // Ce hook maintient une connexion WebSocket vers /sandbox-watch et dispatche
@@ -548,7 +546,7 @@ export default function IdeView() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full" style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', width: showChat && chatDocked ? 'calc(100% - 420px)' : '100%', transition: 'width 0.25s ease' }}>
+    <div className="jarvis-ide-shell flex h-full" style={{ backgroundColor: 'var(--ide-shell-bg)', color: 'var(--text-primary)', width: showChat && chatDocked ? 'calc(100% - 420px)' : '100%', transition: 'width 0.25s ease' }}>
 
       {/* Sidebar Unifiée */}
       <UnifiedSidebar
@@ -662,7 +660,7 @@ export default function IdeView() {
       )}
 
       {/* Editor Area */}
-      <div className="flex flex-1 flex-col min-w-0 min-h-0 relative">
+      <div className="jarvis-ide-workspace flex flex-1 flex-col min-w-0 min-h-0 relative">
         {/* Tab Bar — masqué quand un panneau plein-écran est actif */}
         {!showSandbox && !showHistory && !showAutomation && !showMemory && !showHelp && !showSettingsPanel && !showKnowledge && !showNotebooks && (
           <EditorTabs
@@ -721,7 +719,7 @@ export default function IdeView() {
         )}
 
         {/* Main Editor + Panels Layout */}
-                <div className="flex flex-col flex-1 min-h-0">
+                <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                   <div className="flex flex-1 min-h-0">
                     {/* Monaco Editor / Settings Panel */}
                     <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">

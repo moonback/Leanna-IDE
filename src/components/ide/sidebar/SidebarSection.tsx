@@ -86,7 +86,7 @@ interface SubmenuItemProps {
   assistantConnected: boolean;
 }
 
-function SubmenuItem({ id, icon, label, children, state, actions }: SubmenuItemProps) {
+function SubmenuItem({ icon, label, children, state, actions }: SubmenuItemProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 

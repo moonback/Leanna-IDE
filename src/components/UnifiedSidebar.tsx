@@ -94,14 +94,14 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
 
   return (
     <nav
-      className="flex flex-col items-center select-none relative"
+      className="jarvis-sidebar flex flex-col items-center select-none relative"
       style={{
-        width: '48px',
-        borderRight: '1px solid var(--border-base)',
-        backgroundColor: 'var(--bg-sidebar)',
+        width: '56px',
+        borderRight: '1px solid var(--ide-shell-border)',
+        backgroundColor: 'var(--ide-sidebar-bg)',
         height: '100%',
-        paddingBottom: '4px',
-        boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.03)',
+        paddingBottom: '8px',
+        boxShadow: 'none',
       }}
       aria-label="Navigation principale"
     >
@@ -196,16 +196,16 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
 function BrandLogo({ theme, onNavigate }: { theme: string; onNavigate: () => void }) {
   return (
     <div
-      className="w-full h-[52px] flex items-center justify-center flex-shrink-0"
-      style={{ borderBottom: '1px solid var(--border-base)' }}
+      className="w-full h-[64px] flex items-center justify-center flex-shrink-0"
+      style={{ borderBottom: '1px solid var(--ide-shell-border)' }}
     >
       <button
         type="button"
-        className="w-[34px] h-[34px] rounded-xl overflow-hidden flex items-center justify-center cursor-pointer"
+        className="w-[38px] h-[38px] rounded-[14px] overflow-hidden flex items-center justify-center cursor-pointer"
         style={{
-          background: 'rgba(255,255,255,0.04)',
-          boxShadow: '0 0 8px rgba(0,0,0,0.08)',
-          border: '1px solid rgba(255,255,255,0.06)',
+          background: 'var(--ide-sidebar-item-bg)',
+          boxShadow: 'none',
+          border: '1px solid var(--ide-shell-border)',
         }}
         onClick={onNavigate}
         title="Jarvis OS"
@@ -236,7 +236,7 @@ function IDEToolsSections({
   const actionsRecord = actions as unknown as Record<string, () => void>;
 
   return (
-    <div className="w-full flex flex-col pt-1">
+    <div className="w-full flex flex-col gap-1 pt-3">
       {sidebarSections.map((section, idx) => (
         <motion.div
           key={section.id}
