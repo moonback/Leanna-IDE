@@ -152,7 +152,6 @@ const ttsCache = new TTSCache();
 
 const providerMetrics: Record<string, ProviderMetrics> = {
   openrouter_kokoro: { totalCalls: 0, totalLatencyMs: 0, errors: 0, lastLatencyMs: 0, lastErrorTime: 0 },
-  openrouter_fish: { totalCalls: 0, totalLatencyMs: 0, errors: 0, lastLatencyMs: 0, lastErrorTime: 0 },
   gemini: { totalCalls: 0, totalLatencyMs: 0, errors: 0, lastLatencyMs: 0, lastErrorTime: 0 },
 };
 
@@ -180,9 +179,9 @@ function getAverageLatency(provider: string): number {
 }
 
 /** Retourne le provider le plus rapide selon les métriques */
-function selectBestProvider(): "openrouter_kokoro" | "openrouter_fish" | "gemini" {
-  type Provider = "openrouter_kokoro" | "openrouter_fish" | "gemini";
-  const providers: Provider[] = ["openrouter_kokoro", "openrouter_fish", "gemini"];
+function selectBestProvider(): "openrouter_kokoro" | "gemini" {
+  type Provider = "openrouter_kokoro" | "gemini";
+  const providers: Provider[] = ["openrouter_kokoro", "gemini"];
   let best: Provider = providers[0];
   let bestLatency = getAverageLatency(best);
 
@@ -408,7 +407,7 @@ async function callOpenRouter(
   const apiKey = getOpenRouterKey();
   if (!apiKey) return null;
 
-  const providerKey = model.includes("kokoro") ? "openrouter_kokoro" : "openrouter_fish";
+  const providerKey = "openrouter_kokoro";
   const start = Date.now();
 
   try {
@@ -651,6 +650,7 @@ async function generateSpeechChunked(
 
 /**
  * Exécute l'appel TTS avec retry et fallback entre providers.
+ * Route automatiquement vers Gemini si la voix demandée est une voix Gemini native.
  */
 async function executeTTSWithFallback(
   text: string,
@@ -661,6 +661,29 @@ async function executeTTSWithFallback(
 ): Promise<string | null> {
   const hasOpenRouterKey = !!getOpenRouterKey();
 
+  // Si la voix est native Gemini (ex: Puck, Charon, Aoede...), forcer Gemini
+  if (isGeminiVoice(voice)) {
+    const providerOrder: Array<() => Promise<string | null>> = [
+      () => callGeminiSafe(text, voice),
+      // Fallback OpenRouter avec voix mappée si Gemini échoue
+      ...(hasOpenRouterKey ? [
+        () => callOpenRouterSafe(text, "ff_siwis", "hexgrad/kokoro-82m", speed),
+      ] : []),
+    ];
+
+    for (const providerFn of providerOrder) {
+      try {
+        const result = await providerFn();
+        if (result) return result;
+      } catch (err) {
+        log.warn(`Provider échoué: ${(err as Error).message}`);
+        continue;
+      }
+    }
+    log.error(`Tous les providers TTS ont échoué pour voix Gemini "${voice}": "${text.slice(0, 50)}..."`);
+    return null;
+  }
+
   // Déterminer l'ordre des providers
   let providerOrder: Array<() => Promise<string | null>>;
 
@@ -669,7 +692,7 @@ async function executeTTSWithFallback(
   } else if (provider === "openrouter") {
     providerOrder = [
       () => callOpenRouterSafe(text, voice, model || "hexgrad/kokoro-82m", speed),
-      () => callOpenRouterSafe(text, voice === "ff_siwis" ? "ff_siwis" : voice, "fish-audio/s2.1-pro-free:free", speed),
+      () => callGeminiSafe(text, voice),
     ];
   } else {
     // Auto : sélection intelligente basée sur les métriques
@@ -681,18 +704,10 @@ async function executeTTSWithFallback(
         providerOrder = [
           () => callGeminiSafe(text, voice),
           () => callOpenRouterSafe(text, voice, "hexgrad/kokoro-82m", speed),
-          () => callOpenRouterSafe(text, voice, "fish-audio/s2.1-pro-free:free", speed),
-        ];
-      } else if (best === "openrouter_fish") {
-        providerOrder = [
-          () => callOpenRouterSafe(text, voice, "fish-audio/s2.1-pro-free:free", speed),
-          () => callOpenRouterSafe(text, voice, "hexgrad/kokoro-82m", speed),
-          () => callGeminiSafe(text, voice),
         ];
       } else {
         providerOrder = [
           () => callOpenRouterSafe(text, voice, "hexgrad/kokoro-82m", speed),
-          () => callOpenRouterSafe(text, voice, "fish-audio/s2.1-pro-free:free", speed),
           () => callGeminiSafe(text, voice),
         ];
       }
@@ -742,6 +757,26 @@ function mapToGeminiVoice(voice: string): string {
   };
   return mapping[voice] || voice;
 }
+
+/**
+ * Voix Gemini TTS natives (doivent être routées vers le provider Gemini).
+ * Ces voix supportent le français nativement et sont de meilleure qualité
+ * que les voix Kokoro pour les langues non-anglaises.
+ */
+const GEMINI_NATIVE_VOICES = new Set([
+  "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede",
+  "Callirrhoe", "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba",
+  "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar",
+  "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi",
+  "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat",
+]);
+
+/** Vérifie si une voix est une voix Gemini native */
+function isGeminiVoice(voice: string): boolean {
+  return GEMINI_NATIVE_VOICES.has(voice);
+}
+
+// ─── Utility Functions ──────────────────────────────────────────────────────
 
 // ─── Utility Functions ──────────────────────────────────────────────────────
 

@@ -1224,7 +1224,7 @@ GÃ©nÃ¨re le rÃ©sumÃ© global maintenant.`;
       // ff_siwis = voix fÃ©minine franÃ§aise (Alex)
       // am_adam = voix masculine anglaise naturelle (Sam) â€” ou af_jessica pour fÃ©minine
       const alexVoice = req.body.alexVoice || "ff_siwis";
-      const samVoice = req.body.samVoice || "am_adam";
+      const samVoice = req.body.samVoice || "Puck";
 
       // DÃ©couper le script en rÃ©pliques
       const lines = overview.script.split("\n").filter((l: string) => l.trim());

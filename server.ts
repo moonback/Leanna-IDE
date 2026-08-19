@@ -58,6 +58,7 @@ import conversationsRouter from "./server/routes/conversations";
 import listsRouter from "./server/routes/lists";
 import automationRouter from "./server/routes/automation";
 import { createNotebooksRouter } from "./server/routes/notebooks";
+import { createTTSRouter } from "./server/routes/tts";
 import { notebookManager } from "./server/notebooks";
 import { backupService } from "./server/notebooks/BackupService";
 import { sourceProcessingQueue } from "./server/notebooks/ProcessingQueue";
@@ -557,6 +558,7 @@ async function startServer() {
   app.use("/api/notebooks/:id/sources/upload", notebookEmbeddingLimiter);
 
   app.use("/api/notebooks", createNotebooksRouter());
+  app.use("/api/tts", createTTSRouter());
   // ── Fin routeurs modulaires ───────────────────────────────────────────────
 
   // ── Agent Builder: génération IA d'agents personnalisés ───────────────────

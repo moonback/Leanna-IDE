@@ -692,57 +692,115 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }
               </div>
             </div>
 
-            {/* TTS Progress bar */}
+            {/* TTS Progress bar — Enhanced player */}
             {playing && ttsTotalLines > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
-                style={{ backgroundColor: '#10b98110', border: '1px solid #10b98130' }}
+                className="flex flex-col gap-2 px-4 py-3 rounded-xl"
+                style={{ backgroundColor: '#10b98108', border: '1px solid #10b98125' }}
               >
-                <Volume2 className="w-4 h-4 animate-pulse flex-shrink-0" style={{ color: '#10b981' }} />
-                <div className="flex-1">
-                  <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{ backgroundColor: '#10b981' }}
-                      animate={{ width: `${(ttsProgress / ttsTotalLines) * 100}%` }}
-                    />
+                {/* Top row: waveform + progress */}
+                <div className="flex items-center gap-3">
+                  {/* Mini waveform animation */}
+                  <div className="flex items-center gap-[2px] h-5 flex-shrink-0">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <motion.div
+                        key={i}
+                        className="w-[3px] rounded-full"
+                        style={{ backgroundColor: '#10b981' }}
+                        animate={{
+                          height: ['8px', '16px', '10px', '18px', '8px'],
+                        }}
+                        transition={{
+                          duration: 1.2,
+                          repeat: Infinity,
+                          delay: i * 0.15,
+                          ease: 'easeInOut',
+                        }}
+                      />
+                    ))}
                   </div>
+
+                  {/* Progress bar */}
+                  <div className="flex-1">
+                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ background: 'linear-gradient(90deg, #10b981, #34d399)' }}
+                        animate={{ width: `${(ttsProgress / ttsTotalLines) * 100}%` }}
+                        transition={{ duration: 0.3, ease: 'easeOut' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Progress count */}
+                  <span className="text-[10px] font-semibold flex-shrink-0 tabular-nums" style={{ color: '#10b981' }}>
+                    {ttsProgress}/{ttsTotalLines}
+                  </span>
                 </div>
-                <span className="text-[9px] font-medium flex-shrink-0" style={{ color: '#10b981' }}>
-                  {ttsProgress}/{ttsTotalLines}
-                </span>
-                <button
-                  onClick={cycleSpeed}
-                  className="px-2 py-0.5 rounded text-[9px] font-bold flex-shrink-0 transition-colors hover:bg-white/10"
-                  style={{ color: '#10b981', border: '1px solid #10b98140' }}
-                  title="Changer la vitesse"
-                >
-                  {playbackSpeed}x
-                </button>
+
+                {/* Bottom row: controls */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {/* Stop button */}
+                    <button
+                      onClick={handleStopTTS}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-semibold transition-all active:scale-95"
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                        color: '#ef4444',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                      }}
+                    >
+                      <Square className="w-3 h-3" />
+                      Arrêter
+                    </button>
+
+                    {/* Speed button */}
+                    <button
+                      onClick={cycleSpeed}
+                      className="px-2.5 py-1.5 rounded-lg text-[9px] font-bold transition-all hover:bg-white/5 active:scale-95"
+                      style={{ color: '#10b981', border: '1px solid #10b98130' }}
+                      title="Changer la vitesse"
+                    >
+                      {playbackSpeed}×
+                    </button>
+                  </div>
+
+                  {/* Estimated remaining */}
+                  <span className="text-[9px] font-medium" style={{ color: 'var(--text-dimmed)' }}>
+                    {ttsTotalLines - ttsProgress > 0 
+                      ? `~${Math.ceil((ttsTotalLines - ttsProgress) * 3)}s restants`
+                      : 'Terminé'
+                    }
+                  </span>
+                </div>
               </motion.div>
             )}
 
-            {/* Speed + Download bar (when not playing) */}
+            {/* Controls bar (when not playing) */}
             {!playing && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={cycleSpeed}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-medium border transition-all hover:bg-white/5"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-medium border transition-all hover:bg-white/5 active:scale-95"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                   title="Vitesse de lecture"
                 >
-                  ⚡ {playbackSpeed}x
+                  ⚡ {playbackSpeed}×
                 </button>
                 <button
                   onClick={handleDownloadScript}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-medium border transition-all hover:bg-white/5"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-medium border transition-all hover:bg-white/5 active:scale-95"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                   title="Télécharger le script"
                 >
                   📥 Script .md
                 </button>
+                <span className="text-[9px] ml-auto font-medium" style={{ color: 'var(--text-dimmed)' }}>
+                  ~{Math.ceil(selectedOverview.script.split('\n').filter((l: string) => l.trim()).length * 3 / playbackSpeed)}s à {playbackSpeed}×
+                </span>
               </div>
             )}
 

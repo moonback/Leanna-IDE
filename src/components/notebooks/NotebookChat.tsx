@@ -437,67 +437,154 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  // ─── TTS — Text-to-Speech ─────────────────────────────────────────────────
+  // ─── TTS — Text-to-Speech (via serveur TTS avancé) ──────────────────────
 
-  const handleTTS = useCallback((msgId: string, content: string) => {
-    // If already speaking this message, stop it
+  const ttsAudioCtxRef = useRef<AudioContext | null>(null);
+  const ttsAbortRef = useRef<AbortController | null>(null);
+  const ttsNextStartRef = useRef<number>(0);
+
+  const getTTSAudioContext = useCallback(() => {
+    if (!ttsAudioCtxRef.current || ttsAudioCtxRef.current.state === 'closed') {
+      const AC = window.AudioContext || (window as any).webkitAudioContext;
+      ttsAudioCtxRef.current = new AC({ sampleRate: 24000 });
+    }
+    return ttsAudioCtxRef.current;
+  }, []);
+
+  const playTTSChunk = useCallback((base64Audio: string) => {
+    const audioCtx = getTTSAudioContext();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    try {
+      const binaryStr = atob(base64Audio);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+      const pcm16 = new Int16Array(bytes.buffer);
+      const float32 = new Float32Array(pcm16.length);
+      for (let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768.0;
+      const audioBuffer = audioCtx.createBuffer(1, float32.length, 24000);
+      audioBuffer.getChannelData(0).set(float32);
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioCtx.destination);
+      const now = audioCtx.currentTime;
+      const startTime = Math.max(now, ttsNextStartRef.current);
+      source.start(startTime);
+      ttsNextStartRef.current = startTime + audioBuffer.duration;
+    } catch (e) {
+      console.error('[NotebookChat TTS] Erreur lecture audio:', e);
+    }
+  }, [getTTSAudioContext]);
+
+  const stopTTS = useCallback(() => {
+    if (ttsAbortRef.current) {
+      ttsAbortRef.current.abort();
+      ttsAbortRef.current = null;
+    }
+    if (ttsAudioCtxRef.current && ttsAudioCtxRef.current.state !== 'closed') {
+      ttsAudioCtxRef.current.close().catch(() => {});
+      ttsAudioCtxRef.current = null;
+    }
+    ttsNextStartRef.current = 0;
+    setSpeakingMsgId(null);
+  }, []);
+
+  const handleTTS = useCallback(async (msgId: string, content: string) => {
+    // Toggle off if already playing this message
     if (speakingMsgId === msgId) {
-      window.speechSynthesis.cancel();
-      setSpeakingMsgId(null);
-      speechRef.current = null;
+      stopTTS();
       return;
     }
 
-    // Stop any ongoing speech
-    window.speechSynthesis.cancel();
+    // Stop any ongoing TTS
+    stopTTS();
 
-    // Strip markdown syntax for cleaner speech
-    const cleanText = content
-      .replace(/```[\s\S]*?```/g, ' bloc de code. ')
-      .replace(/#{1,4}\s/g, '')
-      .replace(/\*\*(.+?)\*\*/g, '$1')
-      .replace(/\*(.+?)\*/g, '$1')
-      .replace(/`(.+?)`/g, '$1')
-      .replace(/\[(.+?)\]\(.+?\)/g, '$1')
-      .replace(/^[\-\*]\s/gm, '')
-      .replace(/^\d+\.\s/gm, '')
-      .replace(/^>\s?/gm, '')
-      .replace(/\|/g, ' ')
-      .replace(/-{3,}/g, '')
-      .replace(/\n{2,}/g, '. ')
-      .replace(/\n/g, ' ')
-      .trim();
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = 'fr-FR';
-    utterance.rate = 1;
-    utterance.pitch = 1;
-
-    // Try to pick a French voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const frVoice = voices.find(v => v.lang.startsWith('fr'));
-    if (frVoice) utterance.voice = frVoice;
-
-    utterance.onend = () => {
-      setSpeakingMsgId(null);
-      speechRef.current = null;
-    };
-    utterance.onerror = () => {
-      setSpeakingMsgId(null);
-      speechRef.current = null;
-    };
-
-    speechRef.current = utterance;
     setSpeakingMsgId(msgId);
-    window.speechSynthesis.speak(utterance);
-  }, [speakingMsgId]);
+    ttsNextStartRef.current = 0;
+
+    const controller = new AbortController();
+    ttsAbortRef.current = controller;
+
+    try {
+      // Utiliser le streaming SSE pour les textes longs, requête simple sinon
+      if (content.length > 500) {
+        const res = await fetch('/api/tts/speak-stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: content, voice: 'ff_siwis' }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) throw new Error(`TTS stream error: ${res.status}`);
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error('No stream body');
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || '';
+
+          for (const event of events) {
+            if (!event.trim()) continue;
+            const lines = event.split('\n');
+            let eventType = '';
+            let data = '';
+            for (const line of lines) {
+              if (line.startsWith('event: ')) eventType = line.slice(7);
+              if (line.startsWith('data: ')) data = line.slice(6);
+            }
+            if (eventType === 'chunk') {
+              const parsed = JSON.parse(data);
+              if (parsed.audio) playTTSChunk(parsed.audio);
+            }
+          }
+        }
+      } else {
+        const res = await fetch('/api/tts/speak', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: content, voice: 'ff_siwis' }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) throw new Error(`TTS error: ${res.status}`);
+        const data = await res.json();
+        if (data.audio) playTTSChunk(data.audio);
+      }
+    } catch (e: any) {
+      if (e.name !== 'AbortError') {
+        console.error('[NotebookChat TTS] Erreur:', e.message);
+      }
+    } finally {
+      // Attendre la fin de la lecture audio avant de réinitialiser l'état
+      const ctx = ttsAudioCtxRef.current;
+      if (ctx && ctx.state !== 'closed' && ttsNextStartRef.current > ctx.currentTime) {
+        const remainingMs = (ttsNextStartRef.current - ctx.currentTime) * 1000;
+        setTimeout(() => {
+          setSpeakingMsgId((current) => current === msgId ? null : current);
+        }, remainingMs + 100);
+      } else {
+        setSpeakingMsgId((current) => current === msgId ? null : current);
+      }
+      ttsAbortRef.current = null;
+    }
+  }, [speakingMsgId, stopTTS, playTTSChunk]);
 
   // Cleanup TTS on unmount
   useEffect(() => {
     return () => {
-      window.speechSynthesis.cancel();
+      if (ttsAbortRef.current) ttsAbortRef.current.abort();
+      if (ttsAudioCtxRef.current && ttsAudioCtxRef.current.state !== 'closed') {
+        ttsAudioCtxRef.current.close().catch(() => {});
+      }
     };
   }, []);
+
 
   // ─── Copy to Clipboard ────────────────────────────────────────────────────
 
@@ -1396,16 +1483,27 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                           {/* TTS */}
                           <button
                             onClick={() => handleTTS(msg.id, msg.content)}
-                            className={`flex items-center gap-1 text-[9px] transition-opacity ${speakingMsgId === msg.id ? 'opacity-100' : 'opacity-40 hover:opacity-100'}`}
+                            className={`flex items-center gap-1.5 text-[9px] transition-all rounded-md px-1.5 py-0.5 ${speakingMsgId === msg.id ? 'opacity-100 bg-[var(--accent-primary)]/10' : 'opacity-40 hover:opacity-100'}`}
                             style={{ color: speakingMsgId === msg.id ? 'var(--accent-primary)' : undefined }}
-                            title={speakingMsgId === msg.id ? 'Arrêter la lecture' : 'Lire à voix haute'}
+                            title={speakingMsgId === msg.id ? 'Arrêter la lecture' : 'Lire à voix haute (TTS IA)'}
                           >
                             {speakingMsgId === msg.id ? (
-                              <Square className="w-3 h-3" />
+                              <>
+                                <Square className="w-3 h-3" />
+                                <span className="flex items-center gap-[2px]">
+                                  <span className="w-[2px] h-2 bg-current rounded-full animate-[pulse_0.6s_ease-in-out_infinite]" />
+                                  <span className="w-[2px] h-3 bg-current rounded-full animate-[pulse_0.6s_ease-in-out_infinite_0.15s]" />
+                                  <span className="w-[2px] h-2.5 bg-current rounded-full animate-[pulse_0.6s_ease-in-out_infinite_0.3s]" />
+                                  <span className="w-[2px] h-2 bg-current rounded-full animate-[pulse_0.6s_ease-in-out_infinite_0.45s]" />
+                                </span>
+                                <span>Stop</span>
+                              </>
                             ) : (
-                              <Volume2 className="w-3 h-3" />
+                              <>
+                                <Volume2 className="w-3 h-3" />
+                                <span>Écouter</span>
+                              </>
                             )}
-                            <span>{speakingMsgId === msg.id ? 'Stop' : 'Écouter'}</span>
                           </button>
 
                           {/* Save to notes */}
