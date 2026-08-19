@@ -292,6 +292,14 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
   const [showReportModal, setShowReportModal] = useState(false);
   const [modalSelectedType, setModalSelectedType] = useState<string | null>(null);
 
+  // Modal infographie
+  const [showInfographicModal, setShowInfographicModal] = useState(false);
+  const [infraOrientation, setInfraOrientation] = useState<'portrait' | 'landscape' | 'square'>('portrait');
+  const [infraStyle, setInfraStyle] = useState<string>('auto');
+  const [infraDetail, setInfraDetail] = useState<'low' | 'medium' | 'high'>('medium');
+  const [infraLang, setInfraLang] = useState<string>('fr');
+  const [infraDescription, setInfraDescription] = useState('');
+
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Charger les docs générés
@@ -350,7 +358,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
 
   // ─── Génération en streaming ────────────────────────────────────────────
 
-  const handleGenerate = useCallback(async (type: string) => {
+  const handleGenerate = useCallback(async (type: string, extraInstructions?: string) => {
     if (sources.length === 0) {
       toastError('Ajoutez des sources d\'abord.');
       return;
@@ -361,6 +369,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
     setSelectedDoc(null);
 
     const sourceIds = selectedSourceIds.length > 0 ? selectedSourceIds : undefined;
+    const finalInstructions = [customInstructions.trim(), extraInstructions?.trim()].filter(Boolean).join('\n') || undefined;
 
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/generate/stream`, {
@@ -369,7 +378,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
         body: JSON.stringify({
           type,
           sourceIds,
-          customInstructions: customInstructions.trim() || undefined,
+          customInstructions: finalInstructions,
         }),
       });
 
@@ -425,6 +434,45 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
       setStreamingText('');
     }
   }, [notebookId, sources, selectedSourceIds, customInstructions, success, toastError]);
+
+  // Lancer la génération d'infographie depuis le modal
+  const handleInfographicGenerate = useCallback(() => {
+    setShowInfographicModal(false);
+
+    const orientationMap: Record<string, string> = {
+      portrait: '9:16', landscape: '16:9', square: '1:1',
+    };
+    const styleLabels: Record<string, string> = {
+      auto: 'Sélection automatique du style visuel',
+      kawaii: 'Style Kawaii : mignon, coloré, personnages arrondis, pastels',
+      clay: 'Style Pâte à modeler : textures 3D, reliefs doux, ombres douces',
+      sketch: 'Style Croquis : traits au crayon, hachuré, noir et blanc avec touches de couleur',
+      anime: 'Style Anime : illustration japonaise, couleurs vives, détails nets',
+      editorial: 'Style Éditorial : magazine haut de gamme, typographie soignée, minimaliste',
+      educational: 'Style Éducatif : schémas clairs, icônes simples, annotations, pédagogique',
+      bento: 'Style Grille Bento : mise en page en blocs carrés/rectangulaires bien organisés',
+      bricks: 'Style Briques : sections empilées, couleurs franches, séparations nettes',
+      scientific: 'Style Scientifique : graphiques, données, précision, palette sobre',
+      professional: 'Style Professionnel : corporate, élégant, couleurs business (bleu, gris, blanc)',
+    };
+    const detailLabels: Record<string, string> = {
+      low: 'Niveau de détail : minimal, très synthétique, 3-4 éléments max',
+      medium: 'Niveau de détail : modéré, 5-7 sections avec quelques données clés',
+      high: 'Niveau de détail : élevé, très dense, beaucoup de données et sous-sections',
+    };
+
+    const instructions = [
+      `Orientation : ${orientationMap[infraOrientation]} (${infraOrientation})`,
+      `Langue du texte dans l'infographie : ${infraLang === 'fr' ? 'Français' : infraLang === 'en' ? 'Anglais' : infraLang === 'es' ? 'Espagnol' : infraLang === 'ar' ? 'Arabe' : infraLang === 'de' ? 'Allemand' : infraLang}`,
+      styleLabels[infraStyle],
+      detailLabels[infraDetail],
+      infraDescription.trim() ? `Description utilisateur : ${infraDescription.trim()}` : '',
+    ].filter(Boolean).join('\n');
+
+    setTimeout(() => {
+      handleGenerate('infographic', instructions);
+    }, 100);
+  }, [infraOrientation, infraStyle, infraDetail, infraLang, infraDescription, handleGenerate]);
 
   // ─── Régénérer ──────────────────────────────────────────────────────────
 
@@ -667,7 +715,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
               return (
                 <button
                   key={key}
-                  onClick={() => handleGenerate(key)}
+                  onClick={() => key === 'infographic' ? setShowInfographicModal(true) : handleGenerate(key)}
                   disabled={generating || sources.length === 0}
                   className={`relative w-full flex flex-col lg:flex-row items-center lg:items-center gap-1.5 lg:gap-3 p-2.5 lg:p-3 rounded-xl border text-center lg:text-left transition-all disabled:opacity-40 active:scale-[0.97] ${isActive ? 'ring-2' : 'hover:shadow-sm hover:-translate-y-0.5'}`}
                   style={{
@@ -1123,6 +1171,222 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ═══ MODAL INFOGRAPHIE ═══ */}
+      <AnimatePresence>
+        {showInfographicModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+            onClick={(e) => { if (e.target === e.currentTarget) setShowInfographicModal(false); }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden"
+              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#f9731615' }}>
+                    <Lightbulb className="w-4.5 h-4.5" style={{ color: '#f97316' }} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Créer une infographie</h3>
+                    <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>Générée par IA à partir de vos sources</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowInfographicModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-5 space-y-5 max-h-[65vh] overflow-y-auto custom-scrollbar">
+
+                {/* Orientation */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Choisissez une orientation</p>
+                  <div className="flex gap-2">
+                    {([
+                      { key: 'portrait' as const, label: 'Portrait', icon: '📱' },
+                      { key: 'landscape' as const, label: 'Paysage', icon: '🖥️' },
+                      { key: 'square' as const, label: 'Carré', icon: '⬜' },
+                    ]).map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => setInfraOrientation(opt.key)}
+                        className="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl text-[10px] font-medium transition-all"
+                        style={{
+                          backgroundColor: infraOrientation === opt.key ? '#f9731612' : 'var(--bg-base)',
+                          color: infraOrientation === opt.key ? '#f97316' : 'var(--text-muted)',
+                          border: `1.5px solid ${infraOrientation === opt.key ? '#f97316' : 'var(--border-base)'}`,
+                        }}
+                      >
+                        <span className="text-lg">{opt.icon}</span>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Langue */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Langue</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {([
+                      { key: 'fr', label: 'Français', flag: '🇫🇷' },
+                      { key: 'en', label: 'English', flag: '🇬🇧' },
+                      { key: 'es', label: 'Español', flag: '🇪🇸' },
+                      { key: 'de', label: 'Deutsch', flag: '🇩🇪' },
+                      { key: 'ar', label: 'العربية', flag: '🇸🇦' },
+                      { key: 'pt', label: 'Português', flag: '🇧🇷' },
+                      { key: 'it', label: 'Italiano', flag: '🇮🇹' },
+                      { key: 'zh', label: '中文', flag: '🇨🇳' },
+                      { key: 'ja', label: '日本語', flag: '🇯🇵' },
+                    ]).map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => setInfraLang(opt.key)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-medium transition-all"
+                        style={{
+                          backgroundColor: infraLang === opt.key ? '#f9731612' : 'var(--bg-base)',
+                          color: infraLang === opt.key ? '#f97316' : 'var(--text-muted)',
+                          border: `1px solid ${infraLang === opt.key ? '#f97316' : 'var(--border-base)'}`,
+                        }}
+                      >
+                        <span>{opt.flag}</span>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Style visuel */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Choisissez un style visuel</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([
+                      { key: 'auto', label: 'Sélection auto', emoji: '✨' },
+                      { key: 'kawaii', label: 'Kawaii', emoji: '🌸' },
+                      { key: 'clay', label: 'Pâte à modeler', emoji: '🎨' },
+                      { key: 'sketch', label: 'Croquis', emoji: '✏️' },
+                      { key: 'anime', label: 'Anime', emoji: '🎌' },
+                      { key: 'editorial', label: 'Éditorial', emoji: '📰' },
+                      { key: 'educational', label: 'Éducatif', emoji: '📚' },
+                      { key: 'bento', label: 'Grille Bento', emoji: '🍱' },
+                      { key: 'bricks', label: 'Briques', emoji: '🧱' },
+                      { key: 'scientific', label: 'Scientifique', emoji: '🔬' },
+                      { key: 'professional', label: 'Professionnel', emoji: '💼' },
+                    ]).map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => setInfraStyle(opt.key)}
+                        className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-[9px] font-medium transition-all"
+                        style={{
+                          backgroundColor: infraStyle === opt.key ? '#f9731612' : 'var(--bg-base)',
+                          color: infraStyle === opt.key ? '#f97316' : 'var(--text-muted)',
+                          border: `1px solid ${infraStyle === opt.key ? '#f97316' : 'var(--border-base)'}`,
+                        }}
+                      >
+                        <span>{opt.emoji}</span>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Niveau de détail */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Niveau de détail</p>
+                  <div className="flex gap-2">
+                    {([
+                      { key: 'low' as const, label: 'Minimal', desc: '3-4 éléments' },
+                      { key: 'medium' as const, label: 'Modéré', desc: '5-7 sections' },
+                      { key: 'high' as const, label: 'Dense', desc: 'Très détaillé' },
+                    ]).map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => setInfraDetail(opt.key)}
+                        className="flex-1 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl text-[10px] font-medium transition-all"
+                        style={{
+                          backgroundColor: infraDetail === opt.key ? '#f9731612' : 'var(--bg-base)',
+                          color: infraDetail === opt.key ? '#f97316' : 'var(--text-muted)',
+                          border: `1.5px solid ${infraDetail === opt.key ? '#f97316' : 'var(--border-base)'}`,
+                        }}
+                      >
+                        <span className="font-semibold">{opt.label}</span>
+                        <span className="text-[8px] opacity-60">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sources */}
+                {sources.length > 1 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                      Sources ({selectedSourceIds.length || sources.length}/{sources.length})
+                    </p>
+                    <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                      {selectedSourceIds.length === 0 ? 'Toutes les sources seront utilisées' : `${selectedSourceIds.length} source(s) sélectionnée(s)`}
+                    </p>
+                  </div>
+                )}
+
+                {/* Description personnalisée */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                    Décrivez l'infographie que vous souhaitez créer
+                  </p>
+                  <textarea
+                    value={infraDescription}
+                    onChange={(e) => setInfraDescription(e.target.value)}
+                    placeholder="Ex: Une infographie sur les tendances du marché avec des statistiques clés, un comparatif visuel des acteurs principaux..."
+                    className="w-full px-3 py-2.5 rounded-xl text-[10px] resize-none leading-relaxed"
+                    style={{
+                      backgroundColor: 'var(--bg-base)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border-base)',
+                    }}
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t flex items-center justify-between" style={{ borderColor: 'var(--border-base)' }}>
+                <button
+                  onClick={() => setShowInfographicModal(false)}
+                  className="px-4 py-2 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleInfographicGenerate}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-bold transition-all active:scale-95 shadow-sm"
+                  style={{ backgroundColor: '#f97316', color: '#fff' }}
+                >
+                  <Lightbulb className="w-3.5 h-3.5" />
+                  Générer l'infographie
                 </button>
               </div>
             </motion.div>

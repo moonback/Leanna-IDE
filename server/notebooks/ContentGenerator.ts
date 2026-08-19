@@ -234,11 +234,18 @@ Réponds UNIQUEMENT avec le prompt pour le générateur d'images, sans explicati
       options.onChunk("🖼️ Génération de l'image en cours...\n\n");
     }
 
+    // Extraire l'orientation des instructions custom
+    let aspectRatio = "9:16"; // portrait par défaut
+    const orientationMatch = options.customInstructions?.match(/Orientation\s*:\s*([\d:]+)/i);
+    if (orientationMatch) {
+      aspectRatio = orientationMatch[1];
+    }
+
     // Étape 2 : Générer l'image
     const imageResult = await generateImage(imagePrompt, {
       style: "infographic",
       resolution: "2K",
-      aspectRatio: "9:16", // Format portrait pour infographie
+      aspectRatio,
       quality: "high",
     });
 

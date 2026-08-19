@@ -928,6 +928,19 @@ async function startServer() {
       const filePath = typeof req.query.path === 'string' ? req.query.path : '';
       if (!filePath) return res.status(400).json({ error: 'path requis' });
 
+      // Fichiers binaires — pas de diff texte possible
+      const ext = filePath.split('.').pop()?.toLowerCase() || '';
+      const binaryExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'pdf', 'woff', 'woff2', 'ttf', 'otf', 'eot', 'mp3', 'mp4', 'wav', 'ogg', 'zip', 'tar', 'gz']);
+      if (binaryExts.has(ext)) {
+        return res.json({
+          status: 'success',
+          path: filePath,
+          binary: true,
+          original: null,
+          modified: '[Fichier binaire — aperçu non disponible]',
+        });
+      }
+
       const { getSandboxRoot } = await import("./server/utils/sandbox");
       const sandboxFile = path.join(getSandboxRoot(), filePath);
       const mainFile = path.join(SELF_ROOT, filePath);
@@ -1054,6 +1067,13 @@ async function startServer() {
       if (!stat.isFile()) return res.status(404).json({ error: 'Fichier introuvable.' });
     } catch {
       return res.status(404).json({ error: 'Fichier introuvable.' });
+    }
+
+    // Fichiers binaires — retourner un placeholder au lieu de lire en UTF-8
+    const ext = requestedPath.split('.').pop()?.toLowerCase() || '';
+    const binaryExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'pdf', 'woff', 'woff2', 'ttf', 'otf', 'eot', 'mp3', 'mp4', 'wav', 'ogg', 'zip', 'tar', 'gz']);
+    if (binaryExts.has(ext)) {
+      return res.json({ path: requestedPath, content: '', binary: true });
     }
 
     res.json({ path: requestedPath, content: await fs.promises.readFile(absolutePath, 'utf-8') });
