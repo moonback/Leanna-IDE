@@ -48,8 +48,6 @@ Jarvis OS est un **environnement de développement IA** tout-en-un, conçu comme
 - Un **moteur de workflows** et d'automatisation avec planification de missions autonomes
 - Une **passerelle MCP** (Model Context Protocol) pour connecter des outils externes
 
-Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore son propre code source.
-
 ---
 
 ## 🔧 Stack technique
@@ -73,8 +71,6 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
 - Éditeur Monaco (syntaxe, autocomplétion, multi-fichiers, multi-onglets)
 - Explorateur de fichiers avec arbre interactif
 - Recherche globale dans le projet (Ctrl+Shift+F)
-- Terminal intégré avec exécution de commandes
-- Intégration Git (branches, commits, diff visuel)
 - Sandbox IA isolé pour les modifications assistées (validation avant merge)
 
 ### 🎙️ Assistant Multimodal (Gemini Live)
@@ -83,7 +79,6 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
 - **Vision webcam** : Analyse de documents physiques ou schémas manuscrits
 - **Partage d'écran** : Capture et interprétation du contenu affiché
 - **Chat textuel** : Conversation avec historique, streaming SSE, contexte persistant
-- **Orb flottant** : Interface minimale accessible depuis n'importe quelle page
 
 ### 🤖 Système Multi-Agents
 
@@ -215,7 +210,6 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
 
 ### 🔗 Intégrations
 
-- **GitHub** : Repos, issues, PRs, review
 - **Supabase** : Persistance, mémoire long terme
 - **OpenRouter** : Modèles alternatifs (GPT-4o, Claude, Llama, etc.)
 
