@@ -64,6 +64,7 @@
       --radius-2xl: 12px;
 
       --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     :root[data-theme="light"] {
@@ -124,6 +125,7 @@
         radial-gradient(ellipse at 70% 80%, rgba(6, 182, 212, 0.04) 0%, transparent 50%);
       pointer-events: none;
       z-index: 0;
+      transition: opacity 0.6s var(--ease-out);
     }
 
     /* ===== MAIN PANEL ===== */
@@ -142,6 +144,20 @@
       border-radius: var(--radius-2xl);
       box-shadow: var(--shadow-lg);
       z-index: 1;
+      opacity: 0;
+      transform: translateY(6px) scale(0.99);
+      animation: panel-in 0.5s var(--ease-out) 0.05s forwards;
+      transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out), filter 0.5s var(--ease-out);
+    }
+
+    .panel.leaving {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.985);
+      filter: blur(2px);
+    }
+
+    @keyframes panel-in {
+      to { opacity: 1; transform: translateY(0) scale(1); }
     }
 
     /* ===== HEADER ===== */
@@ -202,6 +218,13 @@
       color: var(--accent-primary);
       font-family: var(--font-mono);
       font-weight: 500;
+      transition: background 0.3s var(--ease-out), color 0.3s var(--ease-out), border-color 0.3s var(--ease-out);
+    }
+
+    .status-badge.online {
+      background: rgba(74, 222, 128, 0.12);
+      color: var(--color-success);
+      border-color: rgba(74, 222, 128, 0.25);
     }
 
     .status-dot {
@@ -211,6 +234,12 @@
       border-radius: 50%;
       box-shadow: 0 0 6px var(--accent-glow);
       animation: pulse 1.4s ease-in-out infinite;
+      transition: background 0.3s var(--ease-out);
+    }
+
+    .status-badge.online .status-dot {
+      background: var(--color-success);
+      box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
     }
 
     @keyframes pulse {
@@ -226,6 +255,34 @@
       padding: 12px 0;
     }
 
+    .orb-wrap {
+      position: relative;
+      width: 88px;
+      height: 88px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Rotating scan ring — reads as "the system is thinking" */
+    .orb-scan {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent 0deg, var(--accent-glow) 40deg, transparent 90deg, transparent 360deg);
+      animation: orb-scan-spin 2.2s linear infinite;
+      opacity: 0.7;
+      transition: opacity 0.4s var(--ease-out);
+      -webkit-mask: radial-gradient(circle, transparent 58%, #000 60%, #000 66%, transparent 68%);
+      mask: radial-gradient(circle, transparent 58%, #000 60%, #000 66%, transparent 68%);
+    }
+
+    .orb-wrap.complete .orb-scan { opacity: 0; }
+
+    @keyframes orb-scan-spin {
+      to { transform: rotate(360deg); }
+    }
+
     .orb {
       position: relative;
       width: 64px;
@@ -237,6 +294,10 @@
         0 0 60px rgba(129, 140, 248, 0.15),
         inset 0 -4px 12px rgba(0,0,0,0.3);
       animation: orb-breathe 3s ease-in-out infinite;
+      transition: background 0.5s var(--ease-out), box-shadow 0.5s var(--ease-out);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .orb::before {
@@ -247,6 +308,7 @@
       background: radial-gradient(circle, var(--accent-glow), transparent 70%);
       animation: orb-ring 3s ease-in-out infinite;
       opacity: 0.5;
+      transition: background 0.5s var(--ease-out);
     }
 
     .orb::after {
@@ -261,6 +323,25 @@
       filter: blur(3px);
     }
 
+    .orb-check {
+      width: 22px;
+      height: 22px;
+      opacity: 0;
+      transform: scale(0.4);
+      transition: opacity 0.35s var(--ease-spring), transform 0.35s var(--ease-spring);
+    }
+
+    .orb-check path {
+      fill: none;
+      stroke: #ffffff;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 24;
+      stroke-dashoffset: 24;
+      transition: stroke-dashoffset 0.4s var(--ease-out) 0.1s;
+    }
+
     .orb.complete {
       background: radial-gradient(circle at 35% 35%, #86efac, var(--color-success) 50%, #16a34a 100%);
       box-shadow:
@@ -272,6 +353,15 @@
 
     .orb.complete::before {
       background: radial-gradient(circle, rgba(74, 222, 128, 0.4), transparent 70%);
+    }
+
+    .orb.complete .orb-check {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .orb.complete .orb-check path {
+      stroke-dashoffset: 0;
     }
 
     @keyframes orb-breathe {
@@ -298,8 +388,14 @@
       gap: 4px;
       min-height: 140px;
       max-height: 140px;
-      overflow-y: hidden;
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 10px), transparent 100%);
+      mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 10px), transparent 100%);
     }
+
+    .log::-webkit-scrollbar { display: none; }
 
     .log-row {
       display: flex;
@@ -308,10 +404,11 @@
       font-size: 10.5px;
       color: var(--text-dimmed);
       opacity: 0;
-      animation: reveal 0.2s var(--ease-out) forwards;
+      animation: reveal 0.25s var(--ease-out) forwards;
       padding: 3px 6px;
       border-radius: var(--radius-sm);
-      transition: background 0.2s, color 0.2s;
+      transition: background 0.25s var(--ease-out), color 0.25s var(--ease-out);
+      flex-shrink: 0;
     }
 
     .log-row.active {
@@ -329,9 +426,14 @@
       text-align: center;
       color: var(--text-dimmed);
       flex-shrink: 0;
+      display: inline-block;
+      transition: color 0.25s var(--ease-out), transform 0.3s var(--ease-spring);
     }
     .log-row.active .log-icon { color: var(--accent-primary); }
-    .log-row.done .log-icon { color: var(--color-success); }
+    .log-row.done .log-icon {
+      color: var(--color-success);
+      transform: scale(1.15);
+    }
 
     .log-label {
       flex: 1;
@@ -346,6 +448,7 @@
       letter-spacing: 0.8px;
       color: var(--text-dimmed);
       text-transform: uppercase;
+      transition: color 0.25s var(--ease-out);
     }
     .log-status.ok { color: var(--color-success); }
     .log-status.running {
@@ -385,13 +488,16 @@
     .progress-label .accent {
       color: var(--accent-primary);
       font-weight: 500;
+      transition: color 0.4s var(--ease-out);
     }
+    .progress-label .accent.done { color: var(--color-success); }
 
     .progress-pct {
       color: var(--text-muted);
       font-variant-numeric: tabular-nums;
       font-size: 11px;
       font-weight: 600;
+      transition: color 0.4s var(--ease-out);
     }
 
     .progress-track {
@@ -407,8 +513,12 @@
       width: 0%;
       background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
       border-radius: 4px;
-      transition: width 0.4s var(--ease-out);
+      transition: width 0.4s var(--ease-out), background 0.4s var(--ease-out);
       position: relative;
+    }
+
+    .progress-fill.done {
+      background: linear-gradient(90deg, var(--color-success), #22d3ee);
     }
 
     .progress-fill::after {
@@ -503,6 +613,13 @@
       color: var(--text-muted);
     }
 
+    .footer-hint {
+      color: var(--text-dimmed);
+      opacity: 0;
+      transition: opacity 0.4s var(--ease-out);
+    }
+    .footer-hint.show { opacity: 1; }
+
     /* ===== REDUCED MOTION ===== */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -510,9 +627,11 @@
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
       }
+      .panel { opacity: 1; transform: none; }
       .log-row { opacity: 1; transform: none; }
       .orb { animation: none; }
       .orb::before { animation: none; opacity: 0.4; }
+      .orb-scan { display: none; }
       .status-dot { animation: none; opacity: 1; }
       .footer-dot { animation: none; opacity: 1; }
       .progress-fill::after { animation: none; }
@@ -532,7 +651,7 @@
           <div class="brand-sub">Intelligence Core</div>
         </div>
       </div>
-      <div class="status-badge">
+      <div class="status-badge" id="statusBadge">
         <div class="status-dot"></div>
         <span id="badgeText">BOOT</span>
       </div>
@@ -540,7 +659,14 @@
 
     <!-- ORB -->
     <div class="orb-container">
-      <div class="orb" id="orb"></div>
+      <div class="orb-wrap" id="orbWrap">
+        <div class="orb-scan"></div>
+        <div class="orb" id="orb">
+          <svg class="orb-check" viewBox="0 0 24 24">
+            <path d="M4 12.5L9.5 18L20 6" />
+          </svg>
+        </div>
+      </div>
     </div>
 
     <hr class="divider" />
@@ -583,6 +709,7 @@
         <div class="footer-dot"></div>
         <span>SECURE</span>
       </div>
+      <span class="footer-hint" id="footerHint">Cliquer pour continuer</span>
       <span>v0.4.0</span>
       <span>AES-256-GCM</span>
     </div>
@@ -637,18 +764,25 @@
       ];
 
       // DOM refs
+      const splash = document.getElementById("splash");
       const log = document.getElementById("log");
       const progressFill = document.getElementById("progressFill");
       const progressBar = document.getElementById("progressBar");
       const progressPct = document.getElementById("progressPct");
       const statusText = document.getElementById("statusText");
+      const statusBadge = document.getElementById("statusBadge");
       const badgeText = document.getElementById("badgeText");
+      const orbWrap = document.getElementById("orbWrap");
       const orb = document.getElementById("orb");
+      const footerHint = document.getElementById("footerHint");
       const cpuFill = document.getElementById("cpuFill");
       const cpuValue = document.getElementById("cpuValue");
       const ramFill = document.getElementById("ramFill");
       const ramValue = document.getElementById("ramValue");
       const uptimeValue = document.getElementById("uptimeValue");
+
+      let bootDone = false;
+      let uptimeTimer = null;
 
       function addRow(step) {
         const row = document.createElement("div");
@@ -659,6 +793,7 @@
           <span class="log-status running">RUN</span>
         `;
         log.appendChild(row);
+        log.scrollTop = log.scrollHeight;
         return row;
       }
 
@@ -674,6 +809,23 @@
 
         uptimeValue.textContent = (elapsed / 1000).toFixed(1) + "s";
       }
+
+      // Allow closing the splash early once boot completes (click or any key)
+      function finish() {
+        if (splash.classList.contains("leaving")) return;
+        splash.classList.add("leaving");
+        window.dispatchEvent(new CustomEvent("jarvis:boot-complete"));
+        // If embedded (e.g. Electron), the host app should listen for the
+        // event above and swap views; this timeout is a safe fallback.
+        setTimeout(() => {
+          if (typeof window.onSplashFinished === "function") {
+            window.onSplashFinished();
+          }
+        }, 450);
+      }
+
+      document.addEventListener("click", () => { if (bootDone) finish(); });
+      document.addEventListener("keydown", () => { if (bootDone) finish(); });
 
       async function boot() {
         const total = steps.reduce((a, s) => a + s.duration, 0);
@@ -706,10 +858,13 @@
         }
 
         // Boot complete
-        statusText.innerHTML = `<span class="accent">Système opérationnel</span>`;
+        statusText.innerHTML = `<span class="accent done">Système opérationnel</span>`;
         progressPct.textContent = "100%";
+        progressFill.classList.add("done");
         badgeText.textContent = "ONLINE";
+        statusBadge.classList.add("online");
         orb.classList.add("complete");
+        orbWrap.classList.add("complete");
 
         // Final metrics
         cpuFill.style.width = "8%";
@@ -717,9 +872,12 @@
         ramFill.style.width = "38%";
         ramValue.textContent = "38%";
 
+        bootDone = true;
+        setTimeout(() => footerHint.classList.add("show"), 300);
+
         // Keep uptime ticking
         let t = elapsed / 1000;
-        setInterval(() => {
+        uptimeTimer = setInterval(() => {
           t += 0.1;
           uptimeValue.textContent = t.toFixed(1) + "s";
         }, 100);
