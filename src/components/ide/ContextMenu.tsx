@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   FilePlus, FolderPlus, Pencil, Copy, Trash2,
-  Clipboard, ChevronRight, GitCompare, Scissors, ClipboardPaste, Files, Bot,
+  Clipboard, ChevronRight, GitCompare, Scissors, ClipboardPaste, Files, Bot, BookPlus,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -50,6 +50,7 @@ function getActions(
     return [
       { id: 'open',        label: 'Ouvrir',              icon: <ChevronRight size={13} /> },
       { id: 'send-to-ai',  label: "Envoyer à l'IA",    icon: <Bot size={13} /> },
+      { id: 'import-to-notebook', label: 'Importer dans un notebook', icon: <BookPlus size={13} /> },
       { id: 'rename',      label: 'Renommer',            icon: <Pencil size={13} />, dividerBefore: true },
       { id: 'duplicate',   label: 'Dupliquer',           icon: <Files size={13} /> },
       { id: 'cut',         label: 'Couper',              icon: <Scissors size={13} /> },

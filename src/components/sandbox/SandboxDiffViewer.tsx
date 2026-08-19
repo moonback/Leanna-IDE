@@ -457,14 +457,23 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
     setActionBusy('all');
     setFeedback(null);
     try {
-      await fetch('/api/sandbox/sync', {
+      const res = await fetch('/api/sandbox/sync', {
         method: 'POST',
         headers: getAuthHeaders(),
       });
-      setFeedback({ type: 'success', msg: `${files.length} fichier(s) appliqué(s)` });
-      setFiles([]);
-      setSelectedFile(null);
-      window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+      const data = await res.json();
+      if (data.status === 'success') {
+        setFeedback({ type: 'success', msg: `${files.length} fichier(s) appliqué(s)` });
+        setFiles([]);
+        setSelectedFile(null);
+        window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+      } else if (data.status === 'validation_failed') {
+        const errCount = data.errorCount || 0;
+        const warnCount = data.warningCount || 0;
+        setFeedback({ type: 'error', msg: `Validation échouée : ${errCount} erreur(s), ${warnCount} avertissement(s). Corrigez les erreurs avant de synchroniser.` });
+      } else {
+        setFeedback({ type: 'error', msg: data.error || 'Erreur lors de la synchronisation' });
+      }
     } catch {
       setFeedback({ type: 'error', msg: 'Erreur réseau' });
     } finally {

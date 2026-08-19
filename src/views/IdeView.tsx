@@ -10,6 +10,7 @@ const NotebooksView = lazy(() => import('./NotebooksView'));
 import { X } from 'lucide-react';
 import { IdeModal, type ModalMode } from '../components/ide/IdeModal';
 import { ContextMenu, type ContextTarget, type ClipboardEntry } from '../components/ide/ContextMenu';
+import { NotebookPickerModal } from '../components/ide/NotebookPickerModal';
 import { DiffViewer } from '../components/ide/DiffViewer';
 import { CommandPalette } from '../components/ide/CommandPalette';
 import { GlobalSearch } from '../components/ide/GlobalSearch';
@@ -195,6 +196,7 @@ export default function IdeView() {
     y: number;
   } | null>(null);
   const [clipboardEntry, setClipboardEntry] = useState<ClipboardEntry | null>(null);
+  const [notebookPicker, setNotebookPicker] = useState<{ filePath: string; fileName: string } | null>(null);
 
   // ── File operations helpers ────────────────────────────────────────────────
 
@@ -313,6 +315,11 @@ export default function IdeView() {
             `[Fichier sélectionné] ${target.path}`,
             `📄 ${target.name}`
           );
+        }
+        break;
+      case 'import-to-notebook':
+        if (target.kind === 'file') {
+          setNotebookPicker({ filePath: target.path, fileName: target.name });
         }
         break;
       case 'new-file':
@@ -904,6 +911,14 @@ export default function IdeView() {
       {/* Modals and Overlays */}
       {modalState && (
         <IdeModal mode={modalState} onConfirm={handleModalConfirm} onCancel={() => setModalState(null)} />
+      )}
+
+      {notebookPicker && (
+        <NotebookPickerModal
+          filePath={notebookPicker.filePath}
+          fileName={notebookPicker.fileName}
+          onClose={() => setNotebookPicker(null)}
+        />
       )}
 
       {contextMenu && (

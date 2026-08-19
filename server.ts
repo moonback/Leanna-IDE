@@ -791,7 +791,7 @@ async function startServer() {
       const result = await syncToMain();
       res.json({ status: "success", ...result });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ status: "error", error: e.message });
     }
   });
 
