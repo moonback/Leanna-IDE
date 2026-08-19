@@ -102,6 +102,8 @@ const writerAgent: AgentDefinition = {
     "list_project_files",
     "search_in_files",
     "read_file_outline",
+    "analyze_project_file",
+    "verify_file",
   ],
   systemPrompt: buildAgentPrompt("writer"),
   maxConcurrency: 3,

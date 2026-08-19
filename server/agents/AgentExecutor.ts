@@ -511,8 +511,16 @@ export class AgentExecutor {
 
       if (!EXECUTABLE_AGENT_TOOLS.has(call.name) || !agent.capabilities.includes(call.name)) {
         // Tenter une résolution partielle (le modèle tronque parfois les noms)
+        // Stratégie : 1) préfixe direct, 2) suppression de _project_file côté outil,
+        // 3) suppression de _project_file côté appel (ex: verify_project_file → verify_file)
+        const callWithoutProject = call.name.replace("_project_file", "_file");
+        const callBase = call.name.replace("_project_file", "");
         const resolved = [...EXECUTABLE_AGENT_TOOLS].find(
-          (tool) => tool.startsWith(call.name) || call.name.startsWith(tool.replace("_project_file", ""))
+          (tool) =>
+            tool.startsWith(call.name) ||
+            call.name.startsWith(tool.replace("_project_file", "")) ||
+            tool === callWithoutProject ||
+            tool === callBase
         );
         if (resolved && agent.capabilities.includes(resolved)) {
           call.name = resolved;
