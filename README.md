@@ -56,9 +56,9 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
 
 | Couche | Technologies |
 |--------|-------------|
-| **Frontend** | React 19, React Router 7, Tailwind CSS 4, Monaco Editor, Motion (animations), Lucide React |
-| **Backend** | Node.js, Express 4, WebSocket (ws), multer |
-| **IA** | Google Gemini (SDK `@google/genai`), OpenRouter (multi-modèles), embeddings `gemini-embedding-001` |
+| **Frontend** | React 19, React Router 7, Tailwind CSS 4, Monaco Editor, Motion (animations), Lucide React, react-window |
+| **Backend** | Node.js 22+, Express 4, WebSocket (ws), multer, compression |
+| **IA** | Google Gemini 2.x (SDK `@google/genai`), OpenRouter (multi-modèles), embeddings `gemini-embedding-001`, Gemini Vision |
 | **Desktop** | Electron 43, electron-builder (NSIS Windows) |
 | **Bundling** | Vite 6, esbuild, tsx |
 | **Persistance** | Système de fichiers JSON, Supabase (optionnel) |
@@ -108,7 +108,9 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
 
 ### 📓 Notebooks RAG (style NotebookLM)
 
-- **Sources multiples** : Upload fichiers (PDF, DOCX, MD, HTML, CSV, JSON, YAML), ingestion d'URLs, texte collé, paste depuis le presse-papier
+- **Sources multiples** : Upload fichiers (PDF, DOCX, MD, HTML, images PNG/JPG/WebP, CSV, JSON, YAML), ingestion d'URLs, texte collé, paste depuis le presse-papier
+- **Support images** : Upload d'images avec analyse Vision IA (OCR, description visuelle), affichage inline dans le viewer
+- **Rendu HTML visuel** : Les fichiers HTML uploadés sont rendus visuellement dans une iframe avec toggle Visuel/Texte
 - **Recherche hybride** : Embeddings sémantiques (Gemini) + TF-IDF lexical + Reciprocal Rank Fusion + Re-ranking LLM (5 stratégies de parsing)
 - **Chat groundé** : Questions/réponses avec citations précises et score de pertinence
 - **Conversations multiples** : Threads de chat séparés par notebook, switch instantané, titrage automatique
@@ -137,6 +139,7 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
   - Carte mentale (rendu Mermaid visuel)
   - Analyse SWOT (forces, faiblesses, opportunités, menaces)
   - Glossaire (termes techniques, acronymes)
+  - Infographies (génération d'images IA)
 - **Génération en streaming** : Contenu affiché en temps réel avec design pro
 - **Filtrage de sources** : Sélection des sources spécifiques pour la génération
 - **Instructions personnalisées** : Prompt custom pour guider le style et le focus
@@ -157,9 +160,13 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
   - **Backlinks** : Détection automatique des mentions entre notes avec liens visuels
 - **Sources** :
   - Preview du contenu inline
+  - Rendu visuel HTML (iframe sandboxée)
+  - Affichage d'images (PNG, JPG, WebP) avec description IA
   - Re-indexing (re-embed après mise à jour du modèle)
   - Tags custom (ajout/suppression inline)
+  - Suppression individuelle (icône au hover)
   - Paste depuis le presse-papier
+  - Résumé global automatique de toutes les sources
 - **UX** :
   - Skeletons de loading cohérents
   - Breadcrumb navigation (Notebooks > Titre > Onglet)
@@ -181,6 +188,7 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
 - Tâches planifiées (cron-like) avec déclencheurs
 - Missions autonomes avec planification IA
 - Exécution parallèle ou séquentielle avec dépendances
+- Navigation web automatisée (Puppeteer)
 
 ### 🏗️ Infrastructure Backend
 
@@ -189,6 +197,7 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
 - **Backup automatique** : Sauvegarde incrémentale toutes les 30 min, rotation (10 backups max), restauration par notebook ou globale
 - **Queue de processing** : File d'attente pour l'ingestion de sources (concurrence ×2, retry exponentiel, priorités, annulation)
 - **Cache intelligent** : Cache LRU avec TTL + matching par similarité Jaccard pour les questions proches, invalidation auto quand les sources changent
+- **Circuit breaker client** : Protection contre les cascades d'erreurs réseau (auto-recovery après 8s)
 
 ### 🔌 Passerelle MCP
 
@@ -208,7 +217,7 @@ Le projet fonctionne en mode **self-referential** : Jarvis gère et améliore so
 
 - **GitHub** : Repos, issues, PRs, review
 - **Supabase** : Persistance, mémoire long terme
-- **OpenRouter** : Modèles alternatifs (GPT-4o, Claude, etc.)
+- **OpenRouter** : Modèles alternatifs (GPT-4o, Claude, Llama, etc.)
 
 ---
 
@@ -307,30 +316,43 @@ Génère un `.exe` (NSIS) dans le dossier `release/`.
 
 ```
 Jarvis-OS/
-├── assets/                    # Images, icônes
+├── assets/                    # Images, icônes, splash screen
 ├── electron/                  # Process principal Electron (main, preload, splash)
 ├── server/                    # Backend Express + WebSocket
-│   ├── agents/                # Orchestrateur multi-agents & fleet
+│   ├── agents/                # Orchestrateur multi-agents, boucle autonome, persistence
 │   ├── autonomy/              # Boucle autonome supervisée
 │   ├── knowledge/             # Indexation, graphe, recherche sémantique
 │   ├── mcp/                   # Bridge MCP (stdio/SSE)
 │   ├── mission/               # Planificateur de missions autonomes
-│   ├── notebooks/             # RAG Engine, EmbeddingStore, GroundedChat, ContentGenerator, BackupService, ProcessingQueue, ResponseCache
+│   ├── notebooks/             # RAG Engine (11 modules)
+│   │   ├── NotebookManager    # CRUD notebooks, sources, notes
+│   │   ├── SourceIngester     # Extraction texte (PDF, HTML, images, URL)
+│   │   ├── EmbeddingStore     # Vectorisation Gemini + stockage LRU
+│   │   ├── RAGEngine          # Recherche hybride (embeddings + TF-IDF + RRF)
+│   │   ├── GroundedChat       # Chat avec citations et re-ranking
+│   │   ├── ContentGenerator   # Génération de contenu (résumés, FAQ, infographies...)
+│   │   ├── BackupService      # Sauvegarde automatique incrémentale
+│   │   ├── ProcessingQueue    # File d'attente async pour ingestion
+│   │   └── ResponseCache      # Cache LRU intelligent avec invalidation
 │   ├── prompts/               # Instructions système (SystemPromptBuilder)
-│   ├── routes/                # 32 fichiers de routes REST (incl. threads, tags, reindex, feedback)
-│   ├── runtime/               # ToolRegistry, AgentPlugins, SkillManagerV2
-│   ├── skills/                # 20+ skills IA (codebase, git, memory, automation...)
-│   ├── utils/                 # Logger, crypto, sandbox, validation, key pool
+│   ├── routes/                # 32 fichiers de routes REST
+│   ├── runtime/               # ToolRegistry, AgentRuntime, StateMachine
+│   ├── skills/                # 22 skills IA (codebase, git, memory, automation...)
+│   ├── utils/                 # Logger, crypto, sandbox, validation, key pool, textGeneration
 │   └── workflows/             # Moteur de workflows documentaires
-├── src/                       # Frontend React
-│   ├── components/            # 60+ composants (IDE, notebooks, panels, sidebar, UI, Skeleton, Canvas)
+├── src/                       # Frontend React 19
+│   ├── components/            # 60+ composants
+│   │   ├── notebooks/         # 11 composants notebook (Chat, Sources, Notes, Canvas, Audio...)
+│   │   ├── ide/               # IDE (Editor, Explorer, Terminal, Git)
+│   │   └── ui/                # Composants UI réutilisables (Toast, Skeleton...)
 │   ├── config/                # Configuration sidebar, thèmes
 │   ├── context/               # Providers (Theme, Profile, LiveAPI, ScreenShare)
-│   ├── hooks/                 # Hooks (useLiveAPI, useProfile, useTheme...)
+│   ├── hooks/                 # Custom hooks
 │   ├── services/              # Clients HTTP
-│   ├── types/                 # Types centralisés (notebook.ts)
-│   └── views/                 # 10 vues (IDE, Notebooks, Memories, Settings, etc.)
+│   ├── types/                 # Types centralisés
+│   └── views/                 # 10 vues (IDE, Notebooks, Memories, Settings...)
 ├── server-bootstrap.ts        # Point d'entrée serveur (env, crypto, validation)
+├── server.ts                  # Serveur Express + WebSocket + Gemini Live
 ├── index.html                 # Shell HTML Vite
 ├── package.json               # Scripts, dépendances
 └── vite.config.ts             # Configuration Vite + plugins
@@ -340,7 +362,7 @@ Jarvis-OS/
 
 ## 🌐 API Backend
 
-35 groupes de routes REST disponibles :
+32 groupes de routes REST :
 
 | Route | Description |
 |-------|-------------|
@@ -350,6 +372,7 @@ Jarvis-OS/
 | `/api/custom-agents` | Agents personnalisés (Agent Builder) |
 | `/api/custom-skills` | Skills créées par l'utilisateur |
 | `/api/documents` | Gestion et analyse documentaire |
+| `/api/generate-agent` | Génération dynamique d'agents |
 | `/api/git` | Opérations Git (status, commit, branches) |
 | `/api/github` | Intégration GitHub (repos, issues, PRs) |
 | `/api/health` | Monitoring & santé système |
@@ -359,14 +382,18 @@ Jarvis-OS/
 | `/api/lists` | Listes et to-do |
 | `/api/mcp` | Gestion des serveurs MCP |
 | `/api/memories` | Mémoire long terme |
-| `/api/notebooks` | Notebooks RAG (sources, chat, génération, audio) |
-| `/api/notebooks/backup` | Backup & restauration automatique des notebooks |
-| `/api/notebooks/queue` | File d'attente de processing des sources |
-| `/api/notebooks/cache` | Statistiques & contrôle du cache intelligent |
+| `/api/notebooks` | Notebooks RAG (sources, chat, génération, audio, threads, notes) |
+| `/api/openrouter` | Configuration OpenRouter |
 | `/api/profile` | Profil utilisateur, préférences IA |
 | `/api/safeguards` | Garde-fous de sécurité |
 | `/api/sandbox` | Environnement sandbox isolé |
+| `/api/self-root` | Gestion du self-root |
 | `/api/skills` | Registry des outils IA |
+| `/api/summarize-context` | Optimisation contexte LLM |
+| `/api/tokens-optimization` | Gestion des tokens |
+| `/api/tts` | Synthèse vocale (Text-to-Speech) |
+| `/api/understanding` | Moteur de compréhension |
+| `/api/upload-document` | Upload et analyse de documents |
 | `/api/workflows` | Moteur de workflows |
 | `/api/workspace` | Gestion du workspace |
 
@@ -374,19 +401,25 @@ Jarvis-OS/
 
 ## 🛠️ Skills & Outils IA
 
-L'IA dispose de 20+ skills regroupées par domaine :
+L'IA dispose de 22+ skills regroupées par domaine :
 
 | Skill | Outils fournis |
 |-------|---------------|
 | **codebase** | Lecture/écriture de fichiers, recherche, refactoring |
+| **codebaseReader** | Lecture optimisée de code source |
+| **codebaseWriter** | Écriture sécurisée avec validation |
 | **git** | Status, commit, push, branches, diff |
 | **github** | Issues, PRs, repos, review |
-| **automation** | Créer/lister/supprimer des tâches planifiées, navigation web |
+| **automation** | Tâches planifiées, navigation web (Puppeteer) |
+| **automationBrowser** | Navigation web autonome |
 | **knowledge** | Indexation, recherche sémantique, graphe de dépendances |
+| **documentKnowledge** | Connaissance documentaire spécialisée |
+| **documentLinker** | Liaisons entre documents |
 | **memory** | Stockage/récupération de mémoires persistantes |
 | **mission** | Planification et exécution de missions autonomes |
 | **agents** | Délégation à des agents spécialisés |
 | **reasoning** | Chain-of-thought, décomposition de problèmes |
+| **chainOfThought** | Raisonnement explicite pas-à-pas |
 | **workflow** | Exécution de pipelines documentaires |
 | **verify** | Validation et tests |
 | **system** | Commandes système, monitoring |
@@ -411,6 +444,7 @@ L'IA dispose de 20+ skills regroupées par domaine :
 - **Injection guards** : Protection contre l'injection de prompts
 - **Backup & Recovery** : Sauvegarde automatique incrémentale avec restauration granulaire
 - **Memory management** : Éviction LRU pour prévenir les fuites mémoire sur les embeddings
+- **Iframe sandbox** : Rendu HTML isolé (sans scripts) pour les sources HTML
 
 ---
 
