@@ -360,11 +360,30 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
     finally { setLoadingSuggestions(false); }
   }, [notebookId, sources.length]);
 
+  // Auto-refresh toutes les 5 minutes
+  useEffect(() => {
+    if (sources.length === 0) return;
+    // Charge au premier rendu
+    loadSuggestions();
+    const interval = setInterval(loadSuggestions, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notebookId]);
+
+  // Refresh automatique quand le nombre de sources change
+  const prevSourcesCountRef = useRef(sources.length);
+  useEffect(() => {
+    if (sources.length > 0 && sources.length !== prevSourcesCountRef.current) {
+      prevSourcesCountRef.current = sources.length;
+      loadSuggestions();
+    }
+  }, [sources.length, loadSuggestions]);
+
   // Ouvrir le modal "Rapport complet"
   const openReportModal = useCallback(() => {
     setShowReportModal(true);
     setModalSelectedType(null);
-    // Charger les suggestions seulement la première fois (pas de refresh auto)
+    // Les suggestions sont déjà chargées automatiquement, mais on rafraîchit si vide
     if (suggestions.length === 0 && !loadingSuggestions) {
       loadSuggestions();
     }
@@ -882,7 +901,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
       {/* Document viewer — shown in fullView mode */}
       {fullView && (
-      <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-8" style={{ borderColor: 'var(--notebook-border)' }}>
+      <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-4" style={{ borderColor: 'var(--notebook-border)' }}>
         {/* Streaming view */}
         {streamingText && !selectedDoc && (
           <div className="space-y-5 max-w-3xl">
@@ -1262,7 +1281,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 10 }}
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden"
+              className="w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden"
               style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
             >
               {/* Header */}
