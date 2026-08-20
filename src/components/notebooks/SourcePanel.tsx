@@ -336,53 +336,71 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
   if (compact) {
     return (
-      <div className="notebook-sources-compact h-full min-h-0 overflow-hidden">
-        <div className="flex items-center justify-between gap-3 px-4 py-4">
+      <div className="h-full min-h-0 overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 px-4 py-4 flex-shrink-0">
           <div>
             <p className="notebook-eyebrow">Sources</p>
-            <h2 className="text-sm font-semibold text-[var(--text-primary)]">{sources.length} document{sources.length > 1 ? 's' : ''}</h2>
+            <h2 className="text-sm font-medium text-[var(--text-primary)]">{sources.length} document{sources.length > 1 ? 's' : ''}</h2>
           </div>
           <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="notebook-primary-small">
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            Ajouter
+            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+            <span>Ajouter</span>
           </button>
           <input ref={fileInputRef} type="file" accept={ACCEPTED_EXTENSIONS} multiple onChange={handleFileInputChange} className="hidden" />
         </div>
-        <div className="px-4 pb-3">
-          <div className="notebook-search-field">
-            <Search className="h-4 w-4" />
-            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Rechercher dans les sources" />
+
+        {/* Search */}
+        <div className="px-4 pb-3 flex-shrink-0">
+          <div className="notebook-search-field" style={{ minHeight: 36 }}>
+            <Search className="h-3.5 w-3.5" />
+            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Rechercher..." style={{ fontSize: '13px' }} />
           </div>
         </div>
+
+        {/* Source list */}
         <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-2 pb-4">
           {sources.length === 0 ? (
-            <div className="mx-3 mt-8 rounded-[var(--notebook-radius-lg)] bg-[var(--notebook-surface)] p-5 text-center">
-              <FileText className="mx-auto mb-3 h-6 w-6 text-[var(--accent-primary)]" />
-              <p className="text-sm font-medium text-[var(--text-primary)]">Aucune source pour le moment</p>
-              <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">Ajoutez des PDF, des sites web, des documents ou du texte pour constituer ce carnet.</p>
+            <div className="notebook-empty-state" style={{ padding: '32px 16px' }}>
+              <div className="notebook-empty-state-icon" style={{ width: 44, height: 44 }}>
+                <FileText className="h-5 w-5" />
+              </div>
+              <p className="text-sm font-medium text-[var(--text-primary)]">Aucune source</p>
+              <p className="text-xs text-[var(--text-muted)]">Ajoutez des documents pour commencer.</p>
             </div>
           ) : filteredSources.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">Aucune source ne correspond à votre recherche.</p>
+            <p className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Aucun résultat.</p>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {filteredSources.map((source) => (
-                <div key={source.id} className="notebook-source-row group w-full flex items-center" data-active={selectedSourceId === source.id}>
-                  <button type="button" onClick={() => onSelectSource?.(source.id)} className="flex items-center gap-2 flex-1 min-w-0 text-left py-0">
-                    <span className="notebook-source-icon" style={{ color: TYPE_COLORS[source.type] || 'var(--text-muted)' }}>{TYPE_ICONS[source.type] || '📎'}</span>
+                <div
+                  key={source.id}
+                  className="notebook-source-row group w-full"
+                  data-active={selectedSourceId === source.id}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onSelectSource?.(source.id)}
+                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                  >
+                    <span className="notebook-source-icon" style={{ color: TYPE_COLORS[source.type] || 'var(--text-muted)' }}>
+                      {TYPE_ICONS[source.type] || '📎'}
+                    </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-[var(--text-primary)]">{source.title}</span>
-                      <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{source.wordCount?.toLocaleString()} Mots · {source.chunksCount} passages</span>
+                      <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">{source.title}</span>
+                      <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
+                        {source.type} · {source.wordCount?.toLocaleString()} mots
+                      </span>
                     </span>
                   </button>
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleDelete(source.id); }}
                     className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 flex-shrink-0"
-                    title="Supprimer cette source"
+                    title="Supprimer"
                   >
                     <Trash2 className="h-3.5 w-3.5 text-red-400" />
                   </button>
-                  <span className="h-2 w-2 rounded-full bg-[var(--accent-primary)] opacity-0 transition-opacity group-data-[active=true]:opacity-100 flex-shrink-0" />
                 </div>
               ))}
             </div>
@@ -394,7 +412,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
   return (
     <div
-      className="h-full overflow-y-auto custom-scrollbar p-5 lg:p-7 space-y-4 relative"
+      className="h-full overflow-y-auto custom-scrollbar p-6 lg:p-8 space-y-5 relative"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -408,22 +426,19 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
             exit={{ opacity: 0 }}
             className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-2xl"
             style={{
-              backgroundColor: 'rgba(var(--accent-primary-rgb, 99, 102, 241), 0.1)',
-              border: '2.5px dashed var(--accent-primary)',
+              backgroundColor: 'var(--notebook-accent-surface)',
+              border: '2.5px dashed var(--notebook-accent)',
               backdropFilter: 'blur(4px)',
             }}
           >
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: 'var(--accent-subtle)' }}
-            >
-              <Upload className="w-8 h-8" style={{ color: 'var(--accent-primary)' }} />
+            <div className="notebook-empty-state-icon" style={{ width: 64, height: 64 }}>
+              <Upload className="w-7 h-7" />
             </div>
-            <p className="text-sm font-bold" style={{ color: 'var(--accent-primary)' }}>
+            <p className="text-sm font-medium" style={{ color: 'var(--notebook-accent)' }}>
               Déposez vos fichiers ici
             </p>
-            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              PDF, texte, Markdown, HTML, DOCX, CSV, JSON, YAML, Images (PNG, JPG, WebP)
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              PDF, texte, Markdown, HTML, DOCX, CSV, JSON, YAML, Images
             </p>
           </motion.div>
         )}
@@ -480,8 +495,8 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 shadow-sm"
-          style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+          className="notebook-fab disabled:opacity-50"
+          style={{ padding: '10px 18px', fontSize: '13px' }}
         >
           {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
           Uploader
@@ -497,8 +512,8 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
         <button
           onClick={() => { setShowUrlForm(!showUrlForm); setShowTextForm(false); }}
-          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium border transition-all hover:bg-white/5 ${showUrlForm ? 'ring-1 ring-[var(--accent-primary)]' : ''}`}
-          style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+          className={`notebook-chip ${showUrlForm ? 'notebook-chip--active' : ''}`}
+          style={showUrlForm ? { borderColor: 'var(--notebook-accent)', color: 'var(--notebook-accent)', background: 'var(--notebook-accent-surface)' } : {}}
         >
           <Globe className="w-3.5 h-3.5" />
           URL
@@ -506,8 +521,8 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
         <button
           onClick={() => { setShowTextForm(!showTextForm); setShowUrlForm(false); }}
-          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium border transition-all hover:bg-white/5 ${showTextForm ? 'ring-1 ring-[var(--accent-primary)]' : ''}`}
-          style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+          className={`notebook-chip ${showTextForm ? 'notebook-chip--active' : ''}`}
+          style={showTextForm ? { borderColor: 'var(--notebook-accent)', color: 'var(--notebook-accent)', background: 'var(--notebook-accent-surface)' } : {}}
         >
           <Type className="w-3.5 h-3.5" />
           Texte
@@ -515,8 +530,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
         <button
           onClick={handleClipboardPaste}
-          className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium border transition-all hover:bg-white/5"
-          style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+          className="notebook-chip"
           title="Coller depuis le presse-papier"
         >
           <ClipboardPaste className="w-3.5 h-3.5" />
@@ -533,15 +547,13 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
       {/* Search (when >3 sources) */}
       {sources.length > 3 && (
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--text-dimmed)' }} />
+        <div className="notebook-search-field">
+          <Search className="h-4 w-4 flex-shrink-0" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Rechercher dans les sources..."
-            className="w-full pl-9 pr-4 py-2 rounded-lg text-xs outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
-            style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
           />
         </div>
       )}
@@ -555,11 +567,11 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="p-4 rounded-2xl border space-y-3"
-              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
+            <div className="p-5 rounded-2xl border space-y-3"
+              style={{ backgroundColor: 'var(--notebook-card-bg)', borderColor: 'var(--notebook-border)' }}>
               <div className="flex items-center gap-2 mb-1">
-                <Globe className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>Ingérer une URL</p>
+                <Globe className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Importer une URL</p>
               </div>
               <input
                 type="url"
@@ -568,22 +580,21 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 onKeyDown={e => e.key === 'Enter' && handleUrlIngest()}
                 placeholder="https://example.com/article..."
                 autoFocus
-                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
-                style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
+                style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
               />
               <div className="flex gap-2">
                 <button
                   onClick={handleUrlIngest}
                   disabled={!url.trim() || uploading}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-40 transition active:scale-95"
-                  style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                  className="notebook-fab disabled:opacity-40"
+                  style={{ padding: '8px 16px', fontSize: '13px' }}
                 >
-                  {uploading ? 'Ingestion...' : 'Ingérer'}
+                  {uploading ? 'Ingestion...' : 'Importer'}
                 </button>
                 <button
                   onClick={() => { setShowUrlForm(false); setUrl(''); }}
-                  className="px-3 py-2 rounded-xl text-xs"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="notebook-chip"
                 >
                   Annuler
                 </button>
@@ -602,19 +613,19 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="p-4 rounded-2xl border space-y-3"
-              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
+            <div className="p-5 rounded-2xl border space-y-3"
+              style={{ backgroundColor: 'var(--notebook-card-bg)', borderColor: 'var(--notebook-border)' }}>
               <div className="flex items-center gap-2 mb-1">
-                <Type className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
-                <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>Ajouter du texte</p>
+                <Type className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Ajouter du texte</p>
               </div>
               <input
                 type="text"
                 value={textTitle}
                 onChange={e => setTextTitle(e.target.value)}
-                placeholder="Titre (optionnel)..."
-                className="w-full px-4 py-2 rounded-xl text-xs outline-none"
-                style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                placeholder="Titre (optionnel)"
+                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
               />
               <div className="relative">
                 <textarea
@@ -622,11 +633,11 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                   onChange={e => setTextContent(e.target.value)}
                   placeholder="Collez votre texte ici..."
                   rows={6}
-                  className="w-full px-4 py-3 rounded-xl text-xs outline-none resize-none"
-                  style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                  className="w-full px-4 py-3 rounded-xl text-sm outline-none resize-none"
+                  style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
                 />
                 {textContent && (
-                  <span className="absolute bottom-2 right-3 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="absolute bottom-2 right-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
                     ~{textContent.split(/\s+/).length} mots
                   </span>
                 )}
@@ -635,15 +646,14 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 <button
                   onClick={handleTextAdd}
                   disabled={!textContent.trim() || uploading}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-40 transition active:scale-95"
-                  style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                  className="notebook-fab disabled:opacity-40"
+                  style={{ padding: '8px 16px', fontSize: '13px' }}
                 >
                   {uploading ? 'Ajout...' : 'Ajouter'}
                 </button>
                 <button
                   onClick={() => { setShowTextForm(false); setTextTitle(''); setTextContent(''); }}
-                  className="px-3 py-2 rounded-xl text-xs"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="notebook-chip"
                 >
                   Annuler
                 </button>
@@ -663,25 +673,22 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       {/* Sources List */}
       {sources.length === 0 ? (
         <div
-          className="flex flex-col items-center justify-center py-14 gap-5 rounded-2xl border-2 border-dashed transition-colors"
-          style={{ borderColor: dragOver ? 'var(--accent-primary)' : 'var(--border-base)' }}
+          className="notebook-empty-state rounded-2xl border-2 border-dashed transition-colors"
+          style={{ borderColor: dragOver ? 'var(--notebook-accent)' : 'var(--notebook-border)', padding: '48px 24px' }}
         >
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: 'var(--accent-subtle)' }}
-          >
-            <FileText className="w-7 h-7" style={{ color: 'var(--accent-primary)' }} />
+          <div className="notebook-empty-state-icon" style={{ width: 56, height: 56 }}>
+            <FileText className="w-6 h-6" />
           </div>
-          <div className="text-center space-y-1.5">
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Ajoutez vos premières sources
-            </p>
-            <p className="text-xs max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              Glissez-déposez vos fichiers ici, ou utilisez les boutons ci-dessus.
-            </p>
-            <p className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
-              PDF, texte, Markdown, HTML, DOCX, CSV, JSON, YAML
-            </p>
+          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            Ajoutez vos premières sources
+          </p>
+          <p className="text-xs max-w-sm" style={{ color: 'var(--text-muted)' }}>
+            Glissez-déposez des fichiers, ou utilisez les boutons ci-dessus pour importer.
+          </p>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {['PDF', 'URL', 'Texte', 'DOCX', 'Markdown'].map(t => (
+              <span key={t} className="notebook-chip" style={{ fontSize: '11px', padding: '4px 10px' }}>{t}</span>
+            ))}
           </div>
         </div>
       ) : (
@@ -694,8 +701,10 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="group p-4 rounded-2xl border flex gap-3 transition-all hover:border-[var(--border-focus)] hover:shadow-sm"
-                style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+                className="group p-4 rounded-2xl border flex gap-3 transition-all"
+                style={{ backgroundColor: 'var(--notebook-card-bg)', borderColor: 'var(--notebook-border)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--notebook-accent)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--notebook-border)'; }}
               >
                 {/* Type icon with color indicator */}
                 <div className="flex flex-col items-center gap-1">

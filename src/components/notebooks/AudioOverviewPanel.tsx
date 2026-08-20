@@ -36,11 +36,14 @@ interface Props {
   overviews: AudioOverview[];
   sources: Source[];
   onRefresh: () => void;
+  fullView?: boolean;
+  onClose?: () => void;
+  onViewDoc?: (doc: { id: string; title: string; type: string; content: string; createdAt: string }) => void;
 }
 
 type Tone = 'casual' | 'academic' | 'humorous' | 'professional';
 
-export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }: Props) {
+export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, fullView = false, onClose, onViewDoc }: Props) {
   const { success, error: toastError } = useToast();
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -345,30 +348,27 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }
   }, []);
 
   return (
-    <div className="h-full flex flex-col lg:flex-row">
+    <div className={`h-full ${fullView ? 'flex flex-col lg:flex-row' : 'flex flex-col'}`}>
       {/* Left: Generator + list */}
       <div
-        className="w-full lg:w-80 flex-shrink-0 border-b lg:border-b-0 lg:border-r overflow-y-auto custom-scrollbar p-5 space-y-5"
-        style={{ borderColor: 'var(--border-base)' }}
+        className={`${fullView ? 'w-full lg:w-80 flex-shrink-0 border-b lg:border-b-0 lg:border-r' : 'flex-1'} overflow-y-auto custom-scrollbar p-5 space-y-5`}
+        style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-studio-bg)' }}
       >
         {/* Generator card */}
         <div
           className="p-5 rounded-2xl border space-y-4"
-          style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+          style={{ backgroundColor: 'var(--notebook-card-bg)', borderColor: 'var(--notebook-border)' }}
         >
           <div className="flex items-center gap-2.5">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: 'var(--accent-subtle)' }}
-            >
-              <Mic className="w-4.5 h-4.5" style={{ color: 'var(--accent-primary)' }} />
+            <div className="notebook-empty-state-icon" style={{ width: 36, height: 36 }}>
+              <Mic className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                 Audio Overview
               </p>
-              <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
-                Podcast IA avec lecture audio
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Podcast IA conversationnel
               </p>
             </div>
           </div>
@@ -545,7 +545,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }
                   className="relative group"
                 >
                   <button
-                    onClick={() => setSelectedOverview(ov)}
+                    onClick={() => { setSelectedOverview(ov); if (onViewDoc && !fullView) onViewDoc({ id: ov.id, title: ov.title, type: 'audio-overview', content: ov.script, createdAt: ov.createdAt }); }}
                     className={`w-full p-3.5 rounded-xl border text-left transition-all hover:shadow-sm ${selectedOverview?.id === ov.id ? 'ring-1 ring-[var(--accent-primary)]' : ''}`}
                     style={{ borderColor: selectedOverview?.id === ov.id ? 'var(--accent-primary)' : 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
                   >
@@ -587,8 +587,9 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }
         )}
       </div>
 
-      {/* Right: Script viewer */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-7">
+      {/* Script viewer — shown in fullView mode when overview is selected */}
+      {fullView && selectedOverview && (
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-7" style={{ borderColor: 'var(--notebook-border)' }}>
         {selectedOverview ? (
           <div className="space-y-5 max-w-2xl mx-auto">
             {/* Header */}
@@ -861,26 +862,9 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh }
               })}
             </div>
           </div>
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center gap-4">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: 'var(--accent-subtle)' }}
-            >
-              <Mic className="w-7 h-7" style={{ color: 'var(--accent-primary)' }} />
-            </div>
-            <div className="text-center space-y-1.5">
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                Audio Overview
-              </p>
-              <p className="text-xs max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                Générez un podcast IA : deux hôtes discutent de vos sources.
-                Écoutez-le en TTS ou téléchargez le script en Markdown.
-              </p>
-            </div>
-          </div>
-        )}
+        ) : null}
       </div>
+      )}
     </div>
   );
 }

@@ -1,17 +1,17 @@
 /**
- * NotebookList — Page d'accueil des notebooks
+ * NotebookList — Page d'accueil des notebooks (style NotebookLM)
  *
- * Affiche tous les notebooks avec création rapide, recherche, tri et vue grille/liste.
+ * Design Google NotebookLM : cards épurées, mise en page aérée,
+ * création rapide, recherche et tri.
  */
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   BookOpen, Plus, Loader2, Trash2, Clock, FileText, MessageSquare,
-  Search, Grid3X3, List, SortAsc, SortDesc, Sparkles, X,
+  Search, SortAsc, SortDesc, Sparkles, X, Upload, Globe, Mic,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
-import { ViewHeader } from '../ui/ViewHeader';
 
 interface NotebookSummary {
   id: string;
@@ -30,7 +30,6 @@ interface Props {
   onClose?: () => void;
 }
 
-type ViewMode = 'grid' | 'list';
 type SortBy = 'updatedAt' | 'title' | 'sourcesCount';
 
 function timeAgo(dateStr: string): string {
@@ -41,7 +40,7 @@ function timeAgo(dateStr: string): string {
   if (days > 0) return `il y a ${days}j`;
   if (hours > 0) return `il y a ${hours}h`;
   if (mins > 0) return `il y a ${mins}m`;
-  return 'maintenant';
+  return 'à l\'instant';
 }
 
 export function NotebookList({ onSelectNotebook, onClose }: Props) {
@@ -53,7 +52,6 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortBy>('updatedAt');
   const [sortDesc, setSortDesc] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -74,11 +72,8 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
   useEffect(() => { loadNotebooks(); }, [loadNotebooks]);
 
-  // Filtrage et tri
   const filteredNotebooks = useMemo(() => {
     let result = notebooks;
-
-    // Recherche
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(nb =>
@@ -86,20 +81,13 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
         nb.description.toLowerCase().includes(q)
       );
     }
-
-    // Tri
     result = [...result].sort((a, b) => {
       let cmp = 0;
-      if (sortBy === 'updatedAt') {
-        cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-      } else if (sortBy === 'title') {
-        cmp = a.title.localeCompare(b.title);
-      } else if (sortBy === 'sourcesCount') {
-        cmp = a.sourcesCount - b.sourcesCount;
-      }
+      if (sortBy === 'updatedAt') cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      else if (sortBy === 'title') cmp = a.title.localeCompare(b.title);
+      else if (sortBy === 'sourcesCount') cmp = a.sourcesCount - b.sourcesCount;
       return sortDesc ? -cmp : cmp;
     });
-
     return result;
   }, [notebooks, searchQuery, sortBy, sortDesc]);
 
@@ -146,28 +134,35 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   }, [deleteTarget, success, toastError]);
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
-      {/* Header */}
-      <ViewHeader
-        icon={BookOpen}
-        title="Notebooks"
-        badge="AI Research"
-        description="Collections de sources avec chat IA, résumés et génération"
-        actions={
+    <div className="notebook-workspace h-full flex flex-col overflow-hidden">
+      {/* ─── Header ─────────────────────────────────────────── */}
+      <header className="flex-shrink-0 px-6 lg:px-10 pt-8 pb-6">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-3">
+            <div className="notebook-empty-state-icon" style={{ width: 40, height: 40 }}>
+              <BookOpen className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-medium" style={{ color: 'var(--text-primary)' }}>
+                Mes Notebooks
+              </h1>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                {notebooks.length} notebook{notebooks.length !== 1 ? 's' : ''} · Recherche IA avec citations
+              </p>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowCreateForm(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-semibold transition-all active:scale-95 hover:opacity-90 shadow-sm"
-              style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+              className="notebook-fab"
             >
-              <Plus className="w-3.5 h-3.5" />
-              Nouveau
+              <Plus className="w-4 h-4" />
+              <span>Créer</span>
             </button>
             {onClose && (
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg transition-colors hover:bg-[var(--ctrl-hover)]"
-                style={{ color: 'var(--text-muted)' }}
+                className="notebook-icon-button"
                 aria-label="Fermer"
                 title="Fermer"
               >
@@ -175,120 +170,76 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               </button>
             )}
           </div>
-        }
-      />
+        </div>
+      </header>
 
-      {/* Search & Filters Bar */}
+      {/* ─── Search & Sort Bar ──────────────────────────────── */}
       {notebooks.length > 0 && (
-        <div
-          className="flex items-center gap-3 px-5 py-3 lg:px-7 border-b flex-shrink-0"
-          style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-        >
-          {/* Search */}
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--text-dimmed)' }} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Rechercher un notebook..."
-              className="w-full pl-9 pr-4 py-2 rounded-lg text-xs outline-none transition-all focus:ring-1"
-              style={{
-                backgroundColor: 'var(--bg-input)',
-                border: '1px solid var(--border-base)',
-                color: 'var(--text-primary)',
-              }}
-            />
-          </div>
+        <div className="flex-shrink-0 px-6 lg:px-10 pb-4">
+          <div className="flex items-center gap-3">
+            {/* Search */}
+            <div className="notebook-search-field flex-1 max-w-md">
+              <Search className="h-4 w-4 flex-shrink-0" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Rechercher un notebook..."
+              />
+            </div>
 
-          {/* Sort */}
-          <div className="flex items-center gap-1">
+            {/* Sort */}
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as SortBy)}
-              className="px-3 py-2 rounded-lg text-[10px] outline-none cursor-pointer"
-              style={{
-                backgroundColor: 'var(--bg-input)',
-                border: '1px solid var(--border-base)',
-                color: 'var(--text-muted)',
-              }}
+              className="notebook-chip"
+              style={{ cursor: 'pointer', border: '1px solid var(--notebook-border)' }}
             >
-              <option value="updatedAt">Récent</option>
-              <option value="title">Titre</option>
-              <option value="sourcesCount">Sources</option>
+              <option value="updatedAt">Plus récent</option>
+              <option value="title">Titre A-Z</option>
+              <option value="sourcesCount">Nb. sources</option>
             </select>
             <button
               onClick={() => setSortDesc(!sortDesc)}
-              className="p-2 rounded-lg transition-colors hover:bg-white/5"
-              style={{ color: 'var(--text-muted)' }}
+              className="notebook-icon-button"
               title={sortDesc ? 'Décroissant' : 'Croissant'}
             >
-              {sortDesc ? <SortDesc className="w-3.5 h-3.5" /> : <SortAsc className="w-3.5 h-3.5" />}
+              {sortDesc ? <SortDesc className="w-4 h-4" /> : <SortAsc className="w-4 h-4" />}
             </button>
           </div>
-
-          {/* View mode */}
-          <div
-            className="flex items-center rounded-lg overflow-hidden border"
-            style={{ borderColor: 'var(--border-base)' }}
-          >
-            <button
-              onClick={() => setViewMode('grid')}
-              className="p-2 transition-colors"
-              style={{
-                backgroundColor: viewMode === 'grid' ? 'var(--accent-subtle)' : 'transparent',
-                color: viewMode === 'grid' ? 'var(--accent-primary)' : 'var(--text-dimmed)',
-              }}
-            >
-              <Grid3X3 className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className="p-2 transition-colors"
-              style={{
-                backgroundColor: viewMode === 'list' ? 'var(--accent-subtle)' : 'transparent',
-                color: viewMode === 'list' ? 'var(--accent-primary)' : 'var(--text-dimmed)',
-              }}
-            >
-              <List className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Count */}
-          <span className="text-[10px] ml-1" style={{ color: 'var(--text-dimmed)' }}>
-            {filteredNotebooks.length}/{notebooks.length}
-          </span>
         </div>
       )}
 
-      {/* Create Form */}
+      {/* ─── Create Form ────────────────────────────────────── */}
       <AnimatePresence>
         {showCreateForm && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-b flex-shrink-0"
-            style={{ borderColor: 'var(--border-base)' }}
+            className="overflow-hidden flex-shrink-0 px-6 lg:px-10"
           >
-            <div className="p-5 lg:px-7 space-y-3" style={{ backgroundColor: 'var(--bg-panel)' }}>
-              <div className="flex items-center gap-2 mb-1">
-                <Sparkles className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <div
+              className="rounded-2xl border p-6 mb-4 space-y-4"
+              style={{ backgroundColor: 'var(--notebook-card-bg)', borderColor: 'var(--notebook-border)' }}
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5" style={{ color: 'var(--notebook-accent)' }} />
+                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                   Nouveau notebook
-                </p>
+                </span>
               </div>
               <input
                 type="text"
                 value={newTitle}
                 onChange={e => setNewTitle(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                placeholder="Titre du notebook..."
+                placeholder="Titre du notebook"
                 autoFocus
-                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all focus:ring-1"
+                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
                 style={{
-                  backgroundColor: 'var(--bg-input)',
-                  border: '1px solid var(--border-base)',
+                  backgroundColor: 'var(--notebook-surface-muted)',
+                  border: '1px solid var(--notebook-border)',
                   color: 'var(--text-primary)',
                 }}
               />
@@ -297,27 +248,26 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 value={newDescription}
                 onChange={e => setNewDescription(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                placeholder="Description (optionnel)..."
-                className="w-full px-4 py-2 rounded-xl text-xs outline-none transition-all focus:ring-1"
+                placeholder="Description (optionnel)"
+                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all"
                 style={{
-                  backgroundColor: 'var(--bg-input)',
-                  border: '1px solid var(--border-base)',
+                  backgroundColor: 'var(--notebook-surface-muted)',
+                  border: '1px solid var(--notebook-border)',
                   color: 'var(--text-primary)',
                 }}
               />
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-3 pt-1">
                 <button
                   onClick={handleCreate}
                   disabled={!newTitle.trim() || creating}
-                  className="px-5 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:opacity-40"
-                  style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                  className="notebook-fab disabled:opacity-40"
+                  style={{ padding: '10px 20px', fontSize: '13px' }}
                 >
-                  {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Créer'}
+                  {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Créer le notebook'}
                 </button>
                 <button
                   onClick={() => { setShowCreateForm(false); setNewTitle(''); setNewDescription(''); }}
-                  className="px-4 py-2.5 rounded-xl text-xs font-medium transition-colors hover:bg-white/5"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="notebook-chip"
                 >
                   Annuler
                 </button>
@@ -327,198 +277,140 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Notebook Grid / List */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-7">
+      {/* ─── Notebook Cards ─────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-6 lg:px-10 pb-8">
         {loading ? (
-          <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4' : 'space-y-3 max-w-2xl'}`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
                 className="p-5 rounded-2xl border animate-pulse"
-                style={{ borderColor: 'var(--border-base)' }}
+                style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-card-bg)' }}
               >
-                <div className="flex items-start gap-3">
-                  <div className="w-11 h-11 rounded-xl" style={{ backgroundColor: 'var(--border-base)' }} />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 w-3/4 rounded" style={{ backgroundColor: 'var(--border-base)' }} />
-                    <div className="h-3 w-full rounded" style={{ backgroundColor: 'var(--border-base)' }} />
-                    <div className="flex gap-3 pt-2">
-                      <div className="h-3 w-16 rounded" style={{ backgroundColor: 'var(--border-base)' }} />
-                      <div className="h-3 w-12 rounded" style={{ backgroundColor: 'var(--border-base)' }} />
-                    </div>
+                <div className="space-y-3">
+                  <div className="h-5 w-3/4 rounded-lg" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
+                  <div className="h-4 w-full rounded-lg" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
+                  <div className="flex gap-3 pt-3">
+                    <div className="h-6 w-20 rounded-full" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
+                    <div className="h-6 w-16 rounded-full" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : notebooks.length === 0 ? (
-          /* Empty state — premier notebook avec onboarding */
-          <div className="flex flex-col items-center justify-center py-16 gap-6 max-w-xl mx-auto">
-            <div
-              className="w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg"
-              style={{ backgroundColor: 'var(--accent-subtle)' }}
-            >
-              <BookOpen className="w-9 h-9" style={{ color: 'var(--accent-primary)' }} />
+          /* ─── Empty state — onboarding ─── */
+          <div className="notebook-empty-state py-20">
+            <div className="notebook-empty-state-icon" style={{ width: 72, height: 72 }}>
+              <BookOpen className="h-8 w-8" />
             </div>
-            <div className="text-center space-y-2">
-              <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-                Bienvenue dans Notebooks
-              </p>
-              <p className="text-xs max-w-md leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                Créez votre premier notebook pour commencer. Ajoutez des sources (PDF, URLs, textes)
-                puis posez des questions — l'IA répondra en citant vos documents.
-              </p>
-            </div>
+            <h2 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+              Commencez avec un notebook
+            </h2>
+            <p className="text-sm max-w-md" style={{ color: 'var(--text-muted)' }}>
+              Importez des sources (PDF, URLs, texte) et posez des questions.
+              L'IA répondra en citant vos documents.
+            </p>
 
-            {/* Feature highlights */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
+            {/* Feature chips */}
+            <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
               {[
-                { icon: '📚', title: 'Sources', desc: 'PDF, URLs, texte, Markdown, audio' },
-                { icon: '💬', title: 'Chat IA', desc: 'Questions avec citations précises' },
-                { icon: '🎙️', title: 'Podcast', desc: 'Générez un audio overview' },
-              ].map((feat) => (
-                <div
-                  key={feat.title}
-                  className="p-4 rounded-xl text-center space-y-1.5"
-                  style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
-                >
-                  <span className="text-xl">{feat.icon}</span>
-                  <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{feat.title}</p>
-                  <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{feat.desc}</p>
-                </div>
+                { icon: Upload, label: 'Upload PDF' },
+                { icon: Globe, label: 'Importer URL' },
+                { icon: MessageSquare, label: 'Chat IA' },
+                { icon: Sparkles, label: 'Résumés' },
+                { icon: Mic, label: 'Audio Overview' },
+              ].map(({ icon: Icon, label }) => (
+                <span key={label} className="notebook-chip">
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </span>
               ))}
             </div>
 
             <button
               onClick={() => setShowCreateForm(true)}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 shadow-md hover:shadow-lg"
-              style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+              className="notebook-fab mt-6"
             >
               <Plus className="w-4 h-4" />
               Créer mon premier notebook
             </button>
           </div>
         ) : filteredNotebooks.length === 0 ? (
-          /* No results from search */
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
+          /* ─── No search results ─── */
+          <div className="notebook-empty-state py-12">
             <Search className="w-6 h-6" style={{ color: 'var(--text-dimmed)' }} />
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Aucun notebook trouvé pour "{searchQuery}"
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Aucun résultat pour « {searchQuery} »
             </p>
           </div>
-        ) : viewMode === 'grid' ? (
-          /* Grid View */
+        ) : (
+          /* ─── Grid View ─── */
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             <AnimatePresence initial={false}>
               {filteredNotebooks.map((nb, i) => (
                 <motion.div
                   key={nb.id}
                   layout
-                  initial={{ opacity: 0, y: 12 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
                   transition={{ duration: 0.2, delay: i < 12 ? i * 0.03 : 0 }}
                   onClick={() => onSelectNotebook(nb.id)}
-                  className="group cursor-pointer p-5 rounded-2xl border flex flex-col gap-3 transition-all hover:border-[var(--border-focus)] hover:shadow-lg hover:-translate-y-0.5"
-                  style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+                  className="group cursor-pointer rounded-2xl border p-5 flex flex-col gap-3 transition-all duration-200"
+                  style={{
+                    backgroundColor: 'var(--notebook-card-bg)',
+                    borderColor: 'var(--notebook-border)',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--notebook-accent)';
+                    (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--notebook-border)';
+                    (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                  }}
                 >
-                  {/* Header */}
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="w-11 h-11 rounded-xl flex items-center justify-center text-lg flex-shrink-0 shadow-sm"
-                      style={{ backgroundColor: `${nb.color}20`, border: `1px solid ${nb.color}30` }}
-                    >
-                      {nb.icon}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                  {/* Card header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-xl flex-shrink-0">{nb.icon}</span>
+                      <h3 className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                         {nb.title}
-                      </p>
-                      {nb.description && (
-                        <p className="text-[11px] mt-0.5 line-clamp-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                          {nb.description}
-                        </p>
-                      )}
+                      </h3>
                     </div>
                     <button
                       onClick={(e) => handleDeleteClick(nb.id, e)}
-                      className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/10"
+                      className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 flex-shrink-0"
                       title="Supprimer"
+                      aria-label="Supprimer"
                     >
-                      <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
                     </button>
                   </div>
 
-                  {/* Stats */}
-                  <div className="flex items-center gap-4 mt-auto pt-3 border-t" style={{ borderColor: 'var(--border-base)' }}>
-                    <span className="flex items-center gap-1.5 text-[10px] font-medium" style={{ color: 'var(--text-dimmed)' }}>
+                  {/* Description */}
+                  {nb.description && (
+                    <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                      {nb.description}
+                    </p>
+                  )}
+
+                  {/* Footer stats */}
+                  <div className="flex items-center gap-3 mt-auto pt-3">
+                    <span className="notebook-chip" style={{ padding: '4px 10px', fontSize: '11px' }}>
                       <FileText className="w-3 h-3" />
                       {nb.sourcesCount} source{nb.sourcesCount !== 1 ? 's' : ''}
                     </span>
-                    <span className="flex items-center gap-1.5 text-[10px] font-medium" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="notebook-chip" style={{ padding: '4px 10px', fontSize: '11px' }}>
                       <MessageSquare className="w-3 h-3" />
                       {nb.notesCount} note{nb.notesCount !== 1 ? 's' : ''}
                     </span>
-                    <span className="ml-auto flex items-center gap-1 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
-                      <Clock className="w-2.5 h-2.5" />
+                    <span className="ml-auto flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+                      <Clock className="w-3 h-3" />
                       {timeAgo(nb.updatedAt)}
                     </span>
                   </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        ) : (
-          /* List View */
-          <div className="space-y-2">
-            <AnimatePresence initial={false}>
-              {filteredNotebooks.map((nb, i) => (
-                <motion.div
-                  key={nb.id}
-                  layout
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ duration: 0.15, delay: i < 20 ? i * 0.02 : 0 }}
-                  onClick={() => onSelectNotebook(nb.id)}
-                  className="group cursor-pointer flex items-center gap-4 px-4 py-3 rounded-xl border transition-all hover:border-[var(--border-focus)] hover:shadow-sm"
-                  style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
-                >
-                  <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center text-base flex-shrink-0"
-                    style={{ backgroundColor: `${nb.color}20` }}
-                  >
-                    {nb.icon}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                      {nb.title}
-                    </p>
-                    {nb.description && (
-                      <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        {nb.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 flex-shrink-0">
-                    <span className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
-                      <FileText className="w-3 h-3" />
-                      {nb.sourcesCount}
-                    </span>
-                    <span className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
-                      <MessageSquare className="w-3 h-3" />
-                      {nb.notesCount}
-                    </span>
-                    <span className="text-[9px] w-16 text-right" style={{ color: 'var(--text-dimmed)' }}>
-                      {timeAgo(nb.updatedAt)}
-                    </span>
-                  </div>
-                  <button
-                    onClick={(e) => handleDeleteClick(nb.id, e)}
-                    className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/10"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
-                  </button>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -526,7 +418,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
         )}
       </div>
 
-      {/* Modal de confirmation de suppression */}
+      {/* ─── Delete Confirmation Modal ──────────────────────── */}
       <AnimatePresence>
         {deleteTarget && (
           <motion.div
@@ -534,51 +426,51 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+            style={{ backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
             onClick={() => setDeleteTarget(null)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.92, y: 10 }}
+              initial={{ opacity: 0, scale: 0.94, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 10 }}
+              exit={{ opacity: 0, scale: 0.94, y: 8 }}
               transition={{ duration: 0.2 }}
               onClick={e => e.stopPropagation()}
-              className="w-full max-w-sm rounded-2xl border p-6 shadow-2xl"
-              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+              className="w-full max-w-sm rounded-2xl border p-6 shadow-xl"
+              style={{ backgroundColor: 'var(--notebook-surface-elevated)', borderColor: 'var(--notebook-border)' }}
             >
               <div className="flex items-center gap-3 mb-4">
                 <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  className="w-10 h-10 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: 'rgba(239,68,68,0.1)' }}
                 >
-                  <Trash2 className="w-5 h-5" style={{ color: 'var(--color-error)' }} />
+                  <Trash2 className="w-5 h-5 text-red-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    Supprimer le notebook
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    Supprimer ce notebook ?
                   </p>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                     Cette action est irréversible
                   </p>
                 </div>
               </div>
 
-              <p className="text-xs leading-relaxed mb-5" style={{ color: 'var(--text-muted)' }}>
-                Supprimer ce notebook et toutes ses sources ? Les données ne pourront pas être récupérées.
+              <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--text-muted)' }}>
+                Toutes les sources, notes et conversations seront supprimées définitivement.
               </p>
 
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={() => setDeleteTarget(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-white/5"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="notebook-chip"
+                  style={{ padding: '8px 16px' }}
                 >
                   Annuler
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 hover:opacity-90"
-                  style={{ backgroundColor: 'var(--color-error, #ef4444)', color: '#fff' }}
+                  className="px-4 py-2 rounded-full text-sm font-medium transition-all active:scale-95 hover:opacity-90"
+                  style={{ backgroundColor: '#ef4444', color: '#fff' }}
                 >
                   Supprimer
                 </button>

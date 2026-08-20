@@ -5,7 +5,7 @@
  * deep dive, rendu markdown, et UX amélioré.
  */
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo, type JSX } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Send, Loader2, Lightbulb, BookOpen, Trash2, Quote, Telescope, Download,
@@ -348,8 +348,9 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const [loading, setLoading] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestionOffset, setSuggestionOffset] = useState(0);
   const [followUps, setFollowUps] = useState<string[]>([]);
-  const [streamingText, setStreamingText] = useState('');
+  const [followUpOffset, setFollowUpOffset] = useState(0);  const [streamingText, setStreamingText] = useState('');
   const [deepDiveProgress, setDeepDiveProgress] = useState('');
   const [showCitations, setShowCitations] = useState<string | null>(null);
   const [hoveredCitation, setHoveredCitation] = useState<{ citation: Citation; fullContent: string; x: number; y: number } | null>(null);
@@ -824,7 +825,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               } else if (parsed.message) {
                 setStreamingText('');
                 setMessages(prev => [...prev, parsed.message]);
-                if (parsed.followUps) setFollowUps(parsed.followUps);
+                if (parsed.followUps) { setFollowUps(parsed.followUps); setFollowUpOffset(0); }
               } else if (parsed.error) {
                 throw new Error(parsed.error);
               }
@@ -939,7 +940,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               } else if (parsed.message) {
                 setDeepDiveProgress('');
                 setMessages(prev => [...prev, parsed.message]);
-                if (parsed.followUps) setFollowUps(parsed.followUps);
+                if (parsed.followUps) { setFollowUps(parsed.followUps); setFollowUpOffset(0); }
               } else if (parsed.error) {
                 throw new Error(parsed.error);
               }
@@ -1030,7 +1031,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               } else if (parsed.message) {
                 setStreamingText('');
                 setMessages(prev => [...prev, parsed.message]);
-                if (parsed.followUps) setFollowUps(parsed.followUps);
+                if (parsed.followUps) { setFollowUps(parsed.followUps); setFollowUpOffset(0); }
               }
             } catch { /* skip */ }
           }
@@ -1101,7 +1102,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               } else if (parsed.message) {
                 setStreamingText('');
                 setMessages(prev => [...prev, parsed.message]);
-                if (parsed.followUps) setFollowUps(parsed.followUps);
+                if (parsed.followUps) { setFollowUps(parsed.followUps); setFollowUpOffset(0); }
               }
             } catch { /* skip */ }
           }
@@ -1214,19 +1215,16 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   if (!hasSources) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-5 p-8">
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center"
-          style={{ backgroundColor: 'var(--accent-subtle)' }}
-        >
-          <BookOpen className="w-7 h-7" style={{ color: 'var(--accent-primary)' }} />
+        <div className="notebook-empty-state-icon">
+          <BookOpen className="w-6 h-6" />
         </div>
-        <div className="text-center space-y-1.5">
-          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Ajoutez des sources d'abord
+        <div className="text-center space-y-2">
+          <p className="text-base font-medium" style={{ color: 'var(--text-primary)' }}>
+            Ajoutez des sources pour commencer
           </p>
-          <p className="text-xs max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-            Le chat a besoin de sources pour répondre à vos questions.
-            Allez dans l'onglet "Sources" pour uploader des documents.
+          <p className="text-sm max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            Importez des documents dans le panneau Sources, puis posez des questions ici.
+            L'IA répondra en citant les passages pertinents.
           </p>
         </div>
       </div>
@@ -1351,41 +1349,54 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
           </div>
         ) : messages.length === 0 ? (
           /* Welcome state */
-          <div className="flex flex-col items-center justify-center py-10 gap-5">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: 'var(--accent-subtle)' }}
-            >
-              <MessageCircle className="w-6 h-6" style={{ color: 'var(--accent-primary)' }} />
+          <div className="flex flex-col items-center justify-center py-16 gap-6 max-w-lg mx-auto">
+            <div className="notebook-empty-state-icon" style={{ width: 64, height: 64 }}>
+              <MessageCircle className="w-7 h-7" />
             </div>
-            <div className="text-center space-y-1">
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <div className="text-center space-y-2">
+              <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
                 Interrogez vos sources
               </p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                L'IA répondra en citant les passages pertinents de vos documents.
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                Posez une question et l'IA répondra en citant les passages pertinents de vos documents.
               </p>
             </div>
 
-            {/* Suggestions */}
+            {/* Suggestions — 2 visibles + bouton pour en voir d'autres */}
             {suggestions.length > 0 && (
-              <div className="space-y-2 w-full max-w-lg mt-2">
-                <p className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-dimmed)' }}>
-                  <Lightbulb className="w-3 h-3" />
-                  Questions suggérées
+              <div className="w-full mt-4 space-y-3">
+                <p className="text-xs font-medium flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
+                  <Lightbulb className="w-3.5 h-3.5" />
+                  Suggestions
                 </p>
-                <div className="grid gap-2">
-                  {suggestions.map((s, i) => (
+                <div className="grid grid-cols-2 gap-2">
+                  {suggestions.slice(suggestionOffset, suggestionOffset + 2).map((s, i) => (
                     <button
-                      key={i}
+                      key={`${suggestionOffset}-${i}`}
                       onClick={() => handleSend(s)}
-                      className="w-full text-left p-3.5 rounded-xl border text-xs transition-all hover:border-[var(--accent-primary)] hover:shadow-sm active:scale-[0.99]"
-                      style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)' }}
+                      className="notebook-chip text-left px-3 py-2.5 rounded-lg text-sm leading-snug transition-all hover:scale-[1.02] hover:shadow-sm"
+                      style={{
+                        whiteSpace: 'normal',
+                        textAlign: 'left',
+                        backgroundColor: 'var(--notebook-chat-ai)',
+                        border: '1px solid var(--notebook-border)',
+                        color: 'var(--text-primary)',
+                      }}
                     >
-                      {s}
+                      <span className="line-clamp-2">{s}</span>
                     </button>
                   ))}
                 </div>
+                {suggestions.length > 2 && (
+                  <button
+                    onClick={() => setSuggestionOffset((prev) => (prev + 2) >= suggestions.length ? 0 : prev + 2)}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-colors hover:opacity-80"
+                    style={{ color: 'var(--accent-primary)' }}
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Autres suggestions
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1397,17 +1408,16 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
-                className={`mx-auto mb-8 flex w-full max-w-4xl ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`mx-auto mb-6 flex w-full max-w-4xl ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`${msg.role === 'user' ? 'max-w-[72%] rounded-[var(--notebook-radius-lg)] px-4 py-3' : 'w-full max-w-[820px] rounded-[var(--notebook-radius-lg)] px-6 py-5'}`}
+                  className="notebook-chat-message"
+                  data-role={msg.role}
                   style={{
-                    backgroundColor: msg.role === 'user' ? 'var(--accent-primary)' : 'var(--notebook-surface-elevated)',
-                    color: msg.role === 'user' ? '#fff' : 'var(--text-primary)',
-                    border: msg.role === 'assistant' ? '1px solid var(--notebook-border)' : 'none',
-                    boxShadow: msg.role === 'user'
-                      ? 'none'
-                      : 'none',
+                    backgroundColor: msg.role === 'user' ? 'var(--notebook-chat-user)' : 'var(--notebook-chat-ai)',
+                    color: 'var(--text-primary)',
+                    border: msg.role === 'assistant' ? '1px solid var(--notebook-border)' : '1px solid transparent',
+                    maxWidth: msg.role === 'user' ? '75%' : '100%',
                   }}
                 >
                   {/* Message content — with edit mode for user messages */}
@@ -1416,7 +1426,8 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                       <textarea
                         value={editingContent}
                         onChange={(e) => setEditingContent(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg text-xs bg-white/10 border border-white/20 outline-none resize-none text-white placeholder-white/50"
+                        className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none"
+                        style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
                         rows={3}
                         autoFocus
                       />
@@ -1424,13 +1435,14 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                         <button
                           onClick={() => handleEditSubmit(msg.id)}
                           disabled={!editingContent.trim()}
-                          className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-white/20 hover:bg-white/30 transition-colors disabled:opacity-40"
+                          className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-40"
+                          style={{ backgroundColor: 'var(--notebook-accent)', color: '#1b1b1f' }}
                         >
                           Renvoyer
                         </button>
                         <button
                           onClick={handleEditCancel}
-                          className="px-3 py-1.5 rounded-lg text-[10px] font-medium hover:bg-white/10 transition-colors opacity-70"
+                          className="px-3 py-1.5 rounded-full text-xs font-medium notebook-chip"
                         >
                           Annuler
                         </button>
@@ -1439,7 +1451,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                   ) : msg.role === 'assistant' ? (
                     renderMessageContent(msg.content)
                   ) : (
-                    <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                   )}
 
                   {/* Actions bar */}
@@ -1554,7 +1566,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
                   {/* Citations */}
                   {msg.citations.length > 0 && (
-                    <div className="mt-3 pt-2.5 border-t" style={{ borderColor: msg.role === 'user' ? 'rgba(255,255,255,0.15)' : 'var(--border-base)' }}>
+                    <div className="mt-3 pt-2.5 border-t" style={{ borderColor: 'var(--notebook-border)' }}>
                       <button
                         onClick={() => setShowCitations(showCitations === msg.id ? null : msg.id)}
                         className="flex items-center gap-1.5 text-[10px] font-medium opacity-70 hover:opacity-100 transition"
@@ -1607,19 +1619,15 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex justify-start"
+                className="flex justify-start max-w-4xl mx-auto"
               >
                 <div
-                  className="max-w-[85%] px-5 py-4 rounded-2xl rounded-bl-md"
-                  style={{
-                    backgroundColor: 'var(--bg-panel)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border-base)',
-                    boxShadow: '0 1px 6px rgba(0,0,0,0.04), 0 0 0 0.5px var(--border-base)',
-                  }}
+                  className="notebook-chat-message w-full"
+                  data-role="assistant"
+                  style={{ border: '1px solid var(--notebook-border)' }}
                 >
                   {renderMessageContent(streamingText)}
-                  <span className="inline-block w-2 h-4 ml-0.5 animate-pulse rounded-sm" style={{ backgroundColor: 'var(--accent-primary)' }} />
+                  <span className="inline-block w-1.5 h-4 ml-0.5 animate-pulse rounded-sm" style={{ backgroundColor: 'var(--notebook-accent)' }} />
                 </div>
               </motion.div>
             )}
@@ -1669,16 +1677,17 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex justify-start"
+                className="flex justify-start max-w-4xl mx-auto"
               >
                 <div
-                  className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-bl-md"
-                  style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+                  className="notebook-chat-message"
+                  data-role="assistant"
+                  style={{ border: '1px solid var(--notebook-border)', padding: '16px 20px' }}
                 >
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--accent-primary)', animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--accent-primary)', animationDelay: '150ms' }} />
-                    <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--accent-primary)', animationDelay: '300ms' }} />
+                  <div className="flex gap-1.5">
+                    <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--notebook-accent)', animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--notebook-accent)', animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--notebook-accent)', animationDelay: '300ms' }} />
                   </div>
                 </div>
               </motion.div>
@@ -1690,24 +1699,40 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="space-y-2 pt-3"
+                className="space-y-3 pt-4 max-w-4xl mx-auto"
               >
-                <p className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-dimmed)' }}>
-                  <Lightbulb className="w-3 h-3" />
+                <p className="text-xs font-medium flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
+                  <Lightbulb className="w-3.5 h-3.5" />
                   Questions de suivi
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {followUps.map((q, i) => (
+                <div className="grid grid-cols-2 gap-2">
+                  {followUps.slice(followUpOffset, followUpOffset + 2).map((q, i) => (
                     <button
-                      key={i}
+                      key={`${followUpOffset}-${i}`}
                       onClick={() => handleSend(q)}
-                      className="px-3 py-2 rounded-xl border text-[11px] transition-all hover:border-[var(--accent-primary)] hover:shadow-sm active:scale-[0.98]"
-                      style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)' }}
+                      className="notebook-chip text-left px-3 py-2.5 rounded-lg text-sm leading-snug transition-all hover:scale-[1.02] hover:shadow-sm"
+                      style={{
+                        whiteSpace: 'normal',
+                        textAlign: 'left',
+                        backgroundColor: 'var(--notebook-chat-ai)',
+                        border: '1px solid var(--notebook-border)',
+                        color: 'var(--text-primary)',
+                      }}
                     >
-                      {q}
+                      <span className="line-clamp-2">{q}</span>
                     </button>
                   ))}
                 </div>
+                {followUps.length > 2 && (
+                  <button
+                    onClick={() => setFollowUpOffset((prev) => (prev + 2) >= followUps.length ? 0 : prev + 2)}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-colors hover:opacity-80"
+                    style={{ color: 'var(--accent-primary)' }}
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Autres suggestions
+                  </button>
+                )}
               </motion.div>
             )}
 
@@ -1848,11 +1873,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
         {/* Main input container */}
         <div
-          className="relative mx-auto flex max-w-4xl items-end gap-0 rounded-[26px] transition-all"
+          className="relative mx-auto flex max-w-4xl items-end gap-0 rounded-[28px] transition-all"
           style={{
-            backgroundColor: 'var(--notebook-surface-elevated)',
-            border: '1px solid var(--border-base)',
-            boxShadow: '0 18px 60px rgba(0,0,0,0.12)',
+            backgroundColor: 'var(--notebook-surface)',
+            border: '1px solid var(--notebook-border)',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
           }}
         >
           {/* Left actions — filter */}
@@ -1934,10 +1959,10 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || loading}
-              className="p-2.5 rounded-xl transition-all active:scale-90 disabled:opacity-30 shadow-sm"
+              className="p-2.5 rounded-full transition-all active:scale-90 disabled:opacity-30"
               style={{
-                backgroundColor: input.trim() && !loading ? 'var(--accent-primary)' : 'var(--bg-ctrl)',
-                color: input.trim() && !loading ? '#fff' : 'var(--text-dimmed)',
+                backgroundColor: input.trim() && !loading ? 'var(--notebook-accent)' : 'var(--notebook-surface-muted)',
+                color: input.trim() && !loading ? '#1b1b1f' : 'var(--text-dimmed)',
               }}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

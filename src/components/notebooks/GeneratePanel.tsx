@@ -16,7 +16,7 @@ import {
   Sparkles, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List,
   Loader2, Trash2, Copy, CheckCircle2, Download, RefreshCw,
   Filter, PenLine, Brain, Target, BookOpen, FolderInput,
-  FileBarChart, Lightbulb, Zap, X, ArrowRight,
+  FileBarChart, Lightbulb, Zap, X, ArrowRight, ArrowLeft,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { useProfile } from '../../context/UserProfileContext';
@@ -41,6 +41,14 @@ interface Props {
   notebookId: string;
   sources: SourceItem[];
   onRefresh: () => void;
+  /** When true, renders full layout with doc viewer (for center panel) */
+  fullView?: boolean;
+  /** Close the full view */
+  onClose?: () => void;
+  /** Open a specific doc in the main center panel */
+  onViewDoc?: (doc: { id: string; title: string; type: string; content: string; createdAt: string }) => void;
+  /** Initial document to display when opening in fullView */
+  initialDoc?: { id: string; title: string; type: string; content: string; createdAt: string } | null;
 }
 
 const DOC_TYPES = [
@@ -269,7 +277,7 @@ function renderBoldItalic(text: string): (string | JSX.Element)[] {
   });
 }
 
-export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
+export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false, onClose, onViewDoc, initialDoc }: Props) {
   const { success, error: toastError } = useToast();
   const { profile } = useProfile();
   const [generating, setGenerating] = useState(false);
@@ -317,6 +325,13 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
       } catch { /* ignore */ }
     })();
   }, [notebookId]);
+
+  // Set initial doc when opened in fullView
+  useEffect(() => {
+    if (initialDoc && fullView) {
+      setSelectedDoc(initialDoc as any);
+    }
+  }, [initialDoc, fullView]);
 
   // Auto-scroll pendant le streaming
   useEffect(() => {
@@ -567,11 +582,12 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
   }, []);
 
   return (
-    <div className="h-full flex flex-col lg:flex-row">
-      {/* Left panel: Controls + document list */}
+    <div className={`h-full ${fullView ? 'flex flex-col' : 'flex flex-col'}`}>
+      {/* Controls panel — hidden in fullView (doc viewer only) */}
+      {!fullView && (
       <div
-        className="w-full lg:w-[300px] flex-shrink-0 border-b lg:border-b-0 lg:border-r overflow-y-auto custom-scrollbar p-4 lg:p-5 space-y-4"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
+        className="flex-1 overflow-y-auto custom-scrollbar p-4 lg:p-5 space-y-4"
+        style={{ backgroundColor: 'var(--notebook-studio-bg)' }}
       >
         {/* Quick config bar */}
         <div className="flex items-center gap-2">
@@ -579,8 +595,8 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
           {sources.length > 1 && (
             <button
               onClick={() => setShowSourceFilter(!showSourceFilter)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-medium border transition-all ${showSourceFilter ? 'ring-1 ring-[var(--accent-primary)]' : 'hover:bg-white/5'}`}
-              style={{ borderColor: 'var(--border-base)', color: selectedSourceIds.length > 0 ? 'var(--accent-primary)' : 'var(--text-muted)' }}
+              className="notebook-chip"
+              style={showSourceFilter || selectedSourceIds.length > 0 ? { borderColor: 'var(--notebook-accent)', color: 'var(--notebook-accent)', background: 'var(--notebook-accent-surface)' } : {}}
             >
               <Filter className="w-3 h-3" />
               {selectedSourceIds.length > 0 ? `${selectedSourceIds.length} src` : 'Sources'}
@@ -590,8 +606,8 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
           {/* Custom prompt toggle */}
           <button
             onClick={() => setShowCustomPrompt(!showCustomPrompt)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-medium border transition-all ${showCustomPrompt ? 'ring-1 ring-[#f59e0b]' : 'hover:bg-white/5'}`}
-            style={{ borderColor: 'var(--border-base)', color: customInstructions.trim() ? '#f59e0b' : 'var(--text-muted)' }}
+            className="notebook-chip"
+            style={showCustomPrompt || customInstructions.trim() ? { borderColor: '#f59e0b', color: '#f59e0b', background: 'rgba(245,158,11,0.08)' } : {}}
           >
             <PenLine className="w-3 h-3" />
             Prompt
@@ -599,7 +615,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
           </button>
 
           {/* Source count */}
-          <span className="ml-auto text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="ml-auto text-[10px]" style={{ color: 'var(--text-muted)' }}>
             {sources.length} source{sources.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -721,10 +737,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
                   key={key}
                   onClick={() => key === 'infographic' ? setShowInfographicModal(true) : handleGenerate(key)}
                   disabled={generating || sources.length === 0}
-                  className={`relative w-full flex flex-col lg:flex-row items-center lg:items-center gap-1.5 lg:gap-3 p-2.5 lg:p-3 rounded-xl border text-center lg:text-left transition-all disabled:opacity-40 active:scale-[0.97] ${isActive ? 'ring-2' : 'hover:shadow-sm hover:-translate-y-0.5'}`}
+                  className={`notebook-studio-card relative w-full flex flex-col lg:flex-row items-center lg:items-center gap-1.5 lg:gap-3 p-2.5 lg:p-3 text-center lg:text-left disabled:opacity-40 ${isActive ? 'ring-2' : ''}`}
                   style={{
-                    borderColor: isActive ? color : 'var(--border-base)',
-                    backgroundColor: isActive ? `${color}08` : 'var(--bg-panel)',
+                    borderColor: isActive ? color : 'var(--notebook-border)',
+                    backgroundColor: isActive ? `${color}08` : 'var(--notebook-card-bg)',
                     boxShadow: isActive ? `0 0 12px ${color}15` : undefined,
                   }}
                 >
@@ -791,7 +807,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
                   <motion.div
                     key={doc.id}
                     layout
-                    onClick={() => { setSelectedDoc(doc); setStreamingText(''); }}
+                    onClick={() => { setSelectedDoc(doc); setStreamingText(''); if (onViewDoc && !fullView) onViewDoc(doc); }}
                     className={`group cursor-pointer p-2.5 rounded-xl border transition-all hover:shadow-sm ${isSelected ? 'shadow-sm' : ''}`}
                     style={{
                       borderColor: isSelected ? docType?.color || 'var(--accent-primary)' : 'var(--border-base)',
@@ -833,9 +849,11 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
           </div>
         )}
       </div>
+      )}
 
-      {/* Right: Document viewer */}
-      <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-7">
+      {/* Document viewer — shown in fullView mode */}
+      {fullView && (
+      <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-8" style={{ borderColor: 'var(--notebook-border)' }}>
         {/* Streaming view */}
         {streamingText && !selectedDoc && (
           <div className="space-y-5 max-w-3xl">
@@ -858,9 +876,14 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
 
         {/* Selected document view */}
         {selectedDoc && !streamingText ? (
-          <div className={`space-y-5 ${selectedDoc.type === 'mindmap' ? 'max-w-none' : 'max-w-3xl'}`}>
+          <div className={`space-y-5 ${selectedDoc.type === 'mindmap' ? 'max-w-none' : 'max-w-3xl mx-auto'}`}>
             {/* Document header — sticky */}
-            <div className="flex items-start gap-3 pb-4 border-b sticky top-0 z-10 pt-1" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}>
+            <div className="flex items-start gap-3 pb-4 border-b sticky top-0 z-10 pt-1" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-canvas, var(--bg-base))' }}>
+              {onClose && (
+                <button onClick={onClose} className="notebook-icon-button flex-shrink-0 mt-0.5" title="Retour">
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+              )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span
@@ -986,6 +1009,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh }: Props) {
           </div>
         )}
       </div>
+      )}
 
       {/* ═══ MODAL RAPPORT COMPLET ═══ */}
       <AnimatePresence>
