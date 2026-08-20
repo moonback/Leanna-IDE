@@ -1990,11 +1990,11 @@ GÃ©nÃ¨re le rÃ©sumÃ© global maintenant.`;
   router.post("/:id/generate", async (req: Request, res: Response) => {
     try {
       const { type, sourceIds, language, customInstructions, imageModel } = req.body;
-      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary", "infographic", "full-report", "report-business", "report-market", "report-technical", "report-competitive", "report-financial", "report-marketing", "report-product", "report-risk", "report-executive", "report-project"];
+      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary", "infographic", "full-report", "report-business", "report-market", "report-technical", "report-competitive", "report-financial", "report-marketing", "report-product", "report-risk", "report-executive", "report-project", "roadmap"];
 
       if (!type || !validTypes.includes(type)) {
         res.status(400).json({
-          error: `Le champ 'type' doit Ãªtre l'un de: ${validTypes.join(", ")}`,
+          error: `Le champ 'type' doit être l'un de: ${validTypes.join(", ")}`,
         });
         return;
       }
@@ -2010,11 +2010,11 @@ GÃ©nÃ¨re le rÃ©sumÃ© global maintenant.`;
   router.post("/:id/generate/stream", async (req: Request, res: Response) => {
     try {
       const { type, sourceIds, language, customInstructions, imageModel } = req.body;
-      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary", "infographic", "full-report", "report-business", "report-market", "report-technical", "report-competitive", "report-financial", "report-marketing", "report-product", "report-risk", "report-executive", "report-project"];
+      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary", "infographic", "full-report", "report-business", "report-market", "report-technical", "report-competitive", "report-financial", "report-marketing", "report-product", "report-risk", "report-executive", "report-project", "roadmap"];
 
       if (!type || !validTypes.includes(type)) {
         res.status(400).json({
-          error: `Le champ 'type' doit Ãªtre l'un de: ${validTypes.join(", ")}`,
+          error: `Le champ 'type' doit être l'un de: ${validTypes.join(", ")}`,
         });
         return;
       }
