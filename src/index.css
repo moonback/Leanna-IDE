@@ -1209,7 +1209,7 @@ body {
   background: var(--notebook-canvas);
 }
 @media (min-width: 1280px) {
-  .notebook-shell {
+  .notebook-shell[data-studio-open="true"] {
     grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(260px, 320px);
   }
 }
