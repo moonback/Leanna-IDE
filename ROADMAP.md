@@ -125,21 +125,21 @@ Faire de Jarvis-OS un **OS IA desktop tout-en-un** : un outil qui comprend, gén
 
 ---
 
-## Phase 7 — Templates & UX (v0.6.0) 🚧
+## Phase 7 — Templates & UX (v0.6.0) ✅
 
 > Objectif : Bibliothèque de modèles et amélioration de l'expérience.
 
 | Tâche | Statut | Description |
 | :--- | :---: | :--- |
 | Template MVP | ✅ | Structure : vision, problème, solution, métriques |
-| Template Rapport de Conception | 🔲 | Architecture, choix techniques, contraintes |
-| Template Cahier des Charges | 🔲 | Exigences fonctionnelles/non-fonctionnelles |
-| Template Spécification Technique | 🔲 | API, schémas, protocoles |
-| Template Plan de Projet | 🔲 | Objectifs, jalons, livrables, risques |
-| Système de variables dynamiques | 🔲 | Placeholders (nom projet, date, auteur) |
-| UI de sélection de template | 🔲 | Panneau avec preview et personnalisation |
-| Thèmes visuels multiples | 🔲 | Dark, Light, Custom |
-| Responsive mobile | 🔲 | Adaptation tablette/mobile |
+| Template Rapport de Conception | ✅ | Architecture, choix techniques, contraintes |
+| Template Cahier des Charges | ✅ | Exigences fonctionnelles/non-fonctionnelles |
+| Template Spécification Technique | ✅ | API, schémas, protocoles |
+| Template Plan de Projet | ✅ | Objectifs, jalons, livrables, risques |
+| Système de variables dynamiques | ✅ | Placeholders (nom projet, date, auteur) |
+| UI de sélection de template | ✅ | Panneau avec preview et personnalisation |
+| Thèmes visuels multiples | ✅ | Dark, Light, Cyberpunk, Sepia, High Contrast |
+| Responsive mobile | ✅ | Adaptation tablette/mobile |
 
 ---
 

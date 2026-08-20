@@ -224,6 +224,221 @@
 }
 
 /* ═══════════════════════════════════════════════
+   CYBERPUNK THEME
+═══════════════════════════════════════════════ */
+:root[data-theme="cyberpunk"] {
+  --bg-base:       #060814;
+  --bg-secondary:  #0d1127;
+  --bg-panel:      rgba(15, 23, 42, 0.95);
+  --bg-ctrl:       rgba(13, 17, 39, 0.95);
+  --bg-sidebar:    rgba(6, 8, 20, 0.98);
+  --bg-input:      rgba(24, 34, 66, 0.6);
+  --bg-elevated:   #121833;
+
+  --shadow-xs:  0 1px 2px rgba(0,240,255,0.2);
+  --shadow-sm:  0 2px 8px rgba(0,240,255,0.25);
+  --shadow-md:  0 4px 16px rgba(255,0,128,0.25);
+  --shadow-lg:  0 12px 40px rgba(0,240,255,0.3);
+  --shadow-xl:  0 24px 56px rgba(255,0,128,0.35);
+  --shadow-glow: 0 0 24px rgba(0,240,255,0.35);
+
+  --border-base:   rgba(0, 240, 255, 0.35);
+  --border-strong: rgba(255, 0, 128, 0.6);
+  --border-focus:  #00f0ff;
+  --border-glow:   rgba(0, 240, 255, 0.5);
+
+  --text-primary:   #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted:     #94a3b8;
+  --text-dimmed:    #64748b;
+
+  --accent-primary:  #00f0ff;
+  --accent-hover:    #38bdf8;
+  --accent-subtle:   rgba(0, 240, 255, 0.15);
+  --accent-glow:     rgba(0, 240, 255, 0.5);
+  --accent-secondary: #ff0080;
+
+  --color-success:  #00ff9d;
+  --color-warning:  #ffb703;
+  --color-error:    #ff0055;
+  --color-info:     #00f0ff;
+
+  --orb-idle:      #00f0ff;
+  --orb-online:    #38bdf8;
+  --orb-listening: #ff0080;
+  --orb-speaking:  #e056fd;
+  --orb-busy:      #ffb703;
+  --orb-thinking:  #7d5fff;
+
+  --ctrl-icon:       #94a3b8;
+  --ctrl-icon-hover: #00f0ff;
+  --ctrl-hover:      rgba(0, 240, 255, 0.15);
+  --btn-active-bg:   rgba(0, 240, 255, 0.2);
+  --btn-active-text: #00f0ff;
+
+  --drag-overlay:   rgba(0, 240, 255, 0.2);
+  --scroll-thumb:   #1e293b;
+  --scroll-thumb-hover: #00f0ff;
+
+  --nav-active-bg:  rgba(0, 240, 255, 0.15);
+  --nav-active-bar: #00f0ff;
+
+  --glass-bg:        rgba(15, 23, 42, 0.85);
+  --glass-border:    rgba(0, 240, 255, 0.2);
+  --glass-blur:      16px;
+}
+
+/* ═══════════════════════════════════════════════
+   SEPIA THEME
+═══════════════════════════════════════════════ */
+:root[data-theme="sepia"] {
+  --bg-base:       #fbf0d9;
+  --bg-secondary:  #f3e5c8;
+  --bg-panel:      rgba(253, 246, 227, 0.95);
+  --bg-ctrl:       rgba(247, 237, 212, 0.95);
+  --bg-sidebar:    rgba(243, 229, 200, 0.98);
+  --bg-input:      rgba(235, 218, 185, 0.6);
+  --bg-elevated:   #fdf6e3;
+
+  --shadow-xs:  0 1px 2px rgba(181,137,0,0.08);
+  --shadow-sm:  0 2px 6px rgba(181,137,0,0.1);
+  --shadow-md:  0 4px 16px rgba(181,137,0,0.12);
+  --shadow-lg:  0 12px 36px rgba(181,137,0,0.15);
+  --shadow-xl:  0 24px 52px rgba(181,137,0,0.18);
+  --shadow-glow: 0 0 16px rgba(181,137,0,0.12);
+
+  --border-base:   rgba(181, 137, 0, 0.25);
+  --border-strong: rgba(181, 137, 0, 0.45);
+  --border-focus:  #b58900;
+  --border-glow:   rgba(181, 137, 0, 0.3);
+
+  --text-primary:   #433422;
+  --text-secondary: #5c4731;
+  --text-muted:     #85694b;
+  --text-dimmed:    #a88c6b;
+
+  --accent-primary:  #b58900;
+  --accent-hover:    #cb4b16;
+  --accent-subtle:   rgba(181, 137, 0, 0.12);
+  --accent-glow:     rgba(181, 137, 0, 0.25);
+  --accent-secondary: #d33682;
+
+  --color-success:  #859900;
+  --color-warning:  #b58900;
+  --color-error:    #dc322f;
+  --color-info:     #268bd2;
+
+  --orb-idle:      #b58900;
+  --orb-online:    #859900;
+  --orb-listening: #268bd2;
+  --orb-speaking:  #d33682;
+  --orb-busy:      #cb4b16;
+  --orb-thinking:  #6c71c4;
+
+  --ctrl-icon:       #85694b;
+  --ctrl-icon-hover: #433422;
+  --ctrl-hover:      rgba(181, 137, 0, 0.12);
+  --btn-active-bg:   rgba(181, 137, 0, 0.18);
+  --btn-active-text: #b58900;
+
+  --drag-overlay:   rgba(181, 137, 0, 0.15);
+  --scroll-thumb:   #d2be97;
+  --scroll-thumb-hover: #b58900;
+
+  --nav-active-bg:  rgba(181, 137, 0, 0.12);
+  --nav-active-bar: #b58900;
+
+  --glass-bg:        rgba(253, 246, 227, 0.85);
+  --glass-border:    rgba(181, 137, 0, 0.15);
+  --glass-blur:      12px;
+}
+
+/* ═══════════════════════════════════════════════
+   HIGH CONTRAST THEME
+═══════════════════════════════════════════════ */
+:root[data-theme="high-contrast"] {
+  --bg-base:       #000000;
+  --bg-secondary:  #121212;
+  --bg-panel:      #000000;
+  --bg-ctrl:       #000000;
+  --bg-sidebar:    #000000;
+  --bg-input:      #1a1a1a;
+  --bg-elevated:   #1f1f1f;
+
+  --shadow-xs:  none;
+  --shadow-sm:  none;
+  --shadow-md:  none;
+  --shadow-lg:  none;
+  --shadow-xl:  none;
+  --shadow-glow: none;
+
+  --border-base:   #ffffff;
+  --border-strong: #ffff00;
+  --border-focus:  #ffff00;
+  --border-glow:   #ffff00;
+
+  --text-primary:   #ffffff;
+  --text-secondary: #ffffff;
+  --text-muted:     #e0e0e0;
+  --text-dimmed:    #cccccc;
+
+  --accent-primary:  #ffff00;
+  --accent-hover:    #00ffff;
+  --accent-subtle:   #333300;
+  --accent-glow:     #ffff00;
+  --accent-secondary: #00ffff;
+
+  --color-success:  #00ff00;
+  --color-warning:  #ffff00;
+  --color-error:    #ff0000;
+  --color-info:     #00ffff;
+
+  --orb-idle:      #ffff00;
+  --orb-online:    #00ff00;
+  --orb-listening: #00ffff;
+  --orb-speaking:  #ff00ff;
+  --orb-busy:      #ff9900;
+  --orb-thinking:  #ffff00;
+
+  --ctrl-icon:       #ffffff;
+  --ctrl-icon-hover: #ffff00;
+  --ctrl-hover:      #333333;
+  --btn-active-bg:   #ffff00;
+  --btn-active-text: #000000;
+
+  --drag-overlay:   #333300;
+  --scroll-thumb:   #ffffff;
+  --scroll-thumb-hover: #ffff00;
+
+  --nav-active-bg:  #ffff00;
+  --nav-active-bar: #ffffff;
+
+  --glass-bg:        #000000;
+  --glass-border:    #ffffff;
+  --glass-blur:      0px;
+}
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE MOBILE & TABLET LAYOUT UTILITIES
+═══════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .jarvis-sidebar {
+    position: fixed !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+  .jarvis-sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 0 0 30px rgba(0,0,0,0.7);
+  }
+}
+
+
+/* ═══════════════════════════════════════════════
    BASE
 ═══════════════════════════════════════════════ */
 /* Global theme transitions — smooth dark/light swap */

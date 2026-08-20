@@ -49,6 +49,7 @@ import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboar
 import { AgentFleetPanel } from '../components/panels/AgentFleetPanel';
 import { AssistantLogsPanel } from '../components/panels/AssistantLogsPanel';
 import { AgentActivityOverlay } from '../components/ide/AgentActivityOverlay';
+import { TemplateSelectorModal } from '../components/templates/TemplateSelectorModal';
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -121,6 +122,7 @@ export default function IdeView() {
   const [showCommandPalette, setShowCommandPalette] = useState<'files' | 'commands' | null>(null);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showRunMenu, setShowRunMenu] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
   const [showMcp, setShowMcp] = useState(false);
   const [showSkillsMonitor, setShowSkillsMonitor] = useState(false);
@@ -688,6 +690,7 @@ export default function IdeView() {
             onToggleMinimap={() => updateSetting('showMinimap', !ideSettings.showMinimap)}
             onToggleWordWrap={() => updateSetting('wordWrap', !ideSettings.wordWrap)}
             onToggleMarkdownPreview={() => setMarkdownPreview(v => !v)}
+            onOpenTemplates={() => setShowTemplateModal(true)}
           />
         )}
 
@@ -1005,6 +1008,21 @@ export default function IdeView() {
       {showFleet && (
         <AgentFleetPanel inline onClose={() => setShowFleet(false)} />
       )}
+
+      {/* Template Selector Modal */}
+      <TemplateSelectorModal
+        isOpen={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        onInsertToIde={async (filename, content) => {
+          try {
+            await fileSystem.saveFile(filename, content);
+            await fileSystem.openFile(filename);
+            await fileSystem.loadTree();
+          } catch {
+            /* ignore */
+          }
+        }}
+      />
     </div>
   );
 }

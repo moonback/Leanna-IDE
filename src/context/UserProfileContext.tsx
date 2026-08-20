@@ -34,7 +34,7 @@ export interface UserProfile {
   openrouterApiKey: string;       // Clé API OpenRouter (stockée localement)
   openrouterImageModel: string;   // Modèle OpenRouter pour la génération d'images/infographies
   // Appearance (kept here so Settings is the single source of truth)
-  theme:         'dark' | 'light';
+  theme:         'dark' | 'light' | 'cyberpunk' | 'sepia' | 'high-contrast';
   accentColor:   string;
   // UI features
   floatingOrb:   boolean;  // Afficher l'orb flottant déplaçable

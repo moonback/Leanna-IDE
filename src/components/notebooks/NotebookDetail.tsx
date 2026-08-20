@@ -14,12 +14,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft, FileText, MessageSquare, StickyNote, Sparkles, Mic,
   Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose,
+  Save,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { SourcePanel } from './SourcePanel';
 import { SourceViewer } from './SourceViewer';
 import { NotebookChat } from './NotebookChat';
-import { NotesPanel } from './NotesPanel';
+import { NotesPanel, type NoteEditorData } from './NotesPanel';
 import { GeneratePanel } from './GeneratePanel';
 import { AudioOverviewPanel } from './AudioOverviewPanel';
 import { SourcesPanelSkeleton } from '../ui/Skeleton';
@@ -47,6 +48,134 @@ interface Props {
   onBack: () => void;
 }
 
+// ─── Note Editor — rendered in the center column ──────────────────────────────
+function NoteEditorCenter({
+  notebookId,
+  data,
+  onClose,
+  onSaved,
+}: {
+  notebookId: string;
+  data: NoteEditorData;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { success, error: toastError } = useToast();
+  const [title, setTitle] = useState(data.title);
+  const [content, setContent] = useState(data.content);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      if (data.id) {
+        // Update
+        const res = await fetch(`/api/notebooks/${notebookId}/notes/${data.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: title.trim(), content: content.trim() }),
+        });
+        if (!res.ok) throw new Error();
+        success('Note mise à jour');
+      } else {
+        // Create
+        const res = await fetch(`/api/notebooks/${notebookId}/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: title.trim(), content: content.trim() }),
+        });
+        if (!res.ok) throw new Error();
+        success('Note créée');
+      }
+      onSaved();
+    } catch {
+      toastError('Erreur lors de la sauvegarde');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 16 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 16 }}
+      transition={{ duration: 0.18 }}
+      className="h-full flex flex-col"
+      style={{ backgroundColor: 'var(--bg-base)' }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
+        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: 'var(--accent-subtle)' }}
+          >
+            <StickyNote className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              {data.id ? 'Modifier la note' : 'Nouvelle note'}
+            </h2>
+            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              {content.length} caractères
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors hover:bg-white/5"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <X className="w-3.5 h-3.5" />
+            Annuler
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!title.trim() || saving}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40 transition-all active:scale-95 text-white"
+            style={{ backgroundColor: 'var(--accent-primary)' }}
+          >
+            <Save className="w-3.5 h-3.5" />
+            {saving ? 'Sauvegarde...' : data.id ? 'Mettre à jour' : 'Enregistrer'}
+          </button>
+        </div>
+      </div>
+
+      {/* Title */}
+      <div className="px-6 pt-6 pb-3 flex-shrink-0">
+        <input
+          type="text"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Titre de la note..."
+          autoFocus
+          className="w-full text-xl font-bold bg-transparent outline-none placeholder:opacity-30"
+          style={{ color: 'var(--text-primary)' }}
+          onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
+        />
+        <div className="h-px mt-3" style={{ backgroundColor: 'var(--border-base)' }} />
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-h-0 px-6 pb-6">
+        <textarea
+          value={content}
+          onChange={e => setContent(e.target.value)}
+          placeholder="Écrivez votre note ici... (Markdown supporté)"
+          className="w-full h-full bg-transparent outline-none resize-none text-sm leading-7 placeholder:opacity-30"
+          style={{ color: 'var(--text-secondary)' }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
 export function NotebookDetail({ notebookId, onBack }: Props) {
   const { error: toastError } = useToast();
   const [notebook, setNotebook] = useState<NotebookData | null>(null);
@@ -57,6 +186,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [indexingProgress, setIndexingProgress] = useState<{ total: number; done: number; active: boolean }>({ total: 0, done: 0, active: false });
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [viewingGeneratedDoc, setViewingGeneratedDoc] = useState<{ id: string; title: string; type: string; content: string; createdAt: string } | null>(null);
+  const [noteEditorData, setNoteEditorData] = useState<NoteEditorData | null>(null);
 
   const loadNotebook = useCallback(async () => {
     setLoading(true);
@@ -132,7 +262,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const renderStudioContent = (tab: StudioTab) => {
     switch (tab) {
       case 'notes':
-        return <NotesPanel notebookId={notebookId} notes={notebook.notes} onRefresh={loadNotebook} />;
+        return <NotesPanel notebookId={notebookId} notes={notebook.notes} onRefresh={loadNotebook} onOpenNoteEditor={(data) => { setNoteEditorData(data); setSelectedSourceId(null); setViewingGeneratedDoc(null); }} />;
       case 'generate':
         return <GeneratePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />;
       case 'audio':
@@ -163,6 +293,18 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           fullView
           initialDoc={viewingGeneratedDoc}
           onClose={() => setViewingGeneratedDoc(null)}
+        />
+      );
+    }
+
+    // Note editor in center column
+    if (noteEditorData !== null) {
+      return (
+        <NoteEditorCenter
+          notebookId={notebookId}
+          data={noteEditorData}
+          onClose={() => setNoteEditorData(null)}
+          onSaved={() => { setNoteEditorData(null); loadNotebook(); }}
         />
       );
     }

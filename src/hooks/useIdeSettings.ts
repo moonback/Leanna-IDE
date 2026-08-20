@@ -4,7 +4,7 @@ import { type IdeSettings, DEFAULT_IDE_SETTINGS } from '../types/ide';
 /**
  * Hook for managing IDE settings with persistence
  */
-export function useIdeSettings(appTheme?: 'light' | 'dark') {
+export function useIdeSettings(appTheme?: string) {
   const [settings, setSettings] = useState<IdeSettings>(() => loadSettings());
 
   // Load settings from localStorage
@@ -39,7 +39,8 @@ export function useIdeSettings(appTheme?: 'light' | 'dark') {
   // Sync Monaco theme with app theme
   useEffect(() => {
     if (appTheme) {
-      const monacoTheme: IdeSettings['theme'] = appTheme === 'dark' ? 'vs-dark' : 'vs';
+      const isDarkVariant = ['dark', 'cyberpunk', 'high-contrast'].includes(appTheme);
+      const monacoTheme: IdeSettings['theme'] = isDarkVariant ? 'vs-dark' : 'vs';
       if (settings.theme !== monacoTheme) {
         const newSettings = { ...settings, theme: monacoTheme };
         setSettings(newSettings);

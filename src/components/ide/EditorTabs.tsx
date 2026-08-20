@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { motion } from 'motion/react';
-import { X, Save, Map, WrapText, AlignJustify, Eye, Code } from 'lucide-react';
+import { X, Save, Map, WrapText, AlignJustify, Eye, Code, Sparkles } from 'lucide-react';
 import { FileIcon } from './FileIcon';
 import { fileName } from '../../utils/fileUtils';
 import type { OpenFile } from '../../types/ide';
@@ -19,6 +19,7 @@ type EditorTabsProps = {
   onToggleMinimap: () => void;
   onToggleWordWrap: () => void;
   onToggleMarkdownPreview: () => void;
+  onOpenTemplates?: () => void;
 };
 
 export function EditorTabs({
@@ -35,6 +36,7 @@ export function EditorTabs({
   onToggleMinimap,
   onToggleWordWrap,
   onToggleMarkdownPreview,
+  onOpenTemplates,
 }: EditorTabsProps) {
   if (openFiles.length === 0) return null;
 
@@ -153,6 +155,16 @@ export function EditorTabs({
         >
           <AlignJustify size={13} style={{ color: 'var(--text-muted)' }} />
         </button>
+
+        {onOpenTemplates && (
+          <button
+            onClick={onOpenTemplates}
+            className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/5 transition"
+            title="Bibliothèque de Templates & Modèles"
+          >
+            <Sparkles size={13} style={{ color: 'var(--accent-primary)' }} />
+          </button>
+        )}
 
         <button
           onClick={onSave}

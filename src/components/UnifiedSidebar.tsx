@@ -21,6 +21,7 @@ import {
   LayoutList,
   FileText,
   BookOpen,
+  Menu,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -57,6 +58,7 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
   const assistantMenuRef = useRef<HTMLDivElement>(null);
   const [assistantMenuOpen, setAssistantMenuOpen] = useState(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const hasAnimatedRef = useRef(false);
 
   // ── Consolidated IDE state/actions via custom hook ──
@@ -93,20 +95,39 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <nav
-      className="jarvis-sidebar flex flex-col items-center select-none relative"
-      style={{
-        width: '56px',
-        borderRight: '1px solid var(--ide-shell-border)',
-        backgroundColor: 'var(--ide-sidebar-bg)',
-        height: '100%',
-        paddingBottom: '8px',
-        boxShadow: 'none',
-      }}
-      aria-label="Navigation principale"
-    >
-      {/* ═══ BRAND LOGO ═══ */}
-      <BrandLogo theme={theme} onNavigate={() => navigate('/ide')} />
+    <>
+      {/* Mobile Toggle Button */}
+      <button
+        onClick={() => setMobileOpen(!mobileOpen)}
+        className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-xl border bg-black/60 backdrop-blur-md text-[var(--text-primary)] transition-all shadow-md"
+        style={{ borderColor: 'var(--border-base)' }}
+        aria-label="Menu principal"
+      >
+        <Menu className="w-4 h-4" />
+      </button>
+
+      {/* Mobile Backdrop Overlay */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          className="md:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-xs"
+        />
+      )}
+
+      <nav
+        className={`jarvis-sidebar flex flex-col items-center select-none relative ${mobileOpen ? 'mobile-open' : ''}`}
+        style={{
+          width: '56px',
+          borderRight: '1px solid var(--ide-shell-border)',
+          backgroundColor: 'var(--ide-sidebar-bg)',
+          height: '100%',
+          paddingBottom: '8px',
+          boxShadow: 'none',
+        }}
+        aria-label="Navigation principale"
+      >
+        {/* ═══ BRAND LOGO ═══ */}
+        <BrandLogo theme={theme} onNavigate={() => { navigate('/ide'); setMobileOpen(false); }} />
 
       {/* ═══ IDE TOOLS ═══ */}
       <div className="flex-1 w-full flex flex-col min-h-0">
@@ -188,6 +209,7 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
         )}
       </div>
     </nav>
+    </>
   );
 });
 

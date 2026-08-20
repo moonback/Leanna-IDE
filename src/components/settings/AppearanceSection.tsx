@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Palette, Check, Moon, Sun } from 'lucide-react';
+import { Palette, Check, Moon, Sun, Zap, BookOpen, Eye } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext';
 import { Section, Field, ToggleSwitch } from './SettingsPrimitives';
 import { ACCENTS } from './constants';
@@ -29,10 +29,13 @@ export function AppearanceSection() {
     >
       {/* Theme */}
       <Field label="Thème d'interface">
-        <div role="radiogroup" aria-label="Thème" className="grid grid-cols-2 gap-2">
+        <div role="radiogroup" aria-label="Thème" className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {([
-            { id: 'dark',  label: 'Sombre', icon: Moon,  desc: 'Idéal pour la nuit' },
-            { id: 'light', label: 'Clair',  icon: Sun,   desc: 'Lumineux et épuré' },
+            { id: 'dark',          label: 'Sombre',        icon: Moon,     desc: 'Idéal pour la nuit' },
+            { id: 'light',         label: 'Clair',         icon: Sun,      desc: 'Lumineux et épuré' },
+            { id: 'cyberpunk',     label: 'Cyberpunk',     icon: Zap,      desc: 'Néon futuriste' },
+            { id: 'sepia',         label: 'Lecture Sepia', icon: BookOpen, desc: 'Chaud & confortable' },
+            { id: 'high-contrast', label: 'Haut Contraste',icon: Eye,      desc: 'Accessibilité optimale' },
           ] as const).map(t => {
             const isActive = profile.theme === t.id;
             return (
@@ -54,16 +57,16 @@ export function AppearanceSection() {
                   boxShadow: isActive ? '0 2px 8px color-mix(in srgb, var(--accent-primary) 15%, transparent)' : 'none',
                 }}
               >
-                <div className="flex h-6 w-6 items-center justify-center rounded-lg"
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg flex-shrink-0"
                   style={{ backgroundColor: isActive ? 'var(--accent-primary)' : 'var(--bg-panel)' }}>
-                  <t.icon className="h-3 w-3" style={{ color: isActive ? '#fff' : 'var(--text-muted)' }} />
+                  <t.icon className="h-3.5 w-3.5" style={{ color: isActive ? '#fff' : 'var(--text-muted)' }} />
                 </div>
-                <div>
-                  <p className="text-[11px] font-semibold"
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold truncate"
                     style={{ color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
                     {t.label}
                   </p>
-                  <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{t.desc}</p>
+                  <p className="text-[9px] truncate" style={{ color: 'var(--text-dimmed)' }}>{t.desc}</p>
                 </div>
               </motion.button>
             );

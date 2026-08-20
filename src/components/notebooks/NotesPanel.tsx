@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { NotesCanvas } from './NotesCanvas';
+import { TemplateSelectorModal } from '../templates/TemplateSelectorModal';
+import { Sparkles } from 'lucide-react';
 
 interface NoteItem {
   id: string;
@@ -22,11 +24,19 @@ interface NoteItem {
   updatedAt: string;
 }
 
+export interface NoteEditorData {
+  id?: string;
+  title: string;
+  content: string;
+}
+
 interface Props {
   notebookId: string;
   notes: NoteItem[];
   onRefresh: () => void;
   compact?: boolean;
+  /** Called when user wants to create/edit a note in the center column */
+  onOpenNoteEditor?: (data: NoteEditorData) => void;
 }
 
 function timeAgo(dateStr: string): string {
@@ -40,7 +50,7 @@ function timeAgo(dateStr: string): string {
   return 'now';
 }
 
-export function NotesPanel({ notebookId, notes, onRefresh, compact = false }: Props) {
+export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOpenNoteEditor }: Props) {
   const { success, error: toastError } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -49,6 +59,7 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false }: Pr
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'alpha'>('newest');
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'canvas'>('list');
 
   // ─── Note Templates ────────────────────────────────────────────────────────
@@ -89,12 +100,16 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false }: Pr
   ], []);
 
   const applyTemplate = useCallback((template: typeof templates[0]) => {
-    setTitle(template.title);
-    setContent(template.content);
-    setShowForm(true);
-    setShowTemplates(false);
-    setEditingId(null);
-  }, []);
+    if (onOpenNoteEditor) {
+      onOpenNoteEditor({ title: template.title, content: template.content });
+    } else {
+      setTitle(template.title);
+      setContent(template.content);
+      setShowForm(true);
+      setShowTemplates(false);
+      setEditingId(null);
+    }
+  }, [onOpenNoteEditor]);
 
   // ─── Export all notes ─────────────────────────────────────────────────────
 
@@ -176,10 +191,14 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false }: Pr
   }, [notebookId, onRefresh]);
 
   const startEdit = (note: NoteItem) => {
-    setEditingId(note.id);
-    setTitle(note.title);
-    setContent(note.content);
-    setShowForm(false);
+    if (onOpenNoteEditor) {
+      onOpenNoteEditor({ id: note.id, title: note.title, content: note.content });
+    } else {
+      setEditingId(note.id);
+      setTitle(note.title);
+      setContent(note.content);
+      setShowForm(false);
+    }
   };
 
   const cancelForm = () => {
@@ -257,7 +276,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
               <article key={note.id} className="notebook-note-card">
                 <div className="flex items-start gap-2">
                   {note.pinned && <Pin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--accent-primary)]" />}
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 cursor-pointer" onClick={() => startEdit(note)}>
                     <h3 className="truncate text-sm font-semibold text-[var(--text-primary)]">{note.title}</h3>
                     <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{note.content}</p>
                     <p className="mt-3 text-xs text-[var(--text-muted)]">{timeAgo(note.updatedAt || note.createdAt)}</p>
@@ -276,7 +295,13 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
       {/* Header with stats */}
       <div className="flex items-center gap-3 flex-wrap">
         <button
-          onClick={() => { setShowForm(true); setEditingId(null); setTitle(''); setContent(''); }}
+          onClick={() => {
+            if (onOpenNoteEditor) {
+              onOpenNoteEditor({ title: '', content: '' });
+            } else {
+              setShowForm(true); setEditingId(null); setTitle(''); setContent('');
+            }
+          }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 shadow-sm"
           style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
         >
@@ -313,6 +338,14 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                     <span style={{ color: 'var(--text-primary)' }}>{tpl.label}</span>
                   </button>
                 ))}
+                <div className="border-t border-[var(--border-base)] my-1" />
+                <button
+                  onClick={() => { setShowTemplates(false); setShowTemplateModal(true); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-[11px] font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--accent-subtle)]"
+                >
+                  <Sparkles className="w-3.5 h-3.5 flex-shrink-0 text-[var(--accent-primary)]" />
+                  <span>Bibliothèque complète...</span>
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
@@ -392,74 +425,78 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
         </div>
       </div>
 
-      {/* Create/Edit Form */}
-      <AnimatePresence>
-        {(showForm || editingId) && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div
-              className="p-5 rounded-2xl border space-y-3"
-              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--accent-primary)', boxShadow: '0 0 0 1px var(--accent-primary)' }}
+      {/* Inline fallback form (only when no onOpenNoteEditor prop provided) */}
+      {!onOpenNoteEditor && (
+        <AnimatePresence>
+          {(showForm || editingId) && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
             >
-              <div className="flex items-center gap-2">
-                <StickyNote className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  {editingId ? 'Modifier la note' : 'Nouvelle note'}
-                </p>
-              </div>
-
-              <input
-                type="text"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="Titre de la note..."
-                autoFocus
-                className="w-full px-4 py-2.5 rounded-xl text-sm font-medium outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
-                style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
-              />
-
-              <div className="relative">
-                <textarea
-                  value={content}
-                  onChange={e => setContent(e.target.value)}
-                  placeholder="Contenu de la note..."
-                  rows={6}
-                  className="w-full px-4 py-3 rounded-xl text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)] leading-relaxed"
+              <div
+                className="p-5 rounded-2xl border space-y-3"
+                style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--accent-primary)', boxShadow: '0 0 0 1px var(--accent-primary)' }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <StickyNote className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                    <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {editingId ? 'Modifier la note' : 'Nouvelle note'}
+                    </p>
+                  </div>
+                  <button onClick={cancelForm} className="p-1 rounded-lg hover:bg-white/10 transition-colors">
+                    <X className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder="Titre de la note..."
+                  autoFocus
+                  className="w-full px-4 py-2.5 rounded-xl text-sm font-medium outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
                   style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                 />
-                <span className="absolute bottom-2 right-3 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
-                  {content.length} car.
-                </span>
+                <div className="relative">
+                  <textarea
+                    value={content}
+                    onChange={e => setContent(e.target.value)}
+                    placeholder="Contenu de la note..."
+                    rows={6}
+                    className="w-full px-4 py-3 rounded-xl text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)] leading-relaxed"
+                    style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                  />
+                  <span className="absolute bottom-2 right-3 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                    {content.length} car.
+                  </span>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => editingId ? handleUpdate(editingId) : handleCreate()}
+                    disabled={!title.trim()}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold disabled:opacity-40 transition-all active:scale-95"
+                    style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    {editingId ? 'Mettre à jour' : 'Créer'}
+                  </button>
+                  <button
+                    onClick={cancelForm}
+                    className="flex items-center gap-1 px-3 py-2.5 rounded-xl text-xs transition-colors hover:bg-white/5"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Annuler
+                  </button>
+                </div>
               </div>
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => editingId ? handleUpdate(editingId) : handleCreate()}
-                  disabled={!title.trim()}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold disabled:opacity-40 transition-all active:scale-95"
-                  style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  {editingId ? 'Mettre à jour' : 'Créer'}
-                </button>
-                <button
-                  onClick={cancelForm}
-                  className="flex items-center gap-1 px-3 py-2.5 rounded-xl text-xs transition-colors hover:bg-white/5"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  <X className="w-3.5 h-3.5" />
-                  Annuler
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
 
       {/* Canvas View */}
       {viewMode === 'canvas' && notes.length > 0 ? (
@@ -505,7 +542,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                 }}
               >
                 <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 cursor-pointer" onClick={() => startEdit(note)}>
                     <div className="flex items-center gap-1.5">
                       {note.pinned && <Pin className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
                       <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
@@ -573,6 +610,17 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
       )}
       </>
       )}
+
+      {/* Modal de sélection de templates */}
+      <TemplateSelectorModal
+        isOpen={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        onCreateNote={(noteTitle, noteContent) => {
+          setTitle(noteTitle);
+          setContent(noteContent);
+          setShowForm(true);
+        }}
+      />
     </div>
   );
 }

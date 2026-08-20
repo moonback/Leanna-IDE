@@ -6,14 +6,20 @@
  */
 import { useProfile } from './UserProfileContext';
 
-export type Theme = 'dark' | 'light';
+export type Theme = 'dark' | 'light' | 'cyberpunk' | 'sepia' | 'high-contrast';
 
 export function useTheme() {
   const { profile, setField } = useProfile();
   return {
     theme: profile.theme as Theme,
+    setTheme: (newTheme: Theme) => {
+      setField('theme', newTheme);
+      document.documentElement.setAttribute('data-theme', newTheme);
+    },
     toggleTheme: () => {
-      const next = profile.theme === 'dark' ? 'light' : 'dark';
+      const themes: Theme[] = ['dark', 'light', 'cyberpunk', 'sepia', 'high-contrast'];
+      const currentIndex = themes.indexOf(profile.theme as Theme);
+      const next = themes[(currentIndex + 1) % themes.length];
       setField('theme', next);
       document.documentElement.setAttribute('data-theme', next);
     },
