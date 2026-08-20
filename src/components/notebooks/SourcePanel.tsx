@@ -9,7 +9,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Upload, Globe, FileText, Trash2, Loader2, Type, CheckCircle2, XCircle,
-  Search, Eye, RefreshCw, Tag, ClipboardPaste, BarChart3,
+  Search, Eye, RefreshCw, Tag, ClipboardPaste, BarChart3, X,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { SourcesSummaryCard } from './SourcesSummaryCard';
@@ -338,12 +338,21 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
     return (
       <div className="h-full min-h-0 overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 px-4 py-4 flex-shrink-0">
+        <div className="flex items-center justify-between gap-3 px-4 py-4 flex-shrink-0 border-b border-[var(--notebook-border)]">
           <div>
-            <p className="notebook-eyebrow">Sources</p>
-            <h2 className="text-sm font-medium text-[var(--text-primary)]">{sources.length} document{sources.length > 1 ? 's' : ''}</h2>
+            <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-dimmed)' }}>Sources</p>
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">{sources.length} document{sources.length > 1 ? 's' : ''}</h2>
           </div>
-          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="notebook-primary-small">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105"
+            style={{
+              backgroundColor: 'var(--accent-primary)',
+              color: '#fff',
+            }}
+          >
             {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
             <span>Ajouter</span>
           </button>
@@ -351,61 +360,108 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         </div>
 
         {/* Search */}
-        <div className="px-4 pb-3 flex-shrink-0">
-          <div className="notebook-search-field" style={{ minHeight: 36 }}>
-            <Search className="h-3.5 w-3.5" />
-            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Rechercher..." style={{ fontSize: '13px' }} />
+        <div className="px-3 py-2.5 flex-shrink-0">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all"
+            style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)' }}>
+            <Search className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher..."
+              className="flex-1 bg-transparent outline-none text-xs"
+              style={{ color: 'var(--text-primary)' }}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="p-0.5 rounded hover:bg-white/10">
+                <X className="h-3 w-3" style={{ color: 'var(--text-dimmed)' }} />
+              </button>
+            )}
           </div>
         </div>
 
         {/* Source list */}
         <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-2 pb-4">
           {sources.length === 0 ? (
-            <div className="notebook-empty-state" style={{ padding: '32px 16px' }}>
-              <div className="notebook-empty-state-icon" style={{ width: 44, height: 44 }}>
-                <FileText className="h-5 w-5" />
+            <div className="flex flex-col items-center justify-center text-center py-12 px-4 gap-3">
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center"
+                style={{ backgroundColor: 'var(--notebook-surface-muted)' }}
+              >
+                <FileText className="h-5 w-5" style={{ color: 'var(--text-dimmed)' }} />
               </div>
               <p className="text-sm font-medium text-[var(--text-primary)]">Aucune source</p>
-              <p className="text-xs text-[var(--text-muted)]">Ajoutez des documents pour commencer.</p>
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                Ajoutez des documents pour alimenter l'IA.
+              </p>
             </div>
           ) : filteredSources.length === 0 ? (
-            <p className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Aucun résultat.</p>
+            <p className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Aucun résultat pour "{searchQuery}"</p>
           ) : (
-            <div className="space-y-0.5">
+            <div className="space-y-1 pt-1">
               {filteredSources.map((source) => (
                 <div
                   key={source.id}
-                  className="notebook-source-row group w-full"
+                  className="group flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all"
                   data-active={selectedSourceId === source.id}
+                  style={{
+                    backgroundColor: selectedSourceId === source.id ? 'var(--accent-subtle, rgba(59,130,246,0.08))' : 'transparent',
+                    border: selectedSourceId === source.id ? '1px solid var(--accent-primary)' : '1px solid transparent',
+                  }}
+                  onClick={() => onSelectSource?.(source.id)}
+                  onMouseEnter={(e) => {
+                    if (selectedSourceId !== source.id) {
+                      (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--notebook-surface-muted)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedSourceId !== source.id) {
+                      (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+                    }
+                  }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => onSelectSource?.(source.id)}
-                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                  {/* File type icon */}
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm"
+                    style={{
+                      backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}12`,
+                    }}
                   >
-                    <span className="notebook-source-icon" style={{ color: TYPE_COLORS[source.type] || 'var(--text-muted)' }}>
-                      {TYPE_ICONS[source.type] || '📎'}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">{source.title}</span>
-                      <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
-                        {source.type} · {source.wordCount?.toLocaleString()} mots
-                      </span>
-                    </span>
-                  </button>
+                    {TYPE_ICONS[source.type] || '📎'}
+                  </div>
+
+                  {/* Text content */}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                      {source.title}
+                    </p>
+                    <p className="mt-0.5 truncate text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+                      {source.type} · {source.wordCount?.toLocaleString()} mots
+                    </p>
+                  </div>
+
+                  {/* Delete button on hover */}
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleDelete(source.id); }}
-                    className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 flex-shrink-0"
+                    className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/10 flex-shrink-0"
                     title="Supprimer"
                   >
-                    <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                    <Trash2 className="h-3 w-3 text-red-400" />
                   </button>
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        {/* Footer stats */}
+        {sources.length > 0 && (
+          <div className="flex-shrink-0 px-4 py-2.5 border-t border-[var(--notebook-border)]">
+            <p className="text-[10px] text-center" style={{ color: 'var(--text-dimmed)' }}>
+              {totalWords.toLocaleString()} mots · {totalChunks} chunks
+            </p>
+          </div>
+        )}
       </div>
     );
   }

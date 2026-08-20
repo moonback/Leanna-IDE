@@ -1,7 +1,7 @@
 /**
  * NotebookList — Page d'accueil des notebooks (style NotebookLM)
  *
- * Design Google NotebookLM : cards épurées, mise en page aérée,
+ * Design épuré et moderne avec cards colorées, animations fluides,
  * création rapide, recherche et tri.
  */
 
@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   BookOpen, Plus, Loader2, Trash2, Clock, FileText, MessageSquare,
   Search, SortAsc, SortDesc, Sparkles, X, Upload, Globe, Mic,
+  ArrowRight, Layers,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 
@@ -136,28 +137,39 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   return (
     <div className="notebook-workspace h-full flex flex-col overflow-hidden">
       {/* ─── Header ─────────────────────────────────────────── */}
-      <header className="flex-shrink-0 px-6 lg:px-10 pt-8 pb-6">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-3">
-            <div className="notebook-empty-state-icon" style={{ width: 40, height: 40 }}>
-              <BookOpen className="h-5 w-5" />
+      <header className="flex-shrink-0 px-6 lg:px-10 pt-8 pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div
+              className="w-11 h-11 rounded-2xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))' }}
+            >
+              <Layers className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-medium" style={{ color: 'var(--text-primary)' }}>
-                Mes Notebooks
+              <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                Notebooks
               </h1>
-              <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                {notebooks.length} notebook{notebooks.length !== 1 ? 's' : ''} · Recherche IA avec citations
+              <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                {notebooks.length > 0
+                  ? `${notebooks.length} notebook${notebooks.length !== 1 ? 's' : ''} · ${notebooks.reduce((a, n) => a + n.sourcesCount, 0)} sources`
+                  : 'Recherche IA avec citations sur vos documents'
+                }
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowCreateForm(true)}
-              className="notebook-fab"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{
+                background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
+                color: '#fff',
+                boxShadow: '0 2px 8px rgba(59,130,246,0.25)',
+              }}
             >
               <Plus className="w-4 h-4" />
-              <span>Créer</span>
+              <span>Nouveau</span>
             </button>
             {onClose && (
               <button
@@ -175,37 +187,52 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
       {/* ─── Search & Sort Bar ──────────────────────────────── */}
       {notebooks.length > 0 && (
-        <div className="flex-shrink-0 px-6 lg:px-10 pb-4">
+        <div className="flex-shrink-0 px-6 lg:px-10 py-4">
           <div className="flex items-center gap-3">
-            {/* Search */}
-            <div className="notebook-search-field flex-1 max-w-md">
-              <Search className="h-4 w-4 flex-shrink-0" />
+            <div
+              className="flex items-center gap-2.5 flex-1 max-w-md px-4 py-2.5 rounded-xl transition-all"
+              style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)' }}
+            >
+              <Search className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Rechercher un notebook..."
+                className="flex-1 bg-transparent outline-none text-sm"
+                style={{ color: 'var(--text-primary)' }}
               />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="p-0.5 rounded hover:opacity-70">
+                  <X className="h-3.5 w-3.5" style={{ color: 'var(--text-dimmed)' }} />
+                </button>
+              )}
             </div>
 
-            {/* Sort */}
-            <select
-              value={sortBy}
-              onChange={e => setSortBy(e.target.value as SortBy)}
-              className="notebook-chip"
-              style={{ cursor: 'pointer', border: '1px solid var(--notebook-border)' }}
-            >
-              <option value="updatedAt">Plus récent</option>
-              <option value="title">Titre A-Z</option>
-              <option value="sourcesCount">Nb. sources</option>
-            </select>
-            <button
-              onClick={() => setSortDesc(!sortDesc)}
-              className="notebook-icon-button"
-              title={sortDesc ? 'Décroissant' : 'Croissant'}
-            >
-              {sortDesc ? <SortDesc className="w-4 h-4" /> : <SortAsc className="w-4 h-4" />}
-            </button>
+            <div className="flex items-center gap-1 ml-auto">
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as SortBy)}
+                className="px-3 py-2 rounded-lg text-xs font-medium outline-none cursor-pointer transition-all"
+                style={{
+                  backgroundColor: 'var(--notebook-surface-muted)',
+                  border: '1px solid var(--notebook-border)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                <option value="updatedAt">Récent</option>
+                <option value="title">Titre</option>
+                <option value="sourcesCount">Sources</option>
+              </select>
+              <button
+                onClick={() => setSortDesc(!sortDesc)}
+                className="p-2 rounded-lg transition-all hover:opacity-70"
+                style={{ color: 'var(--text-dimmed)' }}
+                title={sortDesc ? 'Décroissant' : 'Croissant'}
+              >
+                {sortDesc ? <SortDesc className="w-4 h-4" /> : <SortAsc className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -217,15 +244,25 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
             className="overflow-hidden flex-shrink-0 px-6 lg:px-10"
           >
             <div
-              className="rounded-2xl border p-6 mb-4 space-y-4"
-              style={{ backgroundColor: 'var(--notebook-card-bg)', borderColor: 'var(--notebook-border)' }}
+              className="rounded-2xl p-6 mb-5 space-y-4"
+              style={{
+                background: 'linear-gradient(135deg, var(--notebook-card-bg) 0%, var(--notebook-surface) 100%)',
+                border: '1px solid var(--notebook-accent)',
+                boxShadow: '0 4px 24px rgba(59,130,246,0.08)',
+              }}
             >
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5" style={{ color: 'var(--notebook-accent)' }} />
-                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))' }}
+                >
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                   Nouveau notebook
                 </span>
               </div>
@@ -234,9 +271,9 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 value={newTitle}
                 onChange={e => setNewTitle(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                placeholder="Titre du notebook"
+                placeholder="Titre du notebook..."
                 autoFocus
-                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all"
                 style={{
                   backgroundColor: 'var(--notebook-surface-muted)',
                   border: '1px solid var(--notebook-border)',
@@ -260,14 +297,19 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 <button
                   onClick={handleCreate}
                   disabled={!newTitle.trim() || creating}
-                  className="notebook-fab disabled:opacity-40"
-                  style={{ padding: '10px 20px', fontSize: '13px' }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:hover:scale-100"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
+                    color: '#fff',
+                  }}
                 >
-                  {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Créer le notebook'}
+                  {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Créer
                 </button>
                 <button
                   onClick={() => { setShowCreateForm(false); setNewTitle(''); setNewDescription(''); }}
-                  className="notebook-chip"
+                  className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-70"
+                  style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
                 </button>
@@ -284,10 +326,11 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="p-5 rounded-2xl border animate-pulse"
+                className="rounded-2xl border animate-pulse overflow-hidden"
                 style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-card-bg)' }}
               >
-                <div className="space-y-3">
+                <div className="h-1.5" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
+                <div className="p-5 space-y-3">
                   <div className="h-5 w-3/4 rounded-lg" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
                   <div className="h-4 w-full rounded-lg" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
                   <div className="flex gap-3 pt-3">
@@ -300,49 +343,72 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
           </div>
         ) : notebooks.length === 0 ? (
           /* ─── Empty state — onboarding ─── */
-          <div className="notebook-empty-state py-20">
-            <div className="notebook-empty-state-icon" style={{ width: 72, height: 72 }}>
-              <BookOpen className="h-8 w-8" />
+          <div className="flex flex-col items-center justify-center text-center py-16 gap-5">
+            <div
+              className="w-20 h-20 rounded-3xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))', opacity: 0.9 }}
+            >
+              <BookOpen className="h-9 w-9 text-white" />
             </div>
-            <h2 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
-              Commencez avec un notebook
-            </h2>
-            <p className="text-sm max-w-md" style={{ color: 'var(--text-muted)' }}>
-              Importez des sources (PDF, URLs, texte) et posez des questions.
-              L'IA répondra en citant vos documents.
-            </p>
+            <div className="space-y-2">
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Créez votre premier notebook
+              </h2>
+              <p className="text-sm max-w-md leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                Importez vos documents et posez des questions.
+                L'IA répondra en citant les passages pertinents.
+              </p>
+            </div>
 
-            {/* Feature chips */}
-            <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+            {/* Feature grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2 max-w-lg">
               {[
-                { icon: Upload, label: 'Upload PDF' },
-                { icon: Globe, label: 'Importer URL' },
-                { icon: MessageSquare, label: 'Chat IA' },
-                { icon: Sparkles, label: 'Résumés' },
-                { icon: Mic, label: 'Audio Overview' },
-              ].map(({ icon: Icon, label }) => (
-                <span key={label} className="notebook-chip">
-                  <Icon className="h-3.5 w-3.5" />
-                  {label}
-                </span>
+                { icon: Upload, label: 'Upload PDF', desc: 'Glissez-déposez' },
+                { icon: Globe, label: 'Importer URL', desc: 'Articles & pages' },
+                { icon: MessageSquare, label: 'Chat IA', desc: 'Avec citations' },
+                { icon: Sparkles, label: 'Résumés', desc: 'Auto-générés' },
+                { icon: Mic, label: 'Audio', desc: 'Vue d\'ensemble' },
+                { icon: FileText, label: 'Notes', desc: 'Personnalisées' },
+              ].map(({ icon: Icon, label, desc }) => (
+                <div
+                  key={label}
+                  className="flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all"
+                  style={{ backgroundColor: 'var(--notebook-surface-muted)' }}
+                >
+                  <Icon className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{label}</span>
+                  <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{desc}</span>
+                </div>
               ))}
             </div>
 
             <button
               onClick={() => setShowCreateForm(true)}
-              className="notebook-fab mt-6"
+              className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium mt-4 transition-all hover:scale-[1.03] active:scale-[0.97]"
+              style={{
+                background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
+                color: '#fff',
+                boxShadow: '0 4px 16px rgba(59,130,246,0.3)',
+              }}
             >
               <Plus className="w-4 h-4" />
-              Créer mon premier notebook
+              Créer un notebook
             </button>
           </div>
         ) : filteredNotebooks.length === 0 ? (
           /* ─── No search results ─── */
-          <div className="notebook-empty-state py-12">
+          <div className="flex flex-col items-center justify-center text-center py-16 gap-3">
             <Search className="w-6 h-6" style={{ color: 'var(--text-dimmed)' }} />
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
               Aucun résultat pour « {searchQuery} »
             </p>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="text-xs font-medium mt-1"
+              style={{ color: 'var(--accent-primary)' }}
+            >
+              Effacer la recherche
+            </button>
           </div>
         ) : (
           /* ─── Grid View ─── */
@@ -352,64 +418,96 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 <motion.div
                   key={nb.id}
                   layout
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
-                  transition={{ duration: 0.2, delay: i < 12 ? i * 0.03 : 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.25, delay: i < 12 ? i * 0.04 : 0 }}
                   onClick={() => onSelectNotebook(nb.id)}
-                  className="group cursor-pointer rounded-2xl border p-5 flex flex-col gap-3 transition-all duration-200"
+                  className="group cursor-pointer rounded-2xl border overflow-hidden flex flex-col transition-all duration-200"
                   style={{
                     backgroundColor: 'var(--notebook-card-bg)',
                     borderColor: 'var(--notebook-border)',
                   }}
                   onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--notebook-accent)';
-                    (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)';
+                    const el = e.currentTarget as HTMLElement;
+                    el.style.borderColor = nb.color || 'var(--notebook-accent)';
+                    el.style.boxShadow = `0 8px 24px ${nb.color || 'rgba(59,130,246,0.15)'}20`;
+                    el.style.transform = 'translateY(-2px)';
                   }}
                   onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--notebook-border)';
-                    (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                    const el = e.currentTarget as HTMLElement;
+                    el.style.borderColor = 'var(--notebook-border)';
+                    el.style.boxShadow = 'none';
+                    el.style.transform = 'translateY(0)';
                   }}
                 >
-                  {/* Card header */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xl flex-shrink-0">{nb.icon}</span>
-                      <h3 className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                        {nb.title}
-                      </h3>
+                  {/* Color accent bar */}
+                  <div
+                    className="h-1.5 w-full"
+                    style={{ backgroundColor: nb.color || 'var(--accent-primary)' }}
+                  />
+
+                  <div className="p-5 flex flex-col gap-3 flex-1">
+                    {/* Card header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
+                          style={{ backgroundColor: `${nb.color || '#3b82f6'}15` }}
+                        >
+                          {nb.icon || '📓'}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                            {nb.title}
+                          </h3>
+                          <p className="text-[11px] mt-0.5 flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}>
+                            <Clock className="w-3 h-3" />
+                            {timeAgo(nb.updatedAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => handleDeleteClick(nb.id, e)}
+                        className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/10 flex-shrink-0"
+                        title="Supprimer"
+                        aria-label="Supprimer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      </button>
                     </div>
-                    <button
-                      onClick={(e) => handleDeleteClick(nb.id, e)}
-                      className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 flex-shrink-0"
-                      title="Supprimer"
-                      aria-label="Supprimer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                    </button>
-                  </div>
 
-                  {/* Description */}
-                  {nb.description && (
-                    <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                      {nb.description}
-                    </p>
-                  )}
+                    {/* Description */}
+                    {nb.description && (
+                      <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                        {nb.description}
+                      </p>
+                    )}
 
-                  {/* Footer stats */}
-                  <div className="flex items-center gap-3 mt-auto pt-3">
-                    <span className="notebook-chip" style={{ padding: '4px 10px', fontSize: '11px' }}>
-                      <FileText className="w-3 h-3" />
-                      {nb.sourcesCount} source{nb.sourcesCount !== 1 ? 's' : ''}
-                    </span>
-                    <span className="notebook-chip" style={{ padding: '4px 10px', fontSize: '11px' }}>
-                      <MessageSquare className="w-3 h-3" />
-                      {nb.notesCount} note{nb.notesCount !== 1 ? 's' : ''}
-                    </span>
-                    <span className="ml-auto flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
-                      <Clock className="w-3 h-3" />
-                      {timeAgo(nb.updatedAt)}
-                    </span>
+                    {/* Footer stats */}
+                    <div className="flex items-center gap-2 mt-auto pt-2">
+                      <span
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium"
+                        style={{ backgroundColor: 'var(--notebook-surface-muted)', color: 'var(--text-secondary)' }}
+                      >
+                        <FileText className="w-3 h-3" />
+                        {nb.sourcesCount}
+                      </span>
+                      <span
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium"
+                        style={{ backgroundColor: 'var(--notebook-surface-muted)', color: 'var(--text-secondary)' }}
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        {nb.notesCount}
+                      </span>
+                      <span
+                        className="ml-auto flex items-center gap-1 text-[11px] opacity-0 group-hover:opacity-100 transition-all"
+                        style={{ color: 'var(--accent-primary)' }}
+                      >
+                        Ouvrir
+                        <ArrowRight className="w-3 h-3" />
+                      </span>
+                    </div>
                   </div>
                 </motion.div>
               ))}
@@ -426,27 +524,27 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)' }}
             onClick={() => setDeleteTarget(null)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.94, y: 8 }}
+              initial={{ opacity: 0, scale: 0.92, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.94, y: 8 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0, scale: 0.92, y: 10 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
               onClick={e => e.stopPropagation()}
-              className="w-full max-w-sm rounded-2xl border p-6 shadow-xl"
+              className="w-full max-w-sm rounded-2xl border p-6 shadow-2xl"
               style={{ backgroundColor: 'var(--notebook-surface-elevated)', borderColor: 'var(--notebook-border)' }}
             >
               <div className="flex items-center gap-3 mb-4">
                 <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center"
+                  className="w-11 h-11 rounded-xl flex items-center justify-center"
                   style={{ backgroundColor: 'rgba(239,68,68,0.1)' }}
                 >
                   <Trash2 className="w-5 h-5 text-red-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                     Supprimer ce notebook ?
                   </p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -456,21 +554,21 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               </div>
 
               <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--text-muted)' }}>
-                Toutes les sources, notes et conversations seront supprimées définitivement.
+                Toutes les sources, notes et conversations seront définitivement supprimées.
               </p>
 
               <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={() => setDeleteTarget(null)}
-                  className="notebook-chip"
-                  style={{ padding: '8px 16px' }}
+                  className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-70"
+                  style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
-                  className="px-4 py-2 rounded-full text-sm font-medium transition-all active:scale-95 hover:opacity-90"
-                  style={{ backgroundColor: '#ef4444', color: '#fff' }}
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all active:scale-95 hover:opacity-90"
+                  style={{ backgroundColor: '#ef4444', color: '#fff', boxShadow: '0 2px 8px rgba(239,68,68,0.3)' }}
                 >
                   Supprimer
                 </button>
