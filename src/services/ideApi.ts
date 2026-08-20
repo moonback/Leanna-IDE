@@ -69,6 +69,13 @@ const treeCache = {
   inFlight: null as Promise<TreeEntry[]> | null,
 };
 
+/** Cache pour le workspace tree (hors sandbox), TTL 2s */
+const workspaceTreeCache = {
+  entry: null as CacheEntry<TreeEntry[]> | null,
+  ttlMs: 2000,
+  inFlight: null as Promise<TreeEntry[]> | null,
+};
+
 /** Cache TTL pour readFile (évite reloads à chaque clic) */
 const readFileCache = new Map<string, CacheEntry<string>>();
 const READ_FILE_TTL_MS = 1500;
@@ -119,12 +126,47 @@ export const ideApi = {
   },
 
   /**
+   * Load the real workspace tree (outside sandbox), cached 2s + dedup.
+   */
+  async loadWorkspaceTree(force = false): Promise<TreeEntry[]> {
+    const now = Date.now();
+    if (
+      !force &&
+      workspaceTreeCache.entry &&
+      now - workspaceTreeCache.entry.ts < workspaceTreeCache.ttlMs
+    ) {
+      return workspaceTreeCache.entry.value;
+    }
+    if (!force && workspaceTreeCache.inFlight) {
+      return workspaceTreeCache.inFlight;
+    }
+    const p = (async () => {
+      try {
+        const response = await fetchWithRetry('/api/ide/tree-workspace', {
+          headers: getAuthHeaders(),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const entries: TreeEntry[] = data.entries || [];
+        workspaceTreeCache.entry = { value: entries, ts: Date.now() };
+        return entries;
+      } finally {
+        workspaceTreeCache.inFlight = null;
+      }
+    })();
+    workspaceTreeCache.inFlight = p;
+    return p;
+  },
+
+  /**
    * Invalide tous les caches (arbre + fichiers).
    * À appeler après un changement de repo pour forcer un rechargement complet.
    */
   invalidateCache(): void {
     treeCache.entry = null;
     treeCache.inFlight = null;
+    workspaceTreeCache.entry = null;
+    workspaceTreeCache.inFlight = null;
     readFileCache.clear();
   },
 

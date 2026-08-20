@@ -35,6 +35,33 @@ router.get('/tree', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/ide/tree-workspace — Always returns the real workspace tree (ignores sandbox)
+router.get('/tree-workspace', async (req: Request, res: Response) => {
+  try {
+    const root = getDefaultWorkspaceRoot();
+    const walk = (current: string): any[] => {
+      const entries = fs.readdirSync(current, { withFileTypes: true });
+      return entries
+        .filter(entry => !['node_modules', '.git', 'dist', 'build', 'out', '.jarvis'].includes(entry.name))
+        .sort((a, b) => {
+          if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+          return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+        })
+        .map(entry => {
+          const entryPath = path.join(current, entry.name);
+          const entryRel = path.relative(root, entryPath).replace(/\\/g, '/');
+          if (entry.isDirectory()) {
+            return { name: entry.name, path: entryRel === '' ? '.' : entryRel, type: 'directory', children: walk(entryPath) };
+          }
+          return { name: entry.name, path: entryRel === '' ? '.' : entryRel, type: 'file' };
+        });
+    };
+    res.json({ path: root, entries: walk(root) });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/ide/file
 router.get('/file', async (req: Request, res: Response) => {
   const requestedPath = typeof req.query.path === 'string' ? req.query.path : '';

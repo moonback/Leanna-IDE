@@ -8,6 +8,8 @@ import { getLanguage } from '../utils/fileUtils';
  */
 export function useFileSystem() {
   const [tree, setTree] = useState<TreeEntry[]>([]);
+  const [workspaceTree, setWorkspaceTree] = useState<TreeEntry[]>([]);
+  const [diffPaths, setDiffPaths] = useState<Map<string, 'added' | 'modified' | 'deleted'>>(new Map());
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(['.']));
@@ -27,6 +29,33 @@ export function useFileSystem() {
     }
   }, []);
 
+  // Load workspace tree (real files, hors sandbox)
+  const loadWorkspaceTree = useCallback(async () => {
+    try {
+      const entries = await ideApi.loadWorkspaceTree();
+      setWorkspaceTree(entries);
+    } catch {
+      // silent — workspace tree is supplementary
+    }
+  }, []);
+
+  // Load diff status from sandbox API
+  const loadDiff = useCallback(async () => {
+    try {
+      const { sandboxApi } = await import('../services/sandboxApi');
+      const data = await sandboxApi.getDiff();
+      if (data.status === 'success' && Array.isArray((data as any).diff)) {
+        const map = new Map<string, 'added' | 'modified' | 'deleted'>();
+        for (const item of (data as any).diff) {
+          map.set(item.path, item.status);
+        }
+        setDiffPaths(map);
+      }
+    } catch {
+      // silent
+    }
+  }, []);
+
   // Deduplicate open files whenever the list changes
   useEffect(() => {
     const uniqueFiles = Array.from(new Map(openFiles.map(f => [f.path, f])).values());
@@ -41,14 +70,20 @@ export function useFileSystem() {
 
   useEffect(() => {
     loadTree();
-  }, [loadTree]);
+    loadWorkspaceTree();
+    loadDiff();
+  }, [loadTree, loadWorkspaceTree, loadDiff]);
 
   // Reload tree when sandbox state changes (force=true to bypass cache after repo change)
   useEffect(() => {
-    const handleSandboxChange = () => { loadTree(); };
+    const handleSandboxChange = () => {
+      loadTree();
+      loadWorkspaceTree();
+      loadDiff();
+    };
     window.addEventListener('jarvis-sandbox-changed', handleSandboxChange);
     return () => window.removeEventListener('jarvis-sandbox-changed', handleSandboxChange);
-  }, [loadTree]);
+  }, [loadTree, loadWorkspaceTree, loadDiff]);
 
   // ── Temps réel : recharger les fichiers ouverts quand modifiés dans le sandbox ──
   useEffect(() => {
@@ -314,6 +349,8 @@ export function useFileSystem() {
   return {
     // State
     tree,
+    workspaceTree,
+    diffPaths,
     openFiles,
     activePath,
     expandedDirs,
@@ -326,6 +363,8 @@ export function useFileSystem() {
     
     // Actions
     loadTree,
+    loadWorkspaceTree,
+    loadDiff,
     openFile,
     saveFile,
     updateFileContent,

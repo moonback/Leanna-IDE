@@ -648,6 +648,8 @@ export default function IdeView() {
       {showExplorer && (
         <FileExplorer
           tree={fileSystem.tree}
+          workspaceTree={fileSystem.workspaceTree}
+          diffPaths={fileSystem.diffPaths}
           expandedDirs={fileSystem.expandedDirs}
           loading={fileSystem.loading}
           currentDir={fileSystem.currentDir}
@@ -662,7 +664,7 @@ export default function IdeView() {
             });
           }}
           onCreateFile={() => setModalState({ type: 'create-file', dir: fileSystem.currentDir })}
-          onRefresh={fileSystem.loadTree}
+          onRefresh={() => { fileSystem.loadTree(); fileSystem.loadWorkspaceTree(); fileSystem.loadDiff(); }}
           onNavigate={fileSystem.setCurrentDir}
           onMoveEntry={fileSystem.moveEntry}
         />

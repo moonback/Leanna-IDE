@@ -203,7 +203,7 @@ FORMAT DE RÉPONSE :
   tree_of_thought: {
     strategy: "tree_of_thought",
     label: "Tree of Thought",
-    description: "Explore plusieurs branches de raisonnement en parallèle, évalue chacune, sélectionne la meilleure avant d'agir. Idéal pour les tâches critiques ou à fort risque.",
+    description: "Explore plusieurs branches de raisonnement en parallèle, évalue chacune, sélectionne la meilleure avant d'agir. Idéal pour les tâches critiques ou à fort enjeu.",
     systemPrompt: `Tu es un stratège expert en résolution de problèmes critiques. Pour le problème donné, tu dois explorer 3 approches distinctes avant de choisir la meilleure.
 
 INSTRUCTIONS :
@@ -264,25 +264,27 @@ function buildReasoningExplanation(
   // Raisons basées sur la stratégie choisie
   const strategyReasons: Record<Exclude<ThinkingStrategy, "auto">, string> = {
     chain_of_thought: "Je vais raisonner étape par étape pour m'assurer de ne rien oublier.",
-    decomposition: "Je décompose le problème en sous-parties pour mieux le résoudre.",
-    analogical: "Je cherche des analogies avec des problèmes similaires que je connais.",
-    self_critique: "Je vais vérifier ma réponse en la critiquant pour la rendre plus robuste.",
-    first_principles: "Je remonte aux principes fondamentaux pour construire une solution solide.",
+    decomposition: "Je décompose le document en sous-parties pour mieux le traiter.",
+    analogical: "Je cherche des analogies avec des documents ou cas similaires que je connais.",
+    self_critique: "Je vais vérifier ma réponse en la critiquant pour la rendre plus fiable.",
+    first_principles: "Je remonte aux éléments fondamentaux pour construire une réponse solide.",
     tree_of_thought: "J'explore plusieurs approches en parallèle avant de choisir la meilleure.",
   };
 
-  // Raisons supplémentaires basées sur le contexte du prompt
+  // Raisons supplémentaires basées sur le contexte du prompt (usage documentaire)
   let contextReason = "";
-  if (/sécurit|vulnérab|authentif/i.test(lower)) {
-    contextReason = "C'est une question de sécurité, je dois être particulièrement prudent.";
-  } else if (/architect|conception|design/i.test(lower)) {
-    contextReason = "C'est une question d'architecture qui mérite une réflexion approfondie.";
-  } else if (/migrat|refactor/i.test(lower)) {
-    contextReason = "Un refactoring nécessite de bien planifier pour éviter les régressions.";
-  } else if (/debug|bug|erreur|error/i.test(lower)) {
-    contextReason = "Pour trouver la cause du problème, je dois analyser méthodiquement.";
-  } else if (/plusieurs.*fichiers|multi/i.test(lower)) {
-    contextReason = "Ça touche plusieurs fichiers, je dois coordonner les changements.";
+  if (/confidentiel|sensible|conformit|juridique|contrat|rgpd/i.test(lower)) {
+    contextReason = "Ce document touche à des informations sensibles ou confidentielles, je dois être particulièrement prudent.";
+  } else if (/structur|organisat|plan\b|sommaire|table des matières/i.test(lower)) {
+    contextReason = "C'est une question de structuration qui mérite une réflexion approfondie.";
+  } else if (/réorganis|restructur|refonte|réécri/i.test(lower)) {
+    contextReason = "Cette réorganisation du document nécessite de bien planifier pour éviter les incohérences.";
+  } else if (/incohérence|erreur|correction|contradiction/i.test(lower)) {
+    contextReason = "Pour identifier la source du problème, je dois analyser le document méthodiquement.";
+  } else if (/plusieurs.*(document|section|fichier|page)/i.test(lower)) {
+    contextReason = "Ça touche plusieurs documents ou sections, je dois coordonner les changements.";
+  } else if (/résum|synthès/i.test(lower)) {
+    contextReason = "Une synthèse fiable demande d'identifier d'abord les idées clés avant de condenser.";
   } else if (complexity === "critical") {
     contextReason = "La complexité est critique, une approche structurée est indispensable.";
   }
@@ -300,12 +302,14 @@ function autoSelectStrategy(prompt: string): Exclude<ThinkingStrategy, "auto"> {
   // Mots-clés pour la décomposition
   if (
     lower.includes("complexe") ||
-    lower.includes("architecture") ||
-    lower.includes("système") ||
+    lower.includes("structure") ||
+    lower.includes("dossier") ||
+    lower.includes("rapport") ||
     lower.includes("plusieurs parties") ||
     lower.includes("multi-étapes") ||
     lower.includes("plan") ||
-    lower.includes("concevoir") ||
+    lower.includes("structurer") ||
+    lower.includes("organiser") ||
     complexity === "complex"
   ) {
     return "decomposition";
@@ -317,7 +321,9 @@ function autoSelectStrategy(prompt: string): Exclude<ThinkingStrategy, "auto"> {
     lower.includes("similaire") ||
     lower.includes("analogie") ||
     lower.includes("comparable") ||
-    lower.includes("ressemble")
+    lower.includes("ressemble") ||
+    lower.includes("modèle de document") ||
+    lower.includes("template")
   ) {
     return "analogical";
   }
@@ -340,7 +346,7 @@ function autoSelectStrategy(prompt: string): Exclude<ThinkingStrategy, "auto"> {
     lower.includes("critiquer") ||
     lower.includes("robuste") ||
     lower.includes("fiable") ||
-    lower.includes("edge case") ||
+    lower.includes("relire") ||
     lower.includes("cas limite")
   ) {
     return "self_critique";
@@ -367,7 +373,7 @@ export const reasoningSkill: Skill = {
       description:
         "Effectue un raisonnement structuré selon la stratégie choisie (auto, chain_of_thought, decomposition, self_critique, tree_of_thought…). " +
         "Retourne un plan d'action. **Ne jamais s'arrêter après cet outil** — exécute immédiatement le plan ou formule la réponse finale. " +
-        "Utiliser uniquement si : ≥ 3 étapes logiques, sécurité/architecture, approche ayant échoué (self_critique), ou nouvelle feature majeure (tree_of_thought).",
+        "Utiliser uniquement si : ≥ 3 étapes logiques, document sensible/confidentiel, approche ayant échoué (self_critique), ou production d'un document/dossier majeur (tree_of_thought).",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -378,7 +384,7 @@ export const reasoningSkill: Skill = {
           strategy: {
             type: "STRING",
             description:
-              "La stratégie de pensée à utiliser : 'chain_of_thought', 'decomposition', 'analogical', 'self_critique', 'first_principles', 'tree_of_thought', ou 'auto' pour laisser Jarvis choisir. Défaut: 'auto'. Utilisez 'tree_of_thought' pour les problèmes critiques (sécurité, migration, refactoring systémique).",
+              "La stratégie de pensée à utiliser : 'chain_of_thought', 'decomposition', 'analogical', 'self_critique', 'first_principles', 'tree_of_thought', ou 'auto' pour laisser Jarvis choisir. Défaut: 'auto'. Utilisez 'tree_of_thought' pour les tâches critiques (documents sensibles, refonte majeure, dossier stratégique).",
           },
         },
         required: ["prompt"],
@@ -387,7 +393,7 @@ export const reasoningSkill: Skill = {
     {
       name: "agent_execute",
       description:
-        "Exécution interne réservée aux agents : produit directement un résultat concret, des appels structurés autorisés ou des fichiers à modifier. Ne génère pas de plan de raisonnement.",
+        "Exécution interne réservée aux agents : produit directement un résultat concret, des appels structurés autorisés ou du contenu de document à produire/modifier. Ne génère pas de plan de raisonnement.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -434,9 +440,9 @@ export const reasoningSkill: Skill = {
       if (!prompt) return { error: "Prompt d'exécution agent requis." };
 
       const systemPrompt =
-        "Tu es un agent codeur d'exécution. Travaille uniquement sur le contexte fourni. " +
-        "Ne fournis pas de plan, ne demande pas d'archive et ne simule jamais bash/shell. " +
-        "Produis soit des appels structurés autorisés (JSON tool_calls avec name et parameters), soit un résultat final concret avec preuves et fichiers complets à modifier. " +
+        "Tu es un agent d'exécution documentaire. Travaille uniquement sur le contexte fourni. " +
+        "Ne fournis pas de plan, ne demande pas d'archive et ne simule jamais un traitement. " +
+        "Produis soit des appels structurés autorisés (JSON tool_calls avec name et parameters), soit un résultat final concret avec preuves et le contenu complet des documents à produire ou modifier. " +
         "Réponds toujours avec du texte visible; ne reste jamais silencieux.";
 
       // Utilise le provider actif (Gemini ou OpenRouter selon le profil utilisateur)

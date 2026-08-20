@@ -14,6 +14,8 @@ type SortMode = 'name-asc' | 'name-desc' | 'type';
 
 type FileExplorerProps = {
   tree: TreeEntry[];
+  workspaceTree?: TreeEntry[];
+  diffPaths?: Map<string, 'added' | 'modified' | 'deleted'>;
   expandedDirs: Set<string>;
   loading: boolean;
   currentDir: string;
@@ -146,17 +148,28 @@ function toDataNode(
   handleDragOver: (e: React.DragEvent, entry: TreeEntry) => void,
   handleDragLeave: (e: React.DragEvent) => void,
   handleDrop: (e: React.DragEvent, entry: TreeEntry) => void,
+  diffPaths?: Map<string, 'added' | 'modified' | 'deleted'>,
 ): DataNode {
   const isExpanded = expandedDirs.has(entry.path);
   const hasChildren = entry.type === 'directory' && entry.children && entry.children.length > 0;
   const isDragTarget = dragOverPath === entry.path;
+  const diffStatus = diffPaths?.get(entry.path);
+
+  // Diff color coding
+  const diffColor = diffStatus === 'added'
+    ? 'var(--color-success, #22c55e)'
+    : diffStatus === 'modified'
+      ? 'var(--color-warning, #f59e0b)'
+      : diffStatus === 'deleted'
+        ? 'var(--color-error, #ef4444)'
+        : undefined;
 
   const title = (
     <div
       className="flex items-center gap-1.5 py-1 px-2 text-[12px] cursor-pointer select-none relative group transition-colors duration-150 rounded-md"
       style={{
         paddingLeft: `${8 + depth * 14}px`,
-        color: 'var(--text-primary)',
+        color: diffColor || 'var(--text-primary)',
         backgroundColor: isDragTarget
           ? 'color-mix(in srgb, var(--accent-primary) 15%, transparent)'
           : 'transparent',
@@ -194,9 +207,9 @@ function toDataNode(
       <div className="flex items-center gap-1.5 flex-1 min-w-0">
         {entry.type === 'directory' ? (
           isDragTarget || isExpanded ? (
-            <FolderOpen size={14} style={{ color: 'var(--accent-primary)' }} />
+            <FolderOpen size={14} style={{ color: diffColor || 'var(--accent-primary)' }} />
           ) : (
-            <Folder size={14} style={{ color: 'var(--accent-primary)' }} />
+            <Folder size={14} style={{ color: diffColor || 'var(--accent-primary)' }} />
           )
         ) : (
           <FileIcon filePath={entry.path} size={14} />
@@ -208,6 +221,18 @@ function toDataNode(
             entry.name
           )}
         </span>
+        {/* Diff status indicator */}
+        {diffStatus && (
+          <span
+            className="ml-auto text-[9px] font-bold uppercase px-1 rounded"
+            style={{
+              color: diffColor,
+              backgroundColor: `color-mix(in srgb, ${diffColor} 12%, transparent)`,
+            }}
+          >
+            {diffStatus === 'added' ? 'A' : diffStatus === 'modified' ? 'M' : 'D'}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -230,6 +255,7 @@ function toDataNode(
           handleDragOver,
           handleDragLeave,
           handleDrop,
+          diffPaths,
         )
       )
     : undefined;
@@ -247,6 +273,8 @@ function toDataNode(
 
 const FileExplorer = memo(function FileExplorer({
   tree,
+  workspaceTree,
+  diffPaths,
   expandedDirs,
   loading,
   currentDir,
@@ -384,7 +412,7 @@ const FileExplorer = memo(function FileExplorer({
     setDragOverPath(null);
   }, []);
 
-  // Convert to rc-tree format
+  // Convert to rc-tree format (sandbox/active tree)
   const treeData = useMemo(() => {
     return processedTree.map(entry =>
       toDataNode(
@@ -403,6 +431,7 @@ const FileExplorer = memo(function FileExplorer({
         handleDragOver,
         handleDragLeave,
         handleDrop,
+        diffPaths,
       )
     );
   }, [
@@ -420,7 +449,77 @@ const FileExplorer = memo(function FileExplorer({
     handleDragOver,
     handleDragLeave,
     handleDrop,
+    diffPaths,
   ]);
+
+  // Workspace tree section (read-only, no drag & drop)
+  const [wsExpandedDirs, setWsExpandedDirs] = useState<Set<string>>(new Set());
+  const [showWorkspace, setShowWorkspace] = useState(true);
+
+  const wsToggleDir = useCallback((dirPath: string) => {
+    setWsExpandedDirs(prev => {
+      const next = new Set(prev);
+      if (next.has(dirPath)) next.delete(dirPath);
+      else next.add(dirPath);
+      return next;
+    });
+  }, []);
+
+  const processedWorkspaceTree = useMemo(() => {
+    if (!workspaceTree || workspaceTree.length === 0) return [];
+    const filtered = filterTree(workspaceTree, debouncedSearch, showHidden);
+    const applySort = (entries: TreeEntry[]): TreeEntry[] =>
+      sortEntries(entries, sortMode).map(e =>
+        e.type === 'directory' && e.children
+          ? { ...e, children: applySort(e.children) }
+          : e
+      );
+    return applySort(filtered);
+  }, [workspaceTree, debouncedSearch, sortMode, showHidden]);
+
+  const noopDrag = useCallback(() => {}, []);
+  const noopDragEvent = useCallback((_e: React.DragEvent, _entry: TreeEntry) => {}, []);
+  const noopDragLeave = useCallback((_e: React.DragEvent) => {}, []);
+
+  const wsTreeData = useMemo(() => {
+    return processedWorkspaceTree.map(entry =>
+      toDataNode(
+        entry,
+        0,
+        wsExpandedDirs,
+        debouncedSearch,
+        onOpenFile,
+        wsToggleDir,
+        onContextMenu,
+        null,
+        null,
+        undefined,
+        noopDragEvent,
+        noopDrag,
+        noopDragEvent,
+        noopDragLeave,
+        noopDragEvent,
+        diffPaths,
+      )
+    );
+  }, [
+    processedWorkspaceTree,
+    wsExpandedDirs,
+    debouncedSearch,
+    onOpenFile,
+    wsToggleDir,
+    onContextMenu,
+    diffPaths,
+    noopDrag,
+    noopDragEvent,
+    noopDragLeave,
+  ]);
+
+  const wsExpandedKeys = useMemo(() => Array.from(wsExpandedDirs), [wsExpandedDirs]);
+
+  const handleWsTreeExpand = useCallback((keys: React.Key[]) => {
+    keys.forEach(key => wsToggleDir(String(key)));
+  }, [wsToggleDir]);
 
   // Sync expansion with rc-tree
   const expandedKeys = useMemo(() => Array.from(expandedDirs), [expandedDirs]);
@@ -678,17 +777,83 @@ const FileExplorer = memo(function FileExplorer({
             </p>
           </div>
         ) : (
-          <Tree
-            treeData={treeData}
-            height={600}
-            itemHeight={26}
-            virtual
-            showLine
-            expandedKeys={expandedKeys}
-            onExpand={handleTreeExpand}
-            selectable={false}
-            defaultExpandParent
-          />
+          <>
+            {/* Section: Sandbox (active tree) */}
+            {sandboxActive && (
+              <div
+                className="flex items-center gap-1.5 px-3 py-1 border-b sticky top-0 z-10"
+                style={{
+                  borderColor: 'var(--border-base)',
+                  backgroundColor: 'color-mix(in srgb, var(--color-success, #22c55e) 6%, var(--bg-sidebar))',
+                }}
+              >
+                <Shield size={10} style={{ color: 'var(--color-success, #22c55e)' }} />
+                <span className="text-[10px] font-semibold" style={{ color: 'var(--color-success, #22c55e)' }}>
+                  Sandbox
+                </span>
+                {diffPaths && diffPaths.size > 0 && (
+                  <span
+                    className="text-[9px] px-1.5 rounded-full ml-auto"
+                    style={{
+                      backgroundColor: 'color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent)',
+                      color: 'var(--color-warning, #f59e0b)',
+                    }}
+                  >
+                    {diffPaths.size} diff
+                  </span>
+                )}
+              </div>
+            )}
+            <Tree
+              treeData={treeData}
+              height={sandboxActive && showWorkspace ? 320 : 600}
+              itemHeight={26}
+              virtual
+              showLine
+              expandedKeys={expandedKeys}
+              onExpand={handleTreeExpand}
+              selectable={false}
+              defaultExpandParent
+            />
+
+            {/* Section: Workspace (real files, hors sandbox) */}
+            {sandboxActive && processedWorkspaceTree.length > 0 && (
+              <>
+                <div
+                  className="flex items-center gap-1.5 px-3 py-1 border-t border-b cursor-pointer select-none"
+                  style={{
+                    borderColor: 'var(--border-base)',
+                    backgroundColor: 'color-mix(in srgb, var(--accent-primary) 6%, var(--bg-sidebar))',
+                  }}
+                  onClick={() => setShowWorkspace(prev => !prev)}
+                >
+                  <span className="opacity-60">
+                    {showWorkspace ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                  </span>
+                  <Folder size={10} style={{ color: 'var(--accent-primary)' }} />
+                  <span className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}>
+                    Workspace
+                  </span>
+                  <span className="text-[9px] opacity-50 ml-1" style={{ color: 'var(--text-muted)' }}>
+                    (fichiers réels)
+                  </span>
+                </div>
+                {showWorkspace && (
+                  <Tree
+                    treeData={wsTreeData}
+                    height={280}
+                    itemHeight={26}
+                    virtual
+                    showLine
+                    expandedKeys={wsExpandedKeys}
+                    onExpand={handleWsTreeExpand}
+                    selectable={false}
+                    defaultExpandParent
+                  />
+                )}
+              </>
+            )}
+          </>
         )}
       </div>
     </div>
