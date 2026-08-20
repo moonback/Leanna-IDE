@@ -34,6 +34,8 @@ type ThinkingStrategy =
   | "self_critique"
   | "first_principles"
   | "tree_of_thought"
+  | "document_analysis"
+  | "comparative_analysis"
   | "auto";
 
 interface ThinkingConfig {
@@ -47,7 +49,7 @@ const THINKING_STRATEGIES: Record<Exclude<ThinkingStrategy, "auto">, ThinkingCon
   chain_of_thought: {    strategy: "chain_of_thought",
     label: "Chain of Thought",
     description: "Raisonnement étape par étape, chaque étape découlant logiquement de la précédente.",
-    systemPrompt: `Tu es un expert en raisonnement logique. Résous le problème ci-dessous en utilisant une approche Chain of Thought :
+    systemPrompt: `Tu es un expert en raisonnement logique et en analyse documentaire. Résous le problème ci-dessous en utilisant une approche Chain of Thought :
 
 INSTRUCTIONS :
 1. Reformule le problème avec tes propres mots pour confirmer ta compréhension.
@@ -55,6 +57,12 @@ INSTRUCTIONS :
 3. Raisonne étape par étape. Numérote chaque étape et explique pourquoi elle découle de la précédente.
 4. Si tu fais une hypothèse, annonce-la explicitement.
 5. Termine par une conclusion claire et concise, séparée du raisonnement.
+
+CONSIDÉRATIONS DOCUMENTAIRES (si le problème implique un/des documents) :
+- Cite les passages ou sections pertinentes pour ancrer ton raisonnement.
+- Distingue les FAITS (ce que dit le document) de tes INTERPRÉTATIONS.
+- Si le document contient des ambiguïtés, signale-les à chaque étape concernée.
+- Vérifie la cohérence entre les différentes parties du document à chaque étape.
 
 FORMAT DE RÉPONSE :
 ## Compréhension du problème
@@ -73,7 +81,7 @@ FORMAT DE RÉPONSE :
     strategy: "decomposition",
     label: "Décomposition",
     description: "Divise un problème complexe en sous-problèmes indépendants, résout chacun, puis synthétise.",
-    systemPrompt: `Tu es un expert en résolution de problèmes complexes. Utilise la méthode de décomposition :
+    systemPrompt: `Tu es un expert en résolution de problèmes complexes et en structuration documentaire. Utilise la méthode de décomposition :
 
 INSTRUCTIONS :
 1. Identifie le problème principal.
@@ -81,6 +89,12 @@ INSTRUCTIONS :
 3. Résous chaque sous-problème séparément avec un raisonnement clair.
 4. Synthétise les résultats partiels en une solution cohérente.
 5. Vérifie que la synthèse répond bien au problème initial.
+
+CONSIDÉRATIONS DOCUMENTAIRES (si le problème implique un/des documents) :
+- Décompose selon la structure logique du document (sections, chapitres, thèmes) plutôt qu'arbitrairement.
+- Pour chaque sous-partie, identifie : contenu factuel, arguments, conclusions locales.
+- Lors de la synthèse, vérifie qu'il n'y a pas de contradictions entre les sous-parties.
+- Signale les dépendances croisées entre sections (ex: une conclusion en section 3 repose sur des données de section 1).
 
 FORMAT DE RÉPONSE :
 ## Problème principal
@@ -136,7 +150,7 @@ FORMAT DE RÉPONSE :
     strategy: "self_critique",
     label: "Auto-critique itérative",
     description: "Propose une solution, la critique, l'améliore, en boucle jusqu'à convergence.",
-    systemPrompt: `Tu es un expert en pensée critique. Résous le problème en utilisant un processus d'auto-critique itérative :
+    systemPrompt: `Tu es un expert en pensée critique et en révision documentaire. Résous le problème en utilisant un processus d'auto-critique itérative :
 
 INSTRUCTIONS :
 1. Propose une première solution (rapide, intuitive).
@@ -144,6 +158,13 @@ INSTRUCTIONS :
 3. Propose une solution améliorée qui adresse les critiques.
 4. Critique à nouveau : reste-t-il des faiblesses ?
 5. Si oui, itère une dernière fois. Sinon, finalise.
+
+CONSIDÉRATIONS DOCUMENTAIRES (si le problème implique un/des documents) :
+- Vérifie l'exactitude factuelle : les données citées sont-elles correctes et à jour ?
+- Vérifie la cohérence interne : pas de contradictions entre sections.
+- Vérifie la complétude : les informations essentielles sont-elles toutes présentes ?
+- Vérifie la clarté : un lecteur non-expert comprendrait-il chaque partie ?
+- Vérifie le ton et le registre : sont-ils adaptés au public cible ?
 
 FORMAT DE RÉPONSE :
 ## Première tentative
@@ -246,6 +267,112 @@ FORMAT DE RÉPONSE :
 ## Points de vigilance
 - ...`,
   },
+
+  document_analysis: {
+    strategy: "document_analysis",
+    label: "Analyse documentaire",
+    description: "Stratégie spécialisée pour le traitement de documents : synthèse, extraction d'information, vérification de cohérence, restructuration, annotation et conformité.",
+    systemPrompt: `Tu es un expert en analyse et traitement documentaire. Tu excelles en synthèse, extraction d'information clé, vérification de cohérence, détection d'incohérences et restructuration de contenu.
+
+INSTRUCTIONS :
+1. Identifie le TYPE de document (rapport, contrat, note, procédure, courrier, étude, présentation, etc.) et son OBJECTIF.
+2. Extrais la STRUCTURE existante (sections, hiérarchie, flux logique).
+3. Identifie les ÉLÉMENTS CLÉS : thèse principale, arguments, données chiffrées, conclusions, engagements, dates limites, parties prenantes.
+4. Détecte les PROBLÈMES éventuels : incohérences internes, informations manquantes, ambiguïtés, contradictions entre sections, termes imprécis.
+5. Propose des AMÉLIORATIONS concrètes avec localisation précise (section/paragraphe concerné).
+
+PRINCIPES DOCUMENTAIRES :
+- Fidélité : ne jamais inventer d'information absente du document source.
+- Traçabilité : chaque observation doit être rattachée à une section/passage précis.
+- Exhaustivité : couvrir l'ensemble du document, pas seulement les premières pages.
+- Neutralité : séparer les faits des interprétations.
+- Priorisation : classer les observations par impact (critique → mineur).
+
+FORMAT DE RÉPONSE :
+## Identification du document
+- Type : ...
+- Objectif : ...
+- Public cible : ...
+- Volume : ... (sections/pages/mots estimés)
+
+## Structure et flux logique
+(description de l'architecture du document)
+
+## Éléments clés extraits
+1. **[Catégorie]** : [élément] — Section [X]
+2. ...
+
+## Diagnostic
+### Incohérences / Problèmes détectés
+- 🔴 [Critique] : ... (Section X)
+- 🟡 [Modéré] : ... (Section Y)
+- 🟢 [Mineur] : ... (Section Z)
+
+### Informations manquantes
+- ...
+
+## Recommandations
+1. [Action prioritaire] — Impact : [élevé/moyen] — Effort : [faible/moyen/élevé]
+2. ...
+
+## Synthèse en une phrase
+(résumé exécutif du diagnostic)`,
+  },
+
+  comparative_analysis: {
+    strategy: "comparative_analysis",
+    label: "Analyse comparative",
+    description: "Compare, croise et réconcilie plusieurs documents, versions ou sources d'information. Identifie convergences, divergences et contradictions.",
+    systemPrompt: `Tu es un expert en analyse comparative de documents. Tu excelles à croiser des sources, identifier des divergences, et produire une vue unifiée et fiable.
+
+INSTRUCTIONS :
+1. Identifie les SOURCES à comparer (documents, versions, sections, ou données).
+2. Établis un CADRE DE COMPARAISON : quels critères/dimensions utiliser pour comparer ?
+3. Pour chaque critère, identifie les CONVERGENCES (points d'accord) et les DIVERGENCES (désaccords, écarts, contradictions).
+4. Évalue la FIABILITÉ de chaque source sur les points de divergence (date, auteur, niveau de détail, cohérence interne).
+5. Propose une POSITION DE SYNTHÈSE qui réconcilie les sources ou explique pourquoi la réconciliation est impossible.
+6. Signale les ZONES D'OMBRE : sujets couverts par une source mais absents de l'autre.
+
+PRINCIPES DE COMPARAISON :
+- Équité : ne pas favoriser une source a priori.
+- Granularité : comparer au niveau le plus fin pertinent (phrase, donnée chiffrée, date).
+- Contexte : une divergence peut être légitime si les contextes diffèrent (date, périmètre, audience).
+- Transparence : toujours indiquer le degré de certitude de chaque conclusion.
+
+FORMAT DE RÉPONSE :
+## Sources identifiées
+| # | Source | Type | Date | Périmètre |
+|---|--------|------|------|-----------|
+| 1 | ... | ... | ... | ... |
+| 2 | ... | ... | ... | ... |
+
+## Cadre de comparaison
+Critères retenus : [liste des dimensions de comparaison]
+
+## Matrice de comparaison
+### Critère 1 : [nom]
+- **Source 1** : ...
+- **Source 2** : ...
+- **Verdict** : [convergence ✅ | divergence ⚠️ | contradiction ❌]
+
+### Critère 2 : [nom]
+...
+
+## Synthèse des divergences
+| Critère | Nature de l'écart | Source la plus fiable | Confiance |
+|---------|-------------------|-----------------------|-----------|
+| ... | ... | ... | élevée/moyenne/faible |
+
+## Zones d'ombre
+- [Sujet X] : couvert uniquement par Source 1, absent de Source 2.
+- ...
+
+## Position de synthèse recommandée
+(version réconciliée ou explication de l'impossibilité de réconcilier)
+
+## Points nécessitant une vérification humaine
+- ...`,
+  },
 };
 
 // ─── Strategy Auto-Selection ────────────────────────────────────────────────
@@ -269,22 +396,36 @@ function buildReasoningExplanation(
     self_critique: "Je vais vérifier ma réponse en la critiquant pour la rendre plus fiable.",
     first_principles: "Je remonte aux éléments fondamentaux pour construire une réponse solide.",
     tree_of_thought: "J'explore plusieurs approches en parallèle avant de choisir la meilleure.",
+    document_analysis: "J'analyse le document en profondeur pour en extraire la structure et les éléments clés.",
+    comparative_analysis: "Je croise les sources pour identifier les convergences et les écarts.",
   };
 
   // Raisons supplémentaires basées sur le contexte du prompt (usage documentaire)
   let contextReason = "";
-  if (/confidentiel|sensible|conformit|juridique|contrat|rgpd/i.test(lower)) {
+  if (/confidentiel|sensible|conformit|juridique|contrat|rgpd|cnil|données personnelles/i.test(lower)) {
     contextReason = "Ce document touche à des informations sensibles ou confidentielles, je dois être particulièrement prudent.";
-  } else if (/structur|organisat|plan\b|sommaire|table des matières/i.test(lower)) {
-    contextReason = "C'est une question de structuration qui mérite une réflexion approfondie.";
-  } else if (/réorganis|restructur|refonte|réécri/i.test(lower)) {
-    contextReason = "Cette réorganisation du document nécessite de bien planifier pour éviter les incohérences.";
-  } else if (/incohérence|erreur|correction|contradiction/i.test(lower)) {
-    contextReason = "Pour identifier la source du problème, je dois analyser le document méthodiquement.";
-  } else if (/plusieurs.*(document|section|fichier|page)/i.test(lower)) {
-    contextReason = "Ça touche plusieurs documents ou sections, je dois coordonner les changements.";
-  } else if (/résum|synthès/i.test(lower)) {
+  } else if (/compar|croiser|différence|divergence|version|vs\b|versus|entre.*document/i.test(lower)) {
+    contextReason = "Je compare les sources pour identifier les points de convergence et les contradictions.";
+  } else if (/résum|synthès|condenser|essentiel|idée.?clé|point.?clé/i.test(lower)) {
     contextReason = "Une synthèse fiable demande d'identifier d'abord les idées clés avant de condenser.";
+  } else if (/structur|organisat|plan\b|sommaire|table des matières|architecture du document/i.test(lower)) {
+    contextReason = "C'est une question de structuration qui mérite une réflexion approfondie.";
+  } else if (/réorganis|restructur|refonte|réécri|réécriture|remanier/i.test(lower)) {
+    contextReason = "Cette réorganisation du document nécessite de bien planifier pour éviter les incohérences.";
+  } else if (/incohérence|erreur|correction|contradiction|anomalie|coquille/i.test(lower)) {
+    contextReason = "Pour identifier la source du problème, je dois analyser le document méthodiquement.";
+  } else if (/plusieurs.*(document|section|fichier|page|source|version)/i.test(lower)) {
+    contextReason = "Ça touche plusieurs documents ou sections, je dois coordonner les changements.";
+  } else if (/extraire|extraction|identifier.*information|repérer|inventorier|lister.*éléments/i.test(lower)) {
+    contextReason = "J'identifie et j'extrais les informations pertinentes de manière systématique.";
+  } else if (/annoter|annotation|commentaire|marge|remarque|feedback/i.test(lower)) {
+    contextReason = "J'annote le document de façon structurée pour faciliter la relecture.";
+  } else if (/relire|relecture|proofreading|révision|qualité rédaction/i.test(lower)) {
+    contextReason = "Une relecture rigoureuse nécessite de vérifier chaque section avec méthode.";
+  } else if (/conformit|norme|iso|standard|réglementaire|audit|checklist/i.test(lower)) {
+    contextReason = "Je vérifie la conformité point par point selon les critères applicables.";
+  } else if (/classif|catégoris|trier|ranger|taxon|étiqueter|tag/i.test(lower)) {
+    contextReason = "Je classe les éléments du document selon une logique cohérente.";
   } else if (complexity === "critical") {
     contextReason = "La complexité est critique, une approche structurée est indispensable.";
   }
@@ -299,23 +440,51 @@ function autoSelectStrategy(prompt: string): Exclude<ThinkingStrategy, "auto"> {
   const complexity = assessComplexity(prompt);
   if (complexity === "critical") return "tree_of_thought";
 
-  // Mots-clés pour la décomposition
+  // ── Analyse comparative (priorité haute : doit passer avant document_analysis) ──
+  if (
+    /compar(er|aison|atif|ative)/i.test(lower) ||
+    /croiser|différence(s)?.*entre|divergence|version.*(précédente|antérieure|actuelle)/i.test(lower) ||
+    /\bvs\b|versus/i.test(lower) ||
+    /entre.*(document|version|source|fichier)/i.test(lower) ||
+    /réconcili|fusionner.*version|merge.*document/i.test(lower) ||
+    /écart(s)?.*entre|delta\b/i.test(lower)
+  ) {
+    return "comparative_analysis";
+  }
+
+  // ── Analyse documentaire (synthèse, extraction, relecture, conformité, annotation) ──
+  if (
+    /résum(é|er)|synth(è|é)s(e|er)|condenser|point(s)?.?clé(s)?|idée(s)?.?clé(s)?/i.test(lower) ||
+    /extraire|extraction|identifier.*information|repérer.*dans|inventorier/i.test(lower) ||
+    /relire|relecture|proofreading|réviser.*document|corriger.*texte/i.test(lower) ||
+    /conformit(é)?|audit|norme|iso\s?\d|check.?list|réglementaire/i.test(lower) ||
+    /annoter|annotation|marge|feedback.*document/i.test(lower) ||
+    /classif|catégoris|trier.*document|ranger|taxon|étiqueter/i.test(lower) ||
+    /analyser.*document|analyse.*contenu|examen.*texte|diagnostic.*document/i.test(lower) ||
+    /table des matières|sommaire.*générer|index.*document/i.test(lower) ||
+    /cohérence.*document|qualité.*rédaction|lisibilité/i.test(lower) ||
+    /fiche.*lecture|note.*synthèse|abstract|executive.?summary/i.test(lower)
+  ) {
+    return "document_analysis";
+  }
+
+  // ── Décomposition (problèmes structurels, multi-parties) ──
   if (
     lower.includes("complexe") ||
-    lower.includes("structure") ||
     lower.includes("dossier") ||
     lower.includes("rapport") ||
     lower.includes("plusieurs parties") ||
     lower.includes("multi-étapes") ||
-    lower.includes("plan") ||
     lower.includes("structurer") ||
     lower.includes("organiser") ||
+    /plan\b(?!.*d'action.*simple)/i.test(lower) ||
+    /restructur|réorganis|refonte/i.test(lower) ||
     complexity === "complex"
   ) {
     return "decomposition";
   }
 
-  // Mots-clés pour l'analogie
+  // ── Analogie ──
   if (
     lower.includes("comme") ||
     lower.includes("similaire") ||
@@ -323,31 +492,37 @@ function autoSelectStrategy(prompt: string): Exclude<ThinkingStrategy, "auto"> {
     lower.includes("comparable") ||
     lower.includes("ressemble") ||
     lower.includes("modèle de document") ||
-    lower.includes("template")
+    lower.includes("template") ||
+    lower.includes("s'inspirer de") ||
+    lower.includes("à la manière de")
   ) {
     return "analogical";
   }
 
-  // Mots-clés pour les premiers principes
+  // ── Premiers principes ──
   if (
     lower.includes("fondamental") ||
     lower.includes("pourquoi") ||
     lower.includes("principes") ||
     lower.includes("repenser") ||
     lower.includes("depuis zéro") ||
-    lower.includes("from scratch")
+    lower.includes("from scratch") ||
+    lower.includes("repartir de la base")
   ) {
     return "first_principles";
   }
 
-  // Mots-clés pour l'auto-critique
+  // ── Auto-critique (vérification, robustesse) ──
   if (
     lower.includes("vérifier") ||
     lower.includes("critiquer") ||
     lower.includes("robuste") ||
     lower.includes("fiable") ||
     lower.includes("relire") ||
-    lower.includes("cas limite")
+    lower.includes("cas limite") ||
+    lower.includes("valider") ||
+    lower.includes("contre-vérifier") ||
+    lower.includes("double check")
   ) {
     return "self_critique";
   }
@@ -371,9 +546,9 @@ export const reasoningSkill: Skill = {
     {
       name: "reasoning_think",
       description:
-        "Effectue un raisonnement structuré selon la stratégie choisie (auto, chain_of_thought, decomposition, self_critique, tree_of_thought…). " +
+        "Effectue un raisonnement structuré selon la stratégie choisie (auto, chain_of_thought, decomposition, document_analysis, comparative_analysis, self_critique, tree_of_thought…). " +
         "Retourne un plan d'action. **Ne jamais s'arrêter après cet outil** — exécute immédiatement le plan ou formule la réponse finale. " +
-        "Utiliser uniquement si : ≥ 3 étapes logiques, document sensible/confidentiel, approche ayant échoué (self_critique), ou production d'un document/dossier majeur (tree_of_thought).",
+        "Utiliser uniquement si : ≥ 3 étapes logiques, document sensible/confidentiel, approche ayant échoué (self_critique), analyse/synthèse/comparaison de documents (document_analysis, comparative_analysis), ou production d'un document/dossier majeur (tree_of_thought).",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -384,7 +559,7 @@ export const reasoningSkill: Skill = {
           strategy: {
             type: "STRING",
             description:
-              "La stratégie de pensée à utiliser : 'chain_of_thought', 'decomposition', 'analogical', 'self_critique', 'first_principles', 'tree_of_thought', ou 'auto' pour laisser Jarvis choisir. Défaut: 'auto'. Utilisez 'tree_of_thought' pour les tâches critiques (documents sensibles, refonte majeure, dossier stratégique).",
+              "La stratégie de pensée à utiliser : 'chain_of_thought', 'decomposition', 'analogical', 'self_critique', 'first_principles', 'tree_of_thought', 'document_analysis', 'comparative_analysis', ou 'auto' pour laisser Jarvis choisir. Défaut: 'auto'. Utilisez 'document_analysis' pour synthèse/extraction/relecture de documents, 'comparative_analysis' pour croiser des sources, 'tree_of_thought' pour les tâches critiques.",
           },
         },
         required: ["prompt"],
@@ -517,7 +692,9 @@ export const reasoningSkill: Skill = {
       const isDecompositionStrategy =
         chosenStrategy === "decomposition" ||
         chosenStrategy === "chain_of_thought" ||
-        chosenStrategy === "tree_of_thought";
+        chosenStrategy === "tree_of_thought" ||
+        chosenStrategy === "document_analysis" ||
+        chosenStrategy === "comparative_analysis";
 
       const complexity = assessComplexity(prompt);
       const shouldRunCoT = isDecompositionStrategy && complexity !== "simple";
