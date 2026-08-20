@@ -16,8 +16,9 @@ import {
   Sparkles, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List,
   Loader2, Trash2, Copy, CheckCircle2, Download, RefreshCw,
   Filter, PenLine, Brain, Target, BookOpen, FolderInput,
-  FileBarChart, Lightbulb, Zap, X, ArrowRight, ArrowLeft,
+  FileBarChart, Lightbulb, Zap, X, ArrowRight, ArrowLeft, Presentation,
 } from 'lucide-react';
+import { SlidePreviewModal } from './SlidePreviewModal';
 import { useToast } from '../ui/Toast';
 import { useProfile } from '../../context/UserProfileContext';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -305,6 +306,11 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
   // Modal infographie
   const [showInfographicModal, setShowInfographicModal] = useState(false);
+
+  // Modal slides Reveal.js
+  const [showSlideModal, setShowSlideModal] = useState(false);
+  // Types qui ne sont pas compatibles avec la génération de slides
+  const SLIDE_EXCLUDED_TYPES = new Set(['infographic', 'mindmap']);
   const [infraOrientation, setInfraOrientation] = useState<'portrait' | 'landscape' | 'square'>('portrait');
   const [infraStyle, setInfraStyle] = useState<string>('auto');
   const [infraDetail, setInfraDetail] = useState<'low' | 'medium' | 'high'>('medium');
@@ -942,6 +948,16 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 >
                   {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
+                {!SLIDE_EXCLUDED_TYPES.has(selectedDoc.type) && (
+                  <button
+                    onClick={() => setShowSlideModal(true)}
+                    className="p-2 rounded-lg border transition-all hover:bg-white/5 active:scale-95"
+                    style={{ borderColor: '#3b82f640', color: '#3b82f6' }}
+                    title="Générer une présentation Reveal.js"
+                  >
+                    <Presentation className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1421,6 +1437,16 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ═══ MODAL SLIDES REVEAL.JS ═══ */}
+      {showSlideModal && selectedDoc && (
+        <SlidePreviewModal
+          open={showSlideModal}
+          onClose={() => setShowSlideModal(false)}
+          notebookId={notebookId}
+          doc={selectedDoc}
+        />
+      )}
     </div>
   );
 }

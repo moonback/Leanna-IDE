@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Routes API â€” Notebooks (concurrent NotebookLM)
  *
  * Endpoints pour gÃ©rer les notebooks, sources, chat groundÃ©,
@@ -36,6 +36,603 @@ const upload = multer({
     }
   },
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REVEAL.JS SLIDE GENERATION HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Thème CSS Jarvis dark — v2 pro */
+const JARVIS_THEME_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+  :root {
+    --r-background-color: #080c14;
+    --r-main-font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    --r-main-font-size: 36px;
+    --r-main-color: #cbd5e1;
+    --r-block-margin: 16px;
+    --r-heading-margin: 0 0 16px 0;
+    --r-heading-font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    --r-heading-color: #f1f5f9;
+    --r-heading-line-height: 1.15;
+    --r-heading-letter-spacing: -0.03em;
+    --r-heading-text-transform: none;
+    --r-heading-text-shadow: none;
+    --r-heading-font-weight: 800;
+    --r-h1-size: 1.9em;
+    --r-h2-size: 1.3em;
+    --r-h3-size: 1.0em;
+    --r-link-color: #60a5fa;
+    --r-link-color-hover: #93c5fd;
+    --r-selection-background-color: rgba(99,102,241,0.35);
+    --r-selection-color: #fff;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --cyan: #06b6d4;
+    --glow: rgba(59,130,246,0.18);
+  }
+
+  /* ── Background ── */
+  .reveal-viewport {
+    background: #080c14;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% -10%, rgba(59,130,246,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 110%, rgba(139,92,246,0.10) 0%, transparent 55%);
+  }
+  .reveal { background: transparent; }
+
+  /* SVG dot-grid overlay on every slide */
+  .reveal .slides section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(148,163,184,0.06) 1px, transparent 1px);
+    background-size: 28px 28px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .reveal .slides section > * { position: relative; z-index: 1; }
+
+  /* ── Global layout ── */
+  .reveal .slides section { text-align: left; padding: 40px 52px; box-sizing: border-box; }
+  .reveal .slides section.title-slide { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+  /* ── Typography ── */
+  .reveal h1 {
+    font-size: var(--r-h1-size);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #67e8f9 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+    margin-bottom: 0;
+  }
+  .reveal h2 {
+    font-size: var(--r-h2-size);
+    font-weight: 700;
+    color: #f1f5f9;
+    letter-spacing: -0.03em;
+    margin-bottom: 0;
+  }
+  .reveal h3 { font-size: var(--r-h3-size); font-weight: 600; color: #94a3b8; letter-spacing: -0.01em; margin-bottom: 8px; text-transform: uppercase; font-size: 0.6em; letter-spacing: 0.12em; }
+  .reveal p { color: #94a3b8; font-size: 0.82em; line-height: 1.65; margin-bottom: 0.6em; }
+
+  /* ── Lists ── */
+  .reveal ul, .reveal ol { margin-left: 0; padding-left: 0; list-style: none; }
+  .reveal ul li, .reveal ol li {
+    color: #cbd5e1;
+    font-size: 0.82em;
+    line-height: 1.6;
+    margin-bottom: 0.55em;
+    padding-left: 1.4em;
+    position: relative;
+  }
+  .reveal ul li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.6em;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+  }
+  .reveal ol { counter-reset: ol-counter; }
+  .reveal ol li::before {
+    content: counter(ol-counter);
+    counter-increment: ol-counter;
+    position: absolute;
+    left: 0;
+    top: 0.05em;
+    width: 1.1em;
+    height: 1.1em;
+    border-radius: 50%;
+    background: rgba(59,130,246,0.15);
+    border: 1px solid rgba(59,130,246,0.35);
+    color: #60a5fa;
+    font-size: 0.72em;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  /* ── Inline code / pre ── */
+  .reveal strong { color: #93c5fd; font-weight: 600; }
+  .reveal em { color: #a78bfa; font-style: italic; }
+  .reveal code {
+    background: rgba(99,102,241,0.12);
+    border: 1px solid rgba(99,102,241,0.28);
+    border-radius: 5px;
+    padding: 1px 7px;
+    color: #c4b5fd;
+    font-size: 0.82em;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+  .reveal pre {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04);
+    margin: 12px 0;
+  }
+  .reveal pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #c9d1d9;
+    font-size: 0.78em;
+    display: block;
+    line-height: 1.6;
+  }
+
+  /* ── Blockquote — callout style ── */
+  .reveal blockquote {
+    background: linear-gradient(135deg, rgba(59,130,246,0.07), rgba(139,92,246,0.05));
+    border: 1px solid rgba(59,130,246,0.2);
+    border-left: 3px solid var(--blue);
+    border-radius: 0 10px 10px 0;
+    padding: 14px 20px;
+    color: #94a3b8;
+    font-style: normal;
+    font-size: 0.8em;
+    margin: 12px 0;
+    box-shadow: 0 2px 12px rgba(59,130,246,0.06);
+  }
+  .reveal blockquote::before {
+    content: '"';
+    display: block;
+    font-size: 2em;
+    line-height: 0.5;
+    color: rgba(59,130,246,0.3);
+    margin-bottom: 8px;
+    font-family: Georgia, serif;
+  }
+
+  /* ── Progress & controls ── */
+  .reveal .progress { background: rgba(255,255,255,0.05); height: 3px; }
+  .reveal .progress span { background: linear-gradient(90deg, var(--blue), var(--purple)); transition: width 0.4s ease; }
+  .reveal .controls button { color: rgba(99,130,190,0.7) !important; }
+  .reveal .controls button:hover { color: var(--blue) !important; }
+  .reveal .slide-number { color: rgba(148,163,184,0.4) !important; font-size: 11px !important; font-family: var(--r-main-font) !important; letter-spacing: 0.05em; }
+
+  /* ── Custom elements ── */
+  .accent-bar {
+    width: 48px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--blue), var(--purple));
+    border-radius: 2px;
+    margin: 10px 0 20px 0;
+    box-shadow: 0 0 12px rgba(59,130,246,0.5);
+  }
+  .title-slide .accent-bar { margin: 10px auto 20px; }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(59,130,246,0.1);
+    border: 1px solid rgba(59,130,246,0.25);
+    color: #60a5fa;
+    border-radius: 100px;
+    padding: 4px 14px;
+    font-size: 0.32em;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .tag::before { content: '●'; font-size: 0.8em; color: #3b82f6; }
+
+  .slide-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 36px;
+    font-size: 0.32em;
+    color: rgba(148,163,184,0.45);
+    letter-spacing: 0.06em;
+  }
+  .slide-meta span { display: flex; align-items: center; gap: 5px; }
+
+  /* ── Section indicator (top-left corner badge) ── */
+  .section-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.15));
+    border: 1px solid rgba(59,130,246,0.3);
+    color: #60a5fa;
+    font-size: 0.5em;
+    font-weight: 700;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  .slide-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 4px; }
+  .slide-header-text { flex: 1; }
+
+  /* ── Transition polish ── */
+  .reveal .slides section { will-change: transform, opacity; }
+`;
+
+/** Échappe les caractères HTML sensibles */
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Convertit du Markdown simple en HTML basique pour les slides */
+function mdToHtml(text: string): string {
+  const lines = text.split("\n");
+  const html: string[] = [];
+  let inList = false;
+  let inOl = false;
+  let inCode = false;
+  let codeLines: string[] = [];
+  let codeLang = "";
+
+  const closeList = () => {
+    if (inList) { html.push("</ul>"); inList = false; }
+    if (inOl) { html.push("</ol>"); inOl = false; }
+  };
+
+  const processInline = (s: string): string =>
+    s.replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+
+    // Code blocks
+    if (line.startsWith("```")) {
+      if (!inCode) {
+        closeList();
+        inCode = true;
+        codeLang = line.slice(3).trim();
+        codeLines = [];
+      } else {
+        inCode = false;
+        html.push(`<pre><code class="language-${escapeHtml(codeLang)}">${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+        codeLines = [];
+      }
+      continue;
+    }
+    if (inCode) { codeLines.push(rawLine); continue; }
+
+    // Headings (h3/h4 inside slides)
+    if (line.startsWith("### ")) { closeList(); html.push(`<h3>${processInline(line.slice(4))}</h3>`); continue; }
+    if (line.startsWith("#### ")) { closeList(); html.push(`<h4>${processInline(line.slice(5))}</h4>`); continue; }
+
+    // Blockquote
+    if (line.startsWith("> ")) { closeList(); html.push(`<blockquote>${processInline(line.slice(2))}</blockquote>`); continue; }
+
+    // Horizontal rule (skip — already used as separator)
+    if (/^---+$/.test(line.trim())) { closeList(); continue; }
+
+    // Unordered list
+    if (/^[\-\*] /.test(line)) {
+      if (inOl) { html.push("</ol>"); inOl = false; }
+      if (!inList) { html.push("<ul>"); inList = true; }
+      html.push(`<li>${processInline(line.slice(2))}</li>`);
+      continue;
+    }
+
+    // Ordered list
+    if (/^\d+\. /.test(line)) {
+      if (inList) { html.push("</ul>"); inList = false; }
+      if (!inOl) { html.push("<ol>"); inOl = true; }
+      html.push(`<li>${processInline(line.replace(/^\d+\. /, ""))}</li>`);
+      continue;
+    }
+
+    // Empty line
+    if (!line.trim()) { closeList(); html.push(""); continue; }
+
+    // Paragraph
+    closeList();
+    html.push(`<p>${processInline(line)}</p>`);
+  }
+  closeList();
+  return html.join("\n");
+}
+
+/** Découpe le Markdown en slides — chaque slide = { title, body, isTitle, subtitle? } */
+function parseMarkdownToSlides(
+  markdown: string,
+  docTitle: string
+): Array<{ title: string; body: string; isTitle: boolean; subtitle?: string }> {
+  const slides: Array<{ title: string; body: string; isTitle: boolean; subtitle?: string }> = [];
+
+  const lines = markdown.split("\n");
+  let currentTitle = "";
+  let currentLines: string[] = [];
+  let titleSlideSubtitle = "";
+  let seenFirstHeading = false;
+
+  // Scan the opening paragraph before any heading as subtitle for title slide
+  const preambleLines: string[] = [];
+  let i = 0;
+  for (; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.startsWith("#")) break;
+    if (/^---/.test(l.trim())) break;
+    preambleLines.push(l);
+  }
+  titleSlideSubtitle = preambleLines.join(" ").replace(/[*_`]/g, "").replace(/\s+/g, " ").trim();
+  // Keep it to one clean sentence (≤120 chars)
+  if (titleSlideSubtitle.length > 120) {
+    titleSlideSubtitle = titleSlideSubtitle.slice(0, 117) + "…";
+  }
+
+  // Title slide — subtitle comes from preamble
+  slides.push({ title: docTitle, body: "", isTitle: true, subtitle: titleSlideSubtitle });
+
+  const flush = () => {
+    const body = currentLines.join("\n").trim();
+    if (currentTitle || body) {
+      slides.push({ title: currentTitle, body, isTitle: false });
+    }
+    currentTitle = "";
+    currentLines = [];
+  };
+
+  for (; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Séparateur explicite
+    if (line.trim() === "---") {
+      flush();
+      continue;
+    }
+
+    // Titre h1 — nouvelle slide
+    if (line.startsWith("# ") && !line.startsWith("## ")) {
+      flush();
+      seenFirstHeading = true;
+      currentTitle = line.slice(2).trim();
+      continue;
+    }
+
+    // Titre h2 — nouvelle slide section
+    if (line.startsWith("## ")) {
+      flush();
+      seenFirstHeading = true;
+      currentTitle = line.slice(3).trim();
+      continue;
+    }
+
+    // Skip preamble lines already consumed above (safety)
+    if (!seenFirstHeading && preambleLines.includes(line)) continue;
+
+    currentLines.push(line);
+  }
+  flush();
+
+  return slides;
+}
+
+/** Compte le nombre de slides que produira le Markdown */
+function countSlides(markdown: string): number {
+  return parseMarkdownToSlides(markdown, "").length;
+}
+
+/** Construit la présentation Reveal.js HTML complète */
+function buildRevealPresentation(
+  title: string,
+  markdown: string,
+  opts: { theme: string; transition: string; ratio: string }
+): string {
+  const { theme, transition, ratio } = opts;
+  const isJarvisTheme = theme === "jarvis";
+
+  // Dimensions
+  const [rw, rh] = ratio === "4:3" ? [960, 720] : [1280, 720];
+
+  const themeLink = isJarvisTheme
+    ? `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/black.css">`
+    : `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/${theme}.css">`;
+
+  const customStyle = isJarvisTheme ? `<style>${JARVIS_THEME_CSS}</style>` : "";
+
+  const slides = parseMarkdownToSlides(markdown, title);
+  const totalSlides = slides.length;
+  const dateStr = new Date().toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
+
+  // Count content slides for section numbering (skip title slide at i=0)
+  let sectionCounter = 0;
+
+  const slidesHtml = slides.map((s, i) => {
+
+    // ── Title slide ──────────────────────────────────────────────────────────
+    if (i === 0 && s.isTitle) {
+      const subtitle = s.subtitle
+        ? `<p class="title-subtitle">${escapeHtml(s.subtitle)}</p>`
+        : "";
+      return `    <section class="title-slide" data-transition="zoom-in fade-out">
+      <div class="tag">Jarvis OS&nbsp;&nbsp;·&nbsp;&nbsp;Notebook</div>
+      <h1>${escapeHtml(s.title)}</h1>
+      <div class="accent-bar"></div>
+      ${subtitle}
+      <div class="slide-meta">
+        <span>📅 ${dateStr}</span>
+        <span>·</span>
+        <span>📊 ${totalSlides - 1} slides</span>
+      </div>
+    </section>`;
+    }
+
+    // ── Content slide ─────────────────────────────────────────────────────────
+    sectionCounter++;
+    const numBadge = isJarvisTheme
+      ? `<div class="section-num">${sectionCounter}</div>`
+      : "";
+
+    let heading = "";
+    if (s.title) {
+      if (isJarvisTheme) {
+        heading = `<div class="slide-header">
+        ${numBadge}
+        <div class="slide-header-text">
+          <h2>${escapeHtml(s.title)}</h2>
+          <div class="accent-bar"></div>
+        </div>
+      </div>`;
+      } else {
+        heading = `<h2>${escapeHtml(s.title)}</h2><div class="accent-bar"></div>`;
+      }
+    }
+
+    const body = s.body ? mdToHtml(s.body) : "";
+
+    return `    <section>
+      ${heading}
+      ${body}
+    </section>`;
+  }).join("\n\n");
+
+  // Global polish styles applied to ALL themes (Jarvis overrides these in JARVIS_THEME_CSS)
+  const globalStyles = `
+    /* Jarvis-OS global slide polish — applies to all themes */
+    .reveal .slides section { box-sizing: border-box; }
+    .reveal h1, .reveal h2 { letter-spacing: -0.02em; }
+    .reveal h2 { margin-bottom: 0.2em; }
+    .reveal ul, .reveal ol { font-size: 0.82em; line-height: 1.65; }
+    .reveal ul li, .reveal ol li { margin-bottom: 0.45em; }
+    .reveal pre { font-size: 0.62em; border-radius: 10px; }
+    .reveal p { font-size: 0.82em; line-height: 1.6; }
+    .reveal blockquote { font-size: 0.8em; }
+    /* Accent bar — subtle for non-Jarvis themes */
+    .accent-bar {
+      width: 48px; height: 3px;
+      background: currentColor;
+      border-radius: 2px;
+      margin: 8px 0 18px 0;
+      opacity: 0.35;
+    }
+    .title-slide .accent-bar { margin: 8px auto 18px; }
+    /* Tag badge on title slide */
+    .reveal .tag {
+      display: inline-block;
+      border: 1px solid currentColor;
+      border-radius: 100px;
+      padding: 3px 14px;
+      font-size: 0.32em;
+      opacity: 0.55;
+      margin-bottom: 18px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    /* Title subtitle */
+    .title-subtitle {
+      font-size: 0.46em !important;
+      opacity: 0.65;
+      max-width: 72%;
+      margin: 0 auto;
+      line-height: 1.5 !important;
+    }
+    /* Slide meta (date + count) */
+    .slide-meta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-top: 28px;
+      font-size: 0.3em;
+      opacity: 0.4;
+      letter-spacing: 0.05em;
+    }
+    /* Section number badge */
+    .section-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px; height: 26px;
+      border-radius: 7px;
+      border: 1px solid currentColor;
+      font-size: 0.48em;
+      font-weight: 700;
+      opacity: 0.45;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+    .slide-header { display: flex; align-items: flex-start; gap: 12px; }
+    .slide-header-text { flex: 1; }
+  `;
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>${escapeHtml(title)}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+  ${themeLink}
+  <style>${globalStyles}</style>
+  ${customStyle}
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+${slidesHtml}
+    </div>
+  </div>
+  <script type="module">
+    import Reveal from 'https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.esm.js';
+    import Highlight from 'https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.esm.js';
+    import Notes from 'https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/notes/notes.esm.js';
+    Reveal.initialize({
+      hash: true,
+      transition: '${transition}',
+      transitionSpeed: 'default',
+      backgroundTransition: 'fade',
+      width: ${rw},
+      height: ${rh},
+      margin: 0.07,
+      minScale: 0.2,
+      maxScale: 2.0,
+      slideNumber: 'c/t',
+      showSlideNumber: 'all',
+      center: false,
+      touch: true,
+      loop: false,
+      fragments: true,
+      plugins: [Highlight, Notes],
+      highlight: { highlightOnLoad: true },
+    });
+  </script>
+</body>
+</html>`;
+}
 
 export function createNotebooksRouter(): Router {
   const router = Router();
@@ -1202,12 +1799,42 @@ GÃ©nÃ¨re le rÃ©sumÃ© global maintenant.`;
         return;
       }
       res.json({ status: "success", message: "Document supprimÃ©." });
+      res.json({ status: "success", message: "Document supprimé." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // GET /api/notebooks/:id/report-suggestions â€” Suggestions de rapports basÃ©es sur les sources
+  // POST /api/notebooks/:id/generated/:docId/slides — Générer une présentation Reveal.js depuis un document
+  router.post("/:id/generated/:docId/slides", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      const doc = notebook.generatedDocuments.find((d: any) => d.id === req.params.docId);
+      if (!doc) {
+        res.status(404).json({ error: "Document introuvable." });
+        return;
+      }
+
+      const {
+        theme = "black",
+        transition = "slide",
+        ratio = "16:9",
+      } = req.body as { theme?: string; transition?: string; ratio?: string };
+
+      const html = buildRevealPresentation(doc.title, doc.content, { theme, transition, ratio });
+
+      res.json({ status: "success", html, slidesCount: countSlides(doc.content) });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/notebooks/:id/report-suggestions — Suggestions de rapports basées sur les sources
   router.get("/:id/report-suggestions", async (req: Request, res: Response) => {
     try {
       const suggestions: ReportSuggestion[] = await contentGenerator.suggestReports(req.params.id);
