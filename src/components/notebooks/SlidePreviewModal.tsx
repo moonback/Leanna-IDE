@@ -68,6 +68,32 @@ const RATIOS = [
 
 type RatioKey = typeof RATIOS[number]['key'];
 
+const DENSITIES = [
+  {
+    key: 'compact',
+    label: 'Résumé',
+    emoji: '⚡',
+    desc: '3 pts / slide',
+    hint: 'Plus de slides, texte court',
+  },
+  {
+    key: 'normal',
+    label: 'Équilibré',
+    emoji: '⚖️',
+    desc: '4 pts / slide',
+    hint: 'Recommandé — découpe auto',
+  },
+  {
+    key: 'detailed',
+    label: 'Détaillé',
+    emoji: '📋',
+    desc: '5 pts / slide',
+    hint: 'Contenu complet, plus de slides',
+  },
+] as const;
+
+type DensityKey = typeof DENSITIES[number]['key'];
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
@@ -77,6 +103,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
   const [theme, setTheme]           = useState<ThemeKey>('jarvis');
   const [transition, setTransition] = useState<TransitionKey>('slide');
   const [ratio, setRatio]           = useState<RatioKey>('16:9');
+  const [density, setDensity]       = useState<DensityKey>('normal');
 
   // Generation state
   const [loading, setLoading]       = useState(false);
@@ -112,7 +139,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
       const res = await fetch(`/api/notebooks/${notebookId}/generated/${doc.id}/slides`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme, transition, ratio }),
+        body: JSON.stringify({ theme, transition, ratio, density }),
       });
 
       if (!res.ok) {
@@ -140,7 +167,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [notebookId, doc.id, theme, transition, ratio, toastError]);
+  }, [notebookId, doc.id, theme, transition, ratio, density, toastError]);
 
   // Download as .html file
   const handleDownload = useCallback(() => {
@@ -309,6 +336,37 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Density selector */}
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                      Densité du contenu
+                    </p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {DENSITIES.map(d => (
+                        <button
+                          key={d.key}
+                          onClick={() => setDensity(d.key)}
+                          title={d.hint}
+                          className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl text-[9px] font-medium transition-all"
+                          style={{
+                            backgroundColor: density === d.key ? `${accentColor}12` : 'var(--bg-base)',
+                            color: density === d.key ? accentColor : 'var(--text-muted)',
+                            border: `1.5px solid ${density === d.key ? accentColor : 'var(--border-base)'}`,
+                          }}
+                        >
+                          <span className="text-base leading-none">{d.emoji}</span>
+                          <span className="font-semibold">{d.label}</span>
+                          <span className="text-[8px] opacity-60 text-center leading-tight">{d.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {density === 'compact' && (
+                      <p className="text-[9px] px-2 py-1.5 rounded-lg" style={{ backgroundColor: `${accentColor}10`, color: accentColor, border: `1px solid ${accentColor}25` }}>
+                        💡 Le contenu est découpé en plusieurs slides — rien n&apos;est masqué ni supprimé.
+                      </p>
+                    )}
                   </div>
 
                   {/* Note about excluded types */}

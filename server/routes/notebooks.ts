@@ -94,8 +94,23 @@ const JARVIS_THEME_CSS = `
   .reveal .slides section > * { position: relative; z-index: 1; }
 
   /* ── Global layout ── */
-  .reveal .slides section { text-align: left; padding: 40px 52px; box-sizing: border-box; }
-  .reveal .slides section.title-slide { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .reveal .slides section {
+    text-align: left;
+    padding: 28px 44px;
+    box-sizing: border-box;
+    overflow: visible;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .reveal .slides section.title-slide {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 60px;
+  }
 
   /* ── Typography ── */
   .reveal h1 {
@@ -124,8 +139,8 @@ const JARVIS_THEME_CSS = `
   .reveal ul li, .reveal ol li {
     color: #cbd5e1;
     font-size: 0.82em;
-    line-height: 1.6;
-    margin-bottom: 0.55em;
+    line-height: 1.45;
+    margin-bottom: 0.38em;
     padding-left: 1.4em;
     position: relative;
   }
@@ -288,6 +303,15 @@ function escapeHtml(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/** Convertit du Markdown inline en HTML (bold, italic, code) — sans escaper les balises produites */
+function processInlineTitle(str: string): string {
+  // Escape HTML special chars first on plain text, then apply inline Markdown
+  return escapeHtml(str)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+}
+
 /** Convertit du Markdown simple en HTML basique pour les slides */
 function mdToHtml(text: string): string {
   const lines = text.split("\n");
@@ -367,7 +391,8 @@ function mdToHtml(text: string): string {
 /** Découpe le Markdown en slides — chaque slide = { title, body, isTitle, subtitle? } */
 function parseMarkdownToSlides(
   markdown: string,
-  docTitle: string
+  docTitle: string,
+  density: "compact" | "normal" | "detailed" = "normal"
 ): Array<{ title: string; body: string; isTitle: boolean; subtitle?: string }> {
   const slides: Array<{ title: string; body: string; isTitle: boolean; subtitle?: string }> = [];
 
@@ -398,7 +423,15 @@ function parseMarkdownToSlides(
   const flush = () => {
     const body = currentLines.join("\n").trim();
     if (currentTitle || body) {
-      slides.push({ title: currentTitle, body, isTitle: false });
+      const chunks = splitBodyIntoSlideChunks(body, density);
+      chunks.forEach((chunk, idx) => {
+        const partSuffix = chunks.length > 1 ? ` (${idx + 1}/${chunks.length})` : "";
+        slides.push({
+          title: currentTitle ? `${currentTitle}${partSuffix}` : (partSuffix.trim() || docTitle),
+          body: chunk,
+          isTitle: false,
+        });
+      });
     }
     currentTitle = "";
     currentLines = [];
@@ -429,6 +462,23 @@ function parseMarkdownToSlides(
       continue;
     }
 
+    // Titre h3 — nouvelle slide (sous-point)
+    if (line.startsWith("### ") && !line.startsWith("#### ")) {
+      flush();
+      seenFirstHeading = true;
+      currentTitle = line.slice(4).trim();
+      continue;
+    }
+
+    // FAQ : **Question** ou Q: / Question :
+    const faqMatch = line.match(/^(?:\*\*(.+?)\*\*|(?:Q(?:uestion)?)\s*[:：]\s*(.+))$/i);
+    if (faqMatch) {
+      flush();
+      seenFirstHeading = true;
+      currentTitle = (faqMatch[1] || faqMatch[2] || "").replace(/\*\*/g, "").trim();
+      continue;
+    }
+
     // Skip preamble lines already consumed above (safety)
     if (!seenFirstHeading && preambleLines.includes(line)) continue;
 
@@ -439,18 +489,160 @@ function parseMarkdownToSlides(
   return slides;
 }
 
+/**
+ * Limites par slide — le contenu excédentaire est découpé en slides suivantes
+ * plutôt que tronqué ou masqué.
+ */
+function getSlideLimits(density: "compact" | "normal" | "detailed") {
+  return {
+    compact:  { bullets: 3, paras: 1, code: 1, h3: 1, paraChars: 110 },
+    normal:   { bullets: 4, paras: 1, code: 1, h3: 2, paraChars: 150 },
+    detailed: { bullets: 5, paras: 2, code: 1, h3: 2, paraChars: 200 },
+  }[density];
+}
+
+type BodyBlock =
+  | { kind: "bullet"; text: string }
+  | { kind: "ordered"; text: string }
+  | { kind: "para"; text: string }
+  | { kind: "h3"; text: string }
+  | { kind: "h4"; text: string }
+  | { kind: "quote"; text: string }
+  | { kind: "code"; lang: string; lines: string[] }
+  | { kind: "blank" };
+
+function parseBodyBlocks(body: string): BodyBlock[] {
+  const blocks: BodyBlock[] = [];
+  const lines = body.split("\n");
+  let inCode = false;
+  let codeLang = "";
+  let codeLines: string[] = [];
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (line.startsWith("```")) {
+      if (!inCode) {
+        inCode = true;
+        codeLang = line.slice(3).trim();
+        codeLines = [];
+      } else {
+        blocks.push({ kind: "code", lang: codeLang, lines: codeLines });
+        inCode = false;
+      }
+      continue;
+    }
+    if (inCode) { codeLines.push(raw); continue; }
+    if (!line.trim()) { blocks.push({ kind: "blank" }); continue; }
+    if (line.startsWith("### ")) { blocks.push({ kind: "h3", text: line }); continue; }
+    if (line.startsWith("#### ")) { blocks.push({ kind: "h4", text: line }); continue; }
+    if (line.startsWith("> ")) { blocks.push({ kind: "quote", text: line }); continue; }
+    if (/^[\-\*] /.test(line)) { blocks.push({ kind: "bullet", text: line }); continue; }
+    if (/^\d+\. /.test(line)) { blocks.push({ kind: "ordered", text: line }); continue; }
+    blocks.push({ kind: "para", text: line });
+  }
+  if (inCode) blocks.push({ kind: "code", lang: codeLang, lines: codeLines });
+  return blocks;
+}
+
+function blockToMarkdown(block: BodyBlock): string {
+  switch (block.kind) {
+    case "bullet":
+    case "ordered":
+    case "h3":
+    case "h4":
+    case "quote":
+    case "para":
+      return block.text;
+    case "code":
+      return "```" + block.lang + "\n" + block.lines.join("\n") + "\n```";
+    case "blank":
+      return "";
+  }
+}
+
+/** Découpe un body Markdown en plusieurs chunks — aucun contenu n'est perdu */
+function splitBodyIntoSlideChunks(body: string, density: "compact" | "normal" | "detailed" = "normal"): string[] {
+  if (!body.trim()) return [""];
+
+  const limits = getSlideLimits(density);
+  const blocks = parseBodyBlocks(body);
+  const chunks: string[] = [];
+  let currentBlocks: BodyBlock[] = [];
+  let counts = { bullets: 0, paras: 0, code: 0, h3: 0 };
+
+  const resetCounts = () => { counts = { bullets: 0, paras: 0, code: 0, h3: 0 }; };
+
+  const flush = () => {
+    const md = currentBlocks.map(blockToMarkdown).filter(Boolean).join("\n").trim();
+    if (md) chunks.push(md);
+    currentBlocks = [];
+    resetCounts();
+  };
+
+  const canAdd = (block: BodyBlock): boolean => {
+    if (block.kind === "blank") return true;
+    if (block.kind === "bullet" || block.kind === "ordered") return counts.bullets < limits.bullets;
+    if (block.kind === "para") {
+      const text = block.text.replace(/^#+\s*/, "").trim();
+      if (text.length > limits.paraChars) return false;
+      return counts.paras < limits.paras;
+    }
+    if (block.kind === "h3" || block.kind === "h4") return counts.h3 < limits.h3;
+    if (block.kind === "quote") return counts.paras < limits.paras;
+    if (block.kind === "code") return counts.code < limits.code;
+    return true;
+  };
+
+  const addBlock = (block: BodyBlock) => {
+    if (block.kind === "bullet" || block.kind === "ordered") counts.bullets++;
+    else if (block.kind === "para" || block.kind === "quote") counts.paras++;
+    else if (block.kind === "h3" || block.kind === "h4") counts.h3++;
+    else if (block.kind === "code") counts.code++;
+    currentBlocks.push(block);
+  };
+
+  for (const block of blocks) {
+    if (block.kind === "blank") {
+      if (currentBlocks.length) currentBlocks.push(block);
+      continue;
+    }
+
+    if (block.kind === "para") {
+      const text = block.text.replace(/^#+\s*/, "").trim();
+      if (text.length > limits.paraChars) {
+        flush();
+        const sentences = text
+          .split(/(?<=[.!?])\s+/)
+          .map(s => s.trim())
+          .filter(s => s.length > 8);
+        for (const sent of sentences) {
+          const bulletBlock: BodyBlock = { kind: "bullet", text: `- ${sent}` };
+          if (!canAdd(bulletBlock)) flush();
+          addBlock(bulletBlock);
+        }
+        continue;
+      }
+    }
+
+    if (!canAdd(block)) flush();
+    addBlock(block);
+  }
+  flush();
+  return chunks.length ? chunks : [""];
+}
+
 /** Compte le nombre de slides que produira le Markdown */
-function countSlides(markdown: string): number {
-  return parseMarkdownToSlides(markdown, "").length;
+function countSlides(markdown: string, density: "compact" | "normal" | "detailed" = "normal"): number {
+  return parseMarkdownToSlides(markdown, "", density).length;
 }
 
 /** Construit la présentation Reveal.js HTML complète */
 function buildRevealPresentation(
   title: string,
   markdown: string,
-  opts: { theme: string; transition: string; ratio: string }
+  opts: { theme: string; transition: string; ratio: string; density?: string }
 ): string {
-  const { theme, transition, ratio } = opts;
+  const { theme, transition, ratio, density = "normal" } = opts;
   const isJarvisTheme = theme === "jarvis";
 
   // Dimensions
@@ -462,7 +654,8 @@ function buildRevealPresentation(
 
   const customStyle = isJarvisTheme ? `<style>${JARVIS_THEME_CSS}</style>` : "";
 
-  const slides = parseMarkdownToSlides(markdown, title);
+  const densityLevel = (density === "compact" || density === "detailed") ? density : "normal";
+  const slides = parseMarkdownToSlides(markdown, title, densityLevel);
   const totalSlides = slides.length;
   const dateStr = new Date().toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
 
@@ -473,18 +666,21 @@ function buildRevealPresentation(
 
     // ── Title slide ──────────────────────────────────────────────────────────
     if (i === 0 && s.isTitle) {
-      const subtitle = s.subtitle
-        ? `<p class="title-subtitle">${escapeHtml(s.subtitle)}</p>`
+      // Only show subtitle if it's a short, clean sentence (not a wall of text)
+      const rawSub = (s.subtitle || "").trim();
+      const firstSentence = rawSub.split(/[.!?。]/)[0].trim();
+      const subtitle = firstSentence && firstSentence.length <= 100 && firstSentence.length >= 10
+        ? `<p class="title-subtitle">${escapeHtml(firstSentence)}.</p>`
         : "";
       return `    <section class="title-slide" data-transition="zoom-in fade-out">
       <div class="tag">Jarvis OS&nbsp;&nbsp;·&nbsp;&nbsp;Notebook</div>
-      <h1>${escapeHtml(s.title)}</h1>
+      <h1>${processInlineTitle(s.title)}</h1>
       <div class="accent-bar"></div>
       ${subtitle}
       <div class="slide-meta">
         <span>📅 ${dateStr}</span>
         <span>·</span>
-        <span>📊 ${totalSlides - 1} slides</span>
+        <span>📊 ${totalSlides} slides</span>
       </div>
     </section>`;
     }
@@ -501,40 +697,71 @@ function buildRevealPresentation(
         heading = `<div class="slide-header">
         ${numBadge}
         <div class="slide-header-text">
-          <h2>${escapeHtml(s.title)}</h2>
+          <h2>${processInlineTitle(s.title)}</h2>
           <div class="accent-bar"></div>
         </div>
       </div>`;
       } else {
-        heading = `<h2>${escapeHtml(s.title)}</h2><div class="accent-bar"></div>`;
+        heading = `<h2>${processInlineTitle(s.title)}</h2><div class="accent-bar"></div>`;
       }
     }
 
     const body = s.body ? mdToHtml(s.body) : "";
 
-    return `    <section>
+    return `    <section data-transition="${transition}">
       ${heading}
-      ${body}
+      <div class="slide-content">${body}</div>
     </section>`;
   }).join("\n\n");
 
+  const closingSlide = isJarvisTheme
+    ? `    <section class="title-slide closing-slide" data-transition="fade">
+      <div class="tag">Jarvis OS&nbsp;&nbsp;·&nbsp;&nbsp;Notebook</div>
+      <h2>Merci</h2>
+      <div class="accent-bar"></div>
+      <p class="title-subtitle">Questions &amp; discussion</p>
+      <div class="slide-meta">
+        <span>📅 ${dateStr}</span>
+      </div>
+    </section>`
+    : `    <section class="title-slide closing-slide" data-transition="fade">
+      <h2>Merci</h2>
+      <p class="title-subtitle">Questions &amp; discussion</p>
+    </section>`;
+
   // Global polish styles applied to ALL themes (Jarvis overrides these in JARVIS_THEME_CSS)
   const globalStyles = `
-    /* Jarvis-OS global slide polish — applies to all themes */
-    .reveal .slides section { box-sizing: border-box; }
+    .reveal .slides section {
+      box-sizing: border-box;
+      overflow: visible;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    .reveal .slides section .slide-content {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: visible;
+    }
+    .reveal .slides section .slide-content.slide-scrollable {
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
+    }
     .reveal h1, .reveal h2 { letter-spacing: -0.02em; }
-    .reveal h2 { margin-bottom: 0.2em; }
-    .reveal ul, .reveal ol { font-size: 0.82em; line-height: 1.65; }
-    .reveal ul li, .reveal ol li { margin-bottom: 0.45em; }
-    .reveal pre { font-size: 0.62em; border-radius: 10px; }
-    .reveal p { font-size: 0.82em; line-height: 1.6; }
-    .reveal blockquote { font-size: 0.8em; }
-    /* Accent bar — subtle for non-Jarvis themes */
+    .reveal h2 { margin-bottom: 0.15em; font-size: 1.05em; }
+    .reveal ul, .reveal ol { font-size: 0.72em; line-height: 1.45; margin: 0; padding-left: 1.1em; }
+    .reveal ul li, .reveal ol li { margin-bottom: 0.28em; }
+    .reveal pre { font-size: 0.52em; border-radius: 10px; max-height: 280px; overflow: auto; }
+    .reveal p { font-size: 0.72em; line-height: 1.45; margin-bottom: 0.35em; }
+    .reveal blockquote { font-size: 0.68em; margin: 8px 0; padding: 10px 14px; }
+    .reveal h3 { font-size: 0.62em; margin-bottom: 6px; }
+    /* Accent bar */
     .accent-bar {
       width: 48px; height: 3px;
       background: currentColor;
       border-radius: 2px;
-      margin: 8px 0 18px 0;
+      margin: 6px 0 14px 0;
       opacity: 0.35;
     }
     .title-slide .accent-bar { margin: 8px auto 18px; }
@@ -584,8 +811,15 @@ function buildRevealPresentation(
       flex-shrink: 0;
       margin-top: 4px;
     }
-    .slide-header { display: flex; align-items: flex-start; gap: 12px; }
+    .slide-header { display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0; }
     .slide-header-text { flex: 1; }
+    .closing-slide h2 {
+      font-size: 1.6em;
+      font-weight: 800;
+      background: none;
+      -webkit-text-fill-color: inherit;
+      color: inherit;
+    }
   `;
 
   return `<!DOCTYPE html>
@@ -604,12 +838,47 @@ function buildRevealPresentation(
   <div class="reveal">
     <div class="slides">
 ${slidesHtml}
+
+${closingSlide}
     </div>
   </div>
   <script type="module">
     import Reveal from 'https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.esm.js';
     import Highlight from 'https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/highlight/highlight.esm.js';
     import Notes from 'https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/notes/notes.esm.js';
+
+    function fitSlideContent(section) {
+      if (!section || section.classList.contains('title-slide')) return;
+      const content = section.querySelector('.slide-content');
+      if (!content) return;
+
+      content.classList.remove('slide-scrollable');
+      content.style.fontSize = '';
+      content.style.lineHeight = '';
+
+      const header = section.querySelector('.slide-header, h2');
+      const headerH = header ? header.getBoundingClientRect().height + 12 : 0;
+      const maxH = Math.max(section.clientHeight - headerH - 36, 120);
+
+      let scale = 1;
+      while (content.scrollHeight > maxH && scale > 0.38) {
+        scale -= 0.025;
+        content.style.fontSize = (scale * 100) + '%';
+        content.style.lineHeight = scale < 0.65 ? '1.3' : '1.42';
+      }
+
+      if (content.scrollHeight > maxH) {
+        content.style.maxHeight = maxH + 'px';
+        content.classList.add('slide-scrollable');
+      } else {
+        content.style.maxHeight = '';
+      }
+    }
+
+    function fitAllSlides() {
+      document.querySelectorAll('.reveal .slides section').forEach(fitSlideContent);
+    }
+
     Reveal.initialize({
       hash: true,
       transition: '${transition}',
@@ -617,7 +886,7 @@ ${slidesHtml}
       backgroundTransition: 'fade',
       width: ${rw},
       height: ${rh},
-      margin: 0.07,
+      margin: 0.06,
       minScale: 0.2,
       maxScale: 2.0,
       slideNumber: 'c/t',
@@ -625,9 +894,14 @@ ${slidesHtml}
       center: false,
       touch: true,
       loop: false,
-      fragments: true,
+      fragments: false,
+      autoPlayMedia: false,
       plugins: [Highlight, Notes],
       highlight: { highlightOnLoad: true },
+    }).then(() => {
+      fitAllSlides();
+      Reveal.on('slidechanged', (event) => fitSlideContent(event.currentSlide));
+      window.addEventListener('resize', () => fitAllSlides());
     });
   </script>
 </body>
@@ -1798,7 +2072,6 @@ GÃ©nÃ¨re le rÃ©sumÃ© global maintenant.`;
         res.status(404).json({ error: "Document introuvable." });
         return;
       }
-      res.json({ status: "success", message: "Document supprimÃ©." });
       res.json({ status: "success", message: "Document supprimé." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -1824,11 +2097,12 @@ GÃ©nÃ¨re le rÃ©sumÃ© global maintenant.`;
         theme = "black",
         transition = "slide",
         ratio = "16:9",
-      } = req.body as { theme?: string; transition?: string; ratio?: string };
+        density = "normal",
+      } = req.body as { theme?: string; transition?: string; ratio?: string; density?: string };
 
-      const html = buildRevealPresentation(doc.title, doc.content, { theme, transition, ratio });
+      const html = buildRevealPresentation(doc.title, doc.content, { theme, transition, ratio, density });
 
-      res.json({ status: "success", html, slidesCount: countSlides(doc.content) });
+      res.json({ status: "success", html, slidesCount: countSlides(doc.content, density as any) + 1 });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
