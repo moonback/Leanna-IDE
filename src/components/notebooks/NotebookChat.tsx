@@ -407,9 +407,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     return () => { cancelled = true; };
   }, [notebookId, activeThreadId]);
 
-  // Charger les suggestions
+  // Charger les suggestions une seule fois au montage
+  const suggestionsLoadedRef = useRef(false);
   useEffect(() => {
-    if (!hasSources) return;
+    if (!hasSources || suggestionsLoadedRef.current) return;
+    suggestionsLoadedRef.current = true;
     (async () => {
       try {
         const res = await fetch(`/api/notebooks/${notebookId}/chat/suggestions`);
@@ -772,7 +774,6 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     setInput('');
     if (inputRef.current) inputRef.current.style.height = 'auto';
     setLoading(true);
-    setFollowUps([]);
     setStreamingText('');
 
     const tempUserMsg: ChatMessage = {
@@ -825,7 +826,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               } else if (parsed.message) {
                 setStreamingText('');
                 setMessages(prev => [...prev, parsed.message]);
-                if (parsed.followUps) { setFollowUps(parsed.followUps); setFollowUpOffset(0); }
+                // Follow-ups ne se mettent plus à jour automatiquement
               } else if (parsed.error) {
                 throw new Error(parsed.error);
               }
@@ -891,7 +892,6 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     setInput('');
     if (inputRef.current) inputRef.current.style.height = 'auto';
     setLoading(true);
-    setFollowUps([]);
     setStreamingText('');
     setDeepDiveProgress('');
 
@@ -940,7 +940,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               } else if (parsed.message) {
                 setDeepDiveProgress('');
                 setMessages(prev => [...prev, parsed.message]);
-                if (parsed.followUps) { setFollowUps(parsed.followUps); setFollowUpOffset(0); }
+                // Follow-ups ne se mettent plus à jour automatiquement
               } else if (parsed.error) {
                 throw new Error(parsed.error);
               }
@@ -980,7 +980,6 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     if (loading || sources.length < 2) return;
 
     setLoading(true);
-    setFollowUps([]);
     setStreamingText('');
 
     const tempUserMsg: ChatMessage = {
@@ -1031,7 +1030,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               } else if (parsed.message) {
                 setStreamingText('');
                 setMessages(prev => [...prev, parsed.message]);
-                if (parsed.followUps) { setFollowUps(parsed.followUps); setFollowUpOffset(0); }
+                // Follow-ups ne se mettent plus à jour automatiquement
               }
             } catch { /* skip */ }
           }
@@ -1052,7 +1051,6 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     if (loading) return;
 
     setLoading(true);
-    setFollowUps([]);
     setStreamingText('');
 
     const tempUserMsg: ChatMessage = {
@@ -1102,7 +1100,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               } else if (parsed.message) {
                 setStreamingText('');
                 setMessages(prev => [...prev, parsed.message]);
-                if (parsed.followUps) { setFollowUps(parsed.followUps); setFollowUpOffset(0); }
+                // Follow-ups ne se mettent plus à jour automatiquement
               }
             } catch { /* skip */ }
           }
