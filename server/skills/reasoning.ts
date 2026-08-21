@@ -1,4 +1,4 @@
-﻿import { Skill } from "./base";
+import { Skill } from "./base";
 import fs from "fs";
 import { generateText, getActiveProvider } from "../utils/textGeneration";
 import { generateSpeech } from "../utils/geminiTTS";
@@ -730,7 +730,8 @@ export const reasoningSkill: Skill = {
 
       // 2. TTS audio (avec cooldown pour éviter spam) — on ATTEND l'audio avant de continuer
       const now = Date.now();
-      if (context?.emitToClient && (now - _lastTTSAnnouncementTime > TTS_ANNOUNCEMENT_COOLDOWN_MS)) {
+      const ttsEnabled = context?.reasoningVoiceEnabled !== false;
+      if (context?.emitToClient && ttsEnabled && (now - _lastTTSAnnouncementTime > TTS_ANNOUNCEMENT_COOLDOWN_MS)) {
         _lastTTSAnnouncementTime = now;
         try {
           const audioBase64 = await generateSpeech(announcementText, { voiceName: context.voiceName || "Aoede" });
@@ -795,8 +796,9 @@ export const reasoningSkill: Skill = {
         // Notify frontend that reasoning is done
         if (context?.emitToClient) {
           context.emitToClient({ reasoning: { active: false } });
-          // Annonce vocale de fin uniquement si l'annonce de début a été jouée récemment
-          if (Date.now() - _lastTTSAnnouncementTime < TTS_ANNOUNCEMENT_COOLDOWN_MS) {
+          // Annonce vocale de fin uniquement si l'annonce de début a été jouée récemment ET si la voix raisonnement est activée
+          const ttsEndEnabled = context?.reasoningVoiceEnabled !== false;
+          if (ttsEndEnabled && Date.now() - _lastTTSAnnouncementTime < TTS_ANNOUNCEMENT_COOLDOWN_MS) {
             generateSpeech("Mon raisonnement est terminé, je passe à l'action.", { voiceName: context.voiceName || "Aoede" })
               .then((audioBase64) => {
                 if (audioBase64 && context.emitToClient) {

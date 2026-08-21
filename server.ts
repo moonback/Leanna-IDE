@@ -2049,7 +2049,7 @@ async function startServer() {
 
 
       // ── Build dynamic system instruction from profile ────────────────────
-      const systemText = buildSystemInstruction({
+      let systemText = buildSystemInstruction({
         ...currentProfile,
         workspace: getWorkspaceRoot(),
         mode: sessionMode,
@@ -2073,8 +2073,15 @@ async function startServer() {
       let memoryContext = "";
       // Token optimization: limiter les mémoires et conversations selon le budget
       const memoryBudgetTokens = 2000; // Budget tokens pour la mémoire
+      const knowledgeBudgetTokens = 3000; // Budget tokens pour le contexte Knowledge
+      const notebookBudgetTokens = 15_000; // Budget tokens pour le contexte notebooks (≈60k chars)
       const maxMemories = currentProfile.temperature !== undefined && currentProfile.temperature < 0.5 ? 5 : 10;
       const maxConversations = 3;
+      // Hard cap absolu sur le prompt système final (base + tous contextes) avant envoi à Gemini.
+      // Une session démarre avec ce prompt injecté à CHAQUE tour 0 : si on dépasse ~60k tokens,
+      // la facturation/quota explose dès l'ouverture d'une session (260k → quota immédiat).
+      const INITIAL_PROMPT_MAX_TOKENS = 60_000;
+      const INITIAL_PROMPT_MAX_CHARS = INITIAL_PROMPT_MAX_TOKENS * 4;
 
       if ((!requestedSkills || requestedSkills.includes("memory")) && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
         try {
@@ -2164,7 +2171,13 @@ async function startServer() {
             }
           }
 
-          const kTokens = Math.ceil(knowledgeContext.length / 4);
+          let kTokens = Math.ceil(knowledgeContext.length / 4);
+          if (kTokens > knowledgeBudgetTokens) {
+            const maxChars = knowledgeBudgetTokens * 4;
+            knowledgeContext = knowledgeContext.slice(0, maxChars) + "\n…[tronqué — budget Knowledge atteint]";
+            kTokens = knowledgeBudgetTokens;
+            console.warn(`[Knowledge] ⚠️ Contexte projet tronqué à ~${kTokens} tokens (dépassement du budget ${knowledgeBudgetTokens})`);
+          }
           console.log(`[Knowledge] ✅ Contexte projet injecté: ~${kTokens} tokens (${knowledgeGraph.getStats().totalFiles} fichiers, ${projectMemory.size} faits)`);
         } else {
           console.log(`[Knowledge] ⏸️ KnowledgeGraph non initialisé — pas d'injection`);
@@ -2173,27 +2186,91 @@ async function startServer() {
         console.debug(`[Knowledge] Module indisponible: ${(e as Error).message}`);
       }
 
-      // ── Notebooks — Injection du contenu complet des notebooks ──────────
-      // Donne à l'assistant un accès intégral aux sources de tous les notebooks
+      // ── Notebooks — Injection budgetée du contenu des notebooks ──────────
+      // Stratégie anti-bloat : résumés d'abord, limites par source/par notebook,
+      // et budget global notebookBudgetTokens (~15k tokens = 60k chars).
+      // Avant : dump rawText de TOUTES les sources → 253k tokens (97% du prompt).
       let notebookContext = "";
+      let notebookUsedChars = 0;
+      const NOTEBOOK_HEADER_CHARS = 120;
+      const MAX_SOURCES_PER_NOTEBOOK = 5;
+      const MAX_NOTEBOOKS_TOTAL = 5;
+      const MAX_CHARS_PER_SOURCE = 5_000; // ≈1250 tokens max par source
+      const notebookBudgetChars = notebookBudgetTokens * 4;
       try {
         const allNotebooks = notebookManager.getAllNotebooks();
         if (allNotebooks.length > 0) {
           const sections: string[] = [];
-          for (const nb of allNotebooks) {
-            if (nb.sources && nb.sources.length > 0) {
-              const sourcesText = nb.sources.map(s => {
-                const title = s.title || s.origin || "Source";
-                const text = s.rawText || s.summary || "";
-                return `### ${title}\n${text}`;
-              }).join("\n\n");
-              sections.push(`## 📓 Notebook : ${nb.title}\n\n${sourcesText}`);
+          let notebooksSkipped = 0;
+          let sourcesSkippedTotal = 0;
+          let sourcesTruncated = 0;
+          const selectedNotebooks = allNotebooks.slice(0, MAX_NOTEBOOKS_TOTAL);
+          notebooksSkipped = allNotebooks.length - selectedNotebooks.length;
+
+          for (const nb of selectedNotebooks) {
+            if (notebookUsedChars + NOTEBOOK_HEADER_CHARS > notebookBudgetChars) {
+              notebooksSkipped += selectedNotebooks.length - selectedNotebooks.indexOf(nb);
+              break;
+            }
+            if (!nb.sources || nb.sources.length === 0) continue;
+
+            const sourcesToUse = nb.sources.slice(0, MAX_SOURCES_PER_NOTEBOOK);
+            sourcesSkippedTotal += nb.sources.length - sourcesToUse.length;
+
+            const sourceTexts: string[] = [];
+            let headerLen = 0;
+            const nbHeader = `## 📓 Notebook : ${nb.title || 'Sans titre'}\n\n`;
+            headerLen += nbHeader.length;
+
+            for (const s of sourcesToUse) {
+              const title = (s.title || s.origin || "Source").slice(0, 120);
+              // Privilégier le summary (plus compact) plutôt que rawText intégral
+              const raw = s.summary && s.summary.length > 50
+                ? s.summary
+                : (s.rawText || s.summary || "");
+              const maxCharsForSource = Math.max(
+                200,
+                Math.min(MAX_CHARS_PER_SOURCE, notebookBudgetChars - notebookUsedChars - headerLen - 50)
+              );
+              let text: string;
+              if (raw.length > maxCharsForSource) {
+                text = raw.slice(0, maxCharsForSource) + "\n…[tronqué]";
+                sourcesTruncated++;
+              } else {
+                text = raw;
+              }
+              const block = `### ${title}\n${text}`;
+              if (notebookUsedChars + headerLen + block.length + 20 > notebookBudgetChars) {
+                sourcesSkippedTotal += sourcesToUse.length - sourcesToUse.indexOf(s);
+                break;
+              }
+              sourceTexts.push(block);
+            }
+
+            if (sourceTexts.length > 0) {
+              sections.push(nbHeader + sourceTexts.join("\n\n"));
+              notebookUsedChars += headerLen + sourceTexts.reduce((sum, t) => sum + t.length + 2, 0);
             }
           }
+
           if (sections.length > 0) {
-            notebookContext = "\n\n[Notebooks — Contenu complet des sources]\n\n" + sections.join("\n\n---\n\n");
+            let body = sections.join("\n\n---\n\n");
+            const prefix = "\n\n[Notebooks — Sources sélectionnées]\n\n";
+            let suffix = "";
+            const noteParts: string[] = [];
+            if (notebooksSkipped > 0) noteParts.push(`${notebooksSkipped} notebook(s) omis`);
+            if (sourcesSkippedTotal > 0) noteParts.push(`${sourcesSkippedTotal} source(s) omise(s)`);
+            if (sourcesTruncated > 0) noteParts.push(`${sourcesTruncated} source(s) tronquée(s)`);
+            if (noteParts.length > 0) suffix = `\n\n[_Note: ${noteParts.join(', ')}. Utilisez les outils notebooks pour accéder au contenu complet._]`;
+            notebookContext = prefix + body + suffix;
+            notebookUsedChars += prefix.length + suffix.length;
             const nbTokens = Math.ceil(notebookContext.length / 4);
-            console.log(`[Notebooks] 📓 Contexte notebooks injecté: ~${nbTokens} tokens (${allNotebooks.length} notebook(s), ${allNotebooks.reduce((sum, nb) => sum + (nb.sources?.length || 0), 0)} source(s))`);
+            console.log(
+              `[Notebooks] 📓 Contexte notebooks injecté: ~${nbTokens} tokens ` +
+              `(${selectedNotebooks.length - notebooksSkipped}/${allNotebooks.length} notebook(s), ` +
+              `${sections.reduce((sum, sec) => sum + (sec.match(/### /g) || []).length, 0)} source(s) traîtées)` +
+              (noteParts.length > 0 ? ` — ${noteParts.join(', ')}` : '')
+            );
           }
         }
       } catch (e) {
@@ -2214,6 +2291,72 @@ async function startServer() {
         console.log(`[TokenOptimizer]    ℹ️  Aucun contexte mémoire injecté`);
       }
       console.log(`[TokenOptimizer] ───────────────────────────────────────────`);
+
+      // ── Hard cap final sur le prompt système avant envoi ────────────────
+      // Défense en profondeur : même si les budgets par composant sont respectés,
+      // le systemText de base peut être énorme (SystemPromptBuilder, tool schemas...).
+      // On tronque d'abord les contextes ajoutés par ordre de priorité décroissante :
+      // systemText (préserve) → memoryContext → knowledgeContext → notebookContext.
+      // Objectif : < INITIAL_PROMPT_MAX_TOKENS tokens (~240k chars) SURTOUT pour
+      // ne pas flamber le quota dès tour 0 (le bug original = 260k tokens au démarrage).
+      const buildCombined = () => systemText + memoryContext + knowledgeContext + notebookContext;
+      let combinedChars = buildCombined().length;
+      const combinedTokensEst = Math.ceil(combinedChars / 4);
+      if (combinedTokensEst > INITIAL_PROMPT_MAX_TOKENS) {
+        console.warn(
+          `[TokenOptimizer] 🔴 DÉPASSEMENT CAP FINAL: ~${combinedTokensEst} tokens > ${INITIAL_PROMPT_MAX_TOKENS} max. ` +
+          `Tronction contextes (notebooks → knowledge → mémoire)…`
+        );
+        const targetChars = INITIAL_PROMPT_MAX_CHARS - 200; // marge pour suffixe d'avertissement
+        const baseLen = systemText.length;
+        // Priorité 1 : réduire notebookContext
+        if (notebookContext && combinedChars > targetChars) {
+          const allowance = Math.max(0, targetChars - baseLen - memoryContext.length - knowledgeContext.length);
+          if (allowance <= 0) {
+            notebookContext = "";
+          } else if (notebookContext.length > allowance) {
+            notebookContext = notebookContext.slice(0, allowance) + "\n…[tronqué — budget global atteint]";
+          }
+          combinedChars = buildCombined().length;
+        }
+        // Priorité 2 : réduire knowledgeContext
+        if (knowledgeContext && combinedChars > targetChars) {
+          const allowance = Math.max(0, targetChars - baseLen - memoryContext.length - notebookContext.length);
+          if (allowance <= 0) {
+            knowledgeContext = "";
+          } else if (knowledgeContext.length > allowance) {
+            knowledgeContext = knowledgeContext.slice(0, allowance) + "\n…[tronqué — budget global atteint]";
+          }
+          combinedChars = buildCombined().length;
+        }
+        // Priorité 3 : réduire memoryContext
+        if (memoryContext && combinedChars > targetChars) {
+          const allowance = Math.max(0, targetChars - baseLen - knowledgeContext.length - notebookContext.length);
+          if (allowance <= 0) {
+            memoryContext = "";
+          } else if (memoryContext.length > allowance) {
+            memoryContext = memoryContext.slice(0, allowance) + "\n…[tronqué — budget global atteint]";
+          }
+          combinedChars = buildCombined().length;
+        }
+        // Dernier filet : tronquage brutal du combiné si systemText de base est trop gros
+        if (combinedChars > INITIAL_PROMPT_MAX_CHARS) {
+          const overflowMsg = "\n\n[_AVERTISSEMENT: Prompt système tronqué par hard-cap. Certaines instructions sont manquantes._]";
+          // On réinjecte via les variables : tronquer systemText (on garde le début car les contextes étaient déjà vides)
+          const leftoverForBase = INITIAL_PROMPT_MAX_CHARS - overflowMsg.length - memoryContext.length - knowledgeContext.length - notebookContext.length;
+          if (leftoverForBase > 1000) {
+            systemText = systemText.slice(0, leftoverForBase) + "\n…[tronqué — cap absolu]" + overflowMsg;
+          } else {
+            systemText = systemText.slice(0, INITIAL_PROMPT_MAX_CHARS - overflowMsg.length) + overflowMsg;
+          }
+          console.error(
+            `[TokenOptimizer] ☠️ TRONQUAGE BRUTAL APPLIQUÉ. systemText tronqué à ${systemText.length} chars. ` +
+            `Final combiné ≈ ${buildCombined().length} chars.`
+          );
+        }
+        const finalTokens = Math.ceil(buildCombined().length / 4);
+        console.log(`[TokenOptimizer] ✅ Après hard-cap: ~${finalTokens} tokens (${buildCombined().length} chars)`);
+      }
 
             // Handler pour GoAway (expiration de session) - redémarre la session automatiquement
             let goAwayHandled = false; // Flag pour distinguer fermeture GoAway d'une erreur dans onclose
@@ -2886,6 +3029,7 @@ async function startServer() {
 
      const context = {
          voiceName,
+         reasoningVoiceEnabled: currentProfile.reasoningVoiceEnabled !== false,
          notifyLiveAPI: (message: string) => {
              try {
                 session.sendClientContent({
