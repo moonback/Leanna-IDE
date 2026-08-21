@@ -11,7 +11,7 @@ import {
   Send, Loader2, Lightbulb, BookOpen, Trash2, Quote, Telescope, Download,
   MessageCircle, ArrowDown, GitCompare, Zap, StickyNote, Volume2, Square,
   Copy, Check, RefreshCw, Pencil, StopCircle, ThumbsUp, ThumbsDown,
-  Filter, X, MessageSquarePlus, ChevronDown,
+  Filter, X, MessageSquarePlus, ChevronDown, FolderOpen, Folder, FileDown,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -36,6 +36,12 @@ interface Props {
   notebookId: string;
   hasSources: boolean;
   sources?: { id: string; title: string }[];
+}
+
+interface SandboxFolder {
+  path: string;
+  name: string;
+  depth: number;
 }
 
 /** Rich markdown rendering for chat messages */
@@ -367,6 +373,12 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const [threads, setThreads] = useState<{ id: string; title: string; createdAt: string }[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [showThreadList, setShowThreadList] = useState(false);
+  // ─── Folder Picker (save as MD) ───────────────────────────────────────────
+  const [folderPickerMsg, setFolderPickerMsg] = useState<ChatMessage | null>(null);
+  const [sandboxFolders, setSandboxFolders] = useState<SandboxFolder[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState<string>('');
+  const [customFolderName, setCustomFolderName] = useState('');
+  const [savingMd, setSavingMd] = useState(false);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const chunkCache = useRef<Map<string, string>>(new Map());
@@ -608,6 +620,51 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       setTimeout(() => setCopiedMsgId(null), 2000);
     }
   }, []);
+
+  // ─── Save Message as Markdown ─────────────────────────────────────────────
+
+  const openFolderPicker = useCallback(async (msg: ChatMessage) => {
+    setFolderPickerMsg(msg);
+    setSelectedFolder('');
+    setCustomFolderName('');
+    try {
+      const res = await fetch('/api/notebooks/sandbox/folders');
+      if (res.ok) {
+        const data = await res.json();
+        setSandboxFolders(data.folders || []);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleSaveAsMarkdown = useCallback(async () => {
+    if (!folderPickerMsg) return;
+    setSavingMd(true);
+    try {
+      // Le dossier final : soit le custom saisi, soit la sélection
+      const folder = customFolderName.trim()
+        ? customFolderName.trim()
+        : selectedFolder;
+
+      const res = await fetch(`/api/notebooks/${notebookId}/chat/save-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId: folderPickerMsg.id, folder: folder || undefined }),
+      });
+
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: 'Erreur serveur' }));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      toastSuccess(`Sauvegardé : ${data.filePath}`);
+      setFolderPickerMsg(null);
+    } catch (e: any) {
+      toastError(`Erreur : ${e.message}`);
+    } finally {
+      setSavingMd(false);
+    }
+  }, [folderPickerMsg, notebookId, selectedFolder, customFolderName, toastError, toastSuccess]);
 
   // ─── Edit User Message (start/cancel only — submit defined after handleSend) ─
 
@@ -1526,6 +1583,16 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                             <span>Note</span>
                           </button>
 
+                          {/* Save as Markdown */}
+                          <button
+                            onClick={() => openFolderPicker(msg)}
+                            className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
+                            title="Enregistrer ce message en fichier Markdown (.md)"
+                          >
+                            <Download className="w-3 h-3" />
+                            <span>MD</span>
+                          </button>
+
                           {/* Separator */}
                           <span className="text-[6px] opacity-20">•</span>
 
@@ -1550,14 +1617,26 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                       )}
 
                       {msg.role === 'user' && (
-                        <button
-                          onClick={() => handleEditStart(msg.id, msg.content)}
-                          className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
-                          title="Modifier et renvoyer"
-                        >
-                          <Pencil className="w-3 h-3" />
-                          <span>Modifier</span>
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleEditStart(msg.id, msg.content)}
+                            className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
+                            title="Modifier et renvoyer"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            <span>Modifier</span>
+                          </button>
+
+                          {/* Save user message as Markdown */}
+                          <button
+                            onClick={() => openFolderPicker(msg)}
+                            className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
+                            title="Enregistrer ce message en fichier Markdown (.md)"
+                          >
+                            <Download className="w-3 h-3" />
+                            <span>MD</span>
+                          </button>
+                        </>
                       )}
                     </div>
                   )}
@@ -2049,6 +2128,148 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
           </div>
         </div>
       </div>
+
+      {/* ─── Folder Picker Modal ──────────────────────────────────────── */}
+      <AnimatePresence>
+        {folderPickerMsg && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setFolderPickerMsg(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 300 }}
+              className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
+              style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-base)' }}>
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'var(--accent-subtle)' }}>
+                    <FileDown className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      Enregistrer en Markdown
+                    </p>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      Choisir le dossier de destination dans la sandbox
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setFolderPickerMsg(null)}
+                  className="p-1.5 rounded-lg opacity-50 hover:opacity-100 transition-opacity"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Folder list */}
+              <div className="px-4 py-3 max-h-56 overflow-y-auto custom-scrollbar">
+                {sandboxFolders.length === 0 ? (
+                  <p className="text-[11px] text-center py-4" style={{ color: 'var(--text-dimmed)' }}>
+                    Chargement des dossiers…
+                  </p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {sandboxFolders.map(f => (
+                      <button
+                        key={f.path}
+                        onClick={() => { setSelectedFolder(f.path); setCustomFolderName(''); }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all text-[11px] ${
+                          selectedFolder === f.path && !customFolderName
+                            ? 'ring-1 ring-[var(--accent-primary)]'
+                            : 'hover:bg-[var(--accent-subtle)]'
+                        }`}
+                        style={{
+                          backgroundColor: selectedFolder === f.path && !customFolderName
+                            ? 'var(--accent-subtle)'
+                            : 'transparent',
+                          color: 'var(--text-primary)',
+                          paddingLeft: `${12 + f.depth * 16}px`,
+                        }}
+                      >
+                        {selectedFolder === f.path && !customFolderName
+                          ? <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                          : <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
+                        }
+                        <span className="truncate">{f.name || '/ (racine sandbox)'}</span>
+                        {selectedFolder === f.path && !customFolderName && (
+                          <Check className="w-3 h-3 ml-auto flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Custom folder input */}
+              <div className="px-4 pb-3">
+                <p className="text-[10px] mb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>
+                  Ou saisir un chemin personnalisé
+                </p>
+                <input
+                  type="text"
+                  value={customFolderName}
+                  onChange={e => { setCustomFolderName(e.target.value); setSelectedFolder(''); }}
+                  placeholder="ex: docs/notes"
+                  className="w-full px-3 py-2 rounded-lg text-[11px] outline-none transition-all"
+                  style={{
+                    backgroundColor: 'var(--bg-base)',
+                    border: '1px solid var(--border-base)',
+                    color: 'var(--text-primary)',
+                  }}
+                  onFocus={e => (e.target.style.borderColor = 'var(--accent-primary)')}
+                  onBlur={e => (e.target.style.borderColor = 'var(--border-base)')}
+                />
+              </div>
+
+              {/* Destination preview */}
+              {(selectedFolder !== '' || customFolderName.trim()) && (
+                <div className="mx-4 mb-3 px-3 py-2 rounded-lg text-[10px]" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+                  <span className="font-medium">Destination : </span>
+                  <span className="font-mono">
+                    {customFolderName.trim() || selectedFolder || '/'}/
+                  </span>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2 px-4 pb-4">
+                <button
+                  onClick={() => setFolderPickerMsg(null)}
+                  className="px-4 py-2 rounded-lg text-[11px] font-medium transition-all hover:opacity-80"
+                  style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleSaveAsMarkdown}
+                  disabled={savingMd || (selectedFolder === '' && !customFolderName.trim())}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-medium transition-all disabled:opacity-40 hover:opacity-90 active:scale-95"
+                  style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                >
+                  {savingMd ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <FileDown className="w-3.5 h-3.5" />
+                  )}
+                  {savingMd ? 'Enregistrement…' : 'Enregistrer'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

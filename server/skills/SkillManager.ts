@@ -14,6 +14,7 @@ const TOOL_KEYWORDS: Record<string, string[]> = {
   git: ['git', 'commit', 'push', 'pull', 'branch', 'merge', 'rebase', 'diff', 'staging', 'stage', 'repository', 'repo', 'historique', 'version', 'clone', 'statut', 'status', 'modifié', 'modified', 'modification', 'changement', 'change', 'déployer', 'deploy'],
   github: ['github', 'pr', 'pull request', 'issue', 'repository', 'repo', 'fork', 'star', 'notification', 'release', 'workflow', 'actions'],
   automation: ['browser', 'navigate', 'web', 'site', 'scrape', 'click', 'screenshot', 'snapshot', 'automation', 'page', 'url', 'html', 'form', 'extract', 'inspect'],
+  browser: ['navigateur', 'browser', 'ouvrir navigateur', 'open browser', 'browser_navigate', 'browser_search', 'browser_open', 'montrer site', 'afficher page', 'navigue vers', 'navigate to', 'recherche navigateur'],
   list: ['liste', 'list', 'todo', 'tache', 'task', 'shopping', 'item', 'checklist', 'ajouter', 'supprimer'],
   weather: ['meteo', 'weather', 'temperature', 'pluie', 'soleil', 'vent', 'prevision', 'forecast'],
   reasoning: ['raisonnement', 'reasoning', 'reflechir', 'think', 'planifier', 'analyse', 'critique', 'critic', 'brainstorm', 'idee', 'stratégie', 'strategy', 'solution', 'problem solving', 'résoudre', 'solve', 'étape', 'step', 'méthode', 'method'],
@@ -49,6 +50,7 @@ const CRITICAL_SKILLS = [
   'guidelines',
   'documentLinker',
   'documentKnowledge',
+  'browser',
 ];
 const CRITICAL_SKILL_SET = new Set(CRITICAL_SKILLS);
 
@@ -66,6 +68,7 @@ const LAZY_CATEGORIES: Record<string, string> = {
   guidelines: 'guidelines',
   project: 'project',
   aiStudioDirectives: 'aiStudioDirectives',
+  browser: 'browser',
 };
 
 // Mapping inverse : nom de skill → catégorie (pour l'auto-découverte).
@@ -75,6 +78,7 @@ const SKILL_NAME_TO_CATEGORY: Record<string, string> = Object.fromEntries(
 
 // ── Imports statiques de tous les skills (fallback pour Electron/bundle) ──────
 import { automationSkill } from "./automation";
+import { browserSkill } from "./browser";
 import { codebaseSkill } from "./codebase";
 import { githubSkill } from "./github";
 import { guidelinesSkill } from "./guidelines";
@@ -98,6 +102,7 @@ import { Executor } from "../mission";
 // Map des skills statiques (fallback Electron) — utilisée par discoverAndLoad.
 const STATIC_SKILLS: Record<string, Skill> = {
   automation: automationSkill,
+  browser: browserSkill,
   codebase: codebaseSkill,
   git: gitSkill,
   github: githubSkill,
@@ -806,6 +811,7 @@ Analyse la situation et propose un patch de remplacement COMPLET pour ce fichier
       'time',
       'reasoning',
       'agents',
+      'browser',
     ]);
 
     const RELEVANCE_THRESHOLD = 3;

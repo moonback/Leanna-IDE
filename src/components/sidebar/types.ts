@@ -29,6 +29,7 @@ export interface IDEPanelState {
   showSystemHealth: boolean;
   showMcp: boolean;
   showFleet: boolean;
+  showBrowser: boolean;
   visionEnabled: boolean;
   screenShareEnabled: boolean;
 }
@@ -53,6 +54,7 @@ export interface IDEPanelActions {
   onToggleSystemHealth: () => void;
   onToggleMcp: () => void;
   onToggleFleet: () => void;
+  onToggleBrowser: () => void;
   onToggleVision: () => void;
   onToggleScreenShare: () => void;
 }
@@ -106,6 +108,7 @@ export interface UnifiedSidebarProps {
   showSystemHealth?: boolean;
   showMcp?: boolean;
   showFleet?: boolean;
+  showBrowser?: boolean;
   assistantConnected?: boolean;
   assistantWorking?: boolean;
   assistantMuted?: boolean;
@@ -131,6 +134,7 @@ export interface UnifiedSidebarProps {
   onToggleSystemHealth?: () => void;
   onToggleMcp?: () => void;
   onToggleFleet?: () => void;
+  onToggleBrowser?: () => void;
   onToggleVision?: () => void;
   onToggleScreenShare?: () => void;
   onToggleMode?: () => void;

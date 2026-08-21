@@ -118,7 +118,30 @@ export function useLiveAPI() {
       addLog('Interrupted', 'system');
     }
     if (msg.type === 'ide-action' && msg.action) {
-      window.dispatchEvent(new CustomEvent('jarvis-ide-action', { detail: msg.action }));
+      const a = msg.action;
+      window.dispatchEvent(new CustomEvent('jarvis-ide-action', { detail: a }));
+      switch (a.type) {
+        case 'browser-scroll':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-scroll', { detail: a }));
+          break;
+        case 'browser-back':
+        case 'browser-forward':
+        case 'browser-reload':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-control', { detail: a }));
+          break;
+        case 'browser-read-request':
+          if (a.requestId) {
+            window.dispatchEvent(new CustomEvent('jarvis-browser-read-request', {
+              detail: { requestId: a.requestId, selector: a.selector ?? null },
+            }));
+          }
+          break;
+      }
+    }
+    if (msg.type === 'browser-read-request' && msg.requestId) {
+      window.dispatchEvent(new CustomEvent('jarvis-browser-read-request', {
+        detail: { requestId: msg.requestId, selector: msg.selector ?? null },
+      }));
     }
     // ── Confirmation interactive (fichiers critiques) ──────────────────
     if (msg.type === 'confirm-critical-edit' && msg.requestId) {

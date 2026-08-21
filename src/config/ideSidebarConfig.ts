@@ -16,7 +16,7 @@ import {
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Cable, Container, Bot, Crosshair, Database,
   Activity, Wrench, Code2, Users, FileStack,
-  Wand2, BookOpen,
+  Wand2, BookOpen, Globe,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -176,6 +176,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Agent Builder (créer des agents)',
             stateKey: 'showAgentBuilder',
             actionKey: 'onToggleAgentBuilder',
+          },
+          {
+            id: 'browser',
+            type: 'button',
+            icon: Globe,
+            label: 'Navigateur intégré',
+            stateKey: 'showBrowser',
+            actionKey: 'onToggleBrowser',
           },
           {
             id: 'vision',

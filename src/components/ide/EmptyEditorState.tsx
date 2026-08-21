@@ -196,7 +196,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
       {/* ── Contenu ── */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <div className="w-full max-w-[640px]">
+        <div className="w-full max-w-[940px]">
 
           {/* ── Header : Salutation ── */}
           <motion.div

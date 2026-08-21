@@ -16,8 +16,9 @@ import {
   Sparkles, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List,
   Loader2, Trash2, Copy, CheckCircle2, Download, RefreshCw,
   Filter, PenLine, Brain, Target, BookOpen, FolderInput,
-  FileBarChart, Lightbulb, Zap, X, ArrowRight, ArrowLeft,
+  FileBarChart, Lightbulb, Zap, X, ArrowRight, ArrowLeft, Presentation,
 } from 'lucide-react';
+import { SlidePreviewModal } from './SlidePreviewModal';
 import { useToast } from '../ui/Toast';
 import { useProfile } from '../../context/UserProfileContext';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -305,6 +306,11 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
   // Modal infographie
   const [showInfographicModal, setShowInfographicModal] = useState(false);
+
+  // Modal slides Reveal.js
+  const [showSlideModal, setShowSlideModal] = useState(false);
+  // Types qui ne sont pas compatibles avec la génération de slides
+  const SLIDE_EXCLUDED_TYPES = new Set(['infographic', 'mindmap']);
   const [infraOrientation, setInfraOrientation] = useState<'portrait' | 'landscape' | 'square'>('portrait');
   const [infraStyle, setInfraStyle] = useState<string>('auto');
   const [infraDetail, setInfraDetail] = useState<'low' | 'medium' | 'high'>('medium');
@@ -354,11 +360,30 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
     finally { setLoadingSuggestions(false); }
   }, [notebookId, sources.length]);
 
+  // Auto-refresh toutes les 5 minutes
+  useEffect(() => {
+    if (sources.length === 0) return;
+    // Charge au premier rendu
+    loadSuggestions();
+    const interval = setInterval(loadSuggestions, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notebookId]);
+
+  // Refresh automatique quand le nombre de sources change
+  const prevSourcesCountRef = useRef(sources.length);
+  useEffect(() => {
+    if (sources.length > 0 && sources.length !== prevSourcesCountRef.current) {
+      prevSourcesCountRef.current = sources.length;
+      loadSuggestions();
+    }
+  }, [sources.length, loadSuggestions]);
+
   // Ouvrir le modal "Rapport complet"
   const openReportModal = useCallback(() => {
     setShowReportModal(true);
     setModalSelectedType(null);
-    // Charger les suggestions seulement la première fois (pas de refresh auto)
+    // Les suggestions sont déjà chargées automatiquement, mais on rafraîchit si vide
     if (suggestions.length === 0 && !loadingSuggestions) {
       loadSuggestions();
     }
@@ -686,110 +711,9 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
           )}
         </AnimatePresence>
 
-        {/* Generate buttons — redesigned grid */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
-              Générer
-            </p>
-            {generating && (
-              <span className="flex items-center gap-1.5 text-[9px] font-medium" style={{ color: 'var(--accent-primary)' }}>
-                <Loader2 className="w-3 h-3 animate-spin" />
-                En cours...
-              </span>
-            )}
-          </div>
-
-          {/* Bouton principal — Rapport complet (ouvre le modal) */}
-          <button
-            onClick={openReportModal}
-            disabled={generating || sources.length === 0}
-            className="w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all disabled:opacity-40 active:scale-[0.97] hover:shadow-md hover:-translate-y-0.5"
-            style={{
-              borderColor: '#dc262640',
-              backgroundColor: '#dc262608',
-              boxShadow: '0 2px 12px #dc262610',
-            }}
-          >
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: '#dc262615', border: '1px solid #dc262630' }}
-            >
-              <FileBarChart className="w-5 h-5" style={{ color: '#dc2626' }} />
-            </div>
-            <div className="min-w-0 flex-1 text-left">
-              <p className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>
-                📊 Rapport complet
-              </p>
-              <p className="text-[9px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Choisir un type • Suggestions IA incluses
-              </p>
-            </div>
-            <ArrowRight className="w-4 h-4 flex-shrink-0" style={{ color: '#dc2626' }} />
-          </button>
-
-          {/* Types rapides */}
-          <div className="grid grid-cols-3 lg:grid-cols-1 gap-1.5">
-            {DOC_TYPES.filter(t => t.key !== 'full-report').map(({ key, label, icon: Icon, desc, color }) => {
-              const isActive = generatingType === key;
-              return (
-                <button
-                  key={key}
-                  onClick={() => key === 'infographic' ? setShowInfographicModal(true) : handleGenerate(key)}
-                  disabled={generating || sources.length === 0}
-                  className={`notebook-studio-card relative w-full flex flex-col lg:flex-row items-center lg:items-center gap-1.5 lg:gap-3 p-2.5 lg:p-3 text-center lg:text-left disabled:opacity-40 ${isActive ? 'ring-2' : ''}`}
-                  style={{
-                    borderColor: isActive ? color : 'var(--notebook-border)',
-                    backgroundColor: isActive ? `${color}08` : 'var(--notebook-card-bg)',
-                    boxShadow: isActive ? `0 0 12px ${color}15` : undefined,
-                  }}
-                >
-                  {/* Icon */}
-                  <div
-                    className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: `${color}12`, border: `1px solid ${color}25` }}
-                  >
-                    {isActive ? (
-                      <Loader2 className="w-4 h-4 animate-spin" style={{ color }} />
-                    ) : (
-                      <Icon className="w-4 h-4" style={{ color }} />
-                    )}
-                  </div>
-
-                  {/* Text */}
-                  <div className="min-w-0 lg:flex-1">
-                    <p className="text-[10px] lg:text-[11px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
-                      {label}
-                    </p>
-                    <p className="text-[8px] lg:text-[9px] mt-0.5 leading-tight hidden lg:block" style={{ color: 'var(--text-dimmed)' }}>
-                      {desc}
-                    </p>
-                  </div>
-
-                  {/* Active indicator */}
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeGenType"
-                      className="absolute inset-0 rounded-xl pointer-events-none"
-                      style={{ border: `2px solid ${color}`, opacity: 0.5 }}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Source count info */}
-        {sources.length === 0 && (
-          <p className="text-[10px] text-center py-2 px-3 rounded-lg" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
-            Ajoutez des sources pour activer la génération
-          </p>
-        )}
-
-        {/* Generated docs list */}
+        {/* Generated docs list — above type buttons */}
         {generatedDocs.length > 0 && (
-          <div className="space-y-2 pt-4 border-t" style={{ borderColor: 'var(--border-base)' }}>
+          <div className="space-y-2 pb-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
             <div className="flex items-center justify-between">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                 Historique
@@ -848,12 +772,136 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
             </div>
           </div>
         )}
+
+        {/* Generate buttons — redesigned grid */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+              Générer
+            </p>
+            {generating && (
+              <span className="flex items-center gap-1.5 text-[9px] font-medium" style={{ color: 'var(--accent-primary)' }}>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                En cours...
+              </span>
+            )}
+          </div>
+
+          {/* Bouton principal — Rapport complet (ouvre le modal) */}
+          <button
+            onClick={openReportModal}
+            disabled={generating || sources.length === 0}
+            className="w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all disabled:opacity-40 active:scale-[0.97] hover:shadow-md hover:-translate-y-0.5"
+            style={{
+              borderColor: '#dc262640',
+              backgroundColor: '#dc262608',
+              boxShadow: '0 2px 12px #dc262610',
+            }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: '#dc262615', border: '1px solid #dc262630' }}
+            >
+              <FileBarChart className="w-5 h-5" style={{ color: '#dc2626' }} />
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>
+                📊 Rapport complet
+              </p>
+              <p className="text-[9px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Choisir un type • Suggestions IA incluses
+              </p>
+            </div>
+            <ArrowRight className="w-4 h-4 flex-shrink-0" style={{ color: '#dc2626' }} />
+          </button>
+
+          {/* Types rapides — 2 par ligne */}
+          <div className="grid grid-cols-2 gap-1.5">
+            {DOC_TYPES.filter(t => t.key !== 'full-report').map(({ key, label, icon: Icon, desc, color }) => {
+              const isActive = generatingType === key;
+              return (
+                <motion.button
+                  key={key}
+                  onClick={() => key === 'infographic' ? setShowInfographicModal(true) : handleGenerate(key)}
+                  disabled={generating || sources.length === 0}
+                  whileHover={!generating && sources.length > 0 ? { y: -2, scale: 1.02 } : {}}
+                  whileTap={!generating && sources.length > 0 ? { scale: 0.97 } : {}}
+                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  className={`notebook-studio-card group relative w-full flex items-center gap-2.5 p-2.5 text-left disabled:opacity-40 overflow-hidden ${isActive ? 'ring-2' : ''}`}
+                  style={{
+                    borderColor: isActive ? color : 'var(--notebook-border)',
+                    backgroundColor: isActive ? `${color}10` : 'var(--notebook-card-bg)',
+                    boxShadow: isActive ? `0 0 16px ${color}25, 0 2px 8px ${color}10` : undefined,
+                  }}
+                >
+                  {/* Hover glow background */}
+                  <motion.div
+                    className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200"
+                    style={{ background: `radial-gradient(ellipse at 30% 50%, ${color}12 0%, transparent 70%)` }}
+                  />
+
+                  {/* Left color accent bar */}
+                  <motion.div
+                    className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    style={{ backgroundColor: color }}
+                  />
+
+                  {/* Icon */}
+                  <motion.div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200"
+                    style={{ backgroundColor: `${color}12`, border: `1px solid ${color}25` }}
+                    whileHover={{ backgroundColor: `${color}22`, scale: 1.08 }}
+                  >
+                    {isActive ? (
+                      <Loader2 className="w-4 h-4 animate-spin" style={{ color }} />
+                    ) : (
+                      <Icon className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" style={{ color }} />
+                    )}
+                  </motion.div>
+
+                  {/* Text */}
+                  <div className="min-w-0 flex-1 relative z-10">
+                    <p className="text-[10px] font-semibold leading-tight transition-colors duration-200" style={{ color: 'var(--text-primary)' }}>
+                      {label}
+                    </p>
+                    <p className="text-[8px] mt-0.5 leading-tight transition-colors duration-200" style={{ color: 'var(--text-dimmed)' }}>
+                      {desc}
+                    </p>
+                  </div>
+
+                  {/* Arrow hint on hover */}
+                  <motion.div
+                    className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 -translate-x-1 group-hover:translate-x-0"
+                  >
+                    <ArrowRight className="w-3 h-3" style={{ color }} />
+                  </motion.div>
+
+                  {/* Active indicator */}
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeGenType"
+                      className="absolute inset-0 rounded-xl pointer-events-none"
+                      style={{ border: `2px solid ${color}`, opacity: 0.5 }}
+                    />
+                  )}
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Source count info */}
+        {sources.length === 0 && (
+          <p className="text-[10px] text-center py-2 px-3 rounded-lg" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
+            Ajoutez des sources pour activer la génération
+          </p>
+        )}
       </div>
       )}
 
       {/* Document viewer — shown in fullView mode */}
       {fullView && (
-      <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-8" style={{ borderColor: 'var(--notebook-border)' }}>
+      <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-4" style={{ borderColor: 'var(--notebook-border)' }}>
         {/* Streaming view */}
         {streamingText && !selectedDoc && (
           <div className="space-y-5 max-w-3xl">
@@ -942,6 +990,16 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 >
                   {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
+                {!SLIDE_EXCLUDED_TYPES.has(selectedDoc.type) && (
+                  <button
+                    onClick={() => setShowSlideModal(true)}
+                    className="p-2 rounded-lg border transition-all hover:bg-white/5 active:scale-95"
+                    style={{ borderColor: '#3b82f640', color: '#3b82f6' }}
+                    title="Générer une présentation Reveal.js"
+                  >
+                    <Presentation className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1223,7 +1281,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 10 }}
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden"
+              className="w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden"
               style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
             >
               {/* Header */}
@@ -1421,6 +1479,16 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ═══ MODAL SLIDES REVEAL.JS ═══ */}
+      {showSlideModal && selectedDoc && (
+        <SlidePreviewModal
+          open={showSlideModal}
+          onClose={() => setShowSlideModal(false)}
+          notebookId={notebookId}
+          doc={selectedDoc}
+        />
+      )}
     </div>
   );
 }

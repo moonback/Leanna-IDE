@@ -271,6 +271,15 @@ runtimeV2.start().then(() => {
 });
 
 const ideLimiter = createRateLimiter(120, 60_000);
+
+// ── Registre des lectures de page browser en attente ─────────────────────────
+// browser_read_content insère une promesse ici ; POST /api/browser/content-result
+// la résout quand le BrowserPanel a exécuté le JS dans la webview.
+const browserReadPending = new Map<string, {
+  resolve: (text: string) => void;
+  reject: (err: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}>();
 const apiToken = process.env.JARVIS_API_TOKEN;
 
 function getDefaultWorkspaceRoot(): string {
@@ -1378,6 +1387,34 @@ async function startServer() {
     res.json({ status: 'success', path: requestedPath });
   });
 
+  // ── Browser: canal retour webview → skill ───────────────────────────────
+  // Le BrowserPanel (frontend) appelle POST /api/browser/content-result après
+  // avoir exécuté du JS dans la webview. Le skill browser_read_content attend
+  // ce résultat via une promesse stockée dans browserReadPending.
+  app.post("/api/browser/content-result", requireAuth, (req, res) => {
+    const { requestId, result, error } = req.body as {
+      requestId?: string;
+      result?: string | null;
+      error?: string | null;
+    };
+    if (!requestId) return res.status(400).json({ error: 'requestId manquant.' });
+
+    const pending = browserReadPending.get(requestId);
+    if (!pending) {
+      // Résultat arrivé trop tard (timeout déjà déclenché) — ignorer silencieusement
+      return res.json({ status: 'ignored' });
+    }
+    browserReadPending.delete(requestId);
+    clearTimeout(pending.timer);
+
+    if (error) {
+      pending.reject(new Error(error));
+    } else {
+      pending.resolve(result ?? '');
+    }
+    res.json({ status: 'ok' });
+  });
+
   // ── Global error handler — DOIT être enregistré APRÈS les routes mais
   //     AVANT les middlewares statiques (Vite, dist).                             
   //     Permet d'avoir une stacktrace détaillée en console sur les 500.         
@@ -1817,6 +1854,7 @@ async function startServer() {
         'knowledge_memory_search',
         'get_current_time',
         'automation_search',
+        'browser_navigate', 'browser_search', 'browser_open', 'browser_read_content',
         'reasoning_think',
         'agent_orchestrate', 'agent_status',
         'knowledge_search_entities', 'knowledge_status',
@@ -2786,7 +2824,8 @@ async function startServer() {
              } catch (e) {
                 console.error("Failed to emit to client:", e);
              }
-         }
+         },
+         browserReadPending,
      };
 
      // Signal au client que l'assistant est occupée (traitement d'outils)
