@@ -266,7 +266,6 @@ export function BrowserPanel({
       const wv = webviewRef.current;
       if (!wv) return;
 
-      // Script injecté dans la webview pour extraire le texte visible
       const extractScript = detail.selector
         ? `(function(){
             var el = document.querySelector(${JSON.stringify(detail.selector)});
@@ -275,7 +274,6 @@ export function BrowserPanel({
         : `(function(){
             var title = document.title;
             var url = location.href;
-            // Retirer scripts, styles, nav, footer pour n'avoir que le contenu principal
             var clone = document.body.cloneNode(true);
             ['script','style','nav','footer','header','aside'].forEach(function(tag){
               Array.from(clone.querySelectorAll(tag)).forEach(function(el){ el.remove(); });
@@ -311,15 +309,229 @@ export function BrowserPanel({
       }
     };
 
+    // ── Helper générique : POST résultat d'action webview → backend
+    const postActionResult = async (requestId: string, result: any, error: string | null = null) => {
+      try {
+        const token = localStorage.getItem('jarvis_api_token') || '';
+        await fetch('/api/browser/action-result', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'x-jarvis-token': token } : {}),
+          },
+          body: JSON.stringify({ requestId, result, error }),
+        });
+      } catch {/* silent */}
+    };
+
+    // ── Clic sur un élément
+    const handleClick = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { requestId: string; selector: string };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      try {
+        const clickScript = `(function(){
+          var el = document.querySelector(${JSON.stringify(detail.selector)});
+          if (!el) return JSON.stringify({ error: 'Sélecteur introuvable: ${detail.selector.replace(/'/g, "\\'")}' });
+          var evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+          el.dispatchEvent(evt);
+          return JSON.stringify({ ok: true });
+        })()`;
+        const raw = await wv.executeJavaScript(clickScript);
+        let parsed: any = {};
+        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch {}
+        if (parsed?.error) {
+          await postActionResult(detail.requestId, null, parsed.error);
+          return;
+        }
+        setTimeout(async () => {
+          try {
+            const content = await wv.executeJavaScript(`document.body.innerText.substring(0, 3000)`);
+            postActionResult(detail.requestId, { content });
+          } catch {
+            postActionResult(detail.requestId, {});
+          }
+        }, 1200);
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur clic');
+      }
+    };
+
+    // ── Saisie dans un champ
+    const handleType = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        requestId: string; selector: string; text: string; pressEnter?: boolean;
+      };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      try {
+        const typeScript = `(function(){
+          var el = document.querySelector(${JSON.stringify(detail.selector)});
+          if (!el) return JSON.stringify({ error: 'Sélecteur introuvable' });
+          el.focus();
+          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+            el.value = ${JSON.stringify(detail.text)};
+          } else {
+            el.setAttribute('contenteditable', 'true');
+            el.innerText = ${JSON.stringify(detail.text)};
+          }
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return JSON.stringify({ ok: true });
+        })()`;
+        const raw = await wv.executeJavaScript(typeScript);
+        let parsed: any = {};
+        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch {}
+        if (parsed?.error) {
+          await postActionResult(detail.requestId, null, parsed.error);
+          return;
+        }
+        if (detail.pressEnter) {
+          setTimeout(async () => {
+            try {
+              await wv.executeJavaScript(`
+                (function(){
+                  var el = document.querySelector(${JSON.stringify(detail.selector)});
+                  if (el) {
+                    var ev = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true });
+                    el.dispatchEvent(ev);
+                    ev = new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true });
+                    el.dispatchEvent(ev);
+                  }
+                })();
+              `);
+            } catch {/* ignore */}
+            postActionResult(detail.requestId, { ok: true });
+          }, 300);
+        } else {
+          postActionResult(detail.requestId, { ok: true });
+        }
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur saisie');
+      }
+    };
+
+    // ── Snapshot des éléments interactifs
+    const handleSnapshot = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { requestId: string };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      const snapshotScript = `(function(){
+        var bestSelector = function(el) {
+          if (el.id) return '#' + CSS.escape(el.id);
+          var testId = el.getAttribute('data-testid') || el.getAttribute('data-test-id');
+          if (testId) return '[data-testid="' + CSS.escape(testId) + '"]';
+          var name = el.name;
+          if (name) return el.tagName.toLowerCase() + '[name="' + CSS.escape(name) + '"]';
+          var placeholder = el.placeholder;
+          if (placeholder) return el.tagName.toLowerCase() + '[placeholder="' + CSS.escape(placeholder) + '"]';
+          var ariaLabel = el.getAttribute('aria-label');
+          if (ariaLabel) return '[aria-label="' + CSS.escape(ariaLabel) + '"]';
+          var role = el.getAttribute('role');
+          if (role) return '[role="' + role + '"]';
+          return el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).trim().split(/\\s+/).slice(0, 2).join('.') : '');
+        };
+        var inputs = Array.from(document.querySelectorAll(
+          'input:not([type="hidden"]), textarea, select, [role="textbox"], [role="combobox"], [role="searchbox"]'
+        )).slice(0, 20).map(function(el) {
+          return {
+            selector: bestSelector(el),
+            tag: el.tagName.toLowerCase(),
+            type: el.type || el.getAttribute('role') || '',
+            placeholder: el.placeholder || el.getAttribute('aria-placeholder') || '',
+            ariaLabel: el.getAttribute('aria-label') || '',
+            name: el.name || '',
+            visible: el.offsetParent !== null
+          };
+        });
+        var buttons = Array.from(document.querySelectorAll(
+          'button, input[type="submit"], input[type="button"], a[href], [role="button"]'
+        )).filter(function(el) { return el.offsetParent !== null; }).slice(0, 15).map(function(el) {
+          return {
+            selector: bestSelector(el),
+            text: (el.innerText || el.getAttribute('aria-label') || el.value || '').trim().substring(0, 80),
+            ariaLabel: el.getAttribute('aria-label') || ''
+          };
+        });
+        return JSON.stringify({ url: location.href, title: document.title, inputs: inputs, buttons: buttons });
+      })()`;
+      try {
+        const raw = await wv.executeJavaScript(snapshotScript);
+        const parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : raw;
+        postActionResult(detail.requestId, parsed);
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur snapshot');
+      }
+    };
+
+    // ── Inspection d'éléments spécifiques
+    const handleInspect = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { requestId: string; inspectType: 'buttons' | 'inputs' | 'links' | 'all' };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      const inspectScript = `(function(){
+        var bestSelector = function(el) {
+          if (el.id) return '#' + CSS.escape(el.id);
+          var testId = el.getAttribute('data-testid') || el.getAttribute('data-test-id');
+          if (testId) return '[data-testid="' + CSS.escape(testId) + '"]';
+          var name = el.name;
+          if (name) return el.tagName.toLowerCase() + '[name="' + CSS.escape(name) + '"]';
+          var placeholder = el.placeholder;
+          if (placeholder) return el.tagName.toLowerCase() + '[placeholder="' + CSS.escape(placeholder) + '"]';
+          var ariaLabel = el.getAttribute('aria-label');
+          if (ariaLabel) return '[aria-label="' + CSS.escape(ariaLabel) + '"]';
+          return el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).trim().split(/\\s+/).slice(0, 2).join('.') : '');
+        };
+        var results = {};
+        if (type === 'buttons' || type === 'all') {
+          results.buttons = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], [role="button"]')).map(function(btn) { return { selector: bestSelector(btn), text: (btn.innerText || btn.value || '').trim().substring(0, 80), ariaLabel: btn.getAttribute('aria-label') || '' }; }).slice(0, 12);
+        }
+        if (type === 'inputs' || type === 'all') {
+          results.inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select')).map(function(input) { return { selector: bestSelector(input), type: input.type || 'textarea', placeholder: input.placeholder || '', ariaLabel: input.getAttribute('aria-label') || '', name: input.name || '' }; }).slice(0, 12);
+        }
+        if (type === 'links' || type === 'all') {
+          results.links = Array.from(document.querySelectorAll('a[href]')).map(function(link) { return { selector: bestSelector(link), text: (link.innerText || '').trim().substring(0, 80), href: link.href || '' }; }).slice(0, 12);
+        }
+        return JSON.stringify(results);
+      })('${detail.inspectType || 'all'}')`;
+      try {
+        const raw = await wv.executeJavaScript(inspectScript);
+        const parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {};
+        postActionResult(detail.requestId, parsed);
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur inspect');
+      }
+    };
+
     window.addEventListener('jarvis-browser-navigate', handleNav);
     window.addEventListener('jarvis-browser-scroll', handleScroll);
     window.addEventListener('jarvis-browser-control', handleBrowserControl);
     window.addEventListener('jarvis-browser-read-request', handleReadRequest as EventListener);
+    window.addEventListener('jarvis-browser-click', handleClick as EventListener);
+    window.addEventListener('jarvis-browser-type', handleType as EventListener);
+    window.addEventListener('jarvis-browser-snapshot', handleSnapshot as EventListener);
+    window.addEventListener('jarvis-browser-inspect', handleInspect as EventListener);
     return () => {
       window.removeEventListener('jarvis-browser-navigate', handleNav);
       window.removeEventListener('jarvis-browser-scroll', handleScroll);
       window.removeEventListener('jarvis-browser-control', handleBrowserControl);
       window.removeEventListener('jarvis-browser-read-request', handleReadRequest as EventListener);
+      window.removeEventListener('jarvis-browser-click', handleClick as EventListener);
+      window.removeEventListener('jarvis-browser-type', handleType as EventListener);
+      window.removeEventListener('jarvis-browser-snapshot', handleSnapshot as EventListener);
+      window.removeEventListener('jarvis-browser-inspect', handleInspect as EventListener);
     };
   }, [navigateTo]);  // ── Render ──────────────────────────────────────────────────────────────────
 

@@ -280,6 +280,15 @@ const browserReadPending = new Map<string, {
   reject: (err: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 }>();
+
+// ── Registre des actions browser en attente (click, type, snapshot, inspect) ─
+// Réutilise le même pattern que browserReadPending mais pour les interactions
+// qui nécessitent un retour structuré vers le skill. POST /api/browser/action-result
+const browserActionPending = new Map<string, {
+  resolve: (value: any) => void;
+  reject: (err: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}>();
 const apiToken = process.env.JARVIS_API_TOKEN;
 
 function getDefaultWorkspaceRoot(): string {
@@ -1401,7 +1410,6 @@ async function startServer() {
 
     const pending = browserReadPending.get(requestId);
     if (!pending) {
-      // Résultat arrivé trop tard (timeout déjà déclenché) — ignorer silencieusement
       return res.json({ status: 'ignored' });
     }
     browserReadPending.delete(requestId);
@@ -1411,6 +1419,31 @@ async function startServer() {
       pending.reject(new Error(error));
     } else {
       pending.resolve(result ?? '');
+    }
+    res.json({ status: 'ok' });
+  });
+
+  // ── Browser: canal retour actions interactives ──────────────────────────
+  // click / type / snapshot / inspect → POST /api/browser/action-result
+  app.post("/api/browser/action-result", requireAuth, (req, res) => {
+    const { requestId, result, error } = req.body as {
+      requestId?: string;
+      result?: any;
+      error?: string | null;
+    };
+    if (!requestId) return res.status(400).json({ error: 'requestId manquant.' });
+
+    const pending = browserActionPending.get(requestId);
+    if (!pending) {
+      return res.json({ status: 'ignored' });
+    }
+    browserActionPending.delete(requestId);
+    clearTimeout(pending.timer);
+
+    if (error) {
+      pending.reject(new Error(error));
+    } else {
+      pending.resolve(result);
     }
     res.json({ status: 'ok' });
   });
@@ -2826,6 +2859,7 @@ async function startServer() {
              }
          },
          browserReadPending,
+         browserActionPending,
      };
 
      // Signal au client que l'assistant est occupée (traitement d'outils)

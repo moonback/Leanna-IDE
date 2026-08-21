@@ -80,6 +80,20 @@ const readContentSchema = z.object({
   selector: z.string().optional(),
 });
 
+const clickSchema = z.object({
+  selector: z.string().min(1, "Sélecteur CSS requis"),
+});
+
+const typeSchema = z.object({
+  selector: z.string().min(1, "Sélecteur CSS requis"),
+  text: z.string(),
+  pressEnter: z.boolean().optional().default(false),
+});
+
+const inspectSchema = z.object({
+  type: z.enum(["buttons", "inputs", "links", "all"]).default("all"),
+});
+
 // ─── Skill ────────────────────────────────────────────────────────────────────
 
 export const browserSkill: Skill = {
@@ -190,6 +204,71 @@ export const browserSkill: Skill = {
         },
       },
     },
+    {
+      name: "browser_click",
+      description:
+        "Clique sur un élément (bouton, lien, etc.) dans la page actuellement affichée dans le navigateur intégré. Utilise OBLIGATOIREMENT un sélecteur CSS renvoyé par browser_snapshot ou browser_inspect. N'invente PAS de sélecteurs.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          selector: {
+            type: "STRING",
+            description:
+              "Sélecteur CSS de l'élément à cliquer (ex: 'button#submit', '.search-btn', 'a.login'). Doit provenir de browser_snapshot ou browser_inspect.",
+          },
+        },
+        required: ["selector"],
+      },
+    },
+    {
+      name: "browser_type",
+      description:
+        "Saisit du texte dans un champ de saisie (input, textarea) de la page affichée dans le navigateur intégré. Utilise OBLIGATOIREMENT un sélecteur CSS renvoyé par browser_snapshot ou browser_inspect.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          selector: {
+            type: "STRING",
+            description:
+              "Sélecteur CSS du champ de saisie (ex: 'input[name=\"q\"]', 'textarea#message', '#email').",
+          },
+          text: {
+            type: "STRING",
+            description: "Le texte à saisir dans le champ.",
+          },
+          pressEnter: {
+            type: "BOOLEAN",
+            description:
+              "Si true, appuie automatiquement sur Entrée après la saisie (pour valider un formulaire). Défaut : false.",
+          },
+        },
+        required: ["selector", "text"],
+      },
+    },
+    {
+      name: "browser_snapshot",
+      description:
+        "Récupère la liste des éléments interactifs (champs de saisie, boutons) cliquables actuellement visibles sur la page. Retourne les sélecteurs CSS VALIDES à utiliser avec browser_click et browser_type. APPELLE CET OUTIL SYSTEMATIQUEMENT avant d'utiliser browser_click ou browser_type pour connaître les bons sélecteurs.",
+      parameters: {
+        type: "OBJECT",
+        properties: {},
+      },
+    },
+    {
+      name: "browser_inspect",
+      description:
+        "Inspecte un type d'éléments de la page (boutons, champs, liens, ou tous) et retourne leur sélecteur CSS, texte/placeholder/URL. Utile pour identifier les éléments précis à utiliser avec browser_click ou browser_type.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          type: {
+            type: "STRING",
+            description:
+              "Type d'éléments à inspecter : 'buttons', 'inputs', 'links', ou 'all'. Défaut : 'all'.",
+          },
+        },
+      },
+    },
   ],
 
   inputSchemas: {
@@ -202,10 +281,36 @@ export const browserSkill: Skill = {
     browser_forward: emptySchema,
     browser_reload: emptySchema,
     browser_read_content: readContentSchema,
+    browser_click: clickSchema,
+    browser_type: typeSchema,
+    browser_snapshot: emptySchema,
+    browser_inspect: inspectSchema,
   },
 
   handleToolCall: async (name: string, args: any, context?: any) => {
     const emit = context?.emitIdeAction as ((action: any) => void) | undefined;
+
+    // Helper générique pour les actions async (click/type/snapshot/inspect)
+    // qui utilisent le registre browserActionPending de server.ts.
+    const runBrowserAction = async <T = any>(action: any, timeoutMs = 15_000): Promise<T | string> => {
+      const pending = context?.browserActionPending as Map<string, {
+        resolve: (value: any) => void;
+        reject: (err: Error) => void;
+        timer: ReturnType<typeof setTimeout>;
+      }> | undefined;
+      if (!pending) return "[ERREUR] browserActionPending non disponible dans le contexte.";
+      if (!emit) return "[ERREUR] emitIdeAction non disponible.";
+
+      const requestId = `ba_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      return await new Promise<any>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          pending.delete(requestId);
+          reject(new Error(`Timeout (${(timeoutMs / 1000).toFixed(0)}s) — navigateur non disponible ou en chargement.`));
+        }, timeoutMs);
+        pending.set(requestId, { resolve, reject, timer });
+        emit({ requestId, ...action });
+      }).catch((err: Error) => `[ERREUR ACTION] ${err.message}`);
+    };
 
     // ── browser_navigate ──────────────────────────────────────────────────────
     if (name === "browser_navigate") {
@@ -368,6 +473,69 @@ export const browserSkill: Skill = {
         content: text,
         contentLength: text.length,
         message: `Contenu extrait (${text.length} caractères).`,
+      };
+    }
+
+    // ── browser_click ─────────────────────────────────────────────────────────
+    if (name === "browser_click") {
+      const { selector } = validateArgs(browserSkill.inputSchemas!["browser_click"], args);
+      const raw = await runBrowserAction({ type: "browser-click", selector }, 10_000);
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      return {
+        status: "success",
+        selector,
+        message: `Clic effectué sur : ${selector}`,
+        pageContent: raw?.content ?? "",
+      };
+    }
+
+    // ── browser_type ──────────────────────────────────────────────────────────
+    if (name === "browser_type") {
+      const { selector, text, pressEnter } = validateArgs(browserSkill.inputSchemas!["browser_type"], args);
+      const raw = await runBrowserAction({ type: "browser-type", selector, text, pressEnter }, 15_000);
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      return {
+        status: "success",
+        selector,
+        pressEnter,
+        message: `Saisie de ${text.length} caractère(s) dans ${selector}${pressEnter ? " + Entrée" : ""}.`,
+      };
+    }
+
+    // ── browser_snapshot ─────────────────────────────────────────────────────
+    if (name === "browser_snapshot") {
+      validateArgs(browserSkill.inputSchemas!["browser_snapshot"], args);
+      const raw = await runBrowserAction({ type: "browser-snapshot" }, 12_000);
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      const snap = raw as { url?: string; title?: string; inputs?: any[]; buttons?: any[] };
+      return {
+        status: "success",
+        url: snap.url ?? "",
+        title: snap.title ?? "",
+        inputs: snap.inputs ?? [],
+        buttons: snap.buttons ?? [],
+        note: "Utilise UNIQUEMENT les sélecteurs listés ci-dessus pour browser_click / browser_type. N'invente PAS de sélecteurs.",
+      };
+    }
+
+    // ── browser_inspect ──────────────────────────────────────────────────────
+    if (name === "browser_inspect") {
+      const { type } = validateArgs(browserSkill.inputSchemas!["browser_inspect"], args);
+      const raw = await runBrowserAction({ type: "browser-inspect", inspectType: type }, 12_000);
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      return {
+        status: "success",
+        type,
+        elements: raw ?? {},
+        note: "Utilise UNIQUEMENT ces sélecteurs pour browser_click / browser_type.",
       };
     }
 

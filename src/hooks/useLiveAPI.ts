@@ -136,6 +136,18 @@ export function useLiveAPI() {
             }));
           }
           break;
+        case 'browser-click':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-click', { detail: a }));
+          break;
+        case 'browser-type':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-type', { detail: a }));
+          break;
+        case 'browser-snapshot':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-snapshot', { detail: a }));
+          break;
+        case 'browser-inspect':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-inspect', { detail: a }));
+          break;
       }
     }
     if (msg.type === 'browser-read-request' && msg.requestId) {
