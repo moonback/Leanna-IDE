@@ -311,6 +311,14 @@ npm run dist:win
 
 Génère un `.exe` (NSIS) dans le dossier `release/`.
 
+## Build executeur Windows
+
+```bash
+npm run pack:win
+```
+
+Génère un `.exe` (NSIS) dans le dossier `win-unpacked/`.
+
 ---
 
 ## 🏗️ Architecture
