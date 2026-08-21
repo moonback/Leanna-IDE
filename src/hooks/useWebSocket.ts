@@ -142,7 +142,14 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
               if (msg.reason === 'context_overflow') {
                 onMessage(msg);
               }
-              // Ne pas appeler onMessage pour GoAway — pas besoin d'afficher à l'utilisateur
+              // Fermer proactivement la WebSocket pour déclencher onclose → reconnexion
+              // (le serveur est censé la fermer aussi, mais ce filet de sécurité garantit
+              // que la reconnexion démarre même si le serveur oublie).
+              try {
+                if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) {
+                  setTimeout(() => ws.close(), 100);
+                }
+              } catch {}
               return;
             }
 

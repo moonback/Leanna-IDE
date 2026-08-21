@@ -2217,6 +2217,7 @@ async function startServer() {
 
             // Handler pour GoAway (expiration de session) - redémarre la session automatiquement
             let goAwayHandled = false; // Flag pour distinguer fermeture GoAway d'une erreur dans onclose
+            let clientWsClosing = false; // Éviter double close sur clientWs
             const handleGoAway = (goAway: any) => {
               // GoAway indique que Gemini va fermer cette session dans quelques secondes
               // (durée de vie max ~10-15 min). C'est la cause principale des "coupures"
@@ -2241,6 +2242,19 @@ async function startServer() {
               }));
               // Fermer la session actuelle pour forcer une reconnexion propre côté client
               try { session.close(); } catch {}
+              // IMPORTANT : fermer aussi la WebSocket client après un court délai
+              // pour que le client reçoive onclose et déclenche sa reconnexion.
+              // Sans ça, la WS reste ouverte et la reconnexion n'a jamais lieu.
+              if (!clientWsClosing && clientWs.readyState === WebSocket.OPEN) {
+                clientWsClosing = true;
+                setTimeout(() => {
+                  try {
+                    if (clientWs.readyState === WebSocket.OPEN) {
+                      clientWs.close(1000, 'goaway_restart');
+                    }
+                  } catch {}
+                }, 200);
+              }
             };
 
             const session = await getGeminiAI().live.connect({
@@ -2374,6 +2388,16 @@ async function startServer() {
               closeReason = 'session_expired_goaway';
               closeDetail = JSON.stringify(lastServerMessage.goAway);
               console.info(`[Gemini Live] ✅ Session fermée par le serveur (GoAway latent, code: ${closeCode})`);
+              // Race condition : handleGoAway n'a pas envoyé session_restart → le faire ici
+              if (!goAwayHandled) {
+                clientWs.send(JSON.stringify({
+                  type: 'session_restart',
+                  reason: 'goaway',
+                  detail: lastServerMessage.goAway,
+                  conversation_id: conversationId,
+                  turns_completed: conversationCtx.turns,
+                }));
+              }
             } else if (closeCode === 1011) {
               closeReason = 'generation_error';
               closeDetail = closeReasonText || `Close code ${closeCode}`;
@@ -2461,6 +2485,19 @@ async function startServer() {
                       summaryMethod: 'error',
                       messagesSummarized: 0,
                     }));
+                  } finally {
+                    // IMPORTANT : fermer clientWs après session_restart pour
+                    // déclencher la reconnexion côté client.
+                    if (!clientWsClosing && clientWs.readyState === WebSocket.OPEN) {
+                      clientWsClosing = true;
+                      setTimeout(() => {
+                        try {
+                          if (clientWs.readyState === WebSocket.OPEN) {
+                            clientWs.close(1000, 'context_overflow_restart');
+                          }
+                        } catch {}
+                      }, 200);
+                    }
                   }
                 })();
               } else {
@@ -2470,6 +2507,22 @@ async function startServer() {
                   geminiReason: closeReason,
                   geminiDetail: closeDetail
                 }));
+              }
+            }
+
+            // ── Fermer clientWs après GoAway pour déclencher reconnexion ────────
+            // handleGoAway a déjà programmé une fermeture, mais en cas de race
+            // (GoAway latent) ou si le timeout a échoué, on reprogramme ici.
+            if (closeReason === 'session_expired_goaway') {
+              if (!clientWsClosing && clientWs.readyState === WebSocket.OPEN) {
+                clientWsClosing = true;
+                setTimeout(() => {
+                  try {
+                    if (clientWs.readyState === WebSocket.OPEN) {
+                      clientWs.close(1000, 'session_restart_goaway');
+                    }
+                  } catch {}
+                }, 300);
               }
             }
           },
