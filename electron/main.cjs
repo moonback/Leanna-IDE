@@ -95,6 +95,7 @@ function createWindow(splash, splashMinEnd) {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.cjs'),
+      webviewTag: true,
     },
     autoHideMenuBar: !DEBUG,
     titleBarStyle: 'hiddenInset',

@@ -28,6 +28,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     showSystemHealth: props.showSystemHealth ?? false,
     showMcp: props.showMcp ?? false,
     showFleet: props.showFleet ?? false,
+    showBrowser: props.showBrowser ?? false,
     visionEnabled: props.visionEnabled ?? false,
     screenShareEnabled: props.screenShareEnabled ?? false,
   }), [
@@ -36,7 +37,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.showSandbox, props.showWorkflow, props.showSkillsMonitor,
     props.showChat, props.showAgents, props.showAgentBuilder, props.showMissions,
     props.showKnowledge, props.showDocuments, props.showNotebooks, props.showSystemHealth, props.showMcp,
-    props.showFleet, props.visionEnabled,
+    props.showFleet, props.showBrowser, props.visionEnabled,
     props.screenShareEnabled,
   ]);
 
@@ -58,6 +59,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     onToggleSystemHealth: props.onToggleSystemHealth ?? noop,
     onToggleMcp: props.onToggleMcp ?? noop,
     onToggleFleet: props.onToggleFleet ?? noop,
+    onToggleBrowser: props.onToggleBrowser ?? noop,
     onToggleVision: props.onToggleVision ?? noop,
     onToggleScreenShare: props.onToggleScreenShare ?? noop,
   }), [
@@ -66,7 +68,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.onToggleSandbox, props.onToggleWorkflow, props.onToggleSkillsMonitor,
     props.onToggleChat, props.onToggleAgents, props.onToggleAgentBuilder, props.onToggleMissions,
     props.onToggleKnowledge, props.onToggleNotebooks, props.onToggleDocuments, props.onToggleSystemHealth, props.onToggleMcp,
-    props.onToggleFleet, props.onToggleVision, props.onToggleScreenShare,
+    props.onToggleFleet, props.onToggleBrowser, props.onToggleVision, props.onToggleScreenShare,
   ]);
 
   return { state, actions };

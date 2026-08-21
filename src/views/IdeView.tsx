@@ -36,6 +36,7 @@ import { ChatPanel } from '../components/ide/ChatPanel';
 import { LiveSkillsMonitor } from '../components/ide/LiveSkillsMonitor';
 import { WorkflowPanel } from '../components/ide/WorkflowPanel';
 import { McpPanel } from '../components/panels/McpPanel';
+import { BrowserPanel } from '../components/panels/BrowserPanel';
 import { MarkdownPreview } from '../components/ide/MarkdownPreview';
 import { ImagePreview } from '../components/ide/ImagePreview';
 import { EmptyEditorState } from '../components/ide/EmptyEditorState';
@@ -125,6 +126,8 @@ export default function IdeView() {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
   const [showMcp, setShowMcp] = useState(false);
+  const [showBrowser, setShowBrowser] = useState(false);
+  const [browserUrl, setBrowserUrl] = useState<string | undefined>(undefined);
   const [showSkillsMonitor, setShowSkillsMonitor] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [chatDocked, setChatDocked] = useState(false);
@@ -265,6 +268,30 @@ export default function IdeView() {
     window.addEventListener('jarvis-open-sandbox-diff', handleOpenSandboxDiff);
     return () => window.removeEventListener('jarvis-open-sandbox-diff', handleOpenSandboxDiff);
   }, [openSandboxDiff]);
+
+  // ── Actions navigateur pilotées par Leanna via jarvis-ide-action ───────────
+  useEffect(() => {
+    const handle = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || typeof detail !== 'object') return;
+
+      if (detail.type === 'open-browser') {
+        setShowBrowser(true);
+      }
+      if (detail.type === 'close-browser') {
+        setShowBrowser(false);
+        setBrowserUrl(undefined);
+      }
+      if (detail.type === 'browser-navigate' && typeof detail.url === 'string') {
+        setShowBrowser(true);
+        setBrowserUrl(detail.url);
+      }
+      // browser-scroll, browser-back, browser-forward, browser-reload, browser-read-request
+      // sont dispatché directement comme CustomEvents dédiés par useLiveAPI / BrowserPanel
+    };
+    window.addEventListener('jarvis-ide-action', handle as EventListener);
+    return () => window.removeEventListener('jarvis-ide-action', handle as EventListener);
+  }, []);
 
   // Open Agents panel only on explicit user action (button click, overlay)
   useEffect(() => {
@@ -570,6 +597,7 @@ export default function IdeView() {
         showNotebooks={showNotebooks}
         showSystemHealth={showSystemHealth}
         showMcp={showMcp}
+        showBrowser={showBrowser}
         assistantConnected={connected}
         assistantWorking={assistantWorking}
         assistantMuted={muted}
@@ -611,6 +639,7 @@ export default function IdeView() {
         onToggleDocuments={() => setShowDocuments(v => !v)}
         onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
         onToggleMcp={() => setShowMcp(v => !v)}
+        onToggleBrowser={() => setShowBrowser(v => !v)}
         onToggleVision={() => setVisionEnabled(v => !v)}
         onToggleScreenShare={toggleScreenShare}
         onToggleMode={() => {
@@ -675,7 +704,7 @@ export default function IdeView() {
       {/* Editor Area */}
       <div className="jarvis-ide-workspace flex flex-1 flex-col min-w-0 min-h-0 relative">
         {/* Tab Bar — masqué quand un panneau plein-écran est actif */}
-        {!showSandbox && !showHistory && !showAutomation && !showMemory && !showHelp && !showSettingsPanel && !showKnowledge && !showNotebooks && (
+        {!showSandbox && !showHistory && !showAutomation && !showMemory && !showHelp && !showSettingsPanel && !showKnowledge && !showNotebooks && !(showBrowser && !fileSystem.activePath) && (
           <EditorTabs
             openFiles={fileSystem.openFiles}
             activePath={fileSystem.activePath}
@@ -781,6 +810,12 @@ export default function IdeView() {
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement des notebooks…</div></div>}>
                           <NotebooksView onClose={() => { setShowNotebooks(false); setShowExplorer(true); }} />
                         </Suspense>
+                      ) : showBrowser ? (
+                        <BrowserPanel
+                          url={browserUrl}
+                          onClose={() => { setShowBrowser(false); setBrowserUrl(undefined); }}
+                          fullWidth
+                        />
                       ) : showDocuments ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement…</div></div>}>
                           <DocumentPanel />
@@ -856,6 +891,8 @@ export default function IdeView() {
                             <McpPanel />
                           </div>
                         )}
+
+                        {/* Browser Panel — rendu en zone principale (plein écran) */}
 
                         {/* System Health Dashboard */}
                         {showSystemHealth && (
