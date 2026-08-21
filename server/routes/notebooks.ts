@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Routes API â€” Notebooks (concurrent NotebookLM)
  *
  * Endpoints pour gÃ©rer les notebooks, sources, chat groundÃ©,
@@ -1816,6 +1816,138 @@ GÃ©nÃ¨re le rÃ©sumÃ© global maintenant.`;
   });
 
   // GET /api/notebooks/:id/chat/chunk/:chunkId â€” RÃ©cupÃ©rer le contenu complet d'un chunk (pour hover citations)
+  // GET /api/notebooks/sandbox/folders - Lister les dossiers de la sandbox pour le picker
+  router.get("/sandbox/folders", (req: Request, res: Response) => {
+    try {
+      const sandboxRoot = getSandboxRoot();
+
+      if (!fs.existsSync(sandboxRoot)) {
+        fs.mkdirSync(sandboxRoot, { recursive: true });
+      }
+
+      // Lister recursivement les dossiers (max 2 niveaux)
+      function listDirs(dir: string, base: string, depth: number): { path: string; name: string; depth: number }[] {
+        const results: { path: string; name: string; depth: number }[] = [];
+        try {
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            // Ignorer les dossiers cachés et node_modules
+            if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+            const relPath = base ? `${base}/${entry.name}` : entry.name;
+            results.push({ path: relPath, name: entry.name, depth });
+            if (depth < 2) {
+              results.push(...listDirs(path.join(dir, entry.name), relPath, depth + 1));
+            }
+          }
+        } catch { /* ignore unreadable dirs */ }
+        return results;
+      }
+
+      const folders = [
+        { path: "", name: "/ (racine sandbox)", depth: 0 },
+        ...listDirs(sandboxRoot, "", 1),
+      ];
+
+      res.json({ status: "success", sandboxRoot, folders });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  // POST /api/notebooks/:id/chat/save-message - Sauvegarder un message en .md dans le workspace
+  router.post("/:id/chat/save-message", (req: Request, res: Response) => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      const { messageId, filename: customFilename, folder } = req.body as {
+        messageId?: string;
+        filename?: string;
+        folder?: string;
+      };
+
+      // Trouver le message dans l'historique (ou dans les threads)
+      let msg = notebook.chatHistory.find(m => m.id === messageId);
+      if (!msg && notebook.chatThreads) {
+        for (const thread of notebook.chatThreads) {
+          msg = thread.messages.find(m => m.id === messageId);
+          if (msg) break;
+        }
+      }
+
+      if (!msg) {
+        res.status(404).json({ error: "Message introuvable." });
+        return;
+      }
+
+      // Construire le contenu Markdown
+      const role = msg.role === "user" ? "Utilisateur" : "Assistant";
+      const time = new Date(msg.timestamp).toLocaleString("fr-FR", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+      const lines: string[] = [];
+      lines.push(`# ${role} - ${notebook.title}`);
+      lines.push(`> ${time}`);
+      lines.push(`> Notebook : **${notebook.title}**\n`);
+      lines.push("---\n");
+      lines.push(msg.content);
+
+      if (msg.citations && msg.citations.length > 0) {
+        lines.push("\n\n---\n");
+        lines.push("## Citations\n");
+        for (const cit of msg.citations) {
+          lines.push(`### ${cit.sourceTitle}`);
+          lines.push(`- **Pertinence :** ${(cit.relevance * 100).toFixed(0)}%`);
+          lines.push(`\n> ${cit.excerpt}\n`);
+        }
+      }
+
+      const markdown = lines.join("\n");
+
+      // Sauvegarder dans la sandbox (dossier chat-exports a la racine sandbox)
+      const sandboxRoot = getSandboxRoot();
+      const targetFolder = folder
+        ? path.join(sandboxRoot, folder.replace(/\.\./g, ""))
+        : path.join(sandboxRoot, "chat-exports");
+
+      if (!fs.existsSync(targetFolder)) {
+        fs.mkdirSync(targetFolder, { recursive: true });
+      }
+
+      // Nom de fichier sur
+      const timestamp = new Date(msg.timestamp).getTime();
+      const roleSlug = msg.role === "user" ? "user" : "assistant";
+      const contentSlug = msg.content
+        .slice(0, 40)
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .trim()
+        .replace(/\s+/g, "-");
+      const safeFilename = customFilename
+        ? customFilename.replace(/[^a-zA-Z0-9\-_.]/g, "_") + (customFilename.endsWith(".md") ? "" : ".md")
+        : `${roleSlug}-${timestamp}-${contentSlug || "message"}.md`;
+
+      const filePath = path.join(targetFolder, safeFilename);
+      fs.writeFileSync(filePath, markdown, "utf-8");
+
+      res.json({
+        status: "success",
+        filePath: path.relative(sandboxRoot, filePath).replace(/\\/g, "/"),
+        filename: safeFilename,
+        destination: "sandbox",
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   router.get("/:id/chat/chunk/:chunkId", (req: Request, res: Response) => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
