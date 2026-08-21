@@ -185,6 +185,36 @@ Jarvis OS est un **environnement de développement IA** tout-en-un, conçu comme
 - Exécution parallèle ou séquentielle avec dépendances
 - Navigation web automatisée (Puppeteer)
 
+### 🌐 Navigateur Web Intégré (BrowserPanel)
+
+Navigateur embarqué basé sur Electron `<webview>`, **pilotable en temps réel par l'IA via le protocole CustomEvents** (`useLiveAPI` → `jarvis-browser-*`).
+
+#### Commandes disponibles pour l'IA
+
+| Événement dispatché | Action |
+|---|---|
+| `jarvis-ide-action` `open-browser` / `close-browser` | Ouverture / fermeture du panneau navigateur |
+| `jarvis-ide-action` `browser-navigate` | Navigation vers une URL donnée |
+| `jarvis-browser-scroll` | Défilement (top/bottom/up/down) |
+| `jarvis-browser-control` | **Recul** (`browser-back`), **Avance** (`browser-forward`), **Rechargement** (`browser-reload`) |
+| `jarvis-browser-read-request` | **Lecture de contenu** — extraction du texte visible de la page (ou d'un sélecteur CSS cible) et retour via `/api/browser/content-result` |
+
+#### Flux de lecture de page (`browser_read_content`)
+
+1. Le skill émet `emitIdeAction({ type: "browser-read-request", requestId, selector })`
+2. `useLiveAPI` dispatcher l'action via `jarvis-ide-action` **et** émet directement `jarvis-browser-read-request`
+3. `BrowserPanel` capte l'événement, injecte un script d'extraction dans la webview, nettoie scripts/styles/nav/footer, tronque à 8000 caractères
+4. Résultat renvoyé au backend via `POST /api/browser/content-result` avec `requestId`
+5. L'IA reçoit le contenu et peut poursuivre sa tâche (analyse, synthèse, recherche d'infos…)
+
+#### Fonctionnalités UI
+
+- Barre d'adresse avec normalisation automatique (URL, domaine ou recherche Google)
+- Badge visuel « Leanna » quand l'assistant pilote la navigation
+- Indicateur HTTPS / erreurs de chargement
+- Boutons Précédent / Suivant / Actualiser / Accueil
+- Notifications d'événements : `jarvis-browser-navigated`, `jarvis-browser-title-updated`, `jarvis-browser-load-error`
+
 ### 🏗️ Infrastructure Backend
 
 - **Rate limiting ciblé** : Limiteurs dédiés pour chat (30 req/min), embeddings (50/5min), polling (relaxé), auth (strict)
@@ -377,6 +407,7 @@ Jarvis-OS/
 |-------|-------------|
 | `/api/agents` | Orchestration multi-agents |
 | `/api/automation` | Tâches planifiées & automatisation |
+| `/api/browser` | Intégration navigateur (contenu lu depuis BrowserPanel : `content-result`) |
 | `/api/conversations` | Sessions de chat |
 | `/api/custom-agents` | Agents personnalisés (Agent Builder) |
 | `/api/custom-skills` | Skills créées par l'utilisateur |
@@ -421,6 +452,7 @@ L'IA dispose de 22+ skills regroupées par domaine :
 | **github** | Issues, PRs, repos, review |
 | **automation** | Tâches planifiées, navigation web (Puppeteer) |
 | **automationBrowser** | Navigation web autonome |
+| **browser_read_content** | Lecture de contenu d'une page web ouverte dans le BrowserPanel (texte global ou sélecteur CSS) |
 | **knowledge** | Indexation, recherche sémantique, graphe de dépendances |
 | **documentKnowledge** | Connaissance documentaire spécialisée |
 | **documentLinker** | Liaisons entre documents |
