@@ -236,12 +236,13 @@ Jarvis OS est un **environnement de développement IA** tout-en-un, conçu comme
 - **Node.js** ≥ 22.12.0
 - **npm** ≥ 10.x
 - **Clé API Gemini** (Google AI Studio)
+- **Clé API OpenRooter**
 
 ### Étapes
 
 ```bash
 # 1. Cloner le dépôt
-git clone https://github.com/yourusername/Jarvis-OS.git
+git clone https://github.com/moonback/Jarvis-OS.git
 cd Jarvis-OS
 
 # 2. Installer les dépendances
