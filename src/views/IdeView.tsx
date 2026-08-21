@@ -191,6 +191,15 @@ export default function IdeView() {
     }
   }, [fileSystem.activePath]);
 
+  // HTML preview toggle — per-file, reset to false when switching away from .html
+  const [htmlPreview, setHtmlPreview] = useState(false);
+
+  useEffect(() => {
+    if (!fileSystem.activePath?.toLowerCase().endsWith('.html')) {
+      setHtmlPreview(false);
+    }
+  }, [fileSystem.activePath]);
+
   // Per-file reload keys
   const [reloadKeys, setReloadKeys] = useState<Record<string, number>>({});
   const [modalState, setModalState] = useState<ModalMode | null>(null);
@@ -336,6 +345,13 @@ export default function IdeView() {
     switch (actionId) {
       case 'open':
         if (target.kind === 'file') fileSystem.openFile(target.path);
+        break;
+      case 'open-in-browser':
+        if (target.kind === 'file') {
+          const previewUrl = `http://localhost:${import.meta.env.VITE_SERVER_PORT || 5000}/workspace-preview/${encodeURIComponent(target.path)}`;
+          setShowBrowser(true);
+          setBrowserUrl(previewUrl);
+        }
         break;
       case 'send-to-ai':
         if (target.kind === 'file') {
@@ -712,6 +728,7 @@ export default function IdeView() {
             wordWrap={ideSettings.wordWrap}
             activeFileDirty={activeFile?.dirty || false}
             markdownPreview={markdownPreview}
+            htmlPreview={htmlPreview}
             onSelectTab={fileSystem.setActivePath}
             onCloseTab={closeTabWithConfirm}
             onSave={saveActiveFile}
@@ -719,6 +736,7 @@ export default function IdeView() {
             onToggleMinimap={() => updateSetting('showMinimap', !ideSettings.showMinimap)}
             onToggleWordWrap={() => updateSetting('wordWrap', !ideSettings.wordWrap)}
             onToggleMarkdownPreview={() => setMarkdownPreview(v => !v)}
+            onToggleHtmlPreview={() => setHtmlPreview(v => !v)}
             onOpenTemplates={() => setShowTemplateModal(true)}
           />
         )}
@@ -837,6 +855,12 @@ export default function IdeView() {
                       ) : activeFile ? (
                                               markdownPreview && activeFile.language === 'markdown' ? (
                                                 <MarkdownPreview content={activeFile.content} />
+                                              ) : htmlPreview && activeFile.language === 'html' ? (
+                                                <BrowserPanel
+                                                  url={`http://localhost:${import.meta.env.VITE_SERVER_PORT || 5000}/workspace-preview/${encodeURIComponent(activeFile.path)}`}
+                                                  onClose={() => setHtmlPreview(false)}
+                                                  fullWidth
+                                                />
                                               ) : /\.(png|jpg|jpeg|gif|webp|bmp|ico)$/i.test(activeFile.path) ? (
                                                 <ImagePreview filePath={activeFile.path} />
                                               ) : (

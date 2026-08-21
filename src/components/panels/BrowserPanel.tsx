@@ -105,13 +105,23 @@ export function BrowserPanel({
   /** Indicateur visuel quand Leanna pilote la navigation */
   const [assistantNavActive, setAssistantNavActive] = useState(false);
 
+  /** true dès que le <webview> a émis dom-ready — loadURL ne peut être appelé qu'après */
+  const domReadyRef = useRef(false);
+  /** URL en attente si elle arrive avant que dom-ready soit émis */
+  const pendingUrlRef = useRef<string | null>(null);
+
   // ── Navigation interne ──────────────────────────────────────────────────────
 
   const navigateTo = useCallback((raw: string) => {
     const url = normalizeUrl(raw);
     setLoadError(null);
     setInputValue(url);
-    webviewRef.current?.loadURL(url);
+    if (domReadyRef.current) {
+      webviewRef.current?.loadURL(url);
+    } else {
+      // Le webview n'est pas encore prêt — on met l'URL en attente
+      pendingUrlRef.current = url;
+    }
   }, []);
 
   // ── Navigation contrôlée depuis l'extérieur (Leanna) ───────────────────────
@@ -154,6 +164,15 @@ export function BrowserPanel({
   useEffect(() => {
     const wv = webviewRef.current;
     if (!wv) return;
+
+    const onDomReady = () => {
+      domReadyRef.current = true;
+      // Charger l'URL mise en attente si elle existe
+      if (pendingUrlRef.current) {
+        wv.loadURL(pendingUrlRef.current);
+        pendingUrlRef.current = null;
+      }
+    };
 
     const onLoadStart = () => {
       setLoading(true);
@@ -200,6 +219,7 @@ export function BrowserPanel({
       setCanGoForward(wv.canGoForward());
     };
 
+    wv.addEventListener('dom-ready', onDomReady);
     wv.addEventListener('did-start-loading', onLoadStart);
     wv.addEventListener('did-stop-loading', onLoadStop);
     wv.addEventListener('page-title-updated', onTitleUpdate);
@@ -208,7 +228,9 @@ export function BrowserPanel({
     wv.addEventListener('did-navigate-in-page', onNavigate);
 
     return () => {
+      wv.removeEventListener('dom-ready', onDomReady);
       wv.removeEventListener('did-start-loading', onLoadStart);
+      domReadyRef.current = false;
       wv.removeEventListener('did-stop-loading', onLoadStop);
       wv.removeEventListener('page-title-updated', onTitleUpdate);
       wv.removeEventListener('did-fail-load', onFailLoad);

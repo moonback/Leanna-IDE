@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   FilePlus, FolderPlus, Pencil, Copy, Trash2,
-  Clipboard, ChevronRight, GitCompare, Scissors, ClipboardPaste, Files, Bot, BookPlus,
+  Clipboard, ChevronRight, GitCompare, Scissors, ClipboardPaste, Files, Bot, BookPlus, Globe,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -49,8 +49,10 @@ function getActions(
 
   if (target.kind === 'file') {
     const isActive = target.path === activeFilePath;
+    const isHtml = /\.html?$/i.test(target.name);
     return [
       { id: 'open',        label: 'Ouvrir',              icon: <ChevronRight size={13} /> },
+      ...(isHtml ? [{ id: 'open-in-browser', label: 'Ouvrir dans le navigateur', icon: <Globe size={13} /> }] : []),
       { id: 'send-to-ai',  label: "Envoyer à l'IA",    icon: <Bot size={13} /> },
       { id: 'import-to-notebook', label: 'Importer dans un notebook', icon: <BookPlus size={13} /> },
       { id: 'rename',      label: 'Renommer',            icon: <Pencil size={13} />, dividerBefore: true },

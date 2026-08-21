@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { motion } from 'motion/react';
-import { X, Save, Map, WrapText, AlignJustify, Eye, Code, Sparkles } from 'lucide-react';
+import { X, Save, Map, WrapText, AlignJustify, Eye, Code, Sparkles, Globe } from 'lucide-react';
 import { FileIcon } from './FileIcon';
 import { fileName } from '../../utils/fileUtils';
 import type { OpenFile } from '../../types/ide';
@@ -12,6 +12,7 @@ type EditorTabsProps = {
   wordWrap: boolean;
   activeFileDirty: boolean;
   markdownPreview: boolean;
+  htmlPreview: boolean;
   onSelectTab: (path: string) => void;
   onCloseTab: (path: string) => void;
   onSave: () => void;
@@ -19,6 +20,7 @@ type EditorTabsProps = {
   onToggleMinimap: () => void;
   onToggleWordWrap: () => void;
   onToggleMarkdownPreview: () => void;
+  onToggleHtmlPreview: () => void;
   onOpenTemplates?: () => void;
 };
 
@@ -29,6 +31,7 @@ export function EditorTabs({
   wordWrap,
   activeFileDirty,
   markdownPreview,
+  htmlPreview,
   onSelectTab,
   onCloseTab,
   onSave,
@@ -36,11 +39,13 @@ export function EditorTabs({
   onToggleMinimap,
   onToggleWordWrap,
   onToggleMarkdownPreview,
+  onToggleHtmlPreview,
   onOpenTemplates,
 }: EditorTabsProps) {
   if (openFiles.length === 0) return null;
 
   const isMarkdownFile = activePath?.toLowerCase().endsWith('.md') ?? false;
+  const isHtmlFile = activePath?.toLowerCase().endsWith('.html') ?? false;
 
   return (
     <div 
@@ -129,6 +134,17 @@ export function EditorTabs({
               ? <Code size={13} style={{ color: 'var(--accent-primary)' }} />
               : <Eye size={13} style={{ color: 'var(--text-muted)' }} />
             }
+          </button>
+        )}
+
+        {/* HTML preview toggle — visible only for .html files */}
+        {isHtmlFile && (
+          <button
+            onClick={onToggleHtmlPreview}
+            className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/5 transition"
+            title={htmlPreview ? 'Fermer la prévisualisation HTML' : 'Prévisualiser le HTML dans le navigateur intégré'}
+          >
+            <Globe size={13} style={{ color: htmlPreview ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
           </button>
         )}
 

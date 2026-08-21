@@ -460,6 +460,26 @@ async function startServer() {
   const monacoPath = path.join(getElectronAppRoot(), 'node_modules', 'monaco-editor');
   app.use('/monaco-editor', express.static(monacoPath));
 
+  // ── Workspace Preview — sert les fichiers HTML/CSS/JS du workspace dans le navigateur intégré.
+  // La route est intentionnellement AVANT requireAuth car le webview Electron
+  // ne peut pas transmettre de cookie de session lors du chargement d'une page.
+  // Pour limiter la surface d'attaque, seul localhost peut accéder à cette route.
+  app.use('/workspace-preview', (req, res, next) => {
+    const ip = req.ip || req.socket?.remoteAddress || '';
+    const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+    if (!isLocal) return res.status(403).json({ error: 'Accès interdit depuis un hôte distant.' });
+    next();
+  }, (req, res, next) => {
+    // req.path est déjà décodé par express et commence par "/"
+    const root = getWorkspaceRoot();
+    const resolved = resolveWorkspacePath(req.path, root);
+    if (!resolved) return res.status(403).json({ error: 'Chemin non autorisé.' });
+    // express.static appelé dynamiquement avec le root courant (sandbox ou workspace normal)
+    express.static(root, { dotfiles: 'ignore' })(req, res, next);
+  }, (_req, res) => {
+    res.status(404).send('Fichier introuvable.');
+  });
+
   function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
     const authResult = authenticateRequest(req, { apiToken });
     if (!authResult.ok) {
