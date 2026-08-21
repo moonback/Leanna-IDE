@@ -35,6 +35,126 @@ async function waitBriefly(ms: number): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// ─── Humanisation helpers ────────────────────────────────────────────────────
+
+function randomBetween(min: number, max: number): number {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+async function humanWait(min: number, max: number): Promise<void> {
+    await waitBriefly(randomBetween(min, max));
+}
+
+function humanTypingDelay(): number {
+    const r = Math.random();
+    if (r < 0.65) return randomBetween(45, 95);
+    if (r < 0.88) return randomBetween(95, 160);
+    return randomBetween(160, 280);
+}
+
+async function humanType(p: Page, selector: string, text: string): Promise<void> {
+    const el = await p.$(selector);
+    if (!el) throw new Error(`Selecteur ${selector} introuvable pour la saisie`);
+    await el.click();
+    await humanWait(60, 140);
+    try { await p.evaluate((s: string) => {
+        const e = document.querySelector(s) as HTMLInputElement | HTMLTextAreaElement | null;
+        if (e && ('value' in e) && typeof e.value === 'string') { e.value = ''; }
+    }, selector); } catch {}
+    await humanWait(40, 90);
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        await el.type(ch, { delay: humanTypingDelay() });
+        if (i > 0 && i % randomBetween(6, 18) === 0) await humanWait(120, 320);
+        if (Math.random() < 0.04) await humanWait(280, 620);
+    }
+}
+
+async function humanMoveToAndClick(
+    p: Page, selector: string, opts: { button?: 'left' | 'right' | 'middle'; clickCount?: number } = {}
+): Promise<void> {
+    const { button = 'left', clickCount = 1 } = opts;
+    const el = await p.$(selector);
+    if (!el) throw new Error(`Element ${selector} introuvable`);
+    const box = await el.boundingBox();
+    if (!box) {
+        await el.click({ button });
+        if (clickCount === 2) {
+            await waitBriefly(randomBetween(110, 210));
+            await el.click({ button });
+        }
+        return;
+    }
+    const steps = randomBetween(14, 28);
+    const startX = randomBetween(0, 1280);
+    const startY = randomBetween(0, 800);
+    const targetX = box.x + box.width / 2 + randomBetween(-Math.floor(box.width/4), Math.floor(box.width/4));
+    const targetY = box.y + box.height / 2 + randomBetween(-Math.floor(box.height/4), Math.floor(box.height/4));
+    await p.mouse.move(startX, startY);
+    for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const ease = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+        const jitterX = (Math.random() - 0.5) * 6;
+        const jitterY = (Math.random() - 0.5) * 6;
+        const x = startX + (targetX - startX) * ease + jitterX;
+        const y = startY + (targetY - startY) * ease + jitterY;
+        await p.mouse.move(x, y);
+        await waitBriefly(randomBetween(6, 18));
+    }
+    await humanWait(70, 180);
+    await p.mouse.down({ button });
+    await waitBriefly(randomBetween(35, 95));
+    await p.mouse.up({ button });
+    if (clickCount === 2) {
+        await waitBriefly(randomBetween(110, 210));
+        await p.mouse.down({ button });
+        await waitBriefly(randomBetween(35, 95));
+        await p.mouse.up({ button });
+    }
+}
+
+async function humanScroll(p: Page, direction: 'up' | 'down' = 'down', amount?: number): Promise<{ scrolled: number }> {
+    const totalAmount = amount ?? randomBetween(320, 720);
+    const chunkSize = () => randomBetween(30, 90);
+    let remaining = totalAmount;
+    let actual = 0;
+    while (remaining > 0) {
+        const step = Math.min(chunkSize(), remaining);
+        const delta = direction === 'down' ? step : -step;
+        const did = await p.evaluate((d: number) => {
+            const before = window.scrollY;
+            window.scrollBy(0, d);
+            return Math.abs(window.scrollY - before);
+        }, delta);
+        actual += did;
+        remaining -= step;
+        await waitBriefly(randomBetween(18, 42));
+    }
+    return { scrolled: actual };
+}
+
+async function humanHover(p: Page, selector: string): Promise<void> {
+    const el = await p.$(selector);
+    if (!el) throw new Error(`Element ${selector} introuvable pour hover`);
+    const box = await el.boundingBox();
+    if (!box) { await el.hover(); return; }
+    const steps = randomBetween(12, 22);
+    const startX = randomBetween(0, 1280);
+    const startY = randomBetween(0, 800);
+    const targetX = box.x + box.width / 2;
+    const targetY = box.y + box.height / 2;
+    await p.mouse.move(startX, startY);
+    for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const ease = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+        await p.mouse.move(startX + (targetX-startX)*ease, startY + (targetY-startY)*ease);
+        await waitBriefly(randomBetween(6, 16));
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
+
 /** Captures interactive elements from the current page and returns them as structured data. */
 async function captureSnapshot(p: Page) {
     await waitBriefly(1500); // let SPAs finish rendering
@@ -156,40 +276,162 @@ export async function handleNavigate(validated: { url: string }) {
 }
 
 export async function handleClick(validated: { selector: string }) {
-    console.log(`[Automation] Clic sur: ${validated.selector}`);
+    console.log(`[Automation] Clic humain sur: ${validated.selector}`);
     if (!page) return { error: "Aucune page ouverte. Utilisez automation_navigate d'abord." };
 
-    // Guard: reject selectors not present in the last snapshot
     const clickValidation = await validateSelector(validated.selector, page);
     if (clickValidation) return clickValidation;
 
     try {
         await page.waitForSelector(validated.selector, { timeout: 8000 });
-        await page.click(validated.selector);
-        await waitBriefly(2000);
+        await humanHover(page, validated.selector);
+        await humanWait(120, 260);
+        await humanMoveToAndClick(page, validated.selector, { button: 'left', clickCount: 1 });
+        await humanWait(1800, 2600);
 
         const content = await page.evaluate(() => document.body.innerText.substring(0, 3000));
-        return { status: "success", content };
+        return { status: "success", content, simulation: "human-simulated-hover-move-click" };
     } catch (e: any) {
         return { error: `Impossible de trouver l'élément: ${validated.selector}. Erreur: ${e.message}` };
     }
 }
 
+export async function handleDoubleClick(validated: { selector: string }) {
+    console.log(`[Automation] Double-clic sur: ${validated.selector}`);
+    if (!page) return { error: "Aucune page ouverte." };
+    const v = await validateSelector(validated.selector, page);
+    if (v) return v;
+    try {
+        await page.waitForSelector(validated.selector, { timeout: 8000 });
+        await humanHover(page, validated.selector);
+        await humanWait(120, 220);
+        await humanMoveToAndClick(page, validated.selector, { button: 'left', clickCount: 2 });
+        await humanWait(1800, 2600);
+        const content = await page.evaluate(() => document.body.innerText.substring(0, 3000));
+        return { status: "success", content, simulation: "human-double-click" };
+    } catch (e: any) {
+        return { error: `Double-clic échoué: ${e.message}` };
+    }
+}
+
+export async function handleRightClick(validated: { selector: string }) {
+    console.log(`[Automation] Clic droit sur: ${validated.selector}`);
+    if (!page) return { error: "Aucune page ouverte." };
+    const v = await validateSelector(validated.selector, page);
+    if (v) return v;
+    try {
+        await page.waitForSelector(validated.selector, { timeout: 8000 });
+        await humanHover(page, validated.selector);
+        await humanWait(120, 220);
+        await humanMoveToAndClick(page, validated.selector, { button: 'right', clickCount: 1 });
+        await humanWait(500, 900);
+        return { status: "success", simulation: "human-right-click", note: "Contexte ouvert (si la page supporte les menus contextuels)" };
+    } catch (e: any) {
+        return { error: `Clic droit échoué: ${e.message}` };
+    }
+}
+
+export async function handleHover(validated: { selector: string; hoverMs?: number }) {
+    console.log(`[Automation] Hover sur: ${validated.selector}`);
+    if (!page) return { error: "Aucune page ouverte." };
+    const v = await validateSelector(validated.selector, page);
+    if (v) return v;
+    try {
+        await page.waitForSelector(validated.selector, { timeout: 8000 });
+        await humanHover(page, validated.selector);
+        const waitFor = validated.hoverMs ?? randomBetween(800, 1800);
+        await waitBriefly(waitFor);
+        const hoverText = await page.evaluate(() => document.body.innerText.substring(0, 3000));
+        return { status: "success", hoverMs: waitFor, hoverSnapshot: hoverText, simulation: "human-hover" };
+    } catch (e: any) {
+        return { error: `Hover échoué: ${e.message}` };
+    }
+}
+
 export async function handleType(validated: { selector: string; text: string; pressEnter?: boolean }) {
-    console.log(`[Automation] Saisie dans: ${validated.selector}`);
+    console.log(`[Automation] Saisie humaine dans: ${validated.selector}`);
     if (!page) return { error: "Aucune page ouverte." };
 
-    // Guard: reject selectors not present in the last snapshot
     const typeValidation = await validateSelector(validated.selector, page);
     if (typeValidation) return typeValidation;
 
-    await page.waitForSelector(validated.selector, { timeout: 5000 });
-    await page.type(validated.selector, validated.text, { delay: 50 });
-    if (validated.pressEnter) {
-        await page.keyboard.press('Enter');
-        await waitBriefly(2000);
+    try {
+        await page.waitForSelector(validated.selector, { timeout: 5000 });
+        await humanHover(page, validated.selector);
+        await humanWait(90, 180);
+        await humanType(page, validated.selector, validated.text);
+        await humanWait(180, 380);
+        if (validated.pressEnter) {
+            await waitBriefly(randomBetween(120, 260));
+            await page.keyboard.press('Enter', { delay: randomBetween(30, 80) });
+            await humanWait(1800, 2600);
+        }
+        return { status: "success", simulation: "human-typed-per-char" };
+    } catch (e: any) {
+        return { error: `Saisie échouée: ${e.message}` };
     }
-    return { status: "success" };
+}
+
+export async function handlePressKeys(validated: { keys: string[]; pressEnter?: boolean }) {
+    console.log(`[Automation] Appui touches: ${validated.keys.join(',')}`);
+    if (!page) return { error: "Aucune page ouverte." };
+    try {
+        const all = [...validated.keys];
+        for (let i = 0; i < all.length; i++) {
+            const k = all[i] as any;
+            if (i > 0) await waitBriefly(randomBetween(70, 160));
+            await page.keyboard.press(k, { delay: randomBetween(25, 70) });
+        }
+        if (validated.pressEnter) {
+            await waitBriefly(randomBetween(90, 180));
+            await page.keyboard.press('Enter' as any, { delay: randomBetween(25, 70) });
+            await humanWait(1600, 2400);
+        } else {
+            await humanWait(400, 900);
+        }
+        const content = await page.evaluate(() => document.body.innerText.substring(0, 2500));
+        return { status: "success", pressed: all, content };
+    } catch (e: any) {
+        return { error: `Appui touches échoué: ${e.message}` };
+    }
+}
+
+export async function handleScroll(validated: { direction?: 'up' | 'down'; pixels?: number }) {
+    console.log(`[Automation] Scroll humain: ${validated.direction ?? 'down'} ${validated.pixels ?? 'auto'}`);
+    if (!page) return { error: "Aucune page ouverte." };
+    try {
+        const dir = validated.direction ?? 'down';
+        const r = await humanScroll(page, dir, validated.pixels);
+        await humanWait(400, 900);
+        const content = await page.evaluate(() => document.body.innerText.substring(0, 2500));
+        return { status: "success", direction: dir, scrolled: r.scrolled, simulation: "human-chunked-scroll", content };
+    } catch (e: any) {
+        return { error: `Scroll échoué: ${e.message}` };
+    }
+}
+
+export async function handleWaitFor(validated: { selector?: string; text?: string; timeoutMs?: number }) {
+    console.log(`[Automation] Attente élément/texte...`);
+    if (!page) return { error: "Aucune page ouverte." };
+    const timeout = validated.timeoutMs ?? 10_000;
+    try {
+        if (validated.selector) {
+            await page.waitForSelector(validated.selector, { timeout });
+            await validateSelector(validated.selector, page);
+            return { status: "success", waitedFor: `selector:${validated.selector}`, withinMs: timeout };
+        }
+        if (validated.text) {
+            await page.waitForFunction(
+                (t: string) => (document.body?.innerText || '').includes(t),
+                { timeout },
+                validated.text
+            );
+            return { status: "success", waitedFor: `text:"${validated.text}"`, withinMs: timeout };
+        }
+        return { error: "Spécifiez selector ou text pour l'attente." };
+    } catch (e: any) {
+        return { error: `Attente échouée (timeout ${timeout}ms): ${e.message}` };
+    }
 }
 
 export async function handleExtract(validated: { selector: string }) {

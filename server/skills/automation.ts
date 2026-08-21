@@ -8,7 +8,8 @@ import {
 
 import {
   handleNavigate, handleClick, handleType, handleExtract,
-  handleMusicSearch, handleSearch, handleSnapshot, handleInspect, handleClose
+  handleMusicSearch, handleSearch, handleSnapshot, handleInspect, handleClose,
+  handleDoubleClick, handleRightClick, handleHover, handlePressKeys, handleScroll, handleWaitFor
 } from "./automationBrowser";
 
 import {
@@ -122,6 +123,75 @@ export const automationSkill: Skill = {
             name: "automation_close",
             description: "Ferme le navigateur automatisé.",
             parameters: { type: "OBJECT", properties: {} }
+        },
+        {
+            name: "automation_double_click",
+            description: "Effectue un double-clic gauche humain sur un élément (hover avant, trajectoire souris, délais randomisés).",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    selector: { type: "STRING", description: "Sélecteur CSS de l'élément à double-cliquer" }
+                },
+                required: ["selector"]
+            }
+        },
+        {
+            name: "automation_right_click",
+            description: "Effectue un clic droit humain sur un élément pour ouvrir le menu contextuel (hover avant + souris).",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    selector: { type: "STRING", description: "Sélecteur CSS de l'élément à cliquer-droite" }
+                },
+                required: ["selector"]
+            }
+        },
+        {
+            name: "automation_hover",
+            description: "Survole (hover) un élément avec une trajectoire de souris humaine. Idéal pour menus/dropdowns/infobulles.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    selector: { type: "STRING", description: "Sélecteur CSS de l'élément à survoler" },
+                    hoverMs: { type: "NUMBER", description: "Durée de survol en ms (optionnel, défaut aléatoire 800-1800)" }
+                },
+                required: ["selector"]
+            }
+        },
+        {
+            name: "automation_press_keys",
+            description: "Envoie une séquence de touches au clavier (Enter, ArrowDown, Escape, Tab, Ctrl+A, etc.) avec délais humains.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    keys: { type: "ARRAY", description: "Tableau de noms de touches ex: ['Tab','Tab','Enter']", items: { type: "STRING" } },
+                    pressEnter: { type: "BOOLEAN", description: "Ajouter un appui sur Entrée à la fin ?" }
+                },
+                required: ["keys"]
+            }
+        },
+        {
+            name: "automation_scroll",
+            description: "Défilement humain de la page (par paquets de pixels avec pauses, simule molette).",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    direction: { type: "STRING", description: "'up' ou 'down' (défaut 'down')" },
+                    pixels: { type: "NUMBER", description: "Nombre total de pixels à défiler (optionnel, défaut 320-720)" }
+                }
+            }
+        },
+        {
+            name: "automation_wait_for",
+            description: "Attend qu'un élément CSS apparaisse ou qu'un texte soit présent sur la page. Idéal après navigation/clic.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    selector: { type: "STRING", description: "Sélecteur CSS à attendre (soit selector soit text requis)" },
+                    text: { type: "STRING", description: "Texte dont on attend l'apparition dans le body" },
+                    timeoutMs: { type: "NUMBER", description: "Timeout max en ms (défaut 10000)" }
+                }
+            }
         },
         {
             name: "automation_schedule_task",
@@ -254,6 +324,31 @@ export const automationSkill: Skill = {
             type: z.enum(['buttons', 'inputs', 'links', 'all']).optional().default('all')
         }),
         "automation_close": z.object({}),
+        "automation_double_click": z.object({
+            selector: selectorSchema
+        }),
+        "automation_right_click": z.object({
+            selector: selectorSchema
+        }),
+        "automation_hover": z.object({
+            selector: selectorSchema,
+            hoverMs: z.number().int().positive().optional()
+        }),
+        "automation_press_keys": z.object({
+            keys: z.array(z.string().min(1)).min(1, "Au moins une touche requise"),
+            pressEnter: z.boolean().optional().default(false)
+        }),
+        "automation_scroll": z.object({
+            direction: z.enum(['up', 'down']).optional().default('down'),
+            pixels: z.number().int().positive().optional()
+        }),
+        "automation_wait_for": z.object({
+            selector: z.string().trim().optional(),
+            text: z.string().min(1).optional(),
+            timeoutMs: z.number().int().positive().optional()
+        }).refine(a => a.selector || a.text, {
+            message: "selector ou text est requis"
+        }),
         "automation_schedule_task": z.object({
             name: z.string().min(1, "Nom requis").trim(),
             description: z.string().optional().default('Tâche planifiée'),
@@ -323,6 +418,36 @@ export const automationSkill: Skill = {
             if (name === "automation_close") {
                 validateArgs(automationSkill.inputSchemas!["automation_close"], args);
                 return await handleClose();
+            }
+
+            if (name === "automation_double_click") {
+                const validated = validateArgs(automationSkill.inputSchemas!["automation_double_click"], args);
+                return await handleDoubleClick(validated);
+            }
+
+            if (name === "automation_right_click") {
+                const validated = validateArgs(automationSkill.inputSchemas!["automation_right_click"], args);
+                return await handleRightClick(validated);
+            }
+
+            if (name === "automation_hover") {
+                const validated = validateArgs(automationSkill.inputSchemas!["automation_hover"], args);
+                return await handleHover(validated);
+            }
+
+            if (name === "automation_press_keys") {
+                const validated = validateArgs(automationSkill.inputSchemas!["automation_press_keys"], args);
+                return await handlePressKeys(validated);
+            }
+
+            if (name === "automation_scroll") {
+                const validated = validateArgs(automationSkill.inputSchemas!["automation_scroll"], args);
+                return await handleScroll(validated);
+            }
+
+            if (name === "automation_wait_for") {
+                const validated = validateArgs(automationSkill.inputSchemas!["automation_wait_for"], args);
+                return await handleWaitFor(validated);
             }
 
             if (name === "automation_schedule_task") {
