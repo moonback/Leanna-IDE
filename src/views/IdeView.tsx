@@ -54,6 +54,11 @@ import { TemplateSelectorModal } from '../components/templates/TemplateSelectorM
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
+// Résolution du port serveur — cast nécessaire car ce tsconfig ne référence
+// pas vite/client dans ses types globaux (pas de "types": ["vite/client"]).
+const _importMeta = import.meta as ImportMeta & { env?: Record<string, string | undefined> };
+const SERVER_PORT = Number(_importMeta.env?.VITE_SERVER_PORT) || 5000;
+
 export default function IdeView() {
   const { profile } = useProfile();
   const { activity, clearActivity, connected, disconnect, connect, muted, toggleMute, isBusy, reasoning, sendVideoFrame } = useLiveAPIContext();
@@ -348,7 +353,7 @@ export default function IdeView() {
         break;
       case 'open-in-browser':
         if (target.kind === 'file') {
-          const previewUrl = `http://localhost:${import.meta.env.VITE_SERVER_PORT || 5000}/workspace-preview/${encodeURIComponent(target.path)}`;
+          const previewUrl = `http://localhost:${SERVER_PORT}/workspace-preview/${encodeURIComponent(target.path)}`;
           setShowBrowser(true);
           setBrowserUrl(previewUrl);
         }
@@ -857,7 +862,7 @@ export default function IdeView() {
                                                 <MarkdownPreview content={activeFile.content} />
                                               ) : htmlPreview && activeFile.language === 'html' ? (
                                                 <BrowserPanel
-                                                  url={`http://localhost:${import.meta.env.VITE_SERVER_PORT || 5000}/workspace-preview/${encodeURIComponent(activeFile.path)}`}
+                                                  url={`http://localhost:${SERVER_PORT}/workspace-preview/${encodeURIComponent(activeFile.path)}`}
                                                   onClose={() => setHtmlPreview(false)}
                                                   fullWidth
                                                 />

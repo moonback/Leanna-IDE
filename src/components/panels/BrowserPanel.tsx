@@ -717,7 +717,7 @@ export function BrowserPanel({
           src={defaultUrl}
           style={{ width: '100%', height: '100%', display: 'flex' }}
           webpreferences="contextIsolation=yes, javascript=yes"
-          allowpopups="false"
+          allowpopups={false}
         />
       </div>
     </div>
