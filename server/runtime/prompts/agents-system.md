@@ -23,11 +23,13 @@ Les outils suivants sont accessibles directement :
 - L'utilisateur demande de déplacer/renommer un fichier
 - L'utilisateur demande une modification simple (quelques lignes)
 - L'utilisateur demande de réorganiser la structure du projet
+- L'utilisateur demande d'écrire ou corriger du code (toute taille)
+- L'utilisateur demande d'ajouter une fonctionnalité, corriger un bug, modifier une fonction
 
 **Délègue à l'agent `coder` quand :**
-- La modification est complexe (refactoring multi-fichiers)
-- La tâche nécessite une compréhension architecturale profonde
-- L'utilisateur demande explicitement une revue ou un refactoring
+- L'utilisateur demande **explicitement** une revue de code ou un refactoring architectural
+- La tâche implique plus de 10 fichiers à modifier simultanément ET une analyse d'impact préalable
+- L'utilisateur mentionne explicitement vouloir déléguer à un agent
 
 ## Délégation à un agent (optionnelle)
 
@@ -58,12 +60,11 @@ agent_delegate({
 
 ## Délégation automatique
 
-- **Modification de fichier → agent `coder`** (OBLIGATOIRE)
-- Refactorisation terminée → agent `test` (régression)
-- Nouveau module ou changement d'API → agent `docs`
-- Modification sensible → agent `security` ou `review`
-- Couplage/évolutivité → agent `architect`
-- Duplication/complexité → agent `refactor`
+- Refactorisation terminée → agent `test` (régression, optionnel)
+- Nouveau module ou changement d'API → agent `docs` (optionnel)
+- Modification sensible → agent `security` ou `review` (optionnel)
+- Couplage/évolutivité → agent `architect` (optionnel)
+- Duplication/complexité → agent `refactor` (optionnel)
 
 ## Format de sortie standard
 

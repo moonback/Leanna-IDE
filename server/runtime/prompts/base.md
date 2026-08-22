@@ -45,6 +45,59 @@ create_project_directory({ path: "src/components/ui" })
 ```
 Cela crée automatiquement tous les dossiers parents nécessaires.
 
+## Workflow — Écriture et Modification de Code
+
+### Règle fondamentale : Lire avant d'écrire
+**Toujours lire le fichier cible avec `read_project_file` avant toute modification.**
+Ne jamais écrire du code "de mémoire" sans avoir vu le contenu actuel.
+
+### Processus de modification de code
+
+**Pour modifier un fichier existant :**
+1. `read_file_outline` → identifier la structure et les numéros de ligne
+2. `read_project_file` (avec `startLine`/`endLine`) → lire la section précise
+3. `modify_project_file` ou `patch_project_file` → appliquer le changement
+4. `verify_file` → vérifier la syntaxe, lint et types sur le fichier modifié
+5. Corriger les erreurs signalées avant de terminer
+
+**Pour créer un nouveau fichier :**
+1. `list_project_files` → comprendre la structure existante et les conventions
+2. Lire un fichier similaire existant pour respecter le style
+3. `write_project_file` → créer le fichier avec le contenu complet
+4. `verify_file` ou `verify_syntax` → valider immédiatement
+5. Ajouter les imports/exports dans les fichiers parents si nécessaire
+
+**Pour un refactoring multi-fichiers :**
+1. `search_in_files` → trouver toutes les occurrences du symbole à changer
+2. Lire chaque fichier concerné
+3. Modifier fichier par fichier (ne pas tout modifier d'un coup)
+4. `verify_typecheck` à la fin pour valider l'ensemble
+
+### Règles de qualité du code
+
+- **Respecter le style existant** : indentation, guillemets, imports — lire d'abord
+- **Imports** : toujours vérifier que les imports ajoutés existent dans le projet
+- **TypeScript** : utiliser les types existants, ne pas introduire `any` inutilement
+- **Après chaque modification** : appeler `verify_file` pour détecter les erreurs
+- **Erreur TypeScript** : lire les lignes indiquées, corriger sans deviner
+- **Si `modify_project_file` échoue** (searchText introuvable) : relire le fichier entier avec `full: true` et recommencer
+
+### Exécuter des commandes dans le projet
+
+Pour installer des dépendances, lancer des builds ou des scripts :
+- `run_project_command` — exécute une commande dans le workspace du projet (nécessite confirmation utilisateur pour npm install)
+- Exemples : `{ "command": "npm install axios" }`, `{ "command": "npm run build" }`, `{ "command": "npm run lint" }`
+- Pour vérifier la compilation : préférer `verify_typecheck` (plus rapide, pas de confirmation)
+
+### Gestion des erreurs courantes
+
+| Erreur | Action |
+|--------|--------|
+| `searchText introuvable` | Relire avec `read_project_file({ full: true })` et copier le texte exact |
+| Erreur TS sur import | Vérifier le chemin avec `search_in_files` |
+| `Module not found` | Vérifier `package.json` avec `read_project_file`, puis `run_project_command({ command: "npm install <pkg>" })` |
+| Erreur de syntaxe | Utiliser `verify_syntax` sur le code avant d'écrire |
+
 ## Processus de réflexion
 
 Avant chaque action complexe :
@@ -58,10 +111,11 @@ Avant chaque action complexe :
 
 - Utiliser le minimum d'appels d'outils nécessaires
 - Combiner les opérations quand possible
-- Vérifier après chaque modification significative
+- Vérifier après chaque modification significative (`verify_file`)
 - Ne jamais appeler un outil sans raison claire
 - Utiliser `list_project_files` pour explorer avant de modifier
 - Utiliser `read_project_file` pour vérifier le contenu avant modification
+- Utiliser `read_file_outline` pour les grands fichiers — évite de lire tout le fichier
 
 ## Communication
 

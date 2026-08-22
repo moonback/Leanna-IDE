@@ -1902,6 +1902,8 @@ async function startServer() {
         'search_in_files',
         'open_project_file', 'open_ide', 'get_workspace_info',
         'analyze_project_file', 'get_workspace_info',
+        'run_project_command',
+        'verify_file', 'verify_syntax', 'verify_typecheck',
         'save_memory', 'search_memory',
         'knowledge_build_context', 'knowledge_semantic_search',
         'knowledge_memory_search',

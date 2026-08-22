@@ -38,6 +38,28 @@ const ALLOWED_NPM_SUBCOMMANDS = [
     "run", "update", "ci", "ls", "list", "outdated", "audit", "test"
 ] as const;
 
+// ── run_project_command — commandes autorisées ────────────────────────────────
+// Préfixes de commandes autorisés pour run_project_command.
+// Seuls ces préfixes sont acceptés ; tout autre préfixe est rejeté.
+const RUN_ALLOWED_PREFIXES = ["npm ", "npx ", "node "] as const;
+
+// Sous-commandes npm qui NE nécessitent PAS de confirmation interactive
+// (lecture/exécution locale sans modification du disque/réseau).
+const NPM_NO_CONFIRM = new Set(["run", "test", "audit", "ls", "list", "outdated"]);
+
+const RUN_TIMEOUT_MS = 120_000; // 2 minutes max
+
+/**
+ * Détermine si une commande npm nécessite une confirmation utilisateur.
+ * Les commandes qui modifient node_modules (install, uninstall, update, ci) nécessitent
+ * une confirmation explicite ; les scripts (run, test) et audits peuvent s'exécuter sans.
+ */
+function npmNeedsConfirmation(parts: string[]): boolean {
+    // parts[0] === "npm", parts[1] === subcommand
+    const sub = (parts[1] ?? "").toLowerCase();
+    return !NPM_NO_CONFIRM.has(sub);
+}
+
 function truncate(str: string, max = 2000): string {
     return str.length > max ? str.slice(0, max) + "... [tronqué]" : str;
 }
@@ -112,6 +134,24 @@ export const systemSkill: Skill = {
             parameters: { type: "OBJECT", properties: {} }
         },
         {
+            name: "run_project_command",
+            description: "Exécute une commande npm, npx ou node dans le workspace du projet et retourne stdout/stderr. Commandes autorisées : npm run <script>, npm install <pkg>, npm uninstall <pkg>, npm test, npm audit, npx <outil>, node <script.js>. Les commandes qui modifient node_modules (install, uninstall, update, ci) nécessitent une confirmation utilisateur interactive. Idéal pour lancer des builds, installer des dépendances, exécuter des scripts ou vérifier la compilation.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    command: {
+                        type: "STRING",
+                        description: "Commande complète à exécuter (ex: 'npm run build', 'npm install axios', 'npx tsc --noEmit', 'node scripts/setup.js')."
+                    },
+                    cwd: {
+                        type: "STRING",
+                        description: "Sous-dossier relatif dans lequel exécuter la commande (optionnel, défaut: racine du projet). Ex: 'packages/frontend'."
+                    }
+                },
+                required: ["command"]
+            }
+        },
+        {
             name: "system_execute_command",
             description: "Exécute une commande shell restreinte (dir, ls, npm) sur le workspace du projet et retourne le résultat. Les commandes npm nécessitent que 'confirmed' soit explicitement à true (confirmation utilisateur préalable) — l'appel est refusé sinon.",
             parameters: {
@@ -128,6 +168,98 @@ export const systemSkill: Skill = {
     handleToolCall: async (name, args: Record<string, unknown>, toolContext?: { emitToClient?: (data: any) => void }) => {
         try {
             switch (name) {
+                case "run_project_command": {
+                    const rawCmd = asString(args.command).trim();
+                    if (!rawCmd) return { error: "Paramètre 'command' manquant ou vide." };
+
+                    // Vérifier le préfixe autorisé
+                    const allowed = RUN_ALLOWED_PREFIXES.some(p => rawCmd.toLowerCase().startsWith(p));
+                    if (!allowed) {
+                        return { error: `Commande non autorisée. Seuls les préfixes suivants sont acceptés: ${RUN_ALLOWED_PREFIXES.join(", ")}. Exemple: 'npm run build', 'npx tsc --noEmit'.` };
+                    }
+
+                    // Bloquer les caractères dangereux
+                    if (!isSafeShellCommand(rawCmd)) {
+                        return { error: "Commande refusée : caractères shell dangereux détectés." };
+                    }
+
+                    const parts = rawCmd.split(/\s+/);
+                    const verb = parts[0].toLowerCase();
+
+                    // Résoudre le cwd
+                    const root = getProjectRoot();
+                    let cwdPath = root;
+                    if (args.cwd) {
+                        const subDir = asString(args.cwd).trim();
+                        const resolved = normalizeProjectPath(subDir);
+                        if (!resolved) return { error: "Le sous-dossier 'cwd' doit rester dans le workspace du projet." };
+                        if (!fs.existsSync(resolved)) return { error: `Sous-dossier introuvable: ${subDir}` };
+                        cwdPath = resolved;
+                    }
+
+                    // Les commandes npm qui modifient node_modules nécessitent une confirmation
+                    if (verb === "npm" && npmNeedsConfirmation(parts)) {
+                        if (!toolContext?.emitToClient) {
+                            return { error: "Confirmation interactive indisponible dans ce contexte. Exécutez la commande manuellement dans le terminal." };
+                        }
+                        const approved = await requestConfirmation(
+                            rawCmd,
+                            "npm-command",
+                            toolContext.emitToClient,
+                            `Exécuter dans le projet : ${rawCmd}`
+                        );
+                        if (!approved) {
+                            return { error: "Commande refusée par l'utilisateur." };
+                        }
+                    }
+
+                    console.log(`[System] run_project_command: ${rawCmd} (cwd: ${cwdPath})`);
+
+                    const isWin = os.platform() === "win32";
+                    let bin: string;
+                    let binArgs: string[];
+
+                    if (verb === "npm") {
+                        bin = isWin ? "npm.cmd" : "npm";
+                        binArgs = parts.slice(1);
+                    } else if (verb === "npx") {
+                        bin = isWin ? "npx.cmd" : "npx";
+                        binArgs = parts.slice(1);
+                    } else {
+                        // node
+                        bin = isWin ? "node.exe" : "node";
+                        binArgs = parts.slice(1);
+                    }
+
+                    try {
+                        const result = await execFileAsync(bin, binArgs, {
+                            cwd: cwdPath,
+                            timeout: RUN_TIMEOUT_MS,
+                            maxBuffer: MAX_BUFFER,
+                            shell: false,
+                            env: { ...process.env },
+                        });
+                        return {
+                            status: "success",
+                            command: rawCmd,
+                            cwd: cwdPath,
+                            stdout: truncate(result.stdout ?? "", 6000),
+                            stderr: truncate(result.stderr ?? "", 3000),
+                            exitCode: 0,
+                        };
+                    } catch (e: any) {
+                        return {
+                            status: "error",
+                            command: rawCmd,
+                            cwd: cwdPath,
+                            stdout: truncate(e.stdout ?? "", 6000),
+                            stderr: truncate(e.stderr ?? e.message ?? "", 3000),
+                            exitCode: typeof e.code === "number" ? e.code : null,
+                            error: e.killed ? `Commande interrompue (timeout ${RUN_TIMEOUT_MS / 1000}s dépassé)` : e.message,
+                        };
+                    }
+                }
+
                 case "system_open": {
                     const target = asString(args.target).trim();
                     if (!target) return { error: "Paramètre 'target' manquant ou vide." };
