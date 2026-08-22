@@ -50,7 +50,7 @@ function getAgentForTool(tool: string): string {
     patch_project_file: 'writer', analyze_project_file: 'researcher', search_in_files: 'researcher',
     read_file_outline: 'planner', open_project_file: 'writer',
     list_project_files: 'researcher', create_project_directory: 'writer',
-    rename_project_file: 'writer', delete_project_file: 'writer', get_workspace_info: 'researcher',
+    rename_project_file: 'writer', delete_project_file: 'writer', delete_project_folder: 'writer', get_workspace_info: 'researcher',
     git_status: 'writer', git_diff: 'writer', git_stage: 'writer', git_unstage: 'writer',
     git_commit: 'writer', git_push: 'writer', git_pull: 'writer', git_branches: 'writer',
     git_switch_branch: 'writer', git_log: 'writer',

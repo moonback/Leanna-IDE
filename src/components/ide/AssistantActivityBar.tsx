@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   ChevronDown, ChevronUp, CheckCircle2, Loader2, X,
   FolderSearch, FileText, FilePen, FileSearch, FolderPlus,
-  FileMinus, FileCode, Info, Database, Globe, Brain, Cpu,
+  FileMinus, FolderMinus, FileCode, Info, Database, Globe, Brain, Cpu,
   Search, Terminal, RefreshCw,
 } from 'lucide-react';
 import type { ActivityStep } from '../../hooks/useLiveAPI';
@@ -27,6 +27,7 @@ const TOOL_META: Record<string, { icon: React.ElementType; category: string; col
   create_project_directory:   { icon: FolderPlus,   category: 'Fichiers',    color: '#34d399' },
   rename_project_file:        { icon: FilePen,      category: 'Fichiers',    color: '#fbbf24' },
   delete_project_file:        { icon: FileMinus,    category: 'Fichiers',    color: '#f87171' },
+  delete_project_folder:      { icon: FolderMinus,  category: 'Fichiers',    color: '#f87171' },
   analyze_project_file:       { icon: FileSearch,   category: 'Fichiers',    color: '#a78bfa' },
   get_workspace_info:         { icon: Info,         category: 'Workspace',   color: '#94a3b8' },
   generate_codebase_markdown: { icon: RefreshCw,    category: 'Workspace',   color: '#fbbf24' },

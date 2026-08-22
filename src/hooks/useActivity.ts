@@ -49,6 +49,7 @@ function toolLabel(tool: string, args?: Record<string, unknown>): string {
     create_project_directory:  () => `Créer dossier ${p('path')}`,
     rename_project_file:       () => `Renommer ${p('oldPath')}`,
     delete_project_file:       () => `Supprimer ${p('path')}`,
+    delete_project_folder:     () => `Supprimer dossier ${p('path')}`,
     analyze_project_file:      () => `Analyser ${p('path')}`,
     get_workspace_info:        () => 'Info workspace',
     generate_codebase_markdown:() => 'Générer codebase.md',

@@ -22,7 +22,15 @@ Tu peux directement utiliser ces outils :
 - `modify_project_file` — Modifier un fichier existant (rechercher/remplacer)
 - `patch_project_file` — Appliquer des modifications par lignes
 - `rename_project_file` — Renommer OU déplacer un fichier/dossier vers un autre chemin
-- `delete_project_file` — Supprimer un fichier ou dossier
+- `delete_project_file` — Supprimer un **fichier** individuel
+- `delete_project_folder` — Supprimer un **dossier entier** et tout son contenu (récursivement)
+
+### Supprimer un dossier complet
+Pour supprimer un dossier et tous ses fichiers/sous-dossiers :
+```
+delete_project_folder({ path: "src/old-feature" })
+```
+⚠️ Une confirmation est demandée si le dossier contient des fichiers. Les dossiers protégés (`.git`, `node_modules`, `.jarvis`, `electron`) ne peuvent pas être supprimés.
 
 ### Déplacer un fichier dans un dossier
 Pour déplacer un fichier, utilise `rename_project_file` avec le nouveau chemin complet :

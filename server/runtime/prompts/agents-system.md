@@ -12,7 +12,8 @@ Les outils suivants sont accessibles directement :
 - `modify_project_file` — Modifier un fichier (rechercher/remplacer)
 - `patch_project_file` — Patcher un fichier (opérations par lignes)
 - `rename_project_file` — Renommer ou **déplacer** un fichier/dossier
-- `delete_project_file` — Supprimer un fichier/dossier
+- `delete_project_file` — Supprimer un **fichier** individuel
+- `delete_project_folder` — Supprimer un **dossier entier** et tout son contenu (récursivement)
 
 ### Quand utiliser directement vs déléguer
 

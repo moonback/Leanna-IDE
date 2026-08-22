@@ -163,7 +163,7 @@ export function useLiveAPI() {
       // Auto-open IDE when a codebase tool is used
       const IDE_TOOLS = ['list_project_files', 'read_project_file', 'write_project_file',
         'modify_project_file', 'search_in_files', 'open_project_file', 'open_ide',
-        'create_project_directory', 'rename_project_file', 'delete_project_file',
+        'create_project_directory', 'rename_project_file', 'delete_project_file', 'delete_project_folder',
         'analyze_project_file', 'get_workspace_info', 'generate_codebase_markdown'];
       if (IDE_TOOLS.includes(msg.tool_start)) {
         window.dispatchEvent(new CustomEvent('jarvis-ide-action', { detail: { type: 'open-ide' } }));

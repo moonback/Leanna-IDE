@@ -1898,7 +1898,7 @@ async function startServer() {
       const TIER1_CORE_TOOLS = new Set([
         'read_file_outline', 'read_project_file', 'list_project_files',
         'modify_project_file', 'patch_project_file', 'write_project_file',
-        'rename_project_file', 'delete_project_file', 'create_project_directory',
+        'rename_project_file', 'delete_project_file', 'delete_project_folder', 'create_project_directory',
         'search_in_files',
         'open_project_file', 'open_ide', 'get_workspace_info',
         'analyze_project_file', 'get_workspace_info',
@@ -3074,7 +3074,7 @@ async function startServer() {
      // Tools that modify files (blocked in ask mode unless writing a .md file)
      const WRITE_TOOLS = new Set([
        'write_project_file', 'modify_project_file', 'patch_project_file', 'rename_project_file',
-       'delete_project_file', 'create_project_directory',
+       'delete_project_file', 'delete_project_folder', 'create_project_directory',
      ]);
 
      const context = {

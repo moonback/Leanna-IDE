@@ -560,6 +560,93 @@ export async function handleDeleteProjectFile(args: any, toolContext: any) {
   return { status: "success", path: requestedPath, critical, sandbox: sandboxMode_del, message: `File ${requestedPath} deleted.${sandboxMode_del ? ' 📦 (sandbox)' : ''}${critical ? ' ⚠️ Fichier critique supprimé.' : ''}` };
 }
 
+export async function handleDeleteProjectFolder(args: any, toolContext: any) {
+  if (!checkWriteRateLimit()) return { error: "Rate limit atteint : trop d'écritures par minute." };
+  if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
+  const requestedPath = String(args.path || "").trim();
+  if (!requestedPath) return { error: "Le chemin du dossier est requis." };
+
+  const target = resolveSandboxWriteTarget(requestedPath);
+  if (!target) return { error: "Chemin invalide ou en dehors du workspace." };
+  const normalized = target.sandboxPath;
+
+  if (isWriteForbidden(target.logicalPath)) return { error: `Suppression interdite sur ce dossier protégé: ${requestedPath}` };
+  if (!fs.existsSync(normalized)) return { error: "Dossier introuvable." };
+
+  const stats = await fs.promises.stat(normalized);
+  if (!stats.isDirectory()) return { error: "Le chemin doit pointer vers un dossier. Pour supprimer un fichier, utilise delete_project_file." };
+
+  // Garde : refuser la suppression de la racine du workspace ou de dossiers critiques de premier niveau
+  const PROTECTED_DIRS = new Set(['.git', '.jarvis', 'node_modules', 'electron', '.env', '.husky']);
+  const topLevel = requestedPath.replace(/\\/g, '/').split('/')[0];
+  if (!topLevel || topLevel === '.' || PROTECTED_DIRS.has(topLevel)) {
+    return { error: `Suppression interdite sur le dossier protégé ou racine: ${requestedPath}` };
+  }
+
+  // Compter les fichiers affectés pour informer l'utilisateur
+  let fileCount = 0;
+  try {
+    const countFiles = async (dir: string): Promise<number> => {
+      let total = 0;
+      const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+      for (const e of entries) {
+        total += e.isDirectory() ? await countFiles(path.join(dir, e.name)) : 1;
+      }
+      return total;
+    };
+    fileCount = await countFiles(normalized);
+  } catch { /* non bloquant */ }
+
+  // Confirmation requise si dossier non vide
+  if (fileCount > 0 && toolContext?.emitToClient) {
+    const { requestConfirmation } = await import("../utils/confirmationBridge");
+    const approved = await requestConfirmation(
+      requestedPath,
+      'delete',
+      toolContext.emitToClient,
+      `Suppression récursive de ${fileCount} fichier(s) dans "${requestedPath}"`
+    );
+    if (!approved) {
+      return { error: `Suppression annulée par l'utilisateur. Le dossier "${requestedPath}" contient ${fileCount} fichier(s).`, cancelled: true };
+    }
+  } else if (fileCount > 0 && !toolContext?.emitToClient) {
+    // Fail-closed : pas de canal de confirmation interactif pour une suppression non vide
+    return {
+      error: `Suppression refusée : le dossier "${requestedPath}" contient ${fileCount} fichier(s) et aucune confirmation interactive n'est possible dans ce contexte d'exécution.`,
+    };
+  }
+
+  const sandboxMode_dir = isSandboxActive();
+
+  // Checkpoint automatique avant suppression (seulement en mode direct)
+  if (!sandboxMode_dir) {
+    try {
+      const { createCheckpoint } = await import("../utils/checkpoint");
+      await createCheckpoint(`avant suppression dossier: ${requestedPath}`);
+    } catch { /* non bloquant */ }
+  }
+
+  if (!resolveCurrentSandboxPath(requestedPath, normalized)) return { error: "Sandbox indisponible ou chemin modifié — suppression refusée." };
+
+  await fs.promises.rm(normalized, { recursive: true, force: true });
+
+  if (sandboxMode_dir) markFileModified(requestedPath);
+  console.log(`[Codebase] Directory deleted: ${requestedPath} (${fileCount} files)${sandboxMode_dir ? ' [SANDBOX]' : ''}`);
+  appendAuditEvent({ action: 'delete_project_folder', target: requestedPath, actor: 'ai', diff: `[DELETED FOLDER — ${fileCount} files]` }).catch((err) => {
+    console.warn(`[Audit] appendAuditEvent failed for delete_project_folder on ${requestedPath}:`, err);
+  });
+  if (!sandboxMode_dir) {
+    scheduleValidation();
+  }
+  return {
+    status: "success",
+    path: requestedPath,
+    filesDeleted: fileCount,
+    sandbox: sandboxMode_dir,
+    message: `Dossier "${requestedPath}" supprimé (${fileCount} fichier(s) supprimé(s)).${sandboxMode_dir ? ' 📦 (sandbox)' : ''}`,
+  };
+}
+
 export async function handleCreateProjectDirectory(args: any) {
   if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
   const requestedPath = String(args.path || "").trim();

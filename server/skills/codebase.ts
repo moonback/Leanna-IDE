@@ -19,6 +19,7 @@ import {
   handleApplyPatch,
   handleRenameProjectFile,
   handleDeleteProjectFile,
+  handleDeleteProjectFolder,
   handleCreateProjectDirectory
 } from "./codebaseWriter";
 
@@ -206,6 +207,17 @@ export const codebaseSkill: Skill = {
       },
     },
     {
+      name: "delete_project_folder",
+      description: "Supprime un dossier et tout son contenu (récursivement) du workspace. Utiliser pour supprimer un dossier entier avec tous ses fichiers et sous-dossiers. Une confirmation est demandée si le dossier n'est pas vide. Les dossiers protégés (.git, node_modules, .jarvis, electron) ne peuvent pas être supprimés.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          path: { type: "STRING", description: "Chemin relatif du dossier à supprimer (ex: src/old-feature, dist/legacy)." },
+        },
+        required: ["path"],
+      },
+    },
+    {
       name: "create_project_directory",
       description: "Crée un dossier dans le workspace (crée automatiquement tous les dossiers parents si nécessaire). Utiliser AVANT de déplacer des fichiers vers un nouveau dossier, ou pour organiser la structure du projet.",
       parameters: {
@@ -282,6 +294,9 @@ export const codebaseSkill: Skill = {
 
       case "delete_project_file":
         return await handleDeleteProjectFile(args, toolContext);
+
+      case "delete_project_folder":
+        return await handleDeleteProjectFolder(args, toolContext);
 
       case "create_project_directory":
         return await handleCreateProjectDirectory(args);

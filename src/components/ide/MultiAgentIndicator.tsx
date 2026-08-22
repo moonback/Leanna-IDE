@@ -30,7 +30,7 @@ const TOOL_AGENTS: AgentDef[] = [
     name: 'Fichiers',
     icon: FileText,
     color: '#4ade80',
-    tools: ['list_project_files', 'create_project_directory', 'rename_project_file', 'delete_project_file', 'open_project_file', 'get_workspace_info'],
+    tools: ['list_project_files', 'create_project_directory', 'rename_project_file', 'delete_project_file', 'delete_project_folder', 'open_project_file', 'get_workspace_info'],
   },
   {
     id: 'git',

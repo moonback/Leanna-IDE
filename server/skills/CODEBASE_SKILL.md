@@ -130,8 +130,14 @@ Renomme ou déplace un fichier/dossier dans le workspace.
 - `newPath` (string, requis) : peut inclure un changement de dossier pour déplacer le fichier.
 
 #### `delete_project_file`
-Supprime un fichier du projet.
+Supprime un **fichier** individuel du projet.
 - `path` (string, requis)
+
+#### `delete_project_folder`
+Supprime un **dossier entier** et tout son contenu de façon récursive.
+- `path` (string, requis) : chemin relatif du dossier (ex: `src/old-feature`, `dist/legacy`)
+
+⚠️ Une confirmation interactive est demandée si le dossier contient des fichiers. Dossiers protégés non supprimables : `.git`, `node_modules`, `.jarvis`, `electron`, `.husky`.
 
 ## Sécurité
 
