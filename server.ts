@@ -2853,6 +2853,30 @@ async function startServer() {
               video: { data: msg.video.data, mimeType: msg.video.mimeType },
             });
           }
+          // ── Résumé de contexte côté client (fallback context_overflow) ───────────────
+          // Le client envoie ce message après reconnexion si Supabase n'a pas pu
+          // injecter le résumé automatiquement (via context_resume=1).
+          if (msg.type === 'context_resume_summary' && msg.summary) {
+            if (!contextResumeSummary) {
+              // Pas encore injecté côté serveur → injecter maintenant
+              const resumeText =
+                `[CONTEXTE DE LA CONVERSATION PRÉCÉDENTE — Résumé automatique après dépassement de tokens]\n\n` +
+                `${msg.summary}\n\n` +
+                `La conversation précédente a été interrompue car la fenêtre de contexte était saturée. ` +
+                `Continue la conversation en tenant compte de ce résumé. L'utilisateur est au courant du redémarrage.`;
+              try {
+                session.sendClientContent({
+                  turns: [{ role: 'user', parts: [{ text: resumeText }] }],
+                });
+                console.info(`[ContextResume] 📋 Résumé injecté via fallback client (${msg.summary.length} chars)`);
+                clientWs.send(JSON.stringify({ type: 'context_resume_ack', injected: true }));
+              } catch (e) {
+                console.error('[ContextResume] Erreur injection résumé fallback:', e);
+              }
+            } else {
+              console.info('[ContextResume] Résumé déjà injecté côté serveur — message client ignoré');
+            }
+          }
           if (msg.text) {
              // ── Notification d'occupation : prévenir l'utilisateur si une tâche est active ──
              if (getBusyDescription()) {

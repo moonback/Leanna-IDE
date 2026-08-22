@@ -24,6 +24,9 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
   const pendingConversationIdRef = useRef<string | null>(null);
   // Flag pour distinguer un redémarrage après dépassement de tokens (context_overflow)
   const contextOverflowPendingRef = useRef(false);
+  // Résumé issu du message session_restart (context_overflow), à injecter lors de la reconnexion
+  // si Supabase n'est pas disponible ou que le résumé n'est pas encore en DB.
+  const pendingContextSummaryRef = useRef<string>('');
   // Refs stables pour onInitAudio / onCleanupAudio (évite de les recaptuler)
   const onInitAudioRef = useRef<(() => Promise<void>) | null>(null);
   const onCleanupAudioRef = useRef<(() => void) | null>(null);
@@ -116,7 +119,21 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
           reconnectCountRef.current = 0; // reset après reconnexion réussie
           goAwayPendingRef.current = false;
           setStatus('connected');
-          onLog(conversationId ? 'Session reprise après expiration GoAway' : 'Connected to Core', 'info');
+          onLog(conversationId ? (pendingContextSummaryRef.current ? 'Session reprise après dépassement de tokens (avec résumé de contexte)' : 'Session reprise après expiration GoAway') : 'Connected to Core', 'info');          // Injecter le résumé de contexte si disponible (fallback client-side pour context_overflow)
+          // Le serveur l'injecte aussi via context_resume=1, mais ce message garantit
+          // que le contexte est disponible même si Supabase est indisponible.
+          if (pendingContextSummaryRef.current) {
+            const summary = pendingContextSummaryRef.current;
+            pendingContextSummaryRef.current = '';
+            // Petit délai pour s'assurer que la session Gemini côté serveur est prête
+            setTimeout(() => {
+              try {
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: 'context_resume_summary', summary }));
+                }
+              } catch {}
+            }, 800);
+          }
         };
 
         ws.onmessage = (event) => {
@@ -132,9 +149,12 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
               if (msg.reason === 'context_overflow') {
                 onLog(`Limite de tokens atteinte — redémarrage automatique avec résumé de la conversation${convId ? ` (conv: ${convId.slice(0, 8)})` : ''}`, 'system');
                 contextOverflowPendingRef.current = true;
+                // Sauvegarder le résumé pour l'injecter lors de la reconnexion (fallback si Supabase indisponible)
+                pendingContextSummaryRef.current = msg.summary || '';
               } else {
                 onLog(`Session Gemini expirée (GoAway) — reprise automatique${convId ? ` (conv: ${convId.slice(0, 8)})` : ''}`, 'system');
                 contextOverflowPendingRef.current = false;
+                pendingContextSummaryRef.current = '';
               }
               goAwayPendingRef.current = true;
               pendingConversationIdRef.current = convId;
@@ -224,6 +244,19 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
         reconnectCountRef.current = 0;
         setStatus('connected');
         onLog('Connected to Core', 'info');
+        // Injecter le résumé de contexte si disponible (cas de reconnexion context_overflow
+        // déclenchée avant que goAwayPendingRef ait pu router vers connectWithConversationId)
+        if (pendingContextSummaryRef.current) {
+          const summary = pendingContextSummaryRef.current;
+          pendingContextSummaryRef.current = '';
+          setTimeout(() => {
+            try {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'context_resume_summary', summary }));
+              }
+            } catch {}
+          }, 800);
+        }
       };
 
       ws.onmessage = (event) => {
@@ -236,15 +269,26 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
             if (msg.reason === 'context_overflow') {
               onLog(`Limite de tokens atteinte — redémarrage automatique avec résumé de la conversation${convId ? ` (conv: ${convId.slice(0, 8)})` : ''}`, 'system');
               contextOverflowPendingRef.current = true;
+              // Sauvegarder le résumé pour l'injecter lors de la reconnexion (fallback si Supabase indisponible)
+              pendingContextSummaryRef.current = msg.summary || '';
             } else {
               onLog(`Session Gemini expirée (GoAway) — reprise automatique${convId ? ` (conv: ${convId.slice(0, 8)})` : ''}`, 'system');
               contextOverflowPendingRef.current = false;
+              pendingContextSummaryRef.current = '';
             }
             goAwayPendingRef.current = true;
             pendingConversationIdRef.current = convId;
             if (msg.reason === 'context_overflow') {
               onMessage(msg);
             }
+            // Fermer proactivement la WebSocket pour déclencher onclose → reconnexion
+            // (le serveur est censé la fermer aussi, mais ce filet de sécurité garantit
+            // que la reconnexion démarre même si le serveur oublie).
+            try {
+              if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                setTimeout(() => ws.close(), 100);
+              }
+            } catch {}
             return;
           }
 
