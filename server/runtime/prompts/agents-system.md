@@ -14,6 +14,7 @@ Les outils suivants sont accessibles directement :
 - `rename_project_file` — Renommer ou **déplacer** un fichier/dossier
 - `delete_project_file` — Supprimer un **fichier** individuel
 - `delete_project_folder` — Supprimer un **dossier entier** et tout son contenu (récursivement)
+- `create_rich_document` — Créer et afficher un document riche interactif (tableaux, graphiques, courbes, camemberts, fiches, listes)
 
 ### Quand utiliser directement vs déléguer
 

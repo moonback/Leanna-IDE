@@ -58,6 +58,7 @@ function toolLabel(tool: string, args?: Record<string, unknown>): string {
     search_memory:             () => `Chercher en mémoire: ${p('query')}`,
     automation_navigate:       () => `Naviguer vers ${p('url')}`,
     automation_search:         () => `Rechercher: ${p('query')}`,
+    create_rich_document:      () => `Créer document "${p('title')}"`,
     automation_snapshot:       () => 'Capture page',
     automation_click:          () => `Cliquer ${p('selector')}`,
     automation_type:           () => `Saisir dans ${p('selector')}`,

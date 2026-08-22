@@ -1913,6 +1913,7 @@ async function startServer() {
         'knowledge_search_entities', 'knowledge_status',
         'knowledge_memory_add', 'knowledge_memory_list',
         'knowledge_impact_analyze', 'knowledge_reindex',
+        'create_rich_document',
       ]);
 
       // Outils Knowledge autorisés en demande via request_tools (tier2 supplémentaire)

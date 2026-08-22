@@ -78,6 +78,7 @@ const TOOL_TO_SKILL: Record<string, string> = {
   get_communication_style: 'guidelines',
   get_all_guidelines: 'guidelines',
   request_tools: 'system',
+  create_rich_document: 'richDocument',
 };
 
 // ── Tool display names ───────────────────────────────────────────────────────
@@ -131,6 +132,7 @@ const TOOL_DISPLAY: Record<string, string> = {
   get_tools_documentation: 'Docs',
   get_all_guidelines: 'Directives',
   request_tools: 'Charger',
+  create_rich_document: 'Doc riche',
 };
 
 // ── Skill metadata ───────────────────────────────────────────────────────────
@@ -154,7 +156,8 @@ const SKILL_META: Record<string, SkillMeta> = {
   reasoning:  { label: 'Raisonnement', desc: 'Tâches complexes déléguées',                  icon: Brain,     color: '#f97316' },
   history:    { label: 'Historique',    desc: 'Conversations passées',                       icon: BookOpen,  color: '#a78bfa' },
   git:        { label: 'Git',          desc: 'Contrôle de version',                         icon: GitBranch, color: '#f87171' },
-  guidelines: { label: 'Guidelines',   desc: 'Standards du projet',                         icon: Zap,       color: '#10b981' },
+  guidelines: { label: 'Guidelines',   desc: 'Standards du projet',                         icon: Zap,        color: '#10b981' },
+  richDocument: { label: 'Doc Riche',  desc: 'Tableaux, graphiques et fiches interactifs',   icon: TrendingUp, color: '#6366f1' },
 };
 
 // ── Types ────────────────────────────────────────────────────────────────────

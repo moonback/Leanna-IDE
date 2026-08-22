@@ -7,7 +7,9 @@ const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel').then
 const VisionPanel = lazy(() => import('../components/panels/VisionPanel').then(m => ({ default: m.VisionPanel })));
 const DocumentsView = lazy(() => import('./DocumentsView'));
 const NotebooksView = lazy(() => import('./NotebooksView'));
+const RichDocumentViewerLazy = lazy(() => import('../components/ide/RichDocumentViewer').then(m => ({ default: m.RichDocumentViewer })));
 import { X } from 'lucide-react';
+import type { RichDocument } from '../components/ide/RichDocumentViewer';
 import { IdeModal, type ModalMode } from '../components/ide/IdeModal';
 import { ContextMenu, type ContextTarget, type ClipboardEntry } from '../components/ide/ContextMenu';
 import { NotebookPickerModal } from '../components/ide/NotebookPickerModal';
@@ -173,6 +175,7 @@ export default function IdeView() {
   const [showAutomation, setShowAutomation] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const [selfEditingFile, setSelfEditingFile] = useState<string | null>(null);
+  const [richDocument, setRichDocument] = useState<RichDocument | null>(null);
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
 
   // Auto-close assistant-dependent panels when assistant is disconnected
@@ -305,6 +308,22 @@ export default function IdeView() {
     };
     window.addEventListener('jarvis-ide-action', handle as EventListener);
     return () => window.removeEventListener('jarvis-ide-action', handle as EventListener);
+  }, []);
+
+  // ── Documents riches pilotés par Leanna via jarvis-open-rich-document ──────
+  useEffect(() => {
+    const handle = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.document) return;
+      setRichDocument(detail.document);
+      // Fermer les autres panneaux principaux pour donner de la place
+      setShowBrowser(false);
+      setShowDocuments(false);
+      setShowKnowledge(false);
+      setShowNotebooks(false);
+    };
+    window.addEventListener('jarvis-open-rich-document', handle as EventListener);
+    return () => window.removeEventListener('jarvis-open-rich-document', handle as EventListener);
   }, []);
 
   // Open Agents panel only on explicit user action (button click, overlay)
@@ -839,6 +858,13 @@ export default function IdeView() {
                           onClose={() => { setShowBrowser(false); setBrowserUrl(undefined); }}
                           fullWidth
                         />
+                      ) : richDocument ? (
+                        <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement du document…</div></div>}>
+                          <RichDocumentViewerLazy
+                            document={richDocument}
+                            onClose={() => setRichDocument(null)}
+                          />
+                        </Suspense>
                       ) : showDocuments ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement…</div></div>}>
                           <DocumentPanel />

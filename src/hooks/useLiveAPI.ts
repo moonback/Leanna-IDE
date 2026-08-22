@@ -148,6 +148,9 @@ export function useLiveAPI() {
         case 'browser-inspect':
           window.dispatchEvent(new CustomEvent('jarvis-browser-inspect', { detail: a }));
           break;
+        case 'open-rich-document':
+          window.dispatchEvent(new CustomEvent('jarvis-open-rich-document', { detail: a }));
+          break;
       }
     }
     if (msg.type === 'browser-read-request' && msg.requestId) {

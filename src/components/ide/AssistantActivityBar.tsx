@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronUp, CheckCircle2, Loader2, X,
   FolderSearch, FileText, FilePen, FileSearch, FolderPlus,
   FileMinus, FolderMinus, FileCode, Info, Database, Globe, Brain, Cpu,
-  Search, Terminal, RefreshCw,
+  Search, Terminal, RefreshCw, BarChart2,
 } from 'lucide-react';
 import type { ActivityStep } from '../../hooks/useLiveAPI';
 
@@ -40,7 +40,8 @@ const TOOL_META: Record<string, { icon: React.ElementType; category: string; col
   automation_click:           { icon: Globe,        category: 'Web',         color: '#fbbf24' },
   automation_type:            { icon: Globe,        category: 'Web',         color: '#fbbf24' },
   automation_extract:         { icon: Globe,        category: 'Web',         color: '#60a5fa' },
-  reasoning_delegate_task:    { icon: Cpu,          category: 'Raisonnement',color: '#f97316' },
+  reasoning_delegate_task:    { icon: Cpu,       category: 'Raisonnement',color: '#f97316' },
+  create_rich_document:       { icon: BarChart2,  category: 'Document',    color: '#6366f1' },
 };
 
 function getMeta(tool: string) {

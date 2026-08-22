@@ -71,6 +71,7 @@ const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   save_memory: 'memory', search_memory: 'memory',
   get_workspace_info: 'system', generate_codebase_markdown: 'system',
   open_ide: 'system',
+  create_rich_document: 'other',
 };
 
 function getCat(tool: string): ToolCategory {
@@ -109,6 +110,7 @@ const TOOL_LABEL: Record<string, string> = {
   automation_navigate: 'navigation', automation_snapshot: 'capture',
   automation_click: 'clic', automation_type: 'saisie',
   get_workspace_info: 'workspace', open_ide: 'IDE',
+  create_rich_document: 'document riche',
 };
 
 function toolLabel(tool: string): string {

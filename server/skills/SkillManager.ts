@@ -29,6 +29,7 @@ const TOOL_KEYWORDS: Record<string, string[]> = {
   agents: ['agent', 'deleguer', 'delegate', 'sous-agent', 'subagent', 'expert', 'architect', 'reviewer', 'testeur', 'rôle', 'role', 'spécialiste', 'specialist', 'parallel', 'parallèle', 'multitâche', 'multitask', 'collaborer', 'collaborate', 'collaboration', 'pattern', 'flotte', 'fleet', 'bus', 'message', 'délégation', 'autonome', 'autonomous', 'refactor-with-safety', 'security-audit-full', 'new-feature-complete', 'inter-agent', 'workflow agent', 'agents spécialisés'],
   codebase: ['fichier', 'file', 'lire', 'read', 'ecrire', 'write', 'modifier', 'modify', 'patch', 'recherche', 'search', 'codebase', 'explorateur', 'explorer', 'navigator', 'navigation', 'tree', 'listing', 'file tree', 'monaco', 'éditeur', 'editor'],
   documentLinker: ['document', 'pdf', 'résumé', 'résumer', 'synthèse', 'synthétiser', 'lien', 'connexion', 'croiser', 'comparer', 'analyser document', 'upload', 'fichier uploadé', 'multimodal', 'image', 'rapport', 'briefing', 'cross-document', 'inter-document'],
+  richDocument: ['tableau', 'table', 'graphique', 'graph', 'chart', 'courbe', 'curve', 'camembert', 'pie', 'barres', 'bar', 'fiche', 'card', 'liste', 'list', 'visualiser', 'visualize', 'afficher', 'display', 'données', 'data', 'statistiques', 'stats', 'rapport', 'report', 'dashboard', 'kpi', 'indicateur', 'indicator', 'aire', 'area', 'document riche', 'rich document', 'présenter', 'present'],
   aiStudioDirectives: ['directive', 'directives', 'studio', 'ai studio', 'build', 'comportement', 'behavior', 'technique', 'technical', 'conception', 'design', 'tailwind', 'iframe', 'accessibilité', 'accessibility', 'intégration', 'integration', 'oauth', 'api key', 'port 3000', 'styling', 'enum', 'import'],
   project: ['projet', 'project', 'créer', 'create', 'nouveau projet', 'new project', 'scaffold', 'scaffolding', 'template', 'react', 'next', 'vite', 'react router', 'initialiser', 'init', 'bootstrap', 'starter', 'boilerplate'],
 };
@@ -51,6 +52,7 @@ const CRITICAL_SKILLS = [
   'documentLinker',
   'documentKnowledge',
   'browser',
+  'richDocument',
 ];
 const CRITICAL_SKILL_SET = new Set(CRITICAL_SKILLS);
 
@@ -95,6 +97,7 @@ import { agentsSkill } from "./agents";
 import { aiStudioDirectivesSkill } from "./aiStudioDirectives";
 import { documentLinkerSkill } from "./documentLinker";
 import { documentKnowledgeSkill } from "./documentKnowledge";
+import { richDocumentSkill } from "./richDocument";
 import { agentOrchestrator } from "../agents";
 import { missionSkill, initMissionSystem, updateMissionSkills } from "./mission";
 import { Executor } from "../mission";
@@ -122,6 +125,7 @@ const STATIC_SKILLS: Record<string, Skill> = {
   aiStudioDirectives: aiStudioDirectivesSkill,
   documentLinker: documentLinkerSkill,
   document_knowledge: documentKnowledgeSkill,
+  richDocument: richDocumentSkill,
 };
 
 // ── Compatibilité ESM/CJS pour __dirname ──────────────────────────────────────
