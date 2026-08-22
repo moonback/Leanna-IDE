@@ -1052,6 +1052,36 @@ async function startServer() {
     }
   });
 
+  // GET /api/ide/tree-workspace — Always returns the real workspace tree (ignores sandbox)
+  app.get("/api/ide/tree-workspace", requireAuth, async (_req, res) => {
+    try {
+      if (!hasProject()) {
+        return res.json({ path: null, entries: [], noProject: true });
+      }
+      const root = getDefaultWorkspaceRoot();
+      const walk = (current: string): any[] => {
+        const entries = fs.readdirSync(current, { withFileTypes: true });
+        return entries
+          .filter(entry => !['node_modules', '.git', 'dist', 'build', 'out', '.jarvis'].includes(entry.name))
+          .sort((a, b) => {
+            if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+            return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+          })
+          .map(entry => {
+            const entryPath = path.join(current, entry.name);
+            const entryRel = path.relative(root, entryPath).replace(/\\/g, '/');
+            if (entry.isDirectory()) {
+              return { name: entry.name, path: entryRel === '' ? '.' : entryRel, type: 'directory', children: walk(entryPath) };
+            }
+            return { name: entry.name, path: entryRel === '' ? '.' : entryRel, type: 'file' };
+          });
+      };
+      res.json({ path: root, entries: walk(root) });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/ide/tree", requireAuth, async (req, res) => {
     try {
       const clientIp = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0] || req.ip || 'unknown';
