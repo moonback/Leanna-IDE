@@ -1,26 +1,18 @@
 /**
  * RichDocument Skill — Création et affichage de documents riches par Leanna
  *
- * Permet à Leanna de créer des documents structurés contenant :
- *   • Tableaux de données
- *   • Graphiques en barres (simples, groupés, empilés)
- *   • Courbes / lignes (line chart, area chart)
- *   • Camemberts / donuts (pie chart)
- *   • Fiches info (card avec champs clé/valeur)
- *   • Listes structurées (ordonnées ou non)
- *   • Blocs de texte libre
- *
- * Le document est transmis au client via `emitIdeAction` de type `open-rich-document`
- * et affiché dans le RichDocumentViewer React.
+ * Blocs supportés :
+ *   table, bar_chart, line_chart, area_chart, pie_chart,
+ *   card, list, text, code, progress, timeline, stat_grid
  */
 
 import { Skill } from "./base";
 
-// ─── Types partagés avec le front (miroir de RichDocumentViewer.tsx) ──────────
+// ─── Types (miroir de RichDocumentViewer.tsx) ─────────────────────────────────
 
 type RichBlockType =
-  | "table" | "bar_chart" | "line_chart" | "area_chart"
-  | "pie_chart" | "card" | "list" | "text";
+  | "table" | "bar_chart" | "line_chart" | "area_chart" | "pie_chart"
+  | "card" | "list" | "text" | "code" | "progress" | "timeline" | "stat_grid";
 
 interface RichBlock {
   type: RichBlockType;
@@ -34,16 +26,18 @@ interface RichDocument {
   blocks: RichBlock[];
 }
 
-// ─── Validation des blocs ─────────────────────────────────────────────────────
+// ─── Validation ───────────────────────────────────────────────────────────────
 
 function validateBlock(block: any, index: number): { ok: boolean; error?: string } {
   if (!block || typeof block !== "object") {
     return { ok: false, error: `Bloc ${index}: doit être un objet` };
   }
+
   const validTypes: RichBlockType[] = [
-    "table", "bar_chart", "line_chart", "area_chart",
-    "pie_chart", "card", "list", "text",
+    "table", "bar_chart", "line_chart", "area_chart", "pie_chart",
+    "card", "list", "text", "code", "progress", "timeline", "stat_grid",
   ];
+
   if (!validTypes.includes(block.type)) {
     return {
       ok: false,
@@ -87,6 +81,48 @@ function validateBlock(block: any, index: number): { ok: boolean; error?: string
       if (typeof block.content !== "string" || !block.content.trim())
         return { ok: false, error: `Bloc ${index} (text): "content" requis (chaîne non vide)` };
       break;
+
+    case "code":
+      if (typeof block.content !== "string" || !block.content.trim())
+        return { ok: false, error: `Bloc ${index} (code): "content" requis (chaîne non vide)` };
+      break;
+
+    case "progress":
+      if (!Array.isArray(block.items) || block.items.length === 0)
+        return { ok: false, error: `Bloc ${index} (progress): "items" requis (tableau avec "label" et "value")` };
+      for (const item of block.items) {
+        if (typeof item.label !== "string" || item.label.trim() === "")
+          return { ok: false, error: `Bloc ${index} (progress): chaque item doit avoir un "label"` };
+        if (typeof item.value !== "number")
+          return { ok: false, error: `Bloc ${index} (progress): chaque item doit avoir un "value" numérique` };
+      }
+      break;
+
+    case "timeline":
+      if (!Array.isArray(block.events) || block.events.length === 0)
+        return { ok: false, error: `Bloc ${index} (timeline): "events" requis (tableau avec "date" et "title")` };
+      for (const ev of block.events) {
+        if (typeof ev.title !== "string" || ev.title.trim() === "")
+          return { ok: false, error: `Bloc ${index} (timeline): chaque événement doit avoir un "title"` };
+        if (typeof ev.date !== "string" || ev.date.trim() === "")
+          return { ok: false, error: `Bloc ${index} (timeline): chaque événement doit avoir une "date"` };
+        if (ev.status && !["done", "current", "upcoming", "error"].includes(ev.status))
+          return { ok: false, error: `Bloc ${index} (timeline): status valides: done, current, upcoming, error` };
+      }
+      break;
+
+    case "stat_grid":
+      if (!Array.isArray(block.items) || block.items.length === 0)
+        return { ok: false, error: `Bloc ${index} (stat_grid): "items" requis (tableau avec "label" et "value")` };
+      for (const item of block.items) {
+        if (typeof item.label !== "string" || item.label.trim() === "")
+          return { ok: false, error: `Bloc ${index} (stat_grid): chaque item doit avoir un "label"` };
+        if (item.value === undefined || item.value === null)
+          return { ok: false, error: `Bloc ${index} (stat_grid): chaque item doit avoir une "value"` };
+      }
+      if (block.columns !== undefined && ![2, 3, 4].includes(block.columns))
+        return { ok: false, error: `Bloc ${index} (stat_grid): "columns" doit être 2, 3 ou 4` };
+      break;
   }
 
   return { ok: true };
@@ -103,19 +139,24 @@ export const richDocumentSkill: Skill = {
       description: [
         "📊 Crée et affiche immédiatement un document riche interactif dans l'interface.",
         "Utilise cet outil pour présenter des données sous forme de tableaux, graphiques,",
-        "courbes, camemberts, fiches ou listes structurées — bien plus lisible qu'un message texte.",
+        "courbes, camemberts, fiches, listes, code, progressions, chronologies ou statistiques.",
+        "Beaucoup plus lisible qu'un message texte pour des données structurées.",
         "",
         "Types de blocs disponibles :",
-        "• 'table'       — Tableau avec colonnes et lignes",
-        "• 'bar_chart'   — Graphique en barres (groupé ou empilé)",
-        "• 'line_chart'  — Courbe / graphique linéaire",
-        "• 'area_chart'  — Graphique en aires (empilable)",
-        "• 'pie_chart'   — Camembert ou donut",
-        "• 'card'        — Fiche avec champs clé/valeur (KPI, stats)",
-        "• 'list'        — Liste structurée avec sous-textes et badges",
-        "• 'text'        — Bloc de texte libre",
+        "• 'table'      — Tableau avec filtre intégré et export CSV",
+        "• 'bar_chart'  — Graphique en barres (groupé ou empilé), taille S/M/L",
+        "• 'line_chart' — Courbe / graphique linéaire, taille S/M/L",
+        "• 'area_chart' — Graphique en aires (empilable), taille S/M/L",
+        "• 'pie_chart'  — Camembert ou donut avec légende valeurs absolues + %",
+        "• 'card'       — Fiche avec champs clé/valeur (KPI, stats)",
+        "• 'list'       — Liste structurée avec sous-textes et badges",
+        "• 'text'       — Bloc de texte Markdown (rendu automatiquement)",
+        "• 'code'       — Bloc de code avec langage et bouton copie",
+        "• 'progress'   — Barres de progression animées (valeur/max, unité, couleur)",
+        "• 'timeline'   — Frise chronologique avec statuts (done/current/upcoming/error)",
+        "• 'stat_grid'  — Grille de statistiques avec variations +/- et icônes",
         "",
-        "Un document peut combiner plusieurs blocs de types différents (type 'mixed').",
+        "Un document peut combiner plusieurs blocs de types différents.",
       ].join("\n"),
       parameters: {
         type: "OBJECT",
@@ -133,31 +174,58 @@ export const richDocumentSkill: Skill = {
             description: [
               "Tableau de blocs de contenu. Chaque bloc a un champ 'type' obligatoire.",
               "",
-              "Exemples par type :",
+              "── TABLE ──",
+              '{ "type":"table", "title":"Ventes", "columns":["Produit","Q1","Q2"], "rows":[["Alpha",120,145],["Beta",89,110]] }',
               "",
-              "TABLE:",
-              '  { "type":"table", "title":"Ventes", "columns":["Produit","Q1","Q2"], "rows":[["Alpha",120,145],["Beta",89,110]] }',
+              "── BAR_CHART ──",
+              '{ "type":"bar_chart", "title":"CA mensuel", "height":"md", "stacked":false,',
+              '  "data":[{"label":"Jan","ca":1200},{"label":"Fév","ca":1450}],',
+              '  "series":[{"key":"ca","label":"Chiffre d\'affaires","color":"#6366f1"}] }',
               "",
-              "BAR_CHART:",
-              '  { "type":"bar_chart", "title":"CA mensuel", "data":[{"label":"Jan","ca":1200},{"label":"Fév","ca":1450}], "series":[{"key":"ca","label":"Chiffre d\'affaires","color":"#6366f1"}] }',
+              "── LINE_CHART ──",
+              '{ "type":"line_chart", "title":"Évolution", "smooth":true, "height":"md",',
+              '  "data":[{"label":"S1","users":200},{"label":"S2","users":340}],',
+              '  "series":[{"key":"users","label":"Utilisateurs"}] }',
               "",
-              "LINE_CHART (smooth):",
-              '  { "type":"line_chart", "title":"Évolution", "smooth":true, "data":[{"label":"S1","users":200},{"label":"S2","users":340}], "series":[{"key":"users","label":"Utilisateurs"}] }',
+              "── AREA_CHART ──",
+              '{ "type":"area_chart", "title":"Traffic", "height":"md",',
+              '  "data":[{"label":"Lun","visits":500},{"label":"Mar","visits":620}],',
+              '  "series":[{"key":"visits","color":"#22d3ee"}] }',
               "",
-              "AREA_CHART:",
-              '  { "type":"area_chart", "title":"Traffic", "data":[{"label":"Lun","visits":500},{"label":"Mar","visits":620}], "series":[{"key":"visits","color":"#22d3ee"}] }',
+              "── PIE_CHART ──",
+              '{ "type":"pie_chart", "title":"Parts de marché", "donut":true,',
+              '  "data":[{"label":"Produit A","value":45},{"label":"Produit B","value":30},{"label":"Autres","value":25}] }',
               "",
-              "PIE_CHART (donut):",
-              '  { "type":"pie_chart", "title":"Parts de marché", "donut":true, "data":[{"label":"Produit A","value":45},{"label":"Produit B","value":30},{"label":"Autres","value":25}] }',
+              "── CARD ──",
+              '{ "type":"card", "title":"Indicateurs clés", "badge":{"text":"✓ Objectif atteint","color":"#34d399"},',
+              '  "fields":[{"label":"CA Total","value":"124 500 €","highlight":true},{"label":"Clients","value":"1 247"}] }',
               "",
-              "CARD (fiche KPI):",
-              '  { "type":"card", "title":"Indicateurs clés", "badge":{"text":"✓ Objectif atteint","color":"#34d399"}, "fields":[{"label":"CA Total","value":"124 500 €","highlight":true},{"label":"Clients","value":"1 247"}] }',
+              "── LIST ──",
+              '{ "type":"list", "title":"Actions", "ordered":true,',
+              '  "items":[{"text":"Optimiser","sub":"Réduction: 15%","badge":"Urgent"},{"text":"Former l\'équipe"}] }',
               "",
-              "LIST:",
-              '  { "type":"list", "title":"Actions prioritaires", "ordered":true, "items":[{"text":"Optimiser les coûts","sub":"Réduction estimée: 15%","badge":"Urgent"},{"text":"Former l\'équipe"}] }',
+              "── TEXT (Markdown) ──",
+              '{ "type":"text", "title":"Contexte", "content":"## Résumé\\n\\nCe rapport couvre **trois trimestres**..." }',
               "",
-              "TEXT:",
-              '  { "type":"text", "title":"Contexte", "content":"Ce rapport couvre la période..." }',
+              "── CODE ──",
+              '{ "type":"code", "title":"Exemple", "language":"typescript", "content":"const x = 42;\\nconsole.log(x);" }',
+              "",
+              "── PROGRESS ──",
+              '{ "type":"progress", "title":"Avancement", "items":[',
+              '  {"label":"Frontend","value":75,"max":100,"unit":"%","color":"#6366f1"},',
+              '  {"label":"Backend","value":3200,"max":5000,"unit":"lignes"} ]}',
+              "",
+              "── TIMELINE ──",
+              '{ "type":"timeline", "title":"Jalons", "events":[',
+              '  {"date":"Jan 2024","title":"Lancement","status":"done","badge":"v1.0"},',
+              '  {"date":"Mars 2024","title":"En cours","status":"current","description":"Intégration API"},',
+              '  {"date":"Juin 2024","title":"Déploiement prod","status":"upcoming"} ]}',
+              "",
+              "── STAT_GRID ──",
+              '{ "type":"stat_grid", "title":"KPIs", "columns":3, "items":[',
+              '  {"label":"Revenus","value":124500,"unit":"€","change":12.3,"changeLabel":"vs mois dernier","color":"#34d399","icon":"💰"},',
+              '  {"label":"Clients","value":1247,"change":-2.1,"color":"#6366f1","icon":"👥"},',
+              '  {"label":"NPS","value":72,"change":0,"color":"#f59e0b","icon":"⭐"} ]}',
             ].join("\n"),
             items: { type: "OBJECT" },
           },
@@ -172,8 +240,8 @@ export const richDocumentSkill: Skill = {
       return { error: `Outil inconnu: ${name}` };
     }
 
-    // ── Validation de base ────────────────────────────────────────────────────
-    const title = String(args.title || "").trim();
+    // ── Validation titre ──────────────────────────────────────────────────────
+    const title = String(args.title ?? "").trim();
     if (!title) {
       return { error: "Le champ 'title' est requis." };
     }
@@ -183,7 +251,7 @@ export const richDocumentSkill: Skill = {
       return { error: "Le document doit contenir au moins un bloc dans 'blocks'." };
     }
 
-    // Valider chaque bloc
+    // ── Validation des blocs ──────────────────────────────────────────────────
     const blockErrors: string[] = [];
     for (let i = 0; i < blocks.length; i++) {
       const result = validateBlock(blocks[i], i);
@@ -204,14 +272,11 @@ export const richDocumentSkill: Skill = {
       blocks,
     };
 
-    // ── Émission vers le client via ide-action ────────────────────────────────
+    // ── Émission vers le client ───────────────────────────────────────────────
     if (context?.emitIdeAction) {
-      context.emitIdeAction({
-        type: "open-rich-document",
-        document: doc,
-      });
+      context.emitIdeAction({ type: "open-rich-document", document: doc });
       console.log(
-        `[RichDocument] Document émis: "${title}" (${blocks.length} bloc(s): ${blocks.map((b) => b.type).join(", ")})`
+        `[RichDocument] "${title}" — ${blocks.length} bloc(s): ${blocks.map((b) => b.type).join(", ")}`
       );
     } else {
       console.warn("[RichDocument] emitIdeAction non disponible — document non affiché.");

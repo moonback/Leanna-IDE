@@ -375,15 +375,25 @@ async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash:
       const sandboxExisted = fs.existsSync(sandboxFile);
 
       if (mainExisted) {
-        const content = await fs.promises.readFile(mainFile);
-        originals.set(relPath, { existed: true, content });
+        const mainStat = await fs.promises.lstat(mainFile);
+        if (mainStat.isDirectory()) {
+          originals.set(relPath, { existed: true, deleted: true }); // directory — can't buffer it
+        } else {
+          const content = await fs.promises.readFile(mainFile);
+          originals.set(relPath, { existed: true, content });
+        }
       } else {
         originals.set(relPath, { existed: false });
       }
 
       if (!sandboxExisted) {
         if (mainExisted) {
-          await fs.promises.unlink(mainFile);
+          const mainStat = await fs.promises.lstat(mainFile);
+          if (mainStat.isDirectory()) {
+            await fs.promises.rm(mainFile, { recursive: true, force: true });
+          } else {
+            await fs.promises.unlink(mainFile);
+          }
           applied.push(`[DEL] ${relPath}`);
         }
       } else {
@@ -419,7 +429,12 @@ async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash:
           await fs.promises.mkdir(path.dirname(mainFile), { recursive: true });
           await fs.promises.writeFile(mainFile, orig.content);
         } else if (!orig.existed && fs.existsSync(mainFile)) {
-          await fs.promises.unlink(mainFile);
+          const mainStat = await fs.promises.lstat(mainFile);
+          if (mainStat.isDirectory()) {
+            await fs.promises.rm(mainFile, { recursive: true, force: true });
+          } else {
+            await fs.promises.unlink(mainFile);
+          }
         }
       } catch (rbErr: any) {
         rollbackErrors.push(`${relPath}: ${rbErr.message}`);
@@ -481,9 +496,14 @@ export async function acceptFile(relPath: string): Promise<{ applied: boolean }>
 
   try {
     if (!fs.existsSync(sandboxFile)) {
-      // Deleted in sandbox → delete in main
+      // Deleted in sandbox → delete in main (file or directory)
       if (fs.existsSync(mainFile)) {
-        await fs.promises.unlink(mainFile);
+        const stat = await fs.promises.lstat(mainFile);
+        if (stat.isDirectory()) {
+          await fs.promises.rm(mainFile, { recursive: true, force: true });
+        } else {
+          await fs.promises.unlink(mainFile);
+        }
       }
     } else {
       // Copy sandbox → main
@@ -527,13 +547,25 @@ export async function rejectFile(relPath: string): Promise<{ reverted: boolean }
 
   try {
     if (fs.existsSync(mainFile)) {
-      // Restore original from main → sandbox
-      await fs.promises.mkdir(path.dirname(sandboxFile), { recursive: true });
-      await fs.promises.copyFile(mainFile, sandboxFile);
+      const mainStat = await fs.promises.lstat(mainFile);
+      if (mainStat.isDirectory()) {
+        // Restore directory from main → sandbox (re-sync subtree)
+        await fs.promises.mkdir(sandboxFile, { recursive: true });
+        await syncDirectory(mainFile, sandboxFile);
+      } else {
+        // Restore original file from main → sandbox
+        await fs.promises.mkdir(path.dirname(sandboxFile), { recursive: true });
+        await fs.promises.copyFile(mainFile, sandboxFile);
+      }
     } else {
-      // File was added in sandbox but doesn't exist in main → remove from sandbox
+      // File/dir was added in sandbox but doesn't exist in main → remove from sandbox
       if (fs.existsSync(sandboxFile)) {
-        await fs.promises.unlink(sandboxFile);
+        const sbStat = await fs.promises.lstat(sandboxFile);
+        if (sbStat.isDirectory()) {
+          await fs.promises.rm(sandboxFile, { recursive: true, force: true });
+        } else {
+          await fs.promises.unlink(sandboxFile);
+        }
       }
     }
     sandboxModifiedFiles.delete(normalized);
