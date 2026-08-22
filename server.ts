@@ -3024,6 +3024,66 @@ async function startServer() {
               }
             })();
           }
+          // ── Sauvegarde d'un RichDocument dans le workspace (sandbox) ────
+          if (msg.type === 'save-rich-document' && msg.document && msg.path) {
+            (async () => {
+              try {
+                const { resolveSandboxWriteTarget } = await import("./server/skills/codebaseHelpers");
+                const { markFileModified, isSandboxActive } = await import("./server/utils/sandbox");
+                const fsModule = await import("fs");
+                const pathModule = await import("path");
+
+                const outputPath: string = String(msg.path).trim();
+                if (!outputPath) {
+                  clientWs.send(JSON.stringify({
+                    type: 'save-rich-document-result',
+                    status: 'error',
+                    error: 'Chemin de destination manquant.',
+                  }));
+                  return;
+                }
+
+                const target = resolveSandboxWriteTarget(outputPath);
+                if (!target) {
+                  clientWs.send(JSON.stringify({
+                    type: 'save-rich-document-result',
+                    status: 'error',
+                    error: isSandboxActive()
+                      ? `Chemin invalide ou hors du workspace : "${outputPath}"`
+                      : 'Le sandbox n\'est pas actif. Ouvre un projet d\'abord.',
+                  }));
+                  return;
+                }
+
+                const content = JSON.stringify(msg.document, null, 2);
+                await fsModule.promises.mkdir(pathModule.dirname(target.sandboxPath), { recursive: true });
+                await fsModule.promises.writeFile(target.sandboxPath, content, 'utf-8');
+                markFileModified(outputPath);
+
+                console.log(`[RichDocument] Sauvegardé dans le workspace : ${outputPath}`);
+
+                clientWs.send(JSON.stringify({
+                  type: 'save-rich-document-result',
+                  status: 'success',
+                  path: outputPath,
+                  bytes: Buffer.byteLength(content, 'utf-8'),
+                }));
+
+                // Notifier l'IDE pour rafraîchir l'explorateur de fichiers
+                clientWs.send(JSON.stringify({
+                  type: 'ide-action',
+                  action: { type: 'file-changed', path: outputPath },
+                }));
+              } catch (err: any) {
+                console.error('[RichDocument] Erreur sauvegarde workspace:', err);
+                clientWs.send(JSON.stringify({
+                  type: 'save-rich-document-result',
+                  status: 'error',
+                  error: err?.message ?? 'Erreur inconnue lors de la sauvegarde.',
+                }));
+              }
+            })();
+          }
           // ── Confirmation interactive (fichiers critiques) ──────────────
           if (msg.type === 'confirm-response' && msg.requestId) {
             import("./server/utils/confirmationBridge").then(({ handleConfirmationResponse }) => {

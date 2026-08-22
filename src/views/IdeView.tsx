@@ -63,7 +63,7 @@ const SERVER_PORT = Number(_importMeta.env?.VITE_SERVER_PORT) || 5000;
 
 export default function IdeView() {
   const { profile } = useProfile();
-  const { activity, clearActivity, connected, disconnect, connect, muted, toggleMute, isBusy, reasoning, sendVideoFrame } = useLiveAPIContext();
+  const { activity, clearActivity, connected, disconnect, connect, muted, toggleMute, isBusy, reasoning, sendVideoFrame, sendRawMessage } = useLiveAPIContext();
   const { isSharing: screenShareEnabled, toggleScreenShare } = useScreenShare();
 
   // Initialize the global activity store (listens to events even when panel is closed)
@@ -863,6 +863,13 @@ export default function IdeView() {
                           <RichDocumentViewerLazy
                             document={richDocument}
                             onClose={() => setRichDocument(null)}
+                            onSaveToWorkspace={(path) => {
+                              sendRawMessage({
+                                type: 'save-rich-document',
+                                document: richDocument,
+                                path,
+                              });
+                            }}
                           />
                         </Suspense>
                       ) : showDocuments ? (

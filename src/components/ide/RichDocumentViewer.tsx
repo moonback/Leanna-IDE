@@ -5,7 +5,7 @@
  *            card, list, text (markdown), code, progress, timeline, stat_grid
  */
 
-import { memo, useState, useMemo, useCallback } from 'react';
+import { memo, useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { marked } from 'marked';
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie,
@@ -16,7 +16,7 @@ import {
   TrendingUp, PieChart as PieIcon, FileText, List, Layers,
   Code2, Activity, GitCommitVertical, LayoutGrid,
   Copy, Check, ArrowUpRight, ArrowDownRight, Minus,
-  Search, FileDown,
+  Search, FileDown, Save, FolderOpen, CheckCircle2, AlertCircle, Loader2,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1171,10 +1171,216 @@ function RichBlock({ block, index }: { block: RichBlock; index: number }) {
 interface Props {
   document: RichDocument;
   onClose?: () => void;
+  /** Appelé avec le chemin souhaité — le parent gère l'envoi WebSocket */
+  onSaveToWorkspace?: (path: string) => void;
 }
 
-export const RichDocumentViewer = memo(function RichDocumentViewer({ document, onClose }: Props) {
+// ─── Modale de sauvegarde workspace ──────────────────────────────────────────
+
+type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
+
+function SaveModal({
+  defaultPath,
+  onConfirm,
+  onCancel,
+  status,
+  error,
+}: {
+  defaultPath: string;
+  onConfirm: (path: string) => void;
+  onCancel: () => void;
+  status: SaveStatus;
+  error?: string;
+}) {
+  const [path, setPath] = useState(defaultPath);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && status === 'idle') onConfirm(path);
+    if (e.key === 'Escape') onCancel();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 flex items-center justify-center z-[99999]"
+      style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div
+        className="rounded-2xl p-5 w-[420px] shadow-2xl"
+        style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-2.5 mb-4">
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)' }}
+          >
+            <Save size={14} style={{ color: 'var(--accent-primary)' }} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Enregistrer dans le workspace
+            </p>
+            <p className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+              Le fichier sera sauvegardé via le sandbox
+            </p>
+          </div>
+          <button
+            onClick={onCancel}
+            className="ml-auto p-1 rounded-lg hover:bg-white/10 transition-colors"
+            style={{ color: 'var(--text-dimmed)' }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Path input */}
+        <div className="mb-3">
+          <label className="text-[11px] font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+            Chemin du fichier (relatif au projet)
+          </label>
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-xl"
+            style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-base)' }}
+          >
+            <FolderOpen size={13} style={{ color: 'var(--text-dimmed)', flexShrink: 0 }} />
+            <input
+              ref={inputRef}
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={status !== 'idle'}
+              className="flex-1 bg-transparent outline-none text-[12px] font-mono"
+              style={{ color: 'var(--text-primary)' }}
+              placeholder="docs/rapport.rich.json"
+              spellCheck={false}
+            />
+          </div>
+          <p className="text-[10px] mt-1" style={{ color: 'var(--text-dimmed)' }}>
+            Extension recommandée : <span className="font-mono" style={{ color: 'var(--accent-primary)' }}>.rich.json</span>
+          </p>
+        </div>
+
+        {/* Status */}
+        {status === 'success' && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-[12px]"
+            style={{ backgroundColor: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)', color: '#34d399' }}
+          >
+            <CheckCircle2 size={13} />
+            <span>Fichier sauvegardé avec succès</span>
+          </div>
+        )}
+        {status === 'error' && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-[12px]"
+            style={{ backgroundColor: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}
+          >
+            <AlertCircle size={13} />
+            <span className="break-words">{error ?? 'Erreur de sauvegarde'}</span>
+          </div>
+        )}
+
+        {/* Buttons */}
+        <div className="flex items-center gap-2 justify-end">
+          {status !== 'success' && (
+            <button
+              onClick={onCancel}
+              disabled={status === 'saving'}
+              className="px-3 py-1.5 rounded-lg text-xs transition-colors hover:bg-white/10"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Annuler
+            </button>
+          )}
+          {status === 'success' ? (
+            <button
+              onClick={onCancel}
+              className="px-4 py-1.5 rounded-lg text-xs font-medium transition-colors"
+              style={{ backgroundColor: 'rgba(52,211,153,0.2)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }}
+            >
+              Fermer
+            </button>
+          ) : (
+            <button
+              onClick={() => onConfirm(path)}
+              disabled={status === 'saving' || !path.trim()}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors"
+              style={{
+                backgroundColor: status === 'saving' ? 'rgba(99,102,241,0.3)' : 'var(--accent-primary)',
+                color: 'white',
+                opacity: !path.trim() ? 0.5 : 1,
+              }}
+            >
+              {status === 'saving' ? (
+                <><Loader2 size={11} className="animate-spin" /> Sauvegarde…</>
+              ) : (
+                <><Save size={11} /> Enregistrer</>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export const RichDocumentViewer = memo(function RichDocumentViewer({ document, onClose, onSaveToWorkspace }: Props) {
   const [allCollapsed, setAllCollapsed] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [saveError, setSaveError] = useState<string | undefined>();
+
+  // Générer un chemin par défaut à partir du titre
+  const defaultSavePath = useMemo(() => {
+    const slug = document.title
+      .toLowerCase()
+      .replace(/[^a-z0-9\u00C0-\u024F]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'document';
+    return `docs/${slug}.rich.json`;
+  }, [document.title]);
+
+  // Écouter le résultat de sauvegarde depuis le serveur
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.status === 'success') {
+        setSaveStatus('success');
+        setSaveError(undefined);
+      } else if (detail?.status === 'error') {
+        setSaveStatus('error');
+        setSaveError(detail.error ?? 'Erreur inconnue');
+      }
+    };
+    window.addEventListener('jarvis-save-rich-document-result', handler);
+    return () => window.removeEventListener('jarvis-save-rich-document-result', handler);
+  }, []);
+
+  const handleOpenSaveModal = () => {
+    setSaveStatus('idle');
+    setSaveError(undefined);
+    setShowSaveModal(true);
+  };
+
+  const handleConfirmSave = (path: string) => {
+    if (!path.trim() || !onSaveToWorkspace) return;
+    setSaveStatus('saving');
+    onSaveToWorkspace(path.trim());
+  };
+
+  const handleCloseSaveModal = () => {
+    if (saveStatus === 'saving') return;
+    setShowSaveModal(false);
+    setSaveStatus('idle');
+    setSaveError(undefined);
+  };
 
   const handleExportJson = () => {
     const blob = new Blob([JSON.stringify(document, null, 2)], { type: 'application/json' });
@@ -1188,6 +1394,17 @@ export const RichDocumentViewer = memo(function RichDocumentViewer({ document, o
 
   return (
     <div className="flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+      {/* ── SaveModal ── */}
+      {showSaveModal && (
+        <SaveModal
+          defaultPath={defaultSavePath}
+          onConfirm={handleConfirmSave}
+          onCancel={handleCloseSaveModal}
+          status={saveStatus}
+          error={saveError}
+        />
+      )}
+
       {/* ── Header ── */}
       <div
         className="flex items-center gap-3 px-5 py-3 flex-shrink-0"
@@ -1221,11 +1438,23 @@ export const RichDocumentViewer = memo(function RichDocumentViewer({ document, o
           >
             {allCollapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
           </button>
+          {/* Enregistrer dans le workspace */}
+          {onSaveToWorkspace && (
+            <button
+              onClick={handleOpenSaveModal}
+              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              style={{ color: 'var(--text-muted)' }}
+              title="Enregistrer dans le workspace"
+            >
+              <Save size={13} />
+            </button>
+          )}
+          {/* Export JSON local */}
           <button
             onClick={handleExportJson}
             className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
             style={{ color: 'var(--text-muted)' }}
-            title="Exporter en JSON"
+            title="Télécharger en JSON"
           >
             <Download size={13} />
           </button>

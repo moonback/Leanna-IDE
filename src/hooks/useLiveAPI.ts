@@ -153,6 +153,9 @@ export function useLiveAPI() {
           break;
       }
     }
+    if (msg.type === 'save-rich-document-result') {
+      window.dispatchEvent(new CustomEvent('jarvis-save-rich-document-result', { detail: msg }));
+    }
     if (msg.type === 'browser-read-request' && msg.requestId) {
       window.dispatchEvent(new CustomEvent('jarvis-browser-read-request', {
         detail: { requestId: msg.requestId, selector: msg.selector ?? null },
