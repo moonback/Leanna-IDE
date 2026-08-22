@@ -10,13 +10,14 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
   router.get('/status', async (_req: Request, res: Response) => {
     try {
       // SELF_ROOT est lu dynamiquement (peut avoir changé depuis le démarrage)
-      const { SELF_ROOT, hasProject } = await import('../utils/selfRoot');
+      const { SELF_ROOT, WORKSPACE_SITE_URL, hasProject } = await import('../utils/selfRoot');
 
       if (!hasProject()) {
         return res.json({
           rootPath: null,
           locked: false,
           noProject: true,
+          siteUrl: '',
           gitBranch: '—',
           gitStatus: 'unknown',
           lastCommit: '—',
@@ -64,7 +65,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         const parts = abOutput.split(/\s+/);
         if (parts.length === 2) { behind = parseInt(parts[0], 10) || 0; ahead = parseInt(parts[1], 10) || 0; }
       } catch {}
-      res.json({ rootPath: SELF_ROOT, locked: true, gitBranch, gitStatus, lastCommit, lastCommitDate, aheadBehind: { ahead, behind } });
+      res.json({ rootPath: SELF_ROOT, locked: true, siteUrl: WORKSPACE_SITE_URL || '', gitBranch, gitStatus, lastCommit, lastCommitDate, aheadBehind: { ahead, behind } });
     } catch (e: any) {
       res.status(500).json({ error: e.message || 'Erreur interne' });
     }
@@ -76,12 +77,13 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
       const ChangeSchema = z.object({
         path: z.string().min(1, 'Le chemin est requis.'),
         userConfirmed: z.boolean().optional(),
+        siteUrl: z.string().url('URL invalide.').optional().or(z.literal('')),
       });
       const parsed = ChangeSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Paramètres invalides.' });
       }
-      const { path: newPath, userConfirmed } = parsed.data;
+      const { path: newPath, userConfirmed, siteUrl } = parsed.data;
 
       // Si la demande vient de l'UI Settings (confirmation locale déjà affichée),
       // on bypass la confirmation WS qui nécessite une session vocale active.
@@ -114,6 +116,12 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
       const newRoot = await switchSandboxProject(newPath.trim());
       console.log(`[Sandbox] Sandbox READY pour le nouveau projet: ${newRoot}`);
 
+      // Persister l'URL du site si fournie
+      if (siteUrl !== undefined) {
+        const { setWorkspaceSiteUrl } = await import('../utils/selfRoot');
+        setWorkspaceSiteUrl(siteUrl);
+      }
+
       // 3. Recharger et réindexer le Knowledge System pour le nouveau projet
       try {
         const { knowledgeGraph } = await import('../knowledge/KnowledgeGraph');
@@ -125,7 +133,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         console.log(`[KnowledgeGraph] Rechargement pour: ${newRoot}`);
       } catch { /* silent */ }
 
-      res.json({ status: 'success', newRoot });
+      res.json({ status: 'success', newRoot, siteUrl: siteUrl ?? '' });
     } catch (e: any) {
       res.status(400).json({ error: e.message });
     }
@@ -153,6 +161,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
       const NewProjectSchema = z.object({
         path: z.string().optional(),
         name: z.string().optional(),
+        siteUrl: z.string().url('URL invalide.').optional().or(z.literal('')),
       }).refine(data => !!(data.path?.trim() || data.name?.trim()), {
         message: 'Un chemin ou un nom de projet est requis.',
       });
@@ -160,7 +169,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Paramètres invalides.' });
       }
-      const { path: projectPath, name } = parsed.data;
+      const { path: projectPath, name, siteUrl } = parsed.data;
 
       const fsModule = await import('fs');
       const pathModule = await import('path');
@@ -202,6 +211,12 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
       const newRoot = await switchSandboxProject(finalPath);
       console.log(`[Sandbox] Sandbox READY pour le nouveau projet: ${newRoot}`);
 
+      // Persister l'URL du site si fournie
+      if (siteUrl !== undefined) {
+        const { setWorkspaceSiteUrl } = await import('../utils/selfRoot');
+        setWorkspaceSiteUrl(siteUrl);
+      }
+
       // Recharger le Knowledge System pour le nouveau projet (vide)
       try {
         const { knowledgeGraph } = await import('../knowledge/KnowledgeGraph');
@@ -212,7 +227,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         projectIndexer.scanAll().catch(() => {});
       } catch { /* silent */ }
 
-      res.json({ status: 'success', newRoot });
+      res.json({ status: 'success', newRoot, siteUrl: siteUrl ?? '' });
     } catch (e: any) {
       res.status(400).json({ error: e.message });
     }
@@ -414,6 +429,27 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         console.log('[SelfRoot/scaffold] Client déconnecté — process tué.');
       }
     });
+  });
+
+  // PATCH /api/self-root/site-url — mettre à jour uniquement l'URL du site
+  router.patch('/site-url', async (req: Request, res: Response) => {
+    try {
+      const Schema = z.object({
+        siteUrl: z.string().url('URL invalide.').or(z.literal('')),
+      });
+      const parsed = Schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'URL invalide.' });
+      }
+      const { setWorkspaceSiteUrl, hasProject } = await import('../utils/selfRoot');
+      if (!hasProject()) {
+        return res.status(400).json({ error: 'Aucun projet actif.' });
+      }
+      setWorkspaceSiteUrl(parsed.data.siteUrl);
+      res.json({ status: 'success', siteUrl: parsed.data.siteUrl });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   return router;

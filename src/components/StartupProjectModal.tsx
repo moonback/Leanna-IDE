@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   FolderOpen, Upload, ShieldAlert, Loader2,
-  FolderX, FolderInput,
+  FolderX, FolderInput, Globe,
 } from 'lucide-react';
 import { ideApi } from '../services/ideApi';
 
@@ -17,6 +17,8 @@ export function StartupProjectModal() {
 
   // Onglet "Ouvrir"
   const [inputPath, setInputPath] = useState('');
+  const [inputSiteUrl, setInputSiteUrl] = useState('');
+  const [siteUrlError, setSiteUrlError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +32,7 @@ export function StartupProjectModal() {
           setIsOpen(true);
         } else {
           setCurrentPath(data.rootPath);
+          setInputSiteUrl(data.siteUrl ?? '');
           setIsOpen(false);
         }
       })
@@ -60,19 +63,27 @@ export function StartupProjectModal() {
   const handleOpenProject = useCallback(async () => {
     const trimmed = inputPath.trim();
     if (!trimmed) return;
+
+    // Valider l'URL si renseignée
+    const urlTrimmed = inputSiteUrl.trim();
+    if (urlTrimmed) {
+      try { new URL(urlTrimmed); setSiteUrlError(null); }
+      catch { setSiteUrlError("URL invalide — ex: https://mon-site.com"); return; }
+    }
+
     setLoading(true); setError(null);
     try {
       const res = await fetch('/api/self-root/change', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: trimmed, userConfirmed: true }),
+        body: JSON.stringify({ path: trimmed, userConfirmed: true, siteUrl: urlTrimmed }),
       });
       const data = await res.json();
       if (data.status === 'success') await activate(data.newRoot);
       else setError(data.error || 'Erreur lors du changement de répertoire');
     } catch (e: any) { setError(e.message || 'Erreur réseau'); }
     finally { setLoading(false); }
-  }, [inputPath, activate]);
+  }, [inputPath, inputSiteUrl, activate]);
 
   const canBrowse = !!getElectronAPI() || typeof (window as any).showDirectoryPicker === 'function';
 
@@ -144,6 +155,38 @@ export function StartupProjectModal() {
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* URL du site (optionnel) */}
+            <div>
+              <label className="text-[11px] font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
+                URL du site associé
+                <span className="ml-1.5 text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>(optionnel)</span>
+              </label>
+              <div className="relative">
+                <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--text-dimmed)' }} />
+                <input
+                  type="url"
+                  value={inputSiteUrl}
+                  onChange={e => { setInputSiteUrl(e.target.value); setSiteUrlError(null); }}
+                  onKeyDown={e => { if (e.key === 'Enter') handleOpenProject(); }}
+                  placeholder="https://mon-site.com"
+                  className="w-full rounded-lg border pl-8 pr-3 py-2 text-[11px] font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
+                  style={{
+                    backgroundColor: 'var(--bg-input)',
+                    borderColor: siteUrlError ? '#f87171' : 'var(--border-base)',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                  }}
+                  spellCheck={false}
+                />
+              </div>
+              {siteUrlError && (
+                <p className="mt-1 text-[10px]" style={{ color: '#f87171' }}>{siteUrlError}</p>
+              )}
+              <p className="mt-1 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                L'assistant pourra consulter ce site pour répondre à vos questions.
+              </p>
             </div>
 
             {/* Erreur */}

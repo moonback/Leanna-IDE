@@ -66,15 +66,21 @@ function getPersistedProjectPath(): string {
   return path.join(JARVIS_APP_ROOT, ".jarvis", "lastProject.json");
 }
 
-function loadPersistedProject(): string | null {
+interface PersistedProjectData {
+  projectRoot: string;
+  /** URL optionnelle du site associé au projet (docs, app déployée, etc.) */
+  siteUrl?: string;
+}
+
+function loadPersistedProject(): PersistedProjectData | null {
   try {
     const configPath = getPersistedProjectPath();
     if (!fs.existsSync(configPath)) return null;
-    const data = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    const data = JSON.parse(fs.readFileSync(configPath, "utf-8")) as PersistedProjectData;
     if (data?.projectRoot && typeof data.projectRoot === "string") {
       const resolved = path.resolve(data.projectRoot);
       if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
-        return resolved;
+        return { projectRoot: resolved, siteUrl: data.siteUrl || undefined };
       }
     }
   } catch (e) {
@@ -86,11 +92,13 @@ function loadPersistedProject(): string | null {
   return null;
 }
 
-function persistProject(projectRoot: string): void {
+function persistProject(projectRoot: string, siteUrl?: string): void {
   try {
     const configPath = getPersistedProjectPath();
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
-    fs.writeFileSync(configPath, JSON.stringify({ projectRoot }, null, 2), "utf-8");
+    const data: PersistedProjectData = { projectRoot };
+    if (siteUrl) data.siteUrl = siteUrl;
+    fs.writeFileSync(configPath, JSON.stringify(data, null, 2), "utf-8");
   } catch (e: any) {
     console.warn("[SelfRoot] Impossible de persister le projet:", e.message);
   }
@@ -115,6 +123,12 @@ function clearPersistedProject(): void {
 export let SELF_ROOT: string = "";
 
 /**
+ * URL optionnelle du site associé au projet actif (docs, app déployée…).
+ * "" = aucune URL configurée.
+ */
+export let WORKSPACE_SITE_URL: string = "";
+
+/**
  * Retourne true si un projet est actuellement actif.
  */
 export function hasProject(): boolean {
@@ -122,7 +136,7 @@ export function hasProject(): boolean {
 }
 
 /**
- * Initialise SELF_ROOT depuis le projet persisté (si disponible).
+ * Initialise SELF_ROOT (et WORKSPACE_SITE_URL) depuis le projet persisté.
  * À appeler UNE SEULE FOIS au démarrage du serveur.
  * Si aucun projet n'est persisté, SELF_ROOT reste "" et
  * le serveur démarre en mode "aucun projet".
@@ -140,10 +154,15 @@ export function initSelfRoot(): void {
 
   const persisted = loadPersistedProject();
   if (persisted) {
-    SELF_ROOT = persisted;
+    SELF_ROOT = persisted.projectRoot;
+    WORKSPACE_SITE_URL = persisted.siteUrl ?? "";
     console.log(`[SelfRoot] Projet restauré: ${SELF_ROOT}`);
+    if (WORKSPACE_SITE_URL) {
+      console.log(`[SelfRoot] URL site: ${WORKSPACE_SITE_URL}`);
+    }
   } else {
     SELF_ROOT = "";
+    WORKSPACE_SITE_URL = "";
     console.log("[SelfRoot] Aucun projet sélectionné — en attente d'un projet.");
   }
 }
@@ -151,9 +170,10 @@ export function initSelfRoot(): void {
 /**
  * Change la racine du workspace à chaud.
  * Valide que le chemin existe et contient du code source.
+ * siteUrl est optionnel — s'il est undefined, la valeur existante est conservée.
  * Retourne le nouveau chemin ou lève une erreur.
  */
-export function setSelfRoot(newPath: string): string {
+export function setSelfRoot(newPath: string, siteUrl?: string): string {
   const resolved = path.resolve(newPath);
   if (!fs.existsSync(resolved)) {
     throw new Error(`Le chemin n'existe pas: ${resolved}`);
@@ -163,18 +183,37 @@ export function setSelfRoot(newPath: string): string {
     throw new Error(`Le chemin n'est pas un dossier: ${resolved}`);
   }
   SELF_ROOT = resolved;
-  persistProject(resolved);
+  // siteUrl explicitement passé (même "") remplace l'ancienne valeur
+  if (siteUrl !== undefined) {
+    WORKSPACE_SITE_URL = siteUrl.trim();
+  }
+  persistProject(resolved, WORKSPACE_SITE_URL || undefined);
   console.log(`[SelfRoot] Jarvis-OS root verrouillé: ${SELF_ROOT}`);
+  if (WORKSPACE_SITE_URL) {
+    console.log(`[SelfRoot] URL site persistée: ${WORKSPACE_SITE_URL}`);
+  }
   return SELF_ROOT;
 }
 
 /**
- * Réinitialise le workspace : remet SELF_ROOT à "" en mémoire
+ * Met à jour uniquement l'URL du site sans changer le projet actif.
+ */
+export function setWorkspaceSiteUrl(url: string): void {
+  WORKSPACE_SITE_URL = url.trim();
+  if (SELF_ROOT) {
+    persistProject(SELF_ROOT, WORKSPACE_SITE_URL || undefined);
+  }
+  console.log(`[SelfRoot] URL site mise à jour: ${WORKSPACE_SITE_URL || "(effacée)"}`);
+}
+
+/**
+ * Réinitialise le workspace : remet SELF_ROOT et WORKSPACE_SITE_URL à "" en mémoire
  * et supprime le fichier de persistance lastProject.json.
  * À appeler quand l'utilisateur veut changer de projet.
  */
 export function resetSelfRoot(): void {
   SELF_ROOT = "";
+  WORKSPACE_SITE_URL = "";
   clearPersistedProject();
   console.log('[SelfRoot] Workspace réinitialisé — aucun projet actif.');
 }

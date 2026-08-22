@@ -16,7 +16,7 @@ import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import { authenticateRequest, authenticateToken, createRateLimiter, resolveWorkspacePath } from "./server/security";
 import { appendAuditEvent } from "./server/audit";
-import { SELF_ROOT, JARVIS_APP_ROOT, CRITICAL_FILES, initSelfRoot, hasProject } from "./server/utils/selfRoot";
+import { SELF_ROOT, JARVIS_APP_ROOT, CRITICAL_FILES, initSelfRoot, hasProject, WORKSPACE_SITE_URL } from "./server/utils/selfRoot";
 import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox";
 import { subscribeToValidation } from "./server/utils/postEditValidator";
 
@@ -2074,6 +2074,12 @@ async function startServer() {
         workspace: getWorkspaceRoot(),
         mode: sessionMode,
       });
+
+      // ── Site URL — injecter l'URL du site associé au workspace si définie ─
+      if (WORKSPACE_SITE_URL) {
+        systemText += `\n\n[Workspace — Site associé]\nL'URL du site web associé à ce projet est : ${WORKSPACE_SITE_URL}\nTu peux y accéder pour répondre aux questions de l'utilisateur sur le site, sa documentation ou son contenu.`;
+        console.log(`[SystemPrompt] 🌐 URL site injectée: ${WORKSPACE_SITE_URL}`);
+      }
       const voiceName  = currentProfile.aiVoice || "Aoede";
 
       // ── Hyperparameters from profile ────────────────────────────────────
