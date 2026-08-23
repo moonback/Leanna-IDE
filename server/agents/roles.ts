@@ -15,6 +15,13 @@ PRINCIPES :
 - Modifications minimales, ciblées et incrémentales.
 - Sois précis, concis et déterministe.
 
+PERSISTENCE DE CONNAISSANCES (ProjectMemory) :
+- Dès que tu identifies ou confirmes un fait durable sur le projet (stack technique, framework, librairie clé, conventions de code, décisions d'architecture, bugs récurrents), persiste-le systématiquement via l'outil knowledge_memory_add.
+- Catégories disponibles : stack, architecture, convention, pattern, decision, known-bug, api, module, workflow, security, refactoring, todo.
+
+VÉRIFICATION PRÉALABLE DU CONTEXTE ET DU CI/CD :
+- Avant de concevoir ou planifier une automatisation de validation, de lint ou de test, inspecte TOUJOURS les workflows CI/CD existants (.github/workflows/), les scripts de package.json, et les configurations d'outils en place pour éviter toute duplication ou redondance.
+
 DÉLÉGATION OBLIGATOIRE :
 Ne jamais exécuter une tâche qui relève d'un autre agent spécialisé.
 Pour déléguer, inclus un bloc ## DÉLÉGATION dans ta réponse finale.
@@ -24,16 +31,17 @@ RÈGLES DE DÉLÉGATION (impératives) :
   → Si deux compétences sont nécessaires, crée DEUX blocs ## DÉLÉGATION distincts.
 
 Délégations automatiques recommandées :
-- Code implémenté → tester (couverture de tests) ou reviewer (revue de code)
+- Code implémenté → tester (couverture de tests) ou reviewer (revue de code approfondie)
+- Revue de code / audit qualité → reviewer (expert en audit de code et règles lint/typecheck)
 - Bug détecté / stacktrace → debugger (diagnostic et fix)
 - Code monolithique ou dette technique → refactor (restructuration propre)
 - Conception de nouveau module / schéma complexe → architect (modélisation)
 - Audit de sécurité / données sensibles → security (vérification failles)
-- Rédaction terminée → proofreader (relecture)
-- Nouveau document → planner (structuration)
+- Rédaction / texte terminé → proofreader (relecture orthographique et stylistique)
+- Nouveau document / projet → planner (structuration et planification)
 - Document multilangue → translator
 - Document long → summarizer (résumé exécutif)
-- Document technique / sources externes → researcher (vérification des sources)
+- Recherche technique / analyse d'impact / modules → researcher (analyse des dépendances et sources)
 - Brouillon brut → formatter (mise en forme)
 
 FORMATS ET ENVIRONNEMENTS SUPPORTÉS :
@@ -116,6 +124,10 @@ const coderAgent: AgentDefinition = {
     "verify_typecheck",
     "verify_lint",
     "verify_full",
+    "knowledge_build_context",
+    "knowledge_semantic_search",
+    "knowledge_memory_search",
+    "knowledge_memory_add",
     "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("coder"),
@@ -142,6 +154,10 @@ const refactorAgent: AgentDefinition = {
     "verify_typecheck",
     "verify_lint",
     "verify_full",
+    "knowledge_build_context",
+    "knowledge_memory_search",
+    "knowledge_memory_add",
+    "knowledge_impact_analyze",
     "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("refactor"),
@@ -166,6 +182,9 @@ const debuggerAgent: AgentDefinition = {
     "verify_typecheck",
     "verify_lint",
     "verify_full",
+    "knowledge_build_context",
+    "knowledge_memory_search",
+    "knowledge_memory_add",
     "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("debugger"),
@@ -183,8 +202,14 @@ const reviewerAgent: AgentDefinition = {
     "search_in_files",
     "read_file_outline",
     "analyze_project_file",
+    "verify_file",
     "verify_lint",
     "verify_typecheck",
+    "verify_full",
+    "knowledge_build_context",
+    "knowledge_memory_search",
+    "knowledge_memory_add",
+    "knowledge_impact_analyze",
     "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("reviewer"),
@@ -204,8 +229,13 @@ const testerAgent: AgentDefinition = {
     "list_project_files",
     "search_in_files",
     "analyze_project_file",
-    "verify_full",
+    "verify_file",
+    "verify_lint",
     "verify_typecheck",
+    "verify_full",
+    "knowledge_build_context",
+    "knowledge_memory_search",
+    "knowledge_memory_add",
     "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("tester"),
@@ -223,6 +253,11 @@ const securityAgent: AgentDefinition = {
     "search_in_files",
     "analyze_project_file",
     "read_file_outline",
+    "verify_lint",
+    "verify_typecheck",
+    "knowledge_build_context",
+    "knowledge_memory_search",
+    "knowledge_memory_add",
     "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("security"),
@@ -242,6 +277,14 @@ const architectAgent: AgentDefinition = {
     "search_in_files",
     "read_file_outline",
     "analyze_project_file",
+    "verify_file",
+    "knowledge_build_context",
+    "knowledge_semantic_search",
+    "knowledge_search_entities",
+    "knowledge_memory_search",
+    "knowledge_memory_add",
+    "knowledge_impact_analyze",
+    "knowledge_graph_query",
     "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("architect"),
@@ -268,6 +311,8 @@ const writerAgent: AgentDefinition = {
     "read_file_outline",
     "analyze_project_file",
     "verify_file",
+    "knowledge_memory_search",
+    "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("writer"),
   maxConcurrency: 3,
@@ -288,6 +333,8 @@ const formatterAgent: AgentDefinition = {
     "list_project_files",
     "search_in_files",
     "read_file_outline",
+    "verify_file",
+    "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("formatter"),
   maxConcurrency: 2,
@@ -297,12 +344,22 @@ const formatterAgent: AgentDefinition = {
 const researcherAgent: AgentDefinition = {
   role: "researcher",
   name: "Agent Recherche",
-  description: "Collecte d'informations, résumé de sources, vérification de faits, bibliographie.",
+  description: "Collecte d'informations, analyse d'impact, résumé de sources, vérification de faits et persistance dans ProjectMemory.",
   capabilities: [
     "read_project_file",
     "list_project_files",
     "search_in_files",
     "read_file_outline",
+    "analyze_project_file",
+    "knowledge_build_context",
+    "knowledge_semantic_search",
+    "knowledge_search_entities",
+    "knowledge_memory_search",
+    "knowledge_memory_add",
+    "knowledge_memory_list",
+    "knowledge_impact_analyze",
+    "knowledge_graph_query",
+    "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("researcher"),
   maxConcurrency: 2,
@@ -316,9 +373,13 @@ const proofreaderAgent: AgentDefinition = {
   capabilities: [
     "read_project_file",
     "write_project_file",
+    "modify_project_file",
     "patch_project_file",
+    "create_project_directory",
     "list_project_files",
     "search_in_files",
+    "verify_file",
+    "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("proofreader"),
   maxConcurrency: 2,
@@ -332,9 +393,11 @@ const translatorAgent: AgentDefinition = {
   capabilities: [
     "read_project_file",
     "write_project_file",
+    "modify_project_file",
     "patch_project_file",
     "list_project_files",
     "search_in_files",
+    "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("translator"),
   maxConcurrency: 2,
@@ -352,6 +415,8 @@ const summarizerAgent: AgentDefinition = {
     "list_project_files",
     "search_in_files",
     "read_file_outline",
+    "knowledge_memory_search",
+    "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("summarizer"),
   maxConcurrency: 2,
@@ -361,7 +426,7 @@ const summarizerAgent: AgentDefinition = {
 const plannerAgent: AgentDefinition = {
   role: "planner",
   name: "Agent Planificateur",
-  description: "Création de plans, outlines, structures de documents, tables des matières. Peut créer des dossiers et déplacer des fichiers pour réorganiser un projet.",
+  description: "Création de plans d'ingénierie et de documents, structuration d'architecture, alimentation de la mémoire projet et préparation des délégations.",
   capabilities: [
     "read_project_file",
     "write_project_file",
@@ -373,6 +438,14 @@ const plannerAgent: AgentDefinition = {
     "list_project_files",
     "search_in_files",
     "read_file_outline",
+    "verify_file",
+    "knowledge_build_context",
+    "knowledge_semantic_search",
+    "knowledge_search_entities",
+    "knowledge_memory_search",
+    "knowledge_memory_add",
+    "knowledge_memory_list",
+    "knowledge_impact_analyze",
     "reasoning_think",
   ],
   systemPrompt: buildAgentPrompt("planner"),
@@ -772,47 +845,44 @@ ${SECTION_OUTPUT_FORMAT}
 `,
 
     researcher: `
-${SECTION_IDENTITY("Recherche", "spécialiste de la collecte et synthèse d'informations")}
+${SECTION_IDENTITY("Recherche", "spécialiste de la collecte d'informations, analyse d'impact et enrichissement de la mémoire projet")}
 
 ${SECTION_MISSION([
-  "Collecter des informations pertinentes à partir des sources disponibles.",
-  "Vérifier la fiabilité et la cohérence des données.",
-  "Organiser les informations de manière structurée.",
-  "Fournir des références et citations.",
-  "Identifier les lacunes informationnelles.",
+  "Collecter des informations pertinentes et analyser les dépendances et modules critiques via knowledge_build_context et knowledge_impact_analyze.",
+  "Vérifier la fiabilité et la cohérence des données et des dépendances techniques.",
+  "Persister systématiquement les faits techniques clés (frameworks, stack, modules critiques, patterns) dans ProjectMemory via knowledge_memory_add.",
+  "Organiser les informations de manière structurée avec références et extraits.",
+  "Identifier les lacunes informationnelles et risques de dépendances.",
 ])}
 
 ${SECTION_PROCESS([
-  "Comprendre la question ou le sujet de recherche.",
-  "Identifier les sources disponibles (fichiers du projet, docs existantes).",
-  "Extraire les informations pertinentes.",
-  "Croiser et vérifier les données.",
-  "Organiser en synthèse structurée.",
-  "Lister les sources et références.",
+  "Comprendre la question, le module ou le sujet de recherche.",
+  "Utiliser knowledge_build_context ou knowledge_semantic_search pour explorer le contexte.",
+  "Analyser l'impact des modules critiques avec knowledge_impact_analyze si pertinent.",
+  "Enregistrer les faits et découvertes durables dans la mémoire projet via knowledge_memory_add.",
+  "Organiser la synthèse structurée avec sources et confiance.",
   "Signaler les informations manquantes ou incertaines.",
 ])}
 
 ${SECTION_RULES([
-  "Agent en lecture seule sur les fichiers existants.",
-  "Toujours citer les sources.",
+  "Agent en lecture seule sur les fichiers sources du code.",
+  "Toujours persister les découvertes techniques durables avec knowledge_memory_add(content, category, tags).",
+  "Toujours citer les sources (chemins de fichiers, packages).",
   "Distinguer clairement les faits des hypothèses.",
   "Signaler le niveau de confiance de chaque information.",
-  "Structurer la recherche par thème/question.",
 ])}
 
 ${SECTION_INTERDICTIONS([
-  "Ne jamais inventer de sources ou de références.",
-  "Ne jamais présenter une hypothèse comme un fait vérifié.",
-  "Ne jamais ignorer des informations contradictoires.",
-  "Ne jamais modifier les documents sources.",
+  "Ne jamais inventer de sources ou de dépendances.",
+  "Ne jamais omettre d'enregistrer les faits durables dans ProjectMemory.",
+  "Ne jamais modifier les documents sources directement.",
 ])}
 
 ${SECTION_CRITERES([
   "Sources identifiées et traçables.",
-  "Informations organisées par pertinence.",
-  "Contradictions signalées.",
-  "Lacunes explicitement mentionnées.",
-  "Synthèse actionnable pour le rédacteur.",
+  "Faits techniques cruciaux enregistrés dans ProjectMemory.",
+  "Impacts et dépendances clairement documentés.",
+  "Synthèse actionnable pour le planificateur ou le développeur.",
 ])}
 
 ${SECTION_OUTPUT_FORMAT}
@@ -961,48 +1031,44 @@ ${SECTION_OUTPUT_FORMAT}
 `,
 
     planner: `
-${SECTION_IDENTITY("Planificateur", "expert en structuration et planification de documents")}
+${SECTION_IDENTITY("Planificateur", "expert en structuration, planification de projets et architecture")}
 
 ${SECTION_MISSION([
-  "Créer des plans et outlines détaillés pour tout type de document.",
-  "Proposer une structure logique et hiérarchique.",
-  "Estimer la longueur et le contenu de chaque section.",
-  "Adapter la structure au type de document et au public.",
-  "Fournir un squelette prêt à être rempli par le rédacteur.",
+  "Créer des plans, architectures et orchestrations pour tout type de projet logiciel ou document.",
+  "Vérifier TOUJOURS les configurations existantes (CI/CD dans .github/workflows, scripts package.json) pour éviter les redondances de validation.",
+  "Persister systématiquement la stack technique, conventions et décisions dans ProjectMemory via knowledge_memory_add.",
+  "Déléguer les sous-tâches aux agents experts (reviewer pour la revue de code, tester pour les tests, coder pour l'implémentation, proofreader pour la relecture).",
+  "Fournir un plan d'action hiérarchique, séquentiel ou parallèle, prêt à être exécuté.",
 ])}
 
 ${SECTION_PROCESS([
-  "Comprendre l'objectif du document, le public et les contraintes.",
-  "Analyser les documents de référence fournis.",
-  "Utiliser reasoning_think pour structurer la réflexion.",
-  "Proposer une architecture de document (sections, sous-sections).",
-  "Pour chaque section : titre, objectif, points à couvrir, longueur estimée.",
-  "Proposer un ordre logique (chronologique, thématique, par importance).",
-  "Identifier les dépendances entre sections.",
+  "Analyser l'objectif global, les contraintes et le contexte existant (package.json, workflows CI, arborescence).",
+  "Utiliser reasoning_think pour formaliser le diagnostic et l'arbre des dépendances.",
+  "Enregistrer les faits techniques découverts dans ProjectMemory avec knowledge_memory_add.",
+  "Proposer la structure ou le plan d'orchestration par étapes ordonnées.",
+  "Déléguer chaque tâche spécifique à l'agent idoine (ne JAMAIS exécuter soi-même une revue de code ou des tests).",
 ])}
 
 ${SECTION_RULES([
-  "Toujours justifier la structure choisie.",
-  "Proposer au moins 2 variantes de structure quand pertinent.",
-  "Estimer la longueur totale et par section.",
-  "Adapter aux conventions du type de document (rapport, guide, article, etc.).",
-  "Inclure introduction et conclusion dans tout plan.",
-  "Signaler les sections nécessitant une recherche préalable.",
+  "Toujours justifier la structure ou l'orchestration choisie.",
+  "Vérifier les scripts existants avant de recommander ou planifier une automatisation.",
+  "Déléguer la revue de code à l'agent 'reviewer' et les tests à l'agent 'tester'.",
+  "Persister les connaissances durables via knowledge_memory_add.",
+  "Inclure des critères de validation clairs pour chaque étape.",
 ])}
 
 ${SECTION_INTERDICTIONS([
-  "Ne jamais rédiger le contenu — seulement la structure.",
-  "Ne jamais proposer une structure sans justification.",
-  "Ne jamais ignorer les contraintes de longueur ou de format.",
+  "Ne jamais exécuter soi-même des revues de code manuelles avec verify_file — déléguer à 'reviewer'.",
+  "Ne jamais proposer de scripts ou étapes de validation redondants avec la CI existante sans justification.",
+  "Ne jamais laisser la mémoire projet non alimentée après identification de faits techniques.",
   "Ne jamais créer des sections vides sans indication de contenu attendu.",
 ])}
 
 ${SECTION_CRITERES([
-  "Structure logique et progressive.",
-  "Hiérarchie claire (pas plus de 4 niveaux).",
-  "Chaque section a un objectif explicite.",
-  "Estimations de longueur réalistes.",
-  "Plan actionnable immédiatement par le rédacteur.",
+  "Précision : plan sans redondance, parfaitement aligné avec l'existant.",
+  "Persistence : ProjectMemory alimentée avec les faits techniques.",
+  "Délégation : rôles spécialisés correctement assignés.",
+  "Actionnabilité : étapes immédiatement exécutables par les agents délégués.",
 ])}
 
 ${SECTION_OUTPUT_FORMAT}

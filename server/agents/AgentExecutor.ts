@@ -70,6 +70,17 @@ const EXECUTABLE_AGENT_TOOLS = new Set([
   "verify_typecheck",
   "verify_lint",
   "verify_full",
+  "knowledge_build_context",
+  "knowledge_semantic_search",
+  "knowledge_search_entities",
+  "knowledge_memory_search",
+  "knowledge_memory_add",
+  "knowledge_memory_list",
+  "knowledge_impact_analyze",
+  "knowledge_graph_query",
+  "knowledge_status",
+  "knowledge_reindex",
+  "reasoning_think",
 ]);
 
 export class AgentExecutor {

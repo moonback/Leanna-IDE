@@ -69,6 +69,9 @@ const AGENT_ROLE_ALIASES: Readonly<Record<string, AgentRole>> = {
   conception: "architect",
   // Aliases Rédaction & Documents
   writer: "writer",
+  docs: "writer",
+  doc: "writer",
+  documentation: "writer",
   redacteur: "writer",
   rédacteur: "writer",
   write: "writer",
@@ -245,6 +248,7 @@ export const agentRoleSchema = z
       "security", "securite", "sécurité", "sec", "audit_secu", "audit_sécu",
       "architect", "architecte", "architecture", "conception",
       // Docs aliases
+      "docs", "doc", "documentation",
       "redacteur", "rédacteur", "write", "redaction", "rédaction",
       "format", "mise_en_forme", "structure",
       "recherche", "research",

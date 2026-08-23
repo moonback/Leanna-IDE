@@ -37,6 +37,7 @@ test("agentsSkill — déclare tous les outils attendus", () => {
     "agent_list_collaboration_patterns",
     "agent_delegation_matrix",
     "agent_bus_metrics",
+    "assistant_logs",
     "agent_message_history",
   ];
   for (const name of expected) {

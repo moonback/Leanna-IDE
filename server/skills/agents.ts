@@ -26,7 +26,14 @@ const AGENT_LOG_MODULE = /^(Agent|Orchestrator|TaskScheduler|FileWriter|Delegati
 
 const collaborateSchema = z.object({
   patternName: z.enum(
-    ["document-complet", "traduction-verifiee", "recherche-redaction"],
+    [
+      "feature-engineering",
+      "code-review-and-fix",
+      "tech-stack-analysis-and-memory",
+      "document-complet",
+      "traduction-verifiee",
+      "recherche-redaction",
+    ],
     {
       errorMap: () => ({
         message:
@@ -73,15 +80,14 @@ export const agentsSkill: Skill = {
     {
       name: "agent_delegate",
       description:
-        "Délègue une tâche à UN agent spécialisé en rédaction (writer, formatter, researcher, proofreader, translator, summarizer, planner). " +
+        "Délègue une tâche à UN agent spécialisé parmi les 14 rôles disponibles (Code & Ingénierie : coder, refactor, debugger, reviewer, tester, security, architect ; Rédaction : writer, formatter, researcher, proofreader, translator, summarizer, planner). " +
         "La tâche s'exécute en arrière-plan. Utilise \`agent_status\` avec le taskId retourné pour suivre la progression. " +
         "Pour plusieurs rôles simultanés, utilise agent_orchestrate. " +
-        "L'agent 'writer' est le défaut pour toute rédaction de document demandée par l'utilisateur. " +
-        "Délégations automatiques recommandées : rédaction terminée → proofreader ; nouveau document → planner ; multilangue → translator ; document long → summarizer.",
+        "Délégations automatiques recommandées : implémentation → coder ; revue de code → reviewer ; tests automatisés → tester ; sécurité → security ; diagnostic de bug → debugger ; planification/stack → planner ; recherche/impact → researcher ; relecture doc → proofreader.",
       parameters: {
         type: "OBJECT",
         properties: {
-          role:        { type: "STRING", description: "Rôle UNIQUE parmi : writer, formatter, researcher, proofreader, translator, summarizer, planner. Une seule valeur, jamais une liste." },
+          role:        { type: "STRING", description: "Rôle UNIQUE parmi : coder, refactor, debugger, reviewer, tester, security, architect, writer, formatter, researcher, proofreader, translator, summarizer, planner. Une seule valeur, jamais une liste." },
           title:       { type: "STRING", description: "Titre court de la tâche" },
           description: { type: "STRING", description: "Description détaillée" },
           files:       { type: "ARRAY", items: { type: "STRING" }, description: "Fichiers pertinents (optionnel)" },
@@ -95,7 +101,7 @@ export const agentsSkill: Skill = {
       name: "agent_orchestrate",
       description:
         "Orchestre plusieurs agents en parallèle ou en séquence avec dépendances. " +
-        "Chaque tâche dans la liste doit avoir un rôle UNIQUE ('writer', 'proofreader', etc.) — jamais plusieurs rôles combinés dans une même tâche. " +
+        "Chaque tâche dans la liste doit avoir un rôle UNIQUE parmi les 14 rôles ('coder', 'reviewer', 'tester', 'planner', etc.) — jamais plusieurs rôles combinés dans une même tâche. " +
         "Pour créer une dépendance entre tâches du même plan, indique dans dependsOn le titre exact de chaque tâche prérequise ; les IDs de tâches existantes restent aussi acceptés. " +
         "Retourne un orchestrationId : utilise agent_status avec cet ID pour suivre l'avancement global.",
       parameters: {
@@ -108,7 +114,7 @@ export const agentsSkill: Skill = {
             items: {
               type: "OBJECT",
               properties: {
-                role:         { type: "STRING", description: "Rôle : writer, formatter, researcher, proofreader, translator, summarizer ou planner." },
+                role:         { type: "STRING", description: "Rôle : coder, refactor, debugger, reviewer, tester, security, architect, writer, formatter, researcher, proofreader, translator, summarizer ou planner." },
                 title:        { type: "STRING", description: "Titre de la sous-tâche" },
                 description:  { type: "STRING", description: "Description détaillée" },
                 files:        { type: "ARRAY", items: { type: "STRING" }, description: "Fichiers pertinents" },
@@ -143,7 +149,7 @@ export const agentsSkill: Skill = {
       parameters: {
         type: "OBJECT",
         properties: {
-          role:   { type: "STRING", description: "Filtrer par rôle : writer, formatter, researcher, proofreader, translator, summarizer, planner (optionnel)" },
+          role:   { type: "STRING", description: "Filtrer par rôle : coder, refactor, debugger, reviewer, tester, security, architect, writer, formatter, researcher, proofreader, translator, summarizer, planner (optionnel)" },
           status: { type: "STRING", description: "Filtrer par statut : pending, running, completed, failed, cancelled" },
           limit:  { type: "NUMBER", description: "Nombre max (défaut: 20)" },
         },
@@ -178,6 +184,9 @@ export const agentsSkill: Skill = {
         "Les agents communiquent entre eux via le bus de messages et se délèguent des " +
         "sous-tâches de manière autonome. " +
         "Patterns disponibles : " +
+        "'feature-engineering' (architect→coder→tester→reviewer), " +
+        "'code-review-and-fix' (reviewer→debugger→tester), " +
+        "'tech-stack-analysis-and-memory' (researcher→planner→reviewer), " +
         "'document-complet' (planner→writer→proofreader→formatter), " +
         "'traduction-verifiee' (writer→translator→proofreader), " +
         "'recherche-redaction' (researcher→planner→writer→proofreader). " +
@@ -188,7 +197,7 @@ export const agentsSkill: Skill = {
           patternName: {
             type: "STRING",
             description:
-              "Pattern : 'document-complet', 'traduction-verifiee', 'recherche-redaction'",
+              "Pattern : 'feature-engineering', 'code-review-and-fix', 'tech-stack-analysis-and-memory', 'document-complet', 'traduction-verifiee', 'recherche-redaction'",
           },
           title:       { type: "STRING", description: "Titre court de l'objectif" },
           description: { type: "STRING", description: "Description détaillée partagée avec tous les agents" },

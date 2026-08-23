@@ -153,8 +153,44 @@ export interface DelegationCapability {
   reason: string;
 }
 
+import { AGENT_ROLES } from "./types";
+
 /** Matrice de délégation : quels agents peuvent déléguer à qui */
 export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {
+  // ── Code & Ingénierie logicielle ──
+  coder: [
+    { targetRole: "tester", taskTypes: ["tests-unitaires", "couverture", "validation"], reason: "Écriture et passage de tests pour le code implémenté" },
+    { targetRole: "reviewer", taskTypes: ["revue-code", "audit-qualite"], reason: "Revue de code approfondie et conformité aux standards" },
+    { targetRole: "debugger", taskTypes: ["diagnostic-erreur", "analyse-stacktrace"], reason: "Analyse et diagnostic en cas d'erreur bloquante" },
+  ],
+  refactor: [
+    { targetRole: "reviewer", taskTypes: ["audit-qualite", "verification-solid"], reason: "Vérification des améliorations structurelles et patterns" },
+    { targetRole: "tester", taskTypes: ["non-regression", "tests-validation"], reason: "Garantie de non-régression comportementale" },
+  ],
+  debugger: [
+    { targetRole: "tester", taskTypes: ["test-reproduction", "test-regression"], reason: "Validation du correctif et test anti-régression" },
+    { targetRole: "coder", taskTypes: ["implementation-correctif"], reason: "Implémentation complète si le fix nécessite un nouveau composant" },
+  ],
+  reviewer: [
+    { targetRole: "coder", taskTypes: ["application-correctifs", "amelioration-code"], reason: "Application des remarques et correctifs issus de la revue" },
+    { targetRole: "refactor", taskTypes: ["refactorisation-dette"], reason: "Restructuration en cas d'anti-pattern ou code monolithique" },
+    { targetRole: "security", taskTypes: ["audit-securite-cible"], reason: "Audit de sécurité si suspicion de vulnérabilité" },
+  ],
+  tester: [
+    { targetRole: "debugger", taskTypes: ["analyse-echec-test"], reason: "Diagnostic des causes d'échec de tests" },
+    { targetRole: "coder", taskTypes: ["ajustement-testabilite"], reason: "Ajustement du code pour meilleure testabilité" },
+  ],
+  security: [
+    { targetRole: "coder", taskTypes: ["remediation-faille"], reason: "Application des correctifs de sécurité recommandés" },
+    { targetRole: "architect", taskTypes: ["revision-architecture-securite"], reason: "Révision de l'architecture si faille conceptuelle" },
+  ],
+  architect: [
+    { targetRole: "coder", taskTypes: ["implementation-module"], reason: "Implémentation concrète selon l'architecture définie" },
+    { targetRole: "planner", taskTypes: ["planification-etapes"], reason: "Découpage du plan de développement en jalons" },
+    { targetRole: "reviewer", taskTypes: ["validation-conception"], reason: "Revue de conformité de l'implémentation avec l'architecture" },
+  ],
+
+  // ── Rédaction & Documents ──
   writer: [
     { targetRole: "proofreader", taskTypes: ["relecture", "correction"], reason: "Relecture après rédaction" },
     { targetRole: "formatter", taskTypes: ["mise-en-forme", "formatage"], reason: "Mise en forme du document rédigé" },
@@ -165,8 +201,9 @@ export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {
     { targetRole: "writer", taskTypes: ["contenu-manquant"], reason: "Signaler les sections vides nécessitant du contenu" },
   ],
   researcher: [
+    { targetRole: "planner", taskTypes: ["structuration-recherche", "planification"], reason: "Structuration des findings en plan ou mémoire projet" },
+    { targetRole: "coder", taskTypes: ["prototype", "poc"], reason: "Développement d'un prototype technique à partir des sources" },
     { targetRole: "writer", taskTypes: ["redaction-findings"], reason: "Rédaction à partir des résultats de recherche" },
-    { targetRole: "planner", taskTypes: ["structuration-recherche"], reason: "Structuration des findings en plan" },
     { targetRole: "summarizer", taskTypes: ["synthese-sources"], reason: "Synthèse des sources collectées" },
   ],
   proofreader: [
@@ -182,9 +219,13 @@ export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {
     { targetRole: "writer", taskTypes: ["developpement-point"], reason: "Développer un point du résumé si nécessaire" },
   ],
   planner: [
+    { targetRole: "coder", taskTypes: ["implementation-tache"], reason: "Implémentation d'une brique selon le plan" },
+    { targetRole: "reviewer", taskTypes: ["revue-code", "audit-qualite"], reason: "Délégation de la revue de code à l'agent spécialisé" },
+    { targetRole: "tester", taskTypes: ["validation-tests", "qa"], reason: "Délégation de la validation et tests automatisés" },
+    { targetRole: "researcher", taskTypes: ["recherche-complementaire"], reason: "Recherche et analyse technique préalable" },
     { targetRole: "writer", taskTypes: ["redaction-section", "redaction-document"], reason: "Rédaction selon le plan établi" },
-    { targetRole: "researcher", taskTypes: ["recherche-complementaire"], reason: "Recherche complémentaire pour un point du plan" },
     { targetRole: "formatter", taskTypes: ["mise-en-forme-plan"], reason: "Formatage du plan en document structuré" },
+    { targetRole: "proofreader", taskTypes: ["relecture-document"], reason: "Relecture et correction du document planifié" },
   ],
 };
 
@@ -203,6 +244,39 @@ export interface CollaborationPattern {
 
 /** Patterns de collaboration prédéfinis */
 export const COLLABORATION_PATTERNS: CollaborationPattern[] = [
+  // ── Ingénierie Logicielle ──
+  {
+    name: "feature-engineering",
+    description: "Cycle complet de développement : architecture → implémentation → tests QA → revue de code",
+    participants: ["architect", "coder", "tester", "reviewer"],
+    workflow: [
+      { step: 1, agent: "architect", action: "Définir la structure, contrats d'interfaces et découpage" },
+      { step: 2, agent: "coder", action: "Implémenter le code propre et typé selon l'architecture", dependsOn: [1] },
+      { step: 3, agent: "tester", action: "Rédiger et exécuter la suite de tests automatisés", dependsOn: [2] },
+      { step: 4, agent: "reviewer", action: "Auditer la qualité, lint/types et conformité du code", dependsOn: [3] },
+    ],
+  },
+  {
+    name: "code-review-and-fix",
+    description: "Revue de code approfondie puis application ciblée et validation",
+    participants: ["reviewer", "debugger", "tester"],
+    workflow: [
+      { step: 1, agent: "reviewer", action: "Auditer le code et lister les anomalies hiérarchisées" },
+      { step: 2, agent: "debugger", action: "Appliquer les correctifs ciblés sur les anomalies identifiées", dependsOn: [1] },
+      { step: 3, agent: "tester", action: "Vérifier la non-régression et la validité des corrections", dependsOn: [2] },
+    ],
+  },
+  {
+    name: "tech-stack-analysis-and-memory",
+    description: "Analyse technique approfondie, identification des modules et enrichissement de ProjectMemory",
+    participants: ["researcher", "planner", "reviewer"],
+    workflow: [
+      { step: 1, agent: "researcher", action: "Analyser les dépendances, modules critiques et conventions du dépôt" },
+      { step: 2, agent: "planner", action: "Structurer les découvertes et alimenter ProjectMemory via knowledge_memory_add", dependsOn: [1] },
+      { step: 3, agent: "reviewer", action: "Vérifier la cohérence de la stack et des règles de validation de code", dependsOn: [2] },
+    ],
+  },
+  // ── Rédaction & Documents ──
   {
     name: "document-complet",
     description: "Création complète d'un document : planification → rédaction → correction → mise en forme",
@@ -252,9 +326,9 @@ export const agentMessageSchema = z.object({
     "event",
     "broadcast",
   ]),
-  from: z.enum(["writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner"]),
+  from: z.enum(AGENT_ROLES),
   to: z.union([
-    z.enum(["writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner"]),
+    z.enum(AGENT_ROLES),
     z.literal("broadcast"),
   ]),
   priority: z.enum(["low", "medium", "high", "critical"]),

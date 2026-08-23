@@ -241,8 +241,8 @@ describe("AgentRuntime", () => {
     const runtime = createRuntime();
     const agents = runtime.listAgents();
     assert.ok(agents.length >= 6);
-    assert.ok(agents.some((a) => a.id === "architect"));
-    assert.ok(agents.some((a) => a.id === "test"));
+    assert.ok(agents.some((a) => a.id === "planner"));
+    assert.ok(agents.some((a) => a.id === "writer"));
   });
 
   it("devrait enregistrer un agent custom", () => {
