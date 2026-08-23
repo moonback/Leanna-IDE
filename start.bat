@@ -1,15 +1,16 @@
 @echo off
 title Jarvis OS
-echo ========================================
-echo         Demarrage de Jarvis OS
-echo ========================================
+echo.
+echo   [44m[97m        Jarvis OS        [0m
+echo   [90mInitializing System...[0m
 echo.
 
 :: Verifier que Node.js est installe
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [ERREUR] Node.js n'est pas installe ou pas dans le PATH.
-    echo Telecharge-le ici : https://nodejs.org/
+    echo   [91m[ERROR][0m Node.js not found. Please install it to continue.
+    echo   [90mhttps://nodejs.org/[0m
+    echo.
     pause
     exit /b 1
 )
@@ -19,13 +20,13 @@ cd /d "%~dp0"
 
 :: Installer les dependances si node_modules n'existe pas
 if not exist "node_modules\" (
-    echo [INFO] Installation des dependances...
-    call npm install
+    echo   [94m[INFO][0m Installing dependencies...
+    call npm install >nul
     echo.
 )
 
 :: Lancer l'application desktop (serveur + Electron)
-echo [INFO] Lancement de Jarvis OS...
+echo   [92m[START][0m Launching Jarvis OS...
 echo.
 call npm run desktop
 
