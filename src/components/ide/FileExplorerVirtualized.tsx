@@ -454,7 +454,7 @@ const FileExplorer = memo(function FileExplorer({
 
   // Workspace tree section (read-only, no drag & drop)
   const [wsExpandedDirs, setWsExpandedDirs] = useState<Set<string>>(new Set());
-  const [showWorkspace, setShowWorkspace] = useState(true);
+  const [showWorkspace, setShowWorkspace] = useState(false);
 
   const wsToggleDir = useCallback((dirPath: string) => {
     setWsExpandedDirs(prev => {
