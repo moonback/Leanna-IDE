@@ -94,35 +94,37 @@ export async function handleWriteProjectFile(args: any, toolContext: any) {
   if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
   const requestedPath = String(args.path || "").trim();
   const content = String(args.content || "");
+  // Mode append : ajouter à la fin du fichier sans écraser le contenu existant
+  const appendMode = args.append === true;
   if (!requestedPath) return { error: "Le chemin de fichier est requis." };
   const target = resolveSandboxWriteTarget(requestedPath);
   if (!target) return { error: "Chemin invalide ou en dehors du workspace." };
   const normalized = target.sandboxPath;
-  // Les politiques portent sur le chemin logique du projet, jamais sur
-  // `.jarvis/sandbox/...`, afin de préserver .env/.git et les fichiers critiques.
   if (isWriteForbidden(target.logicalPath)) return { error: `Écriture interdite sur ce fichier protégé: ${requestedPath}` };
   const critical = isCriticalFile(target.logicalPath);
 
-  // La cible réelle est exclusivement le chemin sandbox canonique.
   const writePath = normalized;
   const sandboxMode = isSandboxActive();
-  // Lire l'ancien contenu AVANT la confirmation : nécessaire pour le diff
-  // d'audit et pour joindre previousContent à une éventuelle proposition.
   let beforeContent: string | null = null;
-  try { beforeContent = fs.existsSync(writePath) ? await fs.promises.readFile(writePath, 'utf-8') : null; } catch { /* nouveau fichier */ }
+  try { beforeContent = fs.existsSync(writePath) ? await fs.promises.readFile(writePath, "utf-8") : null; } catch { /* nouveau fichier */ }
 
-  // Confirmation interactive (ou mise en file d'attente) pour fichiers critiques
+  // En mode append, construire le contenu final
+  const finalContent = appendMode && beforeContent !== null
+    ? (beforeContent.endsWith("\n") ? beforeContent + content : beforeContent + "\n" + content)
+    : content;
+
   const guard = await guardCriticalFile(
     critical,
     requestedPath,
-    'write',
+    "write",
     toolContext,
-    `Écriture de ${Buffer.byteLength(content, "utf-8")} octets`,
-    { proposed: content, previous: beforeContent ?? undefined }
+    appendMode
+      ? `Ajout de ${Buffer.byteLength(content, "utf-8")} octets en fin de fichier`
+      : `Écriture de ${Buffer.byteLength(content, "utf-8")} octets`,
+    { proposed: finalContent, previous: beforeContent ?? undefined }
   );
   if (guard.blocked) return { error: guard.error, critical: true };
 
-  // Checkpoint automatique avant écriture (seulement en mode direct)
   if (!sandboxMode) {
     try {
       const { createCheckpoint } = await import("../utils/checkpoint");
@@ -131,22 +133,28 @@ export async function handleWriteProjectFile(args: any, toolContext: any) {
   }
   if (!resolveCurrentSandboxPath(requestedPath, writePath)) return { error: "Sandbox indisponible ou chemin modifié — écriture refusée." };
   await fs.promises.mkdir(path.dirname(writePath), { recursive: true });
-  await fs.promises.writeFile(writePath, content, "utf-8");
-  // Marquer le fichier comme modifié dans le sandbox
+  await fs.promises.writeFile(writePath, finalContent, "utf-8");
   if (sandboxMode) markFileModified(requestedPath);
-  console.log(`[Codebase] File written: ${requestedPath}${critical ? ' [CRITIQUE]' : ''}${sandboxMode ? ' [SANDBOX]' : ''}`);
-  // Audit enrichi avec diff
-  appendAuditEvent({ action: 'write_project_file', target: requestedPath, actor: 'ai', diff: generateDiffSummary(beforeContent, content) }).catch((err) => {
+  console.log(`[Codebase] File ${appendMode ? "appended" : "written"}: ${requestedPath}${critical ? " [CRITIQUE]" : ""}${sandboxMode ? " [SANDBOX]" : ""}`);
+  appendAuditEvent({ action: "write_project_file", target: requestedPath, actor: "ai", diff: generateDiffSummary(beforeContent, finalContent) }).catch((err) => {
     console.warn(`[Audit] appendAuditEvent failed for write_project_file on ${requestedPath}:`, err);
   });
   toolContext.emitIdeAction?.({ type: "open-file", path: requestedPath });
   toolContext.emitIdeAction?.({ type: "file-changed", path: requestedPath });
-  // En mode sandbox, pas de restart ni de validation auto (isolé)
   if (!sandboxMode) {
     triggerRestartIfNeeded(requestedPath);
     scheduleValidation();
   }
-  return { status: "success", path: requestedPath, bytesWritten: Buffer.byteLength(content, "utf-8"), critical, sandbox: sandboxMode, message: `File ${requestedPath} written successfully.${sandboxMode ? ' 📦 (sandbox)' : ''}${critical ? ' ⚠️ Fichier critique modifié.' : ''}` };
+  return {
+    status: "success",
+    path: requestedPath,
+    mode: appendMode ? "append" : "write",
+    bytesWritten: Buffer.byteLength(content, "utf-8"),
+    totalBytes: Buffer.byteLength(finalContent, "utf-8"),
+    critical,
+    sandbox: sandboxMode,
+    message: `File ${requestedPath} ${appendMode ? "appended" : "written"} successfully.${sandboxMode ? " 📦 (sandbox)" : ""}${critical ? " ⚠️ Fichier critique modifié." : ""}`,
+  };
 }
 
 export async function handleModifyProjectFile(args: any, toolContext: any) {
@@ -184,12 +192,44 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
 
   const content = await fs.promises.readFile(normalized, "utf-8");
   if (!content.includes(searchText)) {
-    // Donner un contexte utile à l'agent pour qu'il corrige
-    const firstLines = content.split("\n").slice(0, 5).join("\n");
+    // ── Fuzzy match : trouver les passages les plus proches ─────────────────
+    const lines = content.split("\n");
+    const searchLines = searchText.split("\n");
+    const firstSearchLine = searchLines[0].trim();
+
+    // Chercher les lignes qui ressemblent à la première ligne du searchText
+    const candidates: Array<{ lineNo: number; lineContent: string; similarity: number }> = [];
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (!trimmed) continue;
+      // Similarité simple : ratio de caractères communs
+      const longer = Math.max(firstSearchLine.length, trimmed.length);
+      if (longer === 0) continue;
+      const shorter = Math.min(firstSearchLine.length, trimmed.length);
+      let common = 0;
+      for (let c = 0; c < shorter; c++) {
+        if (firstSearchLine[c] === trimmed[c]) common++;
+      }
+      const similarity = common / longer;
+      if (similarity > 0.4) {
+        candidates.push({ lineNo: i + 1, lineContent: lines[i], similarity });
+      }
+    }
+    candidates.sort((a, b) => b.similarity - a.similarity);
+    const topCandidates = candidates.slice(0, 3);
+
     return {
-      error: `searchText introuvable dans le fichier "${requestedPath}". Le texte fourni ne correspond à aucun passage du fichier. Relis le fichier avec read_project_file({ path: "${requestedPath}", full: true }) et copie le texte EXACT (espaces, indentation, retours à la ligne) que tu veux remplacer.`,
-      hint: `Début du fichier:\n${firstLines}`,
-      totalLines: content.split("\n").length,
+      error: `searchText introuvable dans "${requestedPath}". Le texte fourni ne correspond à aucun passage exact du fichier (espaces, indentation ou retours à la ligne différents).`,
+      action: `Relis avec read_project_file({ path: "${requestedPath}", full: true }) et copie le texte EXACT. Alternative : utilise startMarker/endMarker pour délimiter le bloc.`,
+      totalLines: lines.length,
+      searchTextLength: searchText.length,
+      ...(topCandidates.length > 0 && {
+        suggestions: topCandidates.map(c => ({
+          line: c.lineNo,
+          content: c.lineContent,
+          hint: `Ligne ${c.lineNo} ressemble à votre searchText (similarité: ${Math.round(c.similarity * 100)}%)`,
+        })),
+      }),
     };
   }
 
@@ -413,15 +453,30 @@ export async function handleApplyPatch(args: any, toolContext: any) {
   };
 
   // Vérifier d'abord tous les contextes sur le fichier original.
+  // Tolérance trailing-whitespace : on compare les lignes après trim droit
+  // pour éviter les faux rejets dus aux fins de ligne ou espaces invisibles.
   for (const hunk of hunks) {
     const offset = hunk.start - 1;
     const actual = sourceLines.slice(offset, offset + hunk.oldLines.length);
-    if (actual.length !== hunk.oldLines.length || actual.some((line, index) => line !== hunk.oldLines[index])) {
+    if (actual.length !== hunk.oldLines.length) {
       return {
-        error: `Contexte du patch obsolète ou incorrect autour de la ligne ${hunk.start}. Relis le fichier et régénère le diff unifié.`,
-        expected: hunk.oldLines.slice(0, 20).join("\\n"),
-        actual: actual.slice(0, 20).join("\\n"),
+        error: `Contexte du patch dépasse la fin du fichier à partir de la ligne ${hunk.start}. Le fichier a ${sourceLines.length} lignes.`,
       };
+    }
+    // Première passe : correspondance exacte
+    const exactMatch = actual.every((line, idx) => line === hunk.oldLines[idx]);
+    if (!exactMatch) {
+      // Deuxième passe : tolérance whitespace (trim droit uniquement)
+      const softMatch = actual.every((line, idx) => line.trimEnd() === hunk.oldLines[idx].trimEnd());
+      if (!softMatch) {
+        return {
+          error: `Contexte du patch obsolète ou incorrect autour de la ligne ${hunk.start}. Relis le fichier et régénère le diff unifié.`,
+          expected: hunk.oldLines.slice(0, 20).join("\\n"),
+          actual: actual.slice(0, 20).join("\\n"),
+        };
+      }
+      // Soft match OK : normaliser les lignes de contexte pour éviter le diff parasite
+      hunk.oldLines = actual; // utiliser le contenu réel pour l'application
     }
   }
 

@@ -63,19 +63,21 @@ export const codebaseSkill: Skill = {
         properties: {
           path: { type: "STRING", description: "Relative directory path to list (e.g. src/components). Use '.' for root." },
           recursive: { type: "BOOLEAN", description: "Recursively list all subdirectories. Default false." },
+          extensions: { type: "STRING", description: "Comma-separated extensions to filter (e.g. 'ts,tsx'). Optional." },
+          includeStats: { type: "BOOLEAN", description: "Include file modification date and creation date. Default false." },
         },
       },
     },
     {
       name: "read_project_file",
-      description: "Reads a file from the project workspace. For large files, use startLine/endLine to read only the relevant section, OR set full=true to force reading the entire file. Use read_file_outline first to identify which lines to read.",
+      description: "Reads a file from the project workspace. For large files, use startLine/endLine to read only the relevant section, OR set full=true to force reading the entire file with line numbers. Use read_file_outline first to identify which lines to read.",
       parameters: {
         type: "OBJECT",
         properties: {
           path: { type: "STRING", description: "Relative path from project root (e.g. src/App.tsx)." },
           startLine: { type: "NUMBER", description: "First line to read (1-based). Use this for large files to avoid reading everything." },
           endLine: { type: "NUMBER", description: "Last line to read (1-based). Recommended: read ±20 lines around the area to modify." },
-          full: { type: "BOOLEAN", description: "Si true, retourne le fichier complet même s'il est volumineux. Utile quand on a besoin de tout le contenu pour une modification." },
+          full: { type: "BOOLEAN", description: "Si true, retourne le fichier complet avec numéros de ligne. Indispensable avant modify_project_file ou patch_project_file sur un fichier volumineux." },
         },
         required: ["path"],
       },
@@ -93,16 +95,18 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "search_in_files",
-      description: "Searches for text or a pattern across project files. Returns matching files with surrounding context. Use to find where a function, class or variable is used. By default, the query is treated as literal text (special characters are auto-escaped). Set regex:true to use a regular expression.",
+      description: "Searches for text or a pattern across project files. Returns matching files with line number, column, and optional context. Use to find where a function, class or variable is used. By default, the query is treated as literal text. Set regex:true for regex mode. Set replaceWith to preview what a replacement would look like.",
       parameters: {
         type: "OBJECT",
         properties: {
-          query: { type: "STRING", description: "Text or regex pattern to search for. Treated as literal text by default (parentheses, brackets, etc. are auto-escaped)." },
-          path: { type: "STRING", description: "Directory to search in (optional, defaults to project root)." },
+          query: { type: "STRING", description: "Text or regex pattern to search for. Treated as literal text by default." },
+          path: { type: "STRING", description: "Directory or file to search in (optional, defaults to project root)." },
           extensions: { type: "STRING", description: "Comma-separated file extensions to filter (e.g. 'ts,tsx,js'). Optional." },
           caseSensitive: { type: "BOOLEAN", description: "Case-sensitive search. Default false." },
           regex: { type: "BOOLEAN", description: "If true, treat query as a regular expression. Default false (literal text search)." },
-          maxResults: { type: "NUMBER", description: "Maximum number of results. Default 20." },
+          maxResults: { type: "NUMBER", description: "Maximum number of results (max 100). Default 20." },
+          contextLines: { type: "NUMBER", description: "Number of lines of context to show before and after each match (0–10). Default 0." },
+          replaceWith: { type: "STRING", description: "If provided, shows a preview of what each matching line would look like after replacing query with this string." },
         },
         required: ["query"],
       },
@@ -120,12 +124,13 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "write_project_file",
-      description: "Crée un nouveau fichier ou écrase un fichier existant avec le contenu fourni. Utilise cet outil pour créer des fichiers de tout type (code, config, documentation, etc.).",
+      description: "Crée un nouveau fichier ou écrase un fichier existant avec le contenu fourni. Utilise append:true pour ajouter du contenu à la fin sans écraser.",
       parameters: {
         type: "OBJECT",
         properties: {
           path: { type: "STRING", description: "Chemin relatif depuis la racine du projet (ex: src/newFile.ts, docs/README.md)." },
           content: { type: "STRING", description: "Contenu complet du fichier à écrire." },
+          append: { type: "BOOLEAN", description: "Si true, ajoute le contenu à la fin du fichier existant au lieu de l'écraser. Pratique pour ajouter des lignes à un fichier log, config ou markdown." },
         },
         required: ["path", "content"],
       },

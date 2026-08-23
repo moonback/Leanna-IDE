@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.5.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-0.4.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/node-%3E%3D22.12.0-brightgreen" alt="Node.js" />
   <img src="https://img.shields.io/badge/electron-43-blueviolet" alt="Electron" />
   <img src="https://img.shields.io/badge/react-19-61dafb" alt="React" />
@@ -43,7 +43,8 @@ Jarvis OS est un **environnement de développement IA** tout-en-un, conçu comme
 
 - Un **IDE complet** (Monaco Editor, explorateur, recherche, Git)
 - Un **assistant IA multimodal** (voix en temps réel, webcam, partage d'écran via Gemini Live)
-- Un **système multi-agents** spécialisé dans la rédaction et le traitement documentaire
+- Un **assistant code** capable de lire, écrire, modifier, patcher et valider du code de manière autonome
+- Un **système multi-agents** spécialisé dans la rédaction, le code et le traitement documentaire
 - Des **notebooks RAG** (concurrent de NotebookLM — ingestion de sources, chat avec citations, génération de contenu)
 - Un **moteur de workflows** et d'automatisation avec planification de missions autonomes
 - Une **passerelle MCP** (Model Context Protocol) pour connecter des outils externes
@@ -72,6 +73,36 @@ Jarvis OS est un **environnement de développement IA** tout-en-un, conçu comme
 - Explorateur de fichiers avec arbre interactif
 - Recherche globale dans le projet (Ctrl+Shift+F)
 - Sandbox IA isolé pour les modifications assistées (validation avant merge)
+
+### 🤖 Assistant Code (Leanna)
+
+Leanna peut gérer, créer et modifier du code **directement dans le workspace** sans délégation obligatoire :
+
+#### Lecture
+- `read_project_file` — lecture partielle ou complète avec numéros de ligne, hash MD5, preview début+fin pour les gros fichiers
+- `read_file_outline` — structure d'un fichier (fonctions, classes, exports) avec numéros de ligne
+- `search_in_files` — recherche textuelle ou regex avec lignes de contexte, numéro de colonne et prévisualisation de remplacement
+- `list_project_files` — exploration avec filtrage par extension et stats (dates, taille)
+
+#### Écriture & Modification
+- `write_project_file` — création ou écrasement complet + mode `append` pour ajouter en fin de fichier
+- `modify_project_file` — remplacement de texte exact avec fuzzy match et suggestions de correction si le `searchText` n'est pas trouvé
+- `patch_project_file` — patch par numéros de ligne (replace / insert / delete)
+- `apply_patch` — application de diff unifié (format `git diff`) avec tolérance whitespace sur les lignes de contexte
+- `rename_project_file` — renommage et déplacement
+- `delete_project_file` / `delete_project_folder` — suppression avec garde-fous
+
+#### Exécution & Validation
+- `run_project_command` — exécute `npm`, `npx` ou `node` dans le workspace (`npm run build`, `npm install axios`, `npx tsc --noEmit`, etc.)
+- `verify_file` — lint + typecheck TypeScript + analyse sécurité sur un fichier modifié
+- `verify_typecheck` — vérification TypeScript complète du projet
+- `verify_syntax` — validation syntaxique instantanée avant écriture
+
+#### Workflow code intégré
+1. `read_file_outline` → identifier la structure
+2. `read_project_file` (startLine/endLine) → lire la section précise
+3. `modify_project_file` ou `patch_project_file` → appliquer le changement
+4. `verify_file` → valider avant de terminer
 
 ### 🎙️ Assistant Multimodal (Gemini Live)
 
@@ -437,39 +468,39 @@ Jarvis-OS/
 | `/api/workflows` | Moteur de workflows |
 | `/api/workspace` | Gestion du workspace |
 
+> Les skills `codebase`, `verify` et `system` sont chargées au démarrage (critical skills) et disponibles immédiatement sans `request_tools`.
+
 ---
 
 ## 🛠️ Skills & Outils IA
 
 L'IA dispose de 22+ skills regroupées par domaine :
 
-| Skill | Outils fournis |
-|-------|---------------|
-| **codebase** | Lecture/écriture de fichiers, recherche, refactoring |
-| **codebaseReader** | Lecture optimisée de code source |
-| **codebaseWriter** | Écriture sécurisée avec validation |
+| Skill | Outils principaux |
+|-------|------------------|
+| **codebase** | `read_project_file`, `read_file_outline`, `search_in_files`, `list_project_files`, `write_project_file` (+ append), `modify_project_file` (+ fuzzy match), `patch_project_file`, `apply_patch` (+ tolérance whitespace), `rename_project_file`, `delete_project_file`, `delete_project_folder`, `create_project_directory` |
+| **verify** | `verify_file` (lint + typecheck + sécurité), `verify_typecheck`, `verify_syntax`, `verify_lint`, `verify_security`, `verify_full` |
+| **system** | `run_project_command` (npm/npx/node), `system_execute_command`, `system_info`, `system_notify`, `system_open` |
 | **git** | Status, commit, push, branches, diff |
 | **github** | Issues, PRs, repos, review |
 | **automation** | Tâches planifiées, navigation web (Puppeteer) |
-| **automationBrowser** | Navigation web autonome |
-| **browser_read_content** | Lecture de contenu d'une page web ouverte dans le BrowserPanel (texte global ou sélecteur CSS) |
-| **knowledge** | Indexation, recherche sémantique, graphe de dépendances |
+| **browser** | `browser_navigate`, `browser_search`, `browser_open`, `browser_read_content` (lecture page + sélecteur CSS) |
+| **knowledge** | Indexation, recherche sémantique, graphe de dépendances, analyse d'impact |
 | **documentKnowledge** | Connaissance documentaire spécialisée |
-| **documentLinker** | Liaisons entre documents |
-| **memory** | Stockage/récupération de mémoires persistantes |
+| **documentLinker** | Liaisons et analyse croisée entre documents |
+| **memory** | Stockage/récupération de mémoires persistantes (Supabase + embeddings) |
 | **mission** | Planification et exécution de missions autonomes |
-| **agents** | Délégation à des agents spécialisés |
-| **reasoning** | Chain-of-thought, décomposition de problèmes |
-| **chainOfThought** | Raisonnement explicite pas-à-pas |
+| **agents** | Délégation à des agents spécialisés (coder, test, docs, refactor, security, review, architect) |
+| **reasoning** | Chain-of-thought, décomposition de problèmes (`reasoning_think`) |
+| **richDocument** | `create_rich_document` — tableaux, graphiques, KPI, listes interactifs |
 | **workflow** | Exécution de pipelines documentaires |
-| **verify** | Validation et tests |
-| **system** | Commandes système, monitoring |
-| **time** | Gestion du temps, timestamps |
+| **time** | Heure, date, timestamps |
 | **weather** | Informations météo |
 | **guidelines** | Conventions de code, style guides |
-| **history** | Historique des sessions |
-| **list** | Gestion de listes |
-| **project** | Métadonnées projet |
+| **history** | Historique des sessions et conversations |
+| **list** | Gestion de listes et to-do |
+| **project** | Scaffold de nouveaux projets (React, Next, Vite, etc.) |
+| **aiStudioDirectives** | Directives techniques pour la génération IA Studio |
 | **customSkills** | Skills définies par l'utilisateur |
 
 ---
@@ -479,11 +510,14 @@ L'IA dispose de 22+ skills regroupées par domaine :
 - **Authentification** : Token `x-jarvis-token` sur tous les endpoints API
 - **Chiffrement** : Clés API et secrets chiffrés au repos (AES)
 - **Sandbox** : Modifications IA isolées, validation manuelle avant merge
-- **Rate limiting** : Protection multi-couche (global strict, polling relaxé, auth brute-force, notebook chat/embedding dédié)
-- **Audit trail** : Journalisation de toutes les actions sensibles
+- **Rate limiting** : Protection multi-couche (global strict, polling relaxé, auth brute-force, notebook chat/embedding dédié) + **30 écritures fichiers/min max**
+- **Audit trail** : Journalisation de toutes les actions sensibles (write, modify, patch, delete) avec diff résumé
+- **Fichiers critiques** : Confirmation utilisateur interactive obligatoire avant toute modification (`.env`, `package.json`, `server.ts`, etc.) — fail-closed en contexte autonome
+- **Garde-fous écriture** : `isWriteForbidden` bloque les fichiers système (`.git`, `.env`) ; chemins validés contre le workspace, pas de path traversal
+- **run_project_command** : Seuls `npm`, `npx`, `node` autorisés ; commandes modifiant `node_modules` nécessitent confirmation interactive ; caractères shell dangereux bloqués
 - **Circuit breaker** : Protection côté client contre les cascades d'erreurs réseau
 - **Injection guards** : Protection contre l'injection de prompts
-- **Backup & Recovery** : Sauvegarde automatique incrémentale avec restauration granulaire
+- **Backup & Recovery** : Sauvegarde automatique incrémentale (checkpoint Git avant chaque écriture) avec restauration granulaire
 - **Memory management** : Éviction LRU pour prévenir les fuites mémoire sur les embeddings
 - **Iframe sandbox** : Rendu HTML isolé (sans scripts) pour les sources HTML
 

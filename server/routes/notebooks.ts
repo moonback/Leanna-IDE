@@ -1283,6 +1283,163 @@ export function createNotebooksRouter(): Router {
     }
   });
 
+
+  // POST /api/notebooks/:id/sources/codebase — Importer le codebase du workspace en Markdown
+  router.post("/:id/sources/codebase", async (req: Request, res: Response) => {
+    try {
+      const notebookId = req.params.id;
+      const notebook = notebookManager.getNotebook(notebookId);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      const {
+        extensions,
+        excludeDirs = [],
+        maxFileSizeKb = 100,
+        includeConfig = true,
+        title,
+      } = req.body as {
+        extensions?: string[];
+        excludeDirs?: string[];
+        maxFileSizeKb?: number;
+        includeConfig?: boolean;
+        title?: string;
+      };
+
+      const { getProjectRoot: getProjRoot, EXCLUDED_DIRS, TEXT_FILE_EXT } = await import("../skills/codebaseHelpers");
+      const workspaceRoot = getProjRoot();
+
+      if (!fs.existsSync(workspaceRoot)) {
+        res.status(400).json({ error: `Workspace introuvable: ${workspaceRoot}` });
+        return;
+      }
+
+      const allowedExtensions = extensions && extensions.length > 0
+        ? new Set(extensions.map((e: string) => e.toLowerCase().replace(/^\.?/, ".")))
+        : null;
+
+      const excludedDirsSet = new Set([
+        ...EXCLUDED_DIRS,
+        ".jarvis", ".aionrs", ".kiro", ".github", ".husky", ".vscode",
+        "coverage", ".nyc_output", "tmp", "temp", ".cache",
+        ...excludeDirs.map((d: string) => d.toLowerCase()),
+      ]);
+
+      const configFiles = new Set(["package.json", "tsconfig.json", ".env.example", "vite.config.ts", "vite.config.js"]);
+      const maxBytes = maxFileSizeKb * 1024;
+      const collectedFiles: { rel: string; content: string }[] = [];
+      let totalChars = 0;
+      const MAX_TOTAL_CHARS = 2_000_000;
+
+      function walk(dir: string, relBase: string) {
+        if (totalChars >= MAX_TOTAL_CHARS) return;
+        let entries: fs.Dirent[];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+        catch { return; }
+
+        for (const entry of entries) {
+          const relPath = relBase ? `${relBase}/${entry.name}` : entry.name;
+          if (entry.isDirectory()) {
+            if (excludedDirsSet.has(entry.name.toLowerCase())) continue;
+            walk(path.join(dir, entry.name), relPath);
+          } else if (entry.isFile()) {
+            const ext = path.extname(entry.name).toLowerCase();
+            const isConfig = includeConfig && configFiles.has(entry.name);
+            const isTextFile = TEXT_FILE_EXT.test(entry.name);
+            const isAllowed = allowedExtensions ? allowedExtensions.has(ext) : isTextFile;
+            if (!isAllowed && !isConfig) continue;
+
+            let stats: fs.Stats;
+            try { stats = fs.statSync(path.join(dir, entry.name)); } catch { continue; }
+            if (stats.size > maxBytes) continue;
+            if (totalChars + stats.size > MAX_TOTAL_CHARS) continue;
+
+            try {
+              const content = fs.readFileSync(path.join(dir, entry.name), "utf-8");
+              collectedFiles.push({ rel: relPath, content });
+              totalChars += content.length;
+            } catch { /* fichier non lisible */ }
+          }
+        }
+      }
+
+      walk(workspaceRoot, "");
+
+      if (collectedFiles.length === 0) {
+        res.status(400).json({ error: "Aucun fichier texte trouvé dans le workspace." });
+        return;
+      }
+
+      const EXT_TO_LANG: Record<string, string> = {
+        ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx",
+        py: "python", json: "json", md: "markdown", html: "html",
+        css: "css", scss: "scss", yaml: "yaml", yml: "yaml",
+        sh: "bash", sql: "sql", cjs: "javascript", mjs: "javascript",
+        env: "bash", txt: "text",
+      };
+
+      const workspaceName = path.basename(workspaceRoot);
+      const now = new Date().toLocaleString("fr-FR");
+      const mdLines: string[] = [
+        `# Codebase : ${workspaceName}`,
+        ``,
+        `> Exporté le ${now} — ${collectedFiles.length} fichier(s) — ${Math.round(totalChars / 1024)} Ko de texte`,
+        ``,
+        `## Arborescence`,
+        ``,
+        "```",
+        ...collectedFiles.map(f => f.rel),
+        "```",
+        ``,
+        `---`,
+        ``,
+      ];
+
+      for (const { rel, content } of collectedFiles) {
+        const ext = path.extname(rel).replace(".", "") || "text";
+        const lang = EXT_TO_LANG[ext] || ext;
+        mdLines.push(`## \`${rel}\``);
+        mdLines.push(``);
+        mdLines.push("```" + lang);
+        mdLines.push(content.trimEnd());
+        mdLines.push("```");
+        mdLines.push(``);
+      }
+
+      const markdown = mdLines.join("\n");
+      const sourceTitle = title?.trim() || `Codebase — ${workspaceName}`;
+      const buffer = Buffer.from(markdown, "utf-8");
+      const source = await sourceIngester.ingestFromBuffer(
+        buffer,
+        sourceTitle,
+        "text/markdown",
+        notebookId
+      );
+      notebookManager.addSource(notebookId, source);
+
+      res.json({
+        status: "success",
+        source: {
+          id: source.id,
+          title: source.title,
+          type: source.type,
+          summary: source.summary,
+          keywords: source.keywords,
+          wordCount: source.wordCount,
+          chunksCount: source.chunks.length,
+        },
+        stats: {
+          filesCollected: collectedFiles.length,
+          totalChars,
+          workspaceRoot,
+        },
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
   // POST /api/notebooks/:id/sources/:sourceId/reindex â€” Re-indexer une source
   router.post("/:id/sources/:sourceId/reindex", async (req: Request, res: Response) => {
     try {

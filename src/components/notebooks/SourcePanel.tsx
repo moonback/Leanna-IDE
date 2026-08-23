@@ -9,7 +9,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Upload, Globe, FileText, Trash2, Loader2, Type, CheckCircle2, XCircle,
-  Search, Eye, RefreshCw, Tag, ClipboardPaste, BarChart3, X,
+  Search, Eye, RefreshCw, Tag, ClipboardPaste, BarChart3, X, FolderCode,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { SourcesSummaryCard } from './SourcesSummaryCard';
@@ -75,6 +75,12 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
   const [reindexingId, setReindexingId] = useState<string | null>(null);
   const [showClipboardForm, setShowClipboardForm] = useState(false);
   const [tagInput, setTagInput] = useState<{ sourceId: string; value: string } | null>(null);
+  // ─── Codebase import ──────────────────────────────────────────────────────
+  const [showCodebaseForm, setShowCodebaseForm] = useState(false);
+  const [codebaseTitle, setCodebaseTitle] = useState('');
+  const [codebaseExtensions, setCodebaseExtensions] = useState('');
+  const [codebaseMaxSizeKb, setCodebaseMaxSizeKb] = useState(100);
+  const [codebaseIncludeConfig, setCodebaseIncludeConfig] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Report upload progress to parent
@@ -323,6 +329,44 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       toastError('Impossible d\'accéder au presse-papier. Autorisez l\'accès dans le navigateur.');
     }
   }, [toastError, success]);
+
+  // ─── Codebase import ──────────────────────────────────────────────────────
+
+  const handleCodebaseImport = useCallback(async () => {
+    setUploading(true);
+    try {
+      const extensions = codebaseExtensions.trim()
+        ? codebaseExtensions.split(/[\s,;]+/).filter(Boolean).map(e => e.startsWith('.') ? e : `.${e}`)
+        : undefined;
+
+      const res = await fetch(`/api/notebooks/${notebookId}/sources/codebase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: codebaseTitle.trim() || undefined,
+          extensions,
+          maxFileSizeKb: codebaseMaxSizeKb,
+          includeConfig: codebaseIncludeConfig,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: 'Erreur serveur' }));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      success(
+        `Codebase importé : "${data.source.title}" — ${data.stats.filesCollected} fichiers, ${data.source.wordCount.toLocaleString()} mots`
+      );
+      setShowCodebaseForm(false);
+      setCodebaseTitle('');
+      setCodebaseExtensions('');
+      onRefresh();
+    } catch (e: any) {
+      toastError(e.message);
+    } finally {
+      setUploading(false);
+    }
+  }, [notebookId, codebaseTitle, codebaseExtensions, codebaseMaxSizeKb, codebaseIncludeConfig, success, toastError, onRefresh]);
 
   // Stats
   const totalWords = sources.reduce((acc, s) => acc + s.wordCount, 0);
@@ -593,6 +637,16 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
           Coller
         </button>
 
+        <button
+          onClick={() => { setShowCodebaseForm(!showCodebaseForm); setShowUrlForm(false); setShowTextForm(false); }}
+          className={`notebook-chip ${showCodebaseForm ? 'notebook-chip--active' : ''}`}
+          style={showCodebaseForm ? { borderColor: 'var(--notebook-accent)', color: 'var(--notebook-accent)', background: 'var(--notebook-accent-surface)' } : {}}
+          title="Importer le codebase du workspace"
+        >
+          <FolderCode className="w-3.5 h-3.5" />
+          Codebase
+        </button>
+
         {/* Stats */}
         <div className="ml-auto flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
           <span>{sources.length} source{sources.length !== 1 ? 's' : ''}</span>
@@ -709,6 +763,110 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 </button>
                 <button
                   onClick={() => { setShowTextForm(false); setTextTitle(''); setTextContent(''); }}
+                  className="notebook-chip"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Codebase Import Form */}
+      <AnimatePresence>
+        {showCodebaseForm && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-5 rounded-2xl border space-y-4"
+              style={{ backgroundColor: 'var(--notebook-card-bg)', borderColor: 'var(--notebook-border)' }}>
+              {/* Header */}
+              <div className="flex items-center gap-2">
+                <FolderCode className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Importer le codebase du workspace</p>
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                Scanne tous les fichiers texte du projet actif et les consolide en un seul document Markdown indexé dans ce notebook.
+              </p>
+
+              {/* Titre personnalisé */}
+              <input
+                type="text"
+                value={codebaseTitle}
+                onChange={e => setCodebaseTitle(e.target.value)}
+                placeholder="Titre de la source (optionnel)"
+                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
+              />
+
+              {/* Filtres d'extensions */}
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  Extensions à inclure <span style={{ color: 'var(--text-dimmed)' }}>(vide = toutes les extensions texte)</span>
+                </label>
+                <input
+                  type="text"
+                  value={codebaseExtensions}
+                  onChange={e => setCodebaseExtensions(e.target.value)}
+                  placeholder=".ts .tsx .js .py .md ..."
+                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none font-mono"
+                  style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
+              {/* Options */}
+              <div className="flex items-center gap-6">
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    Taille max par fichier
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={10}
+                      max={500}
+                      value={codebaseMaxSizeKb}
+                      onChange={e => setCodebaseMaxSizeKb(Number(e.target.value))}
+                      className="w-20 px-3 py-2 rounded-xl text-sm outline-none text-center"
+                      style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
+                    />
+                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Ko</span>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={codebaseIncludeConfig}
+                    onChange={e => setCodebaseIncludeConfig(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded accent-[var(--notebook-accent)]"
+                  />
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    Inclure les fichiers de config
+                    <span className="block text-[10px]" style={{ color: 'var(--text-dimmed)' }}>package.json, tsconfig.json…</span>
+                  </span>
+                </label>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCodebaseImport}
+                  disabled={uploading}
+                  className="notebook-fab disabled:opacity-40"
+                  style={{ padding: '8px 16px', fontSize: '13px' }}
+                >
+                  {uploading
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Scan en cours…</>
+                    : <><FolderCode className="w-3.5 h-3.5" /> Importer le codebase</>
+                  }
+                </button>
+                <button
+                  onClick={() => { setShowCodebaseForm(false); setCodebaseTitle(''); setCodebaseExtensions(''); }}
                   className="notebook-chip"
                 >
                   Annuler

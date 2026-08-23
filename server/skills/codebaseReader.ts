@@ -1,7 +1,13 @@
 import fs from "fs";
 import path from "path";
+import { createHash } from "crypto";
 import { generateText } from "../utils/textGeneration";
 import { markFileModified } from "../utils/sandbox";
+
+/** Calcule le hash MD5 d'un contenu string (utf-8). */
+function md5(content: string): string {
+  return createHash("md5").update(content, "utf-8").digest("hex");
+}
 import {
   getProjectRoot,
   normalizeProjectPath,
@@ -118,6 +124,12 @@ export async function handleGenerateCodebaseMarkdown(args: any) {
 export async function handleListProjectFiles(args: any) {
   const dirPath = String(args.path || ".").trim();
   const recursive = args.recursive === true;
+  const includeStats = args.includeStats === true;
+  // Filtrage par extension : "ts,tsx,js" → ["ts", "tsx", "js"]
+  const filterExts: string[] | null = args.extensions
+    ? String(args.extensions).split(",").map((e: string) => e.trim().replace(/^\./, "").toLowerCase()).filter(Boolean)
+    : null;
+
   const normalized = normalizeProjectPath(dirPath);
   if (!normalized) return { error: "Chemin invalide ou en dehors du workspace." };
   if (!fs.existsSync(normalized)) return { error: "Dossier introuvable." };
@@ -127,13 +139,43 @@ export async function handleListProjectFiles(args: any) {
   if (recursive) {
     const files: string[] = [];
     await walkDirectory(normalized, dirPath === "." ? "." : dirPath, files);
-    return { status: "success", path: dirPath, recursive: true, count: files.length, files };
+
+    // Filtrage par extension
+    const filtered = filterExts
+      ? files.filter(f => {
+          const ext = path.extname(f).replace(/^\./, "").toLowerCase();
+          return filterExts.includes(ext);
+        })
+      : files;
+
+    if (!includeStats) {
+      return { status: "success", path: dirPath, recursive: true, count: filtered.length, files: filtered };
+    }
+
+    // Avec stats
+    const filesWithStats = await Promise.all(
+      filtered.map(async (f) => {
+        const abs = path.join(getProjectRoot(), f);
+        const s = await fs.promises.stat(abs).catch(() => null);
+        return {
+          path: f,
+          sizeBytes: s?.size,
+          modifiedAt: s?.mtime.toISOString(),
+        };
+      })
+    );
+    return { status: "success", path: dirPath, recursive: true, count: filesWithStats.length, files: filesWithStats };
   }
 
   const entries = await fs.promises.readdir(normalized, { withFileTypes: true });
   const result = await Promise.all(
     entries
       .filter((e) => !EXCLUDED_DIRS.has(e.name))
+      .filter((e) => {
+        if (!filterExts || e.isDirectory()) return true;
+        const ext = path.extname(e.name).replace(/^\./, "").toLowerCase();
+        return filterExts.includes(ext);
+      })
       .map(async (e) => {
         const fullPath = path.join(normalized, e.name);
         const s = await fs.promises.stat(fullPath);
@@ -142,6 +184,10 @@ export async function handleListProjectFiles(args: any) {
           path: dirPath === "." ? e.name : `${dirPath}/${e.name}`,
           type: e.isDirectory() ? "directory" : "file",
           sizeBytes: e.isFile() ? s.size : undefined,
+          ...(includeStats && {
+            modifiedAt: s.mtime.toISOString(),
+            createdAt: s.birthtime.toISOString(),
+          }),
         };
       })
   );
@@ -170,26 +216,45 @@ export async function handleReadProjectFile(args: any) {
   const forceFullContent = args.full === true || args.forceFullContent === true;
   const SMART_LIMIT = 8000;
   const noRangeSpecified = typeof args.startLine !== "number" && typeof args.endLine !== "number";
+
+  // ── Preview partiel amélioré : début + fin du fichier ────────────────────
   if (!forceFullContent && noRangeSpecified && content.length > SMART_LIMIT) {
-    const preview = lines.slice(0, 50).join("\n");
+    const HEAD_LINES = 60;
+    const TAIL_LINES = 30;
+    const headLines = lines.slice(0, HEAD_LINES);
+    const tailLines = lines.length > HEAD_LINES + TAIL_LINES
+      ? lines.slice(lines.length - TAIL_LINES)
+      : [];
+    const hasMiddle = lines.length > HEAD_LINES + TAIL_LINES;
+    const preview = [
+      ...headLines,
+      ...(hasMiddle
+        ? [`\n... [${lines.length - HEAD_LINES - TAIL_LINES} lignes masquées — utilise startLine/endLine ou full:true] ...\n`]
+        : []),
+      ...tailLines,
+    ].join("\n");
+
     return {
       status: "partial",
       path: requestedPath,
       totalLines: lines.length,
       sizeBytes: stats.size,
+      contentHash: md5(raw),
       content: preview,
-      warning: `Fichier volumineux (${lines.length} lignes, ${stats.size} octets). Seules les 50 premières lignes sont affichées. Utilise startLine/endLine pour lire une section spécifique, ou read_project_file avec full=true pour le fichier complet.`,
-      hint: "Pour lire le fichier en entier, rappelle read_project_file avec full: true.",
+      headLines: HEAD_LINES,
+      tailLines: tailLines.length,
+      warning: `Fichier volumineux (${lines.length} lignes, ${stats.size} octets). Début (${HEAD_LINES} lignes) et fin (${tailLines.length} lignes) affichés. Utilise startLine/endLine pour cibler une section, ou full:true pour tout lire.`,
+      hint: "Pour modifier ce fichier : read_project_file({ path, full: true }) pour obtenir les numéros de ligne exacts, puis patch_project_file ou modify_project_file.",
     };
   }
 
   const maxLength = 200_000;
   const truncated = content.length > maxLength;
 
-  // Si lecture complète (full: true), ajouter les numéros de ligne pour faciliter patch_project_file
+  // Numéros de ligne pour faciliter patch_project_file (full: true uniquement)
   const addLineNumbers = (args.full === true || args.forceFullContent === true) && !truncated && lines.length > 30;
   const formattedContent = addLineNumbers
-    ? selectedLines.map((line, i) => `${(startLine + i).toString().padStart(4, ' ')}| ${line}`).join("\n")
+    ? selectedLines.map((line, i) => `${(startLine + i).toString().padStart(4, " ")}| ${line}`).join("\n")
     : (truncated ? content.slice(0, maxLength) + "\n... [tronque]" : content);
 
   return {
@@ -202,7 +267,10 @@ export async function handleReadProjectFile(args: any) {
     lineNumbered: addLineNumbers,
     truncated,
     sizeBytes: stats.size,
-    hint: addLineNumbers ? "Les numéros de ligne sont inclus (format: '  42| code'). Utilise patch_project_file avec startLine/endLine pour modifier." : undefined,
+    contentHash: md5(raw),
+    hint: addLineNumbers
+      ? "Les numéros de ligne sont inclus (format: '  42| code'). Utilise patch_project_file avec startLine/endLine pour modifier des plages précises."
+      : undefined,
   };
 }
 
@@ -239,10 +307,14 @@ export async function handleSearchInFiles(args: any) {
   const extensions = args.extensions ? String(args.extensions).split(",").map((e: string) => e.trim().replace(/^\./, "")) : null;
   const caseSensitive = args.caseSensitive === true;
   const isRegex = args.regex === true;
-  const maxResults = typeof args.maxResults === "number" ? args.maxResults : 20;
+  const maxResults = typeof args.maxResults === "number" ? Math.min(args.maxResults, 100) : 20;
+  // Nombre de lignes de contexte à inclure avant/après chaque match
+  const contextLines = typeof args.contextLines === "number" ? Math.min(Math.max(0, args.contextLines), 10) : 0;
+  // Texte de remplacement pour prévisualiser les changements
+  const replaceWith: string | null = typeof args.replaceWith === "string" ? args.replaceWith : null;
+
   const allFiles: string[] = [];
 
-  // Si le path pointe vers un fichier, chercher uniquement dedans
   const pathStats = await fs.promises.stat(normalized).catch(() => null);
   if (pathStats && pathStats.isFile()) {
     allFiles.push(searchPath);
@@ -250,15 +322,23 @@ export async function handleSearchInFiles(args: any) {
     await walkDirectory(normalized, searchPath === "." ? "." : searchPath, allFiles);
   }
 
-  const results: Array<{ file: string; line: number; content: string }> = [];
+  interface SearchResult {
+    file: string;
+    line: number;
+    column: number;
+    content: string;
+    contextBefore?: string[];
+    contextAfter?: string[];
+    replacePreview?: string;
+  }
 
-  // Mode littéral par défaut : échapper les caractères spéciaux regex
-  // Mode regex explicite : utiliser la query telle quelle
+  const results: SearchResult[] = [];
+
   let pattern: string;
   if (isRegex) {
     pattern = query;
   } else {
-    pattern = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    pattern = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
   let regex: RegExp;
@@ -267,6 +347,7 @@ export async function handleSearchInFiles(args: any) {
   } catch (e: any) {
     return { error: `Expression régulière invalide: ${e.message}. Utilisez regex: false ou échappez les caractères spéciaux.` };
   }
+
   for (const filePath of allFiles) {
     if (results.length >= maxResults) break;
     if (extensions) {
@@ -280,15 +361,50 @@ export async function handleSearchInFiles(args: any) {
       if (s.size > MAX_PREVIEW_SIZE) continue;
       const content = await fs.promises.readFile(absolutePath, "utf-8");
       const lines = content.split(/\r?\n/);
+
       for (let i = 0; i < lines.length && results.length < maxResults; i++) {
-        if (regex.test(lines[i])) {
-          results.push({ file: filePath, line: i + 1, content: lines[i].trim() });
-        }
         regex.lastIndex = 0;
+        const match = regex.exec(lines[i]);
+        if (!match) continue;
+
+        const result: SearchResult = {
+          file: filePath,
+          line: i + 1,
+          column: match.index + 1,
+          content: lines[i].trim(),
+        };
+
+        // Lignes de contexte avant/après
+        if (contextLines > 0) {
+          result.contextBefore = lines
+            .slice(Math.max(0, i - contextLines), i)
+            .map((l, idx) => `${i - contextLines + idx + 1}: ${l}`);
+          result.contextAfter = lines
+            .slice(i + 1, Math.min(lines.length, i + 1 + contextLines))
+            .map((l, idx) => `${i + 2 + idx}: ${l}`);
+        }
+
+        // Prévisualisation du remplacement
+        if (replaceWith !== null) {
+          regex.lastIndex = 0;
+          result.replacePreview = lines[i].replace(regex, replaceWith);
+        }
+
+        results.push(result);
       }
     } catch { /* skip unreadable files */ }
   }
-  return { status: "success", query, count: results.length, results };
+
+  return {
+    status: "success",
+    query,
+    replaceWith: replaceWith ?? undefined,
+    count: results.length,
+    results,
+    hint: results.length === maxResults
+      ? `Limite de ${maxResults} résultats atteinte. Affinez avec 'path', 'extensions' ou augmentez 'maxResults'.`
+      : undefined,
+  };
 }
 
 export async function handleAnalyzeProjectFile(args: any, toolContext: any) {

@@ -46,6 +46,7 @@ const CRITICAL_SKILLS = [
   'reasoning',
   'automation',
   'verify',
+  'system',
   'project',
   'aiStudioDirectives',
   'guidelines',
@@ -816,6 +817,8 @@ Analyse la situation et propose un patch de remplacement COMPLET pour ce fichier
       'reasoning',
       'agents',
       'browser',
+      'system',
+      'verify',
     ]);
 
     const RELEVANCE_THRESHOLD = 3;
