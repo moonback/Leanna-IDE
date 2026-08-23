@@ -5,7 +5,21 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 export type ResponseStyle = 'concise' | 'balanced' | 'detailed';
 export type Language      = 'fr' | 'en' | 'es' | 'de' | 'pt';
 export type AIProvider    = 'gemini' | 'openrouter';
-export type AgentRole     = 'writer' | 'formatter' | 'researcher' | 'proofreader' | 'translator' | 'summarizer' | 'planner';
+export type AgentRole =
+  | 'coder'
+  | 'refactor'
+  | 'debugger'
+  | 'reviewer'
+  | 'tester'
+  | 'security'
+  | 'architect'
+  | 'writer'
+  | 'formatter'
+  | 'researcher'
+  | 'proofreader'
+  | 'translator'
+  | 'summarizer'
+  | 'planner';
 
 export interface AgentsConfig {
   enabled: boolean;
@@ -75,7 +89,10 @@ const DEFAULT_PROFILE: UserProfile = {
   // Agents
   agents: {
     enabled: true,
-    allowedRoles: ['writer', 'formatter', 'researcher', 'proofreader', 'translator', 'summarizer', 'planner'],
+    allowedRoles: [
+      'coder', 'refactor', 'debugger', 'reviewer', 'tester', 'security', 'architect',
+      'writer', 'formatter', 'researcher', 'proofreader', 'translator', 'summarizer', 'planner',
+    ],
   },
   // Reasoning
   reasoningEnabled: true,

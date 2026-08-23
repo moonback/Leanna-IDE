@@ -4,31 +4,96 @@ import { z } from "zod";
 // Types du système d'agents multi-rôles
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Rôles d'agents spécialisés disponibles — orientés rédaction de documents */
-export const AGENT_ROLES = ["writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner"] as const;
+/** Rôles d'agents spécialisés disponibles — ingénierie de code & rédaction de documents */
+export const AGENT_ROLES = [
+  // Agents de Code & Ingénierie logicielle
+  "coder",
+  "refactor",
+  "debugger",
+  "reviewer",
+  "tester",
+  "security",
+  "architect",
+  // Agents de Rédaction & Documentation
+  "writer",
+  "formatter",
+  "researcher",
+  "proofreader",
+  "translator",
+  "summarizer",
+  "planner",
+] as const;
 export type AgentRole = (typeof AGENT_ROLES)[number];
 
 /** Alias contrôlés acceptés aux frontières LLM. Aucun rôle n'est inventé. */
 const AGENT_ROLE_ALIASES: Readonly<Record<string, AgentRole>> = {
+  // Aliases Code & Dév
+  coder: "coder",
+  developpeur: "coder",
+  développeur: "coder",
+  dev: "coder",
+  developer: "coder",
+  code: "coder",
+  programmer: "coder",
+  programmeur: "coder",
+  refactor: "refactor",
+  refactoring: "refactor",
+  clean_code: "refactor",
+  restructuration: "refactor",
+  debugger: "debugger",
+  debug: "debugger",
+  correctif: "debugger",
+  fix: "debugger",
+  bugfix: "debugger",
+  depannage: "debugger",
+  dépannage: "debugger",
+  reviewer: "reviewer",
+  review: "reviewer",
+  revue: "reviewer",
+  code_review: "reviewer",
+  audit_code: "reviewer",
+  tester: "tester",
+  test: "tester",
+  tests: "tester",
+  qa: "tester",
+  quality: "tester",
+  security: "security",
+  securite: "security",
+  sécurité: "security",
+  sec: "security",
+  audit_secu: "security",
+  audit_sécu: "security",
+  architect: "architect",
+  architecte: "architect",
+  architecture: "architect",
+  conception: "architect",
+  // Aliases Rédaction & Documents
+  writer: "writer",
   redacteur: "writer",
   rédacteur: "writer",
   write: "writer",
   redaction: "writer",
   rédaction: "writer",
+  formatter: "formatter",
   format: "formatter",
   mise_en_forme: "formatter",
   structure: "formatter",
+  researcher: "researcher",
   recherche: "researcher",
   research: "researcher",
+  proofreader: "proofreader",
   correcteur: "proofreader",
   correction: "proofreader",
   relecture: "proofreader",
+  translator: "translator",
   traduction: "translator",
   translate: "translator",
+  summarizer: "summarizer",
   synthese: "summarizer",
   synthèse: "summarizer",
   resume: "summarizer",
   résumé: "summarizer",
+  planner: "planner",
   plan: "planner",
   outline: "planner",
   planification: "planner",
@@ -156,12 +221,12 @@ export interface OrchestrationPlan {
 // ─── Zod Schemas pour validation ──────────────────────────────────────────────
 
 const strictAgentRoleSchema = z.enum(
-  ["writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner"],
+  AGENT_ROLES,
   {
     errorMap: (_issue, ctx) => ({
       message:
         `Rôle invalide : "${ctx.data}". ` +
-        `Un seul rôle autorisé par tâche, parmi : writer, formatter, researcher, proofreader, translator, summarizer, planner.`,
+        `Un seul rôle autorisé par tâche, parmi : ${AGENT_ROLES.join(", ")}.`,
     }),
   }
 );
@@ -171,6 +236,15 @@ export const agentRoleSchema = z
   .union([
     strictAgentRoleSchema,
     z.enum([
+      // Code & Dev aliases
+      "coder", "developpeur", "développeur", "dev", "developer", "code", "programmer", "programmeur",
+      "refactor", "refactoring", "clean_code", "restructuration",
+      "debugger", "debug", "correctif", "fix", "bugfix", "depannage", "dépannage",
+      "reviewer", "review", "revue", "code_review", "audit_code",
+      "tester", "test", "tests", "qa", "quality",
+      "security", "securite", "sécurité", "sec", "audit_secu", "audit_sécu",
+      "architect", "architecte", "architecture", "conception",
+      // Docs aliases
       "redacteur", "rédacteur", "write", "redaction", "rédaction",
       "format", "mise_en_forme", "structure",
       "recherche", "research",

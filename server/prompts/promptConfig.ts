@@ -2,7 +2,21 @@ export type ResponseStyle = "concise" | "balanced" | "detailed";
 export type Language = "fr" | "en" | "es" | "de" | "pt";
 export type AssistantMode = "full" | "ask";
 export type PromptProfile = "jarvis-agent-v2";
-export type AgentRole = "writer" | "formatter" | "researcher" | "proofreader" | "translator" | "summarizer" | "planner";
+export type AgentRole =
+  | "coder"
+  | "refactor"
+  | "debugger"
+  | "reviewer"
+  | "tester"
+  | "security"
+  | "architect"
+  | "writer"
+  | "formatter"
+  | "researcher"
+  | "proofreader"
+  | "translator"
+  | "summarizer"
+  | "planner";
 
 export interface AgentsConfig {
   /** Désactiver complètement le système multi-agents (l'assistant agit seul) */

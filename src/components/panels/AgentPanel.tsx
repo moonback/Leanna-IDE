@@ -5,6 +5,7 @@ import {
   Loader2, CheckCircle2, XCircle, Clock,
   ChevronRight, Trash2, Code, GitBranch, Globe,
   Brain, Database, Target, Activity, ArrowRight,
+  Code2, Sparkles, Bug, CheckCheck, FlaskConical, ShieldAlert, Network,
   PenTool, AlignLeft, Search, SpellCheck, Languages, ListTree,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel';
@@ -27,13 +28,25 @@ const ROLE_META: Record<string, {
   label: string;
   description: string;
 }> = {
-  writer:      { icon: PenTool,    color: '#60a5fa', label: 'Rédacteur',    description: 'Rédaction de documents' },
-  formatter:   { icon: AlignLeft,  color: '#4ade80', label: 'Mise en forme',description: 'Formatage & structure' },
-  researcher:  { icon: Search,     color: '#a78bfa', label: 'Recherche',    description: 'Collecte & synthèse' },
-  proofreader: { icon: SpellCheck,  color: '#fbbf24', label: 'Correcteur',  description: 'Orthographe & grammaire' },
-  translator:  { icon: Languages,  color: '#f87171', label: 'Traducteur',   description: 'Traduction & localisation' },
-  summarizer:  { icon: FileText,   color: '#fb923c', label: 'Synthèse',     description: 'Résumés & condensés' },
-  planner:     { icon: ListTree,   color: '#2dd4bf', label: 'Planificateur',description: 'Plans & outlines' },
+  // Code & Ingénierie
+  coder:       { icon: Code2,        color: '#38bdf8', label: 'Développeur',     description: 'Écriture & modification de code' },
+  refactor:    { icon: Sparkles,     color: '#818cf8', label: 'Refactorisation', description: 'Clean code & modularité' },
+  debugger:    { icon: Bug,          color: '#f87171', label: 'Débogueur',       description: 'Diagnostic & correctifs' },
+  reviewer:    { icon: CheckCheck,   color: '#34d399', label: 'Revue de Code',   description: 'Audit & qualité logicielle' },
+  tester:      { icon: FlaskConical, color: '#fb923c', label: 'QA & Tests',      description: 'Tests automatisés & couverture' },
+  security:    { icon: ShieldAlert,  color: '#e879f9', label: 'Sécurité & Audit',description: 'Vulnérabilités & secrets' },
+  architect:   { icon: Network,      color: '#2dd4bf', label: 'Architecte',      description: 'Conception & modélisation' },
+
+  // Rédaction & Documents
+  writer:      { icon: PenTool,      color: '#60a5fa', label: 'Rédacteur',       description: 'Rédaction de documents' },
+  formatter:   { icon: AlignLeft,    color: '#4ade80', label: 'Mise en forme',   description: 'Formatage & structure' },
+  researcher:  { icon: Search,       color: '#a78bfa', label: 'Recherche',       description: 'Collecte & synthèse' },
+  proofreader: { icon: SpellCheck,   color: '#fbbf24', label: 'Correcteur',      description: 'Orthographe & grammaire' },
+  translator:  { icon: Languages,    color: '#f472b6', label: 'Traducteur',      description: 'Traduction & localisation' },
+  summarizer:  { icon: FileText,     color: '#f97316', label: 'Synthèse',        description: 'Résumés & condensés' },
+  planner:     { icon: ListTree,     color: '#14b8a6', label: 'Planificateur',   description: 'Plans & outlines' },
+
+  // Activités & outils
   code:     { icon: Code,         color: '#60a5fa', label: 'Code',         description: 'Lecture/écriture de fichiers' },
   files:    { icon: FileText,     color: '#4ade80', label: 'Fichiers',     description: 'Gestion de fichiers' },
   git:      { icon: GitBranch,    color: '#f472b6', label: 'Git',          description: 'Contrôle de version' },
@@ -52,13 +65,22 @@ function getRoleMeta(role: string) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const AGENT_ROSTER: { id: AgentRole; label: string; desc: string; icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>; color: string }[] = [
-  { id: 'writer',      label: 'Rédacteur',      desc: 'Rédaction de documents',           icon: PenTool,    color: '#60a5fa' },
-  { id: 'formatter',   label: 'Mise en Forme',  desc: 'Formatage & structure Markdown',   icon: AlignLeft,  color: '#4ade80' },
-  { id: 'researcher',  label: 'Recherche',      desc: 'Collecte & synthèse d\'infos',     icon: Search,     color: '#a78bfa' },
-  { id: 'proofreader', label: 'Correcteur',     desc: 'Orthographe, grammaire, style',    icon: SpellCheck,  color: '#fbbf24' },
-  { id: 'translator',  label: 'Traducteur',     desc: 'Traduction & localisation',        icon: Languages,  color: '#f87171' },
-  { id: 'summarizer',  label: 'Synthèse',       desc: 'Résumés & condensés',              icon: FileText,   color: '#fb923c' },
-  { id: 'planner',     label: 'Planificateur',  desc: 'Plans & outlines de documents',    icon: ListTree,   color: '#2dd4bf' },
+  // Code & Ingénierie
+  { id: 'coder',       label: 'Développeur',     desc: 'Écriture et modification de code typé',       icon: Code2,        color: '#38bdf8' },
+  { id: 'refactor',    label: 'Refactorisation', desc: 'Clean code, architecture & modularité',        icon: Sparkles,     color: '#818cf8' },
+  { id: 'debugger',    label: 'Débogueur',       desc: 'Diagnostic de bugs & patches chirurgicaux',     icon: Bug,          color: '#f87171' },
+  { id: 'reviewer',    label: 'Revue de Code',   desc: 'Audit qualité, détection d\'anti-patterns',    icon: CheckCheck,   color: '#34d399' },
+  { id: 'tester',      label: 'QA & Tests',      desc: 'Création & exécution de tests automatisés',    icon: FlaskConical, color: '#fb923c' },
+  { id: 'security',    label: 'Sécurité & Audit',desc: 'Détection failles OWASP, fuites de secrets',   icon: ShieldAlert,  color: '#e879f9' },
+  { id: 'architect',   label: 'Architecte',      desc: 'Conception système, interfaces & modèles',    icon: Network,      color: '#2dd4bf' },
+  // Rédaction & Documentation
+  { id: 'writer',      label: 'Rédacteur',       desc: 'Rédaction de documents & articles',            icon: PenTool,      color: '#60a5fa' },
+  { id: 'formatter',   label: 'Mise en Forme',   desc: 'Formatage & structure Markdown',               icon: AlignLeft,    color: '#4ade80' },
+  { id: 'researcher',  label: 'Recherche',       desc: 'Collecte & synthèse d\'informations',          icon: Search,       color: '#a78bfa' },
+  { id: 'proofreader', label: 'Correcteur',      desc: 'Orthographe, grammaire, style',                icon: SpellCheck,   color: '#fbbf24' },
+  { id: 'translator',  label: 'Traducteur',      desc: 'Traduction & localisation',                    icon: Languages,    color: '#f472b6' },
+  { id: 'summarizer',  label: 'Synthèse',        desc: 'Résumés & condensés',                          icon: FileText,     color: '#f97316' },
+  { id: 'planner',     label: 'Planificateur',   desc: 'Plans & outlines de documents',                icon: ListTree,     color: '#14b8a6' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════

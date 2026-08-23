@@ -185,31 +185,48 @@ export class SystemPromptBuilder {
    * Construit un prompt agents filtré avec uniquement les rôles autorisés.
    */
   private buildFilteredAgentsPrompt(allowedRoles: string[], _renderOpts: any): string {
-    const ALL_ROLES: Record<string, { description: string; write: boolean }> = {
-      writer:      { description: "Rédaction de documents (README, guides, articles, rapports)", write: true },
-      formatter:   { description: "Mise en forme et formatage Markdown", write: true },
-      researcher:  { description: "Recherche et collecte d'informations", write: false },
-      proofreader: { description: "Correction orthographique, grammaticale et stylistique", write: true },
-      translator:  { description: "Traduction et localisation", write: true },
-      summarizer:  { description: "Résumés et synthèses", write: true },
-      planner:     { description: "Plans et structures de documents", write: false },
+    const ALL_ROLES: Record<string, { description: string; write: boolean; category: string }> = {
+      // Code & Ingénierie logicielle
+      coder:       { description: "Implémentation de fonctionnalités, écriture et modification de code propre", write: true, category: "Code" },
+      refactor:    { description: "Restructuration, Clean Code, réduction de dette technique et découpage", write: true, category: "Code" },
+      debugger:    { description: "Diagnostic d'erreurs/stacktraces, root-cause et patches correctifs ciblés", write: true, category: "Code" },
+      reviewer:    { description: "Revue de code, audit de qualité, détection d'anti-patterns et standards", write: false, category: "Code" },
+      tester:      { description: "Conception et écriture de tests automatisés (unitaires, intégration)", write: true, category: "Code" },
+      security:    { description: "Audit de sécurité applicative, vulnérabilités OWASP et secrets", write: false, category: "Code" },
+      architect:   { description: "Conception logicielle, modélisation de données, contrats et modules", write: true, category: "Code" },
+      // Rédaction & Documentation
+      writer:      { description: "Rédaction de documents (README, guides, articles, rapports)", write: true, category: "Docs" },
+      formatter:   { description: "Mise en forme et formatage Markdown", write: true, category: "Docs" },
+      researcher:  { description: "Recherche et collecte d'informations", write: false, category: "Docs" },
+      proofreader: { description: "Correction orthographique, grammaticale et stylistique", write: true, category: "Docs" },
+      translator:  { description: "Traduction et localisation multilingue", write: true, category: "Docs" },
+      summarizer:  { description: "Résumés et synthèses condensées", write: true, category: "Docs" },
+      planner:     { description: "Plans et structures de documents", write: false, category: "Docs" },
     };
 
     const lines: string[] = [];
-    lines.push("# Système Multi-Agents (restreint)");
+    lines.push("# Système Multi-Agents");
     lines.push("");
-    lines.push("Tu fais partie du système multi-agents Jarvis-OS, spécialisé dans la rédaction de documents.");
+    lines.push("Tu fais partie du système multi-agents Jarvis-OS, couvrant l'ingénierie de code et la rédaction.");
     lines.push(`**Agents activés :** ${allowedRoles.join(", ")}`);
     lines.push("");
 
-    // Si writer est actif, garder la règle de délégation obligatoire
-    if (allowedRoles.includes("writer")) {
-      lines.push("## ⚠️ RÈGLE — RÉDACTION DE DOCUMENTS");
-      lines.push("");
-      lines.push("Toute rédaction de document DOIT être déléguée à l'agent `writer` via `agent_delegate`.");
-      lines.push("Pour les corrections, utilise `proofreader`. Pour la traduction, utilise `translator`.");
-      lines.push("");
+    // Règles de délégation conditionnelles
+    lines.push("## ⚠️ RÈGLES DE DÉLÉGATION");
+    lines.push("");
+    if (allowedRoles.includes("coder")) {
+      lines.push("- **Code & Développement :** Délègue l'écriture et les modifications de code à `coder` via `agent_delegate`.");
     }
+    if (allowedRoles.includes("refactor")) {
+      lines.push("- **Refactoring :** Délègue le Clean Code et le découpage de modules à `refactor`.");
+    }
+    if (allowedRoles.includes("debugger")) {
+      lines.push("- **Débogage :** Délègue la résolution d'erreurs et de stacktraces à `debugger`.");
+    }
+    if (allowedRoles.includes("writer")) {
+      lines.push("- **Rédaction :** Délègue la rédaction de documents à `writer`.");
+    }
+    lines.push("");
 
     lines.push("## Agents disponibles");
     lines.push("");

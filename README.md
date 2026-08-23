@@ -111,26 +111,43 @@ Leanna peut gérer, créer et modifier du code **directement dans le workspace**
 - **Partage d'écran** : Capture et interprétation du contenu affiché
 - **Chat textuel** : Conversation avec historique, streaming SSE, contexte persistant
 
-### 🤖 Système Multi-Agents
+### 🤖 Système Multi-Agents (14 Rôles Spécialisés)
 
-7 agents documentaires spécialisés avec orchestration automatique :
+Le système multi-agents de Jarvis OS orchestre **14 agents autonomes** répartis en deux pôles d'excellence : le **Développement Logiciel** et la **Rédaction Documentaire**. Chaque agent possède des compétences isolées, des garde-fous stricts et un prompt d'expertise calibré.
 
-| Agent | Rôle | Capacité |
-|-------|------|----------|
-| ✍️ **Rédacteur** | Rédaction de documents complets | Lecture/Écriture |
-| 🎨 **Mise en forme** | Formatage Markdown, tables, TOC | Lecture/Écriture |
-| 🔍 **Recherche** | Collecte d'infos, vérification de faits | Lecture seule |
-| ✅ **Correcteur** | Orthographe, grammaire, cohérence | Lecture/Écriture |
-| 🌐 **Traducteur** | Traduction et localisation multilingue | Lecture/Écriture |
-| 📋 **Synthèse** | Résumés exécutifs, abstracts | Lecture/Écriture |
-| 📐 **Planificateur** | Plans, outlines, structures | Lecture seule |
+#### 💻 Pôle Code & Ingénierie Logicielle
 
-**Patterns de collaboration :**
-- `document-complet` : Planificateur → Rédacteur → Correcteur → Mise en Forme
-- `traduction-verifiee` : Rédacteur → Traducteur → Correcteur
-- `recherche-redaction` : Recherche → Planificateur → Rédacteur → Correcteur
+| Agent | Rôle / ID | Mission Principale | Capacité |
+|---|---|---|:---:|
+| 💻 **Développeur** | `coder` | Implémentation de fonctionnalités, écriture et modification de code typé et propre | Lecture / Écriture / Tests |
+| ✨ **Refactorisation** | `refactor` | Clean Code, modularité, découpage de composants et réduction de dette technique | Lecture / Écriture / Validation |
+| 🪲 **Débogueur** | `debugger` | Diagnostic d'erreurs/stacktraces, root-cause et application de correctifs chirurgicaux | Lecture / Écriture / Validation |
+| 🔍 **Revue de Code** | `reviewer` | Audit qualité, détection d'anti-patterns SOLID/DRY et feedback constructif | Lecture seule |
+| 🧪 **QA & Tests** | `tester` | Conception et écriture de suites de tests (unitaires, intégration, cas limites) | Lecture / Écriture / Validation |
+| 🛡️ **Sécurité & Audit** | `security` | Audit de vulnérabilités OWASP, fuites de secrets, validation des flux de données | Lecture seule |
+| 🏛️ **Architecte Logiciel** | `architect` | Conception système, arborescence, schémas de données, interfaces et patterns | Lecture / Écriture / Structure |
 
-**Flotte d'agents autonomes** et **missions planifiées** pour des tâches complexes multi-étapes.
+#### 📄 Pôle Rédaction & Documentation
+
+| Agent | Rôle / ID | Mission Principale | Capacité |
+|---|---|---|:---:|
+| ✍️ **Rédacteur** | `writer` | Rédaction de documents complets, guides, README et articles | Lecture / Écriture |
+| 🎨 **Mise en forme** | `formatter` | Formatage structurel Markdown, tables, blocs de code, TOC | Lecture / Écriture |
+| 🔎 **Recherche** | `researcher` | Collecte d'informations, vérification de faits et sources | Lecture seule |
+| 🖋️ **Correcteur** | `proofreader` | Correction orthographique, grammaticale, style et cohérence | Lecture / Écriture |
+| 🌐 **Traducteur** | `translator` | Traduction et localisation multilingue fidèle | Lecture / Écriture |
+| 📝 **Synthèse** | `summarizer` | Résumés exécutifs, condensés et points clés | Lecture / Écriture |
+| 📋 **Planificateur** | `planner` | Plans détaillés, outlines et organisation de documents | Lecture / Écriture / Structure |
+
+#### 🔄 Patterns de Collaboration Multi-Agents
+- **Cycle Feature Complète** : `architect` (conception) → `coder` (implémentation) → `tester` (tests unitaires) → `reviewer` (revue qualité)
+- **Cycle Bugfix Sécurisé** : `debugger` (diagnostic & patch) → `tester` (validation non-régression) → `security` (audit sécurité)
+- **Cycle Clean Code** : `reviewer` (analyse des code smells) → `refactor` (restructuration) → `tester` (garantie comportementale)
+- **Cycle Document Complet** : `planner` → `writer` → `proofreader` → `formatter`
+- **Cycle Traduction Vérifiée** : `writer` → `translator` → `proofreader`
+- **Cycle Recherche & Synthèse** : `researcher` → `planner` → `writer` → `summarizer`
+
+**Flotte d'agents autonomes**, surveillance d'activité en temps réel (`AgentPanel`, `AgentFleetPanel`) et **missions supervisées** pour des projets d'ingénierie complexes.
 
 ### 📓 Notebooks RAG (style NotebookLM)
 

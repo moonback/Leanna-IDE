@@ -52,14 +52,23 @@ export class AgentRegistry {
     this.executor.setSkillHandler(skillHandler);
 
     // Config de boucle autonome par rôle (les agents read-only itèrent moins)
-    const loopConfigByRole: Record<string, { maxIterations: number; minConfidenceScore: number }> = {
-      coder:     { maxIterations: 3, minConfidenceScore: 0.70 }, // agent principal d'écriture — vérifie les fichiers
-      architect: { maxIterations: 2, minConfidenceScore: 0.65 },
-      refactor:  { maxIterations: 3, minConfidenceScore: 0.70 }, // haute exigence — vérifie les fichiers
-      test:      { maxIterations: 3, minConfidenceScore: 0.65 },
-      docs:      { maxIterations: 2, minConfidenceScore: 0.55 },
-      security:  { maxIterations: 1, minConfidenceScore: 0.50 }, // read-only — pas besoin d'itérer
-      review:    { maxIterations: 1, minConfidenceScore: 0.50 }, // read-only
+    const loopConfigByRole: Record<AgentRole, { maxIterations: number; minConfidenceScore: number }> = {
+      // Code & Ingénierie logicielle
+      coder:       { maxIterations: 3, minConfidenceScore: 0.70 }, // écriture & implémentation
+      refactor:    { maxIterations: 3, minConfidenceScore: 0.70 }, // restructuration & non-régression
+      debugger:    { maxIterations: 3, minConfidenceScore: 0.70 }, // diagnostic & patch
+      reviewer:    { maxIterations: 1, minConfidenceScore: 0.50 }, // read-only audit
+      tester:      { maxIterations: 3, minConfidenceScore: 0.65 }, // création & exécution de tests
+      security:    { maxIterations: 1, minConfidenceScore: 0.50 }, // read-only sécurité
+      architect:   { maxIterations: 2, minConfidenceScore: 0.65 }, // conception & structuration
+      // Rédaction & Documentation
+      writer:      { maxIterations: 3, minConfidenceScore: 0.65 },
+      formatter:   { maxIterations: 2, minConfidenceScore: 0.60 },
+      researcher:  { maxIterations: 1, minConfidenceScore: 0.50 }, // read-only recherche
+      proofreader: { maxIterations: 2, minConfidenceScore: 0.65 },
+      translator:  { maxIterations: 2, minConfidenceScore: 0.65 },
+      summarizer:  { maxIterations: 2, minConfidenceScore: 0.60 },
+      planner:     { maxIterations: 2, minConfidenceScore: 0.65 },
     };
 
     // Créer et démarrer un agent autonome pour chaque rôle défini
