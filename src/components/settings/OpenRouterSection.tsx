@@ -35,7 +35,7 @@ export const OPENROUTER_MODELS = [
 
 export const OPENROUTER_IMAGE_MODELS = [
   { id: 'google/gemini-2.5-flash-image',       name: 'Gemini 2.5 Flash Image',    free: true,  desc: 'Google — génération d\'images rapide et gratuite' },
-  { id: 'google/gemini-2.5-pro-image',         name: 'Gemini 2.5 Pro Image',      free: false, desc: 'Google — qualité supérieure, détails fins' },
+  { id: 'google/gemini-3.1-flash-image-preview',         name: 'Gemini 3.1 Flash Image Preview',      free: false, desc: 'Google — qualité supérieure, détails fins' },
   { id: 'bytedance-seed/seedream-4.5',         name: 'SeedReam 4.5',              free: true,  desc: 'ByteDance — haute qualité, rapide' },
   { id: 'black-forest-labs/flux-schnell',      name: 'FLUX Schnell',              free: true,  desc: 'Black Forest Labs — ultra-rapide, léger' },
   { id: 'black-forest-labs/flux-1.1-pro',      name: 'FLUX 1.1 Pro',              free: false, desc: 'Black Forest Labs — qualité pro' },
