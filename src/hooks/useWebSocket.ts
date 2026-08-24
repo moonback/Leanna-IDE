@@ -8,6 +8,7 @@ export interface UseWebSocketOptions {
 
 export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
   const [status, setStatus] = useState<ConnectionStatus>('idle');
+  const statusRef = useRef<ConnectionStatus>('idle');
   const wsRef = useRef<WebSocket | null>(null);
 
   // ── auto-reconnect ────────────────────────────────────────────────────────
@@ -37,6 +38,9 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
   const connected = status === 'connected';
   const connecting = status === 'connecting';
 
+  // Keep statusRef in sync so connect() closures always see the latest value
+  statusRef.current = status;
+
   const disconnect = useCallback((intentional = true) => {
     if (intentional) {
       intentionalDisconnectRef.current = true;
@@ -54,7 +58,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
   }, [onLog]);
 
   const connect = useCallback((activeSkills: string[] = [], mode: 'full' | 'ask' = 'full', onInitAudio: () => Promise<void>, onCleanupAudio: () => void) => {
-    if (status !== 'idle') return;
+    if (statusRef.current !== 'idle') return;
     intentionalDisconnectRef.current = false;
     reconnectSkillsRef.current = activeSkills;
     reconnectModeRef.current = mode;
@@ -343,7 +347,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
       onLog('Failed to start audio / WebSocket', 'error');
       setStatus('idle');
     });
-  }, [status, onLog, disconnect]);
+  }, [onLog, disconnect]);
 
   const sendAudioData = useCallback((base64Data: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

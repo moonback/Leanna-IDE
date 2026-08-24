@@ -238,6 +238,10 @@ export function useAudio({ onAudioData, autoMuteEnabled = false, autoMuteTimeout
     mediaStreamRef.current?.getTracks().forEach(t => t.stop());
     mediaStreamRef.current = null;
 
+    // Reset mute state so the next session starts unmuted
+    setMuted(false);
+    mutedRef.current = false;
+
     inputAmplitudeRef.current = 0;
     outputAmplitudeRef.current = 0;
   }, [clearAutoMuteTimer]);
