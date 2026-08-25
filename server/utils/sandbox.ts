@@ -715,11 +715,43 @@ export async function resetSandbox(): Promise<{ created: boolean; path: string; 
   return { created: true, path: sandboxBase, filesCopied: copied };
 }
 
+function countLineDiff(original: string, modified: string): { additions: number; deletions: number } {
+  const oldLines = original.split(/\r?\n/);
+  const newLines = modified.split(/\r?\n/);
+  const m = oldLines.length;
+  const n = newLines.length;
+
+  // Pour les très gros fichiers, approximation rapide pour éviter l'explosion mémoire/CPU
+  if (m * n > 2000000) {
+    return {
+      additions: Math.max(0, n - m),
+      deletions: Math.max(0, m - n),
+    };
+  }
+
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (oldLines[i - 1] === newLines[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  const lcs = dp[m][n];
+  return {
+    additions: n - lcs,
+    deletions: m - lcs,
+  };
+}
+
 /**
- * Retourne le diff (fichiers modifiés) entre le sandbox et le principal.
+ * Retourne le diff (fichiers modifiés) entre le sandbox et le principal avec les stats de lignes.
  */
-export async function getSandboxDiff(): Promise<Array<{ path: string; status: 'added' | 'modified' | 'deleted' }>> {
-  const diffs: Array<{ path: string; status: 'added' | 'modified' | 'deleted' }> = [];
+export async function getSandboxDiff(): Promise<Array<{ path: string; status: 'added' | 'modified' | 'deleted'; additions: number; deletions: number }>> {
+  const diffs: Array<{ path: string; status: 'added' | 'modified' | 'deleted'; additions: number; deletions: number }> = [];
 
   for (const relPath of sandboxModifiedFiles) {
     let canonicalPath: string;
@@ -736,12 +768,30 @@ export async function getSandboxDiff(): Promise<Array<{ path: string; status: 'a
     const existsInSandbox = fs.existsSync(sandboxFile);
     const existsInMain = fs.existsSync(mainFile);
 
-    if (existsInSandbox && !existsInMain) {
-      diffs.push({ path: canonicalPath, status: 'added' });
-    } else if (!existsInSandbox && existsInMain) {
-      diffs.push({ path: canonicalPath, status: 'deleted' });
-    } else if (existsInSandbox && existsInMain) {
-      diffs.push({ path: canonicalPath, status: 'modified' });
+    try {
+      if (existsInSandbox && !existsInMain) {
+        const content = fs.readFileSync(sandboxFile, 'utf-8');
+        const lineCount = content.split(/\r?\n/).length;
+        diffs.push({ path: canonicalPath, status: 'added', additions: lineCount, deletions: 0 });
+      } else if (!existsInSandbox && existsInMain) {
+        const content = fs.readFileSync(mainFile, 'utf-8');
+        const lineCount = content.split(/\r?\n/).length;
+        diffs.push({ path: canonicalPath, status: 'deleted', additions: 0, deletions: lineCount });
+      } else if (existsInSandbox && existsInMain) {
+        const mainContent = fs.readFileSync(mainFile, 'utf-8');
+        const sandboxContent = fs.readFileSync(sandboxFile, 'utf-8');
+        const { additions, deletions } = countLineDiff(mainContent, sandboxContent);
+        diffs.push({ path: canonicalPath, status: 'modified', additions, deletions });
+      }
+    } catch {
+      // Si erreur de lecture (ex: binaire), on met quand même l'entrée
+      if (existsInSandbox && !existsInMain) {
+        diffs.push({ path: canonicalPath, status: 'added', additions: 0, deletions: 0 });
+      } else if (!existsInSandbox && existsInMain) {
+        diffs.push({ path: canonicalPath, status: 'deleted', additions: 0, deletions: 0 });
+      } else if (existsInSandbox && existsInMain) {
+        diffs.push({ path: canonicalPath, status: 'modified', additions: 0, deletions: 0 });
+      }
     }
   }
 

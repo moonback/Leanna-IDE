@@ -12,14 +12,21 @@ import { motion, AnimatePresence } from 'motion/react';
 
 type SortMode = 'name-asc' | 'name-desc' | 'type';
 
+export type DiffInfo = {
+  status: 'added' | 'modified' | 'deleted';
+  additions?: number;
+  deletions?: number;
+};
+
 type FileExplorerProps = {
   tree: TreeEntry[];
   workspaceTree?: TreeEntry[];
-  diffPaths?: Map<string, 'added' | 'modified' | 'deleted'>;
+  diffPaths?: Map<string, DiffInfo>;
   expandedDirs: Set<string>;
   loading: boolean;
   currentDir: string;
   onOpenFile: (path: string) => void;
+  onOpenFileDiff?: (path: string) => void;
   onToggleDirectory: (path: string) => void;
   onContextMenu: (e: React.MouseEvent, entry: TreeEntry) => void;
   onCreateFile: () => void;
@@ -70,6 +77,47 @@ function filterTree(entries: TreeEntry[], query: string, showHidden: boolean): T
     }
     return acc;
   }, []);
+}
+
+function filterTreeOnlyDiffs(
+  entries: TreeEntry[],
+  diffPaths: Map<string, DiffInfo> | undefined,
+  query: string,
+  showHidden: boolean,
+): TreeEntry[] {
+  if (!diffPaths || diffPaths.size === 0) return [];
+  const q = query.toLowerCase();
+
+  return entries.reduce<TreeEntry[]>((acc, entry) => {
+    const isHidden = entry.name.startsWith('.');
+    if (!showHidden && isHidden) return acc;
+
+    if (entry.type === 'directory' && entry.children) {
+      const filteredChildren = filterTreeOnlyDiffs(entry.children, diffPaths, query, showHidden);
+      if (filteredChildren.length > 0) {
+        acc.push({ ...entry, children: filteredChildren });
+      }
+    } else if (entry.type === 'file') {
+      const diffInfo = getDiffInfo(diffPaths, entry.path);
+      if (diffInfo && (!q || entry.name.toLowerCase().includes(q))) {
+        acc.push(entry);
+      }
+    }
+    return acc;
+  }, []);
+}
+
+function getAllDirectoryPaths(entries: TreeEntry[]): string[] {
+  const dirs: string[] = [];
+  for (const entry of entries) {
+    if (entry.type === 'directory') {
+      dirs.push(entry.path);
+      if (entry.children) {
+        dirs.push(...getAllDirectoryPaths(entry.children));
+      }
+    }
+  }
+  return dirs;
 }
 
 function countEntries(entries: TreeEntry[]): number {
@@ -132,6 +180,38 @@ interface DataNode {
   originalEntry: TreeEntry;
 }
 
+function getDiffInfo(
+  diffPaths: Map<string, DiffInfo> | undefined,
+  targetPath: string,
+): DiffInfo | undefined {
+  if (!diffPaths || diffPaths.size === 0) return undefined;
+  
+  const norm = (p: string) => p.replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase().trim();
+  const normalizedTarget = norm(targetPath);
+  const targetSegments = normalizedTarget.split('/').filter(Boolean);
+  const targetName = targetSegments[targetSegments.length - 1];
+
+  for (const [key, val] of diffPaths.entries()) {
+    const normKey = norm(key);
+    if (
+      normKey === normalizedTarget ||
+      normalizedTarget.endsWith('/' + normKey) ||
+      normKey.endsWith('/' + normalizedTarget)
+    ) {
+      return val;
+    }
+    const keySegments = normKey.split('/').filter(Boolean);
+    const keyName = keySegments[keySegments.length - 1];
+    if (keyName && targetName && keyName === targetName) {
+      // Si les noms de fichiers sont identiques et qu'un des chemins est inclus dans l'autre
+      if (normalizedTarget.includes(normKey) || normKey.includes(normalizedTarget) || keySegments.length === 1 || targetSegments.length === 1) {
+        return val;
+      }
+    }
+  }
+  return undefined;
+}
+
 function toDataNode(
   entry: TreeEntry,
   depth: number,
@@ -148,21 +228,34 @@ function toDataNode(
   handleDragOver: (e: React.DragEvent, entry: TreeEntry) => void,
   handleDragLeave: (e: React.DragEvent) => void,
   handleDrop: (e: React.DragEvent, entry: TreeEntry) => void,
-  diffPaths?: Map<string, 'added' | 'modified' | 'deleted'>,
+  diffPaths?: Map<string, DiffInfo>,
 ): DataNode {
   const isExpanded = expandedDirs.has(entry.path);
   const hasChildren = entry.type === 'directory' && entry.children && entry.children.length > 0;
   const isDragTarget = dragOverPath === entry.path;
-  const diffStatus = diffPaths?.get(entry.path);
+  const diffInfo = entry.type === 'file' ? getDiffInfo(diffPaths, entry.path) : undefined;
+  const diffStatus = diffInfo?.status;
+  const additions = diffInfo?.additions ?? 0;
+  const deletions = diffInfo?.deletions ?? 0;
 
-  // Diff color coding
+  // Diff color coding & background highlight
   const diffColor = diffStatus === 'added'
-    ? 'var(--color-success, #22c55e)'
+    ? '#22c55e'
     : diffStatus === 'modified'
-      ? 'var(--color-warning, #f59e0b)'
+      ? '#f59e0b'
       : diffStatus === 'deleted'
-        ? 'var(--color-error, #ef4444)'
+        ? '#ef4444'
         : undefined;
+
+  const rowBg = isDragTarget
+    ? 'color-mix(in srgb, var(--accent-primary) 15%, transparent)'
+    : diffStatus === 'modified'
+      ? 'color-mix(in srgb, #f59e0b 8%, transparent)'
+      : diffStatus === 'added'
+        ? 'color-mix(in srgb, #22c55e 8%, transparent)'
+        : diffStatus === 'deleted'
+          ? 'color-mix(in srgb, #ef4444 8%, transparent)'
+          : 'transparent';
 
   const title = (
     <div
@@ -170,9 +263,7 @@ function toDataNode(
       style={{
         paddingLeft: `${8 + depth * 14}px`,
         color: diffColor || 'var(--text-primary)',
-        backgroundColor: isDragTarget
-          ? 'color-mix(in srgb, var(--accent-primary) 15%, transparent)'
-          : 'transparent',
+        backgroundColor: rowBg,
         outline: isDragTarget ? '1.5px solid var(--accent-primary)' : 'none',
         outlineOffset: '-1px',
         borderRadius: '6px',
@@ -205,6 +296,14 @@ function toDataNode(
       )}
 
       <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        {/* Status dot for modified files */}
+        {diffStatus && (
+          <span
+            className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse"
+            style={{ backgroundColor: diffColor }}
+          />
+        )}
+
         {entry.type === 'directory' ? (
           isDragTarget || isExpanded ? (
             <FolderOpen size={14} style={{ color: diffColor || 'var(--accent-primary)' }} />
@@ -214,24 +313,60 @@ function toDataNode(
         ) : (
           <FileIcon filePath={entry.path} size={14} />
         )}
-        <span className="truncate font-normal opacity-90 group-hover:opacity-100" title={entry.name}>
+        <span
+          className={`truncate ${diffStatus ? 'font-medium' : 'font-normal opacity-90 group-hover:opacity-100'}`}
+          title={entry.name}
+          style={{ color: diffColor }}
+        >
           {searchQuery ? (
             <HighlightMatch text={entry.name} query={searchQuery} />
           ) : (
             entry.name
           )}
         </span>
-        {/* Diff status indicator */}
+
+        {/* Diff stats indicators (+lines / -lines / badge) */}
         {diffStatus && (
-          <span
-            className="ml-auto text-[9px] font-bold uppercase px-1 rounded"
-            style={{
-              color: diffColor,
-              backgroundColor: `color-mix(in srgb, ${diffColor} 12%, transparent)`,
-            }}
-          >
-            {diffStatus === 'added' ? 'A' : diffStatus === 'modified' ? 'M' : 'D'}
-          </span>
+          <div className="ml-auto flex items-center gap-1 text-[10px] font-mono shrink-0 pl-1">
+            {additions > 0 && (
+              <span
+                className="font-bold px-1.5 py-0.5 rounded text-[10px]"
+                style={{
+                  color: '#22c55e',
+                  backgroundColor: 'rgba(34, 197, 94, 0.18)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                }}
+                title={`${additions} ligne(s) ajoutée(s)`}
+              >
+                +{additions}
+              </span>
+            )}
+            {deletions > 0 && (
+              <span
+                className="font-bold px-1.5 py-0.5 rounded text-[10px]"
+                style={{
+                  color: '#ef4444',
+                  backgroundColor: 'rgba(239, 68, 68, 0.18)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                }}
+                title={`${deletions} ligne(s) retirée(s)`}
+              >
+                -{deletions}
+              </span>
+            )}
+            {additions === 0 && deletions === 0 && (
+              <span
+                className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded"
+                style={{
+                  color: diffColor,
+                  backgroundColor: `color-mix(in srgb, ${diffColor} 18%, transparent)`,
+                  border: `1px solid color-mix(in srgb, ${diffColor} 30%, transparent)`,
+                }}
+              >
+                {diffStatus === 'added' ? 'A' : diffStatus === 'modified' ? 'M' : 'D'}
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -279,6 +414,7 @@ const FileExplorer = memo(function FileExplorer({
   loading,
   currentDir,
   onOpenFile,
+  onOpenFileDiff,
   onToggleDirectory,
   onContextMenu,
   onCreateFile,
@@ -286,37 +422,70 @@ const FileExplorer = memo(function FileExplorer({
   onNavigate,
   onMoveEntry,
 }: FileExplorerProps) {
-  // Sandbox status
+  // Sandbox status & Live Diffs
   const [sandboxActive, setSandboxActive] = useState(false);
+  const [sandboxModifiedCount, setSandboxModifiedCount] = useState(0);
+  const [liveDiffPaths, setLiveDiffPaths] = useState<Map<string, DiffInfo>>(new Map());
 
   useEffect(() => {
     let mounted = true;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const checkSandbox = async (force = false) => {
+    const checkSandbox = async (force = true) => {
       try {
         const { sandboxApi } = await import('../../services/sandboxApi');
-        const data = await sandboxApi.getStatus(force);
-        if (mounted && data.status === 'success') {
-          setSandboxActive(data.sandbox?.active ?? false);
+        const [statusData, diffData] = await Promise.all([
+          sandboxApi.getStatus(force),
+          sandboxApi.getDiff(force),
+        ]);
+
+        if (mounted && statusData.status === 'success') {
+          setSandboxActive(statusData.sandbox?.active ?? false);
+          setSandboxModifiedCount((statusData.sandbox as any)?.modifiedCount ?? 0);
+        }
+
+        if (mounted && diffData.status === 'success' && Array.isArray((diffData as any).diff)) {
+          const map = new Map<string, DiffInfo>();
+          for (const item of (diffData as any).diff) {
+            map.set(item.path, {
+              status: item.status,
+              additions: item.additions ?? 0,
+              deletions: item.deletions ?? 0,
+            });
+          }
+          setLiveDiffPaths(map);
         }
       } catch { /* silent */ }
     };
 
-    checkSandbox();
+    checkSandbox(true);
 
     const handleChange = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => checkSandbox(true), 150);
     };
 
+    // Polling léger toutes les 3s pour garder les compteurs synchronisés
+    const interval = setInterval(() => {
+      checkSandbox(true);
+    }, 3000);
+
     window.addEventListener('jarvis-sandbox-changed', handleChange);
+    window.addEventListener('jarvis-sandbox-file-changed', handleChange);
     return () => {
       mounted = false;
+      clearInterval(interval);
       if (debounceTimer) clearTimeout(debounceTimer);
       window.removeEventListener('jarvis-sandbox-changed', handleChange);
+      window.removeEventListener('jarvis-sandbox-file-changed', handleChange);
     };
   }, []);
+
+  // Effective diff map
+  const effectiveDiffPaths = useMemo(() => {
+    if (liveDiffPaths.size > 0) return liveDiffPaths;
+    return diffPaths;
+  }, [liveDiffPaths, diffPaths]);
 
   // Search, Sort, Hidden files
   const [searchQuery, setSearchQuery] = useState('');
@@ -431,7 +600,7 @@ const FileExplorer = memo(function FileExplorer({
         handleDragOver,
         handleDragLeave,
         handleDrop,
-        diffPaths,
+        effectiveDiffPaths,
       )
     );
   }, [
@@ -449,12 +618,12 @@ const FileExplorer = memo(function FileExplorer({
     handleDragOver,
     handleDragLeave,
     handleDrop,
-    diffPaths,
+    effectiveDiffPaths,
   ]);
 
-  // Workspace tree section (read-only, no drag & drop)
+  // Workspace tree section (read-only, shows ONLY modified files)
   const [wsExpandedDirs, setWsExpandedDirs] = useState<Set<string>>(new Set());
-  const [showWorkspace, setShowWorkspace] = useState(false);
+  const [showWorkspace, setShowWorkspace] = useState(true);
 
   const wsToggleDir = useCallback((dirPath: string) => {
     setWsExpandedDirs(prev => {
@@ -467,28 +636,43 @@ const FileExplorer = memo(function FileExplorer({
 
   const processedWorkspaceTree = useMemo(() => {
     if (!workspaceTree || workspaceTree.length === 0) return [];
-    const filtered = filterTree(workspaceTree, debouncedSearch, showHidden);
+    // Si des fichiers sont modifiés dans le sandbox, on affiche ces fichiers en priorité
+    const entriesToFilter = (effectiveDiffPaths && effectiveDiffPaths.size > 0)
+      ? filterTreeOnlyDiffs(workspaceTree, effectiveDiffPaths, debouncedSearch, showHidden)
+      : filterTree(workspaceTree, debouncedSearch, showHidden);
+
     const applySort = (entries: TreeEntry[]): TreeEntry[] =>
       sortEntries(entries, sortMode).map(e =>
         e.type === 'directory' && e.children
           ? { ...e, children: applySort(e.children) }
           : e
       );
-    return applySort(filtered);
-  }, [workspaceTree, debouncedSearch, sortMode, showHidden]);
+    return applySort(entriesToFilter);
+  }, [workspaceTree, effectiveDiffPaths, debouncedSearch, sortMode, showHidden]);
+
+  // Auto-expand all parent folders containing diffs so modified files are directly visible
+  useEffect(() => {
+    if (processedWorkspaceTree.length > 0) {
+      const allDirs = getAllDirectoryPaths(processedWorkspaceTree);
+      setWsExpandedDirs(new Set(allDirs));
+      setShowWorkspace(true);
+    }
+  }, [processedWorkspaceTree]);
 
   const noopDrag = useCallback(() => {}, []);
   const noopDragEvent = useCallback((_e: React.DragEvent, _entry: TreeEntry) => {}, []);
   const noopDragLeave = useCallback((_e: React.DragEvent) => {}, []);
 
   const wsTreeData = useMemo(() => {
+    // For Workspace files: use onOpenFileDiff to open the diff view instead of the raw editor
+    const openWsFile = onOpenFileDiff ?? onOpenFile;
     return processedWorkspaceTree.map(entry =>
       toDataNode(
         entry,
         0,
         wsExpandedDirs,
         debouncedSearch,
-        onOpenFile,
+        openWsFile,
         wsToggleDir,
         onContextMenu,
         null,
@@ -499,7 +683,7 @@ const FileExplorer = memo(function FileExplorer({
         noopDragEvent,
         noopDragLeave,
         noopDragEvent,
-        diffPaths,
+        effectiveDiffPaths,
       )
     );
   }, [
@@ -507,9 +691,10 @@ const FileExplorer = memo(function FileExplorer({
     wsExpandedDirs,
     debouncedSearch,
     onOpenFile,
+    onOpenFileDiff,
     wsToggleDir,
     onContextMenu,
-    diffPaths,
+    effectiveDiffPaths,
     noopDrag,
     noopDragEvent,
     noopDragLeave,
@@ -791,7 +976,7 @@ const FileExplorer = memo(function FileExplorer({
                 <span className="text-[10px] font-semibold" style={{ color: 'var(--color-success, #22c55e)' }}>
                   Sandbox
                 </span>
-                {diffPaths && diffPaths.size > 0 && (
+                {effectiveDiffPaths && effectiveDiffPaths.size > 0 && (
                   <span
                     className="text-[9px] px-1.5 rounded-full ml-auto"
                     style={{
@@ -799,7 +984,7 @@ const FileExplorer = memo(function FileExplorer({
                       color: 'var(--color-warning, #f59e0b)',
                     }}
                   >
-                    {diffPaths.size} diff
+                    {effectiveDiffPaths.size} diff{effectiveDiffPaths.size > 1 ? 's' : ''}
                   </span>
                 )}
               </div>
@@ -816,7 +1001,7 @@ const FileExplorer = memo(function FileExplorer({
               defaultExpandParent
             />
 
-            {/* Section: Workspace (real files, hors sandbox) */}
+            {/* Section: Workspace (fichiers réels) — Toujours accessible lorsque sandbox actif */}
             {sandboxActive && processedWorkspaceTree.length > 0 && (
               <>
                 <div
@@ -830,13 +1015,37 @@ const FileExplorer = memo(function FileExplorer({
                   <span className="opacity-60">
                     {showWorkspace ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
                   </span>
-                  <Folder size={10} style={{ color: 'var(--accent-primary)' }} />
+                  <FolderInput size={10} style={{ color: 'var(--accent-primary)' }} />
                   <span className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}>
                     Workspace
                   </span>
                   <span className="text-[9px] opacity-50 ml-1" style={{ color: 'var(--text-muted)' }}>
                     (fichiers réels)
                   </span>
+                  {sandboxModifiedCount > 0 ? (
+                    <span
+                      className="ml-auto text-[9px] px-1.5 py-0.5 rounded font-medium flex items-center gap-1"
+                      style={{
+                        backgroundColor: 'color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent)',
+                        color: 'var(--color-warning, #f59e0b)',
+                      }}
+                      title="Cliquez sur un fichier pour examiner et valider les modifications"
+                    >
+                      <span>{sandboxModifiedCount} modif{sandboxModifiedCount > 1 ? 's' : ''}</span>
+                      <span>↔</span>
+                    </span>
+                  ) : (
+                    <span
+                      className="ml-auto text-[9px] px-1.5 py-0.5 rounded font-medium flex items-center gap-1"
+                      style={{
+                        backgroundColor: 'color-mix(in srgb, var(--color-success, #22c55e) 15%, transparent)',
+                        color: 'var(--color-success, #22c55e)',
+                      }}
+                      title="Tous les fichiers sont validés et synchronisés sur le workspace réel"
+                    >
+                      <span>✓ Validé (à jour)</span>
+                    </span>
+                  )}
                 </div>
                 {showWorkspace && (
                   <Tree

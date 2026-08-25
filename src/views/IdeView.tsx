@@ -222,6 +222,18 @@ export default function IdeView() {
   // ── File operations helpers ────────────────────────────────────────────────
 
   const openFileAt = useCallback(async (filePath: string, line?: number, column?: number) => {
+    // Fermer le sandbox et les autres vues plein-écran pour afficher l'éditeur
+    setShowSandbox(false);
+    setShowKnowledge(false);
+    setShowNotebooks(false);
+    setShowBrowser(false);
+    setShowHelp(false);
+    setShowHistory(false);
+    setShowAutomation(false);
+    setShowSettingsPanel(false);
+    setShowMemory(false);
+    setRichDocument(null);
+
     await fileSystem.openFile(filePath);
     if (typeof line === 'number') {
       navigateToPosition(line, column);
@@ -724,7 +736,8 @@ export default function IdeView() {
           expandedDirs={fileSystem.expandedDirs}
           loading={fileSystem.loading}
           currentDir={fileSystem.currentDir}
-          onOpenFile={fileSystem.openFile}
+          onOpenFile={openFileAt}
+          onOpenFileDiff={(path) => openSandboxDiff(path)}
           onToggleDirectory={fileSystem.toggleDirectory}
           onContextMenu={(e, entry) => {
             e.preventDefault();
@@ -753,7 +766,7 @@ export default function IdeView() {
             activeFileDirty={activeFile?.dirty || false}
             markdownPreview={markdownPreview}
             htmlPreview={htmlPreview}
-            onSelectTab={fileSystem.setActivePath}
+            onSelectTab={openFileAt}
             onCloseTab={closeTabWithConfirm}
             onSave={saveActiveFile}
             onFormat={formatDocument}
