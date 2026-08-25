@@ -3,13 +3,19 @@ import { ideApi, type TreeEntry } from '../services/ideApi';
 import { type OpenFile } from '../types/ide';
 import { getLanguage } from '../utils/fileUtils';
 
+export type DiffInfo = {
+  status: 'added' | 'modified' | 'deleted';
+  additions?: number;
+  deletions?: number;
+};
+
 /**
  * Hook for managing file system operations and state
  */
 export function useFileSystem() {
   const [tree, setTree] = useState<TreeEntry[]>([]);
   const [workspaceTree, setWorkspaceTree] = useState<TreeEntry[]>([]);
-  const [diffPaths, setDiffPaths] = useState<Map<string, 'added' | 'modified' | 'deleted'>>(new Map());
+  const [diffPaths, setDiffPaths] = useState<Map<string, DiffInfo>>(new Map());
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(['.']));
@@ -40,14 +46,18 @@ export function useFileSystem() {
   }, []);
 
   // Load diff status from sandbox API
-  const loadDiff = useCallback(async () => {
+  const loadDiff = useCallback(async (force = true) => {
     try {
       const { sandboxApi } = await import('../services/sandboxApi');
-      const data = await sandboxApi.getDiff();
+      const data = await sandboxApi.getDiff(force);
       if (data.status === 'success' && Array.isArray((data as any).diff)) {
-        const map = new Map<string, 'added' | 'modified' | 'deleted'>();
+        const map = new Map<string, DiffInfo>();
         for (const item of (data as any).diff) {
-          map.set(item.path, item.status);
+          map.set(item.path, {
+            status: item.status,
+            additions: item.additions ?? 0,
+            deletions: item.deletions ?? 0,
+          });
         }
         setDiffPaths(map);
       }
@@ -71,30 +81,30 @@ export function useFileSystem() {
   useEffect(() => {
     loadTree();
     loadWorkspaceTree();
-    loadDiff();
+    loadDiff(true);
   }, [loadTree, loadWorkspaceTree, loadDiff]);
 
-  // Reload tree when sandbox state changes (force=true to bypass cache after repo change)
+  // Reload tree and diffs when sandbox state changes
   useEffect(() => {
     const handleSandboxChange = () => {
       loadTree();
       loadWorkspaceTree();
-      loadDiff();
+      loadDiff(true);
     };
     window.addEventListener('jarvis-sandbox-changed', handleSandboxChange);
     return () => window.removeEventListener('jarvis-sandbox-changed', handleSandboxChange);
   }, [loadTree, loadWorkspaceTree, loadDiff]);
 
-  // ── Temps réel : recharger les fichiers ouverts quand modifiés dans le sandbox ──
+  // ── Temps réel : recharger les fichiers ouverts et les diffs quand modifiés dans le sandbox ──
   useEffect(() => {
     const handleFileChanged = (e: Event) => {
+      loadDiff(true);
       const detail = (e as CustomEvent).detail;
       if (!detail?.path) return;
       const changedPath = detail.path as string;
       // Si le fichier modifié est ouvert, le recharger depuis le disque
       const openFile = openFiles.find(f => f.path === changedPath || f.path.endsWith(changedPath));
       if (openFile) {
-        // Recharger sans marquer dirty — c'est une mise à jour externe
         (async () => {
           try {
             const content = await ideApi.readFile(openFile.path);
@@ -107,6 +117,7 @@ export function useFileSystem() {
     };
 
     const handleFileDeleted = (e: Event) => {
+      loadDiff(true);
       const detail = (e as CustomEvent).detail;
       if (!detail?.path) return;
       const deletedPath = detail.path as string;
