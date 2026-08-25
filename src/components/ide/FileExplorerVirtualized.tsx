@@ -655,7 +655,7 @@ const FileExplorer = memo(function FileExplorer({
     if (processedWorkspaceTree.length > 0) {
       const allDirs = getAllDirectoryPaths(processedWorkspaceTree);
       setWsExpandedDirs(new Set(allDirs));
-      setShowWorkspace(true);
+      setShowWorkspace(false);
     }
   }, [processedWorkspaceTree]);
 
