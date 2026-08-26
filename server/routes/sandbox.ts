@@ -337,15 +337,17 @@ export function createSandboxRouter(): Router {
 
 export function createVerifyExitCodeRouter(): Router {
   const router = Router();
-  router.post('/verify-exit-code', (req: Request, res: Response) => {
+  router.post('/verify-exit-code', (req: Request, res: Response): void => {
     const { code } = req.body || {};
     const exitCode = process.env.SANDBOX_EXIT_CODE;
 
     if (!exitCode || exitCode.length !== 6) {
-      return res.status(403).json({ status: 'error', error: 'Code non configuré' });
+      res.status(403).json({ status: 'error', error: 'Code non configuré' });
+      return;
     }
     if (!code || code !== exitCode) {
-      return res.status(403).json({ status: 'error', error: 'Code incorrect' });
+      res.status(403).json({ status: 'error', error: 'Code incorrect' });
+      return;
     }
     res.json({ status: 'success' });
   });

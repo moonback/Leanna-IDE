@@ -93,7 +93,20 @@ export function useSandboxWatcher({
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const token = localStorage.getItem('jarvis_api_token');
     const params = token ? `?token=${encodeURIComponent(token)}` : '';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/sandbox-watch${params}`);
+
+    let host = window.location.host;
+    try {
+      const portStr = window.location.port;
+      if (portStr) {
+        const portNum = Number(portStr);
+        const expressPort = Number((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_SERVER_PORT) || 5000;
+        if (!Number.isNaN(portNum) && portNum !== expressPort && portNum < 1024 === false) {
+          host = `${window.location.hostname}:${expressPort}`;
+        }
+      }
+    } catch { /* fallback sur window.location.host en cas d'erreur */ }
+
+    const ws = new WebSocket(`${protocol}//${host}/sandbox-watch${params}`);
     wsRef.current = ws;
 
     ws.onopen = () => {

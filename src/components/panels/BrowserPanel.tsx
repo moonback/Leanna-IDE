@@ -165,6 +165,14 @@ export function BrowserPanel({
     const wv = webviewRef.current;
     if (!wv) return;
 
+    // Les attributs spécifiques Electron qui ne sont pas dans React's WebViewHTMLAttributes
+    // doivent être settés directement sur l'élément natif (évite le warning
+    // "Received false for a non-boolean attribute allowpopups" + erreur TS2322).
+    try {
+      (wv as any).setAttribute?.('allowpopups', 'false');
+      (wv as any).setAttribute?.('webpreferences', 'contextIsolation=yes, javascript=yes');
+    } catch { /* noop */ }
+
     const onDomReady = () => {
       domReadyRef.current = true;
       // Charger l'URL mise en attente si elle existe
@@ -203,12 +211,13 @@ export function BrowserPanel({
 
     const onFailLoad = (e: Event) => {
       const ev = e as WebviewFailLoadEvent;
-      if (ev.errorCode === -3) return; // ERR_ABORTED — annulation normale
+      if (ev.errorCode === -3) {
+        // ERR_ABORTED — annulation normale (navigation remplacée avant fin de chargement, destroy, etc.)
+        setLoading(false);
+        return;
+      }
       setLoading(false);
       setLoadError(`Impossible de charger cette page (${ev.errorDescription})`);
-      window.dispatchEvent(new CustomEvent('jarvis-browser-load-error', {
-        detail: { url: ev.validatedURL, error: ev.errorDescription },
-      }));
     };
 
     const onNavigate = (e: Event) => {
@@ -711,13 +720,17 @@ export function BrowserPanel({
 
       {/* ── Webview ── */}
       <div className="flex-1 min-h-0 relative">
-        {/* @ts-ignore — webview is an Electron-specific HTML tag */}
+        {/*
+          Les attributs Electron-spécifiques (allowpopups, webpreferences) ne sont
+          pas passés en props JSX pour éviter :
+            TS2322: Type 'string | false' not assignable to boolean | undefined
+            Warning React: Received false for a non-boolean attribute allowpopups
+          Ils sont settés via setAttribute() directement sur l'élément dans useEffect.
+        */}
         <webview
           ref={webviewRef}
           src={defaultUrl}
           style={{ width: '100%', height: '100%', display: 'flex' }}
-          webpreferences="contextIsolation=yes, javascript=yes"
-          allowpopups={false}
         />
       </div>
     </div>
