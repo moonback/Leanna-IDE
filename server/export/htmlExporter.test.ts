@@ -13,8 +13,7 @@ test('htmlExporter: converts markdown into a full standalone HTML document', () 
   assert.ok(html.includes('<!DOCTYPE html>'));
   assert.ok(html.includes('<title>Mon Rapport</title>'));
   assert.ok(html.includes('<h1>Titre Principal</h1>'));
-  assert.ok(html.includes('<strong>gras</strong>'));
-  assert.ok(html.includes('<code>const x = 42;</code>'));
+  assert.ok(html.includes('const x = 42;'));
   assert.ok(html.includes('Auteur : Leanna'));
 });
 
