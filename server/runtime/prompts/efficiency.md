@@ -25,3 +25,10 @@
 - Sujet inconnu → recherche documentaire d'abord
 - Mots-clés think/analyze → `reasoning_think`
 - Préférence mentionnée → `save_memory` immédiatement
+
+**6. Navigation web — raccourcis obligatoires :**
+- "cherche / trouve / recherche sur internet" → `browser_search({ query })` immédiatement
+- URL connue → `browser_summarize_page({ url })` (navigue + lit en 1 appel)
+- URL inconnue → `browser_search` puis `browser_summarize_page` sur un résultat
+- Interaction avec la page → `browser_snapshot` d'abord, puis `browser_click` / `browser_type`
+- Toujours résumer le contenu lu à l'utilisateur après `browser_summarize_page` ou `browser_read_content`
