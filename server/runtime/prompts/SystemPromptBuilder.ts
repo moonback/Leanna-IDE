@@ -126,7 +126,12 @@ export class SystemPromptBuilder {
         sections.push(this.registry.render("autonomy", renderOpts));
       }
 
-      // 3. Efficacité des outils
+      // 3. Navigateur web intégré (comportement conversationnel)
+      if (this.registry.has("browser")) {
+        sections.push(this.registry.render("browser", renderOpts));
+      }
+
+      // 4. Efficacité des outils
       if (this.registry.has("efficiency")) {
         sections.push(this.registry.render("efficiency", renderOpts));
       }

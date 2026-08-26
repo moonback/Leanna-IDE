@@ -192,13 +192,13 @@ export const browserSkill: Skill = {
     {
       name: "browser_navigate",
       description:
-        "Ouvre le navigateur intégré et navigue vers une URL. Le navigateur s'affiche dans l'interface et l'utilisateur peut voir la page en temps réel. Utilise cet outil pour montrer un site web à l'utilisateur.",
+        "Ouvre le navigateur intégré et navigue vers une URL. Le navigateur s'affiche dans l'interface et l'utilisateur voit la page en temps réel. À utiliser dès que l'utilisateur donne une URL précise ou dit 'va sur', 'ouvre', 'montre-moi'. Après navigation, appelle browser_read_content() pour lire le contenu.",
       parameters: {
         type: "OBJECT",
         properties: {
           url: {
             type: "STRING",
-            description: "L'URL à visiter (ex: https://example.com). Peut être une URL complète ou un domaine.",
+            description: "L'URL à visiter (ex: https://example.com). Peut être une URL complète, un domaine, ou un terme de recherche (sera automatiquement converti en recherche Google).",
           },
         },
         required: ["url"],
@@ -216,7 +216,7 @@ export const browserSkill: Skill = {
     {
       name: "browser_search",
       description:
-        "Effectue une recherche dans le navigateur intégré visible par l'utilisateur, sur le moteur de ton choix. Ouvre le navigateur et affiche les résultats.",
+        "Effectue une recherche dans le navigateur intégré visible par l'utilisateur. À utiliser immédiatement dès que l'utilisateur dit 'cherche', 'recherche', 'trouve', 'googl'. Après la recherche, utilise browser_get_links() pour extraire les résultats et browser_navigate() pour ouvrir le meilleur lien.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -242,25 +242,25 @@ export const browserSkill: Skill = {
     },
     {
       name: "browser_scroll",
-      description: "Fait défiler la page affichée dans le navigateur intégré.",
+      description: "Fait défiler la page affichée dans le navigateur. À utiliser quand l'utilisateur dit 'scrolle', 'descends', 'fais défiler', ou quand le contenu est tronqué et qu'il faut voir plus bas.",
       parameters: {
         type: "OBJECT",
         properties: {
           direction: {
             type: "STRING",
             description:
-              "Direction du défilement : 'down', 'up', 'top' (retour en haut), 'bottom' (aller en bas). Défaut : 'down'.",
+              "Direction : 'down' (défiler vers le bas), 'up' (vers le haut), 'top' (retour en haut), 'bottom' (aller tout en bas). Défaut : 'down'.",
           },
           amount: {
             type: "NUMBER",
-            description: "Nombre de pixels à défiler (ignoré pour 'top' et 'bottom', max 5000). Défaut : 300.",
+            description: "Pixels à défiler (ignoré pour 'top' et 'bottom', max 5000). Défaut : 300.",
           },
         },
       },
     },
     {
       name: "browser_back",
-      description: "Revient à la page précédente dans l'historique du navigateur intégré.",
+      description: "Revient à la page précédente dans l'historique. À utiliser quand l'utilisateur dit 'retourne en arrière', 'page précédente', 'reviens'.",
       parameters: {
         type: "OBJECT",
         properties: {},
@@ -276,7 +276,7 @@ export const browserSkill: Skill = {
     },
     {
       name: "browser_reload",
-      description: "Recharge la page actuellement affichée dans le navigateur intégré.",
+      description: "Recharge la page actuellement affichée. À utiliser si la page est vide, bloquée, ou si l'utilisateur dit 'recharge', 'actualise'.",
       parameters: {
         type: "OBJECT",
         properties: {},
@@ -285,14 +285,14 @@ export const browserSkill: Skill = {
     {
       name: "browser_read_content",
       description:
-        "Lit et retourne le contenu textuel de la page actuellement affichée dans le navigateur intégré. Utilise cet outil pour analyser une page web, extraire des informations, lire un article, ou comprendre ce qui est affiché. Tu peux cibler un sélecteur CSS précis pour n'extraire qu'une partie de la page (ex: 'article', 'main', '#content').",
+        "Lit et retourne le contenu textuel de la page actuellement affichée. À appeler après browser_navigate ou browser_search pour extraire les informations et pouvoir répondre à l'utilisateur. Supporte un sélecteur CSS optionnel pour cibler une section précise.",
       parameters: {
         type: "OBJECT",
         properties: {
           selector: {
             type: "STRING",
             description:
-              "Optionnel. Sélecteur CSS pour n'extraire qu'une partie de la page (ex: 'article', 'main', '.content', '#results'). Si omis, extrait tout le contenu visible de la page.",
+              "Optionnel. Sélecteur CSS pour n'extraire qu'une partie de la page (ex: 'article', 'main', '.content', '#results'). Si omis, extrait tout le contenu visible.",
           },
         },
       },
@@ -300,14 +300,14 @@ export const browserSkill: Skill = {
     {
       name: "browser_get_links",
       description:
-        "Extrait la liste des liens (texte visible + URL) présents sur la page actuellement affichée. Utilise cet outil pour découvrir vers quelles pages naviguer ensuite (résultats de recherche, articles liés, navigation d'un site), avant d'utiliser browser_open_link ou browser_navigate.",
+        "Extrait tous les liens (texte visible + URL absolue) de la page actuellement affichée. OUTIL CLÉ après browser_search : récupère les liens des résultats Google/Bing pour ensuite naviguer. Aussi utilisé pour 'ouvre le premier lien' (→ links[0]), 'ouvre le deuxième' (→ links[1]), 'ouvre le lien Wikipedia' (→ filtrer par urlContains:'wikipedia').",
       parameters: {
         type: "OBJECT",
         properties: {
           selector: {
             type: "STRING",
             description:
-              "Optionnel. Limite l'extraction aux liens contenus dans ce sélecteur CSS (ex: '#search', 'article', 'nav'). Si omis, extrait tous les liens visibles de la page.",
+              "Optionnel. Limite l'extraction aux liens dans ce sélecteur CSS (ex: '#search', 'article'). Si omis, extrait tous les liens de la page.",
           },
           limit: {
             type: "NUMBER",
@@ -319,17 +319,17 @@ export const browserSkill: Skill = {
     {
       name: "browser_open_link",
       description:
-        "Ouvre un lien présent sur la page actuellement affichée, identifié par son texte visible (ex: 'En savoir plus', le titre d'un résultat de recherche) et/ou un fragment de son URL. Récupère automatiquement les liens de la page et navigue vers le premier qui correspond. Utile pour cliquer sur un résultat de recherche ou suivre un lien d'article sans avoir besoin d'un sélecteur CSS exact.",
+        "Ouvre un lien de la page courante identifié par son texte visible et/ou un fragment d'URL. UTILISATION PRINCIPALE : quand l'utilisateur dit 'ouvre le lien [texte]' ou 'ouvre celui de Wikipedia/YouTube/etc'. Récupère automatiquement les liens de la page et navigue vers le premier qui correspond. Ne nécessite pas de sélecteur CSS.",
       parameters: {
         type: "OBJECT",
         properties: {
           text: {
             type: "STRING",
-            description: "Texte (ou fragment de texte, insensible à la casse) du lien à ouvrir.",
+            description: "Texte visible du lien (ou fragment, insensible à la casse). Ex: 'En savoir plus', 'Wikipedia', titre d'un résultat.",
           },
           urlContains: {
             type: "STRING",
-            description: "Fragment que l'URL du lien doit contenir (ex: 'wikipedia.org', '/article/').",
+            description: "Fragment que l'URL doit contenir. Ex: 'wikipedia.org', 'youtube.com', '/article/'.",
           },
         },
       },
@@ -337,14 +337,14 @@ export const browserSkill: Skill = {
     {
       name: "browser_click",
       description:
-        "Clique sur un élément (bouton, lien, etc.) dans la page actuellement affichée dans le navigateur intégré. Utilise OBLIGATOIREMENT un sélecteur CSS renvoyé par browser_snapshot ou browser_inspect. N'invente PAS de sélecteurs.",
+        "Clique sur un élément de la page (bouton, lien, etc.). OBLIGATOIRE : appeler browser_snapshot() d'abord pour obtenir les sélecteurs CSS valides. Ne jamais inventer un sélecteur.",
       parameters: {
         type: "OBJECT",
         properties: {
           selector: {
             type: "STRING",
             description:
-              "Sélecteur CSS de l'élément à cliquer (ex: 'button#submit', '.search-btn', 'a.login'). Doit provenir de browser_snapshot ou browser_inspect.",
+              "Sélecteur CSS de l'élément (ex: 'button#submit', '.search-btn'). Doit provenir de browser_snapshot ou browser_inspect.",
           },
         },
         required: ["selector"],
@@ -353,21 +353,21 @@ export const browserSkill: Skill = {
     {
       name: "browser_type",
       description:
-        "Saisit du texte dans un champ de saisie (input, textarea) de la page affichée dans le navigateur intégré. Utilise OBLIGATOIREMENT un sélecteur CSS renvoyé par browser_snapshot ou browser_inspect.",
+        "Saisit du texte dans un champ de la page (input, textarea). OBLIGATOIRE : appeler browser_snapshot() d'abord pour obtenir le sélecteur CSS valide du champ. Utiliser pressEnter:true pour valider une recherche.",
       parameters: {
         type: "OBJECT",
         properties: {
           selector: {
             type: "STRING",
-            description: "Sélecteur CSS du champ de saisie (ex: 'input[name=\"q\"]', 'textarea#message', '#email').",
+            description: "Sélecteur CSS du champ (ex: 'input[name=\"q\"]', '#search'). Doit provenir de browser_snapshot.",
           },
           text: {
             type: "STRING",
-            description: "Le texte à saisir dans le champ.",
+            description: "Le texte à saisir.",
           },
           pressEnter: {
             type: "BOOLEAN",
-            description: "Si true, appuie automatiquement sur Entrée après la saisie (pour valider un formulaire). Défaut : false.",
+            description: "Si true, appuie sur Entrée après la saisie (pour valider un formulaire de recherche). Défaut : false.",
           },
         },
         required: ["selector", "text"],
@@ -376,7 +376,7 @@ export const browserSkill: Skill = {
     {
       name: "browser_snapshot",
       description:
-        "Récupère la liste des éléments interactifs (champs de saisie, boutons) cliquables actuellement visibles sur la page. Retourne les sélecteurs CSS VALIDES à utiliser avec browser_click et browser_type. APPELLE CET OUTIL SYSTEMATIQUEMENT avant d'utiliser browser_click ou browser_type pour connaître les bons sélecteurs.",
+        "Retourne la liste des éléments interactifs visibles (inputs, boutons) avec leurs sélecteurs CSS VALIDES. APPELER SYSTÉMATIQUEMENT avant browser_click ou browser_type. Indispensable pour interagir avec n'importe quelle page.",
       parameters: {
         type: "OBJECT",
         properties: {},
@@ -385,18 +385,18 @@ export const browserSkill: Skill = {
     {
       name: "browser_summarize_page",
       description:
-        "OUTIL PRINCIPAL pour la navigation web. Navigue vers une URL ET lit immédiatement son contenu en une seule étape. Utilise cet outil pour répondre aux questions nécessitant de consulter un site web, lire un article, vérifier des informations en ligne. Le navigateur s'ouvre et l'utilisateur peut voir la page pendant que tu extrais le contenu.",
+        "OUTIL TOUT-EN-UN : navigue vers une URL ET lit immédiatement son contenu en une seule étape. C'est l'outil préféré quand tu as une URL précise à consulter. Le navigateur s'ouvre, l'utilisateur voit la page, et tu reçois le contenu pour répondre.",
       parameters: {
         type: "OBJECT",
         properties: {
           url: {
             type: "STRING",
-            description: "L'URL à visiter et lire (ex: https://example.com). Peut être une URL complète ou un domaine.",
+            description: "L'URL à visiter et lire.",
           },
           selector: {
             type: "STRING",
             description:
-              "Optionnel. Sélecteur CSS pour n'extraire qu'une partie de la page (ex: 'article', 'main', '.content'). Si omis, extrait tout le contenu visible.",
+              "Optionnel. Sélecteur CSS pour n'extraire qu'une partie de la page.",
           },
         },
         required: ["url"],
@@ -405,7 +405,7 @@ export const browserSkill: Skill = {
     {
       name: "browser_research",
       description:
-        "OUTIL DE RECHERCHE APPROFONDIE. Effectue une recherche web, puis visite et lit automatiquement les pages de résultats les plus pertinentes (jusqu'à maxSources), et retourne le contenu de chacune. Utilise cet outil quand l'utilisateur demande de faire une recherche, de comparer des sources, ou d'enquêter sur un sujet — au lieu d'enchaîner manuellement browser_search + browser_navigate + browser_read_content plusieurs fois. Synthétise ensuite toi-même les résultats dans ta réponse, en citant tes sources.",
+        "RECHERCHE APPROFONDIE AUTOMATIQUE. Lance une recherche, extrait les liens des résultats, visite et lit automatiquement jusqu'à maxSources pages, puis retourne tout le contenu. À utiliser pour les sujets complexes, comparaisons multi-sources, ou quand l'utilisateur dit 'fais une recherche approfondie', 'compare plusieurs sources', 'enquête sur'. Synthétise ensuite les résultats en citant les sources.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -415,11 +415,11 @@ export const browserSkill: Skill = {
           },
           engine: {
             type: "STRING",
-            description: "Moteur de recherche à utiliser : 'google' (défaut), 'bing', 'duckduckgo', ou 'wikipedia'.",
+            description: "Moteur : 'google' (défaut), 'bing', 'duckduckgo', 'wikipedia'.",
           },
           maxSources: {
             type: "NUMBER",
-            description: "Nombre maximum de pages de résultats à visiter et lire (défaut 3, max 5).",
+            description: "Nombre de pages à visiter et lire (défaut 3, max 5).",
           },
         },
         required: ["query"],
@@ -428,13 +428,13 @@ export const browserSkill: Skill = {
     {
       name: "browser_inspect",
       description:
-        "Inspecte un type d'éléments de la page (boutons, champs, liens, ou tous) et retourne leur sélecteur CSS, texte/placeholder/URL. Utile pour identifier les éléments précis à utiliser avec browser_click ou browser_type.",
+        "Inspecte les éléments d'un type précis sur la page (boutons, champs, liens, ou tous) et retourne leurs sélecteurs CSS. Alternative à browser_snapshot pour cibler un type d'élément spécifique.",
       parameters: {
         type: "OBJECT",
         properties: {
           type: {
             type: "STRING",
-            description: "Type d'éléments à inspecter : 'buttons', 'inputs', 'links', ou 'all'. Défaut : 'all'.",
+            description: "Type : 'buttons', 'inputs', 'links', ou 'all'. Défaut : 'all'.",
           },
         },
       },
