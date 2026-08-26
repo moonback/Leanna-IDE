@@ -280,7 +280,6 @@ runtimeV2.start().then(() => {
   console.warn(`[RuntimeV2] Démarrage échoué (non bloquant): ${e.message}`);
 });
 
-const ideLimiter = createRateLimiter(120, 60_000);
 
 // ── Registre des lectures de page browser en attente ─────────────────────────
 // browser_read_content insère une promesse ici ; POST /api/browser/content-result
@@ -586,6 +585,7 @@ async function startServer() {
     standardHeaders: true,
     legacyHeaders: false,
     skip: skipForLocal,
+    validate: { keyGeneratorIpFallback: false },
     keyGenerator: (req) => `nb-chat-${req.ip}`,
     message: { error: "Trop de requêtes chat. Veuillez ralentir." },
   });
@@ -596,6 +596,7 @@ async function startServer() {
     standardHeaders: true,
     legacyHeaders: false,
     skip: skipForLocal,
+    validate: { keyGeneratorIpFallback: false },
     keyGenerator: (req) => `nb-emb-${req.ip}`,
     message: { error: "Trop de requêtes d'embedding. Veuillez patienter." },
   });
@@ -614,7 +615,7 @@ async function startServer() {
   app.use("/api/gemini-keys", createGeminiKeysRouter());
   app.use("/api/sandbox", createSandboxRouter());
   app.use("/api/checkpoint", createCheckpointRouter());
-  app.use("/api/ide", ideLimiter, ideRouter);
+  app.use("/api/ide", ideRouter);
   app.use("/api/browser", createBrowserRouter(browserReadPending, browserActionPending));
 
   // POST /api/workspace — désactivé (IDE auto-référentiel)
@@ -659,6 +660,13 @@ async function startServer() {
   // l'utilisateur exporte explicitement JARVIS_LISTEN_HOST (ex: pour un accès
   // LAN volontaire, à combiner impérativement avec JARVIS_API_TOKEN).
   const listenHost = process.env.JARVIS_LISTEN_HOST?.trim() || "127.0.0.1";
+  if (!apiToken) {
+    console.warn(
+      "\n[Security] ⚠️  AVERTISSEMENT SÉCURITÉ : Aucun JARVIS_API_TOKEN n'est configuré dans .env.\n" +
+      "          Les endpoints API (/api/*) et WebSocket (/live, /sandbox-watch) ne sont pas protégés par jeton.\n" +
+      "          Pour restreindre l'accès, définissez JARVIS_API_TOKEN=<votre_jeton_secret> dans votre .env.\n"
+    );
+  }
   if (listenHost === "0.0.0.0" && !apiToken) {
     console.error("[Security] ❌ REFUS DE DÉMARRAGE — JARVIS_LISTEN_HOST=0.0.0.0 exposé sans JARVIS_API_TOKEN. Définissez JARVIS_API_TOKEN dans .env pour sécuriser l'accès.");
     process.exit(1);

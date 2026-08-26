@@ -524,19 +524,26 @@ L'IA dispose de 22+ skills regroupées par domaine :
 
 ## 🔐 Sécurité
 
-- **Authentification** : Token `x-jarvis-token` sur tous les endpoints API
-- **Chiffrement** : Clés API et secrets chiffrés au repos (AES)
-- **Sandbox** : Modifications IA isolées, validation manuelle avant merge
-- **Rate limiting** : Protection multi-couche (global strict, polling relaxé, auth brute-force, notebook chat/embedding dédié) + **30 écritures fichiers/min max**
-- **Audit trail** : Journalisation de toutes les actions sensibles (write, modify, patch, delete) avec diff résumé
-- **Fichiers critiques** : Confirmation utilisateur interactive obligatoire avant toute modification (`.env`, `package.json`, `server.ts`, etc.) — fail-closed en contexte autonome
-- **Garde-fous écriture** : `isWriteForbidden` bloque les fichiers système (`.git`, `.env`) ; chemins validés contre le workspace, pas de path traversal
-- **run_project_command** : Seuls `npm`, `npx`, `node` autorisés ; commandes modifiant `node_modules` nécessitent confirmation interactive ; caractères shell dangereux bloqués
-- **Circuit breaker** : Protection côté client contre les cascades d'erreurs réseau
-- **Injection guards** : Protection contre l'injection de prompts
-- **Backup & Recovery** : Sauvegarde automatique incrémentale (checkpoint Git avant chaque écriture) avec restauration granulaire
-- **Memory management** : Éviction LRU pour prévenir les fuites mémoire sur les embeddings
-- **Iframe sandbox** : Rendu HTML isolé (sans scripts) pour les sources HTML
+- **Authentification & Contrôle d'Accès** :
+  - Jeton secret configuré via `JARVIS_API_TOKEN` dans `.env`
+  - Transmis via en-tête `x-jarvis-token` (REST) ou cookie/query string (WebSockets `/live`, `/sandbox-watch`)
+  - Avertissement visuel au démarrage si aucun jeton n'est configuré
+  - Écoute par défaut restreinte à la boucle locale `127.0.0.1` (`JARVIS_LISTEN_HOST=0.0.0.0` requiert obligatoirement un token)
+- **Chiffrement au Repos (AES-256-GCM)** :
+  - Chiffrement authentifié avec tag d'intégrité (GCM) pour les clés d'API sensibles dans `.env` / `.env.local`
+  - Dérivation de clé machine-bound via `JARVIS_MASTER_KEY` + hardware seed
+  - Rétrocompatibilité transparente avec le format historique AES-256-CBC
+- **Sandbox Isolé** : Modifications et créations de fichiers isolées dans `.jarvis/sandbox/` avec validation statique TypeScript avant synchronisation vers le workspace principal
+- **Rate Limiting Multi-Couche** :
+  - Global strict sur les écritures et endpoints d'authentification
+  - Polling relaxé pour l'interface utilisateur
+  - Limiteur dédié sur le chat et l'indexation vectorielle des notebooks
+  - Plafond de 30 écritures de fichiers/minute
+- **Audit Trail & Journalisation** : Enregistrement structuré de chaque opération de modification/suppression avec diff résumé
+- **Garde-fous Fichiers Critiques** : Confirmation interactive requise pour toute écriture touchant des fichiers du cœur système (`.env`, `package.json`, `server.ts`, etc.) — fail-closed par défaut
+- **Isolation d'Exécution Shell (`run_project_command`)** : Whitelist stricte (`npm`, `npx`, `node`), blocage des caractères shell d'échappement, confirmation interactive sur `node_modules`
+- **Garde-fous Auto-Modification (Checkpoints)** : Snapshot git automatique avant modification et rollback granulaire en cas d'erreur de compilation
+- **Iframe Sandbox** : Rendu isolé sans exécution de scripts pour les aperçus web et sources HTML externes
 
 ---
 
