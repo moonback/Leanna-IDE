@@ -1,53 +1,42 @@
- import express from "express";
+import express from "express";
 import path from "path";
-import compression from "compression";
-import { rateLimit } from "express-rate-limit";
+import { createRateLimitBundle, applyGlobalRateLimits, applyStaticAndCompression, type RateLimitDeps, } from "./server/config/rateLimits";
+import { setupGracefulShutdown } from "./server/lifecycle";
 // vite est importé dynamiquement en dev uniquement (voir plus bas)
 import { WebSocketServer, WebSocket } from "ws";
-import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { SkillManager } from "./server/skills/SkillManager";
 import { agentOrchestrator } from "./server/agents";
 import { mcpBridge } from "./server/mcp";
-import { buildSystemInstruction, type ProfileConfig } from "./server/prompts/systemInstruction";
+import { type ProfileConfig } from "./server/prompts/systemInstruction";
 import { loadScheduledTasks, stopAllScheduledTasks } from "./server/skills/automation";
 import { loadWorkflows, stopAllWorkflowTimers } from "./server/skills/workflow";
-import { startConversation, endConversation, saveMessage, getConversationMessages } from "./server/skills/history";
-import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
-import { authenticateRequest, authenticateToken, createRateLimiter, resolveWorkspacePath } from "./server/security";
-import { appendAuditEvent } from "./server/audit";
-import { SELF_ROOT, JARVIS_APP_ROOT, CRITICAL_FILES, initSelfRoot, hasProject, WORKSPACE_SITE_URL } from "./server/utils/selfRoot";
+import { authenticateRequest, authenticateToken } from "./server/security";
+import { SELF_ROOT, JARVIS_APP_ROOT, initSelfRoot, hasProject } from "./server/utils/selfRoot";
 import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox";
-import { subscribeToValidation } from "./server/utils/postEditValidator";
 
-import { knowledgeGraph, projectIndexer, projectMemory, understandingEngine } from "./server/knowledge";
+import { knowledgeGraph, projectIndexer, projectMemory } from "./server/knowledge";
 
-import { loadGeminiKeys, getGeminiKeys, addGeminiKey, removeGeminiKey, toggleGeminiKey, updateGeminiKeyLabel, withGeminiRetry, createGeminiClient, getNextGeminiKey } from "./server/utils/geminiKeyPool";
-import { requestConfirmation } from "./server/utils/confirmationBridge";
+import { loadGeminiKeys, createGeminiClient } from "./server/utils/geminiKeyPool";
 import { encrypt } from "./server/utils/crypto";
 import { setTextGenerationProfile } from "./server/utils/textGeneration";
-import { estimateTokens, summarizeWithLLM } from "./server/utils/tokenOptimizer";
 
 // Routeurs modulaires
 import healthRouter from "./server/routes/health";
-import knowledgeRouter from "./server/routes/knowledge";
-import memoryRouter from "./server/routes/memory";
+import { knowledgeRouter, memoryRouter, impactRouter, understandingRouter } from "./server/routes/knowledge";
 
 // Sprint 1 — routeurs extraits de server.ts
 import { createAgentBuilderRouter } from "./server/routes/agent-builder";
 import { createCustomAgentsRouter } from "./server/routes/custom-agents-router";
 import { createGeminiKeysRouter } from "./server/routes/gemini-keys";
-import { createSandboxRouter } from "./server/routes/sandbox";
+import { createSandboxRouter, createVerifyExitCodeRouter } from "./server/routes/sandbox";
 import { createCheckpointRouter } from "./server/routes/checkpoint";
 import ideRouter from "./server/routes/ide";
-import { createBrowserRouter, type BrowserPendingEntry, type BrowserActionPendingEntry } from "./server/routes/browser";
+import { createBrowserRouter } from "./server/routes/browser";
 import { attachLiveWebSocket } from "./server/live/LiveSocketHandler";
 import { createExportRouter } from "./server/routes/export";
 
-// Autonomy Engine — Superviseur de boucle d'autonomie
-import { supervisor } from "./server/autonomy";
-import impactRouter from "./server/routes/impact";
-import understandingRouter from "./server/routes/understanding";
 import { createGithubRouter } from "./server/routes/github";
 import { createAgentsRouter } from "./server/routes/agents";
 import workflowsRouter from "./server/routes/workflows";
@@ -114,7 +103,7 @@ sourceProcessingQueue.setHandler(async (task, onProgress) => {
 });
 
 // ─── Gestionnaires d'erreurs globaux (Audit §1) ──────────────────────────────
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
   console.error('[FATAL] Promesse non gérée:', reason);
 });
 
@@ -246,7 +235,6 @@ const skillManager = new SkillManager();
 // Toutes les skills sont mirrorées dans le ToolRegistry pour les métriques
 // et les nouvelles routes /api/v2/*.
 import { createRuntime } from "./server/runtime";
-import { adaptAllSkills } from "./server/runtime/compat/SkillAdapter";
 import { Observability } from "./server/runtime/Observability";
 
 const runtimeV2 = createRuntime({ enableMetrics: true, logLevel: "info" });
@@ -352,25 +340,6 @@ import("./server/utils/checkpoint").then(({ setCheckpointProfileGetter }) => {
   setCheckpointProfileGetter(() => currentProfile);
 }).catch(() => {});
 
-// ── Tool token estimation helpers ──────────────────────────────────────────
-function estimateToolTokens(declaration: any): number {
-  let tokens = 0;
-  // Name + description
-  tokens += Math.ceil((declaration.name?.length || 0) / 4);
-  tokens += Math.ceil((declaration.description?.length || 0) / 4);
-  // Parameters
-  if (declaration.parameters?.properties) {
-    for (const [key, val] of Object.entries(declaration.parameters.properties)) {
-      tokens += Math.ceil((key.length + ((val as any)?.description?.length || 0)) / 4);
-    }
-  }
-  return tokens + 20; // overhead per tool
-}
-
-function estimateToolTokens_total(declarations: any[]): number {
-  return declarations.reduce((sum, d) => sum + estimateToolTokens(d), 0);
-}
-
 /**
  * Retourne la racine de l'application Electron packagée, ou le CWD en dev.
  * En production (app packagée), main.cjs définit ELECTRON_APP_PATH = app.getAppPath()
@@ -385,70 +354,15 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.VITE_SERVER_PORT) || 5000;
 
-  // --- Rate limiters ciblés (évite 429 sur polling UI fréquent) ---
-  // App desktop locale : limiteur désactivé en dev / localhost pour éviter
-  // les 429 intempestifs liés à HMR, React StrictMode, et polling.
+  // --- Rate limiters, middlewares, fichiers statiques — extraits dans server/config/rateLimits.ts ---
   const isDev = process.env.NODE_ENV !== 'production';
-  const skipForLocal = (req: any): boolean => {
-    if (isDev) return true;
-    const ip = req.ip || req.socket?.remoteAddress || '';
-    return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+  const rateLimitDeps: RateLimitDeps = {
+    isDev,
+    getDefaultWorkspaceRoot,
+    getElectronAppRoot,
   };
-
-  // Global strict: endpoints sensibles (agents, tokens, missions, écritures...)
-  const strictLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: isDev ? 1_000_000 : 10_000, // relaxé ×20 pour éviter les faux positifs en usage intensif
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: skipForLocal,
-    message: { error: "Trop de requêtes, veuillez réessayer plus tard." }
-  });
-
-  // Polling (lecture UI fréquente): /api/ide/tree, /api/sandbox/status, etc.
-  // Frontend peut appeler ces GET plusieurs fois par seconde.
-  const pollingLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: isDev ? 1_000_000 : 30_000, // 500/s — relaxé ×25
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: skipForLocal,
-    message: { error: "Trop de requêtes polling." },
-  });
-
-  // Auth endpoints — VRAIMENT sensible aux brute-force, mais exclus profile qui
-  // est un simple sync de préférences et est appelé à chaque chargement.
-  const authLimiter = rateLimit({
-    windowMs: 5 * 60 * 1000, // 5 minutes
-    max: isDev ? 1_000_000 : 150, // ×5 vs précédent, car les tokens courts sont validés
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: skipForLocal,
-    message: { error: "Trop de tentatives d'authentification." },
-  });
-
-  // Appliquer le polling limiter sur les GET /api/ide/* et /api/sandbox/*,
-  // le strict limiter sur les méthodes d'écriture (POST/PUT/DELETE/PATCH),
-  // et le strict limiter sur toutes les autres routes /api/*.
-  app.use("/api/ide", (req, res, next) => {
-    if (req.method === "GET") return pollingLimiter(req, res, next);
-    return strictLimiter(req, res, next);
-  });
-  app.use("/api/sandbox", (req, res, next) => {
-    if (req.method === "GET") return pollingLimiter(req, res, next);
-    return strictLimiter(req, res, next);
-  });
-
-  app.use("/api/safeguards", (req, res, next) => {
-    if (req.method === "GET") return pollingLimiter(req, res, next);
-    return strictLimiter(req, res, next);
-  });
-  app.use("/api/knowledge", (req, res, next) => {
-    if (req.method === "GET") return pollingLimiter(req, res, next);
-    return strictLimiter(req, res, next);
-  });
-  app.use(/^\/api\/(auth|login|token)/, authLimiter);
-  app.use("/api", strictLimiter);
+  const rateBundle = createRateLimitBundle(rateLimitDeps);
+  applyGlobalRateLimits(app, rateBundle, rateLimitDeps);
 
   // Dynamic workspace: returns sandbox root when sandbox mode is active,
   // otherwise returns the main repo root. This affects the file explorer,
@@ -460,40 +374,13 @@ async function startServer() {
     return getDefaultWorkspaceRoot();
   }
 
-  app.use(express.json({ limit: '50mb' }));
+  applyStaticAndCompression(app, { ...rateLimitDeps, getWorkspaceRoot });
 
-  // Compression des réponses API IDE pour améliorer les performances
-  app.use('/api/ide', compression());
-
-  // Sert les fichiers Monaco localement pour éviter le CDN (nécessaire sous Electron).
-  // Utilise getElectronAppRoot() pour résoudre node_modules/ correctement dans le paquet ASAR.
-  const monacoPath = path.join(getElectronAppRoot(), 'node_modules', 'monaco-editor');
-  app.use('/monaco-editor', express.static(monacoPath));
-
-  // ── Workspace Preview — sert les fichiers HTML/CSS/JS du workspace dans le navigateur intégré.
-  // La route est intentionnellement AVANT requireAuth car le webview Electron
-  // ne peut pas transmettre de cookie de session lors du chargement d'une page.
-  // Pour limiter la surface d'attaque, seul localhost peut accéder à cette route.
-  app.use('/workspace-preview', (req, res, next) => {
-    const ip = req.ip || req.socket?.remoteAddress || '';
-    const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-    if (!isLocal) return res.status(403).json({ error: 'Accès interdit depuis un hôte distant.' });
-    next();
-  }, (req, res, next) => {
-    // req.path est déjà décodé par express et commence par "/"
-    const root = getWorkspaceRoot();
-    const resolved = resolveWorkspacePath(req.path, root);
-    if (!resolved) return res.status(403).json({ error: 'Chemin non autorisé.' });
-    // express.static appelé dynamiquement avec le root courant (sandbox ou workspace normal)
-    express.static(root, { dotfiles: 'ignore' })(req, res, next);
-  }, (_req, res) => {
-    res.status(404).send('Fichier introuvable.');
-  });
-
-  function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction): void {
     const authResult = authenticateRequest(req, { apiToken });
     if (!authResult.ok) {
-      return res.status(authResult.status || 401).json({ error: authResult.error || 'Unauthorized' });
+      res.status(authResult.status || 401).json({ error: authResult.error || 'Unauthorized' });
+      return;
     }
     if (apiToken) {
       res.cookie('jarvis_token', apiToken, {
@@ -504,21 +391,6 @@ async function startServer() {
       });
     }
     next();
-  }
-
-  function enforceRateLimit(limiters: { check: (key: string) => boolean }, key: string, res: express.Response) {
-    if (!limiters.check(key)) {
-      res.status(429).json({ error: 'Too many requests' });
-      return false;
-    }
-    return true;
-  }
-
-  function resolveRequestedPath(reqPath: string | undefined) {
-    if (typeof reqPath !== 'string' || !reqPath.trim()) {
-      return null;
-    }
-    return resolveWorkspacePath(reqPath, getWorkspaceRoot());
   }
 
   // API Routes — désormais modularisées dans server/routes/*
@@ -579,33 +451,9 @@ async function startServer() {
   app.use("/api/knowledge", impactRouter);
   app.use("/api/knowledge", understandingRouter);
 
-  // Rate limiter spécifique pour les notebooks (chat/embedding = coûteux en API)
-  const notebookChatLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: isDev ? 1_000_000 : 30, // 30 requêtes chat/min en production
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: skipForLocal,
-    validate: { keyGeneratorIpFallback: false },
-    keyGenerator: (req) => `nb-chat-${req.ip}`,
-    message: { error: "Trop de requêtes chat. Veuillez ralentir." },
-  });
-
-  const notebookEmbeddingLimiter = rateLimit({
-    windowMs: 5 * 60 * 1000, // 5 minutes
-    max: isDev ? 1_000_000 : 50, // 50 requêtes embedding/5min en production
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: skipForLocal,
-    validate: { keyGeneratorIpFallback: false },
-    keyGenerator: (req) => `nb-emb-${req.ip}`,
-    message: { error: "Trop de requêtes d'embedding. Veuillez patienter." },
-  });
-
-  // Appliquer les limiteurs ciblés sur les routes coûteuses
-  app.use("/api/notebooks/:id/chat", notebookChatLimiter);
-  app.use("/api/notebooks/:id/embeddings/reindex", notebookEmbeddingLimiter);
-  app.use("/api/notebooks/:id/sources/upload", notebookEmbeddingLimiter);
+  app.use("/api/notebooks/:id/chat", rateBundle.notebookChatLimiter);
+  app.use("/api/notebooks/:id/embeddings/reindex", rateBundle.notebookEmbeddingLimiter);
+  app.use("/api/notebooks/:id/sources/upload", rateBundle.notebookEmbeddingLimiter);
 
   app.use("/api/notebooks", createNotebooksRouter());
   app.use("/api/tts", createTTSRouter());
@@ -619,23 +467,8 @@ async function startServer() {
   app.use("/api/ide", ideRouter);
   app.use("/api/browser", createBrowserRouter(browserReadPending, browserActionPending));
   app.use("/api/export", createExportRouter());
+  app.use("/api", createVerifyExitCodeRouter());
 
-  // POST /api/workspace — désactivé (IDE auto-référentiel)
-  app.post("/api/workspace", (_req, res) => {
-    res.status(403).json({
-      error: "Jarvis-OS est un IDE auto-référentiel. Le workspace est verrouillé sur son propre code source.",
-      workspace: SELF_ROOT,
-    });
-  });
-
-  // POST /api/verify-exit-code — monté directement ici (hors préfixe sandbox)
-  app.post("/api/verify-exit-code", requireAuth, (req, res) => {
-    const { code } = req.body || {};
-    const exitCode = process.env.SANDBOX_EXIT_CODE;
-    if (!exitCode || exitCode.length !== 6) return res.status(403).json({ status: 'error', error: 'Code non configuré' });
-    if (!code || code !== exitCode) return res.status(403).json({ status: 'error', error: 'Code incorrect' });
-    res.json({ status: 'success' });
-  });
   // ── Fin routeurs extraits Sprint 1 ──────────────────────────────────────
 
 
@@ -756,7 +589,7 @@ async function startServer() {
     const distPath = path.join(getElectronAppRoot(), 'dist');
     console.log('[Server] Mode production — dist path:', distPath);
     app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
+    app.get('*all', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -857,68 +690,19 @@ async function startServer() {
     browserActionPending,
   });
 
-
-
-  // ── Graceful shutdown ────────────────────────────────────────────────────
-  // Centralise l'arrêt propre de toutes les ressources pour éviter, après
-  // plusieurs hot-reloads en développement :
-  //   - MaxListenersExceededWarning (handlers WS qui s'accumulent)
-  //   - "WebSocket already closed" (sessions déjà fermées)
-  //   - Sessions Gemini Live multiples actives simultanément
-  //
-  // Ordre d'arrêt (inverse du démarrage) :
-  //   1. Sessions Gemini Live (libère les ressources API en premier)
-  //   2. WebSocket servers (coupe les connexions clientes)
-  //   3. Timers scheduledTasks + workflow (plus d'exécutions parasites)
-  //   4. Serveur HTTP (libère le port)
-  let isShuttingDown = false;
-  async function gracefulShutdown(reason: string): Promise<void> {
-    if (isShuttingDown) return;
-    isShuttingDown = true;
-    console.log(`[Lifecycle] Arrêt gracieux déclenché (${reason})...`);
-
-    // 1. Fermer toutes les sessions Gemini actives
-    for (const s of activeGeminiSessions) {
-      try { s.close(); } catch { /* ignore — déjà fermée */ }
-    }
-    activeGeminiSessions.clear();
-    console.log('[Lifecycle] Sessions Gemini Live fermées.');
-
-    // 2. Fermer les WebSocket servers
-    await Promise.all([
-      new Promise<void>(resolve => wss.close(() => resolve())),
-    ]);
-    console.log('[Lifecycle] WebSocket servers fermés.');
-
-    // 3. Arrêter les timers (ordre indifférent, les deux sont indépendants)
-    stopAllWorkflowTimers();
-    stopAllScheduledTasks();
-
-    // 3b. Arrêter les serveurs MCP
-    await mcpBridge.shutdown();
-    console.log('[Lifecycle] Serveurs MCP déconnectés.');
-
-    // 3c. Flush persistance : ProjectMemory et KnowledgeGraph
-    try { projectMemory.save(); console.log('[Lifecycle] ProjectMemory flushé.'); } catch {}
-    try { (knowledgeGraph as any).save?.(); console.log('[Lifecycle] KnowledgeGraph flushé.'); } catch {}
-
-    // 3d. Arrêter le runtime V2
-    try { await runtimeV2.stop(); observability.detach(); console.log('[Lifecycle] RuntimeV2 arrêté.'); } catch {}
-
-    // 4. Fermer le serveur HTTP
-    await new Promise<void>(resolve => server.close(() => resolve()));
-    console.log('[Lifecycle] Arrêt complet.');
-  }
-
-  // Signaux Unix (SIGTERM envoyé par nodemon/electron-reload, SIGINT par Ctrl+C)
-  process.once('SIGTERM', () => void gracefulShutdown('SIGTERM'));
-  process.once('SIGINT',  () => void gracefulShutdown('SIGINT'));
-  // beforeExit se déclenche quand la boucle d'événements est vide
-  // (utile sur Windows où les signaux sont limités)
-  process.once('beforeExit', () => void gracefulShutdown('beforeExit'));
-
-  // Exposer le shutdown sur le process pour que electron/main.cjs puisse l'appeler
-  (process as any).__jarvisShutdown = gracefulShutdown;
+  // ── Graceful shutdown — extrait dans server/lifecycle.ts ────────────────
+  setupGracefulShutdown({
+    server,
+    wss,
+    runtimeV2,
+    observability,
+    activeGeminiSessions,
+    projectMemory,
+    knowledgeGraph,
+    mcpBridge,
+    stopAllWorkflowTimers,
+    stopAllScheduledTasks,
+  });
 }
 
 startServer();

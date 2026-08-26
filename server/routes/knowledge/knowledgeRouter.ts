@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { knowledgeGraph, projectIndexer, projectMemory, understandingEngine, dependencyGraph, learningEngine, fileWatcher } from '../knowledge';
-import { SELF_ROOT } from '../utils/selfRoot';
-import { isSandboxActive, getSandboxRoot } from '../utils/sandbox';
+import { knowledgeGraph, projectIndexer, projectMemory, understandingEngine, dependencyGraph, learningEngine, fileWatcher } from '../../knowledge';
+import { SELF_ROOT } from '../../utils/selfRoot';
+import { isSandboxActive, getSandboxRoot } from '../../utils/sandbox';
 
 const router = Router();
 
@@ -253,11 +253,12 @@ router.post('/reindex', async (_req: Request, res: Response) => {
 });
 
 // GET /api/knowledge/search
-router.get('/search', (req: Request, res: Response) => {
+router.get('/search', (req: Request, res: Response): void => {
   try {
     const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
     if (!query) {
-      return res.status(400).json({ error: 'Le paramètre "q" est requis.' });
+      res.status(400).json({ error: 'Le paramètre "q" est requis.' });
+      return;
     }
     const results = knowledgeGraph.searchEntities(query);
     res.json({ status: 'success', results });
@@ -322,8 +323,8 @@ router.get('/watcher', (_req: Request, res: Response) => {
 // GET /api/knowledge/documents — Documents extraits du workspace
 router.get('/documents', async (_req: Request, res: Response) => {
   try {
-    const { getDocumentStore } = await import('../knowledge/DocumentStore');
-    const { documentExtractor } = await import('../knowledge/DocumentExtractor');
+    const { getDocumentStore } = await import('../../knowledge/DocumentStore');
+    const { documentExtractor } = await import('../../knowledge/DocumentExtractor');
     const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
     const store = getDocumentStore(root);
     const docs = store.getAllDocuments();
@@ -352,7 +353,7 @@ router.get('/documents', async (_req: Request, res: Response) => {
 // POST /api/knowledge/documents/reextract — Force une ré-extraction complète
 router.post('/documents/reextract', async (_req: Request, res: Response) => {
   try {
-    const { documentExtractor } = await import('../knowledge/DocumentExtractor');
+    const { documentExtractor } = await import('../../knowledge/DocumentExtractor');
     const stats = await documentExtractor.extractAll();
     res.json({ status: 'success', stats });
   } catch (e: any) {
@@ -361,11 +362,12 @@ router.post('/documents/reextract', async (_req: Request, res: Response) => {
 });
 
 // GET /api/knowledge/documents/search — Recherche dans les documents
-router.get('/documents/search', (req: Request, res: Response) => {
+router.get('/documents/search', (req: Request, res: Response): void => {
   try {
     const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
     if (!query) {
-      return res.status(400).json({ error: 'Le paramètre "q" est requis.' });
+      res.status(400).json({ error: 'Le paramètre "q" est requis.' });
+      return;
     }
     const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
     const { getDocumentStore } = require('../knowledge/DocumentStore');
@@ -374,7 +376,7 @@ router.get('/documents/search', (req: Request, res: Response) => {
     res.json({
       status: 'success',
       count: results.length,
-      results: results.map(d => ({
+      results: results.map((d: any) => ({
         id: d.id,
         fileName: d.fileName,
         summary: d.summary.slice(0, 300),

@@ -62,36 +62,40 @@ export function createSandboxRouter(): Router {
 
   // POST /api/verify-exit-code — vérifie le code de sécurité sans désactiver
   // NOTE: monté séparément sur /api/verify-exit-code dans server.ts
-  router.post('/verify-exit-code', (req: Request, res: Response) => {
+  router.post('/verify-exit-code', (req: Request, res: Response): void => {
     const { code } = req.body || {};
     const exitCode = process.env.SANDBOX_EXIT_CODE;
 
     if (!exitCode || exitCode.length !== 6) {
-      return res.status(403).json({ status: 'error', error: 'Code non configuré' });
+      res.status(403).json({ status: 'error', error: 'Code non configuré' });
+      return;
     }
     if (!code || code !== exitCode) {
-      return res.status(403).json({ status: 'error', error: 'Code incorrect' });
+      res.status(403).json({ status: 'error', error: 'Code incorrect' });
+      return;
     }
     res.json({ status: 'success' });
   });
 
   // POST /api/sandbox/deactivate (code de sécurité requis)
-  router.post('/deactivate', async (req: Request, res: Response) => {
+  router.post('/deactivate', async (req: Request, res: Response): Promise<void> => {
     try {
       const { code } = req.body || {};
       const exitCode = process.env.SANDBOX_EXIT_CODE;
 
       if (!exitCode || exitCode.length !== 6) {
-        return res.status(403).json({
+        res.status(403).json({
           status: 'error',
           error: 'SANDBOX_EXIT_CODE non configuré ou invalide dans .env (6 chiffres requis)',
         });
+        return;
       }
       if (!code || code !== exitCode) {
-        return res.status(403).json({
+        res.status(403).json({
           status: 'error',
           error: 'Code de sécurité incorrect. 6 chiffres requis pour désactiver le sandbox.',
         });
+        return;
       }
 
       deactivateSandbox();
@@ -103,13 +107,14 @@ export function createSandboxRouter(): Router {
   });
 
   // POST /api/sandbox/validate — validation TypeScript du sandbox
-  router.post('/validate', async (_req: Request, res: Response) => {
+  router.post('/validate', async (_req: Request, res: Response): Promise<void> => {
     try {
       if (!isSandboxActive()) {
-        return res.status(400).json({
+        res.status(400).json({
           status: 'error',
           error: "Sandbox inactif. Activez-le d'abord via /api/sandbox/activate.",
         });
+        return;
       }
       const validation = await validateSandbox();
       res.json({
@@ -133,11 +138,11 @@ export function createSandboxRouter(): Router {
   });
 
   // POST /api/sandbox/sync — synchronise sandbox → repo principal
-  router.post('/sync', async (_req: Request, res: Response) => {
+  router.post('/sync', async (_req: Request, res: Response): Promise<void> => {
     try {
       const validation = await validateSandbox();
       if (!validation.valid && validation.errorCount > 0) {
-        return res.json({
+        res.json({
           status: 'validation_failed',
           valid: false,
           errorCount: validation.errorCount,
@@ -153,6 +158,7 @@ export function createSandboxRouter(): Router {
           rawOutput: validation.rawOutput,
           errors: validation.rawOutput,
         });
+        return;
       }
       const result = await syncToMain();
       res.json({ status: 'success', ...result });
@@ -162,10 +168,13 @@ export function createSandboxRouter(): Router {
   });
 
   // POST /api/sandbox/accept-file — accepte un fichier (sandbox → principal)
-  router.post('/accept-file', async (req: Request, res: Response) => {
+  router.post('/accept-file', async (req: Request, res: Response): Promise<void> => {
     try {
       const filePath = req.body?.path;
-      if (!filePath) return res.status(400).json({ error: 'path requis' });
+      if (!filePath) {
+        res.status(400).json({ error: 'path requis' });
+        return;
+      }
       const result = await acceptFile(filePath);
       let postValidation = null;
       if (isSandboxActive()) {
@@ -189,10 +198,13 @@ export function createSandboxRouter(): Router {
   });
 
   // POST /api/sandbox/reject-file — rejette un fichier (restaure l'original)
-  router.post('/reject-file', async (req: Request, res: Response) => {
+  router.post('/reject-file', async (req: Request, res: Response): Promise<void> => {
     try {
       const filePath = req.body?.path;
-      if (!filePath) return res.status(400).json({ error: 'path requis' });
+      if (!filePath) {
+        res.status(400).json({ error: 'path requis' });
+        return;
+      }
       const result = await rejectFile(filePath);
       let postValidation = null;
       if (isSandboxActive()) {
@@ -226,22 +238,24 @@ export function createSandboxRouter(): Router {
   });
 
   // POST /api/sandbox/reset — réinitialise le sandbox (code de sécurité requis)
-  router.post('/reset', async (req: Request, res: Response) => {
+  router.post('/reset', async (req: Request, res: Response): Promise<void> => {
     try {
       const { code } = req.body || {};
       const exitCode = process.env.SANDBOX_EXIT_CODE;
 
       if (!exitCode || exitCode.length !== 6) {
-        return res.status(403).json({
+        res.status(403).json({
           status: 'error',
           error: 'SANDBOX_EXIT_CODE non configuré ou invalide dans .env (6 chiffres requis)',
         });
+        return;
       }
       if (!code || code !== exitCode) {
-        return res.status(403).json({
+        res.status(403).json({
           status: 'error',
           error: 'Code de sécurité incorrect. 6 chiffres requis pour réinitialiser le sandbox.',
         });
+        return;
       }
 
       const result = await resetSandbox();
@@ -272,10 +286,13 @@ export function createSandboxRouter(): Router {
   });
 
   // GET /api/sandbox/file-diff?path=relative/path — contenu avant/après pour un fichier
-  router.get('/file-diff', async (req: Request, res: Response) => {
+  router.get('/file-diff', async (req: Request, res: Response): Promise<void> => {
     try {
       const filePath = typeof req.query.path === 'string' ? req.query.path : '';
-      if (!filePath) return res.status(400).json({ error: 'path requis' });
+      if (!filePath) {
+        res.status(400).json({ error: 'path requis' });
+        return;
+      }
 
       // Fichiers binaires — pas de diff texte possible
       const ext = filePath.split('.').pop()?.toLowerCase() || '';
@@ -285,13 +302,14 @@ export function createSandboxRouter(): Router {
         'ogg', 'zip', 'tar', 'gz',
       ]);
       if (binaryExts.has(ext)) {
-        return res.json({
+        res.json({
           status: 'success',
           path: filePath,
           binary: true,
           original: null,
           modified: '[Fichier binaire — aperçu non disponible]',
         });
+        return;
       }
 
       const sandboxFile = path.join(getSandboxRoot(), filePath);
@@ -314,5 +332,22 @@ export function createSandboxRouter(): Router {
     }
   });
 
+  return router;
+}
+
+export function createVerifyExitCodeRouter(): Router {
+  const router = Router();
+  router.post('/verify-exit-code', (req: Request, res: Response) => {
+    const { code } = req.body || {};
+    const exitCode = process.env.SANDBOX_EXIT_CODE;
+
+    if (!exitCode || exitCode.length !== 6) {
+      return res.status(403).json({ status: 'error', error: 'Code non configuré' });
+    }
+    if (!code || code !== exitCode) {
+      return res.status(403).json({ status: 'error', error: 'Code incorrect' });
+    }
+    res.json({ status: 'success' });
+  });
   return router;
 }

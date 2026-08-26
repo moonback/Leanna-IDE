@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { existsSync } from 'node:fs';
-import { isSandboxActive, getSandboxRoot } from '../utils/sandbox';
+import { isSandboxActive } from '../utils/sandbox';
 import { SELF_ROOT } from '../utils/selfRoot';
 
 export function createWorkspaceRouter(getWorkspaceRoot: () => string): Router {
@@ -10,6 +10,13 @@ export function createWorkspaceRouter(getWorkspaceRoot: () => string): Router {
     const root = getWorkspaceRoot();
     const exists = existsSync(root);
     res.json({ workspace: root, exists, selfReferential: true, sandbox: isSandboxActive() });
+  });
+
+  router.post('/workspace', (_req: Request, res: Response) => {
+    res.status(403).json({
+      error: "Jarvis-OS est un IDE auto-référentiel. Le workspace est verrouillé sur son propre code source.",
+      workspace: SELF_ROOT,
+    });
   });
 
   return router;

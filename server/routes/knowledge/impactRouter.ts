@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { impactAnalyzer } from '../knowledge';
+import { impactAnalyzer } from '../../knowledge';
 
 const router = Router();
 
