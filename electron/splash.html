@@ -65,6 +65,7 @@ body{
   overflow:hidden;display:grid;place-items:center;
   font-family:var(--font-body);color:var(--text);background:var(--bg-deep);
   user-select:none;-webkit-app-region:drag;position:relative;
+  transition:background-color .3s ease, color .3s ease;
 }
 
 /* ===== BACKDROP LAYERS ===== */
@@ -77,6 +78,7 @@ body{
     radial-gradient(circle at 22% 20%,rgba(0,230,255,.09),transparent 34%),
     radial-gradient(circle at 82% 78%,rgba(0,230,255,.06),transparent 38%),
     var(--bg);
+  transition:background-color .3s ease;
 }
 .bg-hex{
   position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
@@ -121,6 +123,7 @@ body{
   box-shadow:0 40px 110px rgba(0,0,0,.6),0 0 0 1px rgba(0,230,255,.03),inset 0 1px 0 rgba(255,255,255,.04);
   backdrop-filter:blur(26px) saturate(1.4);-webkit-backdrop-filter:blur(26px) saturate(1.4);
   opacity:0;transform:translateY(18px) scale(.97);animation:panel-in .8s var(--ease) forwards;
+  cursor:pointer;
 }
 .panel::before{
   content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
@@ -286,6 +289,14 @@ svg.progress-ring{position:absolute;inset:0;transform:rotate(-90deg)}
   .panel,.log-row{opacity:1;transform:none}
   .sweep,.bg-scanline{display:none}
 }
+@media(prefers-reduced-transparency:reduce){
+  .panel{background:var(--bg);backdrop-filter:none;-webkit-backdrop-filter:none}
+  .log-row.active,.metric,.status-badge{background:transparent}
+}
+@media(prefers-contrast:more){
+  .panel{border:1.5px solid var(--cyan);background:var(--bg-deep)}
+  .log-row.active,.metric,.status-badge{border-color:var(--cyan)}
+}
 </style>
 </head>
 
@@ -414,6 +425,14 @@ svg.progress-ring{position:absolute;inset:0;transform:rotate(-90deg)}
       }
     } catch (_) {}
 
+    /* ===== LOGO FALLBACK ===== */
+    // If the brand image fails to load, fall back to the inline SVG mark
+    // instead of leaving a broken-image glyph on screen.
+    const brandLogo = document.getElementById("brandLogo");
+    brandLogo.addEventListener("error", () => {
+      document.querySelector(".emblem").classList.add("fallback");
+    }, { once: true });
+
     /* ===== PARTICLE FIELD ===== */
     (function particles() {
       const canvas = document.getElementById("particleField");
@@ -508,6 +527,8 @@ svg.progress-ring{position:absolute;inset:0;transform:rotate(-90deg)}
     progressRing.style.strokeDashoffset = RING_C;
 
     let bootDone = false;
+    let skipRequested = false;
+    let uptimeInterval = null;
 
     function fmtTime(ms) {
       const s = ms / 1000;
@@ -554,8 +575,15 @@ svg.progress-ring{position:absolute;inset:0;transform:rotate(-90deg)}
         if (typeof window.onSplashFinished === "function") window.onSplashFinished();
       }, 480);
     }
-    document.addEventListener("click", () => { if (bootDone) finish(); });
-    document.addEventListener("keydown", () => { if (bootDone) finish(); });
+
+    // A click/keypress during boot fast-forwards to completion instead of
+    // being silently ignored — the user is never locked out of the input path.
+    function requestSkip() {
+      if (bootDone) { finish(); return; }
+      skipRequested = true;
+    }
+    document.addEventListener("click", requestSkip);
+    document.addEventListener("keydown", requestSkip);
 
     async function boot() {
       const total = steps.reduce((a, s) => a + s.duration, 0);
@@ -567,7 +595,8 @@ svg.progress-ring{position:absolute;inset:0;transform:rotate(-90deg)}
         statusText.innerHTML = `<span class="accent">${step.label}</span>`;
         if (i % 3 === 0) glitchTitle();
 
-        await new Promise(r => setTimeout(r, reduceMotion ? 0 : step.duration));
+        const waitMs = reduceMotion ? 0 : (skipRequested ? Math.min(30, step.duration) : step.duration);
+        await new Promise(r => setTimeout(r, waitMs));
         elapsed += step.duration;
         updateMetrics(elapsed, total);
 
@@ -603,10 +632,14 @@ svg.progress-ring{position:absolute;inset:0;transform:rotate(-90deg)}
       setTimeout(() => footerHint.classList.add("show"), 320);
 
       let t = elapsed / 1000;
-      setInterval(() => {
+      uptimeInterval = setInterval(() => {
         t += 0.1;
         uptimeValue.textContent = t.toFixed(1) + "s";
       }, 100);
+
+      // If a skip was requested while the last step was still animating,
+      // honor it now that we've landed on a clean, fully-settled state.
+      if (skipRequested) finish();
     }
 
     boot();
