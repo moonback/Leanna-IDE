@@ -42,6 +42,7 @@ import { createCheckpointRouter } from "./server/routes/checkpoint";
 import ideRouter from "./server/routes/ide";
 import { createBrowserRouter, type BrowserPendingEntry, type BrowserActionPendingEntry } from "./server/routes/browser";
 import { attachLiveWebSocket } from "./server/live/LiveSocketHandler";
+import { createExportRouter } from "./server/routes/export";
 
 // Autonomy Engine — Superviseur de boucle d'autonomie
 import { supervisor } from "./server/autonomy";
@@ -617,6 +618,7 @@ async function startServer() {
   app.use("/api/checkpoint", createCheckpointRouter());
   app.use("/api/ide", ideRouter);
   app.use("/api/browser", createBrowserRouter(browserReadPending, browserActionPending));
+  app.use("/api/export", createExportRouter());
 
   // POST /api/workspace — désactivé (IDE auto-référentiel)
   app.post("/api/workspace", (_req, res) => {
