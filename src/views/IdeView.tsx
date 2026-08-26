@@ -821,7 +821,18 @@ export default function IdeView() {
                   <div className="flex flex-1 min-h-0">
                     {/* Monaco Editor / Settings Panel */}
                     <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
-                      {showSandbox ? (
+                      {/* BrowserPanel persistant — toujours monté, caché via CSS pour éviter de détruire la webview */}
+                      <div
+                        style={{ display: showBrowser ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}
+                        aria-hidden={!showBrowser}
+                      >
+                        <BrowserPanel
+                          url={browserUrl}
+                          onClose={() => { setShowBrowser(false); setBrowserUrl(undefined); }}
+                          fullWidth
+                        />
+                      </div>
+                      {showBrowser ? null : showSandbox ? (
                         sandboxView === 'diff' ? (
                           <SandboxDiffViewer
                             embedded
@@ -865,12 +876,6 @@ export default function IdeView() {
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement des notebooks…</div></div>}>
                           <NotebooksView onClose={() => { setShowNotebooks(false); setShowExplorer(true); }} />
                         </Suspense>
-                      ) : showBrowser ? (
-                        <BrowserPanel
-                          url={browserUrl}
-                          onClose={() => { setShowBrowser(false); setBrowserUrl(undefined); }}
-                          fullWidth
-                        />
                       ) : richDocument ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement du document…</div></div>}>
                           <RichDocumentViewerLazy
