@@ -3,10 +3,16 @@
  * Design aligné sur l'identité visuelle du splash screen.
  * Thème entièrement piloté par les variables CSS du projet (data-theme sur <html>).
  * Compatible : dark · light · cyberpunk · sepia · high-contrast
+ *
+ * Changements vs. version précédente (revue apple-design) :
+ *  - Ressorts (spring, damping critique) au lieu de transitions durée+easing
+ *  - Focus par défaut sur "Annuler" (option sûre) plutôt que sur l'action destructive
+ *  - Respect de prefers-reduced-motion (cross-fade, arrêt des boucles)
+ *  - Respect de prefers-reduced-transparency (fond quasi-opaque, sans blur)
  */
 
-import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useRef } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useEffect, useRef, useState } from 'react';
 
 interface QuitConfirmDialogProps {
   open: boolean;
@@ -14,23 +20,86 @@ interface QuitConfirmDialogProps {
   onConfirm: () => void;
 }
 
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    setMatches(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, [query]);
+  return matches;
+}
+
 export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialogProps) {
-  const confirmButtonRef = useRef<HTMLButtonElement>(null);
+  // Default focus lives on the SAFE action, not the destructive one — an
+  // accidental Enter while the dialog is settling should never quit.
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedTransparency = useMediaQuery('(prefers-reduced-transparency: reduce)');
 
   useEffect(() => {
     if (!open) return;
-    const timer = setTimeout(() => confirmButtonRef.current?.focus(), 60);
+    const timer = setTimeout(() => cancelButtonRef.current?.focus(), 60);
     return () => clearTimeout(timer);
   }, [open]);
+
+  // Minimal focus trap: keep Tab cycling inside the dialog.
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !panelRef.current) return;
+      const focusables = panelRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open]);
+
+  // Critically damped spring: settles cleanly, no overshoot, and — unlike a
+  // fixed-duration tween — can be interrupted and re-targeted mid-flight.
+  const panelTransition = prefersReducedMotion
+    ? { duration: 0.15, ease: 'linear' as const }
+    : { type: 'spring' as const, bounce: 0, duration: 0.35 };
+
+  const panelInitial = prefersReducedMotion
+    ? { opacity: 0 }
+    : { opacity: 0, scale: 0.9, y: 18 };
+  const panelAnimate = prefersReducedMotion
+    ? { opacity: 1 }
+    : { opacity: 1, scale: 1, y: 0 };
+  const panelExit = panelInitial;
+
+  const overlayBackground = prefersReducedTransparency
+    ? 'var(--bg-base)'
+    : 'color-mix(in srgb, var(--bg-base) 55%, transparent)';
+  const panelBackground = prefersReducedTransparency ? 'var(--bg-panel)' : 'var(--bg-panel)';
 
   return (
     <AnimatePresence mode="wait">
       {open && (
         <>
-          {/* ── Keyframes ── */}
+          {/* ── Keyframes (paused under reduced motion) ── */}
           <style>{`
             @keyframes qd-breathe { 50% { transform: scale(1.06); } }
             @keyframes qd-blink   { to  { opacity: .35; } }
+            @media (prefers-reduced-motion: reduce) {
+              .qd-orb, .qd-dot { animation: none !important; }
+            }
           `}</style>
 
           {/* ── Overlay ── */}
@@ -38,29 +107,30 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
             key="quit-overlay"
             className="fixed inset-0 z-50 flex items-center justify-center px-4"
             style={{
-              background: 'color-mix(in srgb, var(--bg-base) 55%, transparent)',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
+              background: overlayBackground,
+              backdropFilter: prefersReducedTransparency ? 'none' : 'blur(10px)',
+              WebkitBackdropFilter: prefersReducedTransparency ? 'none' : 'blur(10px)',
             }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+            transition={prefersReducedMotion ? { duration: 0.15 } : { duration: 0.18 }}
             onClick={onClose}
             role="presentation"
           >
             {/* ── Panel ── */}
             <motion.div
               key="quit-panel"
+              ref={panelRef}
               role="alertdialog"
               aria-modal="true"
               aria-labelledby="quit-title"
               aria-describedby="quit-desc"
               tabIndex={-1}
-              initial={{ opacity: 0, scale: 0.90, y: 18 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.90, y: 18 }}
-              transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+              initial={panelInitial}
+              animate={panelAnimate}
+              exit={panelExit}
+              transition={panelTransition}
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
               style={{
@@ -70,12 +140,14 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '20px',
-                background: 'var(--bg-panel)',
-                border: '1px solid var(--border-strong)',
+                background: panelBackground,
+                border: prefersReducedTransparency
+                  ? '1px solid var(--border-strong)'
+                  : '1px solid var(--border-strong)',
                 borderRadius: '26px',
                 boxShadow: 'var(--shadow-xl)',
-                backdropFilter: 'blur(28px) saturate(1.3)',
-                WebkitBackdropFilter: 'blur(28px) saturate(1.3)',
+                backdropFilter: prefersReducedTransparency ? 'none' : 'blur(28px) saturate(1.3)',
+                WebkitBackdropFilter: prefersReducedTransparency ? 'none' : 'blur(28px) saturate(1.3)',
                 overflow: 'hidden',
               }}
             >
@@ -106,6 +178,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                   {/* Orbe accent */}
                   <div
                     aria-hidden="true"
+                    className="qd-orb"
                     style={{
                       width: '44px',
                       height: '44px',
@@ -186,6 +259,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                 >
                   <span
                     aria-hidden="true"
+                    className="qd-dot"
                     style={{
                       width: '5px',
                       height: '5px',
@@ -317,8 +391,9 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                   zIndex: 1,
                 }}
               >
-                {/* Annuler */}
+                {/* Annuler — focus par défaut : action sûre */}
                 <button
+                  ref={cancelButtonRef}
                   type="button"
                   onClick={onClose}
                   className="transition-opacity hover:opacity-75 active:scale-[.97]"
@@ -340,7 +415,6 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
 
                 {/* Quitter */}
                 <button
-                  ref={confirmButtonRef}
                   type="button"
                   onClick={onConfirm}
                   className="transition-opacity hover:opacity-85 active:scale-[.97]"
