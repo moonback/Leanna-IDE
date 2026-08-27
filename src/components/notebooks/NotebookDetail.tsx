@@ -427,7 +427,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         {/* Center navigation */}
         <nav className="notebook-segmented hidden md:flex" aria-label="Notebook navigation">
           <button
-            onClick={() => setActiveTab('sources')}
+            onClick={() => { setActiveTab('sources'); setSelectedSourceId(null); }}
             className="notebook-segment transition-transform active:scale-95"
             data-active={activeTab === 'sources'}
             title="Sources (Ctrl+1 / ⌘1)"
@@ -437,7 +437,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             <span className="notebook-count">{notebook.sources.length}</span>
           </button>
           <button
-            onClick={() => setActiveTab('chat')}
+            onClick={() => { setActiveTab('chat'); setSelectedSourceId(null); }}
             className="notebook-segment transition-transform active:scale-95"
             data-active={activeTab === 'chat'}
             title="Chat (Ctrl+2 / ⌘2)"
