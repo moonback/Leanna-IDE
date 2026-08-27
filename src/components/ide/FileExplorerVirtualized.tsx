@@ -672,7 +672,7 @@ const FileExplorer = memo(function FileExplorer({
     }
     if (!hasAutoCollapsed.current) {
       hasAutoCollapsed.current = true;
-      setWsExpandedDirs(new Set(getAllDirectoryPaths(processedWorkspaceTree)));
+      setWsExpandedDirs(new Set());
       setShowWorkspace(false);
     }
   }, [processedWorkspaceTree]);
@@ -1035,11 +1035,11 @@ const FileExplorer = memo(function FileExplorer({
                   </span>
                   <FolderInput size={10} style={{ color: 'var(--accent-primary)' }} />
                   <span className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}>
-                    Workspace
+                    Dossiers Réels
                   </span>
-                  <span className="text-[9px] opacity-50 ml-1" style={{ color: 'var(--text-muted)' }}>
+                  {/* <span className="text-[9px] opacity-50 ml-1" style={{ color: 'var(--text-muted)' }}>
                     (fichiers réels)
-                  </span>
+                  </span> */}
                   {sandboxModifiedCount > 0 ? (
                     <span
                       className="ml-auto text-[9px] px-1.5 py-0.5 rounded font-medium flex items-center gap-1"
