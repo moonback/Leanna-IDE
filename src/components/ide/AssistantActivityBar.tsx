@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import type React from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   ChevronDown, ChevronUp, CheckCircle2, Loader2, X,
   FolderSearch, FileText, FilePen, FileSearch, FolderPlus,
@@ -43,6 +43,11 @@ const TOOL_META: Record<string, { icon: React.ElementType; category: string; col
   reasoning_delegate_task:    { icon: Cpu,       category: 'Raisonnement',color: '#f97316' },
   create_rich_document:       { icon: BarChart2,  category: 'Document',    color: '#6366f1' },
 };
+
+// How long the panel lingers after the last step finishes before it
+// auto-dismisses. Long enough to read "Terminé", short enough not to
+// squat on the user's attention past its usefulness (Purpose).
+const AUTO_HIDE_DELAY_MS = 4000;
 
 function getMeta(tool: string) {
   return TOOL_META[tool] ?? { icon: Terminal, category: 'Outil', color: '#94a3b8' };
@@ -120,6 +125,7 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
   const [visible, setVisible] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefersReducedMotion = useReducedMotion();
   // Track elapsed for running steps
   const [, setTick] = useState(0);
 
@@ -134,14 +140,27 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
     return () => clearInterval(id);
   }, [isWorking]);
 
-  // Show when work starts
+  // Show when work starts, auto-hide a while after it finishes.
+  // Skipped for `inline` (it has no floating chrome to dismiss) and while
+  // the user has it expanded — don't yank a panel away mid-read (Agency).
   useEffect(() => {
-    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+
     if (isWorking) {
       setVisible(true);
+      return;
     }
+
+    if (!inline && visible && !expanded && steps.length > 0) {
+      hideTimerRef.current = setTimeout(() => setVisible(false), AUTO_HIDE_DELAY_MS);
+    }
+
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
-  }, [isWorking]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWorking, expanded, inline]);
 
   // Auto-scroll to bottom when list updates
   useEffect(() => {
@@ -156,15 +175,31 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
   // In inline mode, always visible when there are steps (no auto-hide logic)
   const shouldShow = inline ? steps.length > 0 : visible;
 
+  // Reduced motion: cross-fade only, no slide/scale/overshoot.
+  const panelInitial = prefersReducedMotion
+    ? { opacity: 0 }
+    : inline
+      ? { opacity: 0 }
+      : { opacity: 0, y: 8, scale: 0.97 };
+  const panelAnimate = prefersReducedMotion
+    ? { opacity: 1 }
+    : inline
+      ? { opacity: 1 }
+      : { opacity: 1, y: 0, scale: 1 };
+  const panelExit = panelInitial;
+  const panelTransition = prefersReducedMotion
+    ? { duration: 0.15, ease: 'easeOut' as const }
+    : { type: 'spring' as const, damping: 1, duration: 0.32 };
+
   return (
     <AnimatePresence>
       {shouldShow && (
         <motion.div
           key="activity-bar"
-          initial={inline ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.97 }}
-          animate={inline ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-          exit={inline ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.97 }}
-          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          initial={panelInitial}
+          animate={panelAnimate}
+          exit={panelExit}
+          transition={panelTransition}
           className={inline
             ? "flex flex-col min-h-0 overflow-hidden"
             : "absolute bottom-8 right-4 z-40 w-80 rounded-2xl overflow-hidden"
@@ -174,8 +209,10 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
             : {
                 backgroundColor: 'rgba(15, 23, 42, 0.92)',
                 border: '1px solid rgba(148, 163, 184, 0.18)',
+                borderTop: '1px solid rgba(255, 255, 255, 0.14)', // bright top edge = light catching the material
                 boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
                 backdropFilter: 'blur(18px)',
+                transformOrigin: 'bottom right', // grows from the corner it lives in
               }
           }
         >
@@ -194,22 +231,43 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
           >
             {/* Animated status dot */}
             <div className="relative flex-shrink-0 w-4 h-4 flex items-center justify-center">
-              {isWorking ? (
-                <>
+              <AnimatePresence mode="wait" initial={false}>
+                {isWorking ? (
                   <motion.div
-                    className="absolute inset-0 rounded-full"
-                    style={{ backgroundColor: 'var(--accent-primary)', opacity: 0.2 }}
-                    animate={{ scale: [1, 1.8, 1] }}
-                    transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-                  />
-                  <Loader2
-                    className="w-3.5 h-3.5 animate-spin relative"
-                    style={{ color: 'var(--accent-primary)' }}
-                  />
-                </>
-              ) : (
-                <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#34d399' }} />
-              )}
+                    key="working"
+                    className="absolute inset-0 flex items-center justify-center"
+                    initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.6 }}
+                    animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.6 }}
+                    transition={{ type: 'spring', damping: 1, duration: 0.25 }}
+                  >
+                    {!prefersReducedMotion && (
+                      <motion.div
+                        className="absolute inset-0 rounded-full"
+                        style={{ backgroundColor: 'var(--accent-primary)', opacity: 0.2 }}
+                        animate={{ scale: [1, 1.8, 1] }}
+                        transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                      />
+                    )}
+                    <Loader2
+                      className="w-3.5 h-3.5 animate-spin relative"
+                      style={{ color: 'var(--accent-primary)' }}
+                    />
+                  </motion.div>
+                ) : (
+                  // Completion feedback: a small pop, not an instant swap —
+                  // the state change itself is the thing worth noticing.
+                  <motion.div
+                    key="done"
+                    initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
+                    animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
+                    transition={{ type: 'spring', damping: 0.8, duration: 0.3 }}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#34d399' }} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Main label */}
@@ -253,13 +311,15 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
                   : <ChevronUp className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
                 }
               </button>
-              <button
-                className="p-1 rounded-full transition-colors hover:bg-white/10"
-                aria-label="Fermer"
-                onClick={e => { e.stopPropagation(); setVisible(false); setExpanded(false); }}
-              >
-                {!inline && <X className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />}
-              </button>
+              {!inline && (
+                <button
+                  className="p-1 rounded-full transition-colors hover:bg-white/10"
+                  aria-label="Fermer"
+                  onClick={e => { e.stopPropagation(); setVisible(false); setExpanded(false); }}
+                >
+                  <X className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -271,7 +331,11 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
                 initial={{ height: 0 }}
                 animate={{ height: 'auto' }}
                 exit={{ height: 0 }}
-                transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                transition={
+                  prefersReducedMotion
+                    ? { duration: 0.15, ease: 'easeOut' }
+                    : { type: 'spring', damping: 1, duration: 0.28 }
+                }
                 style={{ overflow: 'hidden' }}
               >
                 <div
@@ -280,19 +344,19 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
                   style={inline ? undefined : { maxHeight: 220 }}
                 >
                   {steps.map((step, i) => {
-                          const meta = getMeta(step.tool);
-                          const isRun = step.status === 'running';
-                          const nextStep = steps[i + 1];
-                          const dur = isRun
-                            ? elapsed(step.timestamp)
-                            : nextStep
-                              ? `${((nextStep.timestamp.getTime() - step.timestamp.getTime()) / 1000).toFixed(1)}s`
-                              : '—';
+                    const meta = getMeta(step.tool);
+                    const isRun = step.status === 'running';
+                    const nextStep = steps[i + 1];
+                    const dur = isRun
+                      ? elapsed(step.timestamp)
+                      : nextStep
+                        ? `${((nextStep.timestamp.getTime() - step.timestamp.getTime()) / 1000).toFixed(1)}s`
+                        : '—';
 
-                          return (
-                            <StepRow key={step.id} step={step} meta={meta} isRun={isRun} dur={dur} />
-                          );
-                        })}
+                    return (
+                      <StepRow key={step.id} step={step} meta={meta} isRun={isRun} dur={dur} />
+                    );
+                  })}
                 </div>
 
                 {/* Footer with total count */}
