@@ -16,7 +16,45 @@ import { useSlashCommand } from '../../hooks/useSlashCommand';
 import { DocumentUpload, DropZoneOverlay, useDocumentDrop, type DocumentResult } from './DocumentUpload';
 import type { TranscriptEntry } from '../../hooks/useLiveAPI';
 
-// ─── Hook pour gérer la file d'attente des messages ──────────────────────
+// --- Styles Globaux ---
+const COLORS = {
+  primary: 'var(--accent-primary)',
+  success: '#34d399',
+  warning: '#fbbf24',
+  error: '#ef4444',
+  muted: 'var(--text-muted)',
+  dimmed: 'var(--text-dimmed)',
+  bgPanel: 'var(--bg-panel)',
+  bgSecondary: 'var(--bg-secondary)',
+  bgInput: 'var(--bg-input)',
+  borderBase: 'var(--border-base)',
+  textPrimary: 'var(--text-primary)',
+};
+
+const RADII = {
+  sm: '8px',
+  md: '12px',
+  lg: '16px',
+  xl: '20px',
+  full: '9999px',
+};
+
+const SHADOWS = {
+  sm: '0 1px 2px rgba(0, 0, 0, 0.08)',
+  md: '0 4px 12px rgba(0, 0, 0, 0.12)',
+  lg: '0 8px 24px rgba(0, 0, 0, 0.16)',
+  xl: '0 16px 48px rgba(0, 0, 0, 0.24)',
+  inner: 'inset 0 1px 2px rgba(255, 255, 255, 0.04)',
+};
+
+const TRANSITIONS = {
+  fast: { duration: 0.12, ease: 'ease' },
+  normal: { duration: 0.2, ease: 'ease' },
+  slow: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+  spring: { type: 'spring', bounce: 0.2, duration: 0.4 } as const,
+};
+
+// --- Hook pour la file d'attente ---
 interface PendingChatMessage {
   text: string;
   displayText?: string;
@@ -31,7 +69,6 @@ function useMessageQueue(
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Ne rien faire si le timer est déjà en attente — il sera nettoyé par le cleanup
     if (!isBusy && queue.length > 0 && connected) {
       timerRef.current = setTimeout(() => {
         const [next, ...rest] = queue;
@@ -55,21 +92,23 @@ function useMessageQueue(
   return { queue, enqueue };
 }
 
-// ─── Styles constants pour les bulles de chat ─────────────────────────────
+// --- Styles des bulles de chat ---
 const BUBBLE_STYLES = {
   assistant: {
-    bg: 'var(--bg-secondary)',
-    border: 'var(--border-base)',
-    borderRadius: '4px 16px 16px 16px',
+    bg: COLORS.bgSecondary,
+    border: COLORS.borderBase,
+    borderRadius: `4px ${RADII.lg} ${RADII.lg} ${RADII.lg}`,
+    shadow: SHADOWS.sm,
   },
   user: {
-    bg: 'var(--accent-subtle)',
-    border: 'rgba(14,165,233,0.2)',
-    borderRadius: '16px 4px 16px 16px',
+    bg: 'rgba(14, 165, 233, 0.08)',
+    border: 'rgba(14, 165, 233, 0.25)',
+    borderRadius: `${RADII.lg} 4px ${RADII.lg} ${RADII.lg}`,
+    shadow: SHADOWS.sm,
   },
 } as const;
 
-// ─── Rendu Markdown pour les messages assistant ───────────────────────────
+// --- Markdown ---
 const ChatMarkdown = memo(function ChatMarkdown({ text }: { text: string }) {
   const html = useMemo(() => {
     try {
@@ -83,19 +122,18 @@ const ChatMarkdown = memo(function ChatMarkdown({ text }: { text: string }) {
   return (
     <div
       className="chat-markdown"
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: controlled HTML from markdown parser
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
 });
 
-// ─── Trois points qui respirent — indicateur d'activité partagé ──────────
+// --- Indicateurs d'activite ---
 const BreathingDots = memo(function BreathingDots({ color, reduceMotion }: { color: string; reduceMotion: boolean }) {
   if (reduceMotion) {
     return (
       <div className="flex items-center gap-0.5">
         {[0, 1, 2].map(i => (
-          <div key={i} className="w-1 h-1 rounded-full" style={{ backgroundColor: color, opacity: 0.5 }} />
+          <div key={i} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color, opacity: 0.5 }} />
         ))}
       </div>
     );
@@ -105,17 +143,17 @@ const BreathingDots = memo(function BreathingDots({ color, reduceMotion }: { col
       {[0, 1, 2].map(i => (
         <motion.div
           key={i}
-          className="w-1 h-1 rounded-full"
+          className="w-1.5 h-1.5 rounded-full"
           style={{ backgroundColor: color }}
-          animate={{ opacity: [0.3, 1, 0.3], y: [0, -1, 0] }}
-          transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
+          animate={{ opacity: [0.3, 1, 0.3], y: [0, -2, 0] }}
+          transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
         />
       ))}
     </div>
   );
 });
 
-// ─── Composants memoïsés ──────────────────────────────────────────────────
+// --- Bulle de message ---
 const ChatMessage = memo(function ChatMessage({
   entry,
   profile: _profile,
@@ -127,41 +165,42 @@ const ChatMessage = memo(function ChatMessage({
 }) {
   const isAssistant = entry.role === 'assistant';
   const bubbleStyle = isAssistant ? BUBBLE_STYLES.assistant : BUBBLE_STYLES.user;
+
   return (
     <motion.div
-      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98 }}
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={reduceMotion ? { duration: 0.1 } : { type: 'spring', bounce: 0.1, duration: 0.35 }}
-      className={`flex gap-2 group ${isAssistant ? '' : 'flex-row-reverse'}`}
+      transition={reduceMotion ? { duration: 0.1 } : TRANSITIONS.spring}
+      className={`flex gap-3 group ${isAssistant ? '' : 'flex-row-reverse'}`}
     >
       <div
-        className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5"
+        className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5"
         style={{
-          backgroundColor: isAssistant ? 'var(--accent-subtle)' : 'rgba(255,255,255,0.05)',
-          border: `1px solid ${isAssistant ? 'rgba(14,165,233,0.3)' : 'var(--border-base)'}`,
+          backgroundColor: isAssistant ? 'rgba(14, 165, 233, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+          border: `1px solid ${isAssistant ? 'rgba(14, 165, 233, 0.3)' : COLORS.borderBase}`,
         }}
       >
         {isAssistant
-          ? <Bot size={11} style={{ color: 'var(--accent-primary)' }} />
-          : <User size={11} style={{ color: 'var(--text-muted)' }} />
+          ? <Bot size={13} style={{ color: COLORS.primary }} />
+          : <User size={13} style={{ color: COLORS.muted }} />
         }
       </div>
-      <div className={`max-w-[85%] ${isAssistant ? '' : 'text-right'}`}>
+      <div className={`max-w-[82%] ${isAssistant ? '' : 'text-right'}`}>
         <div
-          className="px-3 py-2 rounded-2xl text-[0.75rem] leading-relaxed inline-block text-left"
+          className="px-4 py-2.5 rounded-2xl text-[0.8125rem] leading-relaxed inline-block text-left"
           style={{
             backgroundColor: bubbleStyle.bg,
             border: `1px solid ${bubbleStyle.border}`,
             borderRadius: bubbleStyle.borderRadius,
-            color: 'var(--text-primary)',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+            color: COLORS.textPrimary,
+            boxShadow: bubbleStyle.shadow,
           }}
         >
           {isAssistant ? <ChatMarkdown text={entry.text} /> : entry.text}
         </div>
         <span
-          className="text-[0.5625rem] tracking-wide font-mono px-1 mt-0.5 block opacity-0 group-hover:opacity-100 transition-opacity"
-          style={{ color: 'var(--text-dimmed)' }}
+          className="text-[0.625rem] tracking-wide font-mono px-1 mt-1 block opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ color: COLORS.dimmed }}
         >
           {entry.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
         </span>
@@ -170,9 +209,8 @@ const ChatMessage = memo(function ChatMessage({
   );
 });
 
-// ─── Utilitaire pour replacer le curseur après mise à jour de l'input ────
+// --- Utilitaire pour le curseur ---
 function setCursorPosition(textarea: HTMLTextAreaElement, pos: number): void {
-  // requestAnimationFrame garantit que React a flushed le DOM avant de lire selectionStart
   requestAnimationFrame(() => {
     textarea.selectionStart = pos;
     textarea.selectionEnd = pos;
@@ -180,7 +218,7 @@ function setCursorPosition(textarea: HTMLTextAreaElement, pos: number): void {
   });
 }
 
-// ─── Sous-composant InputArea ─────────────────────────────────────────────
+// --- Zone d'input ---
 interface InputAreaProps {
   connected: boolean;
   isBusy: boolean;
@@ -195,7 +233,6 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed }: InputAreaP
 
   const canSend = connected && !isBusy;
 
-  // Hooks de mentions et commandes
   const {
     suggestions,
     showSuggestions,
@@ -226,7 +263,6 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed }: InputAreaP
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // Navigation dans les dropdowns
       if (showSlashSuggestions && slashSuggestions.length > 0) {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Escape') {
           handleSlashKeyDown(e);
@@ -267,32 +303,23 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed }: InputAreaP
       }
     },
     [
-      showSlashSuggestions,
-      slashSuggestions,
-      slashSelectedIndex,
-      handleSlashKeyDown,
-      acceptCommand,
-      showSuggestions,
-      suggestions,
-      selectedIndex,
-      handleMentionKeyDown,
-      acceptSuggestion,
+      showSlashSuggestions, slashSuggestions, slashSelectedIndex, handleSlashKeyDown, acceptCommand,
+      showSuggestions, suggestions, selectedIndex, handleMentionKeyDown, acceptSuggestion,
       handleSend,
     ]
   );
 
   return (
     <div
-      className="flex-shrink-0 px-3 pb-3 pt-2"
-      style={{ borderTop: '1px solid var(--border-base)' }}
+      className="flex-shrink-0 px-4 pb-4 pt-3"
+      style={{ borderTop: `1px solid ${COLORS.borderBase}` }}
     >
       <div
-        className="relative flex items-end gap-2 px-3 py-2 transition-[border-color,box-shadow] duration-150"
+        className="relative flex items-end gap-2.5 px-4 py-2.5 transition-[border-color,box-shadow] duration-200
+                   bg-[var(--bg-input)] rounded-xl border"
         style={{
-          backgroundColor: 'var(--bg-input)',
-          border: `1px solid ${isFocused ? 'var(--accent-primary)' : 'var(--border-base)'}`,
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: isFocused ? '0 0 0 3px rgba(14,165,233,0.12)' : 'none',
+          borderColor: isFocused ? COLORS.primary : COLORS.borderBase,
+          boxShadow: isFocused ? `0 0 0 4px rgba(14, 165, 233, 0.12), ${SHADOWS.inner}` : SHADOWS.inner,
         }}
       >
         {showSuggestions && suggestions.length > 0 && (
@@ -330,36 +357,49 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed }: InputAreaP
           onKeyDown={handleKeyDown}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder={connected ? 'Message… (@ fichier, / skill)' : 'Connectez-vous d\'abord'}
+          placeholder={connected ? 'Message... (@ fichier, / skill)' : 'Connectez-vous d\'abord'}
           disabled={!canSend}
           rows={1}
-          className="flex-1 bg-transparent text-[0.75rem] resize-none outline-none placeholder:opacity-50 min-h-[20px] max-h-[80px]"
-          style={{ color: 'var(--text-primary)' }}
+          className="flex-1 bg-transparent text-[0.8125rem] resize-none outline-none
+                     placeholder:text-[var(--text-dimmed)] placeholder:opacity-60
+                     min-h-[24px] max-h-[100px] leading-tight"
+          style={{ color: COLORS.textPrimary, lineHeight: '1.5' }}
           aria-label="Saisie du message"
           aria-describedby="chat-input-hints"
           aria-autocomplete="list"
           aria-haspopup="listbox"
         />
+
         <DocumentUpload connected={connected} onDocumentAnalyzed={onDocumentAnalyzed} />
+
         <motion.button
           onClick={handleSend}
           disabled={!input.trim() || !canSend}
-          whileTap={input.trim() && canSend ? { scale: 0.9 } : undefined}
-          className="p-1.5 rounded-lg transition-colors disabled:opacity-30 hover:bg-white/10"
+          whileTap={input.trim() && canSend ? { scale: 0.92 } : undefined}
+          className="p-2 rounded-xl transition-colors disabled:opacity-20
+                     hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20"
           title="Envoyer (Enter)"
           aria-label="Envoyer le message"
         >
-          <Send size={14} style={{ color: 'var(--accent-primary)' }} />
+          <Send size={16} style={{ color: COLORS.primary }} />
         </motion.button>
       </div>
-      <div className="flex items-center justify-between mt-1.5 px-1">
-        <span id="chat-input-hints" className="text-[0.5625rem] tracking-wide" style={{ color: 'var(--text-dimmed)' }}>
-          Enter envoyer • @ fichier • / skill • 📎 document
+
+      <div className="flex items-center justify-between mt-2 px-1">
+        <span
+          id="chat-input-hints"
+          className="text-[0.625rem] tracking-wide"
+          style={{ color: COLORS.dimmed }}
+        >
+          Enter = Envoyer | @ = Mention fichier | / = Commande | 📎 = Document
         </span>
         {connected && (
-          <span className="text-[0.5625rem] tracking-wide flex items-center gap-1.5" style={{ color: isBusy ? 'var(--accent-primary)' : '#34d399' }}>
-            <BreathingDots color={isBusy ? '#38bdf8' : '#4ade80'} reduceMotion={false} />
-            {isBusy ? 'En cours…' : 'Connecté'}
+          <span
+            className="text-[0.625rem] tracking-wide flex items-center gap-2"
+            style={{ color: isBusy ? COLORS.primary : COLORS.success }}
+          >
+            <BreathingDots color={isBusy ? COLORS.primary : COLORS.success} reduceMotion={false} />
+            {isBusy ? 'En cours...' : 'Connecte'}
           </span>
         )}
       </div>
@@ -367,7 +407,7 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed }: InputAreaP
   );
 }
 
-// ─── Rubber-band : résistance progressive au-delà des limites ────────────
+// --- Rubber-band pour le drag ---
 function rubberband(overshoot: number, dimension: number, constant = 0.55): number {
   return (overshoot * dimension * constant) / (dimension + constant * Math.abs(overshoot));
 }
@@ -378,7 +418,7 @@ function clampWithRubberband(value: number, min: number, max: number, dimension:
   return value;
 }
 
-// ─── Hook pour rendre le panneau déplaçable (Pointer Events, borné, avec rebond) ─
+// --- Hook pour le panneau deplacable ---
 interface DragSession {
   pointerId: number;
   startClientX: number;
@@ -389,7 +429,7 @@ interface DragSession {
   moved: boolean;
 }
 
-const DRAG_HYSTERESIS = 6; // px avant qu'un clic ne devienne un drag
+const DRAG_HYSTERESIS = 6;
 const EDGE_MARGIN = 8;
 
 function useDraggablePanel(panelRef: React.RefObject<HTMLDivElement | null>, disabled: boolean, reduceMotion: boolean) {
@@ -452,7 +492,6 @@ function useDraggablePanel(panelRef: React.RefObject<HTMLDivElement | null>, dis
     const targetLeft = Math.min(Math.max(curLeft, minLeft), maxLeft);
     const targetTop = Math.min(Math.max(curTop, minTop), maxTop);
 
-    // Rebond de retour dans les bornes, avec transfert de la vélocité du relâchement (§5/§9)
     if (targetLeft !== curLeft) {
       animate(mx, mx.get() + (targetLeft - curLeft), reduceMotion
         ? { duration: 0.15, ease: 'easeOut' }
@@ -477,7 +516,7 @@ function useDraggablePanel(panelRef: React.RefObject<HTMLDivElement | null>, dis
   };
 }
 
-// ─── Composant principal ──────────────────────────────────────────────────
+// --- Composant principal ---
 interface ChatPanelProps {
   pendingMessage?: PendingChatMessage | null;
   onPendingMessageConsumed?: () => void;
@@ -500,21 +539,17 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
   const shouldAutoScrollRef = useRef(true);
   const reduceMotion = !!useReducedMotion();
 
-  // Notify parent when docked state changes
   useEffect(() => {
     onDockedChange?.(docked);
   }, [docked, onDockedChange]);
 
-  // Draggable (Pointer Events, borné avec rebond élastique, vélocité transférée au relâchement)
   const { mx, my, isDragging: isDraggingPanel, resetPosition, dragHandlers } =
     useDraggablePanel(panelRef, docked || fullscreen, reduceMotion);
 
-  // Le panneau ne doit pas garder un offset de drag quand on ancre/plein-écran
   useEffect(() => {
     if (docked || fullscreen) resetPosition();
   }, [docked, fullscreen, resetPosition]);
 
-  // File d'attente
   const { queue, enqueue } = useMessageQueue(isBusy, connected, sendTextMessage);
 
   const handleMessagesScroll = useCallback(() => {
@@ -524,14 +559,12 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
     shouldAutoScrollRef.current = distanceFromBottom <= 20;
   }, []);
 
-  // Scroll automatique uniquement si l'utilisateur est déjà proche du bas.
   useLayoutEffect(() => {
     if (shouldAutoScrollRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
     }
   }, [transcript.length, queue.length, isBusy, connecting, reduceMotion]);
 
-  // Gestion de l'envoi (utilisée par InputArea)
   const handleSend = useCallback(
     (text: string, displayText?: string) => {
       if (!connected) return;
@@ -550,17 +583,14 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
 
   useEffect(() => {
     if (!pendingMessage) return;
-
     if (!connected) {
       if (!connecting) connect([], 'full');
       return;
     }
-
     handleSend(pendingMessage.text, pendingMessage.displayText);
     onPendingMessageConsumed?.();
   }, [pendingMessage, connected, connecting, connect, handleSend, onPendingMessageConsumed]);
 
-  // Document upload
   const handleDocumentAnalyzed = useCallback(
     (result: DocumentResult) => {
       if (!connected) return;
@@ -577,21 +607,17 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
     [connected, sendRawMessage]
   );
 
-  // Drag & Drop
   const { isDragging, dropHandlers } = useDocumentDrop({
     connected,
     onDocumentAnalyzed: handleDocumentAnalyzed,
   });
 
-  // Actions de contrôle
   const handleClear = useCallback(() => clearTranscript(), [clearTranscript]);
   const handleToggleMute = useCallback(() => toggleMute(), [toggleMute]);
   const handleToggleConnect = useCallback(() => {
     if (connected) disconnect();
     else connect([], 'full');
   }, [connected, disconnect, connect]);
-
-  const layoutTransition = reduceMotion ? 'box-shadow 0.15s' : (isDraggingPanel ? 'box-shadow 0.15s' : 'top 0.3s cubic-bezier(0.22,1,0.36,1), right 0.3s cubic-bezier(0.22,1,0.36,1), width 0.3s cubic-bezier(0.22,1,0.36,1), height 0.3s cubic-bezier(0.22,1,0.36,1), max-height 0.3s cubic-bezier(0.22,1,0.36,1), border-radius 0.3s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s');
 
   return (
     <motion.div
@@ -602,70 +628,106 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
         right: fullscreen ? '0' : docked ? '0' : '24px',
         left: fullscreen ? '0' : undefined,
         bottom: fullscreen ? '0' : undefined,
-        width: fullscreen ? '100vw' : minimized ? '300px' : docked ? '420px' : '420px',
-        height: fullscreen ? '100vh' : minimized ? 'auto' : docked ? '100vh' : 'calc(100vh - 120px)',
-        maxHeight: fullscreen ? '100vh' : minimized ? undefined : docked ? '100vh' : '800px',
-        minWidth: fullscreen ? undefined : minimized ? '200px' : '320px',
+        width: fullscreen ? '100vw' :
+              minimized ? '420px' :
+              docked ? '420px' : '420px',
+        height: fullscreen ? '100vh' :
+               minimized ? 'auto' :
+               docked ? '100vh' : 'calc(100vh - 120px)',
+        maxHeight: fullscreen ? '100vh' : minimized ? undefined : '100vh',
+        minWidth: fullscreen ? undefined : '280px',
         zIndex: fullscreen ? 99999 : 9990,
-        backgroundColor: 'var(--bg-panel)',
-        border: fullscreen || docked ? 'none' : '1px solid var(--border-base)',
-        borderLeft: !fullscreen && docked ? '1px solid var(--border-base)' : undefined,
-        borderRadius: fullscreen ? '0' : docked ? '0' : '16px',
+        backgroundColor: COLORS.bgPanel,
+        border: fullscreen || docked ? 'none' : `1px solid ${COLORS.borderBase}`,
+        borderLeft: !fullscreen && docked ? `1px solid ${COLORS.borderBase}` : undefined,
+        borderRadius: fullscreen ? '0' : docked ? '0' : RADII.xl,
         x: fullscreen || docked ? 0 : mx,
         y: fullscreen || docked ? 0 : my,
-        cursor: isDraggingPanel && !docked && !fullscreen ? 'grabbing' : undefined,
-        userSelect: isDraggingPanel ? 'none' : undefined,
+        cursor: isDraggingPanel && !docked && !fullscreen ? 'grabbing' : 'default',
+        userSelect: isDraggingPanel ? 'none' : 'auto',
         boxShadow: fullscreen
           ? 'none'
           : docked
-            ? '-4px 0 20px rgba(0,0,0,0.2)'
+            ? `-4px 0 30px rgba(0, 0, 0, 0.25)`
             : isDraggingPanel
-              ? '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)'
-              : '0 8px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05)',
-        transition: layoutTransition,
-        backdropFilter: fullscreen ? undefined : 'blur(12px)',
+              ? `0 24px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04)`
+              : `0 12px 50px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04)`,
+        transition: reduceMotion
+          ? 'box-shadow 0.15s'
+          : isDraggingPanel
+            ? 'box-shadow 0.15s'
+            : 'top 0.3s cubic-bezier(0.22, 1, 0.36, 1), right 0.3s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s cubic-bezier(0.22, 1, 0.36, 1), height 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s',
+        backdropFilter: fullscreen ? 'none' : 'blur(16px)',
       }}
       {...dropHandlers}
     >
       <DropZoneOverlay isDragging={isDragging} />
 
-      {/* ─── Header (draggable) ─── */}
+      {/* Header (draggable) */}
       <div
         {...(docked || fullscreen ? {} : dragHandlers)}
-        className="flex items-center gap-2.5 px-4 py-2.5 flex-shrink-0"
+        className="flex items-center gap-2 px-4 py-2.5 flex-shrink-0"
         style={{
-          borderBottom: '1px solid var(--border-base)',
+          borderBottom: `1px solid ${COLORS.borderBase}`,
           cursor: docked || fullscreen ? 'default' : (isDraggingPanel ? 'grabbing' : 'grab'),
           touchAction: docked || fullscreen ? undefined : 'none',
         }}
       >
-        {!docked && !fullscreen && <GripVertical size={12} style={{ color: 'var(--text-dimmed)', flexShrink: 0 }} />}
+        {!docked && !fullscreen && (
+          <GripVertical
+            size={14}
+            className="flex-shrink-0"
+            style={{ color: COLORS.dimmed, opacity: 0.6 }}
+          />
+        )}
+
         <div className="relative">
-          <Bot size={16} style={{ color: connected ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
-          <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ border: '1.5px solid var(--bg-panel)' }}>
+          <Bot
+            size={18}
+            style={{ color: connected ? COLORS.primary : COLORS.muted }}
+          />
+          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--bg-panel)]">
             {connected && !reduceMotion ? (
               <motion.div
                 className="w-full h-full rounded-full"
-                style={{ backgroundColor: '#34d399' }}
+                style={{ backgroundColor: COLORS.success }}
                 animate={{ opacity: [1, 0.5, 1] }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
               />
             ) : (
               <div
                 className="w-full h-full rounded-full"
-                style={{ backgroundColor: connected ? '#34d399' : connecting ? '#fbbf24' : '#52525b' }}
+                style={{
+                  backgroundColor: connected
+                    ? COLORS.success
+                    : connecting
+                      ? COLORS.warning
+                      : COLORS.muted
+                }}
               />
             )}
           </div>
         </div>
 
         <div className="flex-1 min-w-0">
-          <span className="text-[0.75rem] font-semibold block" style={{ color: 'var(--text-primary)' }}>
+          <span
+            className="text-[0.8125rem] font-semibold block truncate"
+            style={{ color: COLORS.textPrimary }}
+          >
             {profile?.aiName || 'Leanna'}
           </span>
           <div className="flex items-center gap-2">
-            <span className="text-[0.625rem] tracking-wide" style={{ color: connected ? '#34d399' : connecting ? '#fbbf24' : 'var(--text-dimmed)' }}>
-              {connecting ? 'Connexion en cours…' : isBusy ? 'En cours…' : connected ? 'En ligne' : 'Hors ligne'}
+            <span
+              className="text-[0.6875rem] truncate"
+              style={{
+                color: connected
+                  ? COLORS.success
+                  : connecting
+                    ? COLORS.warning
+                    : COLORS.dimmed
+              }}
+            >
+              {connecting ? 'Connexion...' : isBusy ? 'En cours...' : connected ? 'En ligne' : 'Hors ligne'}
             </span>
             <MultiAgentIndicator steps={activity} />
           </div>
@@ -677,15 +739,17 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
               onClick={handleToggleMute}
               whileTap={reduceMotion ? undefined : { scale: 0.9 }}
               className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-              title={muted ? 'Réactiver le micro' : 'Couper le micro'}
-              aria-label={muted ? 'Réactiver le micro' : 'Couper le micro'}
+              title={muted ? 'Activer le micro' : 'Desactiver le micro'}
+              aria-label={muted ? 'Activer le micro' : 'Desactiver le micro'}
             >
-              {muted
-                ? <MicOff size={14} style={{ color: '#f59e0b' }} />
-                : <Mic size={14} style={{ color: '#34d399' }} />
-              }
+              {muted ? (
+                <MicOff size={16} style={{ color: COLORS.warning }} />
+              ) : (
+                <Mic size={16} style={{ color: COLORS.success }} />
+              )}
             </motion.button>
           )}
+
           {transcript.length > 0 && (
             <motion.button
               onClick={handleClear}
@@ -694,153 +758,201 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
               title="Effacer la conversation"
               aria-label="Effacer la conversation"
             >
-              <Trash2 size={13} style={{ color: 'var(--text-muted)' }} />
+              <Trash2 size={15} style={{ color: COLORS.muted }} />
             </motion.button>
           )}
+
           <motion.button
             onClick={() => {
-              setFullscreen(f => {
+              setFullscreen((f) => {
                 if (!f) { setDocked(false); setMinimized(false); }
                 return !f;
               });
             }}
             whileTap={reduceMotion ? undefined : { scale: 0.9 }}
             className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-            title={fullscreen ? 'Quitter le plein écran' : 'Plein écran'}
-            aria-label={fullscreen ? 'Quitter le plein écran' : 'Plein écran'}
+            title={fullscreen ? 'Quitter le plein ecran' : 'Plein ecran'}
+            aria-label={fullscreen ? 'Quitter le plein ecran' : 'Plein ecran'}
           >
-            {fullscreen
-              ? <Minimize2 size={14} style={{ color: 'var(--accent-primary)' }} />
-              : <Maximize2 size={14} style={{ color: 'var(--text-muted)' }} />
-            }
+            {fullscreen ? (
+              <Minimize2 size={16} style={{ color: COLORS.primary }} />
+            ) : (
+              <Maximize2 size={16} style={{ color: COLORS.muted }} />
+            )}
           </motion.button>
+
           <motion.button
-            onClick={() => setDocked(d => !d)}
+            onClick={() => setDocked((d) => !d)}
             whileTap={reduceMotion ? undefined : { scale: 0.9 }}
             className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-            title={docked ? 'Détacher du bord' : 'Ancrer à droite'}
-            aria-label={docked ? 'Détacher du bord' : 'Ancrer à droite'}
+            title={docked ? 'Detacher' : 'Ancrer a droite'}
+            aria-label={docked ? 'Detacher' : 'Ancrer a droite'}
           >
-            <PanelRight size={14} style={{ color: docked ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
+            <PanelRight
+              size={16}
+              style={{ color: docked ? COLORS.primary : COLORS.muted }}
+            />
           </motion.button>
-          <motion.button
-            onClick={() => setMinimized(m => !m)}
-            whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-            title={minimized ? 'Agrandir' : 'Réduire'}
-            aria-label={minimized ? 'Agrandir le panneau' : 'Réduire le panneau'}
-          >
-            <Minus size={14} style={{ color: 'var(--text-muted)' }} />
-          </motion.button>
-          <div className="w-px h-4 mx-0.5" style={{ backgroundColor: 'var(--border-base)' }} />
+
+          {!docked && (
+            <motion.button
+              onClick={() => setMinimized((m) => !m)}
+              whileTap={reduceMotion ? undefined : { scale: 0.9 }}
+              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              title={minimized ? 'Agrandir' : 'Reduire'}
+              aria-label={minimized ? 'Agrandir' : 'Reduire'}
+            >
+              <Minus size={16} style={{ color: COLORS.muted }} />
+            </motion.button>
+          )}
+
+          <div
+            className="w-px h-5 mx-0.5"
+            style={{ backgroundColor: COLORS.borderBase }}
+          />
+
           <motion.button
             onClick={handleToggleConnect}
             whileTap={reduceMotion ? undefined : { scale: 0.9 }}
             className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-            title={connected ? 'Déconnecter' : 'Connecter'}
-            aria-label={connected ? 'Déconnecter' : 'Connecter'}
+            title={connected ? 'Deconnecter' : 'Connecter'}
+            aria-label={connected ? 'Deconnecter' : 'Connecter'}
           >
-            <Power size={14} style={{ color: connected ? '#ef4444' : 'var(--accent-primary)' }} />
+            <Power
+              size={16}
+              style={{ color: connected ? COLORS.error : COLORS.primary }}
+            />
           </motion.button>
         </div>
       </div>
 
       {!minimized && (
         <>
-          {/* ─── Messages Area ─── */}
+          {/* Messages Area */}
           <div
             ref={messagesRef}
             onScroll={handleMessagesScroll}
-            className="flex-1 overflow-y-auto px-3 py-3 space-y-4 custom-scrollbar"
-            style={{ maxWidth: fullscreen ? '800px' : undefined, margin: fullscreen ? '0 auto' : undefined, width: fullscreen ? '100%' : undefined }}
+            className="flex-1 overflow-y-auto px-4 py-4 space-y-3 custom-scrollbar"
+            style={{
+              maxWidth: fullscreen ? '850px' : undefined,
+              margin: fullscreen ? '0 auto' : undefined,
+              width: fullscreen ? '100%' : undefined,
+            }}
           >
-
-        {connecting && (
-          <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-            <BreathingDots color="var(--accent-primary)" reduceMotion={reduceMotion} />
-            <span className="text-[0.6875rem]" style={{ color: 'var(--text-muted)' }}>Connexion en cours…</span>
-          </div>
-        )}
-
-        {transcript.length === 0 && activity.length === 0 && !connecting && (
-          <div className="flex flex-col items-center justify-center h-full gap-4">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center relative"
-              style={{ backgroundColor: 'var(--accent-subtle)' }}
-            >
+            {connecting && (
               <div
-                className="absolute inset-0 rounded-full"
-                style={{ background: 'radial-gradient(circle, rgba(14,165,233,0.18), transparent 70%)', transform: 'scale(1.8)' }}
-              />
-              <Bot size={22} style={{ color: 'var(--accent-primary)', position: 'relative' }} />
-            </div>
-            <div className="text-center">
-              <p className="text-[0.75rem] font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                {connected ? 'Prêt à aider' : 'Agent hors ligne'}
-              </p>
-              <p className="text-[0.6875rem]" style={{ color: 'var(--text-muted)' }}>
-                {connected
-                  ? 'Posez une question ou dictez une instruction'
-                  : 'Connectez-vous pour démarrer une conversation'
-                }
-              </p>
-            </div>
-          </div>
-        )}
-
-        <AnimatePresence initial={false}>
-          {transcript.map((entry) => (
-            <ChatMessage key={entry.id} entry={entry} profile={profile!} reduceMotion={reduceMotion} />
-          ))}
-        </AnimatePresence>
-
-        {isBusy && (
-          <div className="flex items-center gap-2 px-3 py-2">
-            <BreathingDots color="var(--accent-primary)" reduceMotion={reduceMotion} />
-            <span className="text-[0.6875rem]" style={{ color: 'var(--text-muted)' }}>
-              {profile?.aiName || 'Leanna'} réfléchit…
-            </span>
-          </div>
-        )}
-
-        {queue.length > 0 && (
-          <div className="px-3 py-1.5 space-y-1">
-            {queue.map((msg, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-lg relative overflow-hidden"
-                style={{
-                  backgroundColor: 'var(--accent-subtle)',
-                  border: '1px solid rgba(14,165,233,0.15)',
-                }}
+                className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl"
+                style={{ backgroundColor: COLORS.bgSecondary }}
               >
-                <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ backgroundColor: 'var(--accent-primary)', opacity: 0.5 }} />
-                <span className="text-[0.625rem] truncate ml-1" style={{ color: 'var(--text-secondary)' }}>
-                  {msg.displayText ?? msg.text}
-                </span>
-                <span className="text-[0.5625rem] tracking-wide flex-shrink-0 ml-auto" style={{ color: 'var(--text-dimmed)' }}>
-                  en attente
+                <BreathingDots color={COLORS.primary} reduceMotion={reduceMotion} />
+                <span
+                  className="text-[0.75rem]"
+                  style={{ color: COLORS.muted }}
+                >
+                  Connexion en cours...
                 </span>
               </div>
-            ))}
+            )}
+
+            {transcript.length === 0 && activity.length === 0 && !connecting && (
+              <div className="flex flex-col items-center justify-center h-full gap-5">
+                <div
+                  className="w-14 h-14 rounded-full flex items-center justify-center relative"
+                  style={{ backgroundColor: 'rgba(14, 165, 233, 0.12)' }}
+                >
+                  <div
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background: 'radial-gradient(circle, rgba(14, 165, 233, 0.2), transparent 70%)',
+                      transform: 'scale(1.8)',
+                    }}
+                  />
+                  <Bot size={26} style={{ color: COLORS.primary, position: 'relative' }} />
+                </div>
+                <div className="text-center">
+                  <p
+                    className="text-[0.875rem] font-medium mb-1"
+                    style={{ color: COLORS.textPrimary }}
+                  >
+                    {connected ? 'Pret a vous aider' : 'Agent hors ligne'}
+                  </p>
+                  <p
+                    className="text-[0.75rem] max-w-[300px]"
+                    style={{ color: COLORS.muted }}
+                  >
+                    {connected
+                      ? 'Posez une question ou utilisez une commande'
+                      : 'Connectez-vous pour demarrer une conversation'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <AnimatePresence initial={false}>
+              {transcript.map((entry) => (
+                <ChatMessage key={entry.id} entry={entry} profile={profile!} reduceMotion={reduceMotion} />
+              ))}
+            </AnimatePresence>
+
+            {isBusy && (
+              <div className="flex items-center gap-2.5 px-4 py-2">
+                <BreathingDots color={COLORS.primary} reduceMotion={reduceMotion} />
+                <span
+                  className="text-[0.75rem]"
+                  style={{ color: COLORS.muted }}
+                >
+                  {profile?.aiName || 'Leanna'} refleichit...
+                </span>
+              </div>
+            )}
+
+            {queue.length > 0 && (
+              <div className="px-3 py-2 space-y-1.5">
+                {queue.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2.5 pl-3 pr-3 py-2 rounded-xl relative overflow-hidden"
+                    style={{
+                      backgroundColor: 'rgba(14, 165, 233, 0.06)',
+                      border: '1px solid rgba(14, 165, 233, 0.18)',
+                    }}
+                  >
+                    <div
+                      className="absolute left-0 top-0 bottom-0 w-0.5"
+                      style={{ backgroundColor: COLORS.primary, opacity: 0.5 }}
+                    />
+                    <span
+                      className="text-[0.75rem] truncate ml-1.5"
+                      style={{ color: COLORS.muted }}
+                    >
+                      {msg.displayText ?? msg.text}
+                    </span>
+                    <span
+                      className="text-[0.625rem] tracking-wide flex-shrink-0 ml-auto"
+                      style={{ color: COLORS.dimmed }}
+                    >
+                      en attente
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div ref={bottomRef} />
           </div>
-        )}
 
-        <div ref={bottomRef} />
-      </div>
+          <ActivityFeed steps={activity} connected={connected} />
 
-      {/* ─── Activity Feed ─── */}
-      <ActivityFeed steps={activity} connected={connected} />
-
-      {/* ─── Input Area ─── */}
-      <InputArea
-        connected={connected}
-        isBusy={isBusy}
-        onSend={handleSend}
-        onDocumentAnalyzed={handleDocumentAnalyzed}
-      />
+          <InputArea
+            connected={connected}
+            isBusy={isBusy}
+            onSend={handleSend}
+            onDocumentAnalyzed={handleDocumentAnalyzed}
+          />
         </>
       )}
     </motion.div>
   );
 }
+
+export default ChatPanel;

@@ -2,11 +2,47 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import {
   FileText, Terminal, GitBranch, Package, Eye, Check, X,
-  ChevronDown, ChevronRight, Copy, ExternalLink,
+  ChevronDown, ChevronRight, Copy,
 } from 'lucide-react';
 
-// ── File Card ──────────────────────────────────────────────────────────────
+// ── Styles Communs ──────────────────────────────────────────────────────────
+const cardStyles = {
+  border: '1px solid var(--border-base)',
+  background: 'rgba(255, 255, 255, 0.02)',
+  transition: 'all 0.2s ease',
+};
 
+const textStyles = {
+  primary: 'var(--text-primary)',
+  dimmed: 'var(--text-dimmed)',
+  muted: 'var(--text-muted)',
+  accent: 'var(--accent-primary)',
+};
+
+const actionColors = {
+  created: '#4ade80',
+  modified: '#fbbf24',
+  deleted: '#f87171',
+  read: 'var(--accent-primary)',
+  install: '#4ade80',
+  update: '#fbbf24',
+  remove: '#f87171',
+  success: '#4ade80',
+  error: '#f87171',
+};
+
+const badgeStyles = (color: string) => ({
+  backgroundColor: `${color}15`,
+  color,
+  fontSize: '8px',
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  padding: '2px 6px',
+  borderRadius: '4px',
+  letterSpacing: '0.5px',
+});
+
+// ── File Card ──────────────────────────────────────────────────────────────
 interface FileCardProps {
   path: string;
   action: 'created' | 'modified' | 'deleted' | 'read';
@@ -18,46 +54,55 @@ interface FileCardProps {
 export function FileCard({ path, action, linesAdded, linesRemoved, onClick }: FileCardProps) {
   const fileName = path.split(/[/\\]/).pop() || path;
   const dir = path.split(/[/\\]/).slice(-3, -1).join('/');
-
-  const actionColors = {
-    created: '#4ade80',
-    modified: '#fbbf24',
-    deleted: '#f87171',
-    read: 'var(--accent-primary)',
-  };
-  const actionLabels = {
-    created: 'Créé',
-    modified: 'Modifié',
-    deleted: 'Supprimé',
-    read: 'Lu',
-  };
+  const actionLabels = { created: 'Créé', modified: 'Modifié', deleted: 'Supprimé', read: 'Lu' };
 
   return (
     <motion.button
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={onClick}
-      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-all hover:bg-white/5 group"
-      style={{ border: '1px solid var(--border-base)' }}
+      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-left group
+                 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-primary/20"
+      style={cardStyles}
     >
-      <FileText size={14} style={{ color: actionColors[action] }} className="flex-shrink-0" />
+      <FileText
+        size={16}
+        style={{ color: actionColors[action], flexShrink: 0 }}
+      />
       <div className="flex-1 min-w-0">
-        <span className="text-[11px] font-medium block truncate" style={{ color: 'var(--text-primary)' }}>
+        <span
+          className="text-[12px] font-medium block truncate"
+          style={{ color: textStyles.primary }}
+        >
           {fileName}
         </span>
-        <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{dir}</span>
+        {dir && (
+          <span
+            className="text-[10px] mt-0.5 block truncate"
+            style={{ color: textStyles.dimmed }}
+          >
+            {dir}
+          </span>
+        )}
       </div>
-      <div className="flex items-center gap-1.5 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0">
         {typeof linesAdded === 'number' && linesAdded > 0 && (
-          <span className="text-[9px] font-mono" style={{ color: '#4ade80' }}>+{linesAdded}</span>
+          <span
+            className="text-[10px] font-mono"
+            style={{ color: actionColors.created }}
+          >
+            +{linesAdded}
+          </span>
         )}
         {typeof linesRemoved === 'number' && linesRemoved > 0 && (
-          <span className="text-[9px] font-mono" style={{ color: '#f87171' }}>-{linesRemoved}</span>
+          <span
+            className="text-[10px] font-mono"
+            style={{ color: actionColors.deleted }}
+          >
+            -{linesRemoved}
+          </span>
         )}
-        <span
-          className="text-[8px] font-semibold uppercase px-1.5 py-0.5 rounded"
-          style={{ backgroundColor: `${actionColors[action]}15`, color: actionColors[action] }}
-        >
+        <span className="text-[8px] font-semibold uppercase px-2 py-0.5 rounded-full" style={badgeStyles(actionColors[action])}>
           {actionLabels[action]}
         </span>
       </div>
@@ -66,7 +111,6 @@ export function FileCard({ path, action, linesAdded, linesRemoved, onClick }: Fi
 }
 
 // ── Command Card ───────────────────────────────────────────────────────────
-
 interface CommandCardProps {
   command: string;
   output?: string;
@@ -83,46 +127,76 @@ export function CommandCard({ command, output, exitCode, onCopy }: CommandCardPr
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       className="rounded-xl overflow-hidden"
-      style={{ border: '1px solid var(--border-base)' }}
+      style={cardStyles}
     >
       <div
-        className="flex items-center gap-2 px-3 py-2 cursor-pointer"
-        style={{ backgroundColor: 'rgba(255,255,255,0.02)' }}
-        onClick={() => output && setExpanded(v => !v)}
+        className="flex items-center gap-3 px-4 py-2.5 cursor-pointer
+                   hover:bg-white/5 transition-colors"
+        style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}
+        onClick={() => output && setExpanded((v) => !v)}
       >
-        <Terminal size={13} style={{ color: success ? '#4ade80' : '#f87171' }} />
-        <code className="text-[11px] font-mono flex-1 truncate" style={{ color: 'var(--text-primary)' }}>
+        <Terminal
+          size={14}
+          style={{ color: success ? actionColors.success : actionColors.error, flexShrink: 0 }}
+        />
+        <code
+          className="text-[11px] font-mono flex-1 truncate"
+          style={{ color: textStyles.primary }}
+        >
           {command}
         </code>
         {exitCode !== undefined && (
-          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded"
-            style={{ backgroundColor: success ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: success ? '#4ade80' : '#f87171' }}>
+          <span
+            className="text-[9px] font-mono px-2 py-0.5 rounded-full"
+            style={badgeStyles(success ? actionColors.success : actionColors.error)}
+          >
             {success ? '✓' : `exit ${exitCode}`}
           </span>
         )}
-        {onCopy && (
-          <button onClick={(e) => { e.stopPropagation(); onCopy(); }} className="p-1 rounded hover:bg-white/10 transition">
-            <Copy size={11} style={{ color: 'var(--text-muted)' }} />
-          </button>
-        )}
-        {output && (
-          expanded ? <ChevronDown size={11} style={{ color: 'var(--text-dimmed)' }} />
-                   : <ChevronRight size={11} style={{ color: 'var(--text-dimmed)' }} />
-        )}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {onCopy && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopy();
+              }}
+              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors
+                         focus:outline-none focus:ring-1 focus:ring-white/20"
+              aria-label="Copier la commande"
+            >
+              <Copy size={12} style={{ color: textStyles.muted }} />
+            </button>
+          )}
+          {output && (
+            expanded ? (
+              <ChevronDown size={12} style={{ color: textStyles.dimmed }} />
+            ) : (
+              <ChevronRight size={12} style={{ color: textStyles.dimmed }} />
+            )
+          )}
+        </div>
       </div>
+
       {expanded && output && (
-        <div className="px-3 py-2 border-t max-h-32 overflow-y-auto" style={{ borderColor: 'var(--border-base)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-          <pre className="text-[10px] font-mono whitespace-pre-wrap" style={{ color: 'var(--text-muted)' }}>
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="px-4 py-2 border-t max-h-40 overflow-y-auto"
+          style={{ borderColor: 'var(--border-base)', backgroundColor: 'rgba(0, 0, 0, 0.15)' }}
+        >
+          <pre
+            className="text-[10px] font-mono whitespace-pre-wrap"
+            style={{ color: textStyles.muted, margin: 0 }}
+          >
             {output}
           </pre>
-        </div>
+        </motion.div>
       )}
     </motion.div>
   );
 }
 
-// ── Diff Card (Priorité 9) ─────────────────────────────────────────────────
-
+// ── Diff Card ───────────────────────────────────────────────────────────────
 interface DiffCardProps {
   filePath: string;
   additions: number;
@@ -140,48 +214,88 @@ export function DiffCard({ filePath, additions, deletions, onAccept, onReject, o
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       className="rounded-xl overflow-hidden"
-      style={{ border: '1px solid var(--border-base)' }}
+      style={cardStyles}
     >
-      <div className="flex items-center gap-2.5 px-3 py-2.5" style={{ backgroundColor: 'rgba(255,255,255,0.02)' }}>
-        <GitBranch size={13} style={{ color: '#f472b6' }} />
+      <div
+        className="flex items-center gap-3 px-4 py-2.5"
+        style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}
+      >
+        <GitBranch size={14} style={{ color: '#f472b6', flexShrink: 0 }} />
         <div className="flex-1 min-w-0">
-          <span className="text-[11px] font-medium block truncate" style={{ color: 'var(--text-primary)' }}>
+          <span
+            className="text-[12px] font-medium block truncate"
+            style={{ color: textStyles.primary }}
+          >
             {fileName}
           </span>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[9px] font-mono" style={{ color: '#4ade80' }}>+{additions}</span>
-            <span className="text-[9px] font-mono" style={{ color: '#f87171' }}>-{deletions}</span>
-            <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>lignes</span>
+          <div className="flex items-center gap-2 mt-1">
+            <span
+              className="text-[10px] font-mono"
+              style={{ color: actionColors.created }}
+            >
+              +{additions}
+            </span>
+            <span
+              className="text-[10px] font-mono"
+              style={{ color: actionColors.deleted }}
+            >
+              -{deletions}
+            </span>
+            <span
+              className="text-[9px]"
+              style={{ color: textStyles.dimmed }}
+            >
+              lignes
+            </span>
           </div>
         </div>
       </div>
-      {/* Accept / Reject / View buttons */}
-      <div className="flex items-center gap-1 px-2 py-1.5 border-t" style={{ borderColor: 'var(--border-base)', backgroundColor: 'rgba(0,0,0,0.1)' }}>
-        {onView && (
-          <button onClick={onView} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium hover:bg-white/5 transition"
-            style={{ color: 'var(--accent-primary)' }}>
-            <Eye size={11} /> Voir
-          </button>
-        )}
-        {onAccept && (
-          <button onClick={onAccept} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium hover:bg-green-500/10 transition"
-            style={{ color: '#4ade80' }}>
-            <Check size={11} /> Accepter
-          </button>
-        )}
-        {onReject && (
-          <button onClick={onReject} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium hover:bg-red-500/10 transition"
-            style={{ color: '#f87171' }}>
-            <X size={11} /> Annuler
-          </button>
-        )}
-      </div>
+
+      {(onView || onAccept || onReject) && (
+        <div
+          className="flex items-center gap-1 px-3 py-2 border-t"
+          style={{ borderColor: 'var(--border-base)', backgroundColor: 'rgba(0, 0, 0, 0.08)' }}
+        >
+          {onView && (
+            <button
+              onClick={onView}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium
+                         hover:bg-white/8 transition-colors focus:outline-none focus:ring-1 focus:ring-white/20"
+              style={{ color: textStyles.accent }}
+            >
+              <Eye size={12} />
+              Voir
+            </button>
+          )}
+          {onAccept && (
+            <button
+              onClick={onAccept}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium
+                         hover:bg-green-500/10 transition-colors focus:outline-none focus:ring-1 focus:ring-green-500/30"
+              style={{ color: actionColors.created }}
+            >
+              <Check size={12} />
+              Accepter
+            </button>
+          )}
+          {onReject && (
+            <button
+              onClick={onReject}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium
+                         hover:bg-red-500/10 transition-colors focus:outline-none focus:ring-1 focus:ring-red-500/30"
+              style={{ color: actionColors.deleted }}
+            >
+              <X size={12} />
+              Annuler
+            </button>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }
 
 // ── Package Card ───────────────────────────────────────────────────────────
-
 interface PackageCardProps {
   name: string;
   version?: string;
@@ -189,30 +303,39 @@ interface PackageCardProps {
 }
 
 export function PackageCard({ name, version, action }: PackageCardProps) {
-  const colors = { install: '#4ade80', update: '#fbbf24', remove: '#f87171' };
   const labels = { install: 'Installé', update: 'Mis à jour', remove: 'Supprimé' };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-center gap-2 px-3 py-2 rounded-xl"
-      style={{ border: '1px solid var(--border-base)' }}
+      className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
+      style={cardStyles}
     >
-      <Package size={13} style={{ color: colors[action] }} />
-      <span className="text-[11px] font-mono flex-1" style={{ color: 'var(--text-primary)' }}>
-        {name}{version ? `@${version}` : ''}
+      <Package
+        size={14}
+        style={{ color: actionColors[action], flexShrink: 0 }}
+      />
+      <span
+        className="text-[11px] font-mono flex-1 truncate"
+        style={{ color: textStyles.primary }}
+      >
+        {name}
+        {version && (
+          <span style={{ color: textStyles.dimmed }}>@{version}</span>
+        )}
       </span>
-      <span className="text-[8px] font-semibold uppercase px-1.5 py-0.5 rounded"
-        style={{ backgroundColor: `${colors[action]}12`, color: colors[action] }}>
+      <span
+        className="text-[8px] font-semibold uppercase px-2 py-0.5 rounded-full"
+        style={badgeStyles(actionColors[action])}
+      >
         {labels[action]}
       </span>
     </motion.div>
   );
 }
 
-// ── Multi-file Changes Summary (Priorité 9 — Diff moderne) ────────────────
-
+// ── Changes Summary ─────────────────────────────────────────────────────────
 interface ChangesSummaryProps {
   files: { path: string; additions: number; deletions: number }[];
   onAcceptAll?: () => void;
@@ -230,57 +353,108 @@ export function ChangesSummary({ files, onAcceptAll, onRejectAll, onViewFile }: 
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       className="rounded-xl overflow-hidden"
-      style={{ border: '1px solid var(--border-base)' }}
+      style={cardStyles}
     >
-      {/* Header */}
       <div
-        className="flex items-center gap-2 px-3 py-2 cursor-pointer"
-        style={{ backgroundColor: 'rgba(255,255,255,0.02)' }}
-        onClick={() => setExpanded(v => !v)}
+        className="flex items-center gap-3 px-4 py-2.5 cursor-pointer
+                   hover:bg-white/5 transition-colors"
+        onClick={() => setExpanded((v) => !v)}
       >
-        <GitBranch size={13} style={{ color: '#f472b6' }} />
-        <span className="text-[11px] font-semibold flex-1" style={{ color: 'var(--text-primary)' }}>
+        <GitBranch size={14} style={{ color: '#f472b6', flexShrink: 0 }} />
+        <span
+          className="text-[12px] font-semibold flex-1 truncate"
+          style={{ color: textStyles.primary }}
+        >
           {files.length} fichier{files.length > 1 ? 's' : ''} modifié{files.length > 1 ? 's' : ''}
         </span>
-        <span className="text-[9px] font-mono" style={{ color: '#4ade80' }}>+{totalAdd}</span>
-        <span className="text-[9px] font-mono" style={{ color: '#f87171' }}>-{totalDel}</span>
-        {expanded ? <ChevronDown size={11} style={{ color: 'var(--text-dimmed)' }} />
-                  : <ChevronRight size={11} style={{ color: 'var(--text-dimmed)' }} />}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span
+            className="text-[10px] font-mono"
+            style={{ color: actionColors.created }}
+          >
+            +{totalAdd}
+          </span>
+          <span
+            className="text-[10px] font-mono"
+            style={{ color: actionColors.deleted }}
+          >
+            -{totalDel}
+          </span>
+          {expanded ? (
+            <ChevronDown size={12} style={{ color: textStyles.dimmed }} />
+          ) : (
+            <ChevronRight size={12} style={{ color: textStyles.dimmed }} />
+          )}
+        </div>
       </div>
 
-      {/* File list */}
-      {expanded && (
-        <div className="border-t" style={{ borderColor: 'var(--border-base)' }}>
-          {files.map(f => {
+      {expanded && files.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="border-t"
+          style={{ borderColor: 'var(--border-base)' }}
+        >
+          {files.map((f) => {
             const name = f.path.split(/[/\\]/).pop() || f.path;
             return (
-              <div key={f.path}
-                className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 transition cursor-pointer"
+              <div
+                key={f.path}
+                className="flex items-center gap-3 px-4 py-2 hover:bg-white/5 transition-colors
+                           cursor-pointer border-b last:border-0"
+                style={{ borderColor: 'var(--border-base)' }}
                 onClick={() => onViewFile?.(f.path)}
               >
-                <FileText size={11} style={{ color: 'var(--text-muted)' }} />
-                <span className="text-[10px] flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{name}</span>
-                <span className="text-[9px] font-mono" style={{ color: '#4ade80' }}>+{f.additions}</span>
-                <span className="text-[9px] font-mono" style={{ color: '#f87171' }}>-{f.deletions}</span>
+                <FileText size={12} style={{ color: textStyles.muted, flexShrink: 0 }} />
+                <span
+                  className="text-[10px] flex-1 truncate"
+                  style={{ color: textStyles.primary }}
+                >
+                  {name}
+                </span>
+                <span
+                  className="text-[9px] font-mono"
+                  style={{ color: actionColors.created }}
+                >
+                  +{f.additions}
+                </span>
+                <span
+                  className="text-[9px] font-mono"
+                  style={{ color: actionColors.deleted }}
+                >
+                  -{f.deletions}
+                </span>
               </div>
             );
           })}
-        </div>
+        </motion.div>
       )}
 
-      {/* Actions */}
       {(onAcceptAll || onRejectAll) && (
-        <div className="flex items-center gap-1 px-2 py-1.5 border-t" style={{ borderColor: 'var(--border-base)', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+        <div
+          className="flex items-center gap-1 px-3 py-2 border-t"
+          style={{ borderColor: 'var(--border-base)', backgroundColor: 'rgba(0, 0, 0, 0.08)' }}
+        >
           {onAcceptAll && (
-            <button onClick={onAcceptAll} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium hover:bg-green-500/10 transition"
-              style={{ color: '#4ade80' }}>
-              <Check size={11} /> Accepter tout
+            <button
+              onClick={onAcceptAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium
+                         hover:bg-green-500/10 transition-colors focus:outline-none focus:ring-1 focus:ring-green-500/30"
+              style={{ color: actionColors.created }}
+            >
+              <Check size={12} />
+              Accepter tout
             </button>
           )}
           {onRejectAll && (
-            <button onClick={onRejectAll} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium hover:bg-red-500/10 transition"
-              style={{ color: '#f87171' }}>
-              <X size={11} /> Annuler tout
+            <button
+              onClick={onRejectAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium
+                         hover:bg-red-500/10 transition-colors focus:outline-none focus:ring-1 focus:ring-red-500/30"
+              style={{ color: actionColors.deleted }}
+            >
+              <X size={12} />
+              Annuler tout
             </button>
           )}
         </div>
