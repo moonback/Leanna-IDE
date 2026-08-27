@@ -156,25 +156,6 @@ export function StartupProjectModal() {
             </motion.button>
           </div>
 
-          {/* Avertissement aucun projet */}
-          <AnimatePresence>
-            {!currentPath && (
-              <motion.div
-                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
-                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                transition={INLINE_BANNER_TRANSITION}
-                className="rounded-xl p-3 flex items-center gap-2 overflow-hidden"
-                style={{ backgroundColor: 'color-mix(in srgb, #f59e0b 8%, transparent)', border: '1px solid color-mix(in srgb, #f59e0b 30%, transparent)' }}
-              >
-                <FolderX className="w-4 h-4 flex-shrink-0" style={{ color: '#f59e0b' }} />
-                <span className="text-[11px] font-medium" style={{ color: '#f59e0b' }}>
-                  Aucun projet actif — sélectionnez un projet pour continuer.
-                </span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {/* ── Contenu ── */}
           <div className="space-y-3 mb-5">
             <div>
