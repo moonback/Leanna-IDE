@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   FolderOpen, Upload, ShieldAlert, Loader2,
-  FolderX, FolderInput, Globe, X,
+  FolderX, FolderInput, Globe, X, Plus,
 } from 'lucide-react';
 import { ideApi } from '../services/ideApi';
 
@@ -68,6 +68,40 @@ export function StartupProjectModal() {
       } catch { /* cancelled */ }
     }
   };
+
+  const handleCreateEmptyWorkspace = useCallback(async () => {
+    const electronAPI = getElectronAPI();
+    let selectedPath: string | null = null;
+
+    if (electronAPI) {
+      selectedPath = await electronAPI.selectFolder();
+    } else {
+      try {
+        // @ts-ignore Web Directory Picker
+        const handle = await window.showDirectoryPicker({ mode: 'read' });
+        selectedPath = handle?.name ?? null;
+      } catch { /* cancelled */ }
+    }
+
+    if (selectedPath) {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch('/api/self-root/change', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: selectedPath, userConfirmed: true, siteUrl: '', createEmpty: true }),
+        });
+        const data = await res.json();
+        if (data.status === 'success') await activate(data.newRoot);
+        else setError(data.error || 'Erreur lors de la création du workspace');
+      } catch (e: any) {
+        setError(e.message || 'Erreur réseau');
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [activate, setLoading, setError]);
 
   const handleOpenProject = useCallback(async () => {
     const trimmed = inputPath.trim();
@@ -138,7 +172,7 @@ export function StartupProjectModal() {
               <div>
                 <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Workspace</h2>
                 <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                  Ouvrez un projet existant pour commencer.
+                  Créez ou ouvrez un projet pour commencer.
                 </p>
               </div>
             </div>
@@ -158,6 +192,21 @@ export function StartupProjectModal() {
 
           {/* ── Contenu ── */}
           <div className="space-y-3 mb-5">
+            {canBrowse && (
+              <motion.button
+                type="button"
+                onClick={handleCreateEmptyWorkspace}
+                disabled={loading}
+                whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
+                transition={{ duration: 0.1 }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Créer un workspace vide</span>
+              </motion.button>
+            )}
             <div>
               <label className="text-[11px] font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
                 Chemin du projet existant
