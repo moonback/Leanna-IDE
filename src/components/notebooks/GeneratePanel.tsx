@@ -795,11 +795,12 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
           </span>
         </div>
 
-        {/* Barre de progression et file d'attente - TOUJOURS VISIBLE */}
-        <div
-          className="p-3 rounded-xl border"
-          style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
-        >
+        {/* Barre de progression et file d'attente - VISIBLE UNIQUEMENT PENDANT LA GENERATION */}
+        {(generating || generationQueue.length > 0) && (
+          <div
+            className="p-3 rounded-xl border"
+            style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+          >
           {/* Barre de progression pour la génération en cours */}
           {generating ? (
             <div className="space-y-2">
@@ -957,7 +958,9 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               </AnimatePresence>
             </div>
           )}
+        {/* )} */}
         </div>
+        )}
 
         {/* Source filter dropdown */}
         <AnimatePresence>
@@ -1027,69 +1030,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
           )}
         </AnimatePresence>
 
-        {/* Generated docs list — above type buttons */}
-        {generatedDocs.length > 0 && (
-          <div className="space-y-2 pb-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
-                Historique
-              </p>
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
-                {generatedDocs.length}
-              </span>
-            </div>
-            <div className="space-y-1.5">
-              {generatedDocs.map(doc => {
-                const docType = DOC_TYPES.find(t => t.key === doc.type) || REPORT_TYPES.find(t => t.key === doc.type);
-                const DocIcon = docType?.icon || Sparkles;
-                const isSelected = selectedDoc?.id === doc.id;
-                return (
-                  <motion.div
-                    key={doc.id}
-                    layout
-                    onClick={() => { setSelectedDoc(doc); setStreamingText(''); if (onViewDoc && !fullView) onViewDoc(doc); }}
-                    className={`group cursor-pointer p-2.5 rounded-xl border transition-all hover:shadow-sm ${isSelected ? 'shadow-sm' : ''}`}
-                    style={{
-                      borderColor: isSelected ? docType?.color || 'var(--accent-primary)' : 'var(--border-base)',
-                      backgroundColor: isSelected ? `${docType?.color || 'var(--accent-primary)'}08` : 'var(--bg-panel)',
-                    }}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: `${docType?.color || '#6b7280'}15` }}
-                      >
-                        <DocIcon className="w-3.5 h-3.5" style={{ color: docType?.color || 'var(--accent-primary)' }} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                          {doc.title}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-xs font-medium" style={{ color: docType?.color || 'var(--text-dimmed)' }}>
-                            {docType?.label || doc.type}
-                          </span>
-                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>•</span>
-                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
-                            {new Date(doc.createdAt).toLocaleDateString('fr')}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
-                        className="p-1 opacity-0 group-hover:opacity-100 rounded hover:bg-red-500/10 transition-all"
-                      >
-                        <Trash2 className="w-3 h-3" style={{ color: '#ef4444' }} />
-                      </button>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Generate buttons — redesigned grid */}
+{/* Generate buttons — redesigned grid */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>

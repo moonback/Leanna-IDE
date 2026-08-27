@@ -12,7 +12,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
-  ArrowLeft, FileText, MessageSquare, StickyNote, Sparkles, Mic,
+  ArrowLeft, FileText, MessageSquare, StickyNote, Sparkles, Mic, Clock,
   Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose,
   Save,
 } from 'lucide-react';
@@ -22,6 +22,7 @@ import { SourceViewer } from './SourceViewer';
 import { NotebookChat } from './NotebookChat';
 import { NotesPanel, type NoteEditorData } from './NotesPanel';
 import { GeneratePanel } from './GeneratePanel';
+import { HistoryPanel } from './HistoryPanel';
 import { AudioOverviewPanel } from './AudioOverviewPanel';
 import { SourcesPanelSkeleton } from '../ui/Skeleton';
 
@@ -41,7 +42,7 @@ interface NotebookData {
 }
 
 type Tab = 'sources' | 'chat' | 'notes' | 'generate' | 'audio';
-type StudioTab = 'notes' | 'generate' | 'audio';
+type StudioTab = 'notes' | 'generate' | 'audio' | 'history';
 
 interface Props {
   notebookId: string;
@@ -272,6 +273,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         if (e.key === '3') { e.preventDefault(); setStudioTab('notes'); setStudioOpen(true); }
         if (e.key === '4') { e.preventDefault(); setStudioTab('generate'); setStudioOpen(true); }
         if (e.key === '5') { e.preventDefault(); setStudioTab('audio'); setStudioOpen(true); }
+        if (e.key === '6') { e.preventDefault(); setStudioTab('history'); setStudioOpen(true); }
         if (e.key === '\\') { e.preventDefault(); setStudioOpen(v => !v); }
       }
     };
@@ -300,9 +302,10 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   }
 
   const studioTabs: { key: StudioTab; icon: typeof StickyNote; label: string; badge?: number }[] = [
-    { key: 'generate', icon: Sparkles, label: 'Studio' },
+    { key: 'generate', icon: Sparkles, label: 'Générer', badge: notebook.generatedDocuments.length },
     { key: 'notes', icon: StickyNote, label: 'Notes', badge: notebook.notes.length },
-    { key: 'audio', icon: Mic, label: 'Audio' },
+    { key: 'history', icon: Clock, label: 'Historique', badge: notebook.chatHistory.length },
+    { key: 'audio', icon: Mic, label: 'Audio', badge: notebook.audioOverviews.length },
   ];
 
   /** Renders the studio panel content */
@@ -312,8 +315,12 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         return <NotesPanel notebookId={notebookId} notes={notebook.notes} onRefresh={loadNotebook} onOpenNoteEditor={(data) => { setNoteEditorData(data); setSelectedSourceId(null); setViewingGeneratedDoc(null); }} />;
       case 'generate':
         return <GeneratePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />;
+      case 'history':
+        return <HistoryPanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />;
       case 'audio':
         return <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />;
+      default:
+        return <div className="p-4 text-center text-[var(--text-muted)]">Onglet non trouvé</div>;
     }
   };
 
@@ -523,22 +530,30 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           <aside className="notebook-context-rail hidden min-w-0 md:flex flex-col overflow-hidden">
             {/* Studio tabs */}
             <div className="flex items-center gap-1 border-b border-[var(--notebook-border)] px-4 py-3">
-              {studioTabs.map(({ key, icon: Icon, label, badge }) => (
-                <button
-                  key={key}
-                  onClick={() => setStudioTab(key)}
-                  className="notebook-segment transition-transform active:scale-95"
-                  data-active={studioTab === key}
-                  title={label}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span className="text-xs">{label}</span>
-                  {badge !== undefined && badge > 0 && <span className="notebook-count">{badge}</span>}
-                </button>
-              ))}
+              {studioTabs.map(({ key, icon: Icon, label, badge }) => {
+                const shortcuts: Record<StudioTab, string> = {
+                  notes: 'Ctrl+3 / ⌘3',
+                  generate: 'Ctrl+4 / ⌘4',
+                  history: 'Ctrl+6 / ⌘6',
+                  audio: 'Ctrl+5 / ⌘5',
+                };
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setStudioTab(key)}
+                    className="notebook-segment transition-transform active:scale-95"
+                    data-active={studioTab === key}
+                    title={`${label} (${shortcuts[key]})`}
+                    aria-label={label}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {badge !== undefined && badge > 0 && <span className="notebook-count">{badge}</span>}
+                  </button>
+                );
+              })}
               <button
                 onClick={() => setStudioOpen(false)}
-                className="notebook-icon-button ml-auto transition-transform active:scale-90"
+                className="notebook-icon-button ml-auto transition-transform active:scale-90 flex-shrink-0"
                 aria-label="Fermer le studio"
               >
                 <X className="h-3.5 w-3.5" />
