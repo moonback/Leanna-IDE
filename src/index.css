@@ -51,6 +51,18 @@
   }
 }
 
+/* ═══════════════════════════════════════════════
+   THEME TOKEN GROUPS — IMPORTANT
+   This file defines FIVE selectable themes: dark, light,
+   cyberpunk, sepia, high-contrast (see AppearanceSection.tsx).
+   Several feature areas (IDE shell, Notebooks, agent status
+   badges) layer their own derived tokens on top of the base
+   palette below. Whenever a new derived token group is added,
+   it MUST be defined for all five `data-theme` values — a
+   theme that falls back to an undefined custom property
+   silently loses its background/text/border for that feature.
+═══════════════════════════════════════════════ */
+
 :root[data-theme="dark"] {
   /* Fond — deeper, richer blacks with subtle blue undertone */
   --bg-base:       #0a0a0f;
@@ -984,7 +996,6 @@ body {
 }
 
 .skip-navigation-link:focus {
-  transform: translateY(0);
   outline: 2px solid var(--border-focus);
   outline-offset: 2px;
 }
@@ -1150,6 +1161,7 @@ body {
 
 /* ═══════════════════════════════════════════════
    AGENT STATUS TOKENS — États sémantiques IA
+   Defined for all five themes (see note at top of file).
 ═══════════════════════════════════════════════ */
 :root[data-theme="dark"] {
   --status-idle-color:     var(--text-muted);
@@ -1175,6 +1187,45 @@ body {
   --status-error-bg:       color-mix(in srgb, var(--color-error) 8%, transparent);
   --status-waiting-color:  var(--color-info);
   --status-waiting-bg:     color-mix(in srgb, var(--color-info) 8%, transparent);
+}
+
+:root[data-theme="cyberpunk"] {
+  --status-idle-color:     var(--text-muted);
+  --status-idle-bg:        var(--bg-input);
+  --status-running-color:  var(--accent-primary);
+  --status-running-bg:     var(--accent-subtle);
+  --status-success-color:  var(--color-success);
+  --status-success-bg:     color-mix(in srgb, var(--color-success) 10%, transparent);
+  --status-error-color:    var(--color-error);
+  --status-error-bg:       color-mix(in srgb, var(--color-error) 10%, transparent);
+  --status-waiting-color:  var(--color-info);
+  --status-waiting-bg:     color-mix(in srgb, var(--color-info) 10%, transparent);
+}
+
+:root[data-theme="sepia"] {
+  --status-idle-color:     var(--text-muted);
+  --status-idle-bg:        var(--bg-input);
+  --status-running-color:  var(--accent-primary);
+  --status-running-bg:     var(--accent-subtle);
+  --status-success-color:  var(--color-success);
+  --status-success-bg:     color-mix(in srgb, var(--color-success) 8%, transparent);
+  --status-error-color:    var(--color-error);
+  --status-error-bg:       color-mix(in srgb, var(--color-error) 8%, transparent);
+  --status-waiting-color:  var(--color-info);
+  --status-waiting-bg:     color-mix(in srgb, var(--color-info) 8%, transparent);
+}
+
+:root[data-theme="high-contrast"] {
+  --status-idle-color:     var(--text-muted);
+  --status-idle-bg:        var(--bg-input);
+  --status-running-color:  var(--accent-primary);
+  --status-running-bg:     var(--accent-subtle);
+  --status-success-color:  var(--color-success);
+  --status-success-bg:     color-mix(in srgb, var(--color-success) 20%, transparent);
+  --status-error-color:    var(--color-error);
+  --status-error-bg:       color-mix(in srgb, var(--color-error) 20%, transparent);
+  --status-waiting-color:  var(--color-info);
+  --status-waiting-bg:     color-mix(in srgb, var(--color-info) 20%, transparent);
 }
 
 /* ═══════════════════════════════════════════════
@@ -1338,6 +1389,10 @@ body {
 
 /* ═══════════════════════════════════════════════
    NOTEBOOK WORKSPACE — NotebookLM-inspired design
+   Defined for all five themes (see note at top of file).
+   --notebook-accent-text is the text color to use ON TOP
+   of --notebook-accent — computed per theme so contrast
+   holds regardless of how light/dark that theme's accent is.
 ═══════════════════════════════════════════════ */
 :root[data-theme="dark"] {
   --notebook-bg: #1b1b1f;
@@ -1349,6 +1404,7 @@ body {
   --notebook-card-bg: rgba(44, 44, 52, 0.9);
   --notebook-card-hover: rgba(52, 52, 62, 0.95);
   --notebook-accent: #a8c7fa;
+  --notebook-accent-text: #1b1b1f;
   --notebook-accent-surface: rgba(168, 199, 250, 0.08);
   --notebook-accent-hover: rgba(168, 199, 250, 0.14);
   --notebook-studio-bg: rgba(36, 36, 44, 0.94);
@@ -1365,10 +1421,62 @@ body {
   --notebook-card-bg: #ffffff;
   --notebook-card-hover: #f1f3f4;
   --notebook-accent: #1a73e8;
+  --notebook-accent-text: #ffffff;
   --notebook-accent-surface: rgba(26, 115, 232, 0.06);
   --notebook-accent-hover: rgba(26, 115, 232, 0.10);
   --notebook-studio-bg: #f0f4f9;
   --notebook-chat-user: rgba(26, 115, 232, 0.08);
+  --notebook-chat-ai: transparent;
+}
+:root[data-theme="cyberpunk"] {
+  --notebook-bg: #0d1127;
+  --notebook-canvas: #060814;
+  --notebook-surface: rgba(15, 23, 42, 0.92);
+  --notebook-surface-muted: rgba(0, 240, 255, 0.05);
+  --notebook-surface-elevated: rgba(18, 24, 51, 0.96);
+  --notebook-border: rgba(0, 240, 255, 0.2);
+  --notebook-card-bg: rgba(13, 17, 39, 0.9);
+  --notebook-card-hover: rgba(18, 24, 51, 0.95);
+  --notebook-accent: #00f0ff;
+  --notebook-accent-text: #04141a;
+  --notebook-accent-surface: rgba(0, 240, 255, 0.08);
+  --notebook-accent-hover: rgba(0, 240, 255, 0.16);
+  --notebook-studio-bg: rgba(13, 17, 39, 0.94);
+  --notebook-chat-user: rgba(0, 240, 255, 0.12);
+  --notebook-chat-ai: transparent;
+}
+:root[data-theme="sepia"] {
+  --notebook-bg: #f3e5c8;
+  --notebook-canvas: #fbf0d9;
+  --notebook-surface: rgba(253, 246, 227, 0.95);
+  --notebook-surface-muted: rgba(181, 137, 0, 0.06);
+  --notebook-surface-elevated: #fdf6e3;
+  --notebook-border: rgba(181, 137, 0, 0.18);
+  --notebook-card-bg: rgba(253, 246, 227, 0.92);
+  --notebook-card-hover: #f7edd4;
+  --notebook-accent: #b58900;
+  --notebook-accent-text: #fdf6e3;
+  --notebook-accent-surface: rgba(181, 137, 0, 0.08);
+  --notebook-accent-hover: rgba(181, 137, 0, 0.14);
+  --notebook-studio-bg: #f7edd4;
+  --notebook-chat-user: rgba(181, 137, 0, 0.12);
+  --notebook-chat-ai: transparent;
+}
+:root[data-theme="high-contrast"] {
+  --notebook-bg: #000000;
+  --notebook-canvas: #000000;
+  --notebook-surface: #000000;
+  --notebook-surface-muted: #1a1a1a;
+  --notebook-surface-elevated: #121212;
+  --notebook-border: #ffffff;
+  --notebook-card-bg: #000000;
+  --notebook-card-hover: #1a1a1a;
+  --notebook-accent: #ffff00;
+  --notebook-accent-text: #000000;
+  --notebook-accent-surface: #333300;
+  --notebook-accent-hover: #4d4d00;
+  --notebook-studio-bg: #000000;
+  --notebook-chat-user: #333300;
   --notebook-chat-ai: transparent;
 }
 :root {
@@ -1383,7 +1491,7 @@ body {
 .notebook-workspace {
   background: var(--notebook-bg);
   color: var(--text-primary);
-  font-family: 'Google Sans', 'Inter', system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 /* Header — clean top bar */
@@ -1504,7 +1612,7 @@ body {
   min-height: 36px;
   padding: 8px 16px;
   background: var(--notebook-accent);
-  color: #1b1b1f;
+  color: var(--notebook-accent-text);
   font-size: 13px;
   font-weight: 600;
   border-radius: var(--notebook-radius-pill);
@@ -1694,7 +1802,7 @@ body {
   padding: 12px 24px;
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-accent);
-  color: #1b1b1f;
+  color: var(--notebook-accent-text);
   font-size: 14px;
   font-weight: 600;
   border: none;
@@ -1709,6 +1817,7 @@ body {
 
 /* ═══════════════════════════════════════════════
    IDE SHELL / SIDEBAR — calmer desktop frame
+   Defined for all five themes (see note at top of file).
 ═══════════════════════════════════════════════ */
 :root[data-theme="dark"] {
   --ide-shell-bg: #0f1017;
@@ -1727,6 +1836,33 @@ body {
   --ide-sidebar-active: rgba(79, 70, 229, 0.10);
   --ide-sidebar-item-bg: rgba(17, 24, 39, 0.035);
   --ide-shell-border: rgba(86, 82, 74, 0.12);
+}
+:root[data-theme="cyberpunk"] {
+  --ide-shell-bg: #060814;
+  --ide-panel-bg: rgba(13, 17, 39, 0.96);
+  --ide-sidebar-bg: rgba(6, 8, 20, 0.98);
+  --ide-sidebar-hover: rgba(0, 240, 255, 0.06);
+  --ide-sidebar-active: rgba(0, 240, 255, 0.14);
+  --ide-sidebar-item-bg: rgba(0, 240, 255, 0.03);
+  --ide-shell-border: rgba(0, 240, 255, 0.12);
+}
+:root[data-theme="sepia"] {
+  --ide-shell-bg: #fbf0d9;
+  --ide-panel-bg: rgba(253, 246, 227, 0.96);
+  --ide-sidebar-bg: rgba(243, 229, 200, 0.98);
+  --ide-sidebar-hover: rgba(67, 52, 34, 0.045);
+  --ide-sidebar-active: rgba(181, 137, 0, 0.12);
+  --ide-sidebar-item-bg: rgba(67, 52, 34, 0.03);
+  --ide-shell-border: rgba(181, 137, 0, 0.15);
+}
+:root[data-theme="high-contrast"] {
+  --ide-shell-bg: #000000;
+  --ide-panel-bg: #000000;
+  --ide-sidebar-bg: #000000;
+  --ide-sidebar-hover: #1a1a1a;
+  --ide-sidebar-active: #333300;
+  --ide-sidebar-item-bg: #0d0d0d;
+  --ide-shell-border: #ffffff;
 }
 .jarvis-ide-shell {
   background:

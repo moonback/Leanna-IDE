@@ -294,13 +294,19 @@ export function attachLiveWebSocket(
         'knowledge_memory_search',
         'get_current_time',
         'automation_search',
-        'browser_navigate', 'browser_search', 'browser_open', 'browser_read_content',
+        'browser_navigate', 'browser_search', 'browser_open', 'browser_close',
+        'browser_read_content', 'browser_scroll', 'browser_back', 'browser_forward',
+        'browser_reload', 'browser_snapshot', 'browser_click', 'browser_type',
+        'browser_inspect', 'browser_get_links', 'browser_open_link',
+        'browser_summarize_page', 'browser_research',
         'reasoning_think',
         'agent_orchestrate', 'agent_status',
         'knowledge_search_entities', 'knowledge_status',
         'knowledge_memory_add', 'knowledge_memory_list',
         'knowledge_impact_analyze', 'knowledge_reindex',
         'create_rich_document',
+        // Custom skills — toujours disponibles (Tier 1)
+        'list_custom_skills', 'create_custom_skill', 'update_custom_skill', 'delete_custom_skill', 'toggle_custom_skill',
       ]);
 
       const ASK_MODE_ALLOWED_TOOLS = new Set([
@@ -319,6 +325,8 @@ export function attachLiveWebSocket(
         'automation_list_scheduled_tasks',
         'agent_delegate', 'agent_orchestrate', 'agent_status',
         'agent_list_tasks', 'agent_list_roles', 'agent_cancel', 'agent_stats',
+        // Custom skills — accessibles en mode ask aussi
+        'list_custom_skills', 'create_custom_skill', 'update_custom_skill', 'delete_custom_skill', 'toggle_custom_skill',
       ]);
 
       let filteredDeclarations: typeof declarations;
@@ -326,7 +334,7 @@ export function attachLiveWebSocket(
 
       if (sessionMode === 'ask') {
         filteredDeclarations = declarations.filter(d =>
-          ASK_MODE_ALLOWED_TOOLS.has(d.name) || (d as any)._mcpServerId,
+          ASK_MODE_ALLOWED_TOOLS.has(d.name) || (d as any)._mcpServerId || d.name.startsWith('custom_'),
         );
       } else {
         const useDynamicRelevance = process.env.FORCE_TIERED_TOOLS !== 'false';
@@ -334,9 +342,12 @@ export function attachLiveWebSocket(
           if (initialQuery.trim().length > 0) {
             const rel = skillManager.getRelevantToolDeclarations(initialQuery, requestedSkills);
             filteredDeclarations = rel.declarations;
+            // Toujours inclure les custom skills même si le score est faible
+            const customDeclarations = declarations.filter(d => d.name.startsWith('custom_') && !filteredDeclarations.some((fd: any) => fd.name === d.name));
+            filteredDeclarations = [...filteredDeclarations, ...customDeclarations];
             scoringInfo = { always: rel.alwaysLoaded, dynamic: rel.dynamicallyLoaded, scored: rel.scoredSkills };
           } else {
-            filteredDeclarations = declarations.filter(d => TIER1_CORE_TOOLS.has(d.name));
+            filteredDeclarations = declarations.filter(d => TIER1_CORE_TOOLS.has(d.name) || d.name.startsWith('custom_'));
             filteredDeclarations.push({
               name: 'request_tools',
               description: `Demande le chargement d'outils supplémentaires. Catégories: "git", "github", "automation", "lists", "weather", "reasoning", "history", "system", "knowledge", "verify", "guidelines", "selfImprovement", "all".`,

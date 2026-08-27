@@ -40,7 +40,7 @@ import { createExportRouter } from "./server/routes/export";
 import { createGithubRouter } from "./server/routes/github";
 import { createAgentsRouter } from "./server/routes/agents";
 import workflowsRouter from "./server/routes/workflows";
-import customSkillsRouter from "./server/routes/custom-skills";
+import { createCustomSkillsRouter } from "./server/routes/custom-skills";
 import auditRouter from "./server/routes/audit";
 import { createProfileRouter, createTokensRouter } from "./server/routes/profile";
 import { createOpenRouterRouter } from "./server/routes/openrouter";
@@ -415,7 +415,7 @@ async function startServer() {
   app.use("/api/audit", auditRouter);
   app.use("/api/automation", automationRouter);
   app.use("/api/workflows", workflowsRouter);
-  app.use("/api/custom-skills", customSkillsRouter);
+  app.use("/api/custom-skills", createCustomSkillsRouter(skillManager));
   // Git désactivé — toutes les routes retournent 404
   // app.use("/api/git", createGitRouter(skillManager, () => currentProfile));
   app.use("/api/git", (_req, res) => {

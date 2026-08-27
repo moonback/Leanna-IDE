@@ -355,6 +355,79 @@ export function BrowserPanel({
       } catch {/* silent */}
     };
 
+    // ── Curseur simulé : injection + animation dans la webview ──────────────
+    // Injecte (une seule fois) un curseur SVG flottant dans la page,
+    // puis l'anime vers la position d'un élément cible avant une action.
+    const CURSOR_INJECT_SCRIPT = `(function(){
+      if (document.getElementById('__jarvis_cursor')) return;
+      var cur = document.createElement('div');
+      cur.id = '__jarvis_cursor';
+      cur.style.cssText = [
+        'position:fixed',
+        'top:0','left:0',
+        'width:22px','height:22px',
+        'pointer-events:none',
+        'z-index:2147483647',
+        'transition:top 0.25s cubic-bezier(.4,0,.2,1),left 0.25s cubic-bezier(.4,0,.2,1)',
+        'will-change:top,left',
+        'display:block',
+      ].join(';');
+      cur.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">'
+        + '<filter id="cs"><feDropShadow dx="1" dy="1" stdDeviation="1.5" flood-opacity="0.4"/></filter>'
+        + '<polygon points="4,2 4,18 8,14 11,20 13,19 10,13 16,13" fill="white" stroke="#333" stroke-width="1" filter="url(#cs)"/>'
+        + '</svg>';
+      document.body.appendChild(cur);
+    })()`;
+
+    const moveCursorToElement = async (wv: WebviewElement, selector: string): Promise<void> => {
+      try {
+        // Injecter le curseur si absent
+        await wv.executeJavaScript(CURSOR_INJECT_SCRIPT);
+        // Déplacer vers le centre de l'élément cible
+        const moveScript = `(function(){
+          var el = document.querySelector(${JSON.stringify(selector)});
+          if (!el) return;
+          var r = el.getBoundingClientRect();
+          var cur = document.getElementById('__jarvis_cursor');
+          if (!cur) return;
+          cur.style.left = (r.left + r.width / 2 - 4) + 'px';
+          cur.style.top  = (r.top  + r.height / 2 - 2) + 'px';
+        })()`;
+        await wv.executeJavaScript(moveScript);
+        // Laisser l'animation CSS se jouer (250 ms transition + 100 ms pause)
+        await new Promise<void>((r) => setTimeout(r, 380));
+        // Effet ripple au clic
+        const rippleScript = `(function(){
+          var el = document.querySelector(${JSON.stringify(selector)});
+          if (!el) return;
+          var r = el.getBoundingClientRect();
+          var rip = document.createElement('div');
+          rip.style.cssText = [
+            'position:fixed',
+            'pointer-events:none',
+            'z-index:2147483646',
+            'border-radius:50%',
+            'border:2px solid rgba(139,92,246,0.8)',
+            'width:8px','height:8px',
+            'left:' + (r.left + r.width/2 - 4) + 'px',
+            'top:' + (r.top + r.height/2 - 4) + 'px',
+            'transition:all 0.35s ease-out',
+            'opacity:1',
+          ].join(';');
+          document.body.appendChild(rip);
+          requestAnimationFrame(function(){
+            rip.style.width  = '36px';
+            rip.style.height = '36px';
+            rip.style.left   = (r.left + r.width/2 - 18) + 'px';
+            rip.style.top    = (r.top + r.height/2 - 18) + 'px';
+            rip.style.opacity = '0';
+          });
+          setTimeout(function(){ rip.remove(); }, 400);
+        })()`;
+        await wv.executeJavaScript(rippleScript);
+      } catch {/* ne bloque pas l'action si l'animation échoue */}
+    };
+
     // ── Clic sur un élément
     const handleClick = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { requestId: string; selector: string };
@@ -364,6 +437,9 @@ export function BrowserPanel({
         return;
       }
       try {
+        // Animer le curseur vers la cible avant le clic
+        await moveCursorToElement(wv, detail.selector);
+
         const clickScript = `(function(){
           var el = document.querySelector(${JSON.stringify(detail.selector)});
           if (!el) return JSON.stringify({ error: 'Sélecteur introuvable: ${detail.selector.replace(/'/g, "\\'")}' });
@@ -402,6 +478,9 @@ export function BrowserPanel({
         return;
       }
       try {
+        // Animer le curseur vers le champ avant la saisie
+        await moveCursorToElement(wv, detail.selector);
+
         const typeScript = `(function(){
           var el = document.querySelector(${JSON.stringify(detail.selector)});
           if (!el) return JSON.stringify({ error: 'Sélecteur introuvable' });
@@ -445,6 +524,53 @@ export function BrowserPanel({
         }
       } catch (err: any) {
         postActionResult(detail.requestId, null, err?.message ?? 'Erreur saisie');
+      }
+    };
+
+    // ── Extraction des liens de la page
+    const handleGetLinks = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { requestId: string; selector: string | null };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      const selectorExpr = detail.selector
+        ? JSON.stringify(detail.selector + ' a[href]')
+        : '"a[href]"';
+      const getLinksScript = `(function(){
+        try {
+          var seen = {};
+          var links = Array.from(document.querySelectorAll(${selectorExpr}))
+            .map(function(a) {
+              var href = a.getAttribute('href');
+              if (!href || href === '#' || href.startsWith('javascript:')) return null;
+              try { href = new URL(href, location.href).href; } catch(e) { return null; }
+              if (seen[href]) return null;
+              seen[href] = true;
+              return { text: (a.innerText || a.getAttribute('aria-label') || '').trim().substring(0, 200), href: href };
+            })
+            .filter(Boolean);
+          return JSON.stringify(links);
+        } catch(e) {
+          return JSON.stringify({ error: e.message });
+        }
+      })()`;
+      try {
+        const raw = await wv.executeJavaScript(getLinksScript);
+        let parsed: any;
+        try {
+          parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } catch {
+          parsed = [];
+        }
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.error) {
+          await postActionResult(detail.requestId, null, parsed.error);
+          return;
+        }
+        await postActionResult(detail.requestId, Array.isArray(parsed) ? parsed : []);
+      } catch (err: any) {
+        await postActionResult(detail.requestId, null, err?.message ?? 'Erreur extraction liens');
       }
     };
 
@@ -546,14 +672,31 @@ export function BrowserPanel({
       }
     };
 
+    // ── Déplacement explicite du curseur simulé vers des coordonnées (x, y)
+    const handleMouseMove = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { x: number; y: number };
+      const wv = webviewRef.current;
+      if (!wv) return;
+      const lx = (Number(detail.x) || 0) - 4;
+      const ly = (Number(detail.y) || 0) - 2;
+      try {
+        await wv.executeJavaScript(CURSOR_INJECT_SCRIPT);
+        await wv.executeJavaScript(
+          `(function(x,y){ var cur=document.getElementById('__jarvis_cursor'); if(cur){cur.style.left=x+'px';cur.style.top=y+'px';} })(${lx},${ly})`
+        );
+      } catch {/* silent */}
+    };
+
     window.addEventListener('jarvis-browser-navigate', handleNav);
     window.addEventListener('jarvis-browser-scroll', handleScroll);
     window.addEventListener('jarvis-browser-control', handleBrowserControl);
     window.addEventListener('jarvis-browser-read-request', handleReadRequest as EventListener);
     window.addEventListener('jarvis-browser-click', handleClick as EventListener);
     window.addEventListener('jarvis-browser-type', handleType as EventListener);
+    window.addEventListener('jarvis-browser-get-links', handleGetLinks as EventListener);
     window.addEventListener('jarvis-browser-snapshot', handleSnapshot as EventListener);
     window.addEventListener('jarvis-browser-inspect', handleInspect as EventListener);
+    window.addEventListener('jarvis-browser-mouse-move', handleMouseMove as EventListener);
     return () => {
       window.removeEventListener('jarvis-browser-navigate', handleNav);
       window.removeEventListener('jarvis-browser-scroll', handleScroll);
@@ -561,8 +704,10 @@ export function BrowserPanel({
       window.removeEventListener('jarvis-browser-read-request', handleReadRequest as EventListener);
       window.removeEventListener('jarvis-browser-click', handleClick as EventListener);
       window.removeEventListener('jarvis-browser-type', handleType as EventListener);
+      window.removeEventListener('jarvis-browser-get-links', handleGetLinks as EventListener);
       window.removeEventListener('jarvis-browser-snapshot', handleSnapshot as EventListener);
       window.removeEventListener('jarvis-browser-inspect', handleInspect as EventListener);
+      window.removeEventListener('jarvis-browser-mouse-move', handleMouseMove as EventListener);
     };
   }, [navigateTo]);  // ── Render ──────────────────────────────────────────────────────────────────
 
