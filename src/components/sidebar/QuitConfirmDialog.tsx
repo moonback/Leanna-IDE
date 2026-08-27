@@ -376,7 +376,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                       letterSpacing: '.10em',
                     }}
                   >
-                    ONLINE
+                    EN LIGNE
                   </span>
                 </div>
               </div>
