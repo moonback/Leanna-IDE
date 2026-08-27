@@ -87,7 +87,7 @@ const workflowStepSchema = z.object({
   label: z.string().optional(),
   condition: z.string().optional(),
   onError: z.enum(["stop", "skip", "retry"]).optional().default("stop"),
-  maxRetries: z.number().int().min(1).max(5).optional().default(2),
+  maxRetries: z.number().int().min(0).max(5).optional().default(2),
 });
 
 export const createWorkflowSchema = z.object({
