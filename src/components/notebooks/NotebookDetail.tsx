@@ -56,7 +56,7 @@ function useFluidTransition() {
   const reduceMotion = useReducedMotion();
   return {
     spring: reduceMotion
-      ? { duration: 0.15, ease: 'easeOut' as const }
+      ? { duration: 0.1, ease: 'easeOut' as const }
       : { type: 'spring' as const, bounce: 0, duration: 0.3 },
     // Variante crossfade pure, sans translation directionnelle — pour des vues
     // "pairs" (onglets non ordonnés) où glisser suggérerait une navigation
@@ -148,7 +148,7 @@ function NoteEditorCenter({
             <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
               {data.id ? 'Modifier la note' : 'Nouvelle note'}
             </h2>
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               {content.length} caractères
             </p>
           </div>
@@ -282,8 +282,8 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   }
 
   const studioTabs: { key: StudioTab; icon: typeof StickyNote; label: string; badge?: number }[] = [
-    { key: 'notes', icon: StickyNote, label: 'Notes', badge: notebook.notes.length },
     { key: 'generate', icon: Sparkles, label: 'Studio' },
+    { key: 'notes', icon: StickyNote, label: 'Notes', badge: notebook.notes.length },
     { key: 'audio', icon: Mic, label: 'Audio' },
   ];
 
@@ -426,7 +426,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setStudioOpen(v => !v)}
-            className="notebook-icon-button hidden lg:flex transition-transform active:scale-90"
+            className="notebook-icon-button hidden md:flex transition-transform active:scale-90"
             data-active={studioOpen}
             title={studioOpen ? 'Fermer Studio (Ctrl+\\ / ⌘\\)' : 'Ouvrir Studio (Ctrl+\\ / ⌘\\)'}
             aria-label={studioOpen ? 'Fermer Studio' : 'Ouvrir Studio'}
@@ -502,7 +502,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
         {/* Right: Studio Panel (Notes / Generate / Audio) */}
         {studioOpen && (
-          <aside className="notebook-context-rail hidden min-w-0 xl:flex flex-col overflow-hidden">
+          <aside className="notebook-context-rail hidden min-w-0 md:flex flex-col overflow-hidden">
             {/* Studio tabs */}
             <div className="flex items-center gap-1 border-b border-[var(--notebook-border)] px-4 py-3">
               {studioTabs.map(({ key, icon: Icon, label, badge }) => (

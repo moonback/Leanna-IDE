@@ -96,7 +96,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
             </h2>
             {source?.type && (
               <span
-                className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase flex-shrink-0"
+                className="text-xs px-2 py-0.5 rounded-full font-bold uppercase flex-shrink-0"
                 style={{
                   backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}15`,
                   color: TYPE_COLORS[source.type] || 'var(--text-dimmed)',
@@ -108,17 +108,17 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
           </div>
           <div className="flex items-center gap-3 mt-0.5">
             {source?.wordCount && (
-              <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                 {source.wordCount.toLocaleString()} mots
               </span>
             )}
             {source?.chunksCount && (
-              <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                 {source.chunksCount} passages
               </span>
             )}
             {source?.language && (
-              <span className="text-[10px] uppercase" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs uppercase" style={{ color: 'var(--text-dimmed)' }}>
                 {source.language}
               </span>
             )}
@@ -130,7 +130,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
             <div className="flex items-center rounded-lg overflow-hidden border mr-2" style={{ borderColor: 'var(--border-base)' }}>
               <button
                 onClick={() => setViewMode('visual')}
-                className="px-2.5 py-1.5 text-[10px] font-semibold transition-colors"
+                className="px-2.5 py-1.5 text-xs font-semibold transition-colors"
                 style={{
                   backgroundColor: viewMode === 'visual' ? 'var(--accent-primary)' : 'transparent',
                   color: viewMode === 'visual' ? '#fff' : 'var(--text-muted)',
@@ -140,7 +140,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
               </button>
               <button
                 onClick={() => setViewMode('text')}
-                className="px-2.5 py-1.5 text-[10px] font-semibold transition-colors"
+                className="px-2.5 py-1.5 text-xs font-semibold transition-colors"
                 style={{
                   backgroundColor: viewMode === 'text' ? 'var(--accent-primary)' : 'transparent',
                   color: viewMode === 'text' ? '#fff' : 'var(--text-muted)',
@@ -174,7 +174,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
           {source.keywords.map((kw) => (
             <span
               key={kw}
-              className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+              className="text-xs px-2 py-0.5 rounded-full font-medium"
               style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
             >
               {kw}
@@ -228,7 +228,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
                   link.click();
                   document.body.removeChild(link);
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
                 style={{
                   backgroundColor: '#10b98120',
                   color: '#10b981',

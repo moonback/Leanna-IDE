@@ -384,7 +384,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-4 py-4 flex-shrink-0 border-b border-[var(--notebook-border)]">
           <div>
-            <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-dimmed)' }}>Sources</p>
+            <p className="text-xs uppercase tracking-wider font-semibold" style={{ color: 'var(--text-dimmed)' }}>Sources</p>
             <h2 className="text-sm font-semibold text-[var(--text-primary)]">{sources.length} document{sources.length > 1 ? 's' : ''}</h2>
           </div>
           <button
@@ -501,7 +501,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         {/* Footer stats */}
         {sources.length > 0 && (
           <div className="flex-shrink-0 px-4 py-2.5 border-t border-[var(--notebook-border)]">
-            <p className="text-[10px] text-center" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-xs text-center" style={{ color: 'var(--text-dimmed)' }}>
               {totalWords.toLocaleString()} mots · {totalChunks} chunks
             </p>
           </div>
@@ -582,7 +582,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                   <span className="truncate flex-1" style={{ color: f.status === 'error' ? 'var(--color-error, #ef4444)' : 'var(--text-primary)' }}>
                     {f.name}
                   </span>
-                  {f.error && <span className="text-[9px] opacity-60 truncate max-w-[150px]">{f.error}</span>}
+                  {f.error && <span className="text-xs opacity-60 truncate max-w-[150px]">{f.error}</span>}
                 </div>
               ))}
             </div>
@@ -648,7 +648,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         </button>
 
         {/* Stats */}
-        <div className="ml-auto flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+        <div className="ml-auto flex items-center gap-3 text-xs" style={{ color: 'var(--text-dimmed)' }}>
           <span>{sources.length} source{sources.length !== 1 ? 's' : ''}</span>
           {totalWords > 0 && <span>{totalWords.toLocaleString()} mots</span>}
           {totalChunks > 0 && <span>{totalChunks} chunks</span>}
@@ -747,7 +747,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                   style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
                 />
                 {textContent && (
-                  <span className="absolute bottom-2 right-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="absolute bottom-2 right-3 text-xs" style={{ color: 'var(--text-muted)' }}>
                     ~{textContent.split(/\s+/).length} mots
                   </span>
                 )}
@@ -847,7 +847,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                   />
                   <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                     Inclure les fichiers de config
-                    <span className="block text-[10px]" style={{ color: 'var(--text-dimmed)' }}>package.json, tsconfig.json…</span>
+                    <span className="block text-xs" style={{ color: 'var(--text-dimmed)' }}>package.json, tsconfig.json…</span>
                   </span>
                 </label>
               </div>
@@ -935,7 +935,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                       {source.title}
                     </p>
                     <span
-                      className="text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase flex-shrink-0"
+                      className="text-xs px-1.5 py-0.5 rounded-full font-bold uppercase flex-shrink-0"
                       style={{ backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}15`, color: TYPE_COLORS[source.type] || 'var(--text-dimmed)' }}
                     >
                       {source.type}
@@ -974,13 +974,13 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
                   {/* Meta row */}
                   <div className="flex items-center gap-3 mt-2 flex-wrap">
-                    <span className="text-[10px] font-medium" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-dimmed)' }}>
                       {source.wordCount.toLocaleString()} mots
                     </span>
-                    <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                       {source.chunksCount} chunks
                     </span>
-                    <span className="text-[10px] uppercase font-medium" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs uppercase font-medium" style={{ color: 'var(--text-dimmed)' }}>
                       {source.language}
                     </span>
                   </div>
@@ -991,7 +991,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                       {source.keywords.slice(0, 6).map((kw: string) => (
                         <span
                           key={kw}
-                          className="text-[9px] px-2 py-0.5 rounded-full font-medium cursor-pointer transition-all hover:line-through hover:opacity-50"
+                          className="text-xs px-2 py-0.5 rounded-full font-medium cursor-pointer transition-all hover:line-through hover:opacity-50"
                           style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)', border: '1px solid var(--border-base)' }}
                           onClick={() => handleRemoveTag(source.id, kw)}
                           title="Cliquer pour retirer"
@@ -1000,7 +1000,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                         </span>
                       ))}
                       {source.keywords.length > 6 && (
-                        <span className="text-[9px] px-2 py-0.5 rounded-full" style={{ color: 'var(--text-dimmed)' }}>
+                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ color: 'var(--text-dimmed)' }}>
                           +{source.keywords.length - 6}
                         </span>
                       )}
@@ -1017,14 +1017,14 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                             placeholder="tag..."
                             autoFocus
                             onBlur={() => setTagInput(null)}
-                            className="text-[9px] px-2 py-0.5 rounded-full w-16 outline-none"
+                            className="text-xs px-2 py-0.5 rounded-full w-16 outline-none"
                             style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }}
                           />
                         </form>
                       ) : (
                         <button
                           onClick={() => setTagInput({ sourceId: source.id, value: '' })}
-                          className="text-[9px] px-2 py-0.5 rounded-full font-medium transition-all hover:bg-[var(--accent-subtle)]"
+                          className="text-xs px-2 py-0.5 rounded-full font-medium transition-all hover:bg-[var(--accent-subtle)]"
                           style={{ color: 'var(--text-dimmed)', border: '1px dashed var(--border-base)' }}
                           title="Ajouter un tag"
                         >

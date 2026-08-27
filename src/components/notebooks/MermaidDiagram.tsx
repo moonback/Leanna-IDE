@@ -142,13 +142,13 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
       <div className="flex items-center justify-between gap-3 px-3 py-2 border-b" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
         <div className="min-w-0">
           <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>Carte mentale interactive</p>
-          <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>Utilisez le zoom et faites défiler pour explorer les branches.</p>
+          <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Utilisez le zoom et faites défiler pour explorer les branches.</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           <button onClick={() => updateZoom(-0.1)} disabled={zoom <= 0.55} className="p-1.5 rounded-md hover:bg-white/5 disabled:opacity-30" title="Réduire le zoom" aria-label="Réduire le zoom">
             <ZoomOut className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
           </button>
-          <span className="w-10 text-center text-[9px] font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>{Math.round(zoom * 100)}%</span>
+          <span className="w-10 text-center text-xs font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>{Math.round(zoom * 100)}%</span>
           <button onClick={() => updateZoom(0.1)} disabled={zoom >= 1.5} className="p-1.5 rounded-md hover:bg-white/5 disabled:opacity-30" title="Agrandir le zoom" aria-label="Agrandir le zoom">
             <ZoomIn className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
           </button>

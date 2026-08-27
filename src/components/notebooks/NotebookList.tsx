@@ -51,10 +51,10 @@ function timeAgo(dateStr: string): string {
 
 // Critically damped default — graceful, no overshoot. Used for anything
 // that wasn't triggered by a physical gesture (fades, reveals, layout).
-const SPRING_UI = { type: 'spring' as const, bounce: 0, duration: 0.35 };
+const SPRING_UI = { type: 'spring' as const, bounce: 0, duration: 0.3 };
 // A touch of bounce, reserved for elements that *feel* grabbed/thrown
 // (the create-notebook button, card hover lift).
-const SPRING_MOMENTUM = { type: 'spring' as const, bounce: 0.18, duration: 0.35 };
+const SPRING_MOMENTUM = { type: 'spring' as const, bounce: 0.18, duration: 0.3 };
 
 export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const { success, error: toastError } = useToast();
@@ -266,7 +266,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               <motion.button
                 onClick={() => setSortDesc(!sortDesc)}
                 whileTap={{ scale: 0.9, rotate: sortDesc ? -8 : 8 }}
-                transition={{ duration: 0.15 }}
+                transition={{ duration: 0.1 }}
                 className="p-2 rounded-lg"
                 style={{ color: 'var(--text-dimmed)' }}
                 title={sortDesc ? 'Décroissant' : 'Croissant'}
@@ -285,7 +285,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={prefersReducedMotion ? { duration: 0.15 } : SPRING_UI}
+            transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
             className="overflow-hidden flex-shrink-0 px-6 lg:px-10"
           >
             <div
@@ -477,7 +477,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                   whileHover={prefersReducedMotion ? undefined : { y: -3, scale: 1.005 }}
                   whileTap={{ scale: 0.99 }}
                   transition={{
-                    ...(prefersReducedMotion ? { duration: 0.15 } : SPRING_MOMENTUM),
+                    ...(prefersReducedMotion ? { duration: 0.1 } : SPRING_MOMENTUM),
                     delay: i < 12 ? i * 0.03 : 0,
                   }}
                   onClick={() => onSelectNotebook(nb.id)}
@@ -597,7 +597,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 x: deleteOrigin ? (deleteOrigin.x - window.innerWidth / 2) * 0.4 : 0,
                 y: deleteOrigin ? (deleteOrigin.y - window.innerHeight / 2) * 0.4 : 0,
               }}
-              transition={prefersReducedMotion ? { duration: 0.15 } : SPRING_UI}
+              transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
               onClick={e => e.stopPropagation()}
               className="w-full max-w-sm rounded-2xl border p-6 shadow-2xl"
               style={{

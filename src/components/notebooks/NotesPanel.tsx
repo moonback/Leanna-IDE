@@ -367,7 +367,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
         {/* Sort */}
         <button
           onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : prev === 'oldest' ? 'alpha' : 'newest')}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-medium border transition-all hover:bg-white/5"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all hover:bg-white/5"
           style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
           title="Changer l'ordre de tri"
         >
@@ -379,7 +379,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
         {notes.length > 0 && (
           <button
             onClick={handleExportAll}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-medium border transition-all hover:bg-white/5 active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
             style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
             title="Exporter toutes les notes en Markdown"
           >
@@ -388,7 +388,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
           </button>
         )}
 
-        <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+        <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-dimmed)' }}>
           {pinnedCount > 0 && (
             <span className="flex items-center gap-1">
               <Pin className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} />
@@ -469,7 +469,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                     className="w-full px-4 py-3 rounded-xl text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)] leading-relaxed"
                     style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                   />
-                  <span className="absolute bottom-2 right-3 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="absolute bottom-2 right-3 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                     {content.length} car.
                   </span>
                 </div>
@@ -533,7 +533,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                 initial={{ opacity: 0, scale: 0.97 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.15 }}
+                transition={{ duration: 0.1 }}
                 className="group p-4 rounded-2xl border transition-all hover:shadow-md hover:-translate-y-0.5"
                 style={{
                   backgroundColor: 'var(--bg-panel)',
@@ -556,18 +556,18 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                     )}
                     {/* Meta */}
                     <div className="flex items-center gap-2 mt-2.5">
-                      <span className="flex items-center gap-1 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                      <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                         <Clock className="w-2.5 h-2.5" />
                         {timeAgo(note.updatedAt)}
                       </span>
                       {note.content && (
-                        <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                        <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                           {note.content.length} car.
                         </span>
                       )}
                       {backlinks[note.id]?.length > 0 && (
                         <span
-                          className="flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded-full"
+                          className="flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded-full"
                           style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
                           title={`Mentionné dans : ${backlinks[note.id].map(id => getNoteTitle(id)).join(', ')}`}
                         >

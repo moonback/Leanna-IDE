@@ -131,7 +131,7 @@ function renderGeneratedContent(content: string): JSX.Element {
                 return (
                   <div key={j} className="my-3 rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border-base)' }}>
                     <img src={imgMatch[2]} alt={imgMatch[1] || 'Image générée'} className="w-full h-auto max-h-[600px] object-contain" style={{ backgroundColor: 'var(--bg-base)' }} />
-                    {imgMatch[1] && <p className="text-[9px] text-center py-1.5 opacity-60">{imgMatch[1]}</p>}
+                    {imgMatch[1] && <p className="text-xs text-center py-1.5 opacity-60">{imgMatch[1]}</p>}
                   </div>
                 );
               }
@@ -150,7 +150,7 @@ function renderGeneratedContent(content: string): JSX.Element {
               if (line.match(/^[\-\*]\s/)) {
                 return (
                   <div key={j} className="flex gap-2 pl-2">
-                    <span className="text-[10px] mt-0.5 opacity-50">•</span>
+                    <span className="text-xs mt-0.5 opacity-50">•</span>
                     <span className="text-xs leading-relaxed flex-1" style={{ color: 'var(--text-primary)' }}>{renderBoldItalic(line.slice(2))}</span>
                   </div>
                 );
@@ -159,7 +159,7 @@ function renderGeneratedContent(content: string): JSX.Element {
                 const num = line.match(/^(\d+)\./)?.[1];
                 return (
                   <div key={j} className="flex gap-2 pl-2">
-                    <span className="text-[10px] mt-0.5 opacity-60 font-semibold min-w-[16px]" style={{ color: 'var(--accent-primary)' }}>{num}.</span>
+                    <span className="text-xs mt-0.5 opacity-60 font-semibold min-w-[16px]" style={{ color: 'var(--accent-primary)' }}>{num}.</span>
                     <span className="text-xs leading-relaxed flex-1" style={{ color: 'var(--text-primary)' }}>{renderBoldItalic(line.replace(/^\d+\.\s/, ''))}</span>
                   </div>
                 );
@@ -233,7 +233,7 @@ function renderInfographicContent(content: string): JSX.Element {
       <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={handleDownload}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-all hover:shadow-sm active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
           style={{
             backgroundColor: '#f9731620',
             color: '#f97316',
@@ -243,12 +243,12 @@ function renderInfographicContent(content: string): JSX.Element {
           📥 Télécharger PNG
         </button>
         {filePath && (
-          <span className="text-[9px] px-2 py-1 rounded-md" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
+          <span className="text-xs px-2 py-1 rounded-md" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
             📁 {filePath}
           </span>
         )}
         {sizeKB > 0 && (
-          <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
             {sizeKB} KB
           </span>
         )}
@@ -258,12 +258,12 @@ function renderInfographicContent(content: string): JSX.Element {
       {(prompt || model) && (
         <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: 'var(--border-base)' }}>
           {model && (
-            <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
               <span className="font-semibold">Modèle :</span> {model}
             </p>
           )}
           {prompt && (
-            <p className="text-[9px] leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
               <span className="font-semibold">Prompt :</span> {prompt.slice(0, 200)}{prompt.length > 200 ? '...' : ''}
             </p>
           )}
@@ -284,7 +284,7 @@ function renderBoldItalic(text: string): (string | JSX.Element)[] {
       return <em key={i} className="italic opacity-80">{part.slice(1, -1)}</em>;
     }
     if (part.startsWith('`') && part.endsWith('`')) {
-      return <code key={i} className="px-1 py-0.5 rounded text-[10px] font-mono" style={{ backgroundColor: 'var(--bg-base)' }}>{part.slice(1, -1)}</code>;
+      return <code key={i} className="px-1 py-0.5 rounded text-xs font-mono" style={{ backgroundColor: 'var(--bg-base)' }}>{part.slice(1, -1)}</code>;
     }
     return part;
   });
@@ -368,9 +368,9 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
   // portent aucune vélocité de geste à restituer.
   const reduceMotion = useReducedMotion();
   const modalSpring = reduceMotion
-    ? { duration: 0.15, ease: 'easeOut' as const }
+    ? { duration: 0.1, ease: 'easeOut' as const }
     : { type: 'spring' as const, bounce: 0, duration: 0.3 };
-  const scrimSpring = { duration: 0.15 };
+  const scrimSpring = { duration: 0.1 };
   const reducedTransparency = useReducedTransparency();
   const scrimStyle = reducedTransparency
     ? { backgroundColor: 'rgba(0,0,0,0.92)' }
@@ -790,7 +790,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
           </button>
 
           {/* Source count */}
-          <span className="ml-auto text-[10px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>
             {sources.length} source{sources.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -814,7 +814,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   })()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                  <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                     Génération en cours: {getDocTypeLabel(generatingType || '')}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
@@ -827,7 +827,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                         transition={{ duration: 0.3, ease: 'easeOut' }}
                       />
                     </div>
-                    <span className="text-[8px] font-medium" style={{ color: getDocTypeColor(generatingType || '') }}>
+                    <span className="text-xs font-medium" style={{ color: getDocTypeColor(generatingType || '') }}>
                       {currentGenerationProgress}%
                     </span>
                   </div>
@@ -835,7 +835,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
               <Sparkles className="w-3 h-3" />
               <span>Prêt à générer</span>
               {generationQueue.length > 0 && (
@@ -851,12 +851,12 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 onClick={() => setShowQueue(!showQueue)}
                 className="flex items-center justify-between w-full text-left"
               >
-                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                   File d'attente ({generationQueue.filter(t => t.status === 'pending').length})
                 </span>
                 <motion.span
                   animate={{ rotate: showQueue ? 180 : 0 }}
-                  className="text-[10px]"
+                  className="text-xs"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   ▼
@@ -903,19 +903,19 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-[9px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                              <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                                 {index === 0 && task.status === 'pending' ? 'Suivant:' : ''} {task.title}
                               </p>
                               <div className="flex items-center gap-1 mt-0.5">
-                                <span className="text-[7px]" style={{ color: 'var(--text-dimmed)' }}>
+                                <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                                   Position: {index + 1}
                                 </span>
                                 {task.status === 'generating' && task.progress > 0 && (
                                   <>
-                                    <span className="text-[7px]" style={{ color: 'var(--text-dimmed)' }}>
+                                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                                       •
                                     </span>
-                                    <span className="text-[7px] font-medium" style={{ color: color }}>
+                                    <span className="text-xs font-medium" style={{ color: color }}>
                                       {task.progress}%
                                     </span>
                                   </>
@@ -984,13 +984,13 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                       onChange={() => toggleSourceSelection(src.id)}
                       className="w-3 h-3 rounded accent-[var(--accent-primary)]"
                     />
-                    <span className="text-[10px] truncate" style={{ color: 'var(--text-primary)' }}>{src.title}</span>
+                    <span className="text-xs truncate" style={{ color: 'var(--text-primary)' }}>{src.title}</span>
                   </label>
                 ))}
                 {selectedSourceIds.length > 0 && (
                   <button
                     onClick={() => setSelectedSourceIds([])}
-                    className="text-[9px] px-2 py-1 w-full text-left hover:underline"
+                    className="text-xs px-2 py-1 w-full text-left hover:underline"
                     style={{ color: 'var(--accent-primary)' }}
                   >
                     Réinitialiser (toutes)
@@ -1016,7 +1016,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 onChange={e => setCustomInstructions(e.target.value)}
                 placeholder="Ex: Ton formel, focus technique, ajoute des exemples..."
                 rows={2}
-                className="w-full px-3 py-2.5 rounded-xl text-[10px] outline-none resize-none transition-all focus:ring-1 focus:ring-[#f59e0b]"
+                className="w-full px-3 py-2.5 rounded-xl text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[#f59e0b]"
                 style={{
                   backgroundColor: 'var(--bg-panel)',
                   border: '1px solid var(--border-base)',
@@ -1031,10 +1031,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
         {generatedDocs.length > 0 && (
           <div className="space-y-2 pb-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                 Historique
               </p>
-              <span className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
                 {generatedDocs.length}
               </span>
             </div>
@@ -1062,15 +1062,15 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                         <DocIcon className="w-3.5 h-3.5" style={{ color: docType?.color || 'var(--accent-primary)' }} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                           {doc.title}
                         </p>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[8px] font-medium" style={{ color: docType?.color || 'var(--text-dimmed)' }}>
+                          <span className="text-xs font-medium" style={{ color: docType?.color || 'var(--text-dimmed)' }}>
                             {docType?.label || doc.type}
                           </span>
-                          <span className="text-[8px]" style={{ color: 'var(--text-dimmed)' }}>•</span>
-                          <span className="text-[8px]" style={{ color: 'var(--text-dimmed)' }}>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>•</span>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                             {new Date(doc.createdAt).toLocaleDateString('fr')}
                           </span>
                         </div>
@@ -1092,11 +1092,11 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
         {/* Generate buttons — redesigned grid */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
               Générer
             </p>
             {generating && (
-              <span className="flex items-center gap-1.5 text-[9px] font-medium" style={{ color: 'var(--accent-primary)' }}>
+              <span className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
                 <Loader2 className="w-3 h-3 animate-spin" />
                 En cours...
               </span>
@@ -1125,7 +1125,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               <p className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>
                 📊 Rapport complet
               </p>
-              <p className="text-[9px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                 Choisir un type • Suggestions IA incluses
               </p>
             </div>
@@ -1181,10 +1181,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
                   {/* Text */}
                   <div className="min-w-0 flex-1 relative z-10">
-                    <p className="text-[10px] font-semibold leading-tight transition-colors duration-200" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-xs font-semibold leading-tight transition-colors duration-200" style={{ color: 'var(--text-primary)' }}>
                       {label}
                     </p>
-                    <p className="text-[8px] mt-0.5 leading-tight transition-colors duration-200" style={{ color: 'var(--text-dimmed)' }}>
+                    <p className="text-xs mt-0.5 leading-tight transition-colors duration-200" style={{ color: 'var(--text-dimmed)' }}>
                       {desc}
                     </p>
                   </div>
@@ -1212,7 +1212,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
         {/* Source count info */}
         {sources.length === 0 && (
-          <p className="text-[10px] text-center py-2 px-3 rounded-lg" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
+          <p className="text-xs text-center py-2 px-3 rounded-lg" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
             Ajoutez des sources pour activer la génération
           </p>
         )}
@@ -1230,7 +1230,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
                 Génération en cours...
               </span>
-              <span className="text-[10px] ml-auto" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs ml-auto" style={{ color: 'var(--text-dimmed)' }}>
                 {streamingText.length} caractères
               </span>
             </div>
@@ -1255,7 +1255,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span
-                    className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase"
+                    className="text-xs px-2 py-0.5 rounded-full font-bold uppercase"
                     style={{
                       backgroundColor: `${(DOC_TYPES.find(t => t.key === selectedDoc.type) || REPORT_TYPES.find(t => t.key === selectedDoc.type))?.color || '#6b7280'}15`,
                       color: (DOC_TYPES.find(t => t.key === selectedDoc.type) || REPORT_TYPES.find(t => t.key === selectedDoc.type))?.color || 'var(--text-dimmed)',
@@ -1263,10 +1263,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   >
                     {(DOC_TYPES.find(t => t.key === selectedDoc.type) || REPORT_TYPES.find(t => t.key === selectedDoc.type))?.label || selectedDoc.type}
                   </span>
-                  <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                     {new Date(selectedDoc.createdAt).toLocaleString('fr-FR')}
                   </span>
-                  <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                     • {selectedDoc.content.length} chars
                   </span>
                 </div>
@@ -1344,7 +1344,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow-md"
                 style={{ backgroundColor: 'var(--bg-panel)', border: '2px solid var(--accent-primary)' }}
               >
-                <span className="text-[10px] font-bold" style={{ color: 'var(--accent-primary)' }}>AI</span>
+                <span className="text-xs font-bold" style={{ color: 'var(--accent-primary)' }}>AI</span>
               </div>
             </div>
 
@@ -1370,15 +1370,15 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
                 >
                   <span className="text-base">{f.emoji}</span>
-                  <span className="text-[9px] font-semibold" style={{ color: 'var(--text-primary)' }}>{f.label}</span>
-                  <span className="text-[8px]" style={{ color: 'var(--text-dimmed)' }}>{f.sub}</span>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{f.label}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{f.sub}</span>
                 </div>
               ))}
             </div>
 
             {sources.length === 0 && (
               <p
-                className="text-[10px] px-4 py-2 rounded-lg"
+                className="text-xs px-4 py-2 rounded-lg"
                 style={{ backgroundColor: '#f59e0b10', color: '#f59e0b', border: '1px solid #f59e0b30' }}
               >
                 ⚠️ Ajoutez des sources dans l'onglet Sources pour commencer
@@ -1423,7 +1423,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                     Générer un rapport
                   </h2>
-                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                     Choisissez un type ou suivez les suggestions basées sur vos {sources.length} source{sources.length > 1 ? 's' : ''}
                   </p>
                 </div>
@@ -1449,14 +1449,14 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                     </h3>
                     {loadingSuggestions && <Loader2 className="w-3 h-3 animate-spin" style={{ color: '#f59e0b' }} />}
                     {!loadingSuggestions && suggestions.length > 0 && (
-                      <span className="text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#f59e0b15', color: '#f59e0b' }}>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#f59e0b15', color: '#f59e0b' }}>
                         {suggestions.length} suggestions
                       </span>
                     )}
                     {!loadingSuggestions && (
                       <button
                         onClick={loadSuggestions}
-                        className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5 active:scale-95"
+                        className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/5 active:scale-95"
                         style={{ border: '1px solid var(--border-base)', color: '#f59e0b' }}
                         title="Demander de nouvelles suggestions"
                       >
@@ -1471,7 +1471,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                       <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#f59e0b' }} />
                       <div>
                         <p className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>Analyse de vos sources en cours…</p>
-                        <p className="text-[9px] mt-0.5" style={{ color: 'var(--text-dimmed)' }}>L'IA identifie les rapports les plus pertinents</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-dimmed)' }}>L'IA identifie les rapports les plus pertinents</p>
                       </div>
                     </div>
                   )}
@@ -1505,18 +1505,18 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                                   {suggestion.title}
                                 </p>
                                 <span
-                                  className="text-[8px] px-1.5 py-0.5 rounded-full font-bold"
+                                  className="text-xs px-1.5 py-0.5 rounded-full font-bold"
                                   style={{ backgroundColor: `${docType?.color || '#6b7280'}15`, color: docType?.color || '#6b7280' }}
                                 >
                                   {suggestion.relevance}% pertinent
                                 </span>
                               </div>
-                              <p className="text-[10px] mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                              <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                                 {suggestion.reason}
                               </p>
                             </div>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1">
-                              <span className="text-[9px] font-medium" style={{ color: 'var(--accent-primary)' }}>Générer</span>
+                              <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>Générer</span>
                               <Zap className="w-3.5 h-3.5" style={{ color: '#f59e0b' }} />
                             </div>
                           </button>
@@ -1526,7 +1526,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   )}
 
                   {!loadingSuggestions && suggestions.length === 0 && (
-                    <p className="text-[10px] py-3 text-center" style={{ color: 'var(--text-dimmed)' }}>
+                    <p className="text-xs py-3 text-center" style={{ color: 'var(--text-dimmed)' }}>
                       Cliquez sur "Obtenir des suggestions" pour que l'IA analyse vos sources.
                     </p>
                   )}
@@ -1535,7 +1535,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 {/* Séparateur */}
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
-                  <span className="text-[9px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                     ou choisir un type de rapport
                   </span>
                   <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
@@ -1557,10 +1557,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                         <Icon className="w-4 h-4" style={{ color }} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                           {label}
                         </p>
-                        <p className="text-[8px] mt-0.5 leading-tight" style={{ color: 'var(--text-dimmed)' }}>
+                        <p className="text-xs mt-0.5 leading-tight" style={{ color: 'var(--text-dimmed)' }}>
                           {desc}
                         </p>
                       </div>
@@ -1571,12 +1571,12 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
               {/* Modal footer */}
               <div className="flex items-center justify-between px-6 py-3 border-t flex-shrink-0" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}>
-                <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                   {sources.length} source{sources.length > 1 ? 's' : ''} disponible{sources.length > 1 ? 's' : ''} • Le rapport sera généré en streaming
                 </p>
                 <button
                   onClick={() => { setShowReportModal(false); reportModalTriggerRef.current?.focus(); }}
-                  className="px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/5"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
@@ -1617,7 +1617,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   </div>
                   <div>
                     <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Créer une infographie</h3>
-                    <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>Générée par IA à partir de vos sources</p>
+                    <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Générée par IA à partir de vos sources</p>
                   </div>
                 </div>
                 <button
@@ -1635,7 +1635,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
                 {/* Orientation */}
                 <div className="space-y-2">
-                  <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Choisissez une orientation</p>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Choisissez une orientation</p>
                   <div className="flex gap-2">
                     {([
                       { key: 'portrait' as const, label: 'Portrait', icon: '📱' },
@@ -1645,7 +1645,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                       <button
                         key={opt.key}
                         onClick={() => setInfraOrientation(opt.key)}
-                        className="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl text-[10px] font-medium transition-all"
+                        className="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl text-xs font-medium transition-all"
                         style={{
                           backgroundColor: infraOrientation === opt.key ? '#f9731612' : 'var(--bg-base)',
                           color: infraOrientation === opt.key ? '#f97316' : 'var(--text-muted)',
@@ -1661,7 +1661,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
                 {/* Langue */}
                 <div className="space-y-2">
-                  <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Langue</p>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Langue</p>
                   <div className="flex gap-1.5 flex-wrap">
                     {([
                       { key: 'fr', label: 'Français', flag: '🇫🇷' },
@@ -1677,7 +1677,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                       <button
                         key={opt.key}
                         onClick={() => setInfraLang(opt.key)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-medium transition-all"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
                         style={{
                           backgroundColor: infraLang === opt.key ? '#f9731612' : 'var(--bg-base)',
                           color: infraLang === opt.key ? '#f97316' : 'var(--text-muted)',
@@ -1693,7 +1693,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
                 {/* Style visuel */}
                 <div className="space-y-2">
-                  <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Choisissez un style visuel</p>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Choisissez un style visuel</p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {([
                       { key: 'auto', label: 'Sélection auto', emoji: '✨' },
@@ -1711,7 +1711,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                       <button
                         key={opt.key}
                         onClick={() => setInfraStyle(opt.key)}
-                        className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-[9px] font-medium transition-all"
+                        className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium transition-all"
                         style={{
                           backgroundColor: infraStyle === opt.key ? '#f9731612' : 'var(--bg-base)',
                           color: infraStyle === opt.key ? '#f97316' : 'var(--text-muted)',
@@ -1727,7 +1727,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
                 {/* Niveau de détail */}
                 <div className="space-y-2">
-                  <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Niveau de détail</p>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Niveau de détail</p>
                   <div className="flex gap-2">
                     {([
                       { key: 'low' as const, label: 'Minimal', desc: '3-4 éléments' },
@@ -1737,7 +1737,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                       <button
                         key={opt.key}
                         onClick={() => setInfraDetail(opt.key)}
-                        className="flex-1 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl text-[10px] font-medium transition-all"
+                        className="flex-1 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
                         style={{
                           backgroundColor: infraDetail === opt.key ? '#f9731612' : 'var(--bg-base)',
                           color: infraDetail === opt.key ? '#f97316' : 'var(--text-muted)',
@@ -1745,7 +1745,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                         }}
                       >
                         <span className="font-semibold">{opt.label}</span>
-                        <span className="text-[8px] opacity-60">{opt.desc}</span>
+                        <span className="text-xs opacity-60">{opt.desc}</span>
                       </button>
                     ))}
                   </div>
@@ -1754,10 +1754,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 {/* Sources */}
                 {sources.length > 1 && (
                   <div className="space-y-2">
-                    <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                    <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>
                       Sources ({selectedSourceIds.length || sources.length}/{sources.length})
                     </p>
-                    <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                    <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                       {selectedSourceIds.length === 0 ? 'Toutes les sources seront utilisées' : `${selectedSourceIds.length} source(s) sélectionnée(s)`}
                     </p>
                   </div>
@@ -1765,14 +1765,14 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
                 {/* Description personnalisée */}
                 <div className="space-y-2">
-                  <p className="text-[10px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>
                     Décrivez l'infographie que vous souhaitez créer
                   </p>
                   <textarea
                     value={infraDescription}
                     onChange={(e) => setInfraDescription(e.target.value)}
                     placeholder="Ex: Une infographie sur les tendances du marché avec des statistiques clés, un comparatif visuel des acteurs principaux..."
-                    className="w-full px-3 py-2.5 rounded-xl text-[10px] resize-none leading-relaxed"
+                    className="w-full px-3 py-2.5 rounded-xl text-xs resize-none leading-relaxed"
                     style={{
                       backgroundColor: 'var(--bg-base)',
                       color: 'var(--text-primary)',
@@ -1787,14 +1787,14 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               <div className="px-6 py-4 border-t flex items-center justify-between" style={{ borderColor: 'var(--border-base)' }}>
                 <button
                   onClick={() => { setShowInfographicModal(false); infographicModalTriggerRef.current?.focus(); }}
-                  className="px-4 py-2 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5"
+                  className="px-4 py-2 rounded-lg text-xs font-medium transition-all hover:bg-white/5"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
                 </button>
                 <button
                   onClick={handleInfographicGenerate}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-bold transition-all active:scale-95 shadow-sm"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm"
                   style={{ backgroundColor: '#f97316', color: '#fff' }}
                 >
                   <Lightbulb className="w-3.5 h-3.5" />

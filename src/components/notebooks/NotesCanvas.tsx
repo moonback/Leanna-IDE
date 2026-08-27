@@ -184,7 +184,7 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
         >
           <ZoomIn className="w-3.5 h-3.5" />
         </button>
-        <span className="text-[9px] font-mono min-w-[36px] text-center" style={{ color: 'var(--text-dimmed)' }}>
+        <span className="text-xs font-mono min-w-[36px] text-center" style={{ color: 'var(--text-dimmed)' }}>
           {Math.round(zoom * 100)}%
         </span>
         <button
@@ -206,7 +206,7 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
 
       {/* Info bar */}
       <div
-        className="absolute bottom-3 left-3 z-30 px-3 py-1.5 rounded-lg text-[9px] backdrop-blur-sm"
+        className="absolute bottom-3 left-3 z-30 px-3 py-1.5 rounded-lg text-xs backdrop-blur-sm"
         style={{ backgroundColor: 'color-mix(in srgb, var(--bg-panel) 90%, transparent)', border: '1px solid var(--border-base)', color: 'var(--text-dimmed)' }}
       >
         {notes.length} notes • {connections.length} lien{connections.length !== 1 ? 's' : ''} • Glissez les cartes • Molette = zoom
@@ -289,7 +289,7 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
                   <Move className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
                   <div className="flex items-center gap-1 flex-1 min-w-0">
                     {note.pinned && <Pin className="w-2.5 h-2.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
-                    <span className="text-[10px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                       {note.title}
                     </span>
                   </div>
@@ -303,17 +303,17 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
                   className="cursor-pointer hover:opacity-80 transition-opacity"
                   onClick={() => onSelectNote?.(note.id)}
                 >
-                  <p className="text-[9px] line-clamp-4 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-xs line-clamp-4 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                     {note.content || 'Note vide — cliquez pour éditer'}
                   </p>
                 </div>
 
                 {/* Meta */}
                 <div className="flex items-center gap-2 mt-2 pt-1.5" style={{ borderTop: '1px solid var(--border-base)' }}>
-                  <span className="text-[8px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                     {timeAgo(note.updatedAt)}
                   </span>
-                  <span className="text-[8px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                     {note.content.length} car.
                   </span>
                 </div>

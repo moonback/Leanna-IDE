@@ -1579,6 +1579,13 @@ body {
   border: none;
   transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
+.notebook-segment:focus-visible,
+.notebook-ghost-button:focus-visible,
+.notebook-icon-button:focus-visible,
+.notebook-primary-small:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.3);
+}
 .notebook-segment {
   padding: 8px 16px;
   font-size: 13px;

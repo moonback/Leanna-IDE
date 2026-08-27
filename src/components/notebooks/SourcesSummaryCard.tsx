@@ -68,7 +68,7 @@ export function SourcesSummaryCard({ notebookId, sourcesCount, sourcesHash }: Pr
     <motion.div
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, ease: 'easeOut' }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
       className="rounded-xl overflow-hidden"
       style={{
         backgroundColor: 'color-mix(in srgb, var(--bg-panel) 85%, var(--accent-primary) 15%)',
@@ -80,7 +80,7 @@ export function SourcesSummaryCard({ notebookId, sourcesCount, sourcesHash }: Pr
         onClick={() => setCollapsed(!collapsed)}
       >
         <Sparkles className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)', opacity: 0.8 }} />
-        <p className="flex-1 text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+        <p className="flex-1 text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
           Résumé • {sourcesCount} source{sourcesCount > 1 ? 's' : ''}
         </p>
 
@@ -118,21 +118,21 @@ export function SourcesSummaryCard({ notebookId, sourcesCount, sourcesHash }: Pr
               {loading && !summary && (
                 <div className="flex items-center gap-2 py-3 justify-center">
                   <Sparkles className="w-3.5 h-3.5 animate-pulse" style={{ color: 'var(--accent-primary)' }} />
-                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                     Génération en cours...
                   </span>
                 </div>
               )}
 
               {error && (
-                <p className="text-[10px] py-1.5" style={{ color: 'var(--color-error, #ef4444)' }}>
+                <p className="text-xs py-1.5" style={{ color: 'var(--color-error, #ef4444)' }}>
                   {error}
                 </p>
               )}
 
               {summary && (
                 <div
-                  className="text-[11px] leading-[1.7] space-y-1"
+                  className="text-xs leading-[1.7] space-y-1"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   {summary.split('\n').map((line, i) => {
@@ -140,7 +140,7 @@ export function SourcesSummaryCard({ notebookId, sourcesCount, sourcesHash }: Pr
                     if (line.startsWith('### ') || line.startsWith('## ')) {
                       const text = line.replace(/^#{2,3}\s*/, '');
                       return (
-                        <p key={i} className="text-[11px] font-semibold mt-2 mb-0.5" style={{ color: 'var(--text-primary)' }}>
+                        <p key={i} className="text-xs font-semibold mt-2 mb-0.5" style={{ color: 'var(--text-primary)' }}>
                           {text}
                         </p>
                       );
@@ -150,7 +150,7 @@ export function SourcesSummaryCard({ notebookId, sourcesCount, sourcesHash }: Pr
                     if (/^\*\*.+\*\*$/.test(line.trim())) {
                       const text = line.trim().replace(/^\*\*|\*\*$/g, '');
                       return (
-                        <p key={i} className="text-[11px] font-semibold mt-1.5 mb-0.5" style={{ color: 'var(--text-primary)' }}>
+                        <p key={i} className="text-xs font-semibold mt-1.5 mb-0.5" style={{ color: 'var(--text-primary)' }}>
                           {text}
                         </p>
                       );
@@ -166,7 +166,7 @@ export function SourcesSummaryCard({ notebookId, sourcesCount, sourcesHash }: Pr
                     if (/^\s*[-•]\s/.test(line)) {
                       return (
                         <div key={i} className="flex gap-1.5 pl-1 my-0.5">
-                          <span className="text-[10px] mt-px flex-shrink-0" style={{ color: 'var(--accent-primary)', opacity: 0.7 }}>•</span>
+                          <span className="text-xs mt-px flex-shrink-0" style={{ color: 'var(--accent-primary)', opacity: 0.7 }}>•</span>
                           <p
                             className="flex-1"
                             dangerouslySetInnerHTML={{ __html: rendered.replace(/^\s*[-•]\s*/, '') }}
@@ -182,7 +182,7 @@ export function SourcesSummaryCard({ notebookId, sourcesCount, sourcesHash }: Pr
                       const rest = rendered.replace(/^\s*\d+[.)]\s*/, '');
                       return (
                         <div key={i} className="flex gap-1.5 pl-1 my-0.5">
-                          <span className="text-[10px] font-medium mt-px flex-shrink-0 w-3 text-right" style={{ color: 'var(--accent-primary)', opacity: 0.7 }}>{num}.</span>
+                          <span className="text-xs font-medium mt-px flex-shrink-0 w-3 text-right" style={{ color: 'var(--accent-primary)', opacity: 0.7 }}>{num}.</span>
                           <p className="flex-1" dangerouslySetInnerHTML={{ __html: rest }} />
                         </div>
                       );
@@ -206,7 +206,7 @@ export function SourcesSummaryCard({ notebookId, sourcesCount, sourcesHash }: Pr
               {loading && summary && (
                 <div className="flex items-center gap-1 mt-2 pt-1.5">
                   <Loader2 className="w-2.5 h-2.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
-                  <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                     Mise à jour...
                   </span>
                 </div>

@@ -196,7 +196,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: 0.1 }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
           onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
@@ -230,7 +230,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                 <h3 className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
                   Présentation Reveal.js
                 </h3>
-                <p className="text-[9px] mt-0.5 truncate" style={{ color: 'var(--text-dimmed)' }}>
+                <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-dimmed)' }}>
                   {doc.title}
                   {slidesCount > 0 && (
                     <span
@@ -267,7 +267,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
 
                   {/* Theme selector */}
                   <div className="space-y-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                       Thème
                     </p>
                     <div className="grid grid-cols-3 gap-1.5">
@@ -276,7 +276,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                           key={t.key}
                           onClick={() => setTheme(t.key)}
                           title={t.desc}
-                          className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl text-[9px] font-medium transition-all"
+                          className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl text-xs font-medium transition-all"
                           style={{
                             backgroundColor: theme === t.key ? `${accentColor}12` : 'var(--bg-base)',
                             color: theme === t.key ? accentColor : 'var(--text-muted)',
@@ -292,7 +292,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
 
                   {/* Transition selector */}
                   <div className="space-y-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                       Transition
                     </p>
                     <div className="grid grid-cols-3 gap-1.5">
@@ -300,7 +300,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                         <button
                           key={t.key}
                           onClick={() => setTransition(t.key)}
-                          className="px-2 py-2 rounded-lg text-[9px] font-medium transition-all text-center"
+                          className="px-2 py-2 rounded-lg text-xs font-medium transition-all text-center"
                           style={{
                             backgroundColor: transition === t.key ? `${accentColor}12` : 'var(--bg-base)',
                             color: transition === t.key ? accentColor : 'var(--text-muted)',
@@ -315,7 +315,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
 
                   {/* Ratio selector */}
                   <div className="space-y-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                       Format
                     </p>
                     <div className="flex gap-2">
@@ -323,7 +323,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                         <button
                           key={r.key}
                           onClick={() => setRatio(r.key)}
-                          className="flex-1 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl text-[10px] font-medium transition-all"
+                          className="flex-1 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
                           style={{
                             backgroundColor: ratio === r.key ? `${accentColor}12` : 'var(--bg-base)',
                             color: ratio === r.key ? accentColor : 'var(--text-muted)',
@@ -332,7 +332,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                         >
                           <Monitor className="w-3.5 h-3.5 mb-0.5" />
                           <span className="font-bold">{r.label}</span>
-                          <span className="text-[8px] opacity-60">{r.desc}</span>
+                          <span className="text-xs opacity-60">{r.desc}</span>
                         </button>
                       ))}
                     </div>
@@ -340,7 +340,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
 
                   {/* Density selector */}
                   <div className="space-y-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                       Densité du contenu
                     </p>
                     <div className="grid grid-cols-3 gap-1.5">
@@ -349,7 +349,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                           key={d.key}
                           onClick={() => setDensity(d.key)}
                           title={d.hint}
-                          className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl text-[9px] font-medium transition-all"
+                          className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl text-xs font-medium transition-all"
                           style={{
                             backgroundColor: density === d.key ? `${accentColor}12` : 'var(--bg-base)',
                             color: density === d.key ? accentColor : 'var(--text-muted)',
@@ -358,12 +358,12 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                         >
                           <span className="text-base leading-none">{d.emoji}</span>
                           <span className="font-semibold">{d.label}</span>
-                          <span className="text-[8px] opacity-60 text-center leading-tight">{d.desc}</span>
+                          <span className="text-xs opacity-60 text-center leading-tight">{d.desc}</span>
                         </button>
                       ))}
                     </div>
                     {density === 'compact' && (
-                      <p className="text-[9px] px-2 py-1.5 rounded-lg" style={{ backgroundColor: `${accentColor}10`, color: accentColor, border: `1px solid ${accentColor}25` }}>
+                      <p className="text-xs px-2 py-1.5 rounded-lg" style={{ backgroundColor: `${accentColor}10`, color: accentColor, border: `1px solid ${accentColor}25` }}>
                         💡 Le contenu est découpé en plusieurs slides — rien n&apos;est masqué ni supprimé.
                       </p>
                     )}
@@ -372,7 +372,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                   {/* Note about excluded types */}
                   {(doc.type === 'infographic' || doc.type === 'mindmap') && (
                     <p
-                      className="text-[9px] px-3 py-2 rounded-lg leading-relaxed"
+                      className="text-xs px-3 py-2 rounded-lg leading-relaxed"
                       style={{ backgroundColor: '#f59e0b10', color: '#f59e0b', border: '1px solid #f59e0b30' }}
                     >
                       ⚠️ Ce type de document peut produire des slides limitées. Les types Résumé, FAQ, Rapport donnent de meilleurs résultats.
@@ -389,7 +389,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                     initial={{ opacity: 0, width: 0 }}
                     animate={{ opacity: 1, width: '100%' }}
                     exit={{ opacity: 0, width: 0 }}
-                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
                     className="flex-1 flex flex-col min-w-0 overflow-hidden"
                     style={{ minHeight: '420px' }}
                   >
@@ -398,13 +398,13 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                       className="flex items-center justify-between px-4 py-2 border-b flex-shrink-0"
                       style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
                     >
-                      <span className="text-[9px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>
                         APERÇU
                       </span>
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={handleOpenTab}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-medium transition-all hover:bg-white/5 active:scale-95"
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/5 active:scale-95"
                           style={{ border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
                           title="Ouvrir en plein écran dans un nouvel onglet"
                         >
@@ -440,7 +440,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                   <>
                     <button
                       onClick={handleDownload}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5 active:scale-95"
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:bg-white/5 active:scale-95"
                       style={{ border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
                       title="Télécharger le fichier HTML"
                     >
@@ -449,7 +449,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                     </button>
                     <button
                       onClick={handleOpenTab}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5 active:scale-95"
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:bg-white/5 active:scale-95"
                       style={{ border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
                       title="Ouvrir dans un nouvel onglet"
                     >
@@ -464,7 +464,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
               <div className="flex items-center gap-2 ml-auto">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5"
+                  className="px-4 py-2 rounded-lg text-xs font-medium transition-all hover:bg-white/5"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Fermer
@@ -472,7 +472,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                 <button
                   onClick={handleGenerate}
                   disabled={loading}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-bold transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ backgroundColor: accentColor, color: '#fff' }}
                 >
                   {loading ? (

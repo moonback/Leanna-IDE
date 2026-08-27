@@ -50,7 +50,7 @@ interface SandboxFolder {
 const SPRING_UI = { type: 'spring' as const, bounce: 0, duration: 0.3 };
 // Slight bounce, reserved for momentum-flavoured moments (a message that
 // just "arrived", a floating action button appearing).
-const SPRING_MOMENTUM = { type: 'spring' as const, bounce: 0.2, duration: 0.35 };
+const SPRING_MOMENTUM = { type: 'spring' as const, bounce: 0.2, duration: 0.3 };
 
 /** Rich markdown rendering for chat messages */
 function renderMessageContent(content: string): JSX.Element {
@@ -78,7 +78,7 @@ function renderMessageContent(content: string): JSX.Element {
                   className="flex items-center justify-between px-3 py-1.5"
                   style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-base)' }}
                 >
-                  <span className="text-[9px] font-mono font-medium uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs font-mono font-medium uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                     {lang}
                   </span>
                 </div>
@@ -257,7 +257,7 @@ function renderMessageContent(content: string): JSX.Element {
             blocks.push(
               <div key={`ol-${blockIdx++}`} className="flex gap-2.5 pl-2 my-0.5">
                 <span
-                  className="text-[10px] font-bold min-w-[16px] mt-[2px] flex-shrink-0 text-center rounded"
+                  className="text-xs font-bold min-w-[16px] mt-[2px] flex-shrink-0 text-center rounded"
                   style={{ color: 'var(--accent-primary)' }}
                 >
                   {num}
@@ -322,7 +322,7 @@ function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
       tokens.push(
         <code
           key={`c-${keyIdx++}`}
-          className="px-1.5 py-0.5 rounded text-[10px] font-mono"
+          className="px-1.5 py-0.5 rounded text-xs font-mono"
           style={{ backgroundColor: 'rgba(0,0,0,0.15)', border: '1px solid var(--border-base)' }}
         >
           {match[6]}
@@ -1323,7 +1323,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 initial={{ opacity: 0, y: 4, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 4, scale: 0.95 }}
-                transition={prefersReducedMotion ? { duration: 0.12 } : SPRING_UI}
+                transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
                 style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', transformOrigin: 'top left' }}
                 className="absolute top-full left-0 mt-1 z-40 w-72 rounded-xl overflow-hidden shadow-xl"
               >
@@ -1345,7 +1345,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
                   {/* Thread list */}
                   {threads.length === 0 ? (
-                    <p className="px-4 py-3 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                    <p className="px-4 py-3 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                       Pas de conversations supplémentaires.
                     </p>
                   ) : (
@@ -1380,7 +1380,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
         {/* Token counter (estimated) */}
         <div
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-medium"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium"
           style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-dimmed)' }}
           title="Estimation des tokens utilisés dans cette conversation"
         >
@@ -1393,7 +1393,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         {/* New thread button */}
         <button
           onClick={handleNewThread}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all hover:bg-[var(--accent-subtle)] active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-[var(--accent-subtle)] active:scale-95"
           style={{ color: 'var(--accent-primary)', border: '1px solid var(--border-base)' }}
           title="Nouvelle conversation"
         >
@@ -1472,7 +1472,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 key={msg.id}
                 initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={prefersReducedMotion ? { duration: 0.15 } : SPRING_UI}
+                transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
                 className={`mx-auto mb-6 flex w-full max-w-4xl ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
@@ -1522,19 +1522,19 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                   {/* Actions bar */}
                   {editingMsgId !== msg.id && (
                     <div className="flex items-center gap-2 mt-2.5 pt-1">
-                      <p className="text-[9px] opacity-40">
+                      <p className="text-xs opacity-40">
                         {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                       </p>
 
                       {/* Separator dot */}
-                      <span className="text-[6px] opacity-20">•</span>
+                      <span className="text-xs opacity-20">•</span>
 
                       {msg.role === 'assistant' && (
                         <>
                           {/* Copy */}
                           <button
                             onClick={() => handleCopy(msg.id, msg.content)}
-                            className={`flex items-center gap-1 text-[9px] transition-all ${copiedMsgId === msg.id ? 'opacity-100' : 'opacity-40 hover:opacity-100'}`}
+                            className={`flex items-center gap-1 text-xs transition-all ${copiedMsgId === msg.id ? 'opacity-100' : 'opacity-40 hover:opacity-100'}`}
                             style={{ color: copiedMsgId === msg.id ? '#10b981' : undefined }}
                             title="Copier la réponse"
                           >
@@ -1550,7 +1550,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                           <button
                             onClick={() => handleRetry(msg.id)}
                             disabled={loading}
-                            className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity disabled:opacity-20"
+                            className="flex items-center gap-1 text-xs opacity-40 hover:opacity-100 transition-opacity disabled:opacity-20"
                             title="Régénérer la réponse"
                           >
                             <RefreshCw className="w-3 h-3" />
@@ -1560,7 +1560,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                           {/* TTS */}
                           <button
                             onClick={() => handleTTS(msg.id, msg.content)}
-                            className={`flex items-center gap-1.5 text-[9px] transition-all rounded-md px-1.5 py-0.5 ${speakingMsgId === msg.id ? 'opacity-100 bg-[var(--accent-primary)]/10' : 'opacity-40 hover:opacity-100'}`}
+                            className={`flex items-center gap-1.5 text-xs transition-all rounded-md px-1.5 py-0.5 ${speakingMsgId === msg.id ? 'opacity-100 bg-[var(--accent-primary)]/10' : 'opacity-40 hover:opacity-100'}`}
                             style={{ color: speakingMsgId === msg.id ? 'var(--accent-primary)' : undefined }}
                             title={speakingMsgId === msg.id ? 'Arrêter la lecture' : 'Lire à voix haute (TTS IA)'}
                           >
@@ -1586,7 +1586,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                           {/* Save to notes */}
                           <button
                             onClick={() => handleSaveToNote(msg)}
-                            className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
+                            className="flex items-center gap-1 text-xs opacity-40 hover:opacity-100 transition-opacity"
                             title="Sauvegarder dans les notes"
                           >
                             <StickyNote className="w-3 h-3" />
@@ -1596,7 +1596,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                           {/* Save as Markdown */}
                           <button
                             onClick={() => openFolderPicker(msg)}
-                            className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
+                            className="flex items-center gap-1 text-xs opacity-40 hover:opacity-100 transition-opacity"
                             title="Enregistrer ce message en fichier Markdown (.md)"
                           >
                             <Download className="w-3 h-3" />
@@ -1604,7 +1604,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                           </button>
 
                           {/* Separator */}
-                          <span className="text-[6px] opacity-20">•</span>
+                          <span className="text-xs opacity-20">•</span>
 
                           {/* Feedback thumbs */}
                           <button
@@ -1630,7 +1630,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                         <>
                           <button
                             onClick={() => handleEditStart(msg.id, msg.content)}
-                            className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
+                            className="flex items-center gap-1 text-xs opacity-40 hover:opacity-100 transition-opacity"
                             title="Modifier et renvoyer"
                           >
                             <Pencil className="w-3 h-3" />
@@ -1640,7 +1640,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                           {/* Save user message as Markdown */}
                           <button
                             onClick={() => openFolderPicker(msg)}
-                            className="flex items-center gap-1 text-[9px] opacity-40 hover:opacity-100 transition-opacity"
+                            className="flex items-center gap-1 text-xs opacity-40 hover:opacity-100 transition-opacity"
                             title="Enregistrer ce message en fichier Markdown (.md)"
                           >
                             <Download className="w-3 h-3" />
@@ -1656,7 +1656,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                     <div className="mt-3 pt-2.5 border-t" style={{ borderColor: 'var(--notebook-border)' }}>
                       <button
                         onClick={() => setShowCitations(showCitations === msg.id ? null : msg.id)}
-                        className="flex items-center gap-1.5 text-[10px] font-medium opacity-70 hover:opacity-100 transition"
+                        className="flex items-center gap-1.5 text-xs font-medium opacity-70 hover:opacity-100 transition"
                       >
                         <Quote className="w-3 h-3" />
                         {msg.citations.length} citation{msg.citations.length > 1 ? 's' : ''}
@@ -1674,7 +1674,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                               {msg.citations.map((cit, i) => (
                                 <div
                                   key={i}
-                                  className="p-2.5 rounded-lg text-[10px] cursor-pointer transition-all hover:ring-1 hover:ring-[var(--accent-primary)]"
+                                  className="p-2.5 rounded-lg text-xs cursor-pointer transition-all hover:ring-1 hover:ring-[var(--accent-primary)]"
                                   style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)' }}
                                   onMouseEnter={(e) => handleCitationHover(cit, e)}
                                   onMouseLeave={handleCitationLeave}
@@ -1682,7 +1682,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                                   <div className="flex items-center gap-2">
                                     <span className="font-semibold">{cit.sourceTitle}</span>
                                     <span
-                                      className="px-1.5 py-0.5 rounded-full text-[8px] font-bold"
+                                      className="px-1.5 py-0.5 rounded-full text-xs font-bold"
                                       style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
                                     >
                                       {(cit.relevance * 100).toFixed(0)}%
@@ -1706,7 +1706,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               <motion.div
                 initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={prefersReducedMotion ? { duration: 0.15 } : SPRING_UI}
+                transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
                 className="flex justify-start max-w-4xl mx-auto"
               >
                 <div
@@ -1835,7 +1835,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              transition={prefersReducedMotion ? { duration: 0.12 } : SPRING_MOMENTUM}
+              transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_MOMENTUM}
               whileTap={{ scale: 0.88 }}
               onClick={scrollToBottom}
               className="fixed bottom-28 right-8 p-2.5 rounded-full shadow-lg z-30 hover:opacity-90 transition-opacity duration-150"
@@ -1854,7 +1854,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
             initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.95 }}
-            transition={{ duration: 0.12 }}
+            transition={{ duration: 0.1 }}
             className="fixed z-50 max-w-md p-4 rounded-xl shadow-2xl pointer-events-none"
             style={{
               left: Math.min(hoveredCitation.x, window.innerWidth - 420),
@@ -1868,7 +1868,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               <Quote className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
               <span className="text-[11px] font-semibold truncate">{hoveredCitation.citation.sourceTitle}</span>
               <span
-                className="text-[9px] px-1.5 py-0.5 rounded-full font-bold flex-shrink-0"
+                className="text-xs px-1.5 py-0.5 rounded-full font-bold flex-shrink-0"
                 style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
               >
                 {(hoveredCitation.citation.relevance * 100).toFixed(0)}%
@@ -1898,14 +1898,14 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               className="flex items-center gap-2 p-2.5 rounded-xl flex-wrap"
               style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
             >
-              <span className="text-[9px] font-semibold flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs font-semibold flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
                 Sources actives :
               </span>
               {sources.map(s => (
                 <button
                   key={s.id}
                   onClick={() => toggleSourceFilter(s.id)}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all active:scale-95 ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all active:scale-95 ${
                     selectedSources.includes(s.id) || selectedSources.length === 0
                       ? 'ring-1 ring-[var(--accent-primary)]'
                       : 'opacity-40'
@@ -1922,7 +1922,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               {selectedSources.length > 0 && (
                 <button
                   onClick={clearSourceFilter}
-                  className="px-2 py-1 rounded-lg text-[9px] font-medium transition-all hover:bg-red-500/10"
+                  className="px-2 py-1 rounded-lg text-xs font-medium transition-all hover:bg-red-500/10"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   <X className="w-3 h-3 inline mr-0.5" />
@@ -1952,7 +1952,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                   <code className="text-[11px] font-mono font-semibold" style={{ color: 'var(--accent-primary)' }}>
                     {cmd.cmd}
                   </code>
-                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                     {cmd.desc}
                   </span>
                 </button>
@@ -1983,7 +1983,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 <Filter className="w-4 h-4" />
                 {selectedSources.length > 0 && (
                   <span
-                    className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full text-[8px] font-bold flex items-center justify-center"
+                    className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full text-xs font-bold flex items-center justify-center"
                     style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
                   >
                     {selectedSources.length}
@@ -2072,7 +2072,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         {/* Bottom bar — hints + personality + secondary actions */}
         <div className="flex items-center justify-between mt-2 px-1">
           <div className="flex items-center gap-2">
-            <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
               Entrée pour envoyer • / commandes
               {selectedSources.length > 0 && (
                 <span style={{ color: 'var(--accent-primary)' }}> • {selectedSources.length} source{selectedSources.length > 1 ? 's' : ''}</span>
@@ -2083,7 +2083,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
             <div className="relative">
               <button
                 onClick={() => setShowPersonalityMenu(!showPersonalityMenu)}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-medium transition-all hover:bg-[var(--accent-subtle)]"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium transition-all hover:bg-[var(--accent-subtle)]"
                 style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
               >
                 <span>{currentPersonality.emoji}</span>
@@ -2096,12 +2096,12 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                     initial={{ opacity: 0, y: 4, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 4, scale: 0.95 }}
-                    transition={prefersReducedMotion ? { duration: 0.12 } : SPRING_UI}
+                    transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
                     className="absolute bottom-full left-0 mb-1 z-40 w-56 rounded-xl overflow-hidden shadow-xl"
                     style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', transformOrigin: 'bottom left' }}
                   >
                     <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-base)' }}>
-                      <p className="text-[9px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Ton de l'assistant</p>
+                      <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Ton de l'assistant</p>
                     </div>
                     {personalities.map((p) => (
                       <button
@@ -2111,10 +2111,10 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                       >
                         <span className="text-sm">{p.emoji}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-medium" style={{ color: personality === p.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                          <p className="text-xs font-medium" style={{ color: personality === p.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
                             {p.label}
                           </p>
-                          <p className="text-[9px] truncate" style={{ color: 'var(--text-dimmed)' }}>{p.desc}</p>
+                          <p className="text-xs truncate" style={{ color: 'var(--text-dimmed)' }}>{p.desc}</p>
                         </div>
                         {personality === p.id && (
                           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--accent-primary)' }} />
@@ -2168,7 +2168,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.92, y: prefersReducedMotion ? 0 : 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.92, y: prefersReducedMotion ? 0 : 16 }}
-              transition={prefersReducedMotion ? { duration: 0.15 } : SPRING_UI}
+              transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
               className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
               style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
               onClick={e => e.stopPropagation()}
@@ -2183,7 +2183,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                     <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
                       Enregistrer en Markdown
                     </p>
-                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                       Choisir le dossier de destination dans la sandbox
                     </p>
                   </div>
@@ -2238,7 +2238,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
               {/* Custom folder input */}
               <div className="px-4 pb-3">
-                <p className="text-[10px] mb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-xs mb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>
                   Ou saisir un chemin personnalisé
                 </p>
                 <input
@@ -2259,7 +2259,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
               {/* Destination preview */}
               {(selectedFolder !== '' || customFolderName.trim()) && (
-                <div className="mx-4 mb-3 px-3 py-2 rounded-lg text-[10px]" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+                <div className="mx-4 mb-3 px-3 py-2 rounded-lg text-xs" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
                   <span className="font-medium">Destination : </span>
                   <span className="font-mono">
                     {customFolderName.trim() || selectedFolder || '/'}/
