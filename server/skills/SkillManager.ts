@@ -200,6 +200,28 @@ async function writeAuditLog(entry: HealAttempt): Promise<void> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Auto-Guerison: Interfaces pour l'analyse des erreurs d'outil
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface ToolAlternativeProposal {
+  type: 'existing_tool' | 'new_skill' | 'workaround';
+  toolName?: string;
+  skillName?: string;
+  description: string;
+  confidence: number;
+  reasoning: string;
+}
+
+export interface ToolErrorAnalysis {
+  errorMessage: string;
+  errorType: string;
+  failedTool: string;
+  failedSkill?: string;
+  proposals: ToolAlternativeProposal[];
+  timestamp: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SkillManager
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -227,6 +249,9 @@ export class SkillManager {
    * définir SELF_HEAL_READONLY=false dans .env.local
    */
   private static readonly READONLY = process.env.SELF_HEAL_READONLY !== 'false';
+
+  /** Historique des analyses d'erreurs d'outils pour suivi et apprentissage */
+  private toolErrorAnalyses: ToolErrorAnalysis[] = [];
 
 
   constructor() {
@@ -967,6 +992,346 @@ Analyse la situation et propose un patch de remplacement COMPLET pour ce fichier
     return { total, success, failed: total - success, rolledBack };
   }
 
+  /**
+   * Analyse une erreur d'outil et propose des alternatives stratégiques.
+   * Plutôt que de simplement réparer le fichier, cette méthode tentera de:
+   * 1. Trouver un outil similaire existant
+   * 2. Proposer la création d'une nouvelle skill si nécessaire
+   * 3. Suggérer des solutions de contournement
+   */
+  async analyzeToolErrorAndProposeAlternatives(
+    toolName: string,
+    error: Error,
+    skillPath?: string
+  ): Promise<ToolErrorAnalysis> {
+    const analysis: ToolErrorAnalysis = {
+      errorMessage: error.message,
+      errorType: this.classifyErrorType(error),
+      failedTool: toolName,
+      failedSkill: skillPath ? path.basename(skillPath) : undefined,
+      proposals: [],
+      timestamp: Date.now(),
+    };
+
+    // 1. Analyser l'erreur pour comprendre le problème
+    const errorContext = this.extractErrorContext(error, toolName);
+
+    // 2. Chercher des outils similaires existants
+    const similarTools = this.findSimilarTools(toolName);
+    
+    if (similarTools.length > 0) {
+      similarTools.forEach(similarTool => {
+        analysis.proposals.push({
+          type: 'existing_tool',
+          toolName: similarTool.name,
+          skillName: similarTool.skillName,
+          description: `Utiliser l'outil similaire '${similarTool.name}' depuis la skill '${similarTool.skillName}'`,
+          confidence: similarTool.similarityScore,
+          reasoning: `L'outil '${similarTool.name}' a des fonctionnalités similaires basées sur l'analyse des mots-clés et des déclarations`,
+        });
+      });
+    }
+
+    // 3. Proposer la création d'une nouvelle skill si l'outil semble manquant
+    if (error.message.includes('unknown tool') || error.message.includes('not found') || 
+        error.message.includes('ucune skill') || error.message.includes('unavailable')) {
+      
+      const skillCategory = this.suggestSkillCategoryForTool(toolName);
+      if (skillCategory) {
+        analysis.proposals.push({
+          type: 'new_skill',
+          skillName: skillCategory,
+          description: `Créer une nouvelle skill '${skillCategory}' pour gérer cet outil`,
+          confidence: 0.8,
+          reasoning: `L'erreur indique que l'outil est inconnu. Sur la base des mots-clés, il pourrait appartenir à la catégorie '${skillCategory}'`,
+        });
+      }
+    }
+
+    // 4. Proposer des solutions de contournement basées sur le type d'erreur
+    const workarounds = this.suggestWorkarounds(error, toolName);
+    analysis.proposals.push(...workarounds);
+
+    // 5. Trier les propositions par confiance
+    analysis.proposals.sort((a, b) => b.confidence - a.confidence);
+
+    // Limiter à max 5 propositions
+    if (analysis.proposals.length > 5) {
+      analysis.proposals = analysis.proposals.slice(0, 5);
+    }
+
+    console.log(`[Auto-Guerison] Analyse complète pour l'outil '${toolName}':`, {
+      errorType: analysis.errorType,
+      proposalCount: analysis.proposals.length,
+      topProposal: analysis.proposals[0]?.type,
+    });
+
+    return analysis;
+  }
+
+  /**
+   * Stocke une analyse d'erreur d'outil pour consultation ultérieure
+   * Permet de suivre les erreurs récurrentes et d'identifier les patterns
+   */
+  private storeToolErrorAnalysis(analysis: ToolErrorAnalysis): void {
+    // Stocker dans l'historique (on pourrait aussi persister dans un fichier)
+    this.toolErrorAnalyses.push(analysis);
+    
+    // Limiter la taille de l'historique
+    if (this.toolErrorAnalyses.length > 20) {
+      this.toolErrorAnalyses.shift();
+    }
+    
+    console.log(`[Auto-Guerison] Analyse stockée pour '${analysis.failedTool}' (type: ${analysis.errorType})`);
+  }
+
+  /**
+   * Retourne l'historique des analyses d'erreurs d'outils
+   */
+  getToolErrorAnalyses(): ToolErrorAnalysis[] {
+    return [...this.toolErrorAnalyses];
+  }
+
+  /**
+   * Analyse proactivement un outil et propose des alternatives (méthode publique)
+   * Peut être appelée par l'IA pour obtenir des suggestions avant d'essayer un outil
+   */
+  async analyzeToolProactively(toolName: string, description?: string): Promise<ToolErrorAnalysis> {
+    // Créer une faux erreur pour utiliser la même logique
+    const mockError = new Error(
+      description || `Analyse proactive demandée pour l'outil: ${toolName}`
+    );
+    
+    // Appeler l'analyse avec l'outil et une pseudo-erreur
+    return this.analyzeToolErrorAndProposeAlternatives(toolName, mockError);
+  }
+
+  /**
+   * Retourne les propositions d'alternatives pour un outil donné (sans erreur)
+   * Utile pour la découverte et la suggestion d'outils
+   */
+  async getToolAlternatives(toolName: string): Promise<ToolAlternativeProposal[]> {
+    const mockError = new Error(`Recherche d'alternatives pour: ${toolName}`);
+    const analysis = await this.analyzeToolErrorAndProposeAlternatives(toolName, mockError);
+    return analysis.proposals;
+  }
+
+  /** Classifie le type d'erreur pour un meilleur traitement */
+  private classifyErrorType(error: Error): string {
+    const message = error.message.toLowerCase();
+    const stack = error.stack?.toLowerCase() || '';
+
+    if (message.includes('unknown tool') || message.includes('not found') || 
+        message.includes('ucune skill')) {
+      return 'TOOL_NOT_FOUND';
+    } else if (message.includes('permission') || message.includes('access') || 
+               message.includes('forbidden') || message.includes('refusé')) {
+      return 'PERMISSION_ERROR';
+    } else if (message.includes('timeout') || message.includes('timed out')) {
+      return 'TIMEOUT_ERROR';
+    } else if (message.includes('network') || message.includes('fetch') || 
+               message.includes('http') || message.includes('connection')) {
+      return 'NETWORK_ERROR';
+    } else if (stack.includes('typeerror') || message.includes('not a function') ||
+               message.includes('undefined')) {
+      return 'IMPLEMENTATION_ERROR';
+    } else if (message.includes('syntax') || stack.includes('syntaxerror')) {
+      return 'SYNTAX_ERROR';
+    } else if (message.includes('validation') || message.includes('invalid')) {
+      return 'VALIDATION_ERROR';
+    } else if (message.includes('rate limit') || message.includes('too many')) {
+      return 'RATE_LIMIT_ERROR';
+    } else {
+      return 'GENERIC_ERROR';
+    }
+  }
+
+  /** Extrait le contexte de l'erreur pour une meilleure analyse */
+  private extractErrorContext(error: Error, toolName: string): Record<string, any> {
+    return {
+      toolName,
+      message: error.message,
+      stack: error.stack?.split('\n').slice(0, 5).join('\n') || '',
+      type: this.classifyErrorType(error),
+      isNotFound: error.message.toLowerCase().includes('unknown') || 
+                  error.message.toLowerCase().includes('not found') ||
+                  error.message.toLowerCase().includes('ucune skill'),
+    };
+  }
+
+  /**
+   * Cherche des outils similaires dans les skills existantes
+   * Utilise l'analyse sémantique des noms d'outils et des mots-clés
+   */
+  private findSimilarTools(toolName: string): Array<{ name: string; skillName: string; similarityScore: number }> {
+    const similarTools: Array<{ name: string; skillName: string; similarityScore: number }> = [];
+    const toolLower = toolName.toLowerCase();
+    const toolParts = toolLower.split('_').filter(p => p.length > 2);
+
+    // Parcourir toutes les skills et leurs outils
+    for (const skillItem of this.skills) {
+      const skillName = skillItem.instance.name;
+      const declarations = skillItem.instance.declarations || [];
+
+      for (const declaration of declarations) {
+        const declarationName = declaration.name || '';
+        const declarationLower = declarationName.toLowerCase();
+        const declarationParts = declarationLower.split('_').filter(p => p.length > 2);
+
+        // Calculer un score de similarité simple
+        let similarityScore = 0;
+
+        // Match exact (mais différent outil)
+        if (declarationLower === toolLower) {
+          continue; // C'est le même outil, on passe
+        }
+
+        // Match partiel
+        const commonParts = toolParts.filter(part => declarationParts.includes(part));
+        similarityScore += commonParts.length * 0.3;
+
+        // Similarité de préfixe/suffixe
+        if (declarationLower.startsWith(toolLower.slice(0, Math.min(toolLower.length, 8)))) {
+          similarityScore += 0.4;
+        }
+        if (toolLower.startsWith(declarationLower.slice(0, Math.min(declarationLower.length, 8)))) {
+          similarityScore += 0.4;
+        }
+
+        // Vérifier si les outils appartiennent à la même catégorie sémantique
+        const toolCategory = this.getToolCategory(toolName);
+        const declarationCategory = this.getToolCategory(declarationName);
+        if (toolCategory && declarationCategory && toolCategory === declarationCategory) {
+          similarityScore += 0.3;
+        }
+
+        // Si le score est suffisant, ajouter à la liste
+        if (similarityScore >= 0.3) {
+          similarTools.push({
+            name: declarationName,
+            skillName: skillName,
+            similarityScore: Math.min(similarityScore, 0.99), // Limiter à < 1.0
+          });
+        }
+      }
+    }
+
+    // Trier par score de similarité
+    similarTools.sort((a, b) => b.similarityScore - a.similarityScore);
+
+    // Retourner les top 3
+    return similarTools.slice(0, 3);
+  }
+
+  /**
+   * Détermine la catégorie sémantique d'un outil basé sur les mots-clés
+   */
+  private getToolCategory(toolName: string): string | null {
+    const toolLower = toolName.toLowerCase();
+    
+    for (const [category, keywords] of Object.entries(TOOL_KEYWORDS)) {
+      for (const keyword of keywords) {
+        if (toolLower.includes(keyword.toLowerCase())) {
+          return category;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Suggère une catégorie de skill pour un nouvel outil
+   */
+  private suggestSkillCategoryForTool(toolName: string): string | null {
+    return this.getToolCategory(toolName);
+  }
+
+  /**
+   * Suggère des solutions de contournement basées sur le type d'erreur
+   */
+  private suggestWorkarounds(error: Error, toolName: string): ToolAlternativeProposal[] {
+    const workarounds: ToolAlternativeProposal[] = [];
+    const errorType = this.classifyErrorType(error);
+    const toolLower = toolName.toLowerCase();
+
+    switch (errorType) {
+      case 'TOOL_NOT_FOUND':
+        workarounds.push({
+          type: 'workaround',
+          description: `Vérifier si l'outil '${toolName}' existe avec une autre casse ou format`,
+          confidence: 0.6,
+          reasoning: `Certains outils peuvent être appelés avec des variations de nom (camelCase, snake_case)`,
+        });
+        break;
+
+      case 'PERMISSION_ERROR':
+        workarounds.push({
+          type: 'workaround',
+          description: `Vérifier les permissions pour l'outil '${toolName}'`,
+          confidence: 0.7,
+          reasoning: `L'erreur de permission peut être résolue en ajustant les autorisations`,
+        });
+        break;
+
+      case 'TIMEOUT_ERROR':
+        workarounds.push({
+          type: 'workaround',
+          description: `Réessayer l'appel avec un timeout plus long`,
+          confidence: 0.5,
+          reasoning: `Les erreurs de timeout peuvent être temporaires`,
+        });
+        break;
+
+      case 'NETWORK_ERROR':
+        workarounds.push({
+          type: 'workaround',
+          description: `Vérifier la connexion réseau et réessayer`,
+          confidence: 0.6,
+          reasoning: `Les erreurs réseau sont souvent temporaires`,
+        });
+        break;
+
+      case 'IMPLEMENTATION_ERROR':
+        workarounds.push({
+          type: 'workaround',
+          description: `L'outil peut avoir un bug d'implémentation, vérifier les logs pour plus de détails`,
+          confidence: 0.4,
+          reasoning: `Les erreurs d'implémentation nécessitent souvent une correction de code`,
+        });
+        break;
+
+      case 'RATE_LIMIT_ERROR':
+        workarounds.push({
+          type: 'workaround',
+          description: `Attendre avant de réessayer (rate limit atteint)`,
+          confidence: 0.8,
+          reasoning: `Les erreurs de rate limit sont temporaires`,
+        });
+        break;
+
+      default:
+        // Suggestions générales
+        if (toolLower.includes('git') || toolLower.includes('repository')) {
+          workarounds.push({
+            type: 'workaround',
+            description: `Vérifier que le dépôt git est dans un état valide`,
+            confidence: 0.5,
+            reasoning: `Les opérations git nécessitent un dépôt valide`,
+          });
+        }
+        if (toolLower.includes('file') || toolLower.includes('fichier')) {
+          workarounds.push({
+            type: 'workaround',
+            description: `Vérifier que le fichier existe et est accessible`,
+            confidence: 0.5,
+            reasoning: `Les opérations sur fichiers nécessitent des chemins valides`,
+          });
+        }
+    }
+
+    return workarounds;
+  }
+
   async handleToolCall(name: string, args: any, context?: any) {
         // Normalisation : certains providers (Gemini) préfixent le nom d'outil
         // avec le nom du skill (ex: "selfImprovement:scan_for_improvements" ou
@@ -996,10 +1361,37 @@ Analyse la situation et propose un patch de remplacement COMPLET pour ce fichier
           } catch (error) {
             console.error(`[SkillManager] Erreur dans ${normalizedName} (${path.basename(skillItem.path)}):`, (error as Error).message);
 
-            // Lancer le processus d'auto-guérison (async, non bloquant sur le throw)
-            this.selfHealSkill(skillItem.path, error as Error, context).catch((healErr) => {
-              console.error(`[Self-Healing] Échec complet du processus:`, healErr);
-            });
+            // Nouvel mécanisme d'auto-guérison avancé : analyser et proposer des alternatives
+            this.analyzeToolErrorAndProposeAlternatives(normalizedName, error as Error, skillItem.path)
+              .then((analysis) => {
+                // Si des alternatives existent, les proposer
+                if (analysis.proposals && analysis.proposals.length > 0) {
+                  console.log(`[Auto-Guerison] 💡 Propositions d'alternatives pour '${normalizedName}':`);
+                  analysis.proposals.forEach((proposal, index) => {
+                    console.log(`  ${index + 1}. [${proposal.type}] ${proposal.description} (confiance: ${(proposal.confidence * 100).toFixed(0)}%)`);
+                    console.log(`     → Raison: ${proposal.reasoning}`);
+                  });
+                  
+                  // Stocker l'analyse pour consultation ultérieure
+                  this.storeToolErrorAnalysis(analysis);
+                }
+                
+                // Lancer aussi la réparation classique du fichier
+                return this.selfHealSkill(skillItem.path, error as Error, context);
+              })
+              .catch((analysisErr) => {
+                console.error(`[Auto-Guerison] Échec de l'analyse des alternatives:`, analysisErr);
+                // Si l'analyse échoue, lancer la réparation classique
+                return this.selfHealSkill(skillItem.path, error as Error, context);
+              })
+              .then((healResult) => {
+                if (!healResult.success) {
+                  console.warn(`[Auto-Guerison] La tentative de réparation a échoué. Consultez les propositions d'alternatives ci-dessus.`);
+                }
+              })
+              .catch((healErr) => {
+                console.error(`[Self-Healing] Échec complet du processus:`, healErr);
+              });
 
             throw error;
           }
