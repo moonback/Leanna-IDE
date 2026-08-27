@@ -196,7 +196,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
             <p className="text-sm" style={{ color: 'var(--color-error, #ef4444)' }}>{error}</p>
             <button
               onClick={fetchContent}
-              className="px-4 py-2 rounded-xl text-xs font-semibold transition active:scale-95"
+              className="px-4 py-2 rounded-full text-xs font-semibold transition active:scale-95"
               style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
             >
               Réessayer
@@ -228,7 +228,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
                   link.click();
                   document.body.removeChild(link);
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
                 style={{
                   backgroundColor: '#10b98120',
                   color: '#10b981',

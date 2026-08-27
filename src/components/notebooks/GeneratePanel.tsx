@@ -233,7 +233,7 @@ function renderInfographicContent(content: string): JSX.Element {
       <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={handleDownload}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
           style={{
             backgroundColor: '#f9731620',
             color: '#f97316',
@@ -243,7 +243,7 @@ function renderInfographicContent(content: string): JSX.Element {
           📥 Télécharger PNG
         </button>
         {filePath && (
-          <span className="text-xs px-2 py-1 rounded-md" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
+          <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
             📁 {filePath}
           </span>
         )}
@@ -890,7 +890,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                           }}
                         >
                           <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-lg flex items-center justify-center flex-shrink-0"
+                            <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
                                  style={{ backgroundColor: `${color}15` }}>
                               {task.status === 'generating' ? (
                                 <Loader2 className="w-2.5 h-2.5 animate-spin" style={{ color }} />
@@ -976,7 +976,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 {sources.map(src => (
                   <label
                     key={src.id}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-full cursor-pointer hover:bg-white/5 transition-colors"
                   >
                     <input
                       type="checkbox"
@@ -1016,7 +1016,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 onChange={e => setCustomInstructions(e.target.value)}
                 placeholder="Ex: Ton formel, focus technique, ajoute des exemples..."
                 rows={2}
-                className="w-full px-3 py-2.5 rounded-xl text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[#f59e0b]"
+                className="w-full px-3 py-2.5 rounded-full text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[#f59e0b]"
                 style={{
                   backgroundColor: 'var(--bg-panel)',
                   border: '1px solid var(--border-base)',
@@ -1056,7 +1056,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   >
                     <div className="flex items-center gap-2.5">
                       <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: `${docType?.color || '#6b7280'}15` }}
                       >
                         <DocIcon className="w-3.5 h-3.5" style={{ color: docType?.color || 'var(--accent-primary)' }} />
@@ -1108,7 +1108,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
             ref={reportModalTriggerRef}
             onClick={openReportModal}
             disabled={generating || sources.length === 0}
-            className="w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all disabled:opacity-40 active:scale-[0.97] hover:shadow-md hover:-translate-y-0.5"
+            className="w-full flex items-center gap-3 p-3.5 rounded-lg border-2 transition-all disabled:opacity-40 active:scale-[0.97] hover:shadow-md hover:-translate-y-0.5"
             style={{
               borderColor: '#dc262640',
               backgroundColor: '#dc262608',
@@ -1116,7 +1116,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
             }}
           >
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
               style={{ backgroundColor: '#dc262615', border: '1px solid #dc262630' }}
             >
               <FileBarChart className="w-5 h-5" style={{ color: '#dc2626' }} />
@@ -1168,7 +1168,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
                   {/* Icon */}
                   <motion.div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200"
+                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200"
                     style={{ backgroundColor: `${color}12`, border: `1px solid ${color}25` }}
                     whileHover={{ backgroundColor: `${color}22`, scale: 1.08 }}
                   >
@@ -1335,7 +1335,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
           <div className="h-full flex flex-col items-center justify-center gap-6 px-8">
             <div className="relative">
               <div
-                className="w-20 h-20 rounded-3xl flex items-center justify-center"
+                className="w-20 h-20 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: 'var(--accent-subtle)' }}
               >
                 <Sparkles className="w-8 h-8" style={{ color: 'var(--accent-primary)' }} />
@@ -1378,7 +1378,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
             {sources.length === 0 && (
               <p
-                className="text-xs px-4 py-2 rounded-lg"
+                className="text-xs px-4 py-2 rounded-full"
                 style={{ backgroundColor: '#f59e0b10', color: '#f59e0b', border: '1px solid #f59e0b30' }}
               >
                 ⚠️ Ajoutez des sources dans l'onglet Sources pour commencer
@@ -1414,7 +1414,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               {/* Modal header */}
               <div className="flex items-center gap-3 px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border-base)' }}>
                 <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  className="w-10 h-10 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: '#dc262612', border: '1px solid #dc262625' }}
                 >
                   <FileBarChart className="w-5 h-5" style={{ color: '#dc2626' }} />
@@ -1456,7 +1456,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                     {!loadingSuggestions && (
                       <button
                         onClick={loadSuggestions}
-                        className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/5 active:scale-95"
+                        className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-white/5 active:scale-95"
                         style={{ border: '1px solid var(--border-base)', color: '#f59e0b' }}
                         title="Demander de nouvelles suggestions"
                       >
@@ -1494,7 +1494,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                             style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
                           >
                             <div
-                              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                              className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
                               style={{ backgroundColor: `${docType?.color || '#6b7280'}12`, border: `1px solid ${docType?.color || '#6b7280'}25` }}
                             >
                               <SugIcon className="w-4 h-4" style={{ color: docType?.color || '#6b7280' }} />
@@ -1551,7 +1551,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                       style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
                     >
                       <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
                         style={{ backgroundColor: `${color}12`, border: `1px solid ${color}25` }}
                       >
                         <Icon className="w-4 h-4" style={{ color }} />
@@ -1576,7 +1576,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 </p>
                 <button
                   onClick={() => { setShowReportModal(false); reportModalTriggerRef.current?.focus(); }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/5"
+                  className="px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-white/5"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
@@ -1612,7 +1612,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#f9731615' }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f9731615' }}>
                     <Lightbulb className="w-4.5 h-4.5" style={{ color: '#f97316' }} />
                   </div>
                   <div>
@@ -1677,7 +1677,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                       <button
                         key={opt.key}
                         onClick={() => setInfraLang(opt.key)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all"
                         style={{
                           backgroundColor: infraLang === opt.key ? '#f9731612' : 'var(--bg-base)',
                           color: infraLang === opt.key ? '#f97316' : 'var(--text-muted)',
@@ -1711,7 +1711,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                       <button
                         key={opt.key}
                         onClick={() => setInfraStyle(opt.key)}
-                        className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium transition-all"
+                        className="flex items-center gap-2 px-2.5 py-2 rounded-full text-xs font-medium transition-all"
                         style={{
                           backgroundColor: infraStyle === opt.key ? '#f9731612' : 'var(--bg-base)',
                           color: infraStyle === opt.key ? '#f97316' : 'var(--text-muted)',
@@ -1737,7 +1737,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                       <button
                         key={opt.key}
                         onClick={() => setInfraDetail(opt.key)}
-                        className="flex-1 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
+                        className="flex-1 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-full text-xs font-medium transition-all"
                         style={{
                           backgroundColor: infraDetail === opt.key ? '#f9731612' : 'var(--bg-base)',
                           color: infraDetail === opt.key ? '#f97316' : 'var(--text-muted)',
@@ -1772,7 +1772,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                     value={infraDescription}
                     onChange={(e) => setInfraDescription(e.target.value)}
                     placeholder="Ex: Une infographie sur les tendances du marché avec des statistiques clés, un comparatif visuel des acteurs principaux..."
-                    className="w-full px-3 py-2.5 rounded-xl text-xs resize-none leading-relaxed"
+                    className="w-full px-3 py-2.5 rounded-full text-xs resize-none leading-relaxed"
                     style={{
                       backgroundColor: 'var(--bg-base)',
                       color: 'var(--text-primary)',
@@ -1787,14 +1787,14 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               <div className="px-6 py-4 border-t flex items-center justify-between" style={{ borderColor: 'var(--border-base)' }}>
                 <button
                   onClick={() => { setShowInfographicModal(false); infographicModalTriggerRef.current?.focus(); }}
-                  className="px-4 py-2 rounded-lg text-xs font-medium transition-all hover:bg-white/5"
+                  className="px-4 py-2 rounded-full text-xs font-medium transition-all hover:bg-white/5"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
                 </button>
                 <button
                   onClick={handleInfographicGenerate}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold transition-all active:scale-95 shadow-sm"
                   style={{ backgroundColor: '#f97316', color: '#fff' }}
                 >
                   <Lightbulb className="w-3.5 h-3.5" />

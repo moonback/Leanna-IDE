@@ -163,7 +163,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div
-              className="w-11 h-11 rounded-2xl flex items-center justify-center"
+              className="w-11 h-11 rounded-full flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))' }}
             >
               <Layers className="h-5 w-5 text-white" />
@@ -171,8 +171,8 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             <div>
               {/* Display-size heading: tight leading, slightly negative tracking */}
               <h1
-                className="text-xl font-semibold"
-                style={{ color: 'var(--text-primary)', letterSpacing: '-0.015em', lineHeight: 1.15 }}
+                className="text-xl font-semibold notebook-heading"
+                style={{ color: 'var(--text-primary)' }}
               >
                 Notebooks
               </h1>
@@ -190,7 +190,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               transition={SPRING_MOMENTUM}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium"
               style={{
                 background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
                 color: '#fff',
@@ -221,7 +221,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
         <div className="flex-shrink-0 px-6 lg:px-10 py-4">
           <div className="flex items-center gap-3">
             <div
-              className="flex items-center gap-2.5 flex-1 max-w-md px-4 py-2.5 rounded-xl transition-colors duration-150 focus-within:ring-2"
+              className="flex items-center gap-2.5 flex-1 max-w-md px-4 py-2.5 rounded-full transition-colors duration-150 focus-within:ring-2"
               style={{
                 backgroundColor: 'var(--notebook-surface-muted)',
                 border: '1px solid var(--notebook-border)',
@@ -252,7 +252,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as SortBy)}
-                className="px-3 py-2 rounded-lg text-xs font-medium outline-none cursor-pointer transition-colors duration-150"
+                className="px-3 py-2 rounded-full text-xs font-medium outline-none cursor-pointer transition-colors duration-150"
                 style={{
                   backgroundColor: 'var(--notebook-surface-muted)',
                   border: '1px solid var(--notebook-border)',
@@ -298,7 +298,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             >
               <div className="flex items-center gap-2.5">
                 <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
                   style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))' }}
                 >
                   <Sparkles className="w-4 h-4 text-white" />
@@ -328,7 +328,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 onChange={e => setNewDescription(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
                 placeholder="Description (optionnel)"
-                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-colors duration-150 focus:ring-2"
+                className="w-full px-4 py-2.5 rounded-full text-sm outline-none transition-colors duration-150 focus:ring-2"
                 style={{
                   backgroundColor: 'var(--notebook-surface-muted)',
                   border: '1px solid var(--notebook-border)',
@@ -343,7 +343,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                   whileHover={{ scale: newTitle.trim() ? 1.02 : 1 }}
                   whileTap={{ scale: newTitle.trim() ? 0.97 : 1 }}
                   transition={SPRING_MOMENTUM}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium disabled:opacity-40"
                   style={{
                     background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
                     color: '#fff',
@@ -355,7 +355,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 <motion.button
                   onClick={() => { setShowCreateForm(false); setNewTitle(''); setNewDescription(''); }}
                   whileTap={{ scale: 0.96 }}
-                  className="px-4 py-2.5 rounded-xl text-sm font-medium"
+                  className="px-4 py-2.5 rounded-full text-sm font-medium"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
@@ -392,15 +392,15 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
           /* ─── Empty state — onboarding ─── */
           <div className="flex flex-col items-center justify-center text-center py-16 gap-5">
             <div
-              className="w-20 h-20 rounded-3xl flex items-center justify-center"
+              className="w-20 h-20 rounded-full flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))', opacity: 0.9 }}
             >
               <BookOpen className="h-9 w-9 text-white" />
             </div>
             <div className="space-y-2">
               <h2
-                className="text-lg font-semibold"
-                style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}
+                className="text-lg font-semibold notebook-heading"
+                style={{ color: 'var(--text-primary)' }}
               >
                 Créez votre premier notebook
               </h2>
@@ -498,15 +498,15 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
+                          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-lg"
                           style={{ backgroundColor: `${nb.color || '#3b82f6'}15` }}
                         >
                           {nb.icon || '📓'}
                         </div>
                         <div className="min-w-0">
                           <h3
-                            className="text-sm font-semibold truncate"
-                            style={{ color: 'var(--text-primary)', letterSpacing: '-0.005em' }}
+                            className="text-sm font-semibold truncate notebook-body"
+                            style={{ color: 'var(--text-primary)' }}
                           >
                             {nb.title}
                           </h3>
@@ -539,14 +539,14 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                     {/* Footer stats */}
                     <div className="flex items-center gap-2 mt-auto pt-2">
                       <span
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium"
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium"
                         style={{ backgroundColor: 'var(--notebook-surface-muted)', color: 'var(--text-secondary)' }}
                       >
                         <FileText className="w-3 h-3" />
                         {nb.sourcesCount}
                       </span>
                       <span
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium"
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium"
                         style={{ backgroundColor: 'var(--notebook-surface-muted)', color: 'var(--text-secondary)' }}
                       >
                         <MessageSquare className="w-3 h-3" />
@@ -607,7 +607,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             >
               <div className="flex items-center gap-3 mb-4">
                 <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center"
+                  className="w-11 h-11 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: 'rgba(239,68,68,0.1)' }}
                 >
                   <Trash2 className="w-5 h-5 text-red-400" />
@@ -630,7 +630,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 <motion.button
                   onClick={() => setDeleteTarget(null)}
                   whileTap={{ scale: 0.96 }}
-                  className="px-4 py-2.5 rounded-xl text-sm font-medium"
+                  className="px-4 py-2.5 rounded-full text-sm font-medium"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
@@ -640,7 +640,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.95 }}
                   transition={SPRING_MOMENTUM}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium"
+                  className="px-5 py-2.5 rounded-full text-sm font-medium"
                   style={{ backgroundColor: '#ef4444', color: '#fff', boxShadow: '0 2px 8px rgba(239,68,68,0.3)' }}
                 >
                   Supprimer

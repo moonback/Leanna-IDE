@@ -139,7 +139,7 @@ function NoteEditorCenter({
       >
         <div className="flex items-center gap-3">
           <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center"
+            className="w-8 h-8 rounded-full flex items-center justify-center"
             style={{ backgroundColor: 'var(--accent-subtle)' }}
           >
             <StickyNote className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
@@ -156,7 +156,7 @@ function NoteEditorCenter({
         <div className="flex items-center gap-2">
           <button
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-transform active:scale-95 hover:bg-white/5"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-transform active:scale-95 hover:bg-white/5"
             style={{ color: 'var(--text-muted)' }}
           >
             <X className="w-3.5 h-3.5" />
@@ -165,7 +165,7 @@ function NoteEditorCenter({
           <button
             onClick={handleSave}
             disabled={!title.trim() || saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40 transition-transform active:scale-95 text-white"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold disabled:opacity-40 transition-transform active:scale-95 text-white"
             style={{ backgroundColor: 'var(--accent-primary)' }}
           >
             <Save className="w-3.5 h-3.5" />
@@ -182,8 +182,8 @@ function NoteEditorCenter({
           onChange={e => setTitle(e.target.value)}
           placeholder="Titre de la note..."
           autoFocus
-          className="w-full text-xl font-bold bg-transparent outline-none placeholder:opacity-30"
-          style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}
+          className="w-full text-xl font-bold bg-transparent outline-none placeholder:opacity-30 notebook-heading"
+          style={{ color: 'var(--text-primary)' }}
           onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
         />
         <div className="h-px mt-3" style={{ backgroundColor: 'var(--border-base)' }} />
@@ -215,6 +215,24 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [viewingGeneratedDoc, setViewingGeneratedDoc] = useState<{ id: string; title: string; type: string; content: string; createdAt: string } | null>(null);
   const [noteEditorData, setNoteEditorData] = useState<NoteEditorData | null>(null);
   const { spring, fadeOnly } = useFluidTransition();
+  
+  // Détecte prefers-reduced-transparency pour le header
+  const [reducedTransparency, setReducedTransparency] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-transparency: reduce)');
+    setReducedTransparency(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedTransparency(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  
+  const headerStyle = reducedTransparency
+    ? { backgroundColor: 'var(--notebook-surface-elevated)' }
+    : { 
+        backdropFilter: 'blur(20px) saturate(180%)', 
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        backgroundColor: 'var(--notebook-surface-elevated)' 
+      };
 
   const loadNotebook = useCallback(async () => {
     setLoading(true);
@@ -267,7 +285,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         {/* Skeleton header */}
         <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface-elevated)' }}>
           <div className="w-8 h-8 rounded-full animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
-          <div className="w-10 h-10 rounded-xl animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
+          <div className="w-10 h-10 rounded-full animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
           <div className="flex-1 space-y-2">
             <div className="h-4 w-48 rounded-full animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
             <div className="h-3 w-64 rounded-full animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
@@ -363,7 +381,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       {/* ─── Header ─────────────────────────────────────────── */}
       <header
         className="notebook-header flex-shrink-0"
-        style={{ backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)' }}
+        style={headerStyle}
       >
         <div className="flex min-w-0 items-center gap-3">
           <button
@@ -376,7 +394,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           </button>
 
           <div
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-base"
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-base"
             style={{ backgroundColor: `${notebook.color}15`, color: notebook.color }}
             aria-hidden="true"
           >
@@ -385,7 +403,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="notebook-title truncate" style={{ letterSpacing: '-0.01em' }}>{notebook.title}</h1>
+              <h1 className="notebook-title truncate notebook-heading">{notebook.title}</h1>
               {indexingProgress.active && (
                 <span className="notebook-pill">
                   <Loader2 className="h-3 w-3 animate-spin" />

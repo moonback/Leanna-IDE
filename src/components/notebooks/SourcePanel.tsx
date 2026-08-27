@@ -405,7 +405,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
         {/* Search */}
         <div className="px-3 py-2.5 flex-shrink-0">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all"
+          <div className="flex items-center gap-2 px-3 py-2 rounded-full transition-all"
             style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)' }}>
             <Search className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
             <input
@@ -428,7 +428,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
           {sources.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-12 px-4 gap-3">
               <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center"
+                className="w-12 h-12 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: 'var(--notebook-surface-muted)' }}
               >
                 <FileText className="h-5 w-5" style={{ color: 'var(--text-dimmed)' }} />
@@ -445,7 +445,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
               {filteredSources.map((source) => (
                 <div
                   key={source.id}
-                  className="group flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all"
+                  className="group flex items-center gap-2.5 px-3 py-2.5 rounded-full cursor-pointer transition-all"
                   data-active={selectedSourceId === source.id}
                   style={{
                     backgroundColor: selectedSourceId === source.id ? 'var(--accent-subtle, rgba(59,130,246,0.08))' : 'transparent',
@@ -465,7 +465,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 >
                   {/* File type icon */}
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm"
+                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm"
                     style={{
                       backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}12`,
                     }}
@@ -734,7 +734,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 value={textTitle}
                 onChange={e => setTextTitle(e.target.value)}
                 placeholder="Titre (optionnel)"
-                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                className="w-full px-4 py-2.5 rounded-full text-sm outline-none"
                 style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
               />
               <div className="relative">
@@ -799,7 +799,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 value={codebaseTitle}
                 onChange={e => setCodebaseTitle(e.target.value)}
                 placeholder="Titre de la source (optionnel)"
-                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                className="w-full px-4 py-2.5 rounded-full text-sm outline-none"
                 style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
               />
 
@@ -813,7 +813,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                   value={codebaseExtensions}
                   onChange={e => setCodebaseExtensions(e.target.value)}
                   placeholder=".ts .tsx .js .py .md ..."
-                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none font-mono"
+                  className="w-full px-4 py-2.5 rounded-full text-sm outline-none font-mono"
                   style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
                 />
               </div>
@@ -831,7 +831,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                       max={500}
                       value={codebaseMaxSizeKb}
                       onChange={e => setCodebaseMaxSizeKb(Number(e.target.value))}
-                      className="w-20 px-3 py-2 rounded-xl text-sm outline-none text-center"
+                      className="w-20 px-3 py-2 rounded-full text-sm outline-none text-center"
                       style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
                     />
                     <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Ko</span>

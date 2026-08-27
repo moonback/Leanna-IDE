@@ -302,7 +302,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
               setShowForm(true); setEditingId(null); setTitle(''); setContent('');
             }
           }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 shadow-sm"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold transition-all active:scale-95 shadow-sm"
           style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
         >
           <Plus className="w-4 h-4" />
@@ -313,7 +313,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
         <div className="relative">
           <button
             onClick={() => setShowTemplates(!showTemplates)}
-            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
             style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
           >
             <Layout className="w-3.5 h-3.5" />
@@ -359,7 +359,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Rechercher dans les notes..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl text-[11px] outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
+            className="w-full pl-9 pr-3 py-2 rounded-full text-[11px] outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
             style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
           />
         </div>
@@ -367,7 +367,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
         {/* Sort */}
         <button
           onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : prev === 'oldest' ? 'alpha' : 'newest')}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all hover:bg-white/5"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium border transition-all hover:bg-white/5"
           style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
           title="Changer l'ordre de tri"
         >
@@ -379,7 +379,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
         {notes.length > 0 && (
           <button
             onClick={handleExportAll}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
             style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
             title="Exporter toutes les notes en Markdown"
           >
@@ -457,7 +457,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                   onChange={e => setTitle(e.target.value)}
                   placeholder="Titre de la note..."
                   autoFocus
-                  className="w-full px-4 py-2.5 rounded-xl text-sm font-medium outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
+                  className="w-full px-4 py-2.5 rounded-full text-sm font-medium outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
                   style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                 />
                 <div className="relative">
@@ -477,7 +477,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                   <button
                     onClick={() => editingId ? handleUpdate(editingId) : handleCreate()}
                     disabled={!title.trim()}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold disabled:opacity-40 transition-all active:scale-95"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold disabled:opacity-40 transition-all active:scale-95"
                     style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
                   >
                     <Save className="w-3.5 h-3.5" />
@@ -485,7 +485,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                   </button>
                   <button
                     onClick={cancelForm}
-                    className="flex items-center gap-1 px-3 py-2.5 rounded-xl text-xs transition-colors hover:bg-white/5"
+                    className="flex items-center gap-1 px-3 py-2.5 rounded-full text-xs transition-colors hover:bg-white/5"
                     style={{ color: 'var(--text-muted)' }}
                   >
                     <X className="w-3.5 h-3.5" />
@@ -509,7 +509,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
       {sorted.length === 0 && !showForm ? (
         <div className="flex flex-col items-center justify-center py-14 gap-4">
           <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            className="w-14 h-14 rounded-full flex items-center justify-center"
             style={{ backgroundColor: 'var(--accent-subtle)' }}
           >
             <StickyNote className="w-6 h-6" style={{ color: 'var(--accent-primary)' }} />

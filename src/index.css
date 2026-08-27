@@ -1822,6 +1822,16 @@ body {
   transform: translateY(-1px);
 }
 
+/* Typography utilities — 2 values only for notebooks */
+.notebook-heading {
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.notebook-body {
+  letter-spacing: -0.005em;
+  line-height: 1.5;
+}
+
 /* ═══════════════════════════════════════════════
    IDE SHELL / SIDEBAR — calmer desktop frame
    Defined for all five themes (see note at top of file).

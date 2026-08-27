@@ -174,7 +174,7 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
 
       {/* Toolbar */}
       <div
-        className="absolute top-3 right-3 z-30 flex items-center gap-1 px-2.5 py-2 rounded-xl shadow-lg backdrop-blur-sm"
+        className="absolute top-3 right-3 z-30 flex items-center gap-1 px-2.5 py-2 rounded-full shadow-lg backdrop-blur-sm"
         style={{ backgroundColor: 'color-mix(in srgb, var(--bg-panel) 90%, transparent)', border: '1px solid var(--border-base)' }}
       >
         <button
@@ -206,7 +206,7 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
 
       {/* Info bar */}
       <div
-        className="absolute bottom-3 left-3 z-30 px-3 py-1.5 rounded-lg text-xs backdrop-blur-sm"
+        className="absolute bottom-3 left-3 z-30 px-3 py-1.5 rounded-full text-xs backdrop-blur-sm"
         style={{ backgroundColor: 'color-mix(in srgb, var(--bg-panel) 90%, transparent)', border: '1px solid var(--border-base)', color: 'var(--text-dimmed)' }}
       >
         {notes.length} notes • {connections.length} lien{connections.length !== 1 ? 's' : ''} • Glissez les cartes • Molette = zoom

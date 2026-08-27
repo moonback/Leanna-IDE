@@ -385,7 +385,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                 <button
                   key={opt.key}
                   onClick={() => setDuration(opt.key)}
-                  className="flex-1 flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
+                  className="flex-1 flex flex-col items-center gap-1 px-3 py-2.5 rounded-full text-xs font-medium transition-all"
                   style={{
                     backgroundColor: duration === opt.key ? 'var(--accent-subtle)' : 'var(--bg-base)',
                     color: duration === opt.key ? 'var(--accent-primary)' : 'var(--text-muted)',
@@ -402,7 +402,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
           {/* Options toggle */}
           <button
             onClick={() => setShowOptions(!showOptions)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium transition-all"
             style={{
               backgroundColor: showOptions ? 'var(--accent-subtle)' : 'var(--bg-base)',
               color: showOptions ? 'var(--accent-primary)' : 'var(--text-muted)',
@@ -435,7 +435,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                       <button
                         key={opt.key}
                         onClick={() => setTone(opt.key)}
-                        className="px-2 py-1.5 rounded-lg text-xs font-medium transition-all"
+                        className="px-2 py-1.5 rounded-full text-xs font-medium transition-all"
                         style={{
                           backgroundColor: tone === opt.key ? 'var(--accent-subtle)' : 'var(--bg-base)',
                           color: tone === opt.key ? 'var(--accent-primary)' : 'var(--text-muted)',
@@ -468,7 +468,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                         <button
                           key={src.id}
                           onClick={() => toggleSource(src.id)}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs transition-all"
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-full text-left text-xs transition-all"
                           style={{
                             backgroundColor: selectedSourceIds.includes(src.id) ? 'var(--accent-subtle)' : 'transparent',
                             color: selectedSourceIds.includes(src.id) ? 'var(--accent-primary)' : 'var(--text-muted)',
@@ -496,7 +496,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                     value={customInstructions}
                     onChange={(e) => setCustomInstructions(e.target.value)}
                     placeholder="Ex: Insiste sur les aspects pratiques, ajoute des exemples concrets..."
-                    className="w-full px-3 py-2 rounded-lg text-xs resize-none leading-relaxed"
+                    className="w-full px-3 py-2 rounded-full text-xs resize-none leading-relaxed"
                     style={{
                       backgroundColor: 'var(--bg-base)',
                       color: 'var(--text-primary)',
@@ -512,7 +512,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
           <button
             onClick={handleGenerate}
             disabled={generating || selectedSourceIds.length === 0}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-bold transition-all active:scale-95 disabled:opacity-50 shadow-sm"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-50 shadow-sm"
             style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
           >
             {generating ? (
@@ -551,7 +551,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                   >
                     <div className="flex items-center gap-2.5">
                       <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: 'var(--accent-subtle)' }}
                       >
                         <Play className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
@@ -595,7 +595,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
             {/* Header */}
             <div className="flex items-center gap-3 pb-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                className="w-10 h-10 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: 'var(--accent-subtle)' }}
               >
                 <Users className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
@@ -618,7 +618,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                 {playing ? (
                   <button
                     onClick={handleStopTTS}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all active:scale-95"
                     style={{
                       backgroundColor: 'rgba(239, 68, 68, 0.1)',
                       color: '#ef4444',
@@ -633,7 +633,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                   <button
                     onClick={handlePlayTTS}
                     disabled={ttsLoading}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
                     style={{
                       backgroundColor: '#10b98120',
                       color: '#10b981',
@@ -653,7 +653,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                 <button
                   onClick={handleSaveToSandbox}
                   disabled={downloading}
-                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
                   style={{
                     backgroundColor: '#f59e0b10',
                     color: '#f59e0b',
@@ -667,7 +667,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                 <button
                   onClick={handleRegenerate}
                   disabled={generating}
-                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
                   style={{
                     backgroundColor: 'var(--bg-base)',
                     color: 'var(--text-muted)',
@@ -680,7 +680,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                 {/* Delete */}
                 <button
                   onClick={() => handleDelete(selectedOverview.id)}
-                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
+                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
                   style={{
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
                     color: '#ef4444',
@@ -747,7 +747,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                     {/* Stop button */}
                     <button
                       onClick={handleStopTTS}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95"
                       style={{
                         backgroundColor: 'rgba(239, 68, 68, 0.08)',
                         color: '#ef4444',
@@ -761,7 +761,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                     {/* Speed button */}
                     <button
                       onClick={cycleSpeed}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all hover:bg-white/5 active:scale-95"
+                      className="px-2.5 py-1.5 rounded-full text-xs font-bold transition-all hover:bg-white/5 active:scale-95"
                       style={{ color: '#10b981', border: '1px solid #10b98130' }}
                       title="Changer la vitesse"
                     >
@@ -785,7 +785,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={cycleSpeed}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                   title="Vitesse de lecture"
                 >
@@ -793,7 +793,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                 </button>
                 <button
                   onClick={handleDownloadScript}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                   title="Télécharger le script"
                 >
