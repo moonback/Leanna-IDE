@@ -22,7 +22,9 @@ Tu contrôles un **vrai navigateur visible par l'utilisateur en temps réel**. Q
 | "retourne en arrière", "page précédente" | `browser_back()` |
 | "recharge", "actualise" | `browser_reload()` |
 | "ferme le navigateur" | `browser_close()` |
-| "tape X dans la barre de recherche" | `browser_snapshot()` → `browser_type({ selector: "...", text: "X", pressEnter: true })` |
+| "tape X dans la barre de recherche" | `browser_get_accessibility_snapshot()` → `browser_type_by_label({ label: "Recherche", text: "X", pressEnter: true })` |
+| "clique sur le bouton [nom]" | `browser_click_by_role({ role: "button", name: "[nom]" })` |
+| "remplis le champ [label] avec [valeur]" | `browser_fill_form({ selector: "...", value: "[valeur]" })` ou `browser_type_by_label({ label: "[label]", text: "[valeur]" })` |
 
 ---
 
@@ -62,14 +64,32 @@ browser_read_content()
 Répondre avec le contenu trouvé
 ```
 
-### Cas 4 — Remplir un formulaire / barre de recherche sur un site
+### Cas 4 — Remplir un formulaire sur un site statique (HTML classique)
 
 ```
-browser_snapshot()                            ← voir les champs disponibles
+browser_snapshot()                            ← voir les champs disponibles (CSS)
 ↓
-browser_type({ selector: "input[...]", text: "requête", pressEnter: true })
+browser_fill_form({ selector: "input[name='email']", value: "user@example.com" })
+browser_fill_form({ selector: "input[name='password']", value: "..." })
 ↓
-browser_read_content()                        ← lire les résultats
+browser_click({ selector: "button[type='submit']" })
+↓
+browser_read_content()                        ← lire le résultat
+```
+
+### Cas 5 — Remplir un formulaire sur une SPA (React/Vue/Angular)
+
+```
+browser_get_accessibility_snapshot()          ← arbre ARIA, stable sur les SPA
+↓
+browser_type_by_label({ label: "Email", text: "user@example.com" })
+browser_type_by_label({ label: "Mot de passe", text: "..." })
+↓
+browser_click_by_role({ role: "button", name: "Se connecter" })
+↓
+browser_wait_for({ condition: ".dashboard", conditionType: "selector" })
+↓
+browser_read_content()
 ```
 
 ---
@@ -96,10 +116,267 @@ Après `browser_search`, la page Google affiche des résultats. `browser_get_lin
 Après chaque navigation, annoncer brièvement : *"J'ai ouvert [titre de la page] — [url]"* puis donner le contenu si pertinent.
 
 ### Lire après avoir cliqué
-Après `browser_click` ou `browser_type`, attendre ~1s puis appeler `browser_read_content()` pour voir le résultat.
+Après `browser_click` ou `browser_click_by_role`, utiliser `browser_wait_for` si la page doit charger du contenu asynchrone, puis `browser_read_content()`.
 
 ### Ne pas répéter les erreurs de chargement
 Si `browser_read_content` retourne un contenu vide ou trop court (<50 caractères) après navigation, attendre 1-2s et réessayer une fois avant de signaler le problème.
+
+---
+
+## Stratégie de sélection d'éléments — Choisir le bon outil
+
+### Règle de décision : CSS vs ARIA
+
+| Type de page | Outil de découverte | Outil d'interaction |
+|---|---|---|
+| Site statique / HTML classique | `browser_snapshot()` | `browser_click`, `browser_type`, `browser_fill_form` |
+| SPA (React, Vue, Angular, Next.js) | `browser_get_accessibility_snapshot()` | `browser_click_by_role`, `browser_type_by_label` |
+| Doute / page inconnue | `browser_get_accessibility_snapshot()` (plus complet) | Au choix selon le résultat |
+
+### Règle absolue
+**N'invente jamais un sélecteur CSS ou un nom ARIA.** Utilise uniquement ce que `browser_snapshot`, `browser_inspect`, ou `browser_get_accessibility_snapshot` ont retourné.
+
+### Priorité des outils d'interaction (du plus stable au moins stable)
+1. `browser_click_by_role` + `browser_type_by_label` — stable même si les classes CSS changent
+2. `browser_fill_form` — stable pour les formulaires (efface + saisit, déclenche tous les events)
+3. `browser_click` + `browser_type` — sélecteurs CSS classiques
+4. `browser_select_option` — exclusivement pour les `<select>` natifs
+
+---
+
+## Interagir avec des pages web
+
+### browser_get_accessibility_snapshot — Arbre ARIA (PRÉFÉRÉ sur les SPA)
+
+Retourne l'arbre d'accessibilité complet : rôles ARIA, noms accessibles, états (disabled, checked, expanded), sélecteurs CSS stables. Couvre >90% des éléments interactifs y compris les composants custom (boutons avec `role="button"`, etc.).
+
+```
+browser_get_accessibility_snapshot()
+→ {
+    elements: [
+      { role: "textbox", name: "Email", selector: "input[name='email']", disabled: false },
+      { role: "textbox", name: "Mot de passe", selector: "input[type='password']" },
+      { role: "button", name: "Se connecter", selector: "button.login-btn" },
+      { role: "link", name: "Mot de passe oublié ?", selector: "a[href='/forgot']" },
+      ...
+    ]
+  }
+```
+
+Utilise ensuite :
+- `browser_click_by_role({ role: "button", name: "Se connecter" })` — clic par rôle+nom
+- `browser_type_by_label({ label: "Email", text: "user@example.com" })` — saisie par libellé
+
+### browser_snapshot — Éléments interactifs (CSS)
+
+`browser_snapshot()` retourne les inputs et boutons avec leurs sélecteurs CSS valides. **Préférer `browser_get_accessibility_snapshot` sur les SPA.**
+
+```
+browser_snapshot()
+→ { inputs: [{ selector: "input[name='q']", ... }], buttons: [...] }
+↓
+browser_type({ selector: "input[name='q']", text: "ma recherche", pressEnter: true })
+```
+
+---
+
+## Référence complète des outils (Sprint 1)
+
+### Navigation de base
+| Outil | Usage |
+|-------|-------|
+| `browser_navigate({ url })` | Ouvre une URL dans le navigateur |
+| `browser_open()` | Affiche le panneau navigateur |
+| `browser_close()` | Cache le panneau navigateur |
+| `browser_search({ query, engine? })` | Lance une recherche (google/bing/duckduckgo/wikipedia) |
+| `browser_back()` | Page précédente |
+| `browser_forward()` | Page suivante |
+| `browser_reload()` | Recharge la page |
+| `browser_scroll({ direction, amount? })` | Défilement (down/up/top/bottom) |
+
+### Lecture de contenu
+| Outil | Usage |
+|-------|-------|
+| `browser_read_content({ selector? })` | Lit le texte de la page (ou d'un sélecteur) |
+| `browser_summarize_page({ url, selector? })` | Navigation + lecture en une étape |
+| `browser_research({ query, maxSources? })` | Recherche multi-sources automatique |
+| `browser_get_links({ selector?, limit? })` | Extrait tous les liens de la page |
+| `browser_open_link({ text?, urlContains? })` | Navigue vers un lien par texte/URL |
+| `browser_get_element_text({ selector })` | **(Sprint 1)** Texte d'un seul élément ciblé |
+| `browser_get_element_attribute({ selector, attribute })` | **(Sprint 1)** Valeur d'un attribut HTML (href, src, value, data-*) |
+
+### Découverte d'éléments
+| Outil | Usage |
+|-------|-------|
+| `browser_get_accessibility_snapshot()` | **(Sprint 1)** Arbre ARIA complet — PRÉFÉRÉ sur SPA |
+| `browser_snapshot()` | Liste des inputs/boutons avec sélecteurs CSS |
+| `browser_inspect({ type? })` | Inspecte boutons/inputs/liens d'un type précis |
+
+### Interactions
+| Outil | Usage |
+|-------|-------|
+| `browser_click_by_role({ role, name, waitFor? })` | **(Sprint 1)** Clic par rôle ARIA + nom — stable sur SPA |
+| `browser_type_by_label({ label, text, pressEnter?, waitFor? })` | **(Sprint 1)** Saisie par libellé — stable sur formulaires |
+| `browser_fill_form({ selector, value, waitFor? })` | **(Sprint 1)** Efface + saisit caractère par caractère (React/Vue) |
+| `browser_select_option({ selector, value })` | **(Sprint 1)** Sélectionne une option dans un `<select>` |
+| `browser_click({ selector })` | Clic CSS classique |
+| `browser_type({ selector, text, pressEnter? })` | Saisie CSS classique |
+
+### Robustesse
+| Outil | Usage |
+|-------|-------|
+| `browser_wait_for({ condition, conditionType?, timeout? })` | **(Sprint 1)** Attend un sélecteur/texte/URL avant de continuer |
+
+---
+
+## Nouveaux outils Sprint 1 — Détails
+
+### browser_get_accessibility_snapshot
+
+Retourne l'arbre d'accessibilité ARIA de la page courante.
+
+**Quand utiliser** : toujours sur les SPA (React, Vue, Angular), ou quand `browser_snapshot` renvoie des sélecteurs instables (classes CSS générées).
+
+**Retour** :
+```json
+{
+  "elements": [
+    { "role": "button", "name": "Valider", "selector": "#submit-btn", "disabled": false },
+    { "role": "textbox", "name": "Nom complet", "selector": "input[name='fullname']", "required": true },
+    { "role": "combobox", "name": "Pays", "selector": "select#country", "expanded": "false" }
+  ],
+  "stats": { "total": 12, "byRole": { "button": 3, "textbox": 5, "link": 4 } }
+}
+```
+
+### browser_click_by_role
+
+Clique sur un élément par son rôle ARIA et son nom accessible.
+
+**Paramètres** :
+- `role` — rôle ARIA : `button`, `link`, `textbox`, `combobox`, `checkbox`, `radio`, `menuitem`, `tab`, `switch`, `option`
+- `name` — nom accessible (insensible à la casse, correspondance partielle)
+- `waitFor` *(optionnel)* — sélecteur CSS ou texte à attendre après le clic (5s max)
+
+**Retry automatique** : 3 tentatives (immédiat, +1s, +3s) si l'élément n'est pas encore dans le DOM.
+
+```
+browser_click_by_role({ role: "button", name: "Ajouter au panier" })
+browser_click_by_role({ role: "tab", name: "Avis", waitFor: ".reviews-list" })
+browser_click_by_role({ role: "menuitem", name: "Déconnexion" })
+```
+
+### browser_type_by_label
+
+Saisit du texte dans un champ identifié par son libellé (label HTML, aria-label, ou placeholder).
+
+**Paramètres** :
+- `label` — libellé du champ (insensible à la casse, correspondance partielle)
+- `text` — texte à saisir (efface le contenu existant avant)
+- `pressEnter` *(optionnel)* — appuie sur Entrée après la saisie
+- `waitFor` *(optionnel)* — attend un sélecteur/texte après la saisie
+
+**Comportement** : recherche d'abord par `aria-label`, puis `<label for="...">`, puis `placeholder`. Efface le champ avant de saisir.
+
+```
+browser_type_by_label({ label: "Email", text: "user@example.com" })
+browser_type_by_label({ label: "Recherche", text: "react hooks", pressEnter: true })
+browser_type_by_label({ label: "Message", text: "Bonjour !", waitFor: ".char-count" })
+```
+
+### browser_fill_form
+
+Remplit un champ en effaçant d'abord son contenu, puis en saisissant caractère par caractère.
+
+**Quand utiliser** : formulaires avec validation en temps réel (React controlled inputs, Vue v-model) où `browser_type` ne déclenche pas correctement les événements `input`/`change`.
+
+**Paramètres** :
+- `selector` — sélecteur CSS du champ (depuis `browser_snapshot` ou `browser_get_accessibility_snapshot`)
+- `value` — valeur à saisir
+- `waitFor` *(optionnel)* — attend un élément après la saisie (ex: liste d'autocomplétion)
+
+```
+browser_fill_form({ selector: "input#username", value: "john_doe" })
+browser_fill_form({ selector: "textarea[name='bio']", value: "Développeur passionné." })
+browser_fill_form({ selector: "#city-input", value: "Paris", waitFor: ".autocomplete-results" })
+```
+
+### browser_select_option
+
+Sélectionne une option dans un `<select>` natif.
+
+**Paramètres** :
+- `selector` — sélecteur CSS du `<select>`
+- `value` — valeur de l'option (attribut `value`) ou texte visible (correspondance partielle, insensible à la casse)
+
+```
+browser_select_option({ selector: "#country", value: "FR" })
+browser_select_option({ selector: "select[name='size']", value: "Large" })
+```
+
+### browser_wait_for
+
+Attend qu'une condition soit remplie sur la page avant de continuer.
+
+**Paramètres** :
+- `condition` — ce qu'on attend (sélecteur CSS, texte, ou fragment d'URL)
+- `conditionType` — `"selector"` (défaut), `"text"`, ou `"url"`
+- `timeout` — délai max en ms (défaut 10000, max 30000)
+
+**Retour** : `{ found: true/false, elapsed: 1230 }`
+
+```
+browser_wait_for({ condition: "#search-results" })
+browser_wait_for({ condition: "Chargement terminé", conditionType: "text" })
+browser_wait_for({ condition: "/dashboard", conditionType: "url", timeout: 15000 })
+```
+
+### browser_get_element_text
+
+Retourne le texte visible d'un seul élément ciblé.
+
+**Quand utiliser** : lire une valeur précise (prix, statut, message d'erreur, badge) sans avoir à relire toute la page.
+
+```
+browser_get_element_text({ selector: ".price" })         → "29,99 €"
+browser_get_element_text({ selector: "#error-message" }) → "Email invalide"
+browser_get_element_text({ selector: "h1" })             → "Résultats de recherche"
+```
+
+### browser_get_element_attribute
+
+Retourne la valeur d'un attribut HTML d'un élément.
+
+```
+browser_get_element_attribute({ selector: "a.download", attribute: "href" })
+browser_get_element_attribute({ selector: "img.logo", attribute: "src" })
+browser_get_element_attribute({ selector: "#status", attribute: "data-status" })
+browser_get_element_attribute({ selector: "#toggle", attribute: "aria-expanded" })
+```
+
+---
+
+## Robustesse — Retry et waitFor
+
+### Retry automatique
+Les outils `browser_click_by_role`, `browser_type_by_label`, et `browser_fill_form` réessaient automatiquement jusqu'à 3 fois si l'élément n'est pas encore dans le DOM :
+- 1ère tentative : immédiate
+- 2ème tentative : après 1 seconde
+- 3ème tentative : après 3 secondes supplémentaires
+
+### Utiliser waitFor pour les actions asynchrones
+Après un clic qui déclenche un chargement, utilise `waitFor` ou `browser_wait_for` plutôt qu'un délai fixe :
+
+```
+// ❌ Mauvais — délai fixe arbitraire
+browser_click_by_role({ role: "button", name: "Rechercher" })
+// attendre 2s...
+browser_read_content()
+
+// ✅ Bon — attendre l'élément de résultat
+browser_click_by_role({ role: "button", name: "Rechercher", waitFor: "#results" })
+browser_read_content()
+```
 
 ---
 
@@ -125,32 +402,16 @@ Utilise-le quand l'utilisateur dit :
 
 ---
 
-## Interagir avec des pages web
-
-### Avant tout clic ou saisie → browser_snapshot obligatoire
-
-`browser_snapshot()` retourne la liste exacte des éléments interactifs avec leurs sélecteurs CSS valides. **N'invente jamais un sélecteur de mémoire.**
-
-```
-browser_snapshot()
-→ { inputs: [{ selector: "input[name='q']", ... }], buttons: [...] }
-↓
-browser_type({ selector: "input[name='q']", text: "ma recherche", pressEnter: true })
-```
-
-### Sélecteurs CSS — règles
-- Utilise **uniquement** les sélecteurs retournés par `browser_snapshot` ou `browser_inspect`
-- Ne jamais inventer un sélecteur sans l'avoir vu dans un snapshot
-
----
-
 ## Comportement en cas d'erreur
 
 | Situation | Action |
 |-----------|--------|
 | Page vide / contenu < 50 chars | Attendre 2s → réessayer `browser_read_content()` une fois |
 | Timeout navigateur | Signaler à l'utilisateur, proposer `browser_reload()` |
-| Sélecteur introuvable | Appeler `browser_snapshot()` pour obtenir les bons sélecteurs |
+| Sélecteur CSS introuvable | Essayer `browser_get_accessibility_snapshot()` pour découvrir les éléments ARIA |
+| Rôle/nom ARIA introuvable | Essayer `browser_snapshot()` → `browser_click` avec sélecteur CSS |
+| SPA non réactive après `browser_type` | Utiliser `browser_fill_form` à la place (déclenche les bons événements) |
+| Élément pas encore chargé | Utiliser `browser_wait_for({ condition: "...", conditionType: "selector" })` |
 | Site ne charge pas | Essayer `browser_search` avec une description du site |
 | Lien non trouvé dans `browser_open_link` | Appeler `browser_get_links()` et naviguer manuellement vers le bon lien |
 

@@ -299,6 +299,13 @@ export function attachLiveWebSocket(
         'browser_reload', 'browser_snapshot', 'browser_click', 'browser_type',
         'browser_inspect', 'browser_get_links', 'browser_open_link',
         'browser_summarize_page', 'browser_research',
+        // Sprint 1 — J1 : Accessibilité
+        'browser_get_accessibility_snapshot', 'browser_click_by_role', 'browser_type_by_label',
+        // Sprint 1 — J2 : Robustesse
+        'browser_wait_for',
+        // Sprint 1 — J3 : Actions primitives
+        'browser_get_element_text', 'browser_get_element_attribute',
+        'browser_fill_form', 'browser_select_option',
         'reasoning_think',
         'agent_orchestrate', 'agent_status',
         'knowledge_search_entities', 'knowledge_status',

@@ -687,6 +687,526 @@ export function BrowserPanel({
       } catch {/* silent */}
     };
 
+    // ── Helper : attente d'une condition dans la webview (Sprint 1 — J2) ──────
+    // Attente générique avec polling 100ms jusqu'à timeout.
+    const waitForConditionInPage = async (
+      wv: WebviewElement,
+      condition: string,
+      conditionType: 'selector' | 'text' | 'url',
+      timeoutMs: number
+    ): Promise<{ found: boolean; elapsed: number }> => {
+      const start = Date.now();
+      const interval = 100;
+      while (Date.now() - start < timeoutMs) {
+        try {
+          let found = false;
+          if (conditionType === 'selector') {
+            found = await wv.executeJavaScript(
+              `!!document.querySelector(${JSON.stringify(condition)})`
+            ) as boolean;
+          } else if (conditionType === 'text') {
+            found = await wv.executeJavaScript(
+              `document.body.innerText.includes(${JSON.stringify(condition)})`
+            ) as boolean;
+          } else if (conditionType === 'url') {
+            found = await wv.executeJavaScript(
+              `location.href.includes(${JSON.stringify(condition)})`
+            ) as boolean;
+          }
+          if (found) return { found: true, elapsed: Date.now() - start };
+        } catch {/* page still loading */}
+        await new Promise<void>((r) => setTimeout(r, interval));
+      }
+      return { found: false, elapsed: timeoutMs };
+    };
+
+    // ── Sprint 1 — J1 : Snapshot accessibilité (ARIA tree) ───────────────────
+    const handleAccessibilitySnapshot = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { requestId: string };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      const ariaScript = `(function(){
+        var INTERACTIVE_ROLES = ['button','link','textbox','combobox','listbox','checkbox',
+          'radio','menuitem','menuitemcheckbox','menuitemradio','option','tab','switch',
+          'slider','spinbutton','searchbox','tree','treeitem','gridcell','columnheader'];
+        var bestSelector = function(el) {
+          if (el.id) return '#' + CSS.escape(el.id);
+          var testId = el.getAttribute('data-testid') || el.getAttribute('data-test-id');
+          if (testId) return '[data-testid="' + CSS.escape(testId) + '"]';
+          var ariaLabelledBy = el.getAttribute('aria-labelledby');
+          if (ariaLabelledBy) {
+            var labelEl = document.getElementById(ariaLabelledBy);
+            if (labelEl) return '[aria-labelledby="' + CSS.escape(ariaLabelledBy) + '"]';
+          }
+          var ariaLabel = el.getAttribute('aria-label');
+          if (ariaLabel) return '[aria-label="' + CSS.escape(ariaLabel) + '"]';
+          var name = el.name;
+          if (name) return el.tagName.toLowerCase() + '[name="' + CSS.escape(name) + '"]';
+          var role = el.getAttribute('role');
+          if (role) return el.tagName.toLowerCase() + '[role="' + role + '"]';
+          return el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).trim().split(/\\s+/).slice(0,2).join('.') : '');
+        };
+        var getAccessibleName = function(el) {
+          var label = el.getAttribute('aria-label');
+          if (label) return label.trim();
+          var labelledBy = el.getAttribute('aria-labelledby');
+          if (labelledBy) {
+            var parts = labelledBy.split(/\\s+/).map(function(id){
+              var ref = document.getElementById(id);
+              return ref ? ref.innerText.trim() : '';
+            }).filter(Boolean);
+            if (parts.length) return parts.join(' ');
+          }
+          var forEl = el.id ? document.querySelector('label[for="' + CSS.escape(el.id) + '"]') : null;
+          if (forEl) return forEl.innerText.trim();
+          var placeholder = el.getAttribute('placeholder') || el.getAttribute('aria-placeholder');
+          if (placeholder) return placeholder.trim();
+          var text = (el.innerText || el.textContent || el.value || el.getAttribute('title') || '').trim();
+          return text.substring(0, 100);
+        };
+        var elements = [];
+        var seen = new WeakSet();
+        // 1. Éléments avec rôle ARIA explicite
+        INTERACTIVE_ROLES.forEach(function(role) {
+          Array.from(document.querySelectorAll('[role="' + role + '"]')).forEach(function(el) {
+            if (seen.has(el) || el.offsetParent === null) return;
+            seen.add(el);
+            elements.push({
+              role: role,
+              name: getAccessibleName(el),
+              selector: bestSelector(el),
+              tag: el.tagName.toLowerCase(),
+              disabled: el.getAttribute('aria-disabled') === 'true' || el.hasAttribute('disabled'),
+              checked: el.getAttribute('aria-checked'),
+              expanded: el.getAttribute('aria-expanded'),
+              required: el.getAttribute('aria-required') === 'true' || el.hasAttribute('required'),
+            });
+          });
+        });
+        // 2. Éléments HTML natifs (boutons, inputs, liens, selects)
+        var nativeSelectors = [
+          { sel: 'button:not([aria-hidden="true"])', role: 'button' },
+          { sel: 'input:not([type="hidden"]):not([aria-hidden="true"])', role: 'textbox' },
+          { sel: 'textarea:not([aria-hidden="true"])', role: 'textbox' },
+          { sel: 'select:not([aria-hidden="true"])', role: 'combobox' },
+          { sel: 'a[href]:not([aria-hidden="true"])', role: 'link' },
+        ];
+        nativeSelectors.forEach(function(def) {
+          Array.from(document.querySelectorAll(def.sel)).forEach(function(el) {
+            if (seen.has(el) || el.offsetParent === null) return;
+            seen.add(el);
+            var inferredRole = el.getAttribute('type') === 'checkbox' ? 'checkbox'
+              : el.getAttribute('type') === 'radio' ? 'radio'
+              : el.getAttribute('type') === 'submit' || el.getAttribute('type') === 'button' ? 'button'
+              : def.role;
+            elements.push({
+              role: inferredRole,
+              name: getAccessibleName(el),
+              selector: bestSelector(el),
+              tag: el.tagName.toLowerCase(),
+              disabled: el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true',
+              checked: el.checked !== undefined ? el.checked : null,
+              expanded: el.getAttribute('aria-expanded'),
+              required: el.hasAttribute('required') || el.getAttribute('aria-required') === 'true',
+            });
+          });
+        });
+        var stats = {
+          total: elements.length,
+          byRole: {}
+        };
+        elements.forEach(function(el) {
+          stats.byRole[el.role] = (stats.byRole[el.role] || 0) + 1;
+        });
+        return JSON.stringify({ url: location.href, title: document.title, elements: elements, stats: stats });
+      })()`;
+      try {
+        const raw = await wv.executeJavaScript(ariaScript);
+        const parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {};
+        postActionResult(detail.requestId, parsed);
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur accessibility snapshot');
+      }
+    };
+
+    // ── Sprint 1 — J1 : Clic par rôle ARIA ───────────────────────────────────
+    const handleClickByRole = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        requestId: string;
+        role: string;
+        accessibleName: string;
+        waitFor: string | null;
+      };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      const clickByRoleScript = `(function(role, name){
+        var getAccessibleName = function(el) {
+          var label = el.getAttribute('aria-label');
+          if (label) return label.trim().toLowerCase();
+          var labelledBy = el.getAttribute('aria-labelledby');
+          if (labelledBy) {
+            var parts = labelledBy.split(/\\s+/).map(function(id){
+              var ref = document.getElementById(id);
+              return ref ? ref.innerText.trim() : '';
+            }).filter(Boolean);
+            if (parts.length) return parts.join(' ').toLowerCase();
+          }
+          var forEl = el.id ? document.querySelector('label[for="' + CSS.escape(el.id) + '"]') : null;
+          if (forEl) return forEl.innerText.trim().toLowerCase();
+          return (el.innerText || el.textContent || el.value || el.getAttribute('placeholder') || el.getAttribute('title') || '').trim().toLowerCase();
+        };
+        var nameLower = name.toLowerCase();
+        // Chercher par rôle ARIA explicite
+        var candidates = Array.from(document.querySelectorAll('[role="' + role + '"]'));
+        // Ajouter les éléments HTML natifs selon le rôle
+        if (role === 'button') candidates = candidates.concat(Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"]')));
+        if (role === 'link') candidates = candidates.concat(Array.from(document.querySelectorAll('a[href]')));
+        if (role === 'textbox') candidates = candidates.concat(Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea')));
+        if (role === 'combobox') candidates = candidates.concat(Array.from(document.querySelectorAll('select')));
+        if (role === 'checkbox') candidates = candidates.concat(Array.from(document.querySelectorAll('input[type="checkbox"]')));
+        if (role === 'radio') candidates = candidates.concat(Array.from(document.querySelectorAll('input[type="radio"]')));
+        // Dédupliquer et filtrer par nom
+        var seen = new WeakSet();
+        var match = null;
+        for (var i = 0; i < candidates.length; i++) {
+          var el = candidates[i];
+          if (seen.has(el)) continue;
+          seen.add(el);
+          if (el.offsetParent === null) continue; // invisible
+          if (nameLower && !getAccessibleName(el).includes(nameLower)) continue;
+          match = el;
+          break;
+        }
+        if (!match) return JSON.stringify({ error: 'Aucun élément [role="' + role + '"] avec le nom "' + name + '" trouvé.' });
+        var evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+        match.dispatchEvent(evt);
+        return JSON.stringify({ ok: true });
+      })(${JSON.stringify(detail.role)}, ${JSON.stringify(detail.accessibleName)})`;
+      try {
+        await moveCursorToElement(wv, `[role="${detail.role}"]`).catch(() => {/* ignore si pas trouvé */});
+        const raw = await wv.executeJavaScript(clickByRoleScript);
+        let parsed: any = {};
+        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch {}
+        if (parsed?.error) {
+          postActionResult(detail.requestId, null, parsed.error);
+          return;
+        }
+        // Attendre la condition waitFor si fournie
+        let changed: Record<string, boolean> = {};
+        if (detail.waitFor) {
+          const urlBefore = await wv.executeJavaScript('location.href').catch(() => '') as string;
+          const waitResult = await waitForConditionInPage(wv, detail.waitFor, 'selector', 5000);
+          if (!waitResult.found) {
+            // Essayer en mode texte
+            const textResult = await waitForConditionInPage(wv, detail.waitFor, 'text', 2000);
+            changed = { elementAppeared: textResult.found };
+          } else {
+            changed = { elementAppeared: true };
+          }
+          const urlAfter = await wv.executeJavaScript('location.href').catch(() => '') as string;
+          changed.url = urlAfter !== urlBefore;
+        }
+        postActionResult(detail.requestId, { ok: true, changed });
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur click-by-role');
+      }
+    };
+
+    // ── Sprint 1 — J1 : Saisie par libellé ───────────────────────────────────
+    const handleTypeByLabel = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        requestId: string;
+        label: string;
+        text: string;
+        pressEnter: boolean;
+        waitFor: string | null;
+      };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      const typeByLabelScript = `(function(label, text){
+        var labelLower = label.toLowerCase();
+        var field = null;
+        // 1. Recherche par aria-label
+        var byAriaLabel = Array.from(document.querySelectorAll('input,textarea,select,[contenteditable]')).find(function(el){
+          return (el.getAttribute('aria-label') || '').toLowerCase().includes(labelLower);
+        });
+        if (byAriaLabel) field = byAriaLabel;
+        // 2. Recherche par <label for="...">
+        if (!field) {
+          var labels = Array.from(document.querySelectorAll('label'));
+          for (var i = 0; i < labels.length; i++) {
+            if (labels[i].innerText.toLowerCase().includes(labelLower)) {
+              var forId = labels[i].getAttribute('for');
+              if (forId) {
+                field = document.getElementById(forId);
+                if (field) break;
+              }
+              // label wrapping
+              field = labels[i].querySelector('input,textarea,select');
+              if (field) break;
+            }
+          }
+        }
+        // 3. Recherche par placeholder
+        if (!field) {
+          field = Array.from(document.querySelectorAll('input,textarea')).find(function(el){
+            return (el.placeholder || el.getAttribute('aria-placeholder') || '').toLowerCase().includes(labelLower);
+          }) || null;
+        }
+        if (!field) return JSON.stringify({ error: 'Champ avec le libellé "' + label + '" introuvable.' });
+        field.focus();
+        // Effacer le contenu existant
+        if (field.tagName.toLowerCase() !== 'select') {
+          if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
+            field.value = '';
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+          } else {
+            field.innerHTML = '';
+          }
+        }
+        // Saisie caractère par caractère
+        for (var c = 0; c < text.length; c++) {
+          var char = text[c];
+          field.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
+          if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
+            field.value += char;
+          } else {
+            field.textContent += char;
+          }
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+          field.dispatchEvent(new KeyboardEvent('keyup', { key: char, bubbles: true }));
+        }
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+        return JSON.stringify({ ok: true, selector: field.id ? '#' + field.id : field.tagName.toLowerCase() });
+      })(${JSON.stringify(detail.label)}, ${JSON.stringify(detail.text)})`;
+      try {
+        const raw = await wv.executeJavaScript(typeByLabelScript);
+        let parsed: any = {};
+        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch {}
+        if (parsed?.error) {
+          postActionResult(detail.requestId, null, parsed.error);
+          return;
+        }
+        // pressEnter
+        if (detail.pressEnter && parsed?.selector) {
+          await new Promise<void>((r) => setTimeout(r, 300));
+          await wv.executeJavaScript(`(function(){
+            var el = document.querySelector(${JSON.stringify(parsed.selector)});
+            if (el) {
+              el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+              el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
+            }
+          })()`).catch(() => {/* ignore */});
+        }
+        // waitFor
+        let changed: Record<string, boolean> = {};
+        if (detail.waitFor) {
+          const waitResult = await waitForConditionInPage(wv, detail.waitFor, 'selector', 5000);
+          if (!waitResult.found) {
+            const textResult = await waitForConditionInPage(wv, detail.waitFor, 'text', 2000);
+            changed = { elementAppeared: textResult.found };
+          } else {
+            changed = { elementAppeared: true };
+          }
+        }
+        postActionResult(detail.requestId, { ok: true, changed });
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur type-by-label');
+      }
+    };
+
+    // ── Sprint 1 — J2 : Attente de condition ─────────────────────────────────
+    const handleWaitFor = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        requestId: string;
+        condition: string;
+        conditionType: 'selector' | 'text' | 'url';
+        timeout: number;
+      };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      try {
+        const result = await waitForConditionInPage(
+          wv,
+          detail.condition,
+          detail.conditionType ?? 'selector',
+          detail.timeout ?? 10_000
+        );
+        postActionResult(detail.requestId, result);
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur wait-for');
+      }
+    };
+
+    // ── Sprint 1 — J3 : Texte d'un élément ───────────────────────────────────
+    const handleGetElementText = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { requestId: string; selector: string };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      const script = `(function(){
+        var el = document.querySelector(${JSON.stringify(detail.selector)});
+        if (!el) return JSON.stringify({ found: false });
+        var text = el.innerText !== undefined ? el.innerText : (el.textContent || el.getAttribute('value') || '');
+        return JSON.stringify({ found: true, text: text.trim().substring(0, 2000) });
+      })()`;
+      try {
+        const raw = await wv.executeJavaScript(script);
+        const parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : { found: false };
+        postActionResult(detail.requestId, parsed);
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur get-element-text');
+      }
+    };
+
+    // ── Sprint 1 — J3 : Attribut d'un élément ────────────────────────────────
+    const handleGetElementAttribute = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        requestId: string;
+        selector: string;
+        attribute: string;
+      };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      const script = `(function(){
+        var el = document.querySelector(${JSON.stringify(detail.selector)});
+        if (!el) return JSON.stringify({ found: false });
+        var val = el.getAttribute(${JSON.stringify(detail.attribute)});
+        // Pour 'value', lire la propriété JS plutôt que l'attribut HTML
+        if (val === null && ${JSON.stringify(detail.attribute)} === 'value' && el.value !== undefined) {
+          val = el.value;
+        }
+        return JSON.stringify({ found: true, value: val });
+      })()`;
+      try {
+        const raw = await wv.executeJavaScript(script);
+        const parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : { found: false };
+        postActionResult(detail.requestId, parsed);
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur get-element-attribute');
+      }
+    };
+
+    // ── Sprint 1 — J3 : Remplissage de formulaire (fill avec effacement) ─────
+    const handleFillForm = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        requestId: string;
+        selector: string;
+        value: string;
+        waitFor: string | null;
+      };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      try {
+        await moveCursorToElement(wv, detail.selector);
+      } catch {/* ignore animation errors */}
+      const script = `(function(){
+        var el = document.querySelector(${JSON.stringify(detail.selector)});
+        if (!el) return JSON.stringify({ found: false });
+        el.focus();
+        // Effacer le contenu existant
+        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+          el.value = '';
+        } else {
+          el.innerHTML = '';
+        }
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        // Saisie caractère par caractère pour déclencher les événements React/Vue
+        var text = ${JSON.stringify(detail.value)};
+        for (var i = 0; i < text.length; i++) {
+          var char = text[i];
+          el.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
+          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+            el.value += char;
+          } else {
+            el.textContent = (el.textContent || '') + char;
+          }
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new KeyboardEvent('keyup', { key: char, bubbles: true }));
+        }
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return JSON.stringify({ found: true, ok: true });
+      })()`;
+      try {
+        const raw = await wv.executeJavaScript(script);
+        let parsed: any = {};
+        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch {}
+        if (!parsed.found) {
+          postActionResult(detail.requestId, { found: false });
+          return;
+        }
+        // waitFor post-action
+        let changed: Record<string, boolean> = {};
+        if (detail.waitFor) {
+          const waitResult = await waitForConditionInPage(wv, detail.waitFor, 'selector', 5000);
+          changed = { elementAppeared: waitResult.found };
+        }
+        postActionResult(detail.requestId, { found: true, ok: true, changed });
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur fill-form');
+      }
+    };
+
+    // ── Sprint 1 — J3 : Sélection d'option dans un <select> ──────────────────
+    const handleSelectOption = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        requestId: string;
+        selector: string;
+        value: string;
+      };
+      const wv = webviewRef.current;
+      if (!wv) {
+        postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      const script = `(function(){
+        var el = document.querySelector(${JSON.stringify(detail.selector)});
+        if (!el || el.tagName.toLowerCase() !== 'select') return JSON.stringify({ found: false });
+        var target = ${JSON.stringify(detail.value)}.toLowerCase();
+        var selectedText = null;
+        // Chercher par value d'abord, puis par texte visible
+        for (var i = 0; i < el.options.length; i++) {
+          var opt = el.options[i];
+          if (opt.value.toLowerCase() === target || opt.text.toLowerCase().includes(target)) {
+            el.value = opt.value;
+            selectedText = opt.text;
+            break;
+          }
+        }
+        if (selectedText === null) return JSON.stringify({ found: true, ok: false });
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        return JSON.stringify({ found: true, ok: true, selectedText: selectedText });
+      })()`;
+      try {
+        const raw = await wv.executeJavaScript(script);
+        const parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : { found: false };
+        postActionResult(detail.requestId, parsed);
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur select-option');
+      }
+    };
+
     window.addEventListener('jarvis-browser-navigate', handleNav);
     window.addEventListener('jarvis-browser-scroll', handleScroll);
     window.addEventListener('jarvis-browser-control', handleBrowserControl);
@@ -697,6 +1217,17 @@ export function BrowserPanel({
     window.addEventListener('jarvis-browser-snapshot', handleSnapshot as EventListener);
     window.addEventListener('jarvis-browser-inspect', handleInspect as EventListener);
     window.addEventListener('jarvis-browser-mouse-move', handleMouseMove as EventListener);
+    // Sprint 1 — J1 : Accessibilité
+    window.addEventListener('jarvis-browser-accessibility-snapshot', handleAccessibilitySnapshot as EventListener);
+    window.addEventListener('jarvis-browser-click-by-role', handleClickByRole as EventListener);
+    window.addEventListener('jarvis-browser-type-by-label', handleTypeByLabel as EventListener);
+    // Sprint 1 — J2 : Robustesse
+    window.addEventListener('jarvis-browser-wait-for', handleWaitFor as EventListener);
+    // Sprint 1 — J3 : Actions primitives
+    window.addEventListener('jarvis-browser-get-element-text', handleGetElementText as EventListener);
+    window.addEventListener('jarvis-browser-get-element-attribute', handleGetElementAttribute as EventListener);
+    window.addEventListener('jarvis-browser-fill-form', handleFillForm as EventListener);
+    window.addEventListener('jarvis-browser-select-option', handleSelectOption as EventListener);
     return () => {
       window.removeEventListener('jarvis-browser-navigate', handleNav);
       window.removeEventListener('jarvis-browser-scroll', handleScroll);
@@ -708,6 +1239,17 @@ export function BrowserPanel({
       window.removeEventListener('jarvis-browser-snapshot', handleSnapshot as EventListener);
       window.removeEventListener('jarvis-browser-inspect', handleInspect as EventListener);
       window.removeEventListener('jarvis-browser-mouse-move', handleMouseMove as EventListener);
+      // Sprint 1 — J1 : Accessibilité
+      window.removeEventListener('jarvis-browser-accessibility-snapshot', handleAccessibilitySnapshot as EventListener);
+      window.removeEventListener('jarvis-browser-click-by-role', handleClickByRole as EventListener);
+      window.removeEventListener('jarvis-browser-type-by-label', handleTypeByLabel as EventListener);
+      // Sprint 1 — J2 : Robustesse
+      window.removeEventListener('jarvis-browser-wait-for', handleWaitFor as EventListener);
+      // Sprint 1 — J3 : Actions primitives
+      window.removeEventListener('jarvis-browser-get-element-text', handleGetElementText as EventListener);
+      window.removeEventListener('jarvis-browser-get-element-attribute', handleGetElementAttribute as EventListener);
+      window.removeEventListener('jarvis-browser-fill-form', handleFillForm as EventListener);
+      window.removeEventListener('jarvis-browser-select-option', handleSelectOption as EventListener);
     };
   }, [navigateTo]);  // ── Render ──────────────────────────────────────────────────────────────────
 

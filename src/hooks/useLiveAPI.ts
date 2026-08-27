@@ -154,6 +154,33 @@ export function useLiveAPI() {
         case 'browser-mouse-move':
           window.dispatchEvent(new CustomEvent('jarvis-browser-mouse-move', { detail: a }));
           break;
+        // Sprint 1 — J1 : Accessibilité
+        case 'browser-accessibility-snapshot':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-accessibility-snapshot', { detail: a }));
+          break;
+        case 'browser-click-by-role':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-click-by-role', { detail: a }));
+          break;
+        case 'browser-type-by-label':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-type-by-label', { detail: a }));
+          break;
+        // Sprint 1 — J2 : Robustesse
+        case 'browser-wait-for':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-wait-for', { detail: a }));
+          break;
+        // Sprint 1 — J3 : Actions primitives
+        case 'browser-get-element-text':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-get-element-text', { detail: a }));
+          break;
+        case 'browser-get-element-attribute':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-get-element-attribute', { detail: a }));
+          break;
+        case 'browser-fill-form':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-fill-form', { detail: a }));
+          break;
+        case 'browser-select-option':
+          window.dispatchEvent(new CustomEvent('jarvis-browser-select-option', { detail: a }));
+          break;
         case 'open-rich-document':
           window.dispatchEvent(new CustomEvent('jarvis-open-rich-document', { detail: a }));
           break;

@@ -183,6 +183,52 @@ const researchSchema = z.object({
   maxSources: z.number().int().positive().max(5).default(3),
 });
 
+// ─── Sprint 1 — Nouveaux schemas ──────────────────────────────────────────────
+
+// J1 — Accessibilité
+const accessibilitySnapshotSchema = z.object({});
+
+const clickByRoleSchema = z.object({
+  role: z.string().min(1, "Rôle ARIA requis (ex: button, link, textbox, combobox)"),
+  name: z.string().min(1, "Nom accessible requis (ex: libellé visible ou aria-label)"),
+  waitFor: z.string().optional(),
+});
+
+const typeByLabelSchema = z.object({
+  label: z.string().min(1, "Libellé du champ requis (ex: 'Email', 'Recherche')"),
+  text: z.string(),
+  pressEnter: z.boolean().optional().default(false),
+  waitFor: z.string().optional(),
+});
+
+// J2 — Robustesse (waitFor ajouté aux actions existantes)
+const waitForSchema = z.object({
+  condition: z.string().min(1, "Condition requise"),
+  conditionType: z.enum(["selector", "text", "url"]).default("selector"),
+  timeout: z.number().int().positive().max(30000).default(10000),
+});
+
+// J3 — Actions primitives
+const getElementTextSchema = z.object({
+  selector: z.string().min(1, "Sélecteur CSS requis"),
+});
+
+const getElementAttributeSchema = z.object({
+  selector: z.string().min(1, "Sélecteur CSS requis"),
+  attribute: z.string().min(1, "Nom de l'attribut requis (ex: href, src, value, data-id)"),
+});
+
+const fillFormSchema = z.object({
+  selector: z.string().min(1, "Sélecteur CSS requis"),
+  value: z.string(),
+  waitFor: z.string().optional(),
+});
+
+const selectOptionSchema = z.object({
+  selector: z.string().min(1, "Sélecteur CSS de l'élément <select> requis"),
+  value: z.string().min(1, "Valeur de l'option à sélectionner requise"),
+});
+
 // ─── Skill ────────────────────────────────────────────────────────────────────
 
 export const browserSkill: Skill = {
@@ -439,6 +485,170 @@ export const browserSkill: Skill = {
         },
       },
     },
+
+    // ── Sprint 1 — J1 : Accessibilité ─────────────────────────────────────────
+    {
+      name: "browser_get_accessibility_snapshot",
+      description:
+        "Retourne l'arbre d'accessibilité (ARIA) de la page : rôles, noms accessibles, états (disabled, checked, expanded) et sélecteurs CSS. PRÉFÉRER cet outil à browser_snapshot pour les SPA (React, Vue, Angular) où les classes CSS sont instables. Retourne au moins 90% des éléments interactifs y compris les composants ARIA custom.",
+      parameters: {
+        type: "OBJECT",
+        properties: {},
+      },
+    },
+    {
+      name: "browser_click_by_role",
+      description:
+        "Clique sur un élément identifié par son rôle ARIA et son nom accessible. OUTIL PRÉFÉRÉ pour les SPA où les sélecteurs CSS sont instables. Ex: role='button', name='Valider'. Supporte un paramètre waitFor optionnel pour attendre qu'un sélecteur ou du texte apparaisse après le clic.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          role: {
+            type: "STRING",
+            description: "Rôle ARIA de l'élément : 'button', 'link', 'textbox', 'combobox', 'checkbox', 'radio', 'menuitem', 'tab', etc.",
+          },
+          name: {
+            type: "STRING",
+            description: "Nom accessible de l'élément (texte visible, aria-label, ou aria-labelledby). Insensible à la casse.",
+          },
+          waitFor: {
+            type: "STRING",
+            description: "Optionnel. Sélecteur CSS ou texte à attendre après le clic (ex: '#results', 'Chargement terminé'). Attend jusqu'à 5s.",
+          },
+        },
+        required: ["role", "name"],
+      },
+    },
+    {
+      name: "browser_type_by_label",
+      description:
+        "Saisit du texte dans un champ identifié par son libellé (label HTML associé, aria-label, ou placeholder). OUTIL PRÉFÉRÉ pour les formulaires car plus stable que les sélecteurs CSS. Efface le contenu existant avant de saisir. Ex: label='Email', text='user@example.com'.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          label: {
+            type: "STRING",
+            description: "Libellé du champ : texte du <label> associé, aria-label, ou placeholder. Insensible à la casse.",
+          },
+          text: {
+            type: "STRING",
+            description: "Le texte à saisir dans le champ.",
+          },
+          pressEnter: {
+            type: "BOOLEAN",
+            description: "Si true, appuie sur Entrée après la saisie. Défaut : false.",
+          },
+          waitFor: {
+            type: "STRING",
+            description: "Optionnel. Sélecteur CSS ou texte à attendre après la saisie.",
+          },
+        },
+        required: ["label", "text"],
+      },
+    },
+
+    // ── Sprint 1 — J2 : Robustesse ────────────────────────────────────────────
+    {
+      name: "browser_wait_for",
+      description:
+        "Attend qu'une condition soit remplie sur la page avant de continuer. Utile pour les SPA où les éléments apparaissent de manière asynchrone. Supporte : l'apparition d'un sélecteur CSS, la présence d'un texte dans la page, ou un changement d'URL.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          condition: {
+            type: "STRING",
+            description: "Ce qu'on attend : un sélecteur CSS (ex: '#results'), un texte (ex: 'Chargement terminé'), ou un pattern d'URL (ex: '/dashboard').",
+          },
+          conditionType: {
+            type: "STRING",
+            description: "Type de condition : 'selector' (défaut), 'text', ou 'url'.",
+          },
+          timeout: {
+            type: "NUMBER",
+            description: "Timeout en millisecondes (défaut 10000, max 30000).",
+          },
+        },
+        required: ["condition"],
+      },
+    },
+
+    // ── Sprint 1 — J3 : Actions primitives ───────────────────────────────────
+    {
+      name: "browser_get_element_text",
+      description:
+        "Retourne le texte visible d'un élément ciblé par un sélecteur CSS. Utile pour lire la valeur d'un champ, le contenu d'un badge, d'un message d'erreur, ou d'un statut dynamique sans avoir à lire toute la page.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          selector: {
+            type: "STRING",
+            description: "Sélecteur CSS de l'élément dont on veut lire le texte (ex: '#error-msg', '.price', 'h1').",
+          },
+        },
+        required: ["selector"],
+      },
+    },
+    {
+      name: "browser_get_element_attribute",
+      description:
+        "Retourne la valeur d'un attribut HTML spécifique d'un élément (href, src, value, data-*, aria-*, class, etc.). Utile pour extraire des URLs de liens, des sources d'images, des valeurs de champs cachés, ou des métadonnées.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          selector: {
+            type: "STRING",
+            description: "Sélecteur CSS de l'élément.",
+          },
+          attribute: {
+            type: "STRING",
+            description: "Nom de l'attribut à lire (ex: 'href', 'src', 'value', 'data-id', 'aria-expanded').",
+          },
+        },
+        required: ["selector", "attribute"],
+      },
+    },
+    {
+      name: "browser_fill_form",
+      description:
+        "Efface le contenu d'un champ puis saisit une nouvelle valeur en simulant la saisie caractère par caractère (déclenche les événements input/change nécessaires aux frameworks comme React/Vue). PRÉFÉRER cet outil à browser_type pour les formulaires dynamiques avec validation en temps réel.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          selector: {
+            type: "STRING",
+            description: "Sélecteur CSS du champ (input, textarea, ou contenteditable). Doit provenir de browser_snapshot ou browser_get_accessibility_snapshot.",
+          },
+          value: {
+            type: "STRING",
+            description: "La valeur à saisir dans le champ (remplace tout contenu existant).",
+          },
+          waitFor: {
+            type: "STRING",
+            description: "Optionnel. Sélecteur CSS ou texte à attendre après la saisie (ex: '.suggestions-list' pour une liste d'autocomplétion).",
+          },
+        },
+        required: ["selector", "value"],
+      },
+    },
+    {
+      name: "browser_select_option",
+      description:
+        "Sélectionne une option dans un élément <select> (liste déroulante native). Déclenche les événements change pour les frameworks réactifs. Fournir la valeur (attribut value de l'option) ou le texte visible.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          selector: {
+            type: "STRING",
+            description: "Sélecteur CSS de l'élément <select>.",
+          },
+          value: {
+            type: "STRING",
+            description: "Valeur de l'option (attribut value) ou texte visible de l'option à sélectionner.",
+          },
+        },
+        required: ["selector", "value"],
+      },
+    },
   ],
 
   inputSchemas: {
@@ -459,6 +669,17 @@ export const browserSkill: Skill = {
     browser_inspect: inspectSchema,
     browser_summarize_page: summarizePageSchema,
     browser_research: researchSchema,
+    // Sprint 1 — J1
+    browser_get_accessibility_snapshot: accessibilitySnapshotSchema,
+    browser_click_by_role: clickByRoleSchema,
+    browser_type_by_label: typeByLabelSchema,
+    // Sprint 1 — J2
+    browser_wait_for: waitForSchema,
+    // Sprint 1 — J3
+    browser_get_element_text: getElementTextSchema,
+    browser_get_element_attribute: getElementAttributeSchema,
+    browser_fill_form: fillFormSchema,
+    browser_select_option: selectOptionSchema,
   },
 
   handleToolCall: async (name: string, args: any, context?: any) => {
@@ -484,6 +705,35 @@ export const browserSkill: Skill = {
         pending.set(requestId, { resolve, reject, timer });
         emit({ requestId, ...action });
       }).catch((err: Error) => `[ERREUR ACTION] ${err.message}`);
+    };
+
+    // Helper avec retry exponentiel (Sprint 1 — J2)
+    // Ré-essaie l'action jusqu'à 3 fois si elle échoue :
+    //   1er essai immédiat, 2e après 1s, 3e après 3s.
+    const runBrowserActionWithRetry = async <T = any>(
+      action: any,
+      timeoutMs = 15_000,
+      maxAttempts = 3
+    ): Promise<T | string> => {
+      const delays = [0, 1_000, 3_000];
+      let lastResult: T | string = "[ERREUR] Aucune tentative effectuée.";
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (delays[attempt] > 0) {
+          await new Promise<void>((r) => setTimeout(r, delays[attempt]));
+        }
+        lastResult = await runBrowserAction<T>(action, timeoutMs);
+        // Succès si ce n'est pas une chaîne d'erreur et que found/ok n'est pas false
+        if (typeof lastResult !== "string") {
+          const r = lastResult as any;
+          if (r?.found === false) {
+            // Élément pas encore dans le DOM — retenter
+            continue;
+          }
+          return lastResult;
+        }
+        // Timeout ou erreur réseau — retenter
+      }
+      return lastResult;
     };
 
     // ── browser_navigate ──────────────────────────────────────────────────────
@@ -954,6 +1204,195 @@ export const browserSkill: Skill = {
         type,
         elements: raw ?? {},
         note: "Utilise UNIQUEMENT ces sélecteurs pour browser_click / browser_type.",
+      };
+    }
+
+    // ── Sprint 1 — J1 : Accessibilité ─────────────────────────────────────────
+
+    // ── browser_get_accessibility_snapshot ────────────────────────────────────
+    if (name === "browser_get_accessibility_snapshot") {
+      validateArgs(browserSkill.inputSchemas!["browser_get_accessibility_snapshot"], args);
+      const raw = await runBrowserAction({ type: "browser-accessibility-snapshot" }, 12_000);
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      const snap = raw as { url?: string; title?: string; elements?: any[]; stats?: any };
+      return {
+        status: "success",
+        url: snap.url ?? "",
+        title: snap.title ?? "",
+        elements: snap.elements ?? [],
+        stats: snap.stats ?? {},
+        note: "Utilise role + name pour browser_click_by_role / browser_type_by_label. Plus stable que les sélecteurs CSS sur les SPA.",
+      };
+    }
+
+    // ── browser_click_by_role ─────────────────────────────────────────────────
+    if (name === "browser_click_by_role") {
+      const { role, name: accessibleName, waitFor } = validateArgs(
+        browserSkill.inputSchemas!["browser_click_by_role"], args
+      );
+      const raw = await runBrowserActionWithRetry(
+        { type: "browser-click-by-role", role, accessibleName, waitFor: waitFor ?? null },
+        10_000
+      );
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      return {
+        status: "success",
+        role,
+        name: accessibleName,
+        changed: (raw as any)?.changed ?? {},
+        message: `Clic effectué sur l'élément [role="${role}" name="${accessibleName}"]${waitFor ? ` — attente de "${waitFor}" effectuée` : ""}.`,
+      };
+    }
+
+    // ── browser_type_by_label ─────────────────────────────────────────────────
+    if (name === "browser_type_by_label") {
+      const { label, text, pressEnter, waitFor } = validateArgs(
+        browserSkill.inputSchemas!["browser_type_by_label"], args
+      );
+      const raw = await runBrowserActionWithRetry(
+        { type: "browser-type-by-label", label, text, pressEnter, waitFor: waitFor ?? null },
+        15_000
+      );
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      return {
+        status: "success",
+        label,
+        pressEnter,
+        changed: (raw as any)?.changed ?? {},
+        message: `Saisie de "${text}" dans le champ "${label}"${pressEnter ? " + Entrée" : ""}${waitFor ? ` — attente de "${waitFor}" effectuée` : ""}.`,
+      };
+    }
+
+    // ── Sprint 1 — J2 : Robustesse ────────────────────────────────────────────
+
+    // ── browser_wait_for ──────────────────────────────────────────────────────
+    if (name === "browser_wait_for") {
+      const { condition, conditionType, timeout } = validateArgs(
+        browserSkill.inputSchemas!["browser_wait_for"], args
+      );
+      const raw = await runBrowserAction(
+        { type: "browser-wait-for", condition, conditionType, timeout },
+        (timeout ?? 10_000) + 3_000
+      );
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      const result = raw as { found: boolean; elapsed?: number };
+      return {
+        status: result.found ? "success" : "error",
+        conditionType,
+        condition,
+        elapsed: result.elapsed ?? 0,
+        message: result.found
+          ? `Condition "${condition}" (${conditionType}) remplie en ${result.elapsed ?? "?"}ms.`
+          : `Timeout : condition "${condition}" (${conditionType}) non remplie après ${timeout}ms.`,
+      };
+    }
+
+    // ── Sprint 1 — J3 : Actions primitives ───────────────────────────────────
+
+    // ── browser_get_element_text ──────────────────────────────────────────────
+    if (name === "browser_get_element_text") {
+      const { selector } = validateArgs(browserSkill.inputSchemas!["browser_get_element_text"], args);
+      const raw = await runBrowserAction({ type: "browser-get-element-text", selector }, 10_000);
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      const result = raw as { text?: string; found?: boolean };
+      if (!result.found) {
+        return { status: "error", message: `Élément introuvable : ${selector}` };
+      }
+      return {
+        status: "success",
+        selector,
+        text: result.text ?? "",
+        message: `Texte extrait de "${selector}" : ${(result.text ?? "").slice(0, 100)}${(result.text ?? "").length > 100 ? "..." : ""}`,
+      };
+    }
+
+    // ── browser_get_element_attribute ─────────────────────────────────────────
+    if (name === "browser_get_element_attribute") {
+      const { selector, attribute } = validateArgs(
+        browserSkill.inputSchemas!["browser_get_element_attribute"], args
+      );
+      const raw = await runBrowserAction(
+        { type: "browser-get-element-attribute", selector, attribute },
+        10_000
+      );
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      const result = raw as { value?: string | null; found?: boolean };
+      if (!result.found) {
+        return { status: "error", message: `Élément introuvable : ${selector}` };
+      }
+      return {
+        status: "success",
+        selector,
+        attribute,
+        value: result.value ?? null,
+        message: result.value !== null && result.value !== undefined
+          ? `Attribut "${attribute}" de "${selector}" = "${result.value}".`
+          : `L'attribut "${attribute}" est absent sur l'élément "${selector}".`,
+      };
+    }
+
+    // ── browser_fill_form ─────────────────────────────────────────────────────
+    if (name === "browser_fill_form") {
+      const { selector, value, waitFor } = validateArgs(
+        browserSkill.inputSchemas!["browser_fill_form"], args
+      );
+      const raw = await runBrowserActionWithRetry(
+        { type: "browser-fill-form", selector, value, waitFor: waitFor ?? null },
+        15_000
+      );
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      const result = raw as { ok?: boolean; found?: boolean; changed?: any };
+      if (!result.found) {
+        return { status: "error", message: `Champ introuvable : ${selector}` };
+      }
+      return {
+        status: "success",
+        selector,
+        value,
+        changed: result.changed ?? {},
+        message: `Champ "${selector}" rempli avec "${value.slice(0, 50)}${value.length > 50 ? "..." : ""}"${waitFor ? ` — attente de "${waitFor}" effectuée` : ""}.`,
+      };
+    }
+
+    // ── browser_select_option ─────────────────────────────────────────────────
+    if (name === "browser_select_option") {
+      const { selector, value } = validateArgs(
+        browserSkill.inputSchemas!["browser_select_option"], args
+      );
+      const raw = await runBrowserAction({ type: "browser-select-option", selector, value }, 10_000);
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      const result = raw as { ok?: boolean; found?: boolean; selectedText?: string };
+      if (!result.found) {
+        return { status: "error", message: `Élément <select> introuvable : ${selector}` };
+      }
+      if (!result.ok) {
+        return {
+          status: "error",
+          message: `Option "${value}" introuvable dans le <select> "${selector}". Utilise browser_get_element_attribute pour inspecter les options disponibles.`,
+        };
+      }
+      return {
+        status: "success",
+        selector,
+        value,
+        selectedText: result.selectedText ?? value,
+        message: `Option "${result.selectedText ?? value}" sélectionnée dans "${selector}".`,
       };
     }
 
