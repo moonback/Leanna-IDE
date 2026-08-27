@@ -1,4 +1,4 @@
-import { Skill, validateArgs } from "./base";
+import { Skill, SkillContext, validateArgs, SkillResult, createSuccessResult, createErrorResult } from "./base";
 import { z } from "zod";
 import {
   createWorkflow, executeWorkflow, deleteWorkflow, toggleWorkflow,
@@ -32,514 +32,865 @@ export { getWorkflowsSnapshot, loadWorkflows as loadWorkflowsFromDb } from "./wo
 const selectorSchema = z.string().min(1, "Sélecteur requis").trim();
 
 export const automationSkill: Skill = {
-    name: "automation",
-    declarations: [
+  name: "automation",
+  declarations: [
+    {
+      name: "automation_navigate",
+      description: "Ouvre le navigateur et navigue vers une URL. Retourne le titre et le texte de la page.",
+      parameters: z.object({
+        url: z.string().url("URL invalide").trim()
+      }),
+      examples: [
         {
-            name: "automation_navigate",
-            description: "Ouvre le navigateur et navigue vers une URL. Retourne le titre et le texte de la page.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    url: { type: "STRING", description: "L'URL à visiter" }
-                },
-                required: ["url"]
-            }
-        },
-        {
-            name: "automation_click",
-            description: "Clique sur un élément de la page actuelle (sélecteur CSS) et attend un peu.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    selector: { type: "STRING", description: "Le sélecteur CSS de l'élément à cliquer" }
-                },
-                required: ["selector"]
-            }
-        },
-        {
-            name: "automation_type",
-            description: "Saisit du texte dans un champ de formulaire de la page actuelle.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    selector: { type: "STRING", description: "Le sélecteur CSS du champ texte" },
-                    text: { type: "STRING", description: "Le texte à taper" },
-                    pressEnter: { type: "BOOLEAN", description: "Appuyer sur Entrée après la saisie ?" }
-                },
-                required: ["selector", "text"]
-            }
-        },
-        {
-            name: "automation_extract",
-            description: "Extrait le contenu texte de la page actuelle, ou d'un sélecteur spécifique.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    selector: { type: "STRING", description: "Optionnel. Le sélecteur CSS. Par défaut, extrait tout le body." }
-                }
-            }
-        },
-        {
-            name: "automation_music_search",
-            description: "Recherche d'informations sur un artiste/album/chanson via recherche web avec focus sur la musique.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    query: { type: "STRING", description: "L'artiste, chanson ou album à rechercher" }
-                },
-                required: ["query"]
-            }
-        },
-        {
-            name: "automation_search",
-            description: "Effectue une recherche web générale (DuckDuckGo) et retourne les premiers résultats.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    query: { type: "STRING", description: "La requête de recherche" }
-                },
-                required: ["query"]
-            }
-        },
-        {
-            name: "automation_snapshot",
-            description: "Retourne un instantané HTML compact des éléments interactifs de la page actuelle (inputs, boutons, selects) avec leurs sélecteurs CSS utilisables. À utiliser AVANT automation_type ou automation_click sur un nouveau site pour obtenir les vrais sélecteurs.",
-            parameters: {
-                type: "OBJECT",
-                properties: {}
-            }
-        },
-        {
-            name: "automation_inspect",
-            description: "Inspecte la page actuelle pour lister les éléments cliquables (boutons, liens) et les champs de formulaire disponibles.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    type: { type: "STRING", description: "Type d'éléments à inspecter: 'buttons', 'inputs', 'links' ou 'all'" }
-                }
-            }
-        },
-        {
-            name: "automation_close",
-            description: "Ferme le navigateur automatisé.",
-            parameters: { type: "OBJECT", properties: {} }
-        },
-        {
-            name: "automation_double_click",
-            description: "Effectue un double-clic gauche humain sur un élément (hover avant, trajectoire souris, délais randomisés).",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    selector: { type: "STRING", description: "Sélecteur CSS de l'élément à double-cliquer" }
-                },
-                required: ["selector"]
-            }
-        },
-        {
-            name: "automation_right_click",
-            description: "Effectue un clic droit humain sur un élément pour ouvrir le menu contextuel (hover avant + souris).",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    selector: { type: "STRING", description: "Sélecteur CSS de l'élément à cliquer-droite" }
-                },
-                required: ["selector"]
-            }
-        },
-        {
-            name: "automation_hover",
-            description: "Survole (hover) un élément avec une trajectoire de souris humaine. Idéal pour menus/dropdowns/infobulles.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    selector: { type: "STRING", description: "Sélecteur CSS de l'élément à survoler" },
-                    hoverMs: { type: "NUMBER", description: "Durée de survol en ms (optionnel, défaut aléatoire 800-1800)" }
-                },
-                required: ["selector"]
-            }
-        },
-        {
-            name: "automation_press_keys",
-            description: "Envoie une séquence de touches au clavier (Enter, ArrowDown, Escape, Tab, Ctrl+A, etc.) avec délais humains.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    keys: { type: "ARRAY", description: "Tableau de noms de touches ex: ['Tab','Tab','Enter']", items: { type: "STRING" } },
-                    pressEnter: { type: "BOOLEAN", description: "Ajouter un appui sur Entrée à la fin ?" }
-                },
-                required: ["keys"]
-            }
-        },
-        {
-            name: "automation_scroll",
-            description: "Défilement humain de la page (par paquets de pixels avec pauses, simule molette).",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    direction: { type: "STRING", description: "'up' ou 'down' (défaut 'down')" },
-                    pixels: { type: "NUMBER", description: "Nombre total de pixels à défiler (optionnel, défaut 320-720)" }
-                }
-            }
-        },
-        {
-            name: "automation_wait_for",
-            description: "Attend qu'un élément CSS apparaisse ou qu'un texte soit présent sur la page. Idéal après navigation/clic.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    selector: { type: "STRING", description: "Sélecteur CSS à attendre (soit selector soit text requis)" },
-                    text: { type: "STRING", description: "Texte dont on attend l'apparition dans le body" },
-                    timeoutMs: { type: "NUMBER", description: "Timeout max en ms (défaut 10000)" }
-                }
-            }
-        },
-        {
-            name: "automation_schedule_task",
-            description: "Planifie une tâche d'automatisation en arrière-plan et l'exécute périodiquement.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    name: { type: "STRING", description: "Nom de la tâche planifiée" },
-                    description: { type: "STRING", description: "Description courte de la tâche" },
-                    actionName: { type: "STRING", description: "Nom de l'action d'automatisation à exécuter (ex: automation_search, automation_navigate, automation_extract)" },
-                    args: { type: "OBJECT", description: "Arguments passés à l'action" },
-                    intervalSeconds: { type: "NUMBER", description: "Intervalle en secondes" },
-                    intervalMinutes: { type: "NUMBER", description: "Intervalle en minutes" },
-                    intervalHours: { type: "NUMBER", description: "Intervalle en heures" },
-                    interval: { type: "STRING", description: "Intervalle au format 30s, 5m ou 1h" }
-                },
-                required: ["name", "actionName"]
-            }
-        },
-        {
-            name: "automation_list_scheduled_tasks",
-            description: "Liste les tâches d'automatisation planifiées actuellement actives.",
-            parameters: { type: "OBJECT", properties: {} }
-        },
-        {
-            name: "automation_cancel_scheduled_task",
-            description: "Annule une tâche planifiée précédemment enregistrée.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    taskId: { type: "STRING", description: "Identifiant de la tâche à annuler" }
-                },
-                required: ["taskId"]
-            }
-        },
-        // ── Workflow (chaînes d'actions) ───────────────────────────────────────
-        {
-            name: "workflow_create",
-            description: "Crée un workflow (chaîne d'actions/pipeline). Enchaîne plusieurs skills séquentiellement avec passage de résultats entre étapes via des templates ({{prev.result}}, {{steps.ID.result}}). Peut être planifié avec un intervalle.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    name: { type: "STRING", description: "Nom du workflow" },
-                    description: { type: "STRING", description: "Description du workflow" },
-                    steps: {
-                        type: "ARRAY",
-                        description: "Liste ordonnée des étapes du workflow",
-                        items: {
-                            type: "OBJECT",
-                            properties: {
-                                id: { type: "STRING", description: "Identifiant unique de l'étape (utilisé pour référencer ses résultats)" },
-                                action: { type: "STRING", description: "Nom de l'action/skill à exécuter (ex: github_list_prs, memory_store, automation_search)" },
-                                args: { type: "OBJECT", description: "Arguments pour l'action. Supporte {{prev.result}}, {{steps.STEP_ID.result}}" },
-                                label: { type: "STRING", description: "Nom lisible de l'étape (optionnel)" },
-                                condition: { type: "STRING", description: "Condition JS pour exécuter l'étape (ex: prev.status === 'success')" },
-                                onError: { type: "STRING", description: "Comportement en cas d'échec: 'stop' (défaut), 'skip', 'retry'" },
-                                maxRetries: { type: "NUMBER", description: "Nombre max de tentatives si onError='retry' (défaut: 2)" }
-                            },
-                            required: ["id", "action"]
-                        }
-                    },
-                    schedule: { type: "STRING", description: "Intervalle de planification (ex: '24h', '30m', '1h'). Omis = exécution manuelle uniquement." }
-                },
-                required: ["name", "steps"]
-            }
-        },
-        {
-            name: "workflow_run",
-            description: "Exécute immédiatement un workflow existant et retourne les résultats de chaque étape.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    workflowId: { type: "STRING", description: "ID du workflow à exécuter" }
-                },
-                required: ["workflowId"]
-            }
-        },
-        {
-            name: "workflow_list",
-            description: "Liste tous les workflows enregistrés avec leur statut et historique d'exécution.",
-            parameters: { type: "OBJECT", properties: {} }
-        },
-        {
-            name: "workflow_delete",
-            description: "Supprime un workflow et annule sa planification éventuelle.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    workflowId: { type: "STRING", description: "ID du workflow à supprimer" }
-                },
-                required: ["workflowId"]
-            }
-        },
-        {
-            name: "workflow_toggle",
-            description: "Active ou désactive un workflow planifié.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    workflowId: { type: "STRING", description: "ID du workflow" },
-                    enabled: { type: "BOOLEAN", description: "true pour activer, false pour désactiver" }
-                },
-                required: ["workflowId", "enabled"]
-            }
-        },
-    ],
-    inputSchemas: {
-        "automation_navigate": z.object({
-            url: z.string().url("URL invalide").trim()
-        }),
-        "automation_click": z.object({
-            selector: selectorSchema
-        }),
-        "automation_type": z.object({
-            selector: selectorSchema,
-            text: z.string().min(1, "Texte requis"),
-            pressEnter: z.boolean().optional().default(false)
-        }),
-        "automation_extract": z.object({
-            selector: z.string().trim().optional().default('body')
-        }),
-        "automation_music_search": z.object({
-            query: z.string().min(1, "Requête requise").trim()
-        }),
-        "automation_search": z.object({
-            query: z.string().min(1, "Requête requise").trim()
-        }),
-        "automation_snapshot": z.object({}),
-        "automation_inspect": z.object({
-            type: z.enum(['buttons', 'inputs', 'links', 'all']).optional().default('all')
-        }),
-        "automation_close": z.object({}),
-        "automation_double_click": z.object({
-            selector: selectorSchema
-        }),
-        "automation_right_click": z.object({
-            selector: selectorSchema
-        }),
-        "automation_hover": z.object({
-            selector: selectorSchema,
-            hoverMs: z.number().int().positive().optional()
-        }),
-        "automation_press_keys": z.object({
-            keys: z.array(z.string().min(1)).min(1, "Au moins une touche requise"),
-            pressEnter: z.boolean().optional().default(false)
-        }),
-        "automation_scroll": z.object({
-            direction: z.enum(['up', 'down']).optional().default('down'),
-            pixels: z.number().int().positive().optional()
-        }),
-        "automation_wait_for": z.object({
-            selector: z.string().trim().optional(),
-            text: z.string().min(1).optional(),
-            timeoutMs: z.number().int().positive().optional()
-        }).refine(a => a.selector || a.text, {
-            message: "selector ou text est requis"
-        }),
-        "automation_schedule_task": z.object({
-            name: z.string().min(1, "Nom requis").trim(),
-            description: z.string().optional().default('Tâche planifiée'),
-            actionName: z.string().min(1, "Action requise"),
-            args: z.record(z.unknown()).optional().default({}),
-            intervalSeconds: z.number().int().positive().optional(),
-            intervalMinutes: z.number().int().positive().optional(),
-            intervalHours: z.number().int().positive().optional(),
-            interval: z.string().trim().optional()
-        }).refine(args => args.intervalSeconds || args.intervalMinutes || args.intervalHours || args.interval, {
-            message: "Un intervalle est requis"
-        }),
-        "automation_list_scheduled_tasks": z.object({}),
-        "automation_cancel_scheduled_task": z.object({
-            taskId: z.string().min(1, "ID requis")
-        }),
-        // Workflow schemas
-        "workflow_create": createWorkflowSchema,
-        "workflow_run": runWorkflowSchema,
-        "workflow_list": z.object({}),
-        "workflow_delete": deleteWorkflowSchema,
-        "workflow_toggle": toggleWorkflowSchema,
-    },
-
-    handleToolCall: async (name, args) => {
-        try {
-            if (name === "automation_navigate") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_navigate"], args);
-                return await handleNavigate(validated);
-            }
-
-            if (name === "automation_click") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_click"], args);
-                return await handleClick(validated);
-            }
-
-            if (name === "automation_type") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_type"], args);
-                return await handleType(validated);
-            }
-
-            if (name === "automation_extract") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_extract"], args);
-                return await handleExtract(validated);
-            }
-
-            if (name === "automation_music_search") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_music_search"], args);
-                return await handleMusicSearch(validated);
-            }
-
-            if (name === "automation_search") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_search"], args);
-                return await handleSearch(validated);
-            }
-
-            if (name === "automation_snapshot") {
-                validateArgs(automationSkill.inputSchemas!["automation_snapshot"], args);
-                return await handleSnapshot();
-            }
-
-            if (name === "automation_inspect") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_inspect"], args);
-                return await handleInspect(validated);
-            }
-
-            if (name === "automation_close") {
-                validateArgs(automationSkill.inputSchemas!["automation_close"], args);
-                return await handleClose();
-            }
-
-            if (name === "automation_double_click") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_double_click"], args);
-                return await handleDoubleClick(validated);
-            }
-
-            if (name === "automation_right_click") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_right_click"], args);
-                return await handleRightClick(validated);
-            }
-
-            if (name === "automation_hover") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_hover"], args);
-                return await handleHover(validated);
-            }
-
-            if (name === "automation_press_keys") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_press_keys"], args);
-                return await handlePressKeys(validated);
-            }
-
-            if (name === "automation_scroll") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_scroll"], args);
-                return await handleScroll(validated);
-            }
-
-            if (name === "automation_wait_for") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_wait_for"], args);
-                return await handleWaitFor(validated);
-            }
-
-            if (name === "automation_schedule_task") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_schedule_task"], args);
-                return await handleScheduleTask(validated);
-            }
-
-            if (name === "automation_list_scheduled_tasks") {
-                validateArgs(automationSkill.inputSchemas!["automation_list_scheduled_tasks"], args);
-                return await handleListScheduledTasks();
-            }
-
-            if (name === "automation_cancel_scheduled_task") {
-                const validated = validateArgs(automationSkill.inputSchemas!["automation_cancel_scheduled_task"], args);
-                return await handleCancelScheduledTask(validated);
-            }
-
-            // ── Workflow handlers ──────────────────────────────────────────────
-            if (name === "workflow_create") {
-                const validated = validateArgs(automationSkill.inputSchemas!["workflow_create"], args);
-                const workflow = await createWorkflow(validated);
-                return {
-                    status: "success",
-                    workflowId: workflow.id,
-                    name: workflow.name,
-                    stepsCount: workflow.steps.length,
-                    scheduled: workflow.schedule || null,
-                    message: `Workflow "${workflow.name}" créé avec ${workflow.steps.length} étape(s).${workflow.schedule ? ` Planifié toutes les ${workflow.schedule}.` : ""}`
-                };
-            }
-
-            if (name === "workflow_run") {
-                const validated = validateArgs(automationSkill.inputSchemas!["workflow_run"], args);
-                const wf = getWorkflow(validated.workflowId);
-                if (!wf) {
-                    return { error: `Workflow ${validated.workflowId} introuvable.` };
-                }
-                const result = await executeWorkflow(wf);
-                return {
-                    status: "success",
-                    result
-                };
-            }
-
-            if (name === "workflow_list") {
-                validateArgs(automationSkill.inputSchemas!["workflow_list"], args);
-                const allWorkflows = listWorkflows();
-                return {
-                    status: "success",
-                    count: allWorkflows.length,
-                    workflows: allWorkflows.map(wf => ({
-                        id: wf.id,
-                        name: wf.name,
-                        description: wf.description,
-                        stepsCount: wf.steps.length,
-                        schedule: wf.schedule || null,
-                        enabled: wf.enabled,
-                        lastRunAt: wf.lastRunAt ? new Date(wf.lastRunAt).toISOString() : null,
-                        lastRunStatus: wf.lastRunStatus || null,
-                    }))
-                };
-            }
-
-            if (name === "workflow_delete") {
-                const validated = validateArgs(automationSkill.inputSchemas!["workflow_delete"], args);
-                const deleted = await deleteWorkflow(validated.workflowId);
-                return {
-                    status: deleted ? "success" : "not_found",
-                    message: deleted ? `Workflow ${validated.workflowId} supprimé.` : `Workflow ${validated.workflowId} introuvable.`
-                };
-            }
-
-            if (name === "workflow_toggle") {
-                const validated = validateArgs(automationSkill.inputSchemas!["workflow_toggle"], args);
-                const updated = await toggleWorkflow(validated.workflowId, validated.enabled);
-                if (!updated) {
-                    return { error: `Workflow ${validated.workflowId} introuvable.` };
-                }
-                return {
-                    status: "success",
-                    enabled: updated.enabled,
-                    message: `Workflow "${updated.name}" ${updated.enabled ? "activé" : "désactivé"}.`
-                };
-            }
-
-            return { error: `Outil inconnu: ${name}` };
-        } catch (e: any) {
-            console.error("[Automation] Erreur:", e);
-            return { error: `Erreur d'automatisation: ${e.message}` };
+          args: { url: "https://example.com" },
+          description: "Navigation vers un site web standard"
         }
+      ],
+      category: "browser",
+      mutating: true
+    },
+    {
+      name: "automation_click",
+      description: "Clique sur un élément de la page actuelle (sélecteur CSS) et attend un peu.",
+      parameters: z.object({
+        selector: selectorSchema
+      }),
+      examples: [
+        {
+          args: { selector: "button.submit" },
+          description: "Clique sur un bouton de soumission"
+        }
+      ],
+      category: "browser",
+      mutating: true
+    },
+    {
+      name: "automation_type",
+      description: "Saisit du texte dans un champ de formulaire de la page actuelle.",
+      parameters: z.object({
+        selector: selectorSchema,
+        text: z.string().min(1, "Texte requis"),
+        pressEnter: z.boolean().optional().default(false)
+      }),
+      examples: [
+        {
+          args: { selector: "#search-input", text: "test query", pressEnter: true },
+          description: "Tape une requête et appuie sur Entrée"
+        }
+      ],
+      category: "browser",
+      mutating: true
+    },
+    {
+      name: "automation_extract",
+      description: "Extrait le contenu texte de la page actuelle, ou d'un sélecteur spécifique.",
+      parameters: z.object({
+        selector: z.string().trim().optional().default('body')
+      }),
+      examples: [
+        {
+          args: { selector: "h1" },
+          description: "Extrait le titre principal de la page"
+        }
+      ],
+      category: "browser"
+    },
+    {
+      name: "automation_music_search",
+      description: "Recherche d'informations sur un artiste/album/chanson via recherche web avec focus sur la musique.",
+      parameters: z.object({
+        query: z.string().min(1, "Requête requise").trim()
+      }),
+      examples: [
+        {
+          args: { query: "Daft Punk" },
+          description: "Recherche d'informations sur Daft Punk"
+        }
+      ],
+      category: "search"
+    },
+    {
+      name: "automation_search",
+      description: "Effectue une recherche web générale (DuckDuckGo) et retourne les premiers résultats.",
+      parameters: z.object({
+        query: z.string().min(1, "Requête requise").trim()
+      }),
+      examples: [
+        {
+          args: { query: "latest AI news 2024" },
+          description: "Recherche d'actualités sur l'IA"
+        }
+      ],
+      category: "search"
+    },
+    {
+      name: "automation_snapshot",
+      description: "Retourne un instantané HTML compact des éléments interactifs de la page actuelle (inputs, boutons, selects) avec leurs sélecteurs CSS utilisables. À utiliser AVANT automation_type ou automation_click sur un nouveau site pour obtenir les vrais sélecteurs.",
+      parameters: z.object({}),
+      examples: [
+        {
+          args: {},
+          description: "Capture un instantané de la page actuelle"
+        }
+      ],
+      category: "browser"
+    },
+    {
+      name: "automation_inspect",
+      description: "Inspecte la page actuelle pour lister les éléments cliquables (boutons, liens) et les champs de formulaire disponibles.",
+      parameters: z.object({
+        type: z.enum(['buttons', 'inputs', 'links', 'all']).optional().default('all')
+      }),
+      examples: [
+        {
+          args: { type: 'buttons' },
+          description: "Liste tous les boutons cliquables de la page"
+        }
+      ],
+      category: "browser"
+    },
+    {
+      name: "automation_close",
+      description: "Ferme le navigateur automatisé.",
+      parameters: z.object({}),
+      examples: [
+        {
+          args: {},
+          description: "Ferme le navigateur"
+        }
+      ],
+      category: "browser",
+      mutating: true
+    },
+    {
+      name: "automation_double_click",
+      description: "Effectue un double-clic gauche humain sur un élément (hover avant, trajectoire souris, délais randomisés).",
+      parameters: z.object({
+        selector: selectorSchema
+      }),
+      examples: [
+        {
+          args: { selector: ".edit-button" },
+          description: "Double-clique sur un bouton d'édition"
+        }
+      ],
+      category: "browser",
+      mutating: true
+    },
+    {
+      name: "automation_right_click",
+      description: "Effectue un clic droit humain sur un élément pour ouvrir le menu contextuel (hover avant + souris).",
+      parameters: z.object({
+        selector: selectorSchema
+      }),
+      examples: [
+        {
+          args: { selector: ".file-item" },
+          description: "Ouvre le menu contextuel d'un fichier"
+        }
+      ],
+      category: "browser",
+      mutating: true
+    },
+    {
+      name: "automation_hover",
+      description: "Survole (hover) un élément avec une trajectoire de souris humaine. Idéal pour menus/dropdowns/infobulles.",
+      parameters: z.object({
+        selector: selectorSchema,
+        hoverMs: z.number().int().positive().optional()
+      }),
+      examples: [
+        {
+          args: { selector: ".dropdown-menu", hoverMs: 1000 },
+          description: "Survole un menu déroulant pendant 1 seconde"
+        }
+      ],
+      category: "browser"
+    },
+    {
+      name: "automation_press_keys",
+      description: "Envoie une séquence de touches au clavier (Enter, ArrowDown, Escape, Tab, Ctrl+A, etc.) avec délais humains.",
+      parameters: z.object({
+        keys: z.array(z.string().min(1)).min(1, "Au moins une touche requise"),
+        pressEnter: z.boolean().optional().default(false)
+      }),
+      examples: [
+        {
+          args: { keys: ['Tab', 'Tab', 'Enter'], pressEnter: false },
+          description: "Navigation tab-tab-enter"
+        }
+      ],
+      category: "browser",
+      mutating: true
+    },
+    {
+      name: "automation_scroll",
+      description: "Défilement humain de la page (par paquets de pixels avec pauses, simule molette).",
+      parameters: z.object({
+        direction: z.enum(['up', 'down']).optional().default('down'),
+        pixels: z.number().int().positive().optional()
+      }),
+      examples: [
+        {
+          args: { direction: 'down', pixels: 500 },
+          description: "Fait défiler la page vers le bas de 500 pixels"
+        }
+      ],
+      category: "browser",
+      mutating: true
+    },
+    {
+      name: "automation_wait_for",
+      description: "Attend qu'un élément CSS apparaisse ou qu'un texte soit présent sur la page. Idéal après navigation/clic.",
+      parameters: z.object({
+        selector: z.string().trim().optional(),
+        text: z.string().min(1).optional(),
+        timeoutMs: z.number().int().positive().optional()
+      }).refine(a => a.selector || a.text, {
+        message: "selector ou text est requis"
+      }),
+      examples: [
+        {
+          args: { selector: ".loading-spinner", timeoutMs: 5000 },
+          description: "Attend la disparition d'un indicateur de chargement (max 5s)"
+        }
+      ],
+      category: "browser"
+    },
+    {
+      name: "automation_schedule_task",
+      description: "Planifie une tâche d'automatisation en arrière-plan et l'exécute périodiquement.",
+      parameters: z.object({
+        name: z.string().min(1, "Nom requis").trim(),
+        description: z.string().optional().default('Tâche planifiée'),
+        actionName: z.string().min(1, "Action requise"),
+        args: z.record(z.unknown()).optional().default({}),
+        intervalSeconds: z.number().int().positive().optional(),
+        intervalMinutes: z.number().int().positive().optional(),
+        intervalHours: z.number().int().positive().optional(),
+        interval: z.string().trim().optional()
+      }).refine(args => args.intervalSeconds || args.intervalMinutes || args.intervalHours || args.interval, {
+        message: "Un intervalle est requis"
+      }),
+      examples: [
+        {
+          args: {
+            name: "daily-report",
+            description: "Génère un rapport quotidien",
+            actionName: "automation_navigate",
+            args: { url: "https://internal.company.com/report" },
+            intervalHours: 24
+          },
+          description: "Planifie une navigation quotidienne vers un rapport"
+        }
+      ],
+      category: "scheduling",
+      mutating: true
+    },
+    {
+      name: "automation_list_scheduled_tasks",
+      description: "Liste les tâches d'automatisation planifiées actuellement actives.",
+      parameters: z.object({}),
+      examples: [
+        {
+          args: {},
+          description: "Liste toutes les tâches planifiées"
+        }
+      ],
+      category: "scheduling"
+    },
+    {
+      name: "automation_cancel_scheduled_task",
+      description: "Annule une tâche planifiée précédemment enregistrée.",
+      parameters: z.object({
+        taskId: z.string().min(1, "ID requis")
+      }),
+      examples: [
+        {
+          args: { taskId: "task_123abc" },
+          description: "Annule la tâche avec l'ID spécifié"
+        }
+      ],
+      category: "scheduling",
+      mutating: true
+    },
+    // ── Workflow (chaînes d'actions) ───────────────────────────────────────
+    {
+      name: "workflow_create",
+      description: "Crée un workflow (chaîne d'actions/pipeline). Enchaîne plusieurs skills séquentiellement avec passage de résultats entre étapes via des templates ({{prev.result}}, {{steps.ID.result}}). Peut être planifié avec un intervalle.",
+      parameters: z.object({
+        name: z.string().min(1, "Nom requis").trim(),
+        description: z.string().optional().default('Workflow sans description'),
+        steps: z.array(z.object({
+          id: z.string().min(1, "ID requis"),
+          action: z.string().min(1, "Action requise"),
+          args: z.record(z.unknown()).optional().default({}),
+          label: z.string().optional(),
+          condition: z.string().optional(),
+          onError: z.enum(['stop', 'skip', 'retry']).optional().default('stop'),
+          maxRetries: z.number().int().min(0).optional().default(2)
+        })).min(1, "Au moins une étape requise"),
+        schedule: z.string().optional().default('')
+      }),
+      examples: [
+        {
+          args: {
+            name: "daily-scrape-and-report",
+            description: "Scrape un site et génère un rapport quotidien",
+            steps: [
+              {
+                id: "step1",
+                action: "automation_navigate",
+                args: { url: "https://example.com/data" },
+                label: "Navigation vers la source de données"
+              },
+              {
+                id: "step2",
+                action: "automation_extract",
+                args: { selector: ".data-table" },
+                label: "Extraction des données"
+              },
+              {
+                id: "step3",
+                action: "memory_store",
+                args: { key: "scraped-data", value: "{{step2.result}}" },
+                label: "Sauvegarde des données en mémoire"
+              }
+            ],
+            schedule: "24h"
+          },
+          description: "Workflow de scraping quotidien"
+        }
+      ],
+      category: "workflow"
+    },
+    {
+      name: "workflow_run",
+      description: "Exécute immédiatement un workflow existant et retourne les résultats de chaque étape.",
+      parameters: z.object({
+        workflowId: z.string().min(1, "ID requis")
+      }),
+      examples: [
+        {
+          args: { workflowId: "wf_123abc" },
+          description: "Exécute le workflow spécifié"
+        }
+      ],
+      category: "workflow"
+    },
+    {
+      name: "workflow_list",
+      description: "Liste tous les workflows enregistrés avec leur statut et historique d'exécution.",
+      parameters: z.object({}),
+      examples: [
+        {
+          args: {},
+          description: "Liste tous les workflows disponibles"
+        }
+      ],
+      category: "workflow"
+    },
+    {
+      name: "workflow_delete",
+      description: "Supprime un workflow et annule sa planification éventuelle.",
+      parameters: z.object({
+        workflowId: z.string().min(1, "ID requis")
+      }),
+      examples: [
+        {
+          args: { workflowId: "wf_123abc" },
+          description: "Supprime le workflow spécifié"
+        }
+      ],
+      category: "workflow",
+      mutating: true
+    },
+    {
+      name: "workflow_toggle",
+      description: "Active ou désactive un workflow planifié.",
+      parameters: z.object({
+        workflowId: z.string().min(1, "ID requis"),
+        enabled: z.boolean()
+      }),
+      examples: [
+        {
+          args: { workflowId: "wf_123abc", enabled: false },
+          description: "Désactive le workflow spécifié"
+        }
+      ],
+      category: "workflow",
+      mutating: true
     }
+  ],
+  inputSchemas: {
+    "automation_navigate": z.object({
+      url: z.string().url("URL invalide").trim()
+    }),
+    "automation_click": z.object({
+      selector: selectorSchema
+    }),
+    "automation_type": z.object({
+      selector: selectorSchema,
+      text: z.string().min(1, "Texte requis"),
+      pressEnter: z.boolean().optional().default(false)
+    }),
+    "automation_extract": z.object({
+      selector: z.string().trim().optional().default('body')
+    }),
+    "automation_music_search": z.object({
+      query: z.string().min(1, "Requête requise").trim()
+    }),
+    "automation_search": z.object({
+      query: z.string().min(1, "Requête requise").trim()
+    }),
+    "automation_snapshot": z.object({}),
+    "automation_inspect": z.object({
+      type: z.enum(['buttons', 'inputs', 'links', 'all']).optional().default('all')
+    }),
+    "automation_close": z.object({}),
+    "automation_double_click": z.object({
+      selector: selectorSchema
+    }),
+    "automation_right_click": z.object({
+      selector: selectorSchema
+    }),
+    "automation_hover": z.object({
+      selector: selectorSchema,
+      hoverMs: z.number().int().positive().optional()
+    }),
+    "automation_press_keys": z.object({
+      keys: z.array(z.string().min(1)).min(1, "Au moins une touche requise"),
+      pressEnter: z.boolean().optional().default(false)
+    }),
+    "automation_scroll": z.object({
+      direction: z.enum(['up', 'down']).optional().default('down'),
+      pixels: z.number().int().positive().optional()
+    }),
+    "automation_wait_for": z.object({
+      selector: z.string().trim().optional(),
+      text: z.string().min(1).optional(),
+      timeoutMs: z.number().int().positive().optional()
+    }).refine(a => a.selector || a.text, {
+      message: "selector ou text est requis"
+    }),
+    "automation_schedule_task": z.object({
+      name: z.string().min(1, "Nom requis").trim(),
+      description: z.string().optional().default('Tâche planifiée'),
+      actionName: z.string().min(1, "Action requise"),
+      args: z.record(z.unknown()).optional().default({}),
+      intervalSeconds: z.number().int().positive().optional(),
+      intervalMinutes: z.number().int().positive().optional(),
+      intervalHours: z.number().int().positive().optional(),
+      interval: z.string().trim().optional()
+    }).refine(args => args.intervalSeconds || args.intervalMinutes || args.intervalHours || args.interval, {
+      message: "Un intervalle est requis"
+    }),
+    "automation_list_scheduled_tasks": z.object({}),
+    "automation_cancel_scheduled_task": z.object({
+      taskId: z.string().min(1, "ID requis")
+    }),
+    // Workflow schemas
+    "workflow_create": createWorkflowSchema,
+    "workflow_run": runWorkflowSchema,
+    "workflow_list": z.object({}),
+    "workflow_delete": deleteWorkflowSchema,
+    "workflow_toggle": toggleWorkflowSchema
+  },
+  handleToolCall: async (name, args, _context: SkillContext = {}): Promise<SkillResult> => {
+    const startTime = Date.now();
+    
+    try {
+      if (name === "automation_navigate") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_navigate"], args, name);
+        const result = await handleNavigate(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_extract", "automation_snapshot", "automation_inspect"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_click") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_click"], args, name);
+        const result = await handleClick(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_type", "automation_extract", "automation_wait_for"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_type") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_type"], args, name);
+        const result = await handleType(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_press_keys", "automation_scroll", "automation_wait_for"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_extract") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_extract"], args, name);
+        const result = await handleExtract(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["memory_store", "workflow_create", "reasoning_think"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_music_search") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_music_search"], args, name);
+        const result = await handleMusicSearch(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["memory_store", "reasoning_summarize"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_search") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_search"], args, name);
+        const result = await handleSearch(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_extract", "reasoning_think", "memory_store"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_snapshot") {
+        validateArgs(automationSkill.inputSchemas!["automation_snapshot"], args, name);
+        const result = await handleSnapshot();
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_type", "automation_click", "automation_wait_for"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_inspect") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_inspect"], args, name);
+        const result = await handleInspect(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_click", "automation_type", "automation_hover"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_close") {
+        validateArgs(automationSkill.inputSchemas!["automation_close"], args, name);
+        const result = await handleClose();
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          [] // Aucune action suivante suggérée après fermeture
+        );
+      }
+
+      if (name === "automation_double_click") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_double_click"], args, name);
+        const result = await handleDoubleClick(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_type", "automation_extract"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_right_click") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_right_click"], args, name);
+        const result = await handleRightClick(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_hover", "automation_press_keys"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_hover") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_hover"], args, name);
+        const result = await handleHover(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_click", "automation_right_click"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_press_keys") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_press_keys"], args, name);
+        const result = await handlePressKeys(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_type", "automation_wait_for"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_scroll") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_scroll"], args, name);
+        const result = await handleScroll(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_wait_for", "automation_extract"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_wait_for") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_wait_for"], args, name);
+        const result = await handleWaitFor(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_type", "automation_click", "automation_extract"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_schedule_task") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_schedule_task"], args, name);
+        const result = await handleScheduleTask(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_list_scheduled_tasks", "workflow_create"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_list_scheduled_tasks") {
+        validateArgs(automationSkill.inputSchemas!["automation_list_scheduled_tasks"], args, name);
+        const result = await handleListScheduledTasks();
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_schedule_task", "automation_cancel_scheduled_task"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "automation_cancel_scheduled_task") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_cancel_scheduled_task"], args, name);
+        const result = await handleCancelScheduledTask(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_list_scheduled_tasks"] // Actions suivantes suggérées
+        );
+      }
+
+      // ── Workflow handlers ──────────────────────────────────────────────
+      if (name === "workflow_create") {
+        const validated = validateArgs(automationSkill.inputSchemas!["workflow_create"], args, name);
+        const workflow = await createWorkflow(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          {
+            status: "success",
+            workflowId: workflow.id,
+            name: workflow.name,
+            stepsCount: workflow.steps.length,
+            scheduled: workflow.schedule || null
+          },
+          name,
+          "automation",
+          durationMs,
+          ["workflow_run", "workflow_list", "workflow_toggle"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "workflow_run") {
+        const validated = validateArgs(automationSkill.inputSchemas!["workflow_run"], args, name);
+        const wf = getWorkflow(validated.workflowId);
+        if (!wf) {
+          return createErrorResult(
+            `Workflow ${validated.workflowId} introuvable.`,
+            "WORKFLOW_NOT_FOUND",
+            name,
+            "automation",
+            true, // recoverable
+            [
+              "Vérifiez que l'ID du workflow est correct",
+              "Listez les workflows disponibles avec workflow_list",
+              "Créez un nouveau workflow avec workflow_create"
+            ],
+            1000 // retryAfterMs
+          );
+        }
+        const result = await executeWorkflow(wf);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          {
+            status: "success",
+            result
+          },
+          name,
+          "automation",
+          durationMs,
+          ["workflow_list", "workflow_toggle"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "workflow_list") {
+        validateArgs(automationSkill.inputSchemas!["workflow_list"], args, name);
+        const allWorkflows = listWorkflows();
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          {
+            status: "success",
+            count: allWorkflows.length,
+            workflows: allWorkflows.map(wf => ({
+              id: wf.id,
+              name: wf.name,
+              description: wf.description,
+              stepsCount: wf.steps.length,
+              schedule: wf.schedule || null,
+              enabled: wf.enabled,
+              lastRunAt: wf.lastRunAt ? new Date(wf.lastRunAt).toISOString() : null,
+              lastRunStatus: wf.lastRunStatus || null
+            }))
+          },
+          name,
+          "automation",
+          durationMs,
+          ["workflow_run", "workflow_create"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "workflow_delete") {
+        const validated = validateArgs(automationSkill.inputSchemas!["workflow_delete"], args, name);
+        const deleted = await deleteWorkflow(validated.workflowId);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          {
+            status: deleted ? "success" : "not_found",
+            message: deleted 
+              ? `Workflow ${validated.workflowId} supprimé.` 
+              : `Workflow ${validated.workflowId} introuvable.`
+          },
+          name,
+          "automation",
+          durationMs,
+          ["workflow_list", "workflow_create"] // Actions suivantes suggérées
+        );
+      }
+
+      if (name === "workflow_toggle") {
+        const validated = validateArgs(automationSkill.inputSchemas!["workflow_toggle"], args, name);
+        const updated = await toggleWorkflow(validated.workflowId, validated.enabled);
+        if (!updated) {
+          return createErrorResult(
+            `Workflow ${validated.workflowId} introuvable.`,
+            "WORKFLOW_NOT_FOUND",
+            name,
+            "automation",
+            true, // recoverable
+            [
+              "Vérifiez que l'ID du workflow est correct",
+              "Listez les workflows disponibles avec workflow_list"
+            ],
+            1000 // retryAfterMs
+          );
+        }
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          {
+            status: "success",
+            enabled: updated.enabled,
+            message: `Workflow "${updated.name}" ${updated.enabled ? "activé" : "désactivé"}`
+          },
+          name,
+          "automation",
+          durationMs,
+          ["workflow_list", "workflow_run"] // Actions suivantes suggérées
+        );
+      }
+
+      return createErrorResult(
+        `Outil inconnu: ${name}`,
+        "TOOL_NOT_FOUND",
+        name,
+        "automation",
+        false,
+        [
+          "Utilisez request_tools pour charger des catégories d'outils supplémentaires",
+          "Consultez la liste des outils disponibles",
+          "Vérifiez l'orthographe du nom de l'outil"
+        ]
+      );
+    } catch (error: any) {
+      console.error(`[Automation] Erreur dans ${name}:`, error);
+      return createErrorResult(
+        error.message || "Erreur d'automatisation inconnue",
+        error.code || "EXECUTION_ERROR",
+        name,
+        "automation",
+        error.recoverable !== false,
+        error.suggestions || [
+          "Vérifiez les paramètres fournis",
+          "Assurez-vous que les prérequis sont remplis (navigateur ouvert, etc.)",
+          "Consultez les logs pour plus de détails"
+        ],
+        error.retryAfterMs
+      );
+    }
+  }
 };
 
 // Enregistrement du skill handler pour le planificateur de tâches
-setSchedulerSkillHandler((name, args) => automationSkill.handleToolCall(name, args));
+setSchedulerSkillHandler((name, args) => automationSkill.handleToolCall(name, args, {}));

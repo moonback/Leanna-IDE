@@ -242,26 +242,38 @@ const observability = new Observability();
 observability.attach(runtimeV2.events);
 
 // Enregistrer les skills du SkillManager dans le ToolRegistry du runtime (mirror)
-// Cela se fait après l'init async du SkillManager
-setTimeout(() => {
-  try {
-    const declarations = skillManager.getToolDeclarations();
-    // Créer un adaptateur léger qui route vers le SkillManager
-    for (const decl of declarations) {
-      if (!runtimeV2.tools.has(decl.name)) {
-        runtimeV2.tools.register({
-          declaration: { name: decl.name, description: decl.description || '', parameters: decl.parameters || {} },
-          handler: async (args) => skillManager.handleToolCall(decl.name, args),
-          category: 'legacy',
-          timeoutMs: 30_000,
-        });
+  // Cela se fait après l'init async du SkillManager
+  setTimeout(() => {
+    try {
+      const declarations = skillManager.getToolDeclarations();
+      // Créer un adaptateur léger qui route vers le SkillManager
+      for (const decl of declarations) {
+        if (!runtimeV2.tools.has(decl.name)) {
+          // Convertir le schéma Zod en objet JSON Schema simple pour le runtime
+          let parameters: Record<string, unknown> = {};
+          if (decl.parameters && typeof decl.parameters === 'object') {
+            // Si c'est un schéma Zod, essayer d'en extraire la structure
+            if ('_def' in decl.parameters) {
+              // C'est un schéma Zod - on utilise un objet vide comme fallback
+              // Le vrai typage se fait côté SkillManager via validateArgs
+              parameters = {};
+            } else {
+              parameters = decl.parameters as Record<string, unknown>;
+            }
+          }
+          runtimeV2.tools.register({
+            declaration: { name: decl.name, description: decl.description || '', parameters },
+            handler: async (args) => skillManager.handleToolCall(decl.name, args),
+            category: 'legacy',
+            timeoutMs: 30_000,
+          });
+        }
       }
+      console.log(`[RuntimeV2] ✅ ${runtimeV2.tools.size} outils mirrorés depuis SkillManager`);
+    } catch (e: any) {
+      console.warn(`[RuntimeV2] Mirror partiel: ${e.message}`);
     }
-    console.log(`[RuntimeV2] ✅ ${runtimeV2.tools.size} outils mirrorés depuis SkillManager`);
-  } catch (e: any) {
-    console.warn(`[RuntimeV2] Mirror partiel: ${e.message}`);
-  }
-}, 3000); // Attendre que le SkillManager ait fini son init async
+  }, 3000); // Attendre que le SkillManager ait fini son init async
 
 runtimeV2.start().then(() => {
   console.log(`[RuntimeV2] ✅ Runtime démarré — ${runtimeV2.listAgents().length} agents, EventBus actif`);

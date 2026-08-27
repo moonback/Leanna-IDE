@@ -841,9 +841,9 @@ Analyse la situation et propose un patch de remplacement COMPLET pour ce fichier
       scored.push({ name: sName, score: relevance });
 
       if (ALWAYS_LOADED_SKILLS.has(sName)) {
-        always.push(...s.instance.declarations);
+        always.push(...s.instance.declarations.map(d => this.normalizeDeclaration(d)));
       } else if (relevance >= RELEVANCE_THRESHOLD) {
-        dynamic.push(...s.instance.declarations);
+        dynamic.push(...s.instance.declarations.map(d => this.normalizeDeclaration(d)));
       }
     }
 
@@ -880,10 +880,68 @@ Analyse la situation et propose un patch de remplacement COMPLET pour ce fichier
 
   // ─── API publique ───────────────────────────────────────────────────────
 
+  /**
+   * Les déclarations destinées aux providers doivent être du JSON Schema,
+   * jamais des instances Zod (qui exposent notamment `_def`).
+   */
+  private normalizeToolParameters(parameters: any): Record<string, unknown> {
+    if (!parameters || typeof parameters !== 'object') return {};
+    if (!parameters._def) return this.stripPrivateSchemaFields(parameters) as Record<string, unknown>;
+
+    const definition = parameters._def as any;
+    const shape = typeof definition.shape === 'function' ? definition.shape() : definition.shape;
+    if (!shape || typeof shape !== 'object') return { type: 'OBJECT', properties: {} };
+
+    const properties: Record<string, unknown> = {};
+    const required: string[] = [];
+    for (const [key, schema] of Object.entries(shape as Record<string, any>)) {
+      const field = schema as any;
+      const fieldDef = field?._def;
+      const typeName = fieldDef?.typeName || '';
+      const isOptional = typeName === 'ZodOptional' || typeName === 'ZodDefault' || typeName === 'ZodNullable';
+      const inner = isOptional ? fieldDef.innerType || fieldDef.type : field;
+      const innerDef = inner?._def || {};
+      const innerType = innerDef.typeName || '';
+      let type = 'STRING';
+      if (innerType === 'ZodNumber') type = 'NUMBER';
+      else if (innerType === 'ZodBoolean') type = 'BOOLEAN';
+      else if (innerType === 'ZodArray') type = 'ARRAY';
+      else if (innerType === 'ZodObject' || innerType === 'ZodRecord') type = 'OBJECT';
+      else if (innerType === 'ZodEnum' || innerType === 'ZodLiteral') type = 'STRING';
+      properties[key] = { type };
+      if (!isOptional) required.push(key);
+    }
+
+    return { type: 'OBJECT', properties, ...(required.length ? { required } : {}) };
+  }
+
+  /** Supprime toute propriété interne susceptible d'être envoyée au provider. */
+  private stripPrivateSchemaFields(value: any): any {
+    if (Array.isArray(value)) return value.map(item => this.stripPrivateSchemaFields(item));
+    if (!value || typeof value !== 'object') return value;
+    const clean: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (key === '_def' || key.startsWith('_')) continue;
+      clean[key] = this.stripPrivateSchemaFields(item);
+    }
+    return clean;
+  }
+
+  private normalizeDeclaration(declaration: any): any {
+    // Gemini function declarations n'acceptent que ces trois champs.
+    // Les métadonnées internes (examples, category, mutating, etc.) restent
+    // disponibles dans les skills mais ne doivent jamais atteindre le provider.
+    return {
+      name: String(declaration?.name || ''),
+      description: String(declaration?.description || ''),
+      parameters: this.normalizeToolParameters(declaration?.parameters),
+    };
+  }
+
   getToolDeclarations(enabledSkillIds?: string[]) {
     return this.skills
       .filter(s => !enabledSkillIds || enabledSkillIds.includes(s.instance.name))
-      .flatMap(s => s.instance.declarations);
+      .flatMap(s => s.instance.declarations.map(d => this.normalizeDeclaration(d)));
   }
 
   registerDynSkill(skill: Skill, skillPath: string) {
