@@ -306,17 +306,19 @@ function useReducedTransparency(): boolean {
 export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false, onClose, onViewDoc, initialDoc }: Props) {
   const { success, error: toastError } = useToast();
   const { profile } = useProfile();
-  const [generating, setGenerating] = useState(false);
-  const [generatingType, setGeneratingType] = useState<string | null>(null);
   const [generatedDocs, setGeneratedDocs] = useState<GeneratedDoc[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<GeneratedDoc | null>(null);
   const [copied, setCopied] = useState(false);
-  const [streamingText, setStreamingText] = useState('');
   
   // File d'attente des générations
   const [generationQueue, setGenerationQueue] = useState<QueuedGeneration[]>([]);
-  const [currentGenerationProgress, setCurrentGenerationProgress] = useState<number>(0);
   const [showQueue, setShowQueue] = useState(false);
+  
+  // Générations parallèles - max 3 simultanées
+  const MAX_PARALLEL_GENERATIONS = 3;
+  const [activeGenerationIds, setActiveGenerationIds] = useState<Set<string>>(new Set());
+  const [streamingTexts, setStreamingTexts] = useState<Record<string, string>>({});
+  const [generationProgresses, setGenerationProgresses] = useState<Record<string, number>>({});
 
   // Source selection
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
@@ -418,10 +420,12 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
   // Auto-scroll pendant le streaming
   useEffect(() => {
-    if (streamingText && contentRef.current) {
+    // Scroll si un des streams a du contenu
+    const hasStreaming = Object.values(streamingTexts).some(text => text);
+    if (hasStreaming && contentRef.current) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight;
     }
-  }, [streamingText]);
+  }, [streamingTexts]);
 
   // Charger les suggestions de rapports - UNIQUEMENT au premier clic ou quand des sources sont ajoutées
   const loadSuggestions = useCallback(async () => {
@@ -502,120 +506,136 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
     return newTask.id;
   }, [selectedSourceIds, customInstructions, getDocTypeLabel]);
   
-  // Traitement de la file d'attente
-  useEffect(() => {
-    if (generating || generationQueue.length === 0 || sources.length === 0) return;
+  // Exécuter une tâche de génération individuelle
+  const executeTask = useCallback(async (task: QueuedGeneration) => {
+    // Ajouter à la liste des générations actives
+    setActiveGenerationIds(prev => new Set(prev).add(task.id));
+    setStreamingTexts(prev => ({ ...prev, [task.id]: '' }));
+    setGenerationProgresses(prev => ({ ...prev, [task.id]: 0 }));
     
-    const nextTask = generationQueue[0];
-    if (nextTask && nextTask.status === 'pending') {
-      // Démarrer la génération de la première tâche en attente
-      const executeTask = async () => {
-        // Mettre à jour le statut
-        setGenerationQueue(prev => prev.map(t => 
-          t.id === nextTask.id ? { ...t, status: 'generating', progress: 0 } : t
-        ));
-        
-        setGenerating(true);
-        setGeneratingType(nextTask.type);
-        setStreamingText('');
-        setSelectedDoc(null);
-        setCurrentGenerationProgress(0);
-        
-        try {
-          const res = await fetch(`/api/notebooks/${notebookId}/generate/stream`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: nextTask.type,
-              sourceIds: nextTask.sourceIds,
-              customInstructions: nextTask.customInstructions,
-              imageModel: profile.openrouterImageModel || undefined,
-            }),
-          });
+    // Mettre à jour le statut de la tâche
+    setGenerationQueue(prev => prev.map(t => 
+      t.id === task.id ? { ...t, status: 'generating', progress: 0 } : t
+    ));
+    
+    // Réinitialiser le document sélectionné si on génère un nouveau
+    if (selectedDoc) setSelectedDoc(null);
+    
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/generate/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: task.type,
+          sourceIds: task.sourceIds,
+          customInstructions: task.customInstructions,
+          imageModel: profile.openrouterImageModel || undefined,
+        }),
+      });
 
-          if (!res.ok) {
-            const d = await res.json().catch(() => ({ error: 'Erreur' }));
-            throw new Error(d.error || `HTTP ${res.status}`);
-          }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: 'Erreur' }));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
 
-          const reader = res.body?.getReader();
-          if (!reader) throw new Error("Pas de body stream");
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("Pas de body stream");
 
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let accumulated = "";
-          let receivedTokens = 0;
-          let totalTokens = 100; // Estimation initiale
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let accumulated = "";
+      let receivedTokens = 0;
+      let totalTokens = 100; // Estimation initiale
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
 
-            for (const line of lines) {
-              if (line.startsWith("event: ")) continue;
-              if (line.startsWith("data: ")) {
-                const data = line.slice(6);
-                try {
-                  const parsed = JSON.parse(data);
-                  if (parsed.text) {
-                    accumulated += parsed.text;
-                    receivedTokens += parsed.text.length;
-                    
-                    // Mettre à jour la progression estimée
-                    const progress = Math.min(95, Math.round((receivedTokens / Math.max(totalTokens, receivedTokens + 100)) * 100));
-                    setCurrentGenerationProgress(progress);
-                    setGenerationQueue(prev => prev.map(t => 
-                      t.id === nextTask.id ? { ...t, progress } : t
-                    ));
-                    setStreamingText(accumulated);
-                  } else if (parsed.document) {
-                    setCurrentGenerationProgress(100);
-                    setGenerationQueue(prev => prev.map(t => 
-                      t.id === nextTask.id ? { ...t, progress: 100, status: 'completed' } : t
-                    ));
-                    setStreamingText('');
-                    setGeneratedDocs(prev => [parsed.document, ...prev]);
-                    setSelectedDoc(parsed.document);
-                    success(`"${parsed.document.title}" généré`);
-                  } else if (parsed.error) {
-                    setGenerationQueue(prev => prev.map(t => 
-                      t.id === nextTask.id ? { ...t, status: 'error', progress: 0 } : t
-                    ));
-                    throw new Error(parsed.error);
-                  }
-                } catch (e: any) {
-                  if (e.message && !e.message.includes('JSON')) throw e;
-                }
+        for (const line of lines) {
+          if (line.startsWith("event: ")) continue;
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.text) {
+                accumulated += parsed.text;
+                receivedTokens += parsed.text.length;
+                
+                // Mettre à jour la progression estimée
+                const progress = Math.min(95, Math.round((receivedTokens / Math.max(totalTokens, receivedTokens + 100)) * 100));
+                setGenerationProgresses(prev => ({ ...prev, [task.id]: progress }));
+                setGenerationQueue(prev => prev.map(t => 
+                  t.id === task.id ? { ...t, progress } : t
+                ));
+                setStreamingTexts(prev => ({ ...prev, [task.id]: accumulated }));
+              } else if (parsed.document) {
+                setGenerationProgresses(prev => ({ ...prev, [task.id]: 100 }));
+                setGenerationQueue(prev => prev.map(t => 
+                  t.id === task.id ? { ...t, progress: 100, status: 'completed' } : t
+                ));
+                setStreamingTexts(prev => ({ ...prev, [task.id]: '' }));
+                setGeneratedDocs(prev => [parsed.document, ...prev]);
+                setSelectedDoc(parsed.document);
+                success(`"${parsed.document.title}" généré`);
+              } else if (parsed.error) {
+                setGenerationQueue(prev => prev.map(t => 
+                  t.id === task.id ? { ...t, status: 'error', progress: 0 } : t
+                ));
+                throw new Error(parsed.error);
               }
+            } catch (e: any) {
+              if (e.message && !e.message.includes('JSON')) throw e;
             }
           }
-        } catch (e: any) {
-          setGenerationQueue(prev => prev.map(t => 
-            t.id === nextTask.id ? { ...t, status: 'error', progress: 0 } : t
-          ));
-          toastError(e.message);
-          setStreamingText('');
-        } finally {
-          setGenerating(false);
-          setGeneratingType(null);
-          setCurrentGenerationProgress(0);
-          
-          // Retirer la tâche terminée de la file après un petit délai
-          setTimeout(() => {
-            setGenerationQueue(prev => prev.slice(1).map(t => 
-              t.status === 'pending' ? { ...t } : t
-            ));
-          }, 1000);
         }
-      };
+      }
+    } catch (e: any) {
+      setGenerationQueue(prev => prev.map(t => 
+        t.id === task.id ? { ...t, status: 'error', progress: 0 } : t
+      ));
+      toastError(e.message);
+      setStreamingTexts(prev => ({ ...prev, [task.id]: '' }));
+    } finally {
+      // Retirer de la liste des générations actives
+      setActiveGenerationIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(task.id);
+        return newSet;
+      });
+      setGenerationProgresses(prev => ({ ...prev, [task.id]: 0 }));
+      setStreamingTexts(prev => ({ ...prev, [task.id]: '' }));
       
-      executeTask();
+      // Retirer la tâche terminée de la file après un petit délai
+      setTimeout(() => {
+        setGenerationQueue(prev => prev.filter(t => t.id !== task.id));
+      }, 1000);
     }
-  }, [generating, generationQueue, sources.length, notebookId, profile.openrouterImageModel, success, toastError, getDocTypeColor]);
+  }, [notebookId, profile.openrouterImageModel, success, toastError]);
+  
+  // Traitement de la file d'attente - gérer jusqu'à MAX_PARALLEL_GENERATIONS tâches simultanées
+  useEffect(() => {
+    if (sources.length === 0 || generationQueue.length === 0) return;
+    
+    // Trouver toutes les tâches en attente qui ne sont pas encore démarrées
+    const pendingTasks = generationQueue.filter(
+      t => t.status === 'pending' && !activeGenerationIds.has(t.id)
+    );
+    
+    // Combien de slots disponibles pour de nouvelles générations
+    const availableSlots = MAX_PARALLEL_GENERATIONS - activeGenerationIds.size;
+    
+    // Démarrer de nouvelles tâches si des slots sont disponibles
+    if (pendingTasks.length > 0 && availableSlots > 0) {
+      const tasksToStart = pendingTasks.slice(0, availableSlots);
+      tasksToStart.forEach(task => {
+        executeTask(task);
+      });
+    }
+  }, [generationQueue, activeGenerationIds, sources.length, executeTask]);
 
   // ─── Génération en streaming ────────────────────────────────────────────
 
@@ -796,44 +816,51 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
         </div>
 
         {/* Barre de progression et file d'attente - VISIBLE UNIQUEMENT PENDANT LA GENERATION */}
-        {(generating || generationQueue.length > 0) && (
+        {activeGenerationIds.size > 0 || generationQueue.length > 0 ? (
           <div
             className="p-3 rounded-xl border"
             style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
           >
           {/* Barre de progression pour la génération en cours */}
-          {generating ? (
+          {activeGenerationIds.size > 0 ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" 
-                     style={{ backgroundColor: `${getDocTypeColor(generatingType || '')}15` }}>
-                  {(() => {
-                    const type = generatingType || '';
-                    const docType = DOC_TYPES.find(t => t.key === type) || REPORT_TYPES.find(t => t.key === type);
-                    const Icon = docType?.icon || Sparkles;
-                    return <Icon className="w-3 h-3" style={{ color: getDocTypeColor(type) }} />;
-                  })()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                    Génération en cours: {getDocTypeLabel(generatingType || '')}
-                  </p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <div className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
-                      <motion.div
-                        className="h-full rounded-full"
-                        style={{ backgroundColor: getDocTypeColor(generatingType || '') }}
-                        initial={{ width: '0%' }}
-                        animate={{ width: `${currentGenerationProgress}%` }}
-                        transition={{ duration: 0.3, ease: 'easeOut' }}
-                      />
+              {[...activeGenerationIds].map(taskId => {
+                const task = generationQueue.find(t => t.id === taskId);
+                if (!task) return null;
+                
+                const color = getDocTypeColor(task.type);
+                const docType = DOC_TYPES.find(t => t.key === task.type) || REPORT_TYPES.find(t => t.key === task.type);
+                const Icon = docType?.icon || Sparkles;
+                const progress = generationProgresses[taskId] || 0;
+                
+                return (
+                  <div key={taskId} className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" 
+                         style={{ backgroundColor: `${color}15` }}>
+                      <Icon className="w-3 h-3" style={{ color: color }} />
                     </div>
-                    <span className="text-xs font-medium" style={{ color: getDocTypeColor(generatingType || '') }}>
-                      {currentGenerationProgress}%
-                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                        {getDocTypeLabel(task.type)}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <div className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+                          <motion.div
+                            className="h-full rounded-full"
+                            style={{ backgroundColor: color }}
+                            initial={{ width: '0%' }}
+                            animate={{ width: `${progress}%` }}
+                            transition={{ duration: 0.3, ease: 'easeOut' }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium" style={{ color: color }}>
+                          {progress}%
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })}
             </div>
           ) : (
             <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -958,9 +985,8 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               </AnimatePresence>
             </div>
           )}
-        {/* )} */}
         </div>
-        )}
+        ) : null}
 
         {/* Source filter dropdown */}
         <AnimatePresence>
@@ -1036,10 +1062,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
             <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
               Générer
             </p>
-            {generating && (
+            {activeGenerationIds.size > 0 && (
               <span className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
                 <Loader2 className="w-3 h-3 animate-spin" />
-                En cours...
+                {activeGenerationIds.size > 1 ? `${activeGenerationIds.size} en cours...` : 'En cours...'}
               </span>
             )}
           </div>
@@ -1076,7 +1102,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
           {/* Types rapides — 3 par ligne — Design compact et moderne */}
           <div className="grid grid-cols-3 gap-1">
             {DOC_TYPES.filter(t => t.key !== 'full-report').map(({ key, label, icon: Icon, desc, color }) => {
-              const isActive = generatingType === key;
+              const isActive = [...activeGenerationIds].some(taskId => {
+                const task = generationQueue.find(t => t.id === taskId);
+                return task && task.type === key;
+              });
               return (
                 <motion.button
                   key={key}
@@ -1140,27 +1169,38 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
       {fullView && (
       <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-1" style={{ borderColor: 'var(--notebook-border)' }}>
         {/* Streaming view */}
-        {streamingText && !selectedDoc && (
+        {Object.keys(streamingTexts).length > 0 && !selectedDoc && (
           <div className="space-y-5 max-w-3xl">
             <div className="flex items-center gap-2 pb-3 border-b" style={{ borderColor: 'var(--border-base)' }}>
               <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--accent-primary)' }} />
               <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                Génération en cours...
+                {activeGenerationIds.size > 1 ? `${activeGenerationIds.size} générations en cours...` : 'Génération en cours...'}
               </span>
               <span className="text-xs ml-auto" style={{ color: 'var(--text-dimmed)' }}>
-                {streamingText.length} caractères
+                {Object.values(streamingTexts).reduce((sum, text) => sum + text.length, 0)} caractères
               </span>
             </div>
-            {generatingType === 'infographic' && streamingText.includes('data:image/') 
-              ? renderInfographicContent(streamingText)
-              : renderGeneratedContent(streamingText)
-            }
+            {activeGenerationIds.size === 1 ? (
+              (() => {
+                const taskId = [...activeGenerationIds][0];
+                const task = generationQueue.find(t => t.id === taskId);
+                const streamingText = streamingTexts[taskId] || '';
+                if (!task) return null;
+                return task.type === 'infographic' && streamingText.includes('data:image/') 
+                  ? renderInfographicContent(streamingText)
+                  : renderGeneratedContent(streamingText);
+              })()
+            ) : (
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Plusieurs générations en cours. Voir la file d'attente pour les détails.
+              </div>
+            )}
             <span className="inline-block w-2 h-4 animate-pulse rounded-sm" style={{ backgroundColor: 'var(--accent-primary)' }} />
           </div>
         )}
 
         {/* Selected document view */}
-        {selectedDoc && !streamingText ? (
+        {selectedDoc && Object.keys(streamingTexts).length === 0 ? (
           <div className={`space-y-5 ${selectedDoc.type === 'mindmap' ? 'max-w-none' : 'max-w-6xl mx-auto'}`}>
             {/* Document header — sticky */}
             <div className="flex items-start gap-3 pb-4 border-b sticky top-0 z-10 pt-1" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-canvas, var(--bg-base))' }}>
@@ -1247,7 +1287,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               renderGeneratedContent(selectedDoc.content)
             )}
           </div>
-        ) : !streamingText && (
+        ) : Object.keys(streamingTexts).length === 0 && (
           /* Empty state — professional landing */
           <div className="h-full flex flex-col items-center justify-center gap-6 px-8">
             <div className="relative">
