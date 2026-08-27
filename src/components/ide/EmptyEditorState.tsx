@@ -8,7 +8,7 @@ import {
   Search, ChevronRight, Trash2,
   Command, BookOpen, Sparkles, Zap,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState';
 import { useLiveAPIContext } from '../../context/LiveAPIContext';
 import { useProfile } from '../../context/UserProfileContext';
@@ -38,6 +38,72 @@ interface GitInfo {
 const MOD = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
   ? '⌘'
   : 'Ctrl';
+
+// Spring de base (critically damped — pas de rebond) pour toute animation
+// d'apparition non pilotée par un geste. Voir §4 apple-design.
+const ENTRANCE_SPRING = { type: 'spring' as const, bounce: 0, duration: 0.4 };
+
+// ─── Feedback interactif partagé (press + focus-visible) ─────────────────
+// Centralise les états :hover / :active / :focus-visible en CSS plutôt que
+// de dupliquer la logique dans des handlers onMouseEnter/onMouseLeave — une
+// seule source de vérité, et ça couvre aussi le clavier et le tactile.
+
+function InteractiveFeedbackStyles() {
+  return (
+    <style>{`
+      .ai-interactive {
+        transition: transform 100ms ease-out, border-color 150ms ease-out,
+          box-shadow 150ms ease-out, background-color 150ms ease-out, color 150ms ease-out;
+        outline: none;
+      }
+      .ai-interactive:active {
+        transform: scale(0.97);
+        transition-duration: 60ms;
+      }
+      .ai-interactive:focus-visible {
+        outline: 2px solid var(--accent-primary);
+        outline-offset: 2px;
+      }
+
+      .ai-card:not(.ai-card-primary):hover {
+        border-color: var(--border-strong);
+        box-shadow: var(--shadow-sm);
+      }
+      .ai-card-primary:hover {
+        filter: brightness(1.08);
+      }
+      .ai-card-primary:active {
+        filter: brightness(1.02);
+      }
+
+      .ai-recent-row:hover {
+        background-color: var(--ctrl-hover);
+      }
+      .ai-recent-row:hover .ai-recent-chevron,
+      .ai-recent-row:hover .ai-recent-lang {
+        opacity: 1;
+      }
+      .ai-recent-row:active {
+        transform: scale(0.99);
+      }
+
+      .ai-quicklink:hover {
+        color: var(--accent-primary);
+        background-color: var(--ctrl-hover);
+      }
+
+      .ai-clear-btn:hover {
+        color: var(--text-muted);
+        background-color: var(--ctrl-hover);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .ai-interactive:active { transform: none; }
+        .ai-recent-row:active { transform: none; }
+      }
+    `}</style>
+  );
+}
 
 // ─── Composant Kbd ──────────────────────────────────────────────────────
 
@@ -115,6 +181,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const { profile } = useProfile();
   const { theme } = useTheme();
   const disconnectedBg = theme === 'dark' ? disconnectedBgDark : disconnectedBgLight;
+  const prefersReducedMotion = useReducedMotion();
 
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSystem, setShowSystem] = useState(false);
@@ -129,6 +196,25 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     if (hour < 18) return 'Bon après-midi';
     return 'Bonsoir';
   }, []);
+
+  // Transition d'entrée : spring critically-damped, ou simple fondu si
+  // l'utilisateur a demandé une motion réduite (§14 apple-design).
+  const makeEntranceProps = useCallback(
+    (delay = 0) => (
+      prefersReducedMotion
+        ? {
+            initial: { opacity: 0 },
+            animate: { opacity: 1 },
+            transition: { duration: 0.15, delay },
+          }
+        : {
+            initial: { opacity: 0, y: 12 },
+            animate: { opacity: 1, y: 0 },
+            transition: { ...ENTRANCE_SPRING, delay },
+          }
+    ),
+    [prefersReducedMotion]
+  );
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -174,6 +260,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
       className="flex flex-1 flex-col overflow-y-auto relative"
       style={{ backgroundColor: 'var(--bg-base)' }}
     >
+      <InteractiveFeedbackStyles />
+
       {/* ── Fond subtil ── */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -199,12 +287,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
         <div className="w-full max-w-[940px]">
 
           {/* ── Header : Salutation ── */}
-          <motion.div
-            className="mb-10"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: 'easeOut' }}
-          >
+          <motion.div className="mb-10" {...makeEntranceProps(0)}>
             <h1
               className="text-[28px] sm:text-[34px] font-semibold tracking-[-0.025em] leading-tight"
               style={{ color: 'var(--text-primary)' }}
@@ -222,9 +305,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
           {/* ── Actions principales — grille 2×2 ── */}
           <motion.div
             className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-10"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.08, ease: 'easeOut' }}
+            {...makeEntranceProps(0.08)}
           >
             {/* Chat IA */}
             <ActionCard
@@ -265,11 +346,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
           {/* ── Fichiers récents ── */}
           {recentFiles.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.16, ease: 'easeOut' }}
-            >
+            <motion.div {...makeEntranceProps(0.16)}>
               <div className="flex items-center justify-between mb-3">
                 <h2
                   className="text-[11px] font-semibold uppercase tracking-[0.08em]"
@@ -279,10 +356,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                 </h2>
                 <button
                   onClick={clearRecentFiles}
-                  className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md transition-colors"
+                  className="ai-interactive ai-clear-btn flex items-center gap-1 text-[10px] px-2 py-1 rounded-md"
                   style={{ color: 'var(--text-dimmed)' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.backgroundColor = 'var(--ctrl-hover)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-dimmed)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
                   <Trash2 size={9} />
                   Effacer
@@ -300,12 +375,10 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                     <button
                       key={path}
                       onClick={() => handleOpenRecent(path)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors group"
+                      className="ai-interactive ai-recent-row w-full flex items-center gap-3 px-4 py-2.5 text-left group"
                       style={{
                         borderTop: index > 0 ? '1px solid var(--border-base)' : undefined,
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--ctrl-hover)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                     >
                       <FileText size={13} style={{ color: 'var(--text-dimmed)' }} className="flex-shrink-0" />
                       <span className="text-[12px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
@@ -316,7 +389,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                       </span>
                       {language && (
                         <span
-                          className="ml-auto text-[9px] font-mono px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                          className="ai-recent-lang ml-auto text-[9px] font-mono px-1.5 py-0.5 rounded opacity-0 transition-opacity flex-shrink-0"
                           style={{
                             backgroundColor: 'var(--bg-input)',
                             color: 'var(--text-muted)',
@@ -327,7 +400,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                       )}
                       <ChevronRight
                         size={12}
-                        className="flex-shrink-0 opacity-0 group-hover:opacity-60 transition-opacity"
+                        className="ai-recent-chevron flex-shrink-0 opacity-0 transition-opacity"
                         style={{ color: 'var(--text-dimmed)' }}
                       />
                     </button>
@@ -343,7 +416,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             style={{ borderTop: '1px solid var(--border-base)' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.3, duration: prefersReducedMotion ? 0.15 : 0.4 }}
           >
             {/* Workspace info */}
             <div className="flex items-center gap-3 text-[10.5px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
@@ -400,26 +473,10 @@ function ActionCard({ icon: Icon, title, description, shortcut, onClick, primary
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex items-start gap-3.5 p-4 text-left rounded-xl transition-all duration-200"
+      className={`ai-interactive ai-card${primary ? ' ai-card-primary' : ''} group relative flex items-start gap-3.5 p-4 text-left rounded-xl`}
       style={{
         backgroundColor: primary ? 'var(--accent-primary)' : 'var(--bg-secondary)',
         border: primary ? 'none' : '1px solid var(--border-base)',
-      }}
-      onMouseEnter={(e) => {
-        if (!primary) {
-          e.currentTarget.style.borderColor = 'var(--border-strong)';
-          e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-        } else {
-          e.currentTarget.style.filter = 'brightness(1.08)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!primary) {
-          e.currentTarget.style.borderColor = 'var(--border-base)';
-          e.currentTarget.style.boxShadow = 'none';
-        } else {
-          e.currentTarget.style.filter = 'brightness(1)';
-        }
       }}
     >
       <div
@@ -471,10 +528,8 @@ function QuickLink({ label, onClick, shortcut }: { label: string; onClick: () =>
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-medium transition-colors"
+      className="ai-interactive ai-quicklink flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-medium"
       style={{ color: 'var(--text-dimmed)' }}
-      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent-primary)'; e.currentTarget.style.backgroundColor = 'var(--ctrl-hover)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-dimmed)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
     >
       {label}
       {shortcut && <Kbd>{shortcut}</Kbd>}
