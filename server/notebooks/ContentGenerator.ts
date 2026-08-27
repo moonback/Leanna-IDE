@@ -138,6 +138,22 @@ export class ContentGenerator {
         title = `🗺️ Roadmap — ${notebook.title}`;
         prompt = this.buildRoadmapPrompt(notebook.title, notebook.description, sourcesContext, lang);
         break;
+      case "visualization":
+      case "chart":
+      case "data-analysis":
+        // Visualisation de données avec extraction et formatage JSON/D3
+        return this.generateVisualContent(notebookId, {
+          ...options,
+          visualizationType: type === "visualization" ? "auto" : type === "chart" ? "bar" : "auto",
+        });
+      case "comparative-analysis":
+        title = "Analyse comparative";
+        prompt = this.buildComparativeAnalysisPrompt(sourcesContext, lang);
+        break;
+      case "synthesis-report":
+        title = "Rapport de synthèse décisionnel";
+        prompt = this.buildSynthesisReportPrompt(sourcesContext, lang);
+        break;
       default:
         throw new Error(`Type non supporté: ${type}`);
     }
@@ -1116,6 +1132,110 @@ ${context}
 Génère le ${reportConfig.title} complet en Markdown.`;
   }
 
+  // ─── Prompts pour les nouveaux types de documents (1.3) ────────────────────
+
+  private buildComparativeAnalysisPrompt(context: string, lang: string): string {
+    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
+    return `${langInstruction}
+
+Réalise une **analyse comparative automatique** détaillée basée sur les sources suivantes. L'analyse doit identifier, comparer et évaluer les différents éléments (produits, solutions, approches, stratégies, etc.) mentionnés dans les documents.
+
+## Structure attendue :
+
+### 📊 1. Introduction
+- Objectif de la comparaison
+- Critères de comparaison retenus
+- Méthodologie utilisée
+
+### 📋 2. Éléments à comparer
+- Liste des produits/solutions/approches identifiés dans les sources
+- Classification par catégorie si pertinent
+
+### 🔍 3. Analyse comparative détaillée
+Pour chaque critère pertinent (fonctionnalités, prix, performance, avantages, inconvénients, etc.) :
+- Tableau comparatif clair et structuré
+- Évaluation objective de chaque élément
+- Sources des informations
+
+### 📈 4. Synthèse des résultats
+- Classement ou scoring global
+- Points forts et points faibles de chaque élément
+- Recommandations basées sur l'analyse
+
+### 🎯 5. Conclusion et recommandations
+- Quel élément se distingue et pourquoi
+- Dans quel contexte chaque élément est le plus adapté
+- Prochaines étapes recommandées
+
+RÈGLES :
+- Identifier TOUS les éléments comparables dans les sources
+- Utiliser des critères objectifs et mesurables quand possible
+- Citer les sources pour chaque information
+- Être neutre et factuel
+- Utiliser des tableaux pour les comparaisons
+- Viser 1500-3000 mots
+
+SOURCES :
+${context}
+
+Génère l'analyse comparative complète en Markdown structuré.`;
+  }
+
+  private buildSynthesisReportPrompt(context: string, lang: string): string {
+    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
+    return `${langInstruction}
+
+Génère un **rapport de synthèse structuré pour l'aide à la décision** basé sur l'ensemble des sources fournies. Ce rapport doit condenser les informations clés et fournir une base solide pour prendre des décisions éclairées.
+
+## Structure attendue :
+
+### 🎯 1. Résumé exécutif
+- Objectif du rapport de synthèse
+- Questions clés adressées
+- Principales conclusions (3-5 points)
+
+### 📊 2. Contexte et périmètre
+- Contexte général du sujet
+- Périmètre de l'analyse (ce qui est couvert et ce qui ne l'est pas)
+- Sources utilisées et leur pertinence
+
+### 🔍 3. Analyse des informations
+- Points clés extraits de chaque source
+- Convergences et divergences entre les sources
+- Informations manquantes ou incertaines
+
+### 💡 4. Synthèse des connaissances
+- Faits établis
+- Tendances identifiées
+- Implications et impacts potentiels
+- Scénarios possibles
+
+### ⚖️ 5. Options et recommandations
+- Options/alternatives identifiées
+- Critères d'évaluation
+- Analyse SWOT pour chaque option si pertinent
+- Recommandation principale avec justification
+
+### ✅ 6. Plan d'action
+- Décisions à prendre
+- Prochaines étapes prioritaires
+- Responsables et échéances
+- Indicateur de succès
+
+RÈGLES :
+- Être concis mais exhaustif
+- Hiérarchiser l'information par importance
+- Distinguer faits, opinions et recommandations
+- Fournir des éléments actionnables
+- Utiliser des listes et tableaux pour la clarté
+- Viser 2000-4000 mots
+
+SOURCES :
+${context}
+
+Génère le rapport de synthèse complet en Markdown professionnel.`;
+  }
+
   // ─── Suggestions intelligentes de rapports ──────────────────────────────────
 
   /**
@@ -1276,6 +1396,165 @@ Génère entre 3 et 5 suggestions, triées par pertinence décroissante.`;
     }
 
     return suggestions.slice(0, 5);
+  }
+
+  // ─── Visualisation de données (D3.js) ─────────────────────────────────────
+
+  /**
+   * Génère une visualisation de données (graphique, diagramme) à partir des sources.
+   * Extrait les données pertinentes et les formate en JSON compatible D3.js.
+   * Peut générer du SVG directement ou retourner les données pour un rendu côté client.
+   */
+  async generateVisualContent(
+    notebookId: string,
+    options: {
+      sourceIds?: string[];
+      visualizationType?: string;
+      language?: string;
+      customInstructions?: string;
+      renderSvg?: boolean;
+    } = {}
+  ): Promise<GeneratedDocument> {
+    const notebook = notebookManager.getNotebook(notebookId);
+    if (!notebook) throw new Error("Notebook introuvable.");
+    if (notebook.sources.length === 0) throw new Error("Aucune source dans ce notebook.");
+
+    // Filtrer les sources si spécifié
+    const sources = options.sourceIds
+      ? notebook.sources.filter(s => options.sourceIds!.includes(s.id))
+      : notebook.sources;
+
+    if (sources.length === 0) throw new Error("Aucune source sélectionnée.");
+
+    const lang = options.language || sources[0]?.language || "fr";
+    const vizType = options.visualizationType || "auto";
+    const langInstr = lang === "fr" ? "Réponds en français." : "Reply in English.";
+
+    // Construire le contexte des sources
+    const sourcesContext = sources.map(s =>
+      `## ${s.title}\n${s.summary}\n\nExtraits clés :\n${s.chunks.slice(0, 5).map(c => c.content).join("\n\n")}`
+    ).join("\n\n---\n\n");
+
+    // Étape 1 : Demander au LLM d'extraire les données et de suggérer une visualisation
+    const extractionPrompt = `${langInstr}
+
+Analyse le contenu suivant et extrais les données numériques ou catégorielles pertinentes pour créer une visualisation.
+
+INSTRUCTIONS :
+- Identifie les données quantitatives (chiffres, pourcentages, statistiques)
+- Identifie les catégories ou dimensions pertinentes
+- Suggère le type de visualisation le plus adapté (bar, line, pie, scatter, network, timeline, etc.)
+- Formate les données en JSON valide, prêt à être utilisé avec D3.js
+- Si ${vizType} === 'auto', choisis le type de visualisation le plus approprié
+- Si ${vizType} !== 'auto', utilise ce type de visualisation
+
+Type de visualisation demandée : ${vizType}
+
+SOURCES :
+${sourcesContext.slice(0, 6000)}
+
+${options.customInstructions ? `INSTRUCTIONS UTILISATEUR : ${options.customInstructions}` : ""}
+
+Réponds UNIQUEMENT avec un objet JSON contenant :
+{
+  "chartType": "type de graphique",
+  "title": "titre de la visualisation",
+  "description": "description brève",
+  "data": { ... les données structurées ... },
+  "config": { ... configuration optionnelle ... }
+}
+`;
+
+    log.info(`📊 Extraction des données pour visualisation (type: ${vizType})`);
+
+    const { generateText } = await import("../utils/textGeneration");
+    const result = await generateText({
+      prompt: extractionPrompt,
+      temperature: 0.3,
+      maxOutputTokens: 4096,
+    });
+
+    // Parser le JSON retourné par le LLM
+    let visualData: any;
+    try {
+      // Nettoyer la réponse pour extraire uniquement le JSON
+      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        visualData = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("Aucun objet JSON trouvé dans la réponse");
+      }
+    } catch (e: any) {
+      log.error(`❌ Erreur parsing JSON de visualisation: ${e.message}`);
+      // Retourner un document avec l'erreur
+      const errorDoc: GeneratedDocument = {
+        id: randomUUID(),
+        notebookId,
+        type: "visualization" as GeneratedDocType,
+        title: "⚠️ Erreur de visualisation",
+        content: `Erreur lors de l'extraction des données: ${e.message}\n\nRéponse brute:\n${result.text}`,
+        sourceIds: sources.map(s => s.id),
+        createdAt: new Date().toISOString(),
+      };
+      notebookManager.addGeneratedDocument(notebookId, errorDoc);
+      return errorDoc;
+    }
+
+    // Si renderSvg est activé, générer le SVG côté serveur
+    let svgContent: string | undefined;
+    if (options.renderSvg) {
+      svgContent = await this.renderSvgFromData(visualData, lang);
+    }
+
+    const doc: GeneratedDocument = {
+      id: randomUUID(),
+      notebookId,
+      type: "visualization" as GeneratedDocType,
+      title: visualData.title || "Visualisation des données",
+      content: visualData.description || `Visualisation de type: ${visualData.chartType}`,
+      sourceIds: sources.map(s => s.id),
+      createdAt: new Date().toISOString(),
+      visualContent: {
+        chartType: visualData.chartType || "unknown",
+        data: visualData.data,
+        config: visualData.config,
+        svg: svgContent,
+      },
+    };
+
+    notebookManager.addGeneratedDocument(notebookId, doc);
+    log.info(`✅ Visualisation générée: "${doc.title}" (type: ${visualData.chartType})`);
+
+    return doc;
+  }
+
+  /**
+   * Rend un SVG à partir des données de visualisation (méthode helper).
+   * Utilise des templates SVG simples pour les graphiques de base.
+   * Pour des visualisations complexes, le rendu devrait être fait côté client avec D3.js.
+   */
+  private async renderSvgFromData(data: any, lang: string): Promise<string> {
+    const { generateText } = await import("../utils/textGeneration");
+    
+    const svgPrompt = `${lang === "fr" ? "Génère" : "Generate"} a simple SVG visualization based on this data and configuration.
+The SVG should be self-contained and valid XML. Use basic SVG elements (rect, circle, path, line, text).
+
+Data: ${JSON.stringify(data.data)}
+Chart type: ${data.chartType}
+Config: ${JSON.stringify(data.config)}
+
+Return ONLY the SVG XML code, without any explanation or markdown formatting.
+`;
+
+    const result = await generateText({
+      prompt: svgPrompt,
+      temperature: 0.2,
+      maxOutputTokens: 2048,
+    });
+
+    // Extraire le SVG de la réponse
+    const svgMatch = result.text.match(/<svg[\s\S]*<\/svg>/i);
+    return svgMatch ? svgMatch[0] : `<svg viewBox="0 0 400 200"><text x="200" y="100" text-anchor="middle">SVG generation failed</text></svg>`;
   }
 
   // ─── Roadmap automatique à la création ───────────────────────────────────

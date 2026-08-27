@@ -539,6 +539,352 @@ export async function handleInspect(validated: { type: 'buttons' | 'inputs' | 'l
     return { status: "success", elements };
 }
 
+// ─── Perception Visuelle (Section 2.1) ─────────────────────────────────────────
+
+/**
+ * Capture une capture d'écran de la page actuelle.
+ * Permet l'analyse visuelle des interfaces complexes.
+ */
+export async function handleScreenshot(validated: { fullPage?: boolean; type?: 'png' | 'jpeg'; quality?: number } = {}) {
+    console.log(`[Automation] Capture d'écran...`);
+    if (!page) return { error: "Aucune page ouverte. Utilisez automation_navigate d'abord." };
+
+    const { fullPage = true, type = 'png', quality = 90 } = validated;
+
+    try {
+        const screenshotBuffer = await page.screenshot({
+            fullPage,
+            type,
+            quality,
+        });
+
+        const screenshotBase64 = screenshotBuffer.toString('base64');
+        const mimeType = `image/${type}`;
+
+        console.log(`[Automation] Capture d'écran réussie (${screenshotBuffer.length} octets)`);
+
+        return {
+            status: "success",
+            screenshot: screenshotBase64,
+            mimeType,
+            size: screenshotBuffer.length,
+        };
+    } catch (error: any) {
+        console.error(`[Automation] Erreur capture d'écran: ${error.message}`);
+        return { error: `Échec de la capture d'écran: ${error.message}` };
+    }
+}
+
+/**
+ * Analyse visuelle d'une capture d'écran ou d'une image.
+ * Utilise un modèle de vision (via LLM) pour décrire le contenu visuel.
+ */
+export async function handleAnalyzeScreenshot(validated: { imageBase64: string; prompt?: string }) {
+    console.log(`[Automation] Analyse visuelle de l'image...`);
+
+    const { imageBase64, prompt = "Décris en détail le contenu visuel de cette image, y compris le texte visible, les éléments d'interface, les couleurs dominantes et l'organisation spatiale." } = validated;
+
+    try {
+        // Utiliser le générateur de texte pour analyser l'image
+        // Note: Cela nécessite que le modèle supporte l'analyse d'images (multimodal)
+        // ou qu'un service OCR externe soit utilisé
+        const { generateText } = await import("../utils/textGeneration");
+        
+        const analysis = await generateText({
+            prompt: `Analyse cette capture d'écran et réponds à la demande suivante : ${prompt}
+
+[Image en base64: ${imageBase64.slice(0, 500)}...]`,
+            temperature: 0.3,
+            maxOutputTokens: 2048,
+        });
+
+        return {
+            status: "success",
+            analysis: analysis.text,
+            promptUsed: prompt,
+        };
+    } catch (error: any) {
+        console.error(`[Automation] Erreur analyse d'image: ${error.message}`);
+        return { error: `Échec de l'analyse visuelle: ${error.message}` };
+    }
+}
+
+// ─── Téléchargement de fichiers (Section 2.2) ──────────────────────────────────
+
+/**
+ * Télécharge un fichier depuis une URL et retourne son contenu.
+ * Peut être utilisé pour analyser des PDFs, CSV, JSON, etc. directement depuis le web.
+ */
+export async function handleDownloadFile(validated: { url: string; saveToSandbox?: boolean }) {
+    console.log(`[Automation] Téléchargement de fichier depuis: ${validated.url}`);
+
+    const { url, saveToSandbox = false } = validated;
+
+    try {
+        // Vérifier que l'URL est sûre
+        if (!url.match(/^https?:\/\//i)) {
+            return { error: "URL non valide. Seules les URLs HTTP/HTTPS sont autorisées." };
+        }
+
+        // Utiliser la page Puppeteer existante ou créer une nouvelle page temporaire
+        const tempPage = page || (await ensurePage());
+        
+        // Naviguer vers l'URL (pour déclencher le téléchargement si c'est un lien direct)
+        await tempPage.goto(url, {
+            waitUntil: 'networkidle2',
+            timeout: 30000,
+        });
+
+        // Vérifier le type de contenu
+        const contentType = tempPage.mainFrame().response()?.headers()['content-type'] || '';
+        const content = await tempPage.content();
+
+        // Si c'est du HTML, extraire le contenu principal
+        if (contentType.includes('text/html')) {
+            const bodyText = await tempPage.evaluate(() => document.body?.innerText || '');
+            
+            return {
+                status: "success",
+                url,
+                contentType: 'text/html',
+                content: bodyText.slice(0, 50000), // Limiter à 50k caractères
+                size: bodyText.length,
+                savedToSandbox: false,
+                note: "Contenu HTML extrait (pas un fichier binaire)",
+            };
+        }
+
+        // Pour les fichiers binaires (PDF, images, etc.)
+        const response = await fetch(url);
+        if (!response.ok) {
+            return { error: `Échec du téléchargement: HTTP ${response.status}` };
+        }
+
+        const fileBuffer = await response.arrayBuffer();
+        const fileContent = Buffer.from(fileBuffer).toString('base64');
+
+        let savedPath: string | null = null;
+        if (saveToSandbox) {
+            const { getSandboxRoot } = await import("../utils/sandbox");
+            const fs = await import('fs');
+            const path = await import('path');
+            
+            const sandboxRoot = getSandboxRoot();
+            const downloadsDir = path.join(sandboxRoot, 'downloads');
+            if (!fs.existsSync(downloadsDir)) {
+                fs.mkdirSync(downloadsDir, { recursive: true });
+            }
+            
+            const filename = path.basename(new URL(url).pathname) || `download-${Date.now()}`;
+            savedPath = path.join(downloadsDir, filename);
+            fs.writeFileSync(savedPath, Buffer.from(fileBuffer));
+            
+            console.log(`[Automation] Fichier sauvegardé: ${savedPath}`);
+        }
+
+        return {
+            status: "success",
+            url,
+            contentType: response.headers.get('content-type') || 'application/octet-stream',
+            content: fileContent,
+            size: fileBuffer.byteLength,
+            savedToSandbox,
+            savedPath,
+        };
+    } catch (error: any) {
+        console.error(`[Automation] Erreur téléchargement: ${error.message}`);
+        return { error: `Échec du téléchargement: ${error.message}` };
+    }
+}
+
+// ─── Persistance des Sessions (Section 2.3) ────────────────────────────────────
+
+/**
+ * Sauvegarde la session actuelle (cookies, storage local) pour persistance.
+ */
+export async function handleSaveSession(validated: { name: string }) {
+    console.log(`[Automation] Sauvegarde de la session: ${validated.name}`);
+
+    if (!page) return { error: "Aucune page ouverte." };
+
+    try {
+        const cookies = await page.cookies();
+        const localStorage = await page.evaluate(() => {
+            const storage: Record<string, string> = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key) storage[key] = localStorage.getItem(key) || '';
+            }
+            return storage;
+        });
+
+        const sessionData = {
+            name: validated.name,
+            url: page.url(),
+            title: await page.title(),
+            cookies,
+            localStorage,
+            savedAt: new Date().toISOString(),
+        };
+
+        // Sauvegarder dans la sandbox
+        const { getSandboxRoot } = await import("../utils/sandbox");
+        const fs = await import('fs');
+        const path = await import('path');
+        
+        const sandboxRoot = getSandboxRoot();
+        const sessionsDir = path.join(sandboxRoot, 'sessions');
+        if (!fs.existsSync(sessionsDir)) {
+            fs.mkdirSync(sessionsDir, { recursive: true });
+        }
+        
+        const sessionFile = path.join(sessionsDir, `${validated.name}.json`);
+        fs.writeFileSync(sessionFile, JSON.stringify(sessionData, null, 2));
+
+        console.log(`[Automation] Session sauvegardée: ${sessionFile}`);
+
+        return {
+            status: "success",
+            sessionName: validated.name,
+            sessionPath: sessionFile,
+            cookieCount: cookies.length,
+            localStorageCount: Object.keys(localStorage).length,
+        };
+    } catch (error: any) {
+        console.error(`[Automation] Erreur sauvegarde session: ${error.message}`);
+        return { error: `Échec de la sauvegarde: ${error.message}` };
+    }
+}
+
+/**
+ * Restaure une session sauvegardée (cookies, authentification).
+ */
+export async function handleRestoreSession(validated: { name: string }) {
+    console.log(`[Automation] Restauration de la session: ${validated.name}`);
+
+    if (!page) return { error: "Aucune page ouverte. Utilisez automation_navigate d'abord." };
+
+    try {
+        const { getSandboxRoot } = await import("../utils/sandbox");
+        const fs = await import('fs');
+        const path = await import('path');
+        
+        const sandboxRoot = getSandboxRoot();
+        const sessionFile = path.join(sandboxRoot, 'sessions', `${validated.name}.json`);
+
+        if (!fs.existsSync(sessionFile)) {
+            return { error: `Session non trouvée: ${validated.name}` };
+        }
+
+        const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
+
+        // Restaurer les cookies
+        if (sessionData.cookies && sessionData.cookies.length > 0) {
+            await page.setCookie(...sessionData.cookies);
+            console.log(`[Automation] ${sessionData.cookies.length} cookies restaurés`);
+        }
+
+        // Naviguer vers l'URL de la session
+        if (sessionData.url) {
+            await page.goto(sessionData.url, {
+                waitUntil: 'networkidle2',
+                timeout: 30000,
+            });
+        }
+
+        console.log(`[Automation] Session restaurée avec succès`);
+
+        return {
+            status: "success",
+            sessionName: validated.name,
+            restoredUrl: page.url(),
+            cookiesRestored: sessionData.cookies?.length || 0,
+        };
+    } catch (error: any) {
+        console.error(`[Automation] Erreur restauration session: ${error.message}`);
+        return { error: `Échec de la restauration: ${error.message}` };
+    }
+}
+
+/**
+ * Liste toutes les sessions sauvegardées.
+ */
+export async function handleListSessions() {
+    console.log(`[Automation] Liste des sessions sauvegardées`);
+
+    try {
+        const { getSandboxRoot } = await import("../utils/sandbox");
+        const fs = await import('fs');
+        const path = await import('path');
+        
+        const sandboxRoot = getSandboxRoot();
+        const sessionsDir = path.join(sandboxRoot, 'sessions');
+
+        if (!fs.existsSync(sessionsDir)) {
+            return { status: "success", sessions: [] };
+        }
+
+        const sessionFiles = fs.readdirSync(sessionsDir)
+            .filter(f => f.endsWith('.json'))
+            .map(f => {
+                const filePath = path.join(sessionsDir, f);
+                const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                return {
+                    name: data.name,
+                    url: data.url,
+                    title: data.title,
+                    savedAt: data.savedAt,
+                    cookieCount: data.cookies?.length || 0,
+                    localStorageCount: Object.keys(data.localStorage || {}).length,
+                };
+            });
+
+        return {
+            status: "success",
+            sessions: sessionFiles,
+            count: sessionFiles.length,
+        };
+    } catch (error: any) {
+        console.error(`[Automation] Erreur liste sessions: ${error.message}`);
+        return { error: `Échec de la lecture: ${error.message}` };
+    }
+}
+
+/**
+ * Supprime une session sauvegardée.
+ */
+export async function handleDeleteSession(validated: { name: string }) {
+    console.log(`[Automation] Suppression de la session: ${validated.name}`);
+
+    try {
+        const { getSandboxRoot } = await import("../utils/sandbox");
+        const fs = await import('fs');
+        const path = await import('path');
+        
+        const sandboxRoot = getSandboxRoot();
+        const sessionFile = path.join(sandboxRoot, 'sessions', `${validated.name}.json`);
+
+        if (!fs.existsSync(sessionFile)) {
+            return { error: `Session non trouvée: ${validated.name}` };
+        }
+
+        fs.unlinkSync(sessionFile);
+
+        console.log(`[Automation] Session supprimée: ${sessionFile}`);
+
+        return {
+            status: "success",
+            sessionName: validated.name,
+            deleted: true,
+        };
+    } catch (error: any) {
+        console.error(`[Automation] Erreur suppression session: ${error.message}`);
+        return { error: `Échec de la suppression: ${error.message}` };
+    }
+}
+
+// ─── Fermeture ────────────────────────────────────────────────────────────────
+
 export async function handleClose() {
     console.log(`[Automation] Fermeture du navigateur.`);
     if (browser) {

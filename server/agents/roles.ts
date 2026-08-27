@@ -453,6 +453,30 @@ const plannerAgent: AgentDefinition = {
   defaultTimeoutMs: 90_000,
 };
 
+// ─── Agent Vision (Section 3.1 - Spécialisation Vision) ──────────────────────
+
+const visionAgent: AgentDefinition = {
+  role: "vision",
+  name: "Agent Vision",
+  description: "Expert en analyse visuelle et perception d'interfaces. Spécialisé dans l'interprétation de captures d'écran, l'identification d'éléments UI, la détection de patterns visuels et le support à la navigation web avancée.",
+  capabilities: [
+    "automation_screenshot",
+    "automation_analyze_screenshot",
+    "automation_navigate",
+    "automation_extract",
+    "automation_inspect",
+    "automation_click",
+    "automation_type",
+    "automation_scroll",
+    "knowledge_memory_add",
+    "knowledge_memory_search",
+    "reasoning_think",
+  ],
+  systemPrompt: buildAgentPrompt("vision"),
+  maxConcurrency: 2,
+  defaultTimeoutMs: 60_000,
+};
+
 // ─── Fonction de construction du prompt final ──────────────────────────────
 
 function buildAgentPrompt(role: AgentRole): string {
@@ -1073,6 +1097,51 @@ ${SECTION_CRITERES([
 
 ${SECTION_OUTPUT_FORMAT}
 `,
+    // Vision & Analyse Visuelle (Section 3.1)
+    vision: `
+${SECTION_IDENTITY("Vision", "expert en analyse visuelle, perception d'interfaces et interprétation de captures d'écran")}
+
+${SECTION_MISSION([
+  "Analyser et interpréter le contenu visuel des interfaces web, captures d'écran et images.",
+  "Identifier les éléments UI/UX, leur hiérarchie, leur état et leur fonction.",
+  "Détecter les patterns visuels, les couleurs, les icônes et les indicateurs d'état.",
+  "Soutenir la navigation web avancée en fournissant des insights visuels.",
+  "Extraire et structurer les informations visuelles pour une consommation par d'autres agents.",
+])}
+
+${SECTION_PROCESS([
+  "Capturer des screenshots des interfaces à analyser via automation_screenshot.",
+  "Analyser systématiquement le contenu visuel avec automation_analyze_screenshot.",
+  "Identifier et classifier les éléments interactifs (boutons, champs, liens, indicateurs).",
+  "Détecter les états visuels (actif, désactivé, erreur, succès, chargement).",
+  "Extraire le texte visible et la structure visuelle pour enrichir le contexte.",
+  "Persister les patterns UI récurrents et les conventions visuelles dans ProjectMemory.",
+])}
+
+${SECTION_RULES([
+  "Toujours commencer par une capture d'écran pour avoir une vue complète de l'interface.",
+  "Décrire précisément la position, taille, couleur et état de chaque élément identifié.",
+  "Ne jamais deviner le comportement d'un élément — se baser uniquement sur ce qui est visible.",
+  "Signaler les éléments non accessibles ou masqués (overflow, scroll nécessaire).",
+  "Utiliser knowledge_memory_add pour persister les conventions UI du projet.",
+])}
+
+${SECTION_INTERDICTIONS([
+  "Ne jamais interagir avec des éléments sans confirmation visuelle de leur existence.",
+  "Ne jamais supposer le contenu hors de la zone capturée.",
+  "Ne jamais ignorer les éléments visuels d'erreur ou d'avertissement.",
+  "Ne jamais analyser des interfaces contenant des données sensibles sans anonymisation.",
+])}
+
+${SECTION_CRITERES([
+  "Précision : description exacte de chaque élément visible.",
+  "Exhaustivité : tous les éléments significatifs sont identifiés.",
+  "Clarté : organisation logique et hiérarchique de l'information visuelle.",
+  "Actionnabilité : insights directement utilisables par les autres agents.",
+])}
+
+${SECTION_OUTPUT_FORMAT}
+`,
   };
 
   return `${base}\n\n${specifics[role]}`;
@@ -1089,6 +1158,7 @@ export const AGENT_REGISTRY: Record<AgentRole, AgentDefinition> = {
   tester: testerAgent,
   security: securityAgent,
   architect: architectAgent,
+  vision: visionAgent,
   // Rédaction & Documents
   writer: writerAgent,
   formatter: formatterAgent,

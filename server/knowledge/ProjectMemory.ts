@@ -971,6 +971,245 @@ export class ProjectMemory {
     }
     return lines.join("\n");
   }
+
+  // ─── Capture automatique de connaissances (Section 3.2) ──────────────────────
+
+  /**
+   * Extrait et enregistre automatiquement les décisions d'architecture
+   * à partir de commentaires de code ou de documents.
+   * Pattern détectés : TODO, FIXME, NOTE, DECISION, ARCHITECTURE, etc.
+   */
+  captureArchitectureDecision(content: string, sourceFile?: string, context?: string): string[] {
+    const decisions: string[] = [];
+    const patterns = [
+      // Patterns de décision d'architecture
+      /(?:DECISION|DECISIONS|ARCHITECTURE|ARCHITECTURAL\s*DECISION):\s*(.+?)(?:\n\n|\n\*|$)/gi,
+      /TODO:\s*(.+?)(?:\n\n|\n\*|$)/gi,
+      /FIXME:\s*(.+?)(?:\n\n|\n\*|$)/gi,
+      /NOTE:\s*(.+?)(?:\n\n|\n\*|$)/gi,
+      /IMPORTANT:\s*(.+?)(?:\n\n|\n\*|$)/gi,
+      /RATIONALE:\s*(.+?)(?:\n\n|\n\*|$)/gi,
+      /WHY:\s*(.+?)(?:\n\n|\n\*|$)/gi,
+    ];
+
+    for (const pattern of patterns) {
+      const matches = content.match(pattern);
+      if (matches) {
+        for (const match of matches) {
+          // Extraire le contenu après le label
+          const colonIndex = match.indexOf(':');
+          if (colonIndex > -1) {
+            const decisionText = match.slice(colonIndex + 1).trim();
+            if (decisionText && decisionText.length > 10) {
+              const factId = this.addFact({
+                content: `Décision d'architecture: ${decisionText}`,
+                category: "decision",
+                tags: ["architecture", "auto-captured", sourceFile ? `file:${sourceFile}` : ""],
+                sourceFile,
+                confidence: 0.7,
+                isStructural: false,
+              });
+              if (factId) decisions.push(factId);
+            }
+          }
+        }
+      }
+    }
+
+    if (decisions.length > 0) {
+      log.info(`🏗️  ${decisions.length} décision(s) d'architecture capturée(s) depuis ${sourceFile || 'contenu'}`);
+    }
+
+    return decisions;
+  }
+
+  /**
+   * Extrait et enregistre automatiquement les conventions de code
+   * à partir de l'analyse de fichiers source.
+   */
+  captureCodeConventions(content: string, sourceFile?: string, language?: string): string[] {
+    const conventions: string[] = [];
+    const languageHint = language || (sourceFile ? sourceFile.split('.').pop() : 'unknown');
+
+    // Patterns de conventions par langage
+    const patterns: Record<string, RegExp[]> = {
+      typescript: [
+        /interface\s+(\w+)/g,           // Détection d'interfaces
+        /type\s+(\w+)\s*=/g,           // Détection de types
+        /export\s+(const|function|class)\s+(\w+)/g, // Export naming
+        /@\w+\s+([^\n]+)/g,            // Decorators
+      ],
+      javascript: [
+        /function\s+(\w+)/g,
+        /const\s+(\w+)\s*=/g,
+        /class\s+(\w+)/g,
+      ],
+      python: [
+        /def\s+(\w+)/g,
+        /class\s+(\w+)/g,
+        /import\s+(\w+)/g,
+      ],
+    };
+
+    const langPatterns = patterns[languageHint] || patterns.javascript;
+
+    for (const pattern of langPatterns) {
+      const matches = content.match(pattern);
+      if (matches) {
+        for (const match of matches) {
+          const conventionText = match.trim();
+          if (conventionText && conventionText.length > 5) {
+            const factId = this.addFact({
+              content: `Convention de code (${languageHint}): ${conventionText}`,
+              category: "convention",
+              tags: ["code-convention", "auto-captured", languageHint, sourceFile ? `file:${sourceFile}` : ""],
+              sourceFile,
+              confidence: 0.6,
+              isStructural: false,
+            });
+            if (factId) conventions.push(factId);
+          }
+        }
+      }
+    }
+
+    // Capturer les patterns de nommage (camelCase, PascalCase, snake_case)
+    const namingPatterns = [
+      /([A-Z][a-z0-9]+)+/g,  // PascalCase
+      /([a-z0-9]+([A-Z][a-z0-9]+)*)/g,  // camelCase
+      /([a-z]+(_[a-z]+)+)/g,  // snake_case
+    ];
+
+    for (const pattern of namingPatterns) {
+      const matches = content.match(pattern);
+      if (matches && matches.length > 3) {
+        // Plus de 3 occurrences = pattern récurrent
+        const factId = this.addFact({
+          content: `Pattern de nommage détecté: ${pattern.source} (occurrences: ${matches.length})`,
+          category: "pattern",
+          tags: ["naming-pattern", "auto-captured", languageHint],
+          sourceFile,
+          confidence: 0.5,
+          isStructural: false,
+        });
+        if (factId) conventions.push(factId);
+      }
+    }
+
+    if (conventions.length > 0) {
+      log.info(`📝 ${conventions.length} convention(s) de code capturée(s) depuis ${sourceFile || 'contenu'}`);
+    }
+
+    return conventions;
+  }
+
+  /**
+   * Analyse un extrait de code ou un document et capture automatiquement
+   * les connaissances pertinentes pour le projet.
+   * Cela inclut : décisions, conventions, patterns, API, modules.
+   */
+  captureFromContent(
+    content: string,
+    options: {
+      sourceFile?: string;
+      language?: string;
+      categoryHints?: string[];
+      autoPersist?: boolean;
+    } = {}
+  ): { capturedFacts: string[]; decisionCount: number; conventionCount: number } {
+    const {
+      sourceFile,
+      language,
+      categoryHints = [],
+      autoPersist = true,
+    } = options;
+
+    const capturedFacts: string[] = [];
+    let decisionCount = 0;
+    let conventionCount = 0;
+
+    // 1. Capturer les décisions d'architecture
+    const decisions = this.captureArchitectureDecision(content, sourceFile, language);
+    decisionCount = decisions.length;
+    capturedFacts.push(...decisions);
+
+    // 2. Capturer les conventions de code
+    const conventions = this.captureCodeConventions(content, sourceFile, language);
+    conventionCount = conventions.length;
+    capturedFacts.push(...conventions);
+
+    // 3. Capturer les dépendances/modules importants
+    const dependencyPatterns = [
+      /import\s+["']([^"']+)["']/g,           // Imports
+      /require\(["']([^"']+)["']\)/g,       // Requires
+      /from\s+["']([^"']+)["']/g,          // From imports
+    ];
+
+    for (const pattern of dependencyPatterns) {
+      const matches = content.match(pattern);
+      if (matches) {
+        for (const match of matches) {
+          const depMatch = match.match(/["']([^"']+)["']/);
+          if (depMatch && depMatch[1]) {
+            const dependency = depMatch[1];
+            // Ignorer les dépendances node_modules standard
+            if (!dependency.startsWith('.') && !dependency.includes('/')) {
+              const factId = this.addFact({
+                content: `Dépendance: ${dependency}`,
+                category: "module",
+                tags: ["dependency", "auto-captured", language || "", sourceFile ? `file:${sourceFile}` : ""],
+                sourceFile,
+                confidence: 0.8,
+                isStructural: true,
+              });
+              if (factId) capturedFacts.push(factId);
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Sauvegarder si autoPersist et qu'il y a eu des captures
+    if (autoPersist && capturedFacts.length > 0) {
+      this.save();
+    }
+
+    return {
+      capturedFacts,
+      decisionCount,
+      conventionCount,
+    };
+  }
+
+  /**
+   * Hook appelé après une analyse de code ou une action significative
+   * pour capturer automatiquement les connaissances du projet.
+   */
+  async autoCaptureFromAnalysis(
+    content: string,
+    options: {
+      sourceFile?: string;
+      language?: string;
+      analysisType?: 'code' | 'document' | 'interface' | 'architecture';
+    } = {}
+  ): Promise<{ captured: number; decisions: number; conventions: number }> {
+    const { sourceFile, language, analysisType = 'code' } = options;
+
+    const result = this.captureFromContent(content, {
+      sourceFile,
+      language,
+      categoryHints: [analysisType],
+      autoPersist: true,
+    });
+
+    log.info(`🤖 Capture automatique depuis ${analysisType}: ${result.capturedFacts.length} faits`);
+
+    return {
+      captured: result.capturedFacts.length,
+      decisions: result.decisionCount,
+      conventions: result.conventionCount,
+    };
+  }
 }
 
 // ─── Singleton ────────────────────────────────────────────────────────────────

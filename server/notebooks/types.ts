@@ -124,7 +124,7 @@ export interface ChatThread {
 
 // ─── Documents générés ───────────────────────────────────────────────────────
 
-export type GeneratedDocType = 'summary' | 'faq' | 'study-guide' | 'briefing' | 'timeline' | 'outline' | 'mindmap' | 'swot' | 'glossary' | 'infographic' | 'full-report' | 'report-business' | 'report-market' | 'report-technical' | 'report-competitive' | 'report-financial' | 'report-marketing' | 'report-product' | 'report-risk' | 'report-executive' | 'report-project' | 'roadmap';
+export type GeneratedDocType = 'summary' | 'faq' | 'study-guide' | 'briefing' | 'timeline' | 'outline' | 'mindmap' | 'swot' | 'glossary' | 'infographic' | 'full-report' | 'report-business' | 'report-market' | 'report-technical' | 'report-competitive' | 'report-financial' | 'report-marketing' | 'report-product' | 'report-risk' | 'report-executive' | 'report-project' | 'roadmap' | 'visualization' | 'chart' | 'data-analysis' | 'comparative-analysis' | 'synthesis-report';
 
 // ─── Suggestions de rapports ─────────────────────────────────────────────────
 
@@ -149,6 +149,22 @@ export interface GeneratedDocument {
   /** Sources utilisées pour la génération */
   sourceIds: string[];
   createdAt: string;
+  /** Contenu visuel structuré (pour les visualisations D3.js) */
+  visualContent?: {
+    /** Type de visualisation (bar, line, pie, scatter, network, etc.) */
+    chartType: string;
+    /** Données au format JSON compatible D3.js */
+    data: any;
+    /** Configuration de la visualisation */
+    config?: {
+      width?: number;
+      height?: number;
+      colors?: string[];
+      labels?: Record<string, string>;
+    };
+    /** SVG généré (si la visualisation a été rendue côté serveur) */
+    svg?: string;
+  };
 }
 
 // ─── Audio Overview (podcast IA) ─────────────────────────────────────────────

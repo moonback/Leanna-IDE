@@ -9,7 +9,10 @@ import {
 import {
   handleNavigate, handleClick, handleType, handleExtract,
   handleMusicSearch, handleSearch, handleSnapshot, handleInspect, handleClose,
-  handleDoubleClick, handleRightClick, handleHover, handlePressKeys, handleScroll, handleWaitFor
+  handleDoubleClick, handleRightClick, handleHover, handlePressKeys, handleScroll, handleWaitFor,
+  handleScreenshot, handleAnalyzeScreenshot,
+  handleDownloadFile,
+  handleSaveSession, handleRestoreSession, handleListSessions, handleDeleteSession
 } from "./automationBrowser";
 
 import {
@@ -161,6 +164,126 @@ export const automationSkill: Skill = {
       ],
       category: "browser",
       mutating: true
+    },
+    // ─── Perception Visuelle (Section 2.1) ─────────────────────────────────────
+    {
+      name: "automation_screenshot",
+      description: "Capture une capture d'écran de la page actuelle. Permet l'analyse visuelle des interfaces complexes.",
+      parameters: z.object({
+        fullPage: z.boolean().optional().default(true).describe("Capturer toute la page (true) ou seulement la zone visible (false)"),
+        type: z.enum(['png', 'jpeg']).optional().default('png').describe("Format de l'image"),
+        quality: z.number().min(0).max(100).optional().default(90).describe("Qualité de l'image (0-100)")
+      }),
+      examples: [
+        {
+          args: { fullPage: true, type: 'png', quality: 90 },
+          description: "Capture complète de la page en PNG haute qualité"
+        },
+        {
+          args: { fullPage: false },
+          description: "Capture seulement la zone visible"
+        }
+      ],
+      category: "browser",
+      outputDescription: "Retourne la capture d'écran en base64 avec métadonnées (type MIME, taille)"
+    },
+    {
+      name: "automation_analyze_screenshot",
+      description: "Analyse visuelle d'une capture d'écran ou d'une image. Utilise un modèle multimodal pour décrire le contenu visuel.",
+      parameters: z.object({
+        imageBase64: z.string().describe("Image encodée en base64 à analyser"),
+        prompt: z.string().optional().default("Décris en détail le contenu visuel de cette image, y compris le texte visible, les éléments d'interface, les couleurs dominantes et l'organisation spatiale.").describe("Prompt personnalisé pour l'analyse")
+      }),
+      examples: [
+        {
+          args: { imageBase64: "base64_data_here", prompt: "Quels boutons sont visibles sur cette interface?" },
+          description: "Analyse ciblée sur les éléments interactifs"
+        }
+      ],
+      category: "browser",
+      outputDescription: "Retourne une description textuelle du contenu visuel"
+    },
+    // ─── Téléchargement de fichiers (Section 2.2) ────────────────────────────────
+    {
+      name: "automation_download_file",
+      description: "Télécharge un fichier depuis une URL et retourne son contenu. Peut sauvegarder dans la sandbox.",
+      parameters: z.object({
+        url: z.string().url("URL invalide").describe("URL du fichier à télécharger"),
+        saveToSandbox: z.boolean().optional().default(false).describe("Sauvegarder le fichier dans la sandbox (downloads/)")
+      }),
+      examples: [
+        {
+          args: { url: "https://example.com/data.csv" },
+          description: "Télécharge un fichier CSV"
+        },
+        {
+          args: { url: "https://example.com/report.pdf", saveToSandbox: true },
+          description: "Télécharge et sauvegarde un PDF dans la sandbox"
+        }
+      ],
+      category: "browser",
+      outputDescription: "Retourne le contenu du fichier (base64 pour les binaires, texte pour HTML), type MIME, taille, et chemin si sauvegardé"
+    },
+    // ─── Persistance des Sessions (Section 2.3) ────────────────────────────────
+    {
+      name: "automation_save_session",
+      description: "Sauvegarde la session actuelle (cookies, localStorage) pour persistance. Permet de maintenir la connexion sur des sites authentifiés.",
+      parameters: z.object({
+        name: z.string().min(1).describe("Nom unique de la session à sauvegarder")
+      }),
+      examples: [
+        {
+          args: { name: "github_session" },
+          description: "Sauvegarde la session GitHub authentifiée"
+        }
+      ],
+      category: "browser",
+      outputDescription: "Retourne le nom de la session, le chemin du fichier, et le nombre de cookies/localStorage sauvegardés"
+    },
+    {
+      name: "automation_restore_session",
+      description: "Restaure une session sauvegardée (cookies, authentification).",
+      parameters: z.object({
+        name: z.string().min(1).describe("Nom de la session à restaurer")
+      }),
+      examples: [
+        {
+          args: { name: "github_session" },
+          description: "Restaure la session GitHub sauvegardée"
+        }
+      ],
+      category: "browser",
+      mutating: true,
+      outputDescription: "Retourne l'URL restaurée et le nombre de cookies restaurés"
+    },
+    {
+      name: "automation_list_sessions",
+      description: "Liste toutes les sessions sauvegardées.",
+      parameters: z.object({}),
+      examples: [
+        {
+          args: {},
+          description: "Affiche toutes les sessions disponibles"
+        }
+      ],
+      category: "browser",
+      outputDescription: "Retourne la liste des sessions avec leurs métadonnées (nom, URL, date, nombre de cookies)"
+    },
+    {
+      name: "automation_delete_session",
+      description: "Supprime une session sauvegardée.",
+      parameters: z.object({
+        name: z.string().min(1).describe("Nom de la session à supprimer")
+      }),
+      examples: [
+        {
+          args: { name: "old_session" },
+          description: "Supprime une session obsolète"
+        }
+      ],
+      category: "browser",
+      mutating: true,
+      outputDescription: "Retourne une confirmation de suppression"
     },
     {
       name: "automation_double_click",
@@ -448,6 +571,32 @@ export const automationSkill: Skill = {
       type: z.enum(['buttons', 'inputs', 'links', 'all']).optional().default('all')
     }),
     "automation_close": z.object({}),
+    // Perception Visuelle
+    "automation_screenshot": z.object({
+      fullPage: z.boolean().optional().default(true),
+      type: z.enum(['png', 'jpeg']).optional().default('png'),
+      quality: z.number().min(0).max(100).optional().default(90)
+    }),
+    "automation_analyze_screenshot": z.object({
+      imageBase64: z.string(),
+      prompt: z.string().optional()
+    }),
+    // Téléchargement de fichiers
+    "automation_download_file": z.object({
+      url: z.string().url(),
+      saveToSandbox: z.boolean().optional().default(false)
+    }),
+    // Persistance des Sessions
+    "automation_save_session": z.object({
+      name: z.string().min(1)
+    }),
+    "automation_restore_session": z.object({
+      name: z.string().min(1)
+    }),
+    "automation_list_sessions": z.object({}),
+    "automation_delete_session": z.object({
+      name: z.string().min(1)
+    }),
     "automation_double_click": z.object({
       selector: selectorSchema
     }),
@@ -614,6 +763,100 @@ export const automationSkill: Skill = {
           "automation",
           durationMs,
           [] // Aucune action suivante suggérée après fermeture
+        );
+      }
+
+      // Perception Visuelle (Section 2.1)
+      if (name === "automation_screenshot") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_screenshot"], args, name);
+        const result = await handleScreenshot(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_analyze_screenshot", "automation_extract"] // Analyse ou extraction suivante
+        );
+      }
+
+      if (name === "automation_analyze_screenshot") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_analyze_screenshot"], args, name);
+        const result = await handleAnalyzeScreenshot(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_screenshot"] // Peut vouloir recapturer
+        );
+      }
+
+      // Téléchargement de fichiers (Section 2.2)
+      if (name === "automation_download_file") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_download_file"], args, name);
+        const result = await handleDownloadFile(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["notebook_ingest_source"] // Peut vouloir ingérer le fichier téléchargé
+        );
+      }
+
+      // Persistance des Sessions (Section 2.3)
+      if (name === "automation_save_session") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_save_session"], args, name);
+        const result = await handleSaveSession(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_close"] // Peut vouloir fermer après sauvegarde
+        );
+      }
+
+      if (name === "automation_restore_session") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_restore_session"], args, name);
+        const result = await handleRestoreSession(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_navigate", "automation_extract"] // Peut vouloir naviguer ou extraire après restauration
+        );
+      }
+
+      if (name === "automation_list_sessions") {
+        validateArgs(automationSkill.inputSchemas!["automation_list_sessions"], args, name);
+        const result = await handleListSessions();
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_restore_session", "automation_delete_session"]
+        );
+      }
+
+      if (name === "automation_delete_session") {
+        const validated = validateArgs(automationSkill.inputSchemas!["automation_delete_session"], args, name);
+        const result = await handleDeleteSession(validated);
+        const durationMs = Date.now() - startTime;
+        return createSuccessResult(
+          result,
+          name,
+          "automation",
+          durationMs,
+          ["automation_list_sessions"]
         );
       }
 

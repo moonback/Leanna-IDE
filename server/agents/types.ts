@@ -14,6 +14,7 @@ export const AGENT_ROLES = [
   "tester",
   "security",
   "architect",
+  "vision",
   // Agents de Rédaction & Documentation
   "writer",
   "formatter",
@@ -67,6 +68,14 @@ const AGENT_ROLE_ALIASES: Readonly<Record<string, AgentRole>> = {
   architecte: "architect",
   architecture: "architect",
   conception: "architect",
+  // Vision & Analyse Visuelle
+  vision: "vision",
+  visual: "vision",
+  vision_expert: "vision",
+  analyse_visuelle: "vision",
+  analyse_visual: "vision",
+  screenshot_analysis: "vision",
+  image_analysis: "vision",
   // Aliases Rédaction & Documents
   writer: "writer",
   docs: "writer",
