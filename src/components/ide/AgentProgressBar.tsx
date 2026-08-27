@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   CheckCircle2, AlertCircle, Loader2, ChevronDown, X, Clock,
   FileText, FilePen, Search, Trash2, Globe, Brain, Users,
@@ -146,6 +146,8 @@ const COMPLEXITY_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?: ReasoningState }) {
+  const reduceMotion = useReducedMotion();
+
   if (!reasoning || (!reasoning.active && !reasoning.steps?.length)) return null;
 
   const meta = reasoning.complexity ? COMPLEXITY_LABEL[reasoning.complexity] : null;
@@ -161,24 +163,24 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
       {/* Header */}
       <div className="flex items-center gap-1.5 px-3 py-1.5">
         <motion.div
-          animate={reasoning.active ? { rotate: 360 } : {}}
-          transition={reasoning.active ? { duration: 2, repeat: Infinity, ease: 'linear' } : {}}
+          animate={reasoning.active && !reduceMotion ? { rotate: 360 } : {}}
+          transition={reasoning.active && !reduceMotion ? { duration: 2, repeat: Infinity, ease: 'linear' } : {}}
         >
           <Brain style={{ width: 10, height: 10, color: '#a855f7' }} />
         </motion.div>
-        <span className="text-[10px] font-medium" style={{ color: '#a855f7' }}>
+        <span className="text-[0.625rem] tracking-wide font-medium" style={{ color: '#a855f7' }}>
           {reasoning.strategyLabel ?? 'Raisonnement'}
         </span>
         {meta && (
           <span
-            className="text-[8px] px-1 py-px rounded font-mono"
+            className="text-[0.5rem] tracking-wide px-1 py-px rounded font-mono"
             style={{ backgroundColor: meta.color + '22', color: meta.color, border: `1px solid ${meta.color}44` }}
           >
             {meta.label}
           </span>
         )}
         {total > 0 && (
-          <span className="ml-auto text-[9px] tabular-nums font-mono" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="ml-auto text-[0.5625rem] tracking-wide tabular-nums font-mono" style={{ color: 'var(--text-dimmed)' }}>
             {doneCount}/{total}
           </span>
         )}
@@ -195,7 +197,7 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
             return (
               <div key={step.index} className="flex items-baseline gap-2">
                 {isRun
-                  ? <Loader2 style={{ width: 9, height: 9, color, flexShrink: 0 }} className="animate-spin mt-px" />
+                  ? <Loader2 style={{ width: 9, height: 9, color, flexShrink: 0 }} className={reduceMotion ? '' : 'animate-spin mt-px'} />
                   : isDone
                     ? <CheckCircle2 style={{ width: 9, height: 9, color, flexShrink: 0 }} className="mt-px" />
                     : isFail
@@ -203,13 +205,13 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
                       : <div className="w-1 h-1 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: color }} />
                 }
                 <span
-                  className="text-[10px] leading-snug truncate"
+                  className="text-[0.625rem] tracking-wide leading-snug truncate"
                   style={{ color: isRun ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: isRun ? 600 : 400 }}
                 >
                   {step.label}
                 </span>
                 {step.durationMs !== undefined && (
-                  <span className="text-[9px] tabular-nums font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-[0.5625rem] tracking-wide tabular-nums font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
                     {step.durationMs < 1000 ? `${step.durationMs}ms` : `${(step.durationMs / 1000).toFixed(1)}s`}
                   </span>
                 )}
@@ -221,16 +223,22 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
 
       {reasoning.active && steps.length === 0 && (
         <div className="flex items-center gap-1.5 px-3 pb-2">
-          {[0, 1, 2].map(i => (
-            <motion.div
-              key={i}
-              className="w-1 h-1 rounded-full"
-              style={{ backgroundColor: '#a855f7' }}
-              animate={{ opacity: [0.3, 1, 0.3] }}
-              transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.18 }}
-            />
-          ))}
-          <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>Analyse…</span>
+          {reduceMotion ? (
+            [0, 1, 2].map(i => (
+              <div key={i} className="w-1 h-1 rounded-full" style={{ backgroundColor: '#a855f7', opacity: 0.6 }} />
+            ))
+          ) : (
+            [0, 1, 2].map(i => (
+              <motion.div
+                key={i}
+                className="w-1 h-1 rounded-full"
+                style={{ backgroundColor: '#a855f7' }}
+                animate={{ opacity: [0.3, 1, 0.3] }}
+                transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.18 }}
+              />
+            ))
+          )}
+          <span className="text-[0.5625rem] tracking-wide" style={{ color: 'var(--text-dimmed)' }}>Analyse…</span>
         </div>
       )}
     </div>
@@ -244,6 +252,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [, setTick] = useState(0);
+  const reduceMotion = useReducedMotion();
 
   const runningStep = useMemo(() => [...steps].reverse().find(s => s.status === 'running'), [steps]);
   const isWorking   = !!runningStep;
@@ -258,6 +267,12 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
     const last  = new Date(steps[steps.length - 1].timestamp);
     return msBetween(first, isWorking ? new Date() : last);
   }, [steps, isWorking]);
+
+  // Critically-damped default spring for state-driven UI (§4 / Quick Reference).
+  // Reduced motion gets a short, non-bouncy fade/step instead of a spring.
+  const uiSpring = reduceMotion
+    ? { duration: 0.12, ease: 'linear' as const }
+    : { type: 'spring' as const, bounce: 0, duration: 0.35 };
 
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
 
@@ -292,9 +307,10 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
           className="absolute inset-y-0 left-0"
           style={{ backgroundColor: accentColor, opacity: 0.8 }}
           animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.3, ease: 'easeOut' }}
+          transition={uiSpring}
         />
-        {isWorking && (
+        {/* Decorative shimmer sweep — motion-only, dropped entirely under reduced motion */}
+        {isWorking && !reduceMotion && (
           <motion.div
             className="absolute inset-y-0 w-8 opacity-50"
             style={{ background: 'linear-gradient(90deg, transparent, var(--accent-primary), transparent)' }}
@@ -305,7 +321,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
       </div>
 
       {/* ── Compact header (single row, ~32px tall) ── */}
-      <div
+      <motion.div
         className="flex items-center gap-2 px-3 h-8 cursor-pointer group"
         onClick={toggleExpand}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(); }}}
@@ -313,11 +329,14 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
         role="button"
         aria-expanded={expanded}
         aria-label="Historique agent"
+        whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+        whileHover={{ backgroundColor: 'rgba(255,255,255,0.02)' }}
+        transition={{ duration: 0.1 }}
       >
         {/* Status dot / spinner */}
         {isWorking ? (
           <Loader2
-            className="animate-spin flex-shrink-0"
+            className={reduceMotion ? 'flex-shrink-0' : 'animate-spin flex-shrink-0'}
             style={{ width: 12, height: 12, color: 'var(--accent-primary)' }}
           />
         ) : errorCount > 0 ? (
@@ -331,11 +350,11 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
           {isWorking ? (
             <>
               <CatIcon tool={runningStep.tool} size={10} />
-              <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+              <span className="text-[0.6875rem] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                 {runningStep.label}
               </span>
               <span
-                className="text-[9px] font-mono px-1 py-px rounded flex-shrink-0"
+                className="text-[0.5625rem] tracking-wide font-mono px-1 py-px rounded flex-shrink-0"
                 style={{
                   backgroundColor: CAT_COLOR[getCat(runningStep.tool)] + '1a',
                   color: CAT_COLOR[getCat(runningStep.tool)],
@@ -345,7 +364,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
               </span>
             </>
           ) : (
-            <span className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+            <span className="text-[0.6875rem] font-medium" style={{ color: 'var(--text-secondary)' }}>
               Terminé
             </span>
           )}
@@ -354,12 +373,12 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
         {/* Right-side meta */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {isWorking && (
-            <span className="text-[9px] tabular-nums font-mono" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-[0.5625rem] tracking-wide tabular-nums font-mono" style={{ color: 'var(--text-dimmed)' }}>
               {msElapsed(runningStep.timestamp)}
             </span>
           )}
           <span
-            className="text-[9px] tabular-nums font-mono px-1.5 py-px rounded"
+            className="text-[0.5625rem] tracking-wide tabular-nums font-mono px-1.5 py-px rounded"
             style={{
               backgroundColor: 'var(--bg-surface)',
               color: errorCount > 0 ? '#f59e0b' : 'var(--text-muted)',
@@ -370,7 +389,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
             {errorCount > 0 && <span style={{ color: '#ef4444' }}> ·{errorCount}err</span>}
           </span>
           {!isWorking && (
-            <span className="text-[9px] tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-[0.5625rem] tracking-wide tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
               {totalDur}
             </span>
           )}
@@ -385,7 +404,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
           {!isWorking && onClear && (
             <button
               onClick={e => { e.stopPropagation(); onClear(); }}
-              className="p-0.5 rounded hover:bg-white/5 transition-colors"
+              className="p-0.5 rounded hover:bg-white/5 active:bg-white/10 active:scale-90 transition-all"
               title="Effacer"
               aria-label="Effacer l'historique"
               style={{ color: 'var(--text-dimmed)' }}
@@ -394,21 +413,21 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
             </button>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* ── Expandable drawer ── */}
       <AnimatePresence>
         {expanded && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
+            initial={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            animate={reduceMotion ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={uiSpring}
             style={{ overflow: 'hidden' }}
           >
             {/* Stats strip */}
             <div
-              className="flex items-center gap-3 px-3 py-1 border-y text-[9px] font-mono tabular-nums"
+              className="flex items-center gap-3 px-3 py-1 border-y text-[0.5625rem] tracking-wide font-mono tabular-nums"
               style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-surface)', color: 'var(--text-dimmed)' }}
             >
               <span style={{ color: '#22c55e' }}>{doneCount} ok</span>
@@ -438,7 +457,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
                     {/* Timeline dot + connector */}
                     <div className="flex flex-col items-center flex-shrink-0 w-3 pt-[5px]">
                       {status === 'running' ? (
-                        <Loader2 style={{ width: 9, height: 9, color: catColor }} className="animate-spin" />
+                        <Loader2 style={{ width: 9, height: 9, color: catColor }} className={reduceMotion ? '' : 'animate-spin'} />
                       ) : status === 'done' ? (
                         <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: catColor, opacity: 0.7 }} />
                       ) : status === 'error' ? (
@@ -452,14 +471,15 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
                     </div>
 
                     {/* Content */}
-                    <div
+                    <motion.div
                       className="flex-1 min-w-0 pb-1.5 cursor-pointer rounded px-1 -mx-1 hover:bg-white/[0.03] transition-colors group"
                       onClick={() => setExpandedStepId(isExp ? null : step.id)}
+                      whileTap={reduceMotion ? undefined : { scale: 0.99 }}
                     >
                       <div className="flex items-baseline gap-1.5 min-w-0">
                         <CatIcon tool={step.tool} size={9} />
                         <span
-                          className="text-[10px] flex-1 truncate leading-tight"
+                          className="text-[0.625rem] flex-1 truncate leading-tight"
                           style={{
                             color: status === 'running' ? 'var(--text-primary)'
                               : status === 'error' ? '#ef4444'
@@ -470,9 +490,9 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
                           {step.label}
                         </span>
                         {dur
-                          ? <span className="text-[8px] tabular-nums font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>{dur}</span>
+                          ? <span className="text-[0.5rem] tracking-wide tabular-nums font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>{dur}</span>
                           : status === 'running'
-                            ? <span className="text-[8px] tabular-nums font-mono flex-shrink-0" style={{ color: catColor }}>{msElapsed(step.timestamp)}</span>
+                            ? <span className="text-[0.5rem] tracking-wide tabular-nums font-mono flex-shrink-0" style={{ color: catColor }}>{msElapsed(step.timestamp)}</span>
                             : null
                         }
                         {step.detail && (
@@ -482,7 +502,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
 
                       {/* Tool tag — only for non-trivial categories */}
                       {getCat(step.tool) !== 'other' && (
-                        <span className="text-[8px] font-mono" style={{ color: catColor, opacity: 0.55 }}>
+                        <span className="text-[0.5rem] tracking-wide font-mono" style={{ color: catColor, opacity: 0.55 }}>
                           {CAT_LABEL[getCat(step.tool)]}
                         </span>
                       )}
@@ -491,14 +511,14 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
                       <AnimatePresence>
                         {isExp && step.detail && (
                           <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.1 }}
+                            initial={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                            animate={reduceMotion ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
+                            exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                            transition={uiSpring}
                             className="overflow-hidden"
                           >
                             <pre
-                              className="mt-1 p-1.5 text-[9px] leading-relaxed whitespace-pre-wrap break-all font-mono rounded"
+                              className="mt-1 p-1.5 text-[0.5625rem] tracking-wide leading-relaxed whitespace-pre-wrap break-all font-mono rounded"
                               style={{
                                 color: 'var(--text-muted)',
                                 backgroundColor: 'var(--bg-input)',
@@ -510,7 +530,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
                           </motion.div>
                         )}
                       </AnimatePresence>
-                    </div>
+                    </motion.div>
                   </div>
                 );
               })}
