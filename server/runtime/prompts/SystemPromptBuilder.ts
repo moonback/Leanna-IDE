@@ -16,37 +16,17 @@ import { PromptRegistry } from "../PromptRegistry";
 import { loadPromptTemplates } from "./loader";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import {
+  SystemPromptConfig,
+  AgentRole,
+  AGENT_ROLES_INFO,
+  LANG_INSTRUCTIONS_FR,
+  STYLE_INSTRUCTIONS_FR,
+} from "./types";
 
 const __dirname_compat = typeof __dirname !== 'undefined'
   ? __dirname
   : path.dirname(fileURLToPath(import.meta.url));
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Types
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export interface SystemPromptConfig {
-  /** Nom de l'assistant */
-  aiName?: string;
-  /** Nom de l'utilisateur */
-  userName?: string;
-  /** Rôle de l'utilisateur */
-  userRole?: string;
-  /** Langue de réponse */
-  language?: "fr" | "en" | "es" | "de" | "pt";
-  /** Style de réponse */
-  responseStyle?: "concise" | "balanced" | "detailed";
-  /** Mode compact (économie de tokens) */
-  compact?: boolean;
-  /** Mode de session : 'full' (agent) ou 'ask' (chat/Q&A documentaire) */
-  mode?: "full" | "ask";
-  /** Configuration des agents (enabled/disabled + rôles autorisés) */
-  agents?: { enabled: boolean; allowedRoles?: string[] };
-  /** Sections à exclure du prompt */
-  excludeSections?: string[];
-  /** Sections additionnelles à inclure */
-  extraSections?: Array<{ id: string; content: string }>;
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Builder
@@ -144,7 +124,7 @@ export class SystemPromptBuilder {
       // 5. Système multi-agents (conditionnel selon config.agents)
       const agentsEnabled = config.agents?.enabled !== false; // activé par défaut
       if (agentsEnabled && this.registry.has("agents-system")) {
-        const allowedRoles = config.agents?.allowedRoles;
+        const allowedRoles = config.agents?.allowedRoles as AgentRole[] | undefined;
         if (allowedRoles && allowedRoles.length > 0) {
           // Injecter un prompt agents filtré avec seulement les rôles autorisés
           sections.push(this.buildFilteredAgentsPrompt(allowedRoles, renderOpts));
@@ -189,26 +169,7 @@ export class SystemPromptBuilder {
   /**
    * Construit un prompt agents filtré avec uniquement les rôles autorisés.
    */
-  private buildFilteredAgentsPrompt(allowedRoles: string[], _renderOpts: any): string {
-    const ALL_ROLES: Record<string, { description: string; write: boolean; category: string }> = {
-      // Code & Ingénierie logicielle
-      coder:       { description: "Implémentation de fonctionnalités, écriture et modification de code propre", write: true, category: "Code" },
-      refactor:    { description: "Restructuration, Clean Code, réduction de dette technique et découpage", write: true, category: "Code" },
-      debugger:    { description: "Diagnostic d'erreurs/stacktraces, root-cause et patches correctifs ciblés", write: true, category: "Code" },
-      reviewer:    { description: "Revue de code, audit de qualité, détection d'anti-patterns et standards", write: false, category: "Code" },
-      tester:      { description: "Conception et écriture de tests automatisés (unitaires, intégration)", write: true, category: "Code" },
-      security:    { description: "Audit de sécurité applicative, vulnérabilités OWASP et secrets", write: false, category: "Code" },
-      architect:   { description: "Conception logicielle, modélisation de données, contrats et modules", write: true, category: "Code" },
-      // Rédaction & Documentation
-      writer:      { description: "Rédaction de documents (README, guides, articles, rapports)", write: true, category: "Docs" },
-      formatter:   { description: "Mise en forme et formatage Markdown", write: true, category: "Docs" },
-      researcher:  { description: "Recherche et collecte d'informations", write: false, category: "Docs" },
-      proofreader: { description: "Correction orthographique, grammaticale et stylistique", write: true, category: "Docs" },
-      translator:  { description: "Traduction et localisation multilingue", write: true, category: "Docs" },
-      summarizer:  { description: "Résumés et synthèses condensées", write: true, category: "Docs" },
-      planner:     { description: "Plans et structures de documents", write: false, category: "Docs" },
-    };
-
+  private buildFilteredAgentsPrompt(allowedRoles: AgentRole[], _renderOpts: any): string {
     const lines: string[] = [];
     lines.push("# Système Multi-Agents");
     lines.push("");
@@ -238,7 +199,7 @@ export class SystemPromptBuilder {
     lines.push("| Rôle | Description | Écriture |");
     lines.push("|------|-------------|----------|");
     for (const role of allowedRoles) {
-      const info = ALL_ROLES[role];
+      const info = AGENT_ROLES_INFO[role];
       if (info) {
         const writeCol = info.write ? "✅ OUI" : "❌ Lecture seule";
         lines.push(`| **${role}** | ${info.description} | ${writeCol} |`);
@@ -279,22 +240,13 @@ export class SystemPromptBuilder {
     const parts: string[] = [];
 
     if (config.language && config.language !== "fr") {
-      const langMap: Record<string, string> = {
-        en: "Respond exclusively in English.",
-        es: "Respond exclusively in Spanish.",
-        de: "Respond exclusively in German.",
-        pt: "Respond exclusively in Portuguese.",
-      };
-      if (langMap[config.language]) parts.push(langMap[config.language]);
+      const langInstructions = LANG_INSTRUCTIONS_FR[config.language];
+      if (langInstructions) parts.push(langInstructions);
     }
 
     if (config.responseStyle) {
-      const styleMap: Record<string, string> = {
-        concise: "Sois ultra-concis. 1 à 3 phrases sauf demande explicite.",
-        balanced: "Adapte la longueur à la complexité.",
-        detailed: "Réponses détaillées et structurées avec listes et exemples.",
-      };
-      if (styleMap[config.responseStyle]) parts.push(styleMap[config.responseStyle]);
+      const styleInstructions = STYLE_INSTRUCTIONS_FR[config.responseStyle];
+      if (styleInstructions) parts.push(styleInstructions);
     }
 
     return parts.length > 0 ? `## Instructions de communication\n\n${parts.join("\n")}` : "";
