@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect, useRef, memo } from 'react';
+import { motion } from 'framer-motion';
+
 import {
   LoaderCircle,
   Hash,
@@ -188,7 +190,11 @@ export const StatusBar = memo(function StatusBar({
             className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover,rgba(128,128,128,0.12))]"
             title={sandboxActive ? 'Sandbox actif' : 'Sandbox inactif'}
           >
-            <div className={`w-2 h-2 rounded-full ${sandboxActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+              <motion.div 
+                className={`w-2 h-2 rounded-full ${sandboxActive ? 'bg-emerald-500' : 'bg-gray-400'}`}
+                animate={{ scale: sandboxActive ? [1, 1.2, 1] : 1 }}
+                transition={{ type: 'spring', bounce: 0.5, duration: 0.4 }}
+              />
             <span style={{ color: sandboxActive ? 'var(--color-success, #059669)' : 'var(--text-muted)' }} className="font-medium">
               {sandboxLabel}
             </span>
@@ -214,7 +220,7 @@ export const StatusBar = memo(function StatusBar({
             </span>
           </button>
 
-          {/* MCP dot */}
+              
           <button
             type="button"
             onClick={onToggleMcp}
@@ -289,13 +295,17 @@ export const StatusBar = memo(function StatusBar({
                 </>
               ) : (
                 <>
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <motion.div 
+                className={`w-2 h-2 rounded-full ${dirty ? "bg-amber-500" : "bg-emerald-500"}`}
+                animate={{ opacity: dirty ? [1, 0.5, 1] : 1 }}
+                transition={dirty ? { repeat: Infinity, duration: 1.5 } : { duration: 0.3 }}
+              />
                   <span style={{ color: 'var(--color-success, #059669)' }}>Sauvé</span>
                 </>
               )}
             </span>
           )}
-
+              
           {/* Séparateur */}
           <div className="w-px h-4 bg-[var(--border-base)] opacity-40" />
 
@@ -324,7 +334,7 @@ export const StatusBar = memo(function StatusBar({
           <div className="w-px h-4 bg-[var(--border-base)] opacity-40" />
 
           {/* Édition */}
-          <div className="flex items-center gap-2 font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>
+          {/* <div className="flex items-center gap-2 font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>
             <span>{encoding}</span>
             <span>LF</span>
             {typeof line === 'number' && typeof column === 'number' && (
@@ -336,7 +346,7 @@ export const StatusBar = memo(function StatusBar({
                 Ln {line}, Col {column}
               </button>
             )}
-          </div>
+          </div> */}
 
           {/* Séparateur */}
           <div className="w-px h-4 bg-[var(--border-base)] opacity-40" />

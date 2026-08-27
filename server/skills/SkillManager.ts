@@ -32,6 +32,8 @@ const TOOL_KEYWORDS: Record<string, string[]> = {
   richDocument: ['tableau', 'table', 'graphique', 'graph', 'chart', 'courbe', 'curve', 'camembert', 'pie', 'barres', 'bar', 'fiche', 'card', 'liste', 'list', 'visualiser', 'visualize', 'afficher', 'display', 'données', 'data', 'statistiques', 'stats', 'rapport', 'report', 'dashboard', 'kpi', 'indicateur', 'indicator', 'aire', 'area', 'document riche', 'rich document', 'présenter', 'present'],
   aiStudioDirectives: ['directive', 'directives', 'studio', 'ai studio', 'build', 'comportement', 'behavior', 'technique', 'technical', 'conception', 'design', 'tailwind', 'iframe', 'accessibilité', 'accessibility', 'intégration', 'integration', 'oauth', 'api key', 'port 3000', 'styling', 'enum', 'import'],
   project: ['projet', 'project', 'créer', 'create', 'nouveau projet', 'new project', 'scaffold', 'scaffolding', 'template', 'react', 'next', 'vite', 'react router', 'initialiser', 'init', 'bootstrap', 'starter', 'boilerplate'],
+  custom_skills_proxy: ['skill', 'custom skill', 'compétence', 'outil perso', 'custom', 'mon skill', 'mes skills', 'skill perso', 'skill personnalisé', 'outil personnalisé', 'custom tool', 'user skill', 'utilisateur'],
+  custom_skills_management: ['créer skill', 'create skill', 'ajouter skill', 'add skill', 'supprimer skill', 'delete skill', 'modifier skill', 'update skill', 'lister skills', 'list skills', 'gérer skills', 'manage skills', 'custom skill management'],
 };
 
 // ─── Découverte Dynamique des Skills (Lazy Loading) ──────────────────────────
@@ -819,6 +821,8 @@ Analyse la situation et propose un patch de remplacement COMPLET pour ce fichier
       'browser',
       'system',
       'verify',
+      'custom_skills_proxy',
+      'custom_skills_management',
     ]);
 
     const RELEVANCE_THRESHOLD = 3;
