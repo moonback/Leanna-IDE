@@ -1044,37 +1044,37 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
             )}
           </div>
 
-          {/* Bouton principal — Rapport complet (ouvre le modal) */}
+          {/* Bouton principal — Rapport complet (ouvre le modal) — Plus compact */}
           <button
             ref={reportModalTriggerRef}
             onClick={openReportModal}
             disabled={generating || sources.length === 0}
-            className="w-full flex items-center gap-3 p-3.5 rounded-lg border-2 transition-all disabled:opacity-40 active:scale-[0.97] hover:shadow-md hover:-translate-y-0.5"
+            className="w-full flex items-center gap-2.5 p-2.5 rounded-lg border transition-all disabled:opacity-40 active:scale-[0.98] hover:shadow-sm"
             style={{
-              borderColor: '#dc262640',
+              borderColor: '#dc262630',
               backgroundColor: '#dc262608',
-              boxShadow: '0 2px 12px #dc262610',
             }}
+            title="Choisir un type de rapport • Suggestions IA incluses"
           >
             <div
-              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: '#dc262615', border: '1px solid #dc262630' }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: '#dc262612', border: '1px solid #dc262625' }}
             >
-              <FileBarChart className="w-5 h-5" style={{ color: '#dc2626' }} />
+              <FileBarChart className="w-4 h-4" style={{ color: '#dc2626' }} />
             </div>
             <div className="min-w-0 flex-1 text-left">
-              <p className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>
-                📊 Rapport complet
+              <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Rapport complet
               </p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Choisir un type • Suggestions IA incluses
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Types avancés
               </p>
             </div>
-            <ArrowRight className="w-4 h-4 flex-shrink-0" style={{ color: '#dc2626' }} />
+            <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#dc2626' }} />
           </button>
 
-          {/* Types rapides — 2 par ligne */}
-          <div className="grid grid-cols-2 gap-1.5">
+          {/* Types rapides — 3 par ligne — Design compact et moderne */}
+          <div className="grid grid-cols-3 gap-1">
             {DOC_TYPES.filter(t => t.key !== 'full-report').map(({ key, label, icon: Icon, desc, color }) => {
               const isActive = generatingType === key;
               return (
@@ -1083,66 +1083,42 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   ref={key === 'infographic' ? infographicModalTriggerRef : undefined}
                   onClick={() => key === 'infographic' ? setShowInfographicModal(true) : handleGenerate(key)}
                   disabled={generating || sources.length === 0}
-                  // Micro-feedback directement piloté par le geste (hover/tap) : le
-                  // léger ressort ici est légitime, contrairement aux modals plus bas.
-                  whileHover={!generating && sources.length > 0 ? { y: -2, scale: 1.02 } : {}}
-                  whileTap={!generating && sources.length > 0 ? { scale: 0.97 } : {}}
+                  whileHover={!generating && sources.length > 0 ? { y: -1, scale: 1.01 } : {}}
+                  whileTap={!generating && sources.length > 0 ? { scale: 0.98 } : {}}
                   transition={reduceMotion ? { duration: 0.1 } : { type: 'spring', stiffness: 400, damping: 25 }}
-                  className={`notebook-studio-card group relative w-full flex items-center gap-2.5 p-2.5 text-left disabled:opacity-40 overflow-hidden ${isActive ? 'ring-2' : ''}`}
+                  className={`group relative w-full flex flex-col items-center gap-1 p-1.5 rounded-lg text-center disabled:opacity-40 transition-all duration-200 ${
+                    isActive ? 'ring-1' : 'hover:bg-white/5'
+                  }`}
                   style={{
+                    border: '1px solid',
                     borderColor: isActive ? color : 'var(--notebook-border)',
-                    backgroundColor: isActive ? `${color}10` : 'var(--notebook-card-bg)',
-                    boxShadow: isActive ? `0 0 16px ${color}25, 0 2px 8px ${color}10` : undefined,
+                    backgroundColor: isActive ? `${color}08` : 'var(--notebook-card-bg)',
                   }}
+                  title={desc}
                 >
-                  {/* Hover glow background */}
-                  <motion.div
-                    className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200"
-                    style={{ background: `radial-gradient(ellipse at 30% 50%, ${color}12 0%, transparent 70%)` }}
-                  />
-
-                  {/* Left color accent bar */}
-                  <motion.div
-                    className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                    style={{ backgroundColor: color }}
-                  />
-
-                  {/* Icon */}
-                  <motion.div
-                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200"
-                    style={{ backgroundColor: `${color}12`, border: `1px solid ${color}25` }}
-                    whileHover={{ backgroundColor: `${color}22`, scale: 1.08 }}
+                  {/* Icon — Plus grande et centrée */}
+                  <div
+                    className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all"
+                    style={{ backgroundColor: `${color}10`, border: `1px solid ${color}20` }}
                   >
                     {isActive ? (
-                      <Loader2 className="w-4 h-4 animate-spin" style={{ color }} />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color }} />
                     ) : (
-                      <Icon className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" style={{ color }} />
+                      <Icon className="w-4 h-4" style={{ color }} />
                     )}
-                  </motion.div>
-
-                  {/* Text */}
-                  <div className="min-w-0 flex-1 relative z-10">
-                    <p className="text-xs font-semibold leading-tight transition-colors duration-200" style={{ color: 'var(--text-primary)' }}>
-                      {label}
-                    </p>
-                    <p className="text-xs mt-0.5 leading-tight transition-colors duration-200" style={{ color: 'var(--text-dimmed)' }}>
-                      {desc}
-                    </p>
                   </div>
 
-                  {/* Arrow hint on hover */}
-                  <motion.div
-                    className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 -translate-x-1 group-hover:translate-x-0"
-                  >
-                    <ArrowRight className="w-3 h-3" style={{ color }} />
-                  </motion.div>
+                  {/* Label — Plus petit et centré */}
+                  <span className="text-[10px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                    {label}
+                  </span>
 
-                  {/* Active indicator */}
+                  {/* Active indicator — Bordure subtile */}
                   {isActive && (
                     <motion.div
                       layoutId="activeGenType"
-                      className="absolute inset-0 rounded-xl pointer-events-none"
-                      style={{ border: `2px solid ${color}`, opacity: 0.5 }}
+                      className="absolute inset-0 rounded-lg pointer-events-none"
+                      style={{ border: `1.5px solid ${color}`, opacity: 0.6 }}
                     />
                   )}
                 </motion.button>
