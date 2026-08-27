@@ -2,14 +2,16 @@
  * SourcePanel — Gestion des sources d'un notebook
  *
  * Upload multi-fichiers avec drag & drop, ingestion d'URLs, ajout de texte.
- * UI/UX améliorée avec meilleur feedback, cards plus riches, et animations fluides.
+ * UI/UX améliorée : hiérarchie plus claire, feedback immédiat, animations
+ * ressort cohérentes (damping fort par défaut, cf. apple-design), accessibilité.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Upload, Globe, FileText, Trash2, Loader2, Type, CheckCircle2, XCircle,
   Search, Eye, RefreshCw, Tag, ClipboardPaste, BarChart3, X, FolderCode,
+  CheckSquare, Square, Plus, Sparkles,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { SourcesSummaryCard } from './SourcesSummaryCard';
@@ -58,8 +60,13 @@ const TYPE_COLORS: Record<string, string> = {
 
 const ACCEPTED_EXTENSIONS = '.pdf,.txt,.md,.html,.docx,.doc,.rtf,.csv,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg';
 
+// Ressort par défaut : critically damped, pas de rebond — cf. apple-design (UI non gestuelle)
+const SPRING_UI = { type: 'spring' as const, bounce: 0, duration: 0.35 };
+const SPRING_SNAPPY = { type: 'spring' as const, bounce: 0, duration: 0.22 };
+
 export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, compact = false, onSelectSource, selectedSourceId }: Props) {
   const { success, error: toastError } = useToast();
+  const prefersReducedMotion = useReducedMotion();
   const [uploading, setUploading] = useState(false);
   const [showUrlForm, setShowUrlForm] = useState(false);
   const [showTextForm, setShowTextForm] = useState(false);
@@ -75,6 +82,8 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
   const [reindexingId, setReindexingId] = useState<string | null>(null);
   const [showClipboardForm, setShowClipboardForm] = useState(false);
   const [tagInput, setTagInput] = useState<{ sourceId: string; value: string } | null>(null);
+  const [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   // ─── Codebase import ──────────────────────────────────────────────────────
   const [showCodebaseForm, setShowCodebaseForm] = useState(false);
   const [codebaseTitle, setCodebaseTitle] = useState('');
@@ -83,6 +92,11 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
   const [codebaseIncludeConfig, setCodebaseIncludeConfig] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Ressort adapté au réglage d'accessibilité de l'utilisateur
+  const spring = prefersReducedMotion ? { duration: 0.15 } : SPRING_UI;
+  const springSnappy = prefersReducedMotion ? { duration: 0.12 } : SPRING_SNAPPY;
+  const tapScale = prefersReducedMotion ? {} : { whileTap: { scale: 0.96 } };
+
   // Report upload progress to parent
   useEffect(() => {
     if (!onUploadProgress) return;
@@ -90,14 +104,21 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
     onUploadProgress({ total: uploadQueue.length, done, active: uploading });
   }, [uploadQueue, uploading, onUploadProgress]);
 
+  // Réinitialise la demande de confirmation si l'utilisateur clique ailleurs
+  useEffect(() => {
+    if (!confirmDeleteAll) return;
+    const t = setTimeout(() => setConfirmDeleteAll(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirmDeleteAll]);
+
   // Filtered sources
-  const filteredSources = sources.filter(s => {
+  const filteredSources = useMemo(() => sources.filter(s => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return s.title.toLowerCase().includes(q) ||
       s.summary.toLowerCase().includes(q) ||
       s.keywords.some(k => k.toLowerCase().includes(q));
-  });
+  }), [sources, searchQuery]);
 
   // ─── Multi-file upload ──────────────────────────────────────────────────────
 
@@ -164,16 +185,31 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
   // ─── Drag & Drop ───────────────────────────────────────────────────────────
 
+  const dragCounter = useRef(0);
+
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); e.stopPropagation(); setDragOver(true);
+    e.preventDefault(); e.stopPropagation();
+  }, []);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    dragCounter.current += 1;
+    if (e.dataTransfer.types.includes('Files')) setDragOver(true);
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); e.stopPropagation(); setDragOver(false);
+    e.preventDefault(); e.stopPropagation();
+    dragCounter.current -= 1;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setDragOver(false);
+    }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); e.stopPropagation(); setDragOver(false);
+    e.preventDefault(); e.stopPropagation();
+    dragCounter.current = 0;
+    setDragOver(false);
     const droppedFiles = Array.from(e.dataTransfer.files);
     if (droppedFiles.length > 0) handleMultiUpload(droppedFiles);
   }, [handleMultiUpload]);
@@ -231,6 +267,59 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       onRefresh();
     } catch { toastError('Impossible de supprimer'); }
   }, [notebookId, success, toastError, onRefresh]);
+
+  const handleToggleSelect = useCallback((sourceId: string) => {
+    setSelectedSources(prev =>
+      prev.includes(sourceId) ? prev.filter(id => id !== sourceId) : [...prev, sourceId]
+    );
+  }, []);
+
+  const allFilteredSelected = filteredSources.length > 0 && filteredSources.every(s => selectedSources.includes(s.id));
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedSources(prev => {
+      const allSelected = filteredSources.length > 0 && filteredSources.every(s => prev.includes(s.id));
+      return allSelected ? [] : filteredSources.map(s => s.id);
+    });
+  }, [filteredSources]);
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (selectedSources.length === 0) return;
+
+    setUploading(true);
+    try {
+      for (const sourceId of selectedSources) {
+        await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}`, { method: 'DELETE' });
+      }
+      success(`${selectedSources.length} source${selectedSources.length > 1 ? 's' : ''} supprimée${selectedSources.length > 1 ? 's' : ''}`);
+      setSelectedSources([]);
+      onRefresh();
+    } catch {
+      toastError('Impossible de supprimer les sources sélectionnées');
+    } finally {
+      setUploading(false);
+    }
+  }, [selectedSources, notebookId, success, toastError, onRefresh]);
+
+  const handleDeleteAll = useCallback(async () => {
+    if (sources.length === 0) return;
+    if (!confirmDeleteAll) { setConfirmDeleteAll(true); return; }
+
+    setConfirmDeleteAll(false);
+    setUploading(true);
+    try {
+      for (const source of sources) {
+        await fetch(`/api/notebooks/${notebookId}/sources/${source.id}`, { method: 'DELETE' });
+      }
+      success(`Toutes les ${sources.length} sources ont été supprimées`);
+      setSelectedSources([]);
+      onRefresh();
+    } catch {
+      toastError('Impossible de supprimer toutes les sources');
+    } finally {
+      setUploading(false);
+    }
+  }, [sources, notebookId, success, toastError, onRefresh, confirmDeleteAll]);
 
   // ─── Preview source content ────────────────────────────────────────────────
 
@@ -371,6 +460,8 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
   // Stats
   const totalWords = sources.reduce((acc, s) => acc + s.wordCount, 0);
   const totalChunks = sources.reduce((acc, s) => acc + s.chunksCount, 0);
+  const uploadDone = uploadQueue.filter(f => f.status === 'success').length;
+  const uploadErrors = uploadQueue.filter(f => f.status === 'error').length;
 
   // Hash des sources pour détecter les changements (ajout/suppression)
   const sourcesHash = useMemo(
@@ -383,45 +474,117 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       <div className="h-full min-h-0 flex flex-col overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-4 py-4 flex-shrink-0 border-b border-[var(--notebook-border)]">
-          <div>
-            <p className="text-xs uppercase tracking-wider font-semibold" style={{ color: 'var(--text-dimmed)' }}>Sources</p>
-            <h2 className="text-sm font-semibold text-[var(--text-primary)]">{sources.length} document{sources.length > 1 ? 's' : ''}</h2>
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase font-semibold" style={{ color: 'var(--text-dimmed)', letterSpacing: '0.08em' }}>Sources</p>
+            <h2 className="text-sm font-semibold truncate text-[var(--text-primary)]">
+              {sources.length} document{sources.length !== 1 ? 's' : ''}
+            </h2>
           </div>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105"
-            style={{
-              backgroundColor: 'var(--accent-primary)',
-              color: '#fff',
-            }}
-          >
-            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-            <span>Ajouter</span>
-          </button>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <AnimatePresence mode="wait" initial={false}>
+              {selectedSources.length > 0 ? (
+                <motion.div
+                  key="selection-actions"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={springSnappy}
+                  className="flex items-center gap-1.5"
+                >
+                  <motion.button
+                    {...tapScale}
+                    type="button"
+                    onClick={handleSelectAll}
+                    disabled={uploading}
+                    className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)] transition-colors disabled:opacity-50"
+                    title={allFilteredSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+                    aria-label={allFilteredSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+                  >
+                    <CheckSquare className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
+                  </motion.button>
+                  <motion.button
+                    {...tapScale}
+                    type="button"
+                    onClick={handleDeleteSelected}
+                    disabled={uploading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-50"
+                    style={{ backgroundColor: 'var(--red-500)', color: '#ed0a0a' }}
+                  >
+                    {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    <span>Supprimer ({selectedSources.length})</span>
+                  </motion.button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="default-actions"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={springSnappy}
+                  className="flex items-center gap-1.5"
+                >
+                  {sources.length > 0 && (
+                    <motion.button
+                      {...tapScale}
+                      type="button"
+                      onClick={handleDeleteAll}
+                      disabled={uploading}
+                      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      style={confirmDeleteAll ? { backgroundColor: 'var(--red-500)' } : {}}
+                      onMouseEnter={(e) => { if (!confirmDeleteAll) (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(239,68,68,0.1)'; }}
+                      onMouseLeave={(e) => { if (!confirmDeleteAll) (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+                      title={confirmDeleteAll ? 'Cliquez pour confirmer' : 'Supprimer toutes les sources'}
+                      aria-label="Supprimer toutes les sources"
+                    >
+                      <Trash2 className="h-4 w-4" style={{ color: confirmDeleteAll ? '#14c929' : '#f87171' }} />
+                    </motion.button>
+                  )}
+                  <motion.button
+                    {...tapScale}
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium disabled:opacity-70"
+                    style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                  >
+                    {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                    <span>Ajouter</span>
+                  </motion.button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           <input ref={fileInputRef} type="file" accept={ACCEPTED_EXTENSIONS} multiple onChange={handleFileInputChange} className="hidden" />
         </div>
 
         {/* Search */}
-        <div className="px-3 py-2.5 flex-shrink-0">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-full transition-all"
-            style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)' }}>
-            <Search className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher..."
-              className="flex-1 bg-transparent outline-none text-xs"
-              style={{ color: 'var(--text-primary)' }}
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="p-0.5 rounded hover:bg-white/10">
-                <X className="h-3 w-3" style={{ color: 'var(--text-dimmed)' }} />
-              </button>
-            )}
+        {sources.length > 0 && (
+          <div className="px-3 py-2.5 flex-shrink-0">
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-full transition-colors focus-within:ring-2"
+              style={{
+                backgroundColor: 'var(--notebook-surface-muted)',
+                border: '1px solid var(--notebook-border)',
+                ...( { '--tw-ring-color': 'var(--accent-primary)' } as React.CSSProperties),
+              }}
+            >
+              <Search className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher..."
+                aria-label="Rechercher dans les sources"
+                className="flex-1 bg-transparent outline-none text-xs min-w-0"
+                style={{ color: 'var(--text-primary)' }}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="p-0.5 rounded hover:bg-white/10 flex-shrink-0" aria-label="Effacer la recherche">
+                  <X className="h-3 w-3" style={{ color: 'var(--text-dimmed)' }} />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Source list */}
         <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-2 pb-4 max-h-full">
@@ -434,66 +597,116 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 <FileText className="h-5 w-5" style={{ color: 'var(--text-dimmed)' }} />
               </div>
               <p className="text-sm font-medium text-[var(--text-primary)]">Aucune source</p>
-              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed max-w-[220px]">
                 Ajoutez des documents pour alimenter l'IA.
               </p>
+              <motion.button
+                {...tapScale}
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 mt-1 px-3.5 py-2 rounded-full text-xs font-medium"
+                style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Ajouter une source
+              </motion.button>
             </div>
           ) : filteredSources.length === 0 ? (
-            <p className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Aucun résultat pour "{searchQuery}"</p>
+            <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+              <Search className="h-4 w-4" style={{ color: 'var(--text-dimmed)' }} />
+              <p className="text-xs text-[var(--text-muted)]">Aucun résultat pour « {searchQuery} »</p>
+            </div>
           ) : (
             <div className="space-y-1 pt-1">
-              {filteredSources.map((source) => (
-                <div
-                  key={source.id}
-                  className="group flex items-center gap-2.5 px-3 py-2.5 rounded-full cursor-pointer transition-all"
-                  data-active={selectedSourceId === source.id}
-                  style={{
-                    backgroundColor: selectedSourceId === source.id ? 'var(--accent-subtle, rgba(59,130,246,0.08))' : 'transparent',
-                    border: selectedSourceId === source.id ? '1px solid var(--accent-primary)' : '1px solid transparent',
-                  }}
-                  onClick={() => onSelectSource?.(source.id)}
-                  onMouseEnter={(e) => {
-                    if (selectedSourceId !== source.id) {
-                      (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--notebook-surface-muted)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedSourceId !== source.id) {
-                      (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-                    }
-                  }}
-                >
-                  {/* File type icon */}
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm"
-                    style={{
-                      backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}12`,
-                    }}
-                  >
-                    {TYPE_ICONS[source.type] || '📎'}
-                  </div>
+              <AnimatePresence initial={false}>
+                {filteredSources.map((source) => {
+                  const isSelected = selectedSources.includes(source.id);
+                  const isSingleSelected = selectedSourceId === source.id;
+                  const hasSelection = selectedSources.length > 0;
 
-                  {/* Text content */}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
-                      {source.title}
-                    </p>
-                    <p className="mt-0.5 truncate text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
-                      {source.type} · {source.wordCount?.toLocaleString()} mots
-                    </p>
-                  </div>
+                  return (
+                    <motion.div
+                      key={source.id}
+                      layout={!prefersReducedMotion}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={spring}
+                      className="group flex items-center gap-2 px-2.5 py-2.5 rounded-full cursor-pointer"
+                      data-active={isSingleSelected || isSelected}
+                      style={{
+                        backgroundColor: isSingleSelected
+                          ? 'var(--accent-subtle, rgba(59,130,246,0.08))'
+                          : isSelected
+                            ? 'rgba(59,130,246,0.15)'
+                            : 'transparent',
+                        border: (isSingleSelected || isSelected) ? '1px solid var(--accent-primary)' : '1px solid transparent',
+                        transition: 'background-color 120ms ease, border-color 120ms ease',
+                      }}
+                      onClick={() => {
+                        if (hasSelection) {
+                          handleToggleSelect(source.id);
+                        } else {
+                          onSelectSource?.(source.id);
+                        }
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSingleSelected && !isSelected) {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--notebook-surface-muted)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSingleSelected && !isSelected) {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      {/* Selection checkbox — visible au survol, ou toujours si une sélection est active */}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleToggleSelect(source.id); }}
+                        className={`flex-shrink-0 p-0.5 rounded-lg hover:bg-white/10 transition-opacity ${hasSelection || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        aria-label={isSelected ? 'Désélectionner' : 'Sélectionner'}
+                      >
+                        {isSelected ? (
+                          <CheckSquare className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
+                        ) : (
+                          <Square className="h-4 w-4" style={{ color: 'var(--text-dimmed)' }} />
+                        )}
+                      </button>
 
-                  {/* Delete button on hover */}
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); handleDelete(source.id); }}
-                    className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/10 flex-shrink-0"
-                    title="Supprimer"
-                  >
-                    <Trash2 className="h-3 w-3 text-red-400" />
-                  </button>
-                </div>
-              ))}
+                      {/* File type icon */}
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm"
+                        style={{ backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}14` }}
+                      >
+                        {TYPE_ICONS[source.type] || '📎'}
+                      </div>
+
+                      {/* Text content */}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                          {source.title}
+                        </p>
+                        <p className="mt-0.5 truncate text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+                          {source.type} · {source.wordCount?.toLocaleString()} mots
+                        </p>
+                      </div>
+
+                      {/* Delete button on hover */}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDelete(source.id); }}
+                        className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 flex-shrink-0"
+                        title="Supprimer"
+                        aria-label={`Supprimer ${source.title}`}
+                      >
+                        <Trash2 className="h-3 w-3 text-red-400" />
+                      </button>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
             </div>
           )}
         </div>
@@ -514,6 +727,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
     <div
       className="h-full overflow-y-auto custom-scrollbar p-6 lg:p-8 space-y-5 relative"
       onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
@@ -524,16 +738,23 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-2xl"
+            transition={springSnappy}
+            className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-2xl pointer-events-none"
             style={{
               backgroundColor: 'var(--notebook-accent-surface)',
               border: '2.5px dashed var(--notebook-accent)',
               backdropFilter: 'blur(4px)',
             }}
           >
-            <div className="notebook-empty-state-icon" style={{ width: 64, height: 64 }}>
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              transition={spring}
+              className="notebook-empty-state-icon"
+              style={{ width: 64, height: 64 }}
+            >
               <Upload className="w-7 h-7" />
-            </div>
+            </motion.div>
             <p className="text-sm font-medium" style={{ color: 'var(--notebook-accent)' }}>
               Déposez vos fichiers ici
             </p>
@@ -544,6 +765,20 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         )}
       </AnimatePresence>
 
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+            Sources
+          </h1>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            {sources.length === 0
+              ? 'Aucun document pour le moment'
+              : `${sources.length} source${sources.length !== 1 ? 's' : ''} · ${totalWords.toLocaleString()} mots · ${totalChunks} chunks`}
+          </p>
+        </div>
+      </div>
+
       {/* Upload progress queue */}
       <AnimatePresence>
         {uploadQueue.length > 0 && (
@@ -551,6 +786,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
+            transition={spring}
             className="overflow-hidden"
           >
             <div
@@ -558,9 +794,14 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
               style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--accent-primary)' }}
             >
               <div className="flex items-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+                {uploadDone === uploadQueue.length ? (
+                  <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success, #22c55e)' }} />
+                ) : (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+                )}
                 <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Upload {uploadQueue.filter(f => f.status === 'success').length}/{uploadQueue.length}
+                  Upload {uploadDone}/{uploadQueue.length}
+                  {uploadErrors > 0 && <span style={{ color: 'var(--color-error, #ef4444)' }}> · {uploadErrors} erreur{uploadErrors > 1 ? 's' : ''}</span>}
                 </p>
               </div>
               {/* Progress bar */}
@@ -569,22 +810,24 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                   className="h-full rounded-full"
                   style={{ backgroundColor: 'var(--accent-primary)' }}
                   initial={{ width: '0%' }}
-                  animate={{ width: `${(uploadQueue.filter(f => f.status === 'success').length / uploadQueue.length) * 100}%` }}
-                  transition={{ duration: 0.3 }}
+                  animate={{ width: `${(uploadDone / uploadQueue.length) * 100}%` }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
                 />
               </div>
-              {uploadQueue.map((f, i) => (
-                <div key={i} className="flex items-center gap-2 text-[11px]">
-                  {f.status === 'pending' && <Loader2 className="w-3 h-3 opacity-30" />}
-                  {f.status === 'uploading' && <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--accent-primary)' }} />}
-                  {f.status === 'success' && <CheckCircle2 className="w-3 h-3" style={{ color: 'var(--color-success, #22c55e)' }} />}
-                  {f.status === 'error' && <XCircle className="w-3 h-3" style={{ color: 'var(--color-error, #ef4444)' }} />}
-                  <span className="truncate flex-1" style={{ color: f.status === 'error' ? 'var(--color-error, #ef4444)' : 'var(--text-primary)' }}>
-                    {f.name}
-                  </span>
-                  {f.error && <span className="text-xs opacity-60 truncate max-w-[150px]">{f.error}</span>}
-                </div>
-              ))}
+              <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+                {uploadQueue.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 text-[11px]">
+                    {f.status === 'pending' && <Loader2 className="w-3 h-3 opacity-30 flex-shrink-0" />}
+                    {f.status === 'uploading' && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
+                    {f.status === 'success' && <CheckCircle2 className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-success, #22c55e)' }} />}
+                    {f.status === 'error' && <XCircle className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-error, #ef4444)' }} />}
+                    <span className="truncate flex-1" style={{ color: f.status === 'error' ? 'var(--color-error, #ef4444)' : 'var(--text-primary)' }}>
+                      {f.name}
+                    </span>
+                    {f.error && <span className="text-xs opacity-60 truncate max-w-[150px]" title={f.error}>{f.error}</span>}
+                  </div>
+                ))}
+              </div>
             </div>
           </motion.div>
         )}
@@ -592,7 +835,8 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
       {/* Actions row */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button
+        <motion.button
+          {...tapScale}
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
           className="notebook-fab disabled:opacity-50"
@@ -600,7 +844,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         >
           {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
           Uploader
-        </button>
+        </motion.button>
         <input
           ref={fileInputRef}
           type="file"
@@ -610,34 +854,38 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
           className="hidden"
         />
 
-        <button
-          onClick={() => { setShowUrlForm(!showUrlForm); setShowTextForm(false); }}
+        <motion.button
+          {...tapScale}
+          onClick={() => { setShowUrlForm(!showUrlForm); setShowTextForm(false); setShowCodebaseForm(false); }}
           className={`notebook-chip ${showUrlForm ? 'notebook-chip--active' : ''}`}
           style={showUrlForm ? { borderColor: 'var(--notebook-accent)', color: 'var(--notebook-accent)', background: 'var(--notebook-accent-surface)' } : {}}
         >
           <Globe className="w-3.5 h-3.5" />
           URL
-        </button>
+        </motion.button>
 
-        <button
-          onClick={() => { setShowTextForm(!showTextForm); setShowUrlForm(false); }}
+        <motion.button
+          {...tapScale}
+          onClick={() => { setShowTextForm(!showTextForm); setShowUrlForm(false); setShowCodebaseForm(false); }}
           className={`notebook-chip ${showTextForm ? 'notebook-chip--active' : ''}`}
           style={showTextForm ? { borderColor: 'var(--notebook-accent)', color: 'var(--notebook-accent)', background: 'var(--notebook-accent-surface)' } : {}}
         >
           <Type className="w-3.5 h-3.5" />
           Texte
-        </button>
+        </motion.button>
 
-        <button
+        <motion.button
+          {...tapScale}
           onClick={handleClipboardPaste}
           className="notebook-chip"
           title="Coller depuis le presse-papier"
         >
           <ClipboardPaste className="w-3.5 h-3.5" />
           Coller
-        </button>
+        </motion.button>
 
-        <button
+        <motion.button
+          {...tapScale}
           onClick={() => { setShowCodebaseForm(!showCodebaseForm); setShowUrlForm(false); setShowTextForm(false); }}
           className={`notebook-chip ${showCodebaseForm ? 'notebook-chip--active' : ''}`}
           style={showCodebaseForm ? { borderColor: 'var(--notebook-accent)', color: 'var(--notebook-accent)', background: 'var(--notebook-accent-surface)' } : {}}
@@ -645,15 +893,58 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         >
           <FolderCode className="w-3.5 h-3.5" />
           Codebase
-        </button>
+        </motion.button>
 
-        {/* Stats */}
-        <div className="ml-auto flex items-center gap-3 text-xs" style={{ color: 'var(--text-dimmed)' }}>
-          <span>{sources.length} source{sources.length !== 1 ? 's' : ''}</span>
-          {totalWords > 0 && <span>{totalWords.toLocaleString()} mots</span>}
-          {totalChunks > 0 && <span>{totalChunks} chunks</span>}
-        </div>
+        {/* Sélection en masse */}
+        {sources.length > 1 && (
+          <motion.button
+            {...tapScale}
+            onClick={handleSelectAll}
+            className="notebook-chip ml-auto sm:ml-0"
+            title={allFilteredSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+          >
+            {allFilteredSelected ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+            {selectedSources.length > 0 ? `${selectedSources.length} sélectionnée${selectedSources.length > 1 ? 's' : ''}` : 'Sélectionner'}
+          </motion.button>
+        )}
       </div>
+
+      {/* Barre d'actions groupées */}
+      <AnimatePresence>
+        {selectedSources.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={springSnappy}
+            className="overflow-hidden"
+          >
+            <div
+              className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl"
+              style={{ backgroundColor: 'var(--accent-subtle, rgba(59,130,246,0.08))', border: '1px solid var(--accent-primary)' }}
+            >
+              <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                {selectedSources.length} source{selectedSources.length > 1 ? 's' : ''} sélectionnée{selectedSources.length > 1 ? 's' : ''}
+              </span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setSelectedSources([])} className="notebook-chip" style={{ padding: '5px 10px', fontSize: '12px' }}>
+                  Annuler
+                </button>
+                <motion.button
+                  {...tapScale}
+                  onClick={handleDeleteSelected}
+                  disabled={uploading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--red-500)', color: '#df0a0a' }}
+                >
+                  {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  Supprimer
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Search (when >3 sources) */}
       {sources.length > 3 && (
@@ -664,7 +955,13 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Rechercher dans les sources..."
+            aria-label="Rechercher dans les sources"
           />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} aria-label="Effacer la recherche" className="p-0.5 rounded hover:bg-white/10">
+              <X className="h-3.5 w-3.5" style={{ color: 'var(--text-dimmed)' }} />
+            </button>
+          )}
         </div>
       )}
 
@@ -675,6 +972,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
+            transition={spring}
             className="overflow-hidden"
           >
             <div className="p-5 rounded-2xl border space-y-3"
@@ -690,18 +988,19 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 onKeyDown={e => e.key === 'Enter' && handleUrlIngest()}
                 placeholder="https://example.com/article..."
                 autoFocus
-                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-shadow focus:ring-2"
                 style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
               />
               <div className="flex gap-2">
-                <button
+                <motion.button
+                  {...tapScale}
                   onClick={handleUrlIngest}
                   disabled={!url.trim() || uploading}
                   className="notebook-fab disabled:opacity-40"
                   style={{ padding: '8px 16px', fontSize: '13px' }}
                 >
-                  {uploading ? 'Ingestion...' : 'Importer'}
-                </button>
+                  {uploading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Ingestion…</> : 'Importer'}
+                </motion.button>
                 <button
                   onClick={() => { setShowUrlForm(false); setUrl(''); }}
                   className="notebook-chip"
@@ -721,6 +1020,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
+            transition={spring}
             className="overflow-hidden"
           >
             <div className="p-5 rounded-2xl border space-y-3"
@@ -734,7 +1034,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 value={textTitle}
                 onChange={e => setTextTitle(e.target.value)}
                 placeholder="Titre (optionnel)"
-                className="w-full px-4 py-2.5 rounded-full text-sm outline-none"
+                className="w-full px-4 py-2.5 rounded-full text-sm outline-none transition-shadow focus:ring-2"
                 style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
               />
               <div className="relative">
@@ -743,24 +1043,25 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                   onChange={e => setTextContent(e.target.value)}
                   placeholder="Collez votre texte ici..."
                   rows={6}
-                  className="w-full px-4 py-3 rounded-xl text-sm outline-none resize-none"
+                  className="w-full px-4 py-3 rounded-xl text-sm outline-none resize-none transition-shadow focus:ring-2"
                   style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
                 />
                 {textContent && (
                   <span className="absolute bottom-2 right-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                    ~{textContent.split(/\s+/).length} mots
+                    ~{textContent.split(/\s+/).filter(Boolean).length} mots
                   </span>
                 )}
               </div>
               <div className="flex gap-2">
-                <button
+                <motion.button
+                  {...tapScale}
                   onClick={handleTextAdd}
                   disabled={!textContent.trim() || uploading}
                   className="notebook-fab disabled:opacity-40"
                   style={{ padding: '8px 16px', fontSize: '13px' }}
                 >
-                  {uploading ? 'Ajout...' : 'Ajouter'}
-                </button>
+                  {uploading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Ajout…</> : 'Ajouter'}
+                </motion.button>
                 <button
                   onClick={() => { setShowTextForm(false); setTextTitle(''); setTextContent(''); }}
                   className="notebook-chip"
@@ -780,6 +1081,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
+            transition={spring}
             className="overflow-hidden"
           >
             <div className="p-5 rounded-2xl border space-y-4"
@@ -799,7 +1101,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 value={codebaseTitle}
                 onChange={e => setCodebaseTitle(e.target.value)}
                 placeholder="Titre de la source (optionnel)"
-                className="w-full px-4 py-2.5 rounded-full text-sm outline-none"
+                className="w-full px-4 py-2.5 rounded-full text-sm outline-none transition-shadow focus:ring-2"
                 style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
               />
 
@@ -813,13 +1115,13 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                   value={codebaseExtensions}
                   onChange={e => setCodebaseExtensions(e.target.value)}
                   placeholder=".ts .tsx .js .py .md ..."
-                  className="w-full px-4 py-2.5 rounded-full text-sm outline-none font-mono"
+                  className="w-full px-4 py-2.5 rounded-full text-sm outline-none font-mono transition-shadow focus:ring-2"
                   style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
                 />
               </div>
 
               {/* Options */}
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-6 flex-wrap">
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                     Taille max par fichier
@@ -831,7 +1133,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                       max={500}
                       value={codebaseMaxSizeKb}
                       onChange={e => setCodebaseMaxSizeKb(Number(e.target.value))}
-                      className="w-20 px-3 py-2 rounded-full text-sm outline-none text-center"
+                      className="w-20 px-3 py-2 rounded-full text-sm outline-none text-center transition-shadow focus:ring-2"
                       style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
                     />
                     <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Ko</span>
@@ -854,7 +1156,8 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
               {/* Actions */}
               <div className="flex gap-2">
-                <button
+                <motion.button
+                  {...tapScale}
                   onClick={handleCodebaseImport}
                   disabled={uploading}
                   className="notebook-fab disabled:opacity-40"
@@ -864,7 +1167,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                     ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Scan en cours…</>
                     : <><FolderCode className="w-3.5 h-3.5" /> Importer le codebase</>
                   }
-                </button>
+                </motion.button>
                 <button
                   onClick={() => { setShowCodebaseForm(false); setCodebaseTitle(''); setCodebaseExtensions(''); }}
                   className="notebook-chip"
@@ -891,7 +1194,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
           style={{ borderColor: dragOver ? 'var(--notebook-accent)' : 'var(--notebook-border)', padding: '48px 24px' }}
         >
           <div className="notebook-empty-state-icon" style={{ width: 56, height: 56 }}>
-            <FileText className="w-6 h-6" />
+            <Sparkles className="w-6 h-6" />
           </div>
           <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
             Ajoutez vos premières sources
@@ -899,7 +1202,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
           <p className="text-xs max-w-sm" style={{ color: 'var(--text-muted)' }}>
             Glissez-déposez des fichiers, ou utilisez les boutons ci-dessus pour importer.
           </p>
-          <div className="flex flex-wrap gap-2 mt-2">
+          <div className="flex flex-wrap gap-2 mt-2 justify-center">
             {['PDF', 'URL', 'Texte', 'DOCX', 'Markdown'].map(t => (
               <span key={t} className="notebook-chip" style={{ fontSize: '11px', padding: '4px 10px' }}>{t}</span>
             ))}
@@ -908,166 +1211,198 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       ) : (
         <div className="space-y-3">
           <AnimatePresence initial={false}>
-            {filteredSources.map((source) => (
-              <motion.div
-                key={source.id}
-                layout
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="group p-4 rounded-2xl border flex gap-3 transition-all"
-                style={{ backgroundColor: 'var(--notebook-card-bg)', borderColor: 'var(--notebook-border)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--notebook-accent)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--notebook-border)'; }}
-              >
-                {/* Type icon with color indicator */}
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-xl flex-shrink-0">{TYPE_ICONS[source.type] || '📎'}</span>
-                  <div
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ backgroundColor: TYPE_COLORS[source.type] || 'var(--text-dimmed)' }}
-                  />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                      {source.title}
-                    </p>
-                    <span
-                      className="text-xs px-1.5 py-0.5 rounded-full font-bold uppercase flex-shrink-0"
-                      style={{ backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}15`, color: TYPE_COLORS[source.type] || 'var(--text-dimmed)' }}
-                    >
-                      {source.type}
-                    </span>
-                  </div>
-
-                  <p className="text-[11px] mt-1 leading-relaxed line-clamp-2" style={{ color: 'var(--text-muted)' }}>
-                    {source.summary}
-                  </p>
-
-                  {/* Expanded content preview */}
-                  <AnimatePresence>
-                    {expandedSource === source.id && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div
-                          className="mt-2 p-3 rounded-xl text-[11px] leading-relaxed max-h-60 overflow-y-auto custom-scrollbar whitespace-pre-wrap"
-                          style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-secondary)' }}
-                        >
-                          {loadingPreview ? (
-                            <div className="flex items-center gap-2" style={{ color: 'var(--text-dimmed)' }}>
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              <span>Chargement du contenu...</span>
-                            </div>
-                          ) : (
-                            sourcePreview[source.id] || source.summary
-                          )}
-                        </div>
-                      </motion.div>
+            {filteredSources.map((source) => {
+              const isSelected = selectedSources.includes(source.id);
+              return (
+                <motion.div
+                  key={source.id}
+                  layout={!prefersReducedMotion}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={spring}
+                  className="group p-4 rounded-2xl border flex gap-3"
+                  style={{
+                    backgroundColor: 'var(--notebook-card-bg)',
+                    borderColor: isSelected ? 'var(--accent-primary)' : 'var(--notebook-border)',
+                    boxShadow: isSelected ? '0 0 0 1px var(--accent-primary)' : 'none',
+                    transition: 'border-color 150ms ease, box-shadow 150ms ease',
+                  }}
+                  onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.borderColor = 'var(--notebook-accent)'; }}
+                  onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.borderColor = 'var(--notebook-border)'; }}
+                >
+                  {/* Checkbox de sélection */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSelect(source.id)}
+                    className={`flex-shrink-0 self-start mt-0.5 transition-opacity ${isSelected || selectedSources.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    aria-label={isSelected ? 'Désélectionner' : 'Sélectionner'}
+                  >
+                    {isSelected ? (
+                      <CheckSquare className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                    ) : (
+                      <Square className="w-4 h-4" style={{ color: 'var(--text-dimmed)' }} />
                     )}
-                  </AnimatePresence>
+                  </button>
 
-                  {/* Meta row */}
-                  <div className="flex items-center gap-3 mt-2 flex-wrap">
-                    <span className="text-xs font-medium" style={{ color: 'var(--text-dimmed)' }}>
-                      {source.wordCount.toLocaleString()} mots
-                    </span>
-                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
-                      {source.chunksCount} chunks
-                    </span>
-                    <span className="text-xs uppercase font-medium" style={{ color: 'var(--text-dimmed)' }}>
-                      {source.language}
-                    </span>
+                  {/* Type icon with color indicator */}
+                  <div
+                    className="flex flex-col items-center gap-1 flex-shrink-0 w-9 h-9 rounded-full justify-center"
+                    style={{ backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}14` }}
+                  >
+                    <span className="text-base leading-none">{TYPE_ICONS[source.type] || '📎'}</span>
                   </div>
 
-                  {/* Keywords + Tags */}
-                  {source.keywords.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {source.keywords.slice(0, 6).map((kw: string) => (
-                        <span
-                          key={kw}
-                          className="text-xs px-2 py-0.5 rounded-full font-medium cursor-pointer transition-all hover:line-through hover:opacity-50"
-                          style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)', border: '1px solid var(--border-base)' }}
-                          onClick={() => handleRemoveTag(source.id, kw)}
-                          title="Cliquer pour retirer"
-                        >
-                          {kw}
-                        </span>
-                      ))}
-                      {source.keywords.length > 6 && (
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ color: 'var(--text-dimmed)' }}>
-                          +{source.keywords.length - 6}
-                        </span>
-                      )}
-                      {/* Add tag inline */}
-                      {tagInput?.sourceId === source.id ? (
-                        <form
-                          onSubmit={(e) => { e.preventDefault(); handleAddTag(source.id, tagInput.value); }}
-                          className="inline-flex"
-                        >
-                          <input
-                            type="text"
-                            value={tagInput.value}
-                            onChange={(e) => setTagInput({ sourceId: source.id, value: e.target.value })}
-                            placeholder="tag..."
-                            autoFocus
-                            onBlur={() => setTagInput(null)}
-                            className="text-xs px-2 py-0.5 rounded-full w-16 outline-none"
-                            style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }}
-                          />
-                        </form>
-                      ) : (
-                        <button
-                          onClick={() => setTagInput({ sourceId: source.id, value: '' })}
-                          className="text-xs px-2 py-0.5 rounded-full font-medium transition-all hover:bg-[var(--accent-subtle)]"
-                          style={{ color: 'var(--text-dimmed)', border: '1px dashed var(--border-base)' }}
-                          title="Ajouter un tag"
-                        >
-                          + tag
-                        </button>
-                      )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                        {source.title}
+                      </p>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase flex-shrink-0"
+                        style={{ letterSpacing: '0.03em', backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}15`, color: TYPE_COLORS[source.type] || 'var(--text-dimmed)' }}
+                      >
+                        {source.type}
+                      </span>
                     </div>
-                  )}
-                </div>
 
-                {/* Actions */}
-                <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all self-start">
-                  <button
-                    onClick={() => handleTogglePreview(source.id)}
-                    className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
-                    title="Voir le contenu"
-                  >
-                    <Eye className="w-3.5 h-3.5" style={{ color: expandedSource === source.id ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
-                  </button>
-                  <button
-                    onClick={() => handleReindex(source.id)}
-                    disabled={reindexingId === source.id}
-                    className="p-1.5 rounded-lg hover:bg-[var(--accent-subtle)] transition-colors disabled:opacity-40"
-                    title="Re-indexer la source"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${reindexingId === source.id ? 'animate-spin' : ''}`} style={{ color: 'var(--accent-primary)' }} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(source.id)}
-                    className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
-                    title="Supprimer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
-                  </button>
-                </div>
-              </motion.div>
-            ))}
+                    <p className="text-[11px] mt-1 leading-relaxed line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                      {source.summary}
+                    </p>
+
+                    {/* Expanded content preview */}
+                    <AnimatePresence>
+                      {expandedSource === source.id && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={spring}
+                          className="overflow-hidden"
+                        >
+                          <div
+                            className="mt-2 p-3 rounded-xl text-[11px] leading-relaxed max-h-60 overflow-y-auto custom-scrollbar whitespace-pre-wrap"
+                            style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-secondary)' }}
+                          >
+                            {loadingPreview ? (
+                              <div className="flex items-center gap-2" style={{ color: 'var(--text-dimmed)' }}>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Chargement du contenu...</span>
+                              </div>
+                            ) : (
+                              sourcePreview[source.id] || source.summary
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Meta row */}
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      <span className="text-xs font-medium" style={{ color: 'var(--text-dimmed)' }}>
+                        {source.wordCount.toLocaleString()} mots
+                      </span>
+                      <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                        {source.chunksCount} chunks
+                      </span>
+                      <span className="text-xs uppercase font-medium" style={{ color: 'var(--text-dimmed)', letterSpacing: '0.02em' }}>
+                        {source.language}
+                      </span>
+                    </div>
+
+                    {/* Keywords + Tags */}
+                    {source.keywords.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2 items-center">
+                        {source.keywords.slice(0, 6).map((kw: string) => (
+                          <span
+                            key={kw}
+                            className="text-xs px-2 py-0.5 rounded-full font-medium cursor-pointer transition-all hover:line-through hover:opacity-50"
+                            style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)', border: '1px solid var(--border-base)' }}
+                            onClick={() => handleRemoveTag(source.id, kw)}
+                            title="Cliquer pour retirer"
+                          >
+                            {kw}
+                          </span>
+                        ))}
+                        {source.keywords.length > 6 && (
+                          <span className="text-xs px-2 py-0.5 rounded-full" style={{ color: 'var(--text-dimmed)' }}>
+                            +{source.keywords.length - 6}
+                          </span>
+                        )}
+                        {/* Add tag inline */}
+                        {tagInput?.sourceId === source.id ? (
+                          <form
+                            onSubmit={(e) => { e.preventDefault(); handleAddTag(source.id, tagInput.value); }}
+                            className="inline-flex"
+                          >
+                            <input
+                              type="text"
+                              value={tagInput.value}
+                              onChange={(e) => setTagInput({ sourceId: source.id, value: e.target.value })}
+                              placeholder="tag..."
+                              autoFocus
+                              onBlur={() => setTagInput(null)}
+                              className="text-xs px-2 py-0.5 rounded-full w-16 outline-none"
+                              style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }}
+                            />
+                          </form>
+                        ) : (
+                          <button
+                            onClick={() => setTagInput({ sourceId: source.id, value: '' })}
+                            className="text-xs px-2 py-0.5 rounded-full font-medium transition-colors hover:bg-[var(--accent-subtle)] opacity-0 group-hover:opacity-100"
+                            style={{ color: 'var(--text-dimmed)', border: '1px dashed var(--border-base)' }}
+                            title="Ajouter un tag"
+                          >
+                            + tag
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity self-start">
+                    <motion.button
+                      {...tapScale}
+                      onClick={() => handleTogglePreview(source.id)}
+                      className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                      title="Voir le contenu"
+                      aria-label="Voir le contenu"
+                    >
+                      <Eye className="w-3.5 h-3.5" style={{ color: expandedSource === source.id ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
+                    </motion.button>
+                    <motion.button
+                      {...tapScale}
+                      onClick={() => handleReindex(source.id)}
+                      disabled={reindexingId === source.id}
+                      className="p-1.5 rounded-lg hover:bg-[var(--accent-subtle)] transition-colors disabled:opacity-40"
+                      title="Re-indexer la source"
+                      aria-label="Re-indexer la source"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${reindexingId === source.id ? 'animate-spin' : ''}`} style={{ color: 'var(--accent-primary)' }} />
+                    </motion.button>
+                    <motion.button
+                      {...tapScale}
+                      onClick={() => handleDelete(source.id)}
+                      className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+                      title="Supprimer"
+                      aria-label={`Supprimer ${source.title}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
+                    </motion.button>
+                  </div>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
 
           {searchQuery && filteredSources.length === 0 && (
-            <p className="text-xs text-center py-6" style={{ color: 'var(--text-dimmed)' }}>
-              Aucune source ne correspond à "{searchQuery}"
-            </p>
+            <div className="flex flex-col items-center gap-2 py-10 text-center">
+              <Search className="h-4 w-4" style={{ color: 'var(--text-dimmed)' }} />
+              <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                Aucune source ne correspond à « {searchQuery} »
+              </p>
+            </div>
           )}
         </div>
       )}
