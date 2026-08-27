@@ -499,7 +499,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       {/* ─── 3-Column Layout ──────────────────────────────── */}
       <div className="notebook-shell flex-1 overflow-hidden" data-studio-open={studioOpen}>
         {/* Left: Sources Rail */}
-        <aside className="notebook-source-rail hidden min-w-0 lg:flex">
+        <aside className="notebook-source-rail hidden min-w-0 h-full lg:flex overflow-y-auto">
           <SourcePanel
             notebookId={notebookId}
             sources={notebook.sources}

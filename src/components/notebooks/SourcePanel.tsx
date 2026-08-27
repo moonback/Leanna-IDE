@@ -380,7 +380,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
   if (compact) {
     return (
-      <div className="h-full min-h-0 overflow-hidden flex flex-col">
+      <div className="h-full min-h-0 flex flex-col overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-4 py-4 flex-shrink-0 border-b border-[var(--notebook-border)]">
           <div>
@@ -424,7 +424,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         </div>
 
         {/* Source list */}
-        <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-2 pb-4">
+        <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-2 pb-4 max-h-full">
           {sources.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-12 px-4 gap-3">
               <div
