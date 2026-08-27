@@ -7,7 +7,7 @@ import {
 import { FileIcon } from './FileIcon';
 import type { TreeEntry } from '../../types/ide';
 import Tree from 'react-window-tree';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 
 
 type SortMode = 'name-asc' | 'name-desc' | 'type';
@@ -35,7 +35,7 @@ type FileExplorerProps = {
   onMoveEntry?: (srcPath: string, destDir: string) => void;
 };
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 function sortEntries(entries: TreeEntry[], mode: SortMode): TreeEntry[] {
   const dirs = entries.filter(e => e.type === 'directory');
@@ -127,7 +127,7 @@ function countEntries(entries: TreeEntry[]): number {
   }, 0);
 }
 
-// â”€â”€ Sort Icon helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Sort Icon helper ────────────────────────────────────────────────────────
 
 function SortIcon({ mode }: { mode: SortMode }) {
   if (mode === 'name-asc') return <ArrowDownAZ size={12} />;
@@ -136,8 +136,8 @@ function SortIcon({ mode }: { mode: SortMode }) {
 }
 
 function sortLabel(mode: SortMode): string {
-  if (mode === 'name-asc') return 'Tri : Aâ†’Z';
-  if (mode === 'name-desc') return 'Tri : Zâ†’A';
+  if (mode === 'name-asc') return 'Tri : A→Z';
+  if (mode === 'name-desc') return 'Tri : Z→A';
   return 'Tri : Type';
 }
 
@@ -147,7 +147,7 @@ function nextSort(mode: SortMode): SortMode {
   return 'name-asc';
 }
 
-// â”€â”€ HighlightMatch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── HighlightMatch ──────────────────────────────────────────────────────────
 
 function HighlightMatch({ text, query }: { text: string; query: string }) {
   const idx = text.toLowerCase().indexOf(query.toLowerCase());
@@ -170,7 +170,7 @@ function HighlightMatch({ text, query }: { text: string; query: string }) {
   );
 }
 
-// â”€â”€ Convert TreeEntry to DataNode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Convert TreeEntry to DataNode ───────────────────────────────────────────
 
 interface DataNode {
   key: string;
@@ -257,8 +257,16 @@ function toDataNode(
           ? 'color-mix(in srgb, #ef4444 8%, transparent)'
           : 'transparent';
 
+  const activateRow = () => {
+    if (entry.type === 'file') onOpenFile(entry.path);
+    else onToggleDirectory(entry.path);
+  };
+
   const title = (
     <div
+      role="treeitem"
+      tabIndex={0}
+      aria-expanded={entry.type === 'directory' ? isExpanded : undefined}
       className="flex items-center gap-1.5 py-1 px-2 text-[12px] cursor-pointer select-none relative group transition-colors duration-150 rounded-md"
       style={{
         paddingLeft: `${8 + depth * 14}px`,
@@ -269,9 +277,12 @@ function toDataNode(
         borderRadius: '6px',
         transition: 'background 0.15s, outline 0.15s',
       }}
-      onClick={() => {
-        if (entry.type === 'file') onOpenFile(entry.path);
-        else onToggleDirectory(entry.path);
+      onClick={activateRow}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          activateRow();
+        }
       }}
       onContextMenu={(e) => onContextMenu(e, entry)}
       draggable
@@ -299,7 +310,7 @@ function toDataNode(
         {/* Status dot for modified files */}
         {diffStatus && (
           <span
-            className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse"
+            className="w-1.5 h-1.5 rounded-full shrink-0"
             style={{ backgroundColor: diffColor }}
           />
         )}
@@ -422,6 +433,7 @@ const FileExplorer = memo(function FileExplorer({
   onNavigate,
   onMoveEntry,
 }: FileExplorerProps) {
+  const reduceMotion = useReducedMotion();
   // Sandbox status & Live Diffs
   const [sandboxActive, setSandboxActive] = useState(false);
   const [sandboxModifiedCount, setSandboxModifiedCount] = useState(0);
@@ -501,10 +513,10 @@ const FileExplorer = memo(function FileExplorer({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Keyboard shortcut: Ctrl+Shift+F to focus search
+  // Keyboard shortcut: Ctrl/Cmd+Shift+F to focus search
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'F') {
         e.preventDefault();
         setShowSearch(true);
         setTimeout(() => searchInputRef.current?.focus(), 50);
@@ -624,6 +636,8 @@ const FileExplorer = memo(function FileExplorer({
   // Workspace tree section (read-only, shows ONLY modified files)
   const [wsExpandedDirs, setWsExpandedDirs] = useState<Set<string>>(new Set());
   const [showWorkspace, setShowWorkspace] = useState(true);
+  // One-shot: polling regenerates processedWorkspaceTree every 3s — never re-collapse after user opens it
+  const hasAutoCollapsed = useRef(false);
 
   const wsToggleDir = useCallback((dirPath: string) => {
     setWsExpandedDirs(prev => {
@@ -650,11 +664,15 @@ const FileExplorer = memo(function FileExplorer({
     return applySort(entriesToFilter);
   }, [workspaceTree, effectiveDiffPaths, debouncedSearch, sortMode, showHidden]);
 
-  // Auto-expand all parent folders containing diffs so modified files are directly visible
+  // Auto-expand dirs + collapse Workspace section once — background refresh must not undo user choice
   useEffect(() => {
-    if (processedWorkspaceTree.length > 0) {
-      const allDirs = getAllDirectoryPaths(processedWorkspaceTree);
-      setWsExpandedDirs(new Set(allDirs));
+    if (processedWorkspaceTree.length === 0) {
+      hasAutoCollapsed.current = false;
+      return;
+    }
+    if (!hasAutoCollapsed.current) {
+      hasAutoCollapsed.current = true;
+      setWsExpandedDirs(new Set(getAllDirectoryPaths(processedWorkspaceTree)));
       setShowWorkspace(false);
     }
   }, [processedWorkspaceTree]);
@@ -799,7 +817,7 @@ const FileExplorer = memo(function FileExplorer({
         <button
           onClick={toggleSearch}
           className={`rounded-md p-1.5 transition-colors hover:bg-[var(--bg-panel)] ${showSearch ? 'bg-[var(--bg-panel)]' : ''}`}
-          title="Rechercher (Ctrl+Shift+F)"
+          title="Rechercher (Ctrl/Cmd+Shift+F)"
           style={{ color: showSearch ? 'var(--accent-primary)' : 'var(--text-muted)' }}
         >
           <Search size={13} />
@@ -841,10 +859,10 @@ const FileExplorer = memo(function FileExplorer({
       <AnimatePresence>
         {showSearch && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            initial={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            animate={reduceMotion ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0.01 : 0.15 }}
             className="overflow-hidden"
           >
             <div
@@ -857,7 +875,7 @@ const FileExplorer = memo(function FileExplorer({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Filtrer les fichiersâ€¦"
+                placeholder="Filtrer les fichiers…"
                 className="flex-1 bg-transparent text-[12px] outline-none placeholder:opacity-40"
                 style={{ color: 'var(--text-primary)' }}
               />
@@ -958,7 +976,7 @@ const FileExplorer = memo(function FileExplorer({
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
             <Search size={24} className="mb-3 opacity-30" style={{ color: 'var(--text-muted)' }} />
             <p className="text-[12px] opacity-60" style={{ color: 'var(--text-muted)' }}>
-              Aucun fichier ne correspond Ã  «{searchQuery}»
+              Aucun fichier ne correspond à «{searchQuery}»
             </p>
           </div>
         ) : (

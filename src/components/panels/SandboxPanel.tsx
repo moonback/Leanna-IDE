@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Box, RefreshCw, Upload, Trash2, Loader2, CheckCircle2,
   XCircle, Power, Lock, ShieldCheck,
   GitCompareArrows, FileCode2,
-  ChevronDown, RotateCcw,
+  ChevronDown, RotateCcw, X,
 } from 'lucide-react';
 import { useSandboxWatcher } from '../../hooks/useSandboxWatcher';
 
@@ -45,6 +45,16 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
   const [showModifiedFiles, setShowModifiedFiles] = useState(false);
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
 
+  // Motion : spring critically-damped par défaut, fondu court si l'utilisateur
+  // a demandé moins de mouvement — même convention que NotebookDetail /
+  // GeneratePanel, pour une texture de mouvement cohérente dans toute l'app.
+  const reduceMotion = useReducedMotion();
+  const spring = reduceMotion
+    ? { duration: 0.15, ease: 'easeOut' as const }
+    : { type: 'spring' as const, bounce: 0, duration: 0.3 };
+  const hoverSpring = reduceMotion
+    ? { duration: 0.1 }
+    : { type: 'spring' as const, stiffness: 400, damping: 25 };
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
@@ -152,6 +162,8 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
       reset: 'Sandbox réinitialisé',
     };
 
+  // Feedback : auto-dismiss après 4s, mais l'utilisateur garde la main pour
+  // le fermer plus tôt (agence) — surtout utile s'il veut relire une erreur.
   useEffect(() => {
     if (!feedback) return;
     const t = setTimeout(() => setFeedback(null), 4000);
@@ -173,7 +185,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
       className="flex flex-col gap-4 p-3"
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, ease: 'easeOut' }}
+      transition={spring}
     >
 
       {/* ═══ Vue d'ensemble ═══ */}
@@ -199,9 +211,24 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             </span>
             {status?.active && <ShieldCheck size={12} style={{ color: 'var(--color-success)' }} />}
           </div>
-          <p className="mt-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-            {status?.modifiedCount ?? 0} modification{(status?.modifiedCount ?? 0) > 1 ? 's' : ''}
-          </p>
+          {/* Le compteur change parfois en arrière-plan (watcher de fichiers) sans
+              action explicite de l'utilisateur : un léger fade sur le changement
+              de valeur rend ce statut silencieux visible sans être bruyant. */}
+          <div className="mt-0.5 h-4 overflow-hidden">
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.p
+                key={status?.modifiedCount ?? 0}
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                transition={spring}
+                className="text-[11px]"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                {status?.modifiedCount ?? 0} modification{(status?.modifiedCount ?? 0) > 1 ? 's' : ''}
+              </motion.p>
+            </AnimatePresence>
+          </div>
         </div>
         <button
           type="button"
@@ -226,6 +253,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             onClick={handleDeactivate}
             busy={busy === 'deactivate'}
             tooltip="Entrez un code à 6 chiffres pour désactiver le sandbox"
+            transition={hoverSpring}
           />
         )}
 
@@ -238,6 +266,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             onClick={() => doAction('activate')}
             busy={busy === 'activate'}
             tooltip="Isoler les écritures dans le sandbox"
+            transition={hoverSpring}
           />
         )}
 
@@ -250,6 +279,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             onClick={() => doAction('init')}
             busy={busy === 'init'}
             tooltip="Copier le code source dans un espace isolé"
+            transition={hoverSpring}
           />
         )}
 
@@ -260,6 +290,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
+              transition={spring}
               className="overflow-hidden"
             >
               <div className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={{ backgroundColor: 'var(--bg-input)' }}>
@@ -301,6 +332,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
+              transition={spring}
               className="overflow-hidden"
             >
               <div className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={{ backgroundColor: 'var(--bg-input)' }}>
@@ -351,6 +383,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
               busy={false}
               tooltip="Comparer avant/après, accepter ou rejeter fichier par fichier"
               highlight
+              transition={hoverSpring}
             />
           </>
         )}
@@ -377,6 +410,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
+                  transition={spring}
                   className="overflow-hidden"
                 >
                   <div className="flex flex-col gap-1 pt-1">
@@ -388,6 +422,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                         onClick={() => doAction('sync')}
                         busy={busy === 'sync'}
                         tooltip="Appliquer toutes les modifications au repo principal"
+                        transition={hoverSpring}
                       />
                     )}
                     {status.active && status.modifiedCount > 0 && (
@@ -398,6 +433,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                         onClick={() => doAction('discard')}
                         busy={busy === 'discard'}
                         tooltip="Supprimer toutes les modifications et réinitialiser le sandbox"
+                        transition={hoverSpring}
                       />
                     )}
                     <ActionRow
@@ -407,6 +443,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                       onClick={handleReset}
                       busy={busy === 'reset'}
                       tooltip="Écraser le sandbox avec une copie fraîche du code source (code requis)"
+                      transition={hoverSpring}
                     />
                   </div>
                 </motion.div>
@@ -442,7 +479,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              transition={spring}
               className="overflow-hidden"
             >
             <div className="space-y-0.5 max-h-44 overflow-y-auto custom-scrollbar px-1.5 pb-1.5">
@@ -485,6 +522,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
+            transition={spring}
             className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-[10px] font-medium"
             style={{
               backgroundColor: feedback.type === 'success'
@@ -494,7 +532,17 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             }}
           >
             {feedback.type === 'success' ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
-            <span>{feedback.msg}</span>
+            <span className="flex-1">{feedback.msg}</span>
+            {/* Fermeture manuelle anticipée — l'utilisateur garde la main plutôt
+                que de subir les 4s d'auto-dismiss, notamment pour relire une erreur. */}
+            <button
+              type="button"
+              onClick={() => setFeedback(null)}
+              className="p-0.5 rounded hover:bg-white/10 transition-colors active:scale-90"
+              aria-label="Fermer"
+            >
+              <X size={11} />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -505,7 +553,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
 
 // ── ActionRow — compact button with icon, label, tooltip ─────────────────────
 
-function ActionRow({ icon, label, color, onClick, busy, tooltip, highlight }: {
+function ActionRow({ icon, label, color, onClick, busy, tooltip, highlight, transition }: {
   icon: React.ReactNode;
   label: string;
   color: string;
@@ -513,6 +561,7 @@ function ActionRow({ icon, label, color, onClick, busy, tooltip, highlight }: {
   busy: boolean;
   tooltip: string;
   highlight?: boolean;
+  transition: { type: 'spring'; stiffness: number; damping: number } | { duration: number };
 }) {
   return (
     <motion.button
@@ -521,7 +570,7 @@ function ActionRow({ icon, label, color, onClick, busy, tooltip, highlight }: {
       disabled={busy}
       whileTap={{ scale: 0.97 }}
       whileHover={{ x: 2 }}
-      transition={{ duration: 0.12 }}
+      transition={transition}
       className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all disabled:opacity-50 w-full group hover:bg-white/5"
       style={{
         backgroundColor: highlight

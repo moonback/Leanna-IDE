@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   ArrowLeft, FileText, MessageSquare, StickyNote, Sparkles, Mic,
   Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose,
@@ -48,6 +48,30 @@ interface Props {
   onBack: () => void;
 }
 
+// ─── Transition helpers ────────────────────────────────────────────────────
+// Springs critically-damped par défaut (bounce: 0) : settle naturel, jamais de
+// saut si l'utilisateur redéclenche une transition en plein vol. Basculent sur
+// un simple fondu court si l'utilisateur a demandé moins de mouvement.
+function useFluidTransition() {
+  const reduceMotion = useReducedMotion();
+  return {
+    spring: reduceMotion
+      ? { duration: 0.15, ease: 'easeOut' as const }
+      : { type: 'spring' as const, bounce: 0, duration: 0.3 },
+    // Variante crossfade pure, sans translation directionnelle — pour des vues
+    // "pairs" (onglets non ordonnés) où glisser suggérerait une navigation
+    // avant/arrière qui n'existe pas.
+    fadeOnly: (offset: { x?: number; y?: number }) =>
+      reduceMotion
+        ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
+        : {
+            initial: { opacity: 0, ...offset },
+            animate: { opacity: 1, x: 0, y: 0 },
+            exit: { opacity: 0, ...offset },
+          },
+  };
+}
+
 // ─── Note Editor — rendered in the center column ──────────────────────────────
 function NoteEditorCenter({
   notebookId,
@@ -64,6 +88,11 @@ function NoteEditorCenter({
   const [title, setTitle] = useState(data.title);
   const [content, setContent] = useState(data.content);
   const [saving, setSaving] = useState(false);
+  const { spring, fadeOnly } = useFluidTransition();
+  // Le note editor a une vraie origine (il remplace la vue courante plutôt que
+  // de basculer entre pairs) : il garde un léger déplacement directionnel,
+  // symétrique à l'entrée et à la sortie (même chemin dans les deux sens).
+  const motionProps = fadeOnly({ x: 16 });
 
   const handleSave = async () => {
     if (!title.trim()) return;
@@ -98,10 +127,8 @@ function NoteEditorCenter({
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 16 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 16 }}
-      transition={{ duration: 0.18 }}
+      {...motionProps}
+      transition={spring}
       className="h-full flex flex-col"
       style={{ backgroundColor: 'var(--bg-base)' }}
     >
@@ -129,7 +156,7 @@ function NoteEditorCenter({
         <div className="flex items-center gap-2">
           <button
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors hover:bg-white/5"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-transform active:scale-95 hover:bg-white/5"
             style={{ color: 'var(--text-muted)' }}
           >
             <X className="w-3.5 h-3.5" />
@@ -138,7 +165,7 @@ function NoteEditorCenter({
           <button
             onClick={handleSave}
             disabled={!title.trim() || saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40 transition-all active:scale-95 text-white"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40 transition-transform active:scale-95 text-white"
             style={{ backgroundColor: 'var(--accent-primary)' }}
           >
             <Save className="w-3.5 h-3.5" />
@@ -156,7 +183,7 @@ function NoteEditorCenter({
           placeholder="Titre de la note..."
           autoFocus
           className="w-full text-xl font-bold bg-transparent outline-none placeholder:opacity-30"
-          style={{ color: 'var(--text-primary)' }}
+          style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}
           onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
         />
         <div className="h-px mt-3" style={{ backgroundColor: 'var(--border-base)' }} />
@@ -187,6 +214,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [viewingGeneratedDoc, setViewingGeneratedDoc] = useState<{ id: string; title: string; type: string; content: string; createdAt: string } | null>(null);
   const [noteEditorData, setNoteEditorData] = useState<NoteEditorData | null>(null);
+  const { spring, fadeOnly } = useFluidTransition();
 
   const loadNotebook = useCallback(async () => {
     setLoading(true);
@@ -216,10 +244,11 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     return () => window.removeEventListener('notebook-sources-changed', handler);
   }, [notebookId, loadNotebook]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — Cmd sur macOS, Ctrl ailleurs (convention plateforme)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+      const modifier = e.metaKey || e.ctrlKey;
+      if (modifier && !e.shiftKey && !e.altKey) {
         if (e.key === '1') { e.preventDefault(); setActiveTab('sources'); }
         if (e.key === '2') { e.preventDefault(); setActiveTab('chat'); }
         if (e.key === '3') { e.preventDefault(); setStudioTab('notes'); setStudioOpen(true); }
@@ -322,14 +351,24 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     );
   };
 
+  // Contenu central : Sources / Chat / SourceViewer / NoteEditor sont des vues
+  // "pairs" sans ordre spatial entre elles — un simple crossfade évite de
+  // suggérer une navigation avant/arrière qui n'existe pas.
+  const centerMotion = fadeOnly({});
+  // Onglets Studio : même logique, pairs non ordonnées → crossfade pur.
+  const studioMotion = fadeOnly({});
+
   return (
     <div className="notebook-workspace h-full flex flex-col overflow-hidden">
       {/* ─── Header ─────────────────────────────────────────── */}
-      <header className="notebook-header flex-shrink-0">
+      <header
+        className="notebook-header flex-shrink-0"
+        style={{ backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)' }}
+      >
         <div className="flex min-w-0 items-center gap-3">
           <button
             onClick={onBack}
-            className="notebook-icon-button"
+            className="notebook-icon-button transition-transform active:scale-90"
             title="Retour aux notebooks"
             aria-label="Retour aux notebooks"
           >
@@ -346,7 +385,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="notebook-title truncate">{notebook.title}</h1>
+              <h1 className="notebook-title truncate" style={{ letterSpacing: '-0.01em' }}>{notebook.title}</h1>
               {indexingProgress.active && (
                 <span className="notebook-pill">
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -364,9 +403,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         <nav className="notebook-segmented hidden md:flex" aria-label="Notebook navigation">
           <button
             onClick={() => setActiveTab('sources')}
-            className="notebook-segment"
+            className="notebook-segment transition-transform active:scale-95"
             data-active={activeTab === 'sources'}
-            title="Sources (Ctrl+1)"
+            title="Sources (Ctrl+1 / ⌘1)"
           >
             <FileText className="h-4 w-4" />
             <span>Sources</span>
@@ -374,9 +413,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           </button>
           <button
             onClick={() => setActiveTab('chat')}
-            className="notebook-segment"
+            className="notebook-segment transition-transform active:scale-95"
             data-active={activeTab === 'chat'}
-            title="Chat (Ctrl+2)"
+            title="Chat (Ctrl+2 / ⌘2)"
           >
             <MessageSquare className="h-4 w-4" />
             <span>Chat</span>
@@ -387,15 +426,20 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setStudioOpen(v => !v)}
-            className="notebook-icon-button hidden lg:flex"
+            className="notebook-icon-button hidden lg:flex transition-transform active:scale-90"
             data-active={studioOpen}
-            title={studioOpen ? 'Fermer Studio (Ctrl+\\)' : 'Ouvrir Studio (Ctrl+\\)'}
+            title={studioOpen ? 'Fermer Studio (Ctrl+\\ / ⌘\\)' : 'Ouvrir Studio (Ctrl+\\ / ⌘\\)'}
             aria-label={studioOpen ? 'Fermer Studio' : 'Ouvrir Studio'}
             aria-pressed={studioOpen}
           >
             {studioOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
           </button>
-          <button onClick={loadNotebook} className="notebook-icon-button" title="Actualiser" aria-label="Actualiser">
+          <button
+            onClick={loadNotebook}
+            className="notebook-icon-button transition-transform active:scale-90"
+            title="Actualiser"
+            aria-label="Actualiser"
+          >
             <RefreshCw className="h-4 w-4" />
           </button>
         </div>
@@ -408,7 +452,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={spring}
             className="flex-shrink-0 overflow-hidden border-b border-[var(--notebook-border)] bg-[var(--notebook-surface)] px-6 py-2"
           >
             <div className="mx-auto flex max-w-5xl items-center gap-3 text-sm text-[var(--text-secondary)]">
@@ -418,6 +462,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
                   className="h-full rounded-full"
                   style={{ backgroundColor: 'var(--notebook-accent)' }}
                   animate={{ width: `${(indexingProgress.done / indexingProgress.total) * 100}%` }}
+                  transition={spring}
                 />
               </div>
               <span className="text-xs font-medium">{indexingProgress.done}/{indexingProgress.total}</span>
@@ -446,10 +491,8 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           <AnimatePresence mode="wait">
             <motion.div
               key={selectedSourceId || viewingGeneratedDoc?.id || activeTab}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.15 }}
+              {...centerMotion}
+              transition={spring}
               className="h-full"
             >
               {renderMainContent()}
@@ -466,7 +509,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
                 <button
                   key={key}
                   onClick={() => setStudioTab(key)}
-                  className="notebook-segment"
+                  className="notebook-segment transition-transform active:scale-95"
                   data-active={studioTab === key}
                   title={label}
                 >
@@ -477,7 +520,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
               ))}
               <button
                 onClick={() => setStudioOpen(false)}
-                className="notebook-icon-button ml-auto"
+                className="notebook-icon-button ml-auto transition-transform active:scale-90"
                 aria-label="Fermer le studio"
               >
                 <X className="h-3.5 w-3.5" />
@@ -489,10 +532,8 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
               <AnimatePresence mode="wait">
                 <motion.div
                   key={studioTab}
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ duration: 0.15 }}
+                  {...studioMotion}
+                  transition={spring}
                   className="h-full"
                 >
                   {renderStudioContent(studioTab)}

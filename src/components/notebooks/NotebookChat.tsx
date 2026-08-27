@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef, useMemo, type JSX } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Send, Loader2, Lightbulb, BookOpen, Trash2, Quote, Telescope, Download,
   MessageCircle, ArrowDown, GitCompare, Zap, StickyNote, Volume2, Square,
@@ -43,6 +43,14 @@ interface SandboxFolder {
   name: string;
   depth: number;
 }
+
+// Critically damped default — graceful settle, no overshoot. Used for
+// anything not triggered by a physical gesture (menus, message entrance,
+// panel reveals).
+const SPRING_UI = { type: 'spring' as const, bounce: 0, duration: 0.3 };
+// Slight bounce, reserved for momentum-flavoured moments (a message that
+// just "arrived", a floating action button appearing).
+const SPRING_MOMENTUM = { type: 'spring' as const, bounce: 0.2, duration: 0.35 };
 
 /** Rich markdown rendering for chat messages */
 function renderMessageContent(content: string): JSX.Element {
@@ -349,6 +357,7 @@ function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
 
 export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const { error: toastError, success: toastSuccess } = useToast();
+  const prefersReducedMotion = useReducedMotion();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1314,8 +1323,9 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 initial={{ opacity: 0, y: 4, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                transition={prefersReducedMotion ? { duration: 0.12 } : SPRING_UI}
+                style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', transformOrigin: 'top left' }}
                 className="absolute top-full left-0 mt-1 z-40 w-72 rounded-xl overflow-hidden shadow-xl"
-                style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
               >
                 <div className="max-h-60 overflow-y-auto custom-scrollbar">
                   {/* Main conversation option */}
@@ -1409,7 +1419,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               <MessageCircle className="w-7 h-7" />
             </div>
             <div className="text-center space-y-2">
-              <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+              <p className="text-lg font-medium" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
                 Interrogez vos sources
               </p>
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -1460,9 +1470,9 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
             {messages.map((msg) => (
               <motion.div
                 key={msg.id}
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }}
+                transition={prefersReducedMotion ? { duration: 0.15 } : SPRING_UI}
                 className={`mx-auto mb-6 flex w-full max-w-4xl ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
@@ -1694,8 +1704,9 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
             {/* Streaming text */}
             {streamingText && (
               <motion.div
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={prefersReducedMotion ? { duration: 0.15 } : SPRING_UI}
                 className="flex justify-start max-w-4xl mx-auto"
               >
                 <div
@@ -1824,8 +1835,10 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
+              transition={prefersReducedMotion ? { duration: 0.12 } : SPRING_MOMENTUM}
+              whileTap={{ scale: 0.88 }}
               onClick={scrollToBottom}
-              className="fixed bottom-28 right-8 p-2.5 rounded-full shadow-lg z-30 transition-colors hover:opacity-90"
+              className="fixed bottom-28 right-8 p-2.5 rounded-full shadow-lg z-30 hover:opacity-90 transition-opacity duration-150"
               style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
             >
               <ArrowDown className="w-4 h-4" />
@@ -1838,9 +1851,9 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       <AnimatePresence>
         {hoveredCitation && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+            exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.95 }}
             transition={{ duration: 0.12 }}
             className="fixed z-50 max-w-md p-4 rounded-xl shadow-2xl pointer-events-none"
             style={{
@@ -1950,11 +1963,12 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
         {/* Main input container */}
         <div
-          className="relative mx-auto flex max-w-4xl items-end gap-0 rounded-[28px] transition-all"
+          className="relative mx-auto flex max-w-4xl items-end gap-0 rounded-[28px] transition-shadow duration-200 focus-within:ring-2"
           style={{
             backgroundColor: 'var(--notebook-surface)',
             border: '1px solid var(--notebook-border)',
             boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+            ['--tw-ring-color' as any]: 'var(--accent-primary)',
           }}
         >
           {/* Left actions — filter */}
@@ -1997,53 +2011,61 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
           {/* Right action buttons */}
           <div className="flex items-center gap-1 px-2 py-2 flex-shrink-0">
-            <button
+            <motion.button
               onClick={() => handleDeepDive()}
               disabled={!input.trim() || loading}
-              className="p-2 rounded-lg transition-all active:scale-90 disabled:opacity-25 hover:bg-[var(--accent-subtle)]"
+              whileTap={input.trim() && !loading ? { scale: 0.88 } : undefined}
+              transition={{ duration: 0.1 }}
+              className="p-2 rounded-lg disabled:opacity-25 hover:bg-[var(--accent-subtle)] transition-colors duration-150"
               style={{ color: 'var(--accent-primary)' }}
               title="Deep Dive — exploration approfondie"
             >
               <Telescope className="w-4 h-4" />
-            </button>
+            </motion.button>
 
-            <button
+            <motion.button
               onClick={handleInsights}
               disabled={loading}
-              className="p-2 rounded-lg transition-all active:scale-90 disabled:opacity-25 hover:bg-amber-500/10"
+              whileTap={!loading ? { scale: 0.88 } : undefined}
+              transition={{ duration: 0.1 }}
+              className="p-2 rounded-lg disabled:opacity-25 hover:bg-amber-500/10 transition-colors duration-150"
               style={{ color: '#f59e0b' }}
               title="Extraire les insights clés"
             >
               <Zap className="w-4 h-4" />
-            </button>
+            </motion.button>
 
             {sources.length >= 2 && (
-              <button
+              <motion.button
                 onClick={handleCompare}
                 disabled={loading}
-                className="p-2 rounded-lg transition-all active:scale-90 disabled:opacity-25 hover:bg-violet-500/10"
+                whileTap={!loading ? { scale: 0.88 } : undefined}
+                transition={{ duration: 0.1 }}
+                className="p-2 rounded-lg disabled:opacity-25 hover:bg-violet-500/10 transition-colors duration-150"
                 style={{ color: '#8b5cf6' }}
                 title="Comparer les sources"
               >
                 <GitCompare className="w-4 h-4" />
-              </button>
+              </motion.button>
             )}
 
             {/* Separator */}
             <div className="w-px h-5 mx-1" style={{ backgroundColor: 'var(--border-base)' }} />
 
             {/* Send button */}
-            <button
+            <motion.button
               onClick={() => handleSend()}
               disabled={!input.trim() || loading}
-              className="p-2.5 rounded-full transition-all active:scale-90 disabled:opacity-30"
+              whileTap={input.trim() && !loading ? { scale: 0.88 } : undefined}
+              transition={{ duration: 0.1 }}
+              className="p-2.5 rounded-full disabled:opacity-30 transition-colors duration-150"
               style={{
                 backgroundColor: input.trim() && !loading ? 'var(--notebook-accent)' : 'var(--notebook-surface-muted)',
                 color: input.trim() && !loading ? '#1b1b1f' : 'var(--text-dimmed)',
               }}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
+            </motion.button>
           </div>
         </div>
 
@@ -2074,8 +2096,9 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                     initial={{ opacity: 0, y: 4, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                    transition={prefersReducedMotion ? { duration: 0.12 } : SPRING_UI}
                     className="absolute bottom-full left-0 mb-1 z-40 w-56 rounded-xl overflow-hidden shadow-xl"
-                    style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+                    style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', transformOrigin: 'bottom left' }}
                   >
                     <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-base)' }}>
                       <p className="text-[9px] font-semibold" style={{ color: 'var(--text-dimmed)' }}>Ton de l'assistant</p>
@@ -2133,18 +2156,19 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       <AnimatePresence>
         {folderPickerMsg && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+            animate={{ opacity: 1, backdropFilter: 'blur(4px)' }}
+            exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+            transition={{ duration: 0.2 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
             onClick={() => setFolderPickerMsg(null)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.92, y: prefersReducedMotion ? 0 : 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 16 }}
-              transition={{ type: 'spring', damping: 22, stiffness: 300 }}
+              exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.92, y: prefersReducedMotion ? 0 : 16 }}
+              transition={prefersReducedMotion ? { duration: 0.15 } : SPRING_UI}
               className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
               style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
               onClick={e => e.stopPropagation()}

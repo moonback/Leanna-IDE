@@ -11,7 +11,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect, JSX } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Sparkles, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List,
   Loader2, Trash2, Copy, CheckCircle2, Download, RefreshCw,
@@ -278,6 +278,19 @@ function renderBoldItalic(text: string): (string | JSX.Element)[] {
   });
 }
 
+/** Détecte prefers-reduced-transparency pour durcir les scrims de modal */
+function useReducedTransparency(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-transparency: reduce)');
+    setReduced(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return reduced;
+}
+
 export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false, onClose, onViewDoc, initialDoc }: Props) {
   const { success, error: toastError } = useToast();
   const { profile } = useProfile();
@@ -303,9 +316,11 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
   // Modal rapport complet
   const [showReportModal, setShowReportModal] = useState(false);
   const [modalSelectedType, setModalSelectedType] = useState<string | null>(null);
+  const reportModalTriggerRef = useRef<HTMLButtonElement>(null);
 
   // Modal infographie
   const [showInfographicModal, setShowInfographicModal] = useState(false);
+  const infographicModalTriggerRef = useRef<HTMLButtonElement>(null);
 
   // Modal slides Reveal.js
   const [showSlideModal, setShowSlideModal] = useState(false);
@@ -318,6 +333,39 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
   const [infraDescription, setInfraDescription] = useState('');
 
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Motion : spring critically-damped par défaut, fondu court si l'utilisateur
+  // a demandé moins de mouvement. Aucun overshoot sur les modals — elles ne
+  // portent aucune vélocité de geste à restituer.
+  const reduceMotion = useReducedMotion();
+  const modalSpring = reduceMotion
+    ? { duration: 0.15, ease: 'easeOut' as const }
+    : { type: 'spring' as const, bounce: 0, duration: 0.3 };
+  const scrimSpring = { duration: 0.15 };
+  const reducedTransparency = useReducedTransparency();
+  const scrimStyle = reducedTransparency
+    ? { backgroundColor: 'rgba(0,0,0,0.92)' }
+    : { backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' };
+
+  // Fermeture au clavier (Escape) + restitution du focus au déclencheur —
+  // wayfinding : on doit toujours pouvoir sortir, et le focus doit revenir
+  // là où l'utilisateur l'avait laissé.
+  useEffect(() => {
+    if (!showReportModal && !showInfographicModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showReportModal) {
+        setShowReportModal(false);
+        reportModalTriggerRef.current?.focus();
+      }
+      if (showInfographicModal) {
+        setShowInfographicModal(false);
+        infographicModalTriggerRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showReportModal, showInfographicModal]);
 
   // Charger les docs générés
   useEffect(() => {
@@ -652,6 +700,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
+              transition={modalSpring}
               className="overflow-hidden"
             >
               <div
@@ -693,6 +742,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
+              transition={modalSpring}
               className="overflow-hidden"
             >
               <textarea
@@ -789,6 +839,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
           {/* Bouton principal — Rapport complet (ouvre le modal) */}
           <button
+            ref={reportModalTriggerRef}
             onClick={openReportModal}
             disabled={generating || sources.length === 0}
             className="w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all disabled:opacity-40 active:scale-[0.97] hover:shadow-md hover:-translate-y-0.5"
@@ -822,11 +873,14 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               return (
                 <motion.button
                   key={key}
+                  ref={key === 'infographic' ? infographicModalTriggerRef : undefined}
                   onClick={() => key === 'infographic' ? setShowInfographicModal(true) : handleGenerate(key)}
                   disabled={generating || sources.length === 0}
+                  // Micro-feedback directement piloté par le geste (hover/tap) : le
+                  // léger ressort ici est légitime, contrairement aux modals plus bas.
                   whileHover={!generating && sources.length > 0 ? { y: -2, scale: 1.02 } : {}}
                   whileTap={!generating && sources.length > 0 ? { scale: 0.97 } : {}}
-                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  transition={reduceMotion ? { duration: 0.1 } : { type: 'spring', stiffness: 400, damping: 25 }}
                   className={`notebook-studio-card group relative w-full flex items-center gap-2.5 p-2.5 text-left disabled:opacity-40 overflow-hidden ${isActive ? 'ring-2' : ''}`}
                   style={{
                     borderColor: isActive ? color : 'var(--notebook-border)',
@@ -1076,16 +1130,18 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={scrimSpring}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-            onClick={(e) => { if (e.target === e.currentTarget) setShowReportModal(false); }}
+            style={scrimStyle}
+            onClick={(e) => { if (e.target === e.currentTarget) { setShowReportModal(false); reportModalTriggerRef.current?.focus(); } }}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              role="dialog"
+              aria-modal="true"
+              initial={reduceMotion ? { opacity: 0 } : { scale: 0.95, opacity: 0, y: 10 }}
+              animate={reduceMotion ? { opacity: 1 } : { scale: 1, opacity: 1, y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { scale: 0.95, opacity: 0, y: 10 }}
+              transition={modalSpring}
               className="w-full max-w-7xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden"
               style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
             >
@@ -1106,9 +1162,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowReportModal(false)}
+                  onClick={() => { setShowReportModal(false); reportModalTriggerRef.current?.focus(); }}
                   className="p-2 rounded-lg transition-all hover:bg-white/5 active:scale-95"
                   style={{ color: 'var(--text-muted)' }}
+                  autoFocus
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1252,7 +1309,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   {sources.length} source{sources.length > 1 ? 's' : ''} disponible{sources.length > 1 ? 's' : ''} • Le rapport sera généré en streaming
                 </p>
                 <button
-                  onClick={() => setShowReportModal(false)}
+                  onClick={() => { setShowReportModal(false); reportModalTriggerRef.current?.focus(); }}
                   className="px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5"
                   style={{ color: 'var(--text-muted)' }}
                 >
@@ -1271,16 +1328,18 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={scrimSpring}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-            onClick={(e) => { if (e.target === e.currentTarget) setShowInfographicModal(false); }}
+            style={scrimStyle}
+            onClick={(e) => { if (e.target === e.currentTarget) { setShowInfographicModal(false); infographicModalTriggerRef.current?.focus(); } }}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              role="dialog"
+              aria-modal="true"
+              initial={reduceMotion ? { opacity: 0 } : { scale: 0.95, opacity: 0, y: 10 }}
+              animate={reduceMotion ? { opacity: 1 } : { scale: 1, opacity: 1, y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { scale: 0.95, opacity: 0, y: 10 }}
+              transition={modalSpring}
               className="w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden"
               style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
             >
@@ -1296,9 +1355,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   </div>
                 </div>
                 <button
-                  onClick={() => setShowInfographicModal(false)}
+                  onClick={() => { setShowInfographicModal(false); infographicModalTriggerRef.current?.focus(); }}
                   className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
                   style={{ color: 'var(--text-muted)' }}
+                  autoFocus
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1460,7 +1520,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               {/* Footer */}
               <div className="px-6 py-4 border-t flex items-center justify-between" style={{ borderColor: 'var(--border-base)' }}>
                 <button
-                  onClick={() => setShowInfographicModal(false)}
+                  onClick={() => { setShowInfographicModal(false); infographicModalTriggerRef.current?.focus(); }}
                   className="px-4 py-2 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5"
                   style={{ color: 'var(--text-muted)' }}
                 >

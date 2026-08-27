@@ -3,10 +3,15 @@
  *
  * Design épuré et moderne avec cards colorées, animations fluides,
  * création rapide, recherche et tri.
+ *
+ * Motion pass: springs instead of fixed-duration tweens, feedback on
+ * pointer-down, interruptible/reversible transitions, translucent
+ * "materialized" modal, reduced-motion support, and size-specific
+ * type tracking — following Apple's Designing Fluid Interfaces.
  */
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   BookOpen, Plus, Loader2, Trash2, Clock, FileText, MessageSquare,
   Search, SortAsc, SortDesc, Sparkles, X, Upload, Globe, Mic,
@@ -44,8 +49,16 @@ function timeAgo(dateStr: string): string {
   return 'à l\'instant';
 }
 
+// Critically damped default — graceful, no overshoot. Used for anything
+// that wasn't triggered by a physical gesture (fades, reveals, layout).
+const SPRING_UI = { type: 'spring' as const, bounce: 0, duration: 0.35 };
+// A touch of bounce, reserved for elements that *feel* grabbed/thrown
+// (the create-notebook button, card hover lift).
+const SPRING_MOMENTUM = { type: 'spring' as const, bounce: 0.18, duration: 0.35 };
+
 export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const { success, error: toastError } = useToast();
+  const prefersReducedMotion = useReducedMotion();
   const [notebooks, setNotebooks] = useState<NotebookSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -56,6 +69,10 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const [sortBy, setSortBy] = useState<SortBy>('updatedAt');
   const [sortDesc, setSortDesc] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  // Spatial consistency: the delete confirmation should feel anchored to
+  // whichever card triggered it, not just appear dead-center every time.
+  const [deleteOrigin, setDeleteOrigin] = useState<{ x: number; y: number } | null>(null);
 
   const loadNotebooks = useCallback(async () => {
     setLoading(true);
@@ -117,6 +134,11 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
   const handleDeleteClick = useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setDeleteOrigin({
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    });
     setDeleteTarget(id);
   }, []);
 
@@ -147,7 +169,11 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               <Layers className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              {/* Display-size heading: tight leading, slightly negative tracking */}
+              <h1
+                className="text-xl font-semibold"
+                style={{ color: 'var(--text-primary)', letterSpacing: '-0.015em', lineHeight: 1.15 }}
+              >
                 Notebooks
               </h1>
               <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -159,9 +185,12 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <motion.button
               onClick={() => setShowCreateForm(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98]"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              transition={SPRING_MOMENTUM}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
               style={{
                 background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
                 color: '#fff',
@@ -170,16 +199,18 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             >
               <Plus className="w-4 h-4" />
               <span>Nouveau</span>
-            </button>
+            </motion.button>
             {onClose && (
-              <button
+              <motion.button
                 onClick={onClose}
+                whileTap={{ scale: 0.92 }}
+                transition={{ duration: 0.1 }}
                 className="notebook-icon-button"
                 aria-label="Fermer"
                 title="Fermer"
               >
                 <X className="w-4 h-4" />
-              </button>
+              </motion.button>
             )}
           </div>
         </div>
@@ -190,8 +221,12 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
         <div className="flex-shrink-0 px-6 lg:px-10 py-4">
           <div className="flex items-center gap-3">
             <div
-              className="flex items-center gap-2.5 flex-1 max-w-md px-4 py-2.5 rounded-xl transition-all"
-              style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)' }}
+              className="flex items-center gap-2.5 flex-1 max-w-md px-4 py-2.5 rounded-xl transition-colors duration-150 focus-within:ring-2"
+              style={{
+                backgroundColor: 'var(--notebook-surface-muted)',
+                border: '1px solid var(--notebook-border)',
+                ['--tw-ring-color' as any]: 'var(--accent-primary)',
+              }}
             >
               <Search className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
               <input
@@ -203,9 +238,13 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 style={{ color: 'var(--text-primary)' }}
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="p-0.5 rounded hover:opacity-70">
+                <motion.button
+                  onClick={() => setSearchQuery('')}
+                  whileTap={{ scale: 0.85 }}
+                  className="p-0.5 rounded"
+                >
                   <X className="h-3.5 w-3.5" style={{ color: 'var(--text-dimmed)' }} />
-                </button>
+                </motion.button>
               )}
             </div>
 
@@ -213,7 +252,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as SortBy)}
-                className="px-3 py-2 rounded-lg text-xs font-medium outline-none cursor-pointer transition-all"
+                className="px-3 py-2 rounded-lg text-xs font-medium outline-none cursor-pointer transition-colors duration-150"
                 style={{
                   backgroundColor: 'var(--notebook-surface-muted)',
                   border: '1px solid var(--notebook-border)',
@@ -224,14 +263,16 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 <option value="title">Titre</option>
                 <option value="sourcesCount">Sources</option>
               </select>
-              <button
+              <motion.button
                 onClick={() => setSortDesc(!sortDesc)}
-                className="p-2 rounded-lg transition-all hover:opacity-70"
+                whileTap={{ scale: 0.9, rotate: sortDesc ? -8 : 8 }}
+                transition={{ duration: 0.15 }}
+                className="p-2 rounded-lg"
                 style={{ color: 'var(--text-dimmed)' }}
                 title={sortDesc ? 'Décroissant' : 'Croissant'}
               >
                 {sortDesc ? <SortDesc className="w-4 h-4" /> : <SortAsc className="w-4 h-4" />}
-              </button>
+              </motion.button>
             </div>
           </div>
         </div>
@@ -244,7 +285,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={prefersReducedMotion ? { duration: 0.15 } : SPRING_UI}
             className="overflow-hidden flex-shrink-0 px-6 lg:px-10"
           >
             <div
@@ -273,11 +314,12 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
                 placeholder="Titre du notebook..."
                 autoFocus
-                className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-colors duration-150 focus:ring-2"
                 style={{
                   backgroundColor: 'var(--notebook-surface-muted)',
                   border: '1px solid var(--notebook-border)',
                   color: 'var(--text-primary)',
+                  ['--tw-ring-color' as any]: 'var(--accent-primary)',
                 }}
               />
               <input
@@ -286,18 +328,22 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 onChange={e => setNewDescription(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
                 placeholder="Description (optionnel)"
-                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all"
+                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-colors duration-150 focus:ring-2"
                 style={{
                   backgroundColor: 'var(--notebook-surface-muted)',
                   border: '1px solid var(--notebook-border)',
                   color: 'var(--text-primary)',
+                  ['--tw-ring-color' as any]: 'var(--accent-primary)',
                 }}
               />
               <div className="flex items-center gap-3 pt-1">
-                <button
+                <motion.button
                   onClick={handleCreate}
                   disabled={!newTitle.trim() || creating}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:hover:scale-100"
+                  whileHover={{ scale: newTitle.trim() ? 1.02 : 1 }}
+                  whileTap={{ scale: newTitle.trim() ? 0.97 : 1 }}
+                  transition={SPRING_MOMENTUM}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40"
                   style={{
                     background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
                     color: '#fff',
@@ -305,14 +351,15 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 >
                   {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   Créer
-                </button>
-                <button
+                </motion.button>
+                <motion.button
                   onClick={() => { setShowCreateForm(false); setNewTitle(''); setNewDescription(''); }}
-                  className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-70"
+                  whileTap={{ scale: 0.96 }}
+                  className="px-4 py-2.5 rounded-xl text-sm font-medium"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
-                </button>
+                </motion.button>
               </div>
             </div>
           </motion.div>
@@ -351,7 +398,10 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               <BookOpen className="h-9 w-9 text-white" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <h2
+                className="text-lg font-semibold"
+                style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}
+              >
                 Créez votre premier notebook
               </h2>
               <p className="text-sm max-w-md leading-relaxed" style={{ color: 'var(--text-muted)' }}>
@@ -372,7 +422,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               ].map(({ icon: Icon, label, desc }) => (
                 <div
                   key={label}
-                  className="flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all"
+                  className="flex flex-col items-center gap-1.5 p-3 rounded-xl"
                   style={{ backgroundColor: 'var(--notebook-surface-muted)' }}
                 >
                   <Icon className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
@@ -382,9 +432,12 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               ))}
             </div>
 
-            <button
+            <motion.button
               onClick={() => setShowCreateForm(true)}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium mt-4 transition-all hover:scale-[1.03] active:scale-[0.97]"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.96 }}
+              transition={SPRING_MOMENTUM}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium mt-4"
               style={{
                 background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
                 color: '#fff',
@@ -393,7 +446,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             >
               <Plus className="w-4 h-4" />
               Créer un notebook
-            </button>
+            </motion.button>
           </div>
         ) : filteredNotebooks.length === 0 ? (
           /* ─── No search results ─── */
@@ -421,24 +474,17 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.25, delay: i < 12 ? i * 0.04 : 0 }}
+                  whileHover={prefersReducedMotion ? undefined : { y: -3, scale: 1.005 }}
+                  whileTap={{ scale: 0.99 }}
+                  transition={{
+                    ...(prefersReducedMotion ? { duration: 0.15 } : SPRING_MOMENTUM),
+                    delay: i < 12 ? i * 0.03 : 0,
+                  }}
                   onClick={() => onSelectNotebook(nb.id)}
-                  className="group cursor-pointer rounded-2xl border overflow-hidden flex flex-col transition-all duration-200"
+                  className="group cursor-pointer rounded-2xl border overflow-hidden flex flex-col"
                   style={{
                     backgroundColor: 'var(--notebook-card-bg)',
                     borderColor: 'var(--notebook-border)',
-                  }}
-                  onMouseEnter={e => {
-                    const el = e.currentTarget as HTMLElement;
-                    el.style.borderColor = nb.color || 'var(--notebook-accent)';
-                    el.style.boxShadow = `0 8px 24px ${nb.color || 'rgba(59,130,246,0.15)'}20`;
-                    el.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={e => {
-                    const el = e.currentTarget as HTMLElement;
-                    el.style.borderColor = 'var(--notebook-border)';
-                    el.style.boxShadow = 'none';
-                    el.style.transform = 'translateY(0)';
                   }}
                 >
                   {/* Color accent bar */}
@@ -458,7 +504,10 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                           {nb.icon || '📓'}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                          <h3
+                            className="text-sm font-semibold truncate"
+                            style={{ color: 'var(--text-primary)', letterSpacing: '-0.005em' }}
+                          >
                             {nb.title}
                           </h3>
                           <p className="text-[11px] mt-0.5 flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}>
@@ -467,14 +516,17 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                           </p>
                         </div>
                       </div>
-                      <button
+                      {/* Always faintly visible (not hover-only) so touch and
+                          keyboard users can find it — agency over discovery */}
+                      <motion.button
                         onClick={(e) => handleDeleteClick(nb.id, e)}
-                        className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/10 flex-shrink-0"
+                        whileTap={{ scale: 0.85 }}
+                        className="p-1.5 rounded-lg opacity-30 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 hover:bg-red-500/10 flex-shrink-0"
                         title="Supprimer"
                         aria-label="Supprimer"
                       >
                         <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                      </button>
+                      </motion.button>
                     </div>
 
                     {/* Description */}
@@ -501,7 +553,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                         {nb.notesCount}
                       </span>
                       <span
-                        className="ml-auto flex items-center gap-1 text-[11px] opacity-0 group-hover:opacity-100 transition-all"
+                        className="ml-auto flex items-center gap-1 text-[11px] opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200"
                         style={{ color: 'var(--accent-primary)' }}
                       >
                         Ouvrir
@@ -523,18 +575,35 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)' }}
+            style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
             onClick={() => setDeleteTarget(null)}
           >
+            {/* Materialize: blur radius and scale animate together, so the
+                surface reads as glass condensing into place, not just fading. */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.92, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 10 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
+              initial={{
+                opacity: 0,
+                scale: prefersReducedMotion ? 1 : 0.9,
+                backdropFilter: 'blur(0px)',
+                x: deleteOrigin ? deleteOrigin.x - window.innerWidth / 2 : 0,
+                y: deleteOrigin ? deleteOrigin.y - window.innerHeight / 2 : 0,
+              }}
+              animate={{ opacity: 1, scale: 1, backdropFilter: 'blur(20px)', x: 0, y: 0 }}
+              exit={{
+                opacity: 0,
+                scale: prefersReducedMotion ? 1 : 0.92,
+                x: deleteOrigin ? (deleteOrigin.x - window.innerWidth / 2) * 0.4 : 0,
+                y: deleteOrigin ? (deleteOrigin.y - window.innerHeight / 2) * 0.4 : 0,
+              }}
+              transition={prefersReducedMotion ? { duration: 0.15 } : SPRING_UI}
               onClick={e => e.stopPropagation()}
               className="w-full max-w-sm rounded-2xl border p-6 shadow-2xl"
-              style={{ backgroundColor: 'var(--notebook-surface-elevated)', borderColor: 'var(--notebook-border)' }}
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--notebook-surface-elevated) 85%, transparent)',
+                borderColor: 'var(--notebook-border)',
+              }}
             >
               <div className="flex items-center gap-3 mb-4">
                 <div
@@ -558,20 +627,24 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               </p>
 
               <div className="flex items-center justify-end gap-3">
-                <button
+                <motion.button
                   onClick={() => setDeleteTarget(null)}
-                  className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-70"
+                  whileTap={{ scale: 0.96 }}
+                  className="px-4 py-2.5 rounded-xl text-sm font-medium"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
-                </button>
-                <button
+                </motion.button>
+                <motion.button
                   onClick={handleDeleteConfirm}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all active:scale-95 hover:opacity-90"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={SPRING_MOMENTUM}
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium"
                   style={{ backgroundColor: '#ef4444', color: '#fff', boxShadow: '0 2px 8px rgba(239,68,68,0.3)' }}
                 >
                   Supprimer
-                </button>
+                </motion.button>
               </div>
             </motion.div>
           </motion.div>
