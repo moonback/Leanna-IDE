@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   FolderOpen, Upload, ShieldAlert, Loader2,
-  FolderX, FolderInput, Globe,
+  FolderX, FolderInput, Globe, X,
 } from 'lucide-react';
 import { ideApi } from '../services/ideApi';
 
@@ -25,6 +25,7 @@ export function StartupProjectModal() {
   const [inputPath, setInputPath] = useState('');
   const [inputSiteUrl, setInputSiteUrl] = useState('');
   const [siteUrlError, setSiteUrlError] = useState<string | null>(null);
+  const [showSiteUrl, setShowSiteUrl] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,17 +129,31 @@ export function StartupProjectModal() {
           style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
         >
           {/* Header */}
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)' }}>
-              <FolderOpen className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)' }}>
+                <FolderOpen className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Workspace</h2>
+                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  Ouvrez un projet existant pour commencer.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Workspace Jarvis-OS</h2>
-              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                Ouvrez un projet existant pour commencer.
-              </p>
-            </div>
+            <motion.button
+              type="button"
+              onClick={() => window.close()}
+              whileHover={shouldReduceMotion ? undefined : { opacity: 0.7 }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
+              transition={{ duration: 0.1 }}
+              className="flex items-center justify-center w-8 h-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
+              title="Quitter"
+            >
+              <X className="w-4 h-4" />
+            </motion.button>
           </div>
 
           {/* Avertissement aucun projet */}
@@ -194,47 +209,69 @@ export function StartupProjectModal() {
             </div>
 
             {/* URL du site (optionnel) */}
-            <div>
-              <label className="text-[11px] font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
-                URL du site associé
-                <span className="ml-1.5 text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>(optionnel)</span>
-              </label>
-              <div className="relative">
-                <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--text-dimmed)' }} />
-                <input
-                  type="url"
-                  value={inputSiteUrl}
-                  onChange={e => { setInputSiteUrl(e.target.value); setSiteUrlError(null); }}
-                  onKeyDown={e => { if (e.key === 'Enter') handleOpenProject(); }}
-                  placeholder="https://mon-site.com"
-                  className="w-full rounded-lg border pl-8 pr-3 py-2 text-[11px] font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
-                  style={{
-                    backgroundColor: 'var(--bg-input)',
-                    borderColor: siteUrlError ? '#f87171' : 'var(--border-base)',
-                    color: 'var(--text-primary)',
-                    outline: 'none',
-                  }}
-                  spellCheck={false}
-                />
-              </div>
-              <AnimatePresence>
-                {siteUrlError && (
-                  <motion.p
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={INLINE_BANNER_TRANSITION}
-                    className="mt-1 text-[10px] overflow-hidden"
-                    style={{ color: '#f87171' }}
-                  >
-                    {siteUrlError}
-                  </motion.p>
-                )}
-              </AnimatePresence>
-              <p className="mt-1 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
-                L'assistant pourra consulter ce site pour répondre à vos questions.
-              </p>
-            </div>
+            <AnimatePresence>
+              {showSiteUrl ? (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={INLINE_BANNER_TRANSITION}
+                >
+                  <label className="text-[11px] font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
+                    URL du site associé
+                    <span className="ml-1.5 text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>(optionnel)</span>
+                  </label>
+                  <div className="relative">
+                    <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--text-dimmed)' }} />
+                    <input
+                      type="url"
+                      value={inputSiteUrl}
+                      onChange={e => { setInputSiteUrl(e.target.value); setSiteUrlError(null); }}
+                      onKeyDown={e => { if (e.key === 'Enter') handleOpenProject(); }}
+                      placeholder="https://mon-site.com"
+                      className="w-full rounded-lg border pl-8 pr-3 py-2 text-[11px] font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
+                      style={{
+                        backgroundColor: 'var(--bg-input)',
+                        borderColor: siteUrlError ? '#f87171' : 'var(--border-base)',
+                        color: 'var(--text-primary)',
+                        outline: 'none',
+                      }}
+                      spellCheck={false}
+                    />
+                  </div>
+                  <AnimatePresence>
+                    {siteUrlError && (
+                      <motion.p
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={INLINE_BANNER_TRANSITION}
+                        className="mt-1 text-[10px] overflow-hidden"
+                        style={{ color: '#f87171' }}
+                      >
+                        {siteUrlError}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                  <p className="mt-1 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                    L'assistant pourra consulter ce site pour répondre à vos questions.
+                  </p>
+                </motion.div>
+              ) : (
+                <motion.button
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={INLINE_BANNER_TRANSITION}
+                  onClick={() => setShowSiteUrl(true)}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-1"
+                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                >
+                  <Globe className="w-4 h-4" />
+                  <span>URL du site associé (optionnel)</span>
+                </motion.button>
+              )}
+            </AnimatePresence>
 
             {/* Erreur */}
             <AnimatePresence>
@@ -255,7 +292,19 @@ export function StartupProjectModal() {
           </div>
 
           {/* Action */}
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+            <motion.button
+              type="button"
+              onClick={() => window.close()}
+              whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
+              transition={{ duration: 0.1 }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-1"
+              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+            >
+              <X className="w-4 h-4" />
+              Quitter
+            </motion.button>
             <motion.button
               type="button"
               onClick={handleOpenProject}
