@@ -1048,7 +1048,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
           <button
             ref={reportModalTriggerRef}
             onClick={openReportModal}
-            disabled={generating || sources.length === 0}
+            disabled={sources.length === 0}
             className="w-full flex items-center gap-2.5 p-2.5 rounded-lg border transition-all disabled:opacity-40 active:scale-[0.98] hover:shadow-sm"
             style={{
               borderColor: '#dc262630',
@@ -1082,9 +1082,9 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   key={key}
                   ref={key === 'infographic' ? infographicModalTriggerRef : undefined}
                   onClick={() => key === 'infographic' ? setShowInfographicModal(true) : handleGenerate(key)}
-                  disabled={generating || sources.length === 0}
-                  whileHover={!generating && sources.length > 0 ? { y: -1, scale: 1.01 } : {}}
-                  whileTap={!generating && sources.length > 0 ? { scale: 0.98 } : {}}
+                  disabled={sources.length === 0}
+                  whileHover={sources.length > 0 ? { y: -1, scale: 1.01 } : {}}
+                  whileTap={sources.length > 0 ? { scale: 0.98 } : {}}
                   transition={reduceMotion ? { duration: 0.1 } : { type: 'spring', stiffness: 400, damping: 25 }}
                   className={`group relative w-full flex flex-col items-center gap-1 p-1.5 rounded-lg text-center disabled:opacity-40 transition-all duration-200 ${
                     isActive ? 'ring-1' : 'hover:bg-white/5'
@@ -1138,7 +1138,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
       {/* Document viewer — shown in fullView mode */}
       {fullView && (
-      <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-4" style={{ borderColor: 'var(--notebook-border)' }}>
+      <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-1" style={{ borderColor: 'var(--notebook-border)' }}>
         {/* Streaming view */}
         {streamingText && !selectedDoc && (
           <div className="space-y-5 max-w-3xl">
@@ -1161,7 +1161,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
         {/* Selected document view */}
         {selectedDoc && !streamingText ? (
-          <div className={`space-y-5 ${selectedDoc.type === 'mindmap' ? 'max-w-none' : 'max-w-3xl mx-auto'}`}>
+          <div className={`space-y-5 ${selectedDoc.type === 'mindmap' ? 'max-w-none' : 'max-w-6xl mx-auto'}`}>
             {/* Document header — sticky */}
             <div className="flex items-start gap-3 pb-4 border-b sticky top-0 z-10 pt-1" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-canvas, var(--bg-base))' }}>
               {onClose && (
@@ -1204,7 +1204,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 </button>
                 <button
                   onClick={handleRegenerate}
-                  disabled={generating}
+                  disabled={sources.length === 0}
                   className="p-2 rounded-lg border transition-all hover:bg-white/5 active:scale-95 disabled:opacity-30"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                   title="Régénérer"
