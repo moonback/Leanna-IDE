@@ -1048,6 +1048,17 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
   // Navigation entre onglets avec Ctrl+Tab et Ctrl+Shift+Tab
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ne pas traiter les raccourcis si le conteneur n'existe pas ou n'est pas visible
+      const container = containerRef.current;
+      if (!container || !container.offsetParent) return;
+      
+      // Ne pas interférer si l'utilisateur tape dans un champ éditable (Monaco, input, textarea)
+      const activeElement = document.activeElement;
+      const isInEditable = activeElement?.hasAttribute?.('contenteditable') ||
+                          activeElement?.tagName === 'INPUT' ||
+                          activeElement?.tagName === 'TEXTAREA';
+      if (isInEditable) return;
+      
       // Ctrl+T - Nouveau onglet
       if (e.ctrlKey && e.key === 't') {
         e.preventDefault();
@@ -1072,12 +1083,12 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
         const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
         setActiveTabId(tabs[prevIndex].id);
       }
-      // Ctrl+F - Rechercher
+      // Ctrl+F - Rechercher dans le terminal
       if (e.ctrlKey && e.key === 'f') {
         e.preventDefault();
         setShowSearch(true);
       }
-      // Échap - Fermer la recherche
+      // Échap - Fermer la recherche (toujours autorisé si la recherche est ouverte)
       if (e.key === 'Escape' && showSearch) {
         e.preventDefault();
         setShowSearch(false);
@@ -1443,10 +1454,9 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
                           <button
                             key={cmd.id}
                             onClick={() => {
-                              const activeTabPanel = document.querySelector(`[data-tab-id="${activeTabId}"] input`) as HTMLInputElement;
-                              if (activeTabPanel) {
-                                activeTabPanel.value = cmd.command;
-                                activeTabPanel.focus();
+                              const tabRef = tabPanelRefs.current.get(activeTabId);
+                              if (tabRef) {
+                                tabRef.executeCommand(cmd.command);
                               }
                               setShowCommandPalette(false);
                             }}
@@ -1513,10 +1523,9 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
                       <button
                         key={i}
                         onClick={() => {
-                          const activeTabPanel = document.querySelector(`[data-tab-id="${activeTabId}"] input`) as HTMLInputElement;
-                          if (activeTabPanel) {
-                            activeTabPanel.value = cmd.command;
-                            activeTabPanel.focus();
+                          const tabRef = tabPanelRefs.current.get(activeTabId);
+                          if (tabRef) {
+                            tabRef.executeCommand(cmd.command);
                           }
                           setShowCommandPalette(false);
                         }}
