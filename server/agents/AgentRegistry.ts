@@ -11,11 +11,11 @@
 import type { AgentRole } from "./types";
 import type { SkillHandler } from "./AgentExecutor";
 import { AutonomousAgent } from "./AutonomousAgent";
-import type { LoopConfig } from "./AutonomousLoop";
 import { AgentExecutor } from "./AgentExecutor";
 import { AgentMessageBus, agentMessageBus } from "./AgentMessageBus";
 import { ProgressNotifier } from "./ProgressNotifier";
-import { AGENT_REGISTRY } from "./roles";
+import { STATIC_AGENT_REGISTRY, listAgentRoles } from "./roles";
+import { dynamicAgentRegistry } from "./DynamicAgentRegistry";
 import { createLogger } from "../utils/logger";
 
 const log = createLogger("AgentRegistry");
@@ -52,7 +52,7 @@ export class AgentRegistry {
     this.executor.setSkillHandler(skillHandler);
 
     // Config de boucle autonome par rôle (les agents read-only itèrent moins)
-    const loopConfigByRole: Record<AgentRole, { maxIterations: number; minConfidenceScore: number }> = {
+    const loopConfigByRole: Record<string, { maxIterations: number; minConfidenceScore: number }> = {
       // Code & Ingénierie logicielle
       coder:       { maxIterations: 3, minConfidenceScore: 0.70 }, // écriture & implémentation
       refactor:    { maxIterations: 3, minConfidenceScore: 0.70 }, // restructuration & non-régression
@@ -71,11 +71,12 @@ export class AgentRegistry {
       planner:     { maxIterations: 2, minConfidenceScore: 0.65 },
     };
 
-    // Créer et démarrer un agent autonome pour chaque rôle défini
-    for (const role of Object.keys(AGENT_REGISTRY) as AgentRole[]) {
-      const loopConfig = loopConfigByRole[role] ?? {};
-      const agent = new AutonomousAgent(role, this.executor, this.bus, loopConfig);
-      this.agents.set(role, agent);
+    // Créer et démarrer un agent autonome pour chaque rôle défini (statiques + dynamiques)
+    const allRoles = listAgentRoles();
+    for (const role of allRoles) {
+      const loopConfig = loopConfigByRole[role] ?? { maxIterations: 2, minConfidenceScore: 0.60 };
+      const agent = new AutonomousAgent(role as AgentRole, this.executor, this.bus, loopConfig);
+      this.agents.set(role as AgentRole, agent);
       agent.start();
     }
 
@@ -145,6 +146,85 @@ export class AgentRegistry {
   /** Propage l'EventBroadcaster à tous les agents */
   setEventBroadcaster(broadcaster: Parameters<ProgressNotifier["setEventBroadcaster"]>[0]): void {
     this.notifier.setEventBroadcaster(broadcaster);
+  }
+
+  // ─── Enregistrement dynamique d'agents ────────────────────────────────────────
+
+  /**
+   * Enregistre et démarre un nouvel agent dynamique.
+   * Peut être appelé après l'initialisation pour ajouter des agents créés via l'Agent Builder.
+   * 
+   * @param role - Rôle de l'agent
+   * @param loopConfig - Configuration optionnelle de la boucle autonome
+   * @returns true si l'agent a été enregistré et démarré, false s'il existait déjà
+   */
+  registerAndStartDynamicAgent(
+    role: string,
+    loopConfig?: { maxIterations: number; minConfidenceScore: number }
+  ): boolean {
+    // Vérifier si l'agent existe déjà (statique ou dynamique)
+    if (this.agents.has(role as AgentRole)) {
+      log.warn(`Agent "${role}" déjà démarré — skip`);
+      return false;
+    }
+
+    const config = loopConfig ?? { maxIterations: 2, minConfidenceScore: 0.60 };
+    const agent = new AutonomousAgent(role as AgentRole, this.executor, this.bus, config);
+    this.agents.set(role as AgentRole, agent);
+    agent.start();
+
+    log.info(`✅ Agent dynamique "${role}" démarré avec config: ${JSON.stringify(config)}`);
+    return true;
+  }
+
+  /**
+   * Enregistre et démarre plusieurs agents dynamiques.
+   */
+  registerAndStartDynamicAgents(
+    roles: string[],
+    loopConfigByRole?: Record<string, { maxIterations: number; minConfidenceScore: number }>
+  ): { succeeded: string[]; failed: string[] } {
+    const succeeded: string[] = [];
+    const failed: string[] = [];
+
+    for (const role of roles) {
+      const config = loopConfigByRole?.[role];
+      if (this.registerAndStartDynamicAgent(role, config)) {
+        succeeded.push(role);
+      } else {
+        failed.push(role);
+      }
+    }
+
+    return { succeeded, failed };
+  }
+
+  /**
+   * Arrête et désenregistre un agent dynamique.
+   * Ne peut pas désenregistrer les agents statiques.
+   */
+  unregisterDynamicAgent(role: string): boolean {
+    const roleKey = role as AgentRole;
+    
+    // Ne pas supprimer les agents statiques
+    if (role in STATIC_AGENT_REGISTRY) {
+      log.warn(`Impossible de désenregistrer l'agent statique "${role}"`);
+      return false;
+    }
+
+    const agent = this.agents.get(roleKey);
+    if (!agent) {
+      return false;
+    }
+
+    agent.stop();
+    this.agents.delete(roleKey);
+    
+    // Also remove from dynamic registry
+    dynamicAgentRegistry.unregisterAgent(role);
+    
+    log.info(`🗑️ Agent dynamique "${role}" arrêté et désenregistré`);
+    return true;
   }
 
   // ─── Monitoring ────────────────────────────────────────────────────────────

@@ -26,7 +26,7 @@ import type {
   CollaborationRequestPayload,
   StatusResponsePayload,
 } from "./AgentCommunication";
-import { DELEGATION_MATRIX } from "./AgentCommunication";
+import { DELEGATION_MATRIX, isDelegationAllowed } from "./AgentCommunication";
 import { AgentMessageBus } from "./AgentMessageBus";
 import { AgentExecutor } from "./AgentExecutor";
 import { AutonomousLoop, type LoopConfig } from "./AutonomousLoop";
@@ -163,11 +163,8 @@ export class AutonomousAgent {
     instructions?: string,
     priority: TaskPriority = "medium"
   ): Promise<TaskResult | null> {
-    // Vérifier la matrice de délégation
-    const allowedTargets = DELEGATION_MATRIX[this.role] ?? [];
-    const canDelegate = allowedTargets.some((d) => d.targetRole === targetRole);
-
-    if (!canDelegate) {
+    // Vérifier la matrice de délégation (inclut support des agents personnalisés)
+    if (!isDelegationAllowed(this.role, targetRole)) {
       log.warn(
         `⚠️ [${this.agentName}] Délégation refusée vers "${targetRole}" — non autorisée dans la matrice`
       );

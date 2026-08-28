@@ -153,7 +153,9 @@ export interface DelegationCapability {
   reason: string;
 }
 
-import { AGENT_ROLES } from "./types";
+import { STATIC_AGENT_ROLES } from "./types";
+import { listAgentRoles } from "./roles";
+import { getAgentDefinition } from "./roles";
 
 /** Matrice de délégation : quels agents peuvent déléguer à qui */
 export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {
@@ -228,6 +230,32 @@ export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {
     { targetRole: "proofreader", taskTypes: ["relecture-document"], reason: "Relecture et correction du document planifié" },
   ],
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Vérification de délégation (inclut support des agents personnalisés)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Vérifie si une délégation de `fromRole` vers `targetRole` est autorisée.
+ * 
+ * Règles :
+ * - Si fromRole ou targetRole est un agent personnalisé (non statique), la délégation est TOUJOURS autorisée
+ * - Sinon, on vérifie dans la DELEGATION_MATRIX statique
+ */
+export function isDelegationAllowed(fromRole: AgentRole, targetRole: AgentRole): boolean {
+  // Vérifier si l'un des deux est un agent personnalisé (non dans les rôles statiques)
+  const fromIsCustom = !STATIC_AGENT_ROLES.includes(fromRole as (typeof STATIC_AGENT_ROLES)[number]);
+  const targetIsCustom = !STATIC_AGENT_ROLES.includes(targetRole as (typeof STATIC_AGENT_ROLES)[number]);
+  
+  // Si l'agent source ou cible est personnalisé, autoriser la délégation
+  if (fromIsCustom || targetIsCustom) {
+    return true;
+  }
+  
+  // Sinon, vérifier dans la matrice statique
+  const allowedTargets = DELEGATION_MATRIX[fromRole as (typeof STATIC_AGENT_ROLES)[number]] ?? [];
+  return allowedTargets.some((d) => d.targetRole === targetRole);
+}
 
 /** Patterns de collaboration entre agents */
 export interface CollaborationPattern {
@@ -326,9 +354,10 @@ export const agentMessageSchema = z.object({
     "event",
     "broadcast",
   ]),
-  from: z.enum(AGENT_ROLES),
+  from: z.union([z.enum(STATIC_AGENT_ROLES), z.string()]),
   to: z.union([
-    z.enum(AGENT_ROLES),
+    z.enum(STATIC_AGENT_ROLES),
+    z.string(),
     z.literal("broadcast"),
   ]),
   priority: z.enum(["low", "medium", "high", "critical"]),

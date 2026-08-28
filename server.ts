@@ -28,6 +28,7 @@ import { knowledgeRouter, memoryRouter, impactRouter, understandingRouter } from
 
 // Sprint 1 — routeurs extraits de server.ts
 import { createAgentBuilderRouter } from "./server/routes/agent-builder";
+import { createAgentRegistrationRouter } from "./server/routes/agent-registration";
 import { createCustomAgentsRouter } from "./server/routes/custom-agents-router";
 import { createGeminiKeysRouter } from "./server/routes/gemini-keys";
 import { createSandboxRouter, createVerifyExitCodeRouter } from "./server/routes/sandbox";
@@ -472,6 +473,7 @@ async function startServer() {
 
   // ── Sprint 1 — routeurs extraits ──────────────────────────────────────────
   app.use("/api/agent-builder", createAgentBuilderRouter());
+  app.use("/api/agent-registration", createAgentRegistrationRouter());
   app.use("/api/custom-agents", createCustomAgentsRouter());
   app.use("/api/gemini-keys", createGeminiKeysRouter());
   app.use("/api/sandbox", createSandboxRouter());

@@ -10,12 +10,22 @@
  */
 
 import type { AgentRole, TaskPriority } from "./types";
-import { DELEGATION_MATRIX } from "./AgentCommunication";
+import { DELEGATION_MATRIX, isDelegationAllowed } from "./AgentCommunication";
+import { listAgentRoles } from "./roles";
 import { createLogger } from "../utils/logger";
 
 const log = createLogger("DelegationParser");
 
-const VALID_ROLES = new Set<AgentRole>(["writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner"]);
+/**
+ * Retourne les rôles valides (statiques + dynamiques).
+ * Le cache est recalculé à chaque appel pour supporter
+ * les agents enregistrés dynamiquement.
+ */
+function getValidRoles(): Set<string> {
+  // Toujours recalculer pour être sûr d'avoir les derniers agents dynamiques
+  const roles = listAgentRoles();
+  return new Set(roles);
+}
 const VALID_PRIORITIES = new Set<TaskPriority>(["low", "medium", "high", "critical"]);
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -122,15 +132,15 @@ export class DelegationParser {
     }
 
     const targetRole = this.normalizeRole(cibleRaw);
-    if (!targetRole || !VALID_ROLES.has(targetRole)) {
+    const validRoles = getValidRoles();
+    if (!targetRole || !validRoles.has(targetRole)) {
       return {
-        warning: `Bloc #${blockIndex}: rôle "${cibleRaw}" invalide. Valides: ${[...VALID_ROLES].join(", ")}`,
+        warning: `Bloc #${blockIndex}: rôle "${cibleRaw}" invalide. Valides: ${[...validRoles].join(", ")}`,
       };
     }
 
-    // Validation matrice
-    const allowed = DELEGATION_MATRIX[fromRole] ?? [];
-    if (!allowed.some((d) => d.targetRole === targetRole)) {
+    // Validation matrice (inclut support des agents personnalisés)
+    if (!isDelegationAllowed(fromRole, targetRole)) {
       return {
         warning: `Bloc #${blockIndex}: [${fromRole}] → [${targetRole}] non autorisé par la matrice`,
       };
@@ -180,10 +190,11 @@ export class DelegationParser {
     if (!cibleRaw) return null;
 
     const targetRole = this.normalizeRole(cibleRaw);
-    if (!targetRole || !VALID_ROLES.has(targetRole)) return null;
+    const validRoles = getValidRoles();
+    if (!targetRole || !validRoles.has(targetRole)) return null;
 
-    const allowed = DELEGATION_MATRIX[fromRole] ?? [];
-    if (!allowed.some((d) => d.targetRole === targetRole)) return null;
+    // Validation matrice (inclut support des agents personnalisés)
+    if (!isDelegationAllowed(fromRole, targetRole)) return null;
 
     const reason = fields["raison"] ?? fields["reason"] ?? fields["motif"] ?? "";
     if (!reason) return null;
@@ -209,9 +220,10 @@ export class DelegationParser {
    */
   private normalizeRole(raw: string): AgentRole | null {
     const cleaned = raw.toLowerCase().trim();
+    const validRoles = getValidRoles();
 
     // Exact match direct
-    if (VALID_ROLES.has(cleaned as AgentRole)) return cleaned as AgentRole;
+    if (validRoles.has(cleaned as AgentRole)) return cleaned as AgentRole;
 
     // Table d'alias — mappe les variantes connues vers le rôle canonique
     const ROLE_ALIASES: Record<string, AgentRole> = {
@@ -270,7 +282,7 @@ export class DelegationParser {
     const parenMatch = cleaned.match(/^(\w+)\s*\(/);
     if (parenMatch) {
       const prefix = parenMatch[1];
-      if (VALID_ROLES.has(prefix as AgentRole)) return prefix as AgentRole;
+      if (validRoles.has(prefix as AgentRole)) return prefix as AgentRole;
       if (ROLE_ALIASES[prefix]) return ROLE_ALIASES[prefix];
     }
 
@@ -278,12 +290,12 @@ export class DelegationParser {
     const dashMatch = cleaned.match(/^(\w+)\s*[-:–—]/);
     if (dashMatch) {
       const prefix = dashMatch[1];
-      if (VALID_ROLES.has(prefix as AgentRole)) return prefix as AgentRole;
+      if (validRoles.has(prefix as AgentRole)) return prefix as AgentRole;
       if (ROLE_ALIASES[prefix]) return ROLE_ALIASES[prefix];
     }
 
     // Dernier recours : vérifier si un rôle valide est contenu dans le texte
-    for (const role of VALID_ROLES) {
+    for (const role of validRoles) {
       if (cleaned.includes(role)) return role;
     }
 
