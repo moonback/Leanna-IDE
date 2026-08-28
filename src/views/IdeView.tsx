@@ -1147,6 +1147,7 @@ export default function IdeView() {
             setBrowserUrl(url);
           }}
           showExplorer={showExplorer}
+          devServerPort={ideSettings.devServerPort}
         />
       )}
 

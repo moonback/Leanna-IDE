@@ -25,6 +25,7 @@ export type IdeSettings = {
   showWhitespace: boolean;
   stickyScroll: boolean;
   bracketPairs: boolean;
+  devServerPort: number;
 };
 
 export const DEFAULT_IDE_SETTINGS: IdeSettings = {
@@ -36,4 +37,5 @@ export const DEFAULT_IDE_SETTINGS: IdeSettings = {
   showWhitespace: false,
   stickyScroll: true,
   bracketPairs: true,
+  devServerPort: 5173,
 };

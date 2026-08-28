@@ -9,6 +9,7 @@ interface TerminalPanelProps {
   onToggleDock?: () => void;
   onOpenBrowser?: (url: string) => void;
   showExplorer?: boolean;
+  devServerPort?: number;
 }
 
 // Référence pour contrôler le terminal depuis l'extérieur
@@ -828,7 +829,7 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive,
 });
 
 // Composant principal
-const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onClose, isDocked, onOpenBrowser, showExplorer }, ref) => {
+const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onClose, isDocked, onOpenBrowser, showExplorer, devServerPort }, ref) => {
   const [tabs, setTabs] = useState<TerminalTab[]>([{ id: '1', title: 'Terminal 1', shell: 'PowerShell', cwd: '' }]);
   const [activeTabId, setActiveTabId] = useState<string>('1');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -961,7 +962,8 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
     const trimmed = command.trim().toLowerCase();
     const serverCommands = ['npm run dev', 'npm start', 'npm run serve', 'npm run preview'];
     if (serverCommands.some(cmd => trimmed.includes(cmd)) && onOpenBrowser) {
-      setTimeout(() => onOpenBrowser('http://localhost:3000'), 2000);
+      const port = devServerPort ?? 5173;
+      setTimeout(() => onOpenBrowser(`http://localhost:${port}`), 2000);
     }
 
     // Ajouter à l'historique des commandes favorites
@@ -987,7 +989,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
         return [newCommand, ...prev].slice(0, 20); // Garder max 20 commandes
       }
     });
-  }, [onOpenBrowser]);
+  }, [onOpenBrowser, devServerPort]);
 
   const removeFromFavorites = useCallback((id: string) => {
     setFavoriteCommands(prev => prev.filter(c => c.id !== id));

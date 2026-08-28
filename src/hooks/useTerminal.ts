@@ -12,25 +12,67 @@ interface TerminalSize {
   rows: number;
 }
 
-// Résolution du port serveur (similaire à ce qui est fait dans IdeView)
-// Utiliser window.location.port si disponible, sinon le port par défaut
+// Détecter si on est dans Electron
+const isElectron = (): boolean => {
+  return typeof window !== 'undefined' && 
+         window.process && 
+         window.process.type === 'renderer';
+};
+
+// Résolution du port serveur
 const getServerPort = (): number => {
-  // Si on est sur le même hôte que le serveur Vite, utiliser le port du serveur backend
-  // qui est généralement 5000 en dev, ou le port configuré
+  // En mode Electron, le port est généralement passé via VITE_SERVER_PORT
+  // ou on utilise 5000 par défaut
   if (typeof window !== 'undefined') {
-    // Le serveur backend est généralement sur le port 5000
-    // Mais si VITE_SERVER_PORT est défini dans l'environnement au build time, l'utiliser
-    const envPort = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_SERVER_PORT;
-    return Number(envPort) || 5000;
+    // En dev avec Vite, utiliser import.meta.env
+    if (import.meta.env && (import.meta.env as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_SERVER_PORT) {
+      const envPort = Number((import.meta.env as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_SERVER_PORT);
+      if (envPort) return envPort;
+    }
+    
+    // En production Electron, essayer de récupérer depuis window
+    if (isElectron()) {
+      // Le port peut être stocké dans window.process.env ou on utilise 5000
+      if (window.process?.env?.VITE_SERVER_PORT) {
+        return Number(window.process.env.VITE_SERVER_PORT);
+      }
+      return 5000;
+    }
+    
+    // Dans un navigateur normal, utiliser window.location.port
+    if (window.location.port) {
+      return Number(window.location.port);
+    }
+    
+    // Fallback : 5000 (port par défaut du serveur backend)
+    return 5000;
   }
   return 5000;
 };
 
 // URL base pour le serveur WebSocket
 export function getTerminalWebSocketUrl(token: string | null = null): string {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.hostname;
   const port = getServerPort();
+  
+  // En mode Electron, si le protocole est file:, on force localhost
+  // car le serveur backend tourne localement
+  let host: string;
+  let protocol: string;
+  
+  if (typeof window !== 'undefined') {
+    if (window.location.protocol === 'file:') {
+      // Mode Electron packaged - le serveur tourne sur localhost
+      host = '127.0.0.1';
+      protocol = 'ws:';
+    } else {
+      host = window.location.hostname || '127.0.0.1';
+      protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    }
+  } else {
+    host = '127.0.0.1';
+    protocol = 'ws:';
+  }
+  
   const baseUrl = `${protocol}//${host}:${port}`;
   
   if (token) {
@@ -138,15 +180,41 @@ export function useTerminal(initialCols = 80, initialRows = 24): [TerminalState,
         setIsConnected(false);
         setIsConnecting(false);
         welcomeShownRef.current = false; // Réinitialiser pour reconnexion
-        // Ne pas afficher le message de fermeture pour éviter le spam
         wsRef.current = null;
+        
+        // Ne pas reconnecter automatiquement si c'est une fermeture intentionnelle (code 1000)
+        // ou si on a atteint le nombre max de tentatives
+        if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
+          // Attendre avec un délai exponentiel (backoff)
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 5000);
+          setTimeout(() => {
+            reconnect();
+          }, delay);
+        } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+          setError('Impossible de se connecter au serveur terminal. Vérifiez que le backend est démarré.');
+        }
       };
 
       ws.onerror = (err) => {
         setIsConnecting(false);
-        const errorMessage = err instanceof Error ? err.message : String(err);
+        let errorMessage = 'Unknown error';
+        
+        if (err instanceof Error) {
+          errorMessage = err.message;
+        } else if (err && typeof err === 'object' && 'message' in err) {
+          errorMessage = String((err as any).message);
+        } else if (err && typeof err === 'object' && 'type' in err) {
+          // Pour les Event objects (comme ErrorEvent)
+          errorMessage = `Connection error: ${(err as any).type || 'Unknown'}`;
+        } else {
+          errorMessage = String(err);
+        }
+        
+        // Message plus clair pour l'utilisateur
+        const serverPort = getServerPort();
+        const userMessage = `Le serveur backend n'est pas accessible sur le port ${serverPort}. Vérifiez que le serveur est bien démarré.`;
         setError('WebSocket error: ' + errorMessage);
-        appendOutput(`\x1b[31mWebSocket error: ${errorMessage}\x1b[0m\n`);
+        appendOutput(`\x1b[31m${userMessage}\x1b[0m\n`);
       };
     } catch (err) {
       setIsConnecting(false);
@@ -225,8 +293,16 @@ export function useTerminal(initialCols = 80, initialRows = 24): [TerminalState,
 
   // Connexion automatique au montage
   useEffect(() => {
-    connect();
+    // En mode Electron packaged, attendre un peu pour laisser le serveur démarrer
+    const isElectronEnv = typeof window !== 'undefined' && window.process && window.process.type === 'renderer';
+    const initialDelay = isElectronEnv ? 2000 : 0; // Attendre 2s en Electron
+    
+    const timer = setTimeout(() => {
+      connect();
+    }, initialDelay);
+    
     return () => {
+      clearTimeout(timer);
       close();
     };
   }, [connect, close]);
