@@ -1672,7 +1672,7 @@ body {
   box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.3);
 }
 .notebook-segment {
-  padding: 8px 16px;
+  padding: 6px 14px;
   font-size: 13px;
 }
 .notebook-segment[data-active="true"],
@@ -1683,13 +1683,13 @@ body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 .notebook-ghost-button {
-  min-height: 36px;
-  padding: 8px 14px;
+  min-height: 32px;
+  padding: 6px 12px;
   font-size: 13px;
 }
 .notebook-icon-button {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
 }
 .notebook-segment:hover,
@@ -1701,8 +1701,8 @@ body {
 
 /* Primary action button (small) */
 .notebook-primary-small {
-  min-height: 36px;
-  padding: 8px 16px;
+  min-height: 32px;
+  padding: 6px 14px;
   background: var(--notebook-accent);
   color: var(--notebook-accent-text);
   font-size: 13px;
@@ -1743,11 +1743,11 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 40px;
+  min-height: 36px;
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
-  padding: 0 14px;
+  padding: 0 12px;
   color: var(--text-muted);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -1769,9 +1769,9 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 56px;
+  min-height: 48px;
   border-radius: var(--notebook-radius-md);
-  padding: 10px 12px;
+  padding: 8px 12px;
   color: var(--text-secondary);
   transition: background-color 0.15s ease;
 }
@@ -1786,8 +1786,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
   border-radius: var(--notebook-radius-sm);
   background: var(--notebook-surface-muted);
@@ -1827,7 +1827,7 @@ body {
 /* Chat message bubbles — NotebookLM style */
 .notebook-chat-message {
   border-radius: var(--notebook-radius-lg);
-  padding: 14px 18px;
+  padding: 12px 16px;
   font-size: 14px;
   line-height: 1.6;
 }
@@ -1847,7 +1847,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 6px 14px;
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
@@ -1871,12 +1871,12 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 48px 24px;
+  padding: 40px 24px;
   gap: 12px;
 }
 .notebook-empty-state-icon {
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1891,7 +1891,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 24px;
+  padding: 10px 20px;
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-accent);
   color: var(--notebook-accent-text);
@@ -2002,7 +2002,7 @@ body {
   --premium-page-gutter: clamp(16px, 3vw, 32px);
   --premium-section-gap: clamp(24px, 4vw, 48px);
   --premium-control-height: 40px;
-  --premium-control-height-touch: 44px;
+  --premium-control-height-touch: 36px;
   --premium-card-radius: 16px;
   --premium-panel-radius: 18px;
   --premium-border: color-mix(in srgb, var(--border-base) 78%, transparent);
@@ -2198,14 +2198,14 @@ video,
 }
 
 .notebook-header {
-  min-height: 60px;
+  min-height: 56px;
   padding: 10px var(--premium-page-gutter);
   background: var(--notebook-surface-elevated);
   border-bottom-color: var(--notebook-border);
 }
 
 .notebook-source-row {
-  min-height: 52px;
+  min-height: 48px;
 }
 
 .notebook-note-card,

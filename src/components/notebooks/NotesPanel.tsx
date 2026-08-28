@@ -61,6 +61,7 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
   const [showTemplates, setShowTemplates] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'canvas'>('list');
+  const [showSearchModal, setShowSearchModal] = useState(false);
 
   // ─── Note Templates ────────────────────────────────────────────────────────
 
@@ -293,137 +294,220 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
   return (
     <div className={`h-full ${viewMode === 'canvas' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto custom-scrollbar'} p-5 lg:p-7 space-y-5`}>
       {/* Header with stats */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <button
-          onClick={() => {
-            if (onOpenNoteEditor) {
-              onOpenNoteEditor({ title: '', content: '' });
-            } else {
-              setShowForm(true); setEditingId(null); setTitle(''); setContent('');
-            }
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold transition-all active:scale-95 shadow-sm"
-          style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
-        >
-          <Plus className="w-4 h-4" />
-          Nouvelle note
-        </button>
-
-        {/* Templates dropdown */}
-        <div className="relative">
+      <div className="space-y-2">
+        {/* First line: Nouvelle note + Templates */}
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowTemplates(!showTemplates)}
-            className="flex items-center gap-1.5 px-3 py-2.5 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
-            style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+            onClick={() => {
+              if (onOpenNoteEditor) {
+                onOpenNoteEditor({ title: '', content: '' });
+              } else {
+                setShowForm(true); setEditingId(null); setTitle(''); setContent('');
+              }
+            }}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95 shadow-sm"
+            style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
           >
-            <Layout className="w-3.5 h-3.5" />
-            Templates
+            <Plus className="w-3.5 h-3.5" />
+            Nouvelle note
           </button>
-          <AnimatePresence>
-            {showTemplates && (
-              <motion.div
-                initial={{ opacity: 0, y: 4, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 4, scale: 0.95 }}
-                className="absolute top-full left-0 mt-1 z-30 w-52 rounded-xl overflow-hidden shadow-xl"
-                style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
-              >
-                {templates.map((tpl) => (
-                  <button
-                    key={tpl.id}
-                    onClick={() => applyTemplate(tpl)}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs transition-colors hover:bg-[var(--accent-subtle)]"
-                  >
-                    <tpl.icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: tpl.color }} />
-                    <span style={{ color: 'var(--text-primary)' }}>{tpl.label}</span>
-                  </button>
-                ))}
-                <div className="border-t border-[var(--border-base)] my-1" />
-                <button
-                  onClick={() => { setShowTemplates(false); setShowTemplateModal(true); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--accent-subtle)]"
+
+          {/* Templates dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
+              style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+            >
+              <Layout className="w-3.5 h-3.5" />
+              Templates
+            </button>
+            <AnimatePresence>
+              {showTemplates && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                  className="absolute top-full left-0 mt-1 z-30 w-48 rounded-xl overflow-hidden shadow-xl"
+                  style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
                 >
-                  <Sparkles className="w-3.5 h-3.5 flex-shrink-0 text-[var(--accent-primary)]" />
-                  <span>Bibliothèque complète...</span>
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  {templates.map((tpl) => (
+                    <button
+                      key={tpl.id}
+                      onClick={() => applyTemplate(tpl)}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs transition-colors hover:bg-[var(--accent-subtle)]"
+                    >
+                      <tpl.icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: tpl.color }} />
+                      <span style={{ color: 'var(--text-primary)' }}>{tpl.label}</span>
+                    </button>
+                  ))}
+                  <div className="border-t border-[var(--border-base)] my-1" />
+                  <button
+                    onClick={() => { setShowTemplates(false); setShowTemplateModal(true); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--accent-subtle)]"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 flex-shrink-0 text-[var(--accent-primary)]" />
+                    <span>Bibliothèque complète...</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
-        {/* Search */}
-        <div className="flex-1 min-w-[180px] relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--text-dimmed)' }} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Rechercher dans les notes..."
-            className="w-full pl-9 pr-3 py-2 rounded-full text-xs outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
-            style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
-          />
-        </div>
-
-        {/* Sort */}
-        <button
-          onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : prev === 'oldest' ? 'alpha' : 'newest')}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium border transition-all hover:bg-white/5"
-          style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
-          title="Changer l'ordre de tri"
-        >
-          <ArrowUpDown className="w-3 h-3" />
-          {sortOrder === 'newest' ? 'Récentes' : sortOrder === 'oldest' ? 'Anciennes' : 'A → Z'}
-        </button>
-
-        {/* Export */}
-        {notes.length > 0 && (
+        {/* Second line: Search button + Controls */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={handleExportAll}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
+            onClick={() => setShowSearchModal(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
             style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
-            title="Exporter toutes les notes en Markdown"
           >
-            <Download className="w-3 h-3" />
-            Export
+            <Search className="w-3.5 h-3.5" />
+            Rechercher
           </button>
-        )}
 
-        <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-dimmed)' }}>
-          {pinnedCount > 0 && (
-            <span className="flex items-center gap-1">
-              <Pin className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} />
-              {pinnedCount} épinglée{pinnedCount > 1 ? 's' : ''}
-            </span>
+          <button
+            onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : prev === 'oldest' ? 'alpha' : 'newest')}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-white/5"
+            style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+            title="Tri"
+          >
+            <ArrowUpDown className="w-3 h-3" />
+            {sortOrder === 'newest' ? 'Récentes' : sortOrder === 'oldest' ? 'Anciennes' : 'A → Z'}
+          </button>
+
+          {notes.length > 0 && (
+            <button
+              onClick={handleExportAll}
+              className="p-1.5 rounded-full border transition-all hover:bg-white/5 active:scale-95"
+              style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+              title="Exporter"
+            >
+              <Download className="w-3 h-3" />
+            </button>
           )}
-          <span>{notes.length} note{notes.length !== 1 ? 's' : ''}</span>
-        </div>
 
-        {/* View mode toggle */}
-        <div className="flex items-center rounded-lg overflow-hidden border" style={{ borderColor: 'var(--border-base)' }}>
-          <button
-            onClick={() => setViewMode('list')}
-            className="p-1.5 transition-colors"
-            style={{
-              backgroundColor: viewMode === 'list' ? 'var(--accent-subtle)' : 'transparent',
-              color: viewMode === 'list' ? 'var(--accent-primary)' : 'var(--text-dimmed)',
-            }}
-            title="Vue liste"
-          >
-            <List className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => setViewMode('canvas')}
-            className="p-1.5 transition-colors"
-            style={{
-              backgroundColor: viewMode === 'canvas' ? 'var(--accent-subtle)' : 'transparent',
-              color: viewMode === 'canvas' ? 'var(--accent-primary)' : 'var(--text-dimmed)',
-            }}
-            title="Vue canvas"
-          >
-            <Grid3X3 className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center rounded-lg overflow-hidden border ml-auto" style={{ borderColor: 'var(--border-base)' }}>
+            <button
+              onClick={() => setViewMode('list')}
+              className="p-1.5 transition-colors"
+              style={{
+                backgroundColor: viewMode === 'list' ? 'var(--accent-subtle)' : 'transparent',
+                color: viewMode === 'list' ? 'var(--accent-primary)' : 'var(--text-dimmed)',
+              }}
+              title="Liste"
+            >
+              <List className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode('canvas')}
+              className="p-1.5 transition-colors"
+              style={{
+                backgroundColor: viewMode === 'canvas' ? 'var(--accent-subtle)' : 'transparent',
+                color: viewMode === 'canvas' ? 'var(--accent-primary)' : 'var(--text-dimmed)',
+              }}
+              title="Canvas"
+            >
+              <Grid3X3 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <span className="text-xs ml-2" style={{ color: 'var(--text-dimmed)' }}>
+            {notes.length} note{notes.length !== 1 ? 's' : ''}
+          </span>
         </div>
       </div>
+
+      {/* Search Modal */}
+      <AnimatePresence>
+        {showSearchModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowSearchModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              className="w-full max-w-md mx-4 rounded-2xl overflow-hidden"
+              style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <Search className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Rechercher dans les notes..."
+                    className="flex-1 text-sm outline-none"
+                    style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => setShowSearchModal(false)}
+                    className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                  >
+                    <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Results */}
+              <div className="max-h-96 overflow-y-auto custom-scrollbar px-5 pb-5">
+                {sorted.length === 0 ? (
+                  <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
+                    Aucune note trouvée
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {sorted.map((note) => (
+                      <button
+                        key={note.id}
+                        onClick={() => {
+                          setShowSearchModal(false);
+                          startEdit(note);
+                        }}
+                        className="w-full text-left p-3 rounded-xl hover:bg-white/5 transition-colors border"
+                        style={{ borderColor: 'var(--border-base)' }}
+                      >
+                        <div className="flex items-center gap-2">
+                          {note.pinned && <Pin className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                              {note.title}
+                            </p>
+                            {note.content && (
+                              <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                                {note.content}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                                <Clock className="w-2.5 h-2.5" />
+                                {timeAgo(note.updatedAt)}
+                              </span>
+                              {note.content && (
+                                <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                                  {note.content.length} car.
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Inline fallback form (only when no onOpenNoteEditor prop provided) */}
       {!onOpenNoteEditor && (
