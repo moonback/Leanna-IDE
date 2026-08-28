@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.5.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-0.6.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/node-%3E%3D22.12.0-brightgreen" alt="Node.js" />
   <img src="https://img.shields.io/badge/electron-43-blueviolet" alt="Electron" />
   <img src="https://img.shields.io/badge/react-19-61dafb" alt="React" />
@@ -27,6 +27,7 @@
 - [Stack technique](#-stack-technique)
 - [Fonctionnalités principales](#-fonctionnalités-principales)
   - [IDE ](#ide-)
+    - [Raccourcis clavier du Terminal](#-raccourcis-clavier-du-terminal)
   - [Assistant Code (Leanna)](#assistant-code-leanna)
   - [Système Multi-Agents](#système-multi-agents)
   - [Notebooks RAG](#notebooks-rag)
@@ -94,9 +95,32 @@ Conçu comme un **système d'exploitation desktop**, Jarvis OS combine :
 
 - **Éditeur Monaco** : Syntaxe, autocomplétion, multi-fichiers, multi-onglets.
 - **Explorateur de fichiers** : Arbre interactif avec filtres et recherche globale (`Ctrl+Shift+F`).
+- **Terminal intégré** : Terminal multi-onglets avec commandes favorites, historique, recherche et exécutions rapides via raccourcis clavier.
 - **Mode Sandbox** : Environnement isolé (`.jarvis/sandbox/`) pour les modifications IA.
 - **Checkpoints Git** : Snapshot automatique avant modification avec possibilité de rollback.
 - **Validation stricte** : TypeScript, lint, analyse de sécurité avant merge.
+
+#### ⌨️ Raccourcis clavier du Terminal
+
+| Raccourci | Action |
+|----------|--------|
+| `Ctrl+\`` | Ouvrir/Fermer le terminal |
+| `Ctrl+T` | Nouveau onglet de terminal |
+| `Ctrl+W` | Fermer l'onglet actuel |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Naviguer entre les onglets |
+| `Ctrl+F` | Rechercher dans le terminal |
+| `Ctrl+1` | Exécuter `npm run dev` |
+| `Ctrl+2` | Exécuter `npm install` |
+| `Ctrl+3` | Exécuter `npm run build` |
+| `Ctrl+4` | Exécuter `npm test` |
+| `Ctrl+5` | Exécuter `git status` |
+| `Ctrl+6` | Exécuter `git pull` |
+| `Ctrl+7` | Effacer le terminal (`clear`) |
+| `Ctrl+8` | Lister les fichiers (`ls`) |
+| `Ctrl+9` | Afficher le répertoire courant (`pwd`) |
+| `Ctrl+0` | Remonter d'un répertoire (`cd ..`) |
+
+> **💡 Astuce** : Les commandes favorites et rapides dans le menu du terminal s'exécutent directement sans avoir à appuyer sur Entrée.
 
 ---
 
