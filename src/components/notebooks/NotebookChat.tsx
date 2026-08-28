@@ -12,9 +12,17 @@ import {
   MessageCircle, ArrowDown, GitCompare, Zap, StickyNote, Volume2, Square,
   Copy, Check, RefreshCw, Pencil, StopCircle, ThumbsUp, ThumbsDown,
   Filter, X, MessageSquarePlus, ChevronDown, FolderOpen, Folder, FileDown,
+  Search,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { MermaidDiagram } from './MermaidDiagram';
+import { AdvancedSearchBar, formatOptions, type AdvancedSearchOptions } from './AdvancedSearchBar';
+import {
+  CitationProvider,
+  EnhancedCitationRenderer,
+  CitationSidebar,
+  type EnhancedCitation
+} from './EnhancedCitation';
 
 interface Citation {
   sourceId: string;
@@ -42,6 +50,25 @@ interface SandboxFolder {
   path: string;
   name: string;
   depth: number;
+}
+
+// Fonction de conversion Citation → EnhancedCitation
+function convertToEnhancedCitation(citation: Citation, index: number): EnhancedCitation {
+  return {
+    id: `${citation.sourceId}-${citation.chunkId}-${index}`,
+    sourceId: citation.sourceId,
+    sourceTitle: citation.sourceTitle,
+    chunkId: citation.chunkId,
+    excerpt: citation.excerpt,
+    relevance: citation.relevance,
+    position: {
+      startChar: 0,
+      endChar: citation.excerpt.length,
+    },
+    confidence: citation.relevance, // Utiliser la pertinence comme confiance par défaut
+    quote: citation.excerpt,
+    displayFormat: 'inline',
+  };
 }
 
 // Critically damped default — graceful settle, no overshoot. Used for
@@ -355,6 +382,8 @@ function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
   return tokens.length > 0 ? tokens : [text];
 }
 
+
+
 export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const { error: toastError, success: toastSuccess } = useToast();
   const prefersReducedMotion = useReducedMotion();
@@ -367,8 +396,6 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const [followUps, setFollowUps] = useState<string[]>([]);
   const [followUpOffset, setFollowUpOffset] = useState(0);  const [streamingText, setStreamingText] = useState('');
   const [deepDiveProgress, setDeepDiveProgress] = useState('');
-  const [showCitations, setShowCitations] = useState<string | null>(null);
-  const [hoveredCitation, setHoveredCitation] = useState<{ citation: Citation; fullContent: string; x: number; y: number } | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
@@ -388,9 +415,64 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const [selectedFolder, setSelectedFolder] = useState<string>('');
   const [customFolderName, setCustomFolderName] = useState('');
   const [savingMd, setSavingMd] = useState(false);
+  
+  // AdvancedSearchBar state
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  
+  // CitationSidebar state
+  const [citationSidebarOpen, setCitationSidebarOpen] = useState(false);
+  const [allCitations, setAllCitations] = useState<EnhancedCitation[]>([]);
+
+  // Update all citations when messages change
+  useEffect(() => {
+    const allEnhancedCitations: EnhancedCitation[] = [];
+    messages.forEach((msg, msgIndex) => {
+      msg.citations.forEach((citation, citIndex) => {
+        allEnhancedCitations.push(convertToEnhancedCitation(citation, citIndex));
+      });
+    });
+    setAllCitations(allEnhancedCitations);
+  }, [messages]);
+
+  // Handler for navigating to source
+  const handleNavigateToSource = useCallback((sourceId: string, chunkId: string) => {
+    // Implementation for navigating to source
+    console.log('Navigate to source:', sourceId, chunkId);
+    // Here you would typically navigate to the source document or highlight the chunk
+  }, []);
+
+  /** Render message content with enhanced citations */
+  const renderMessageWithCitations = useCallback((content: string, citations: Citation[]): JSX.Element => {
+    // Convert citations to EnhancedCitation format
+    const enhancedCitations = citations.map((citation, index) => convertToEnhancedCitation(citation, index));
+    
+    // For now, we'll use the original renderMessageContent but with citation badges
+    // In a real implementation, the backend would include [SOURCE N] references in the content
+    // and EnhancedCitationRenderer would replace them with badges
+    
+    // As a temporary solution, we'll append citation info to the content
+    // This allows us to use EnhancedCitationRenderer
+    const contentWithCitations = content;
+    
+    return (
+      <div className="space-y-3">
+        <EnhancedCitationRenderer content={contentWithCitations} citations={enhancedCitations} />
+        {enhancedCitations.length > 0 && (
+          <div className="mt-2 pt-2 border-t" style={{ borderColor: 'var(--notebook-border)' }}>
+            <button
+              onClick={() => setCitationSidebarOpen(true)}
+              className="flex items-center gap-1.5 text-xs font-medium opacity-70 hover:opacity-100 transition"
+            >
+              <Quote className="w-3 h-3" />
+              {enhancedCitations.length} citation{enhancedCitations.length > 1 ? 's' : ''}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }, []);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const chunkCache = useRef<Map<string, string>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -919,6 +1001,15 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     }
   }, [input, loading, notebookId, toastError]);
 
+  // Handler for advanced search
+  const handleAdvancedSearch = useCallback((query: string, options: AdvancedSearchOptions) => {
+    // Convert options to query string for the search
+    const optionsStr = formatOptions(options);
+    const fullQuery = query + optionsStr;
+    handleSend(fullQuery);
+    setShowAdvancedSearch(false);
+  }, [formatOptions, handleSend]);
+
   // ─── Retry / Regenerate (must be after handleSend) ─────────────────────────
 
   const handleRetry = useCallback(async (msgId: string) => {
@@ -1188,38 +1279,6 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     }
   }, [handleSend]);
 
-  // ─── Citation Hover ─────────────────────────────────────────────────────────
-
-  const handleCitationHover = useCallback(async (citation: Citation, event: React.MouseEvent) => {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-
-    const cached = chunkCache.current.get(citation.chunkId);
-    if (cached) {
-      setHoveredCitation({ citation, fullContent: cached, x: rect.left, y: rect.top });
-      return;
-    }
-
-    setHoveredCitation({ citation, fullContent: citation.excerpt, x: rect.left, y: rect.top });
-
-    try {
-      const res = await fetch(`/api/notebooks/${notebookId}/chat/chunk/${citation.chunkId}`);
-      if (res.ok) {
-        const data = await res.json();
-        const content = data.chunk?.content || citation.excerpt;
-        chunkCache.current.set(citation.chunkId, content);
-        setHoveredCitation(prev =>
-          prev?.citation.chunkId === citation.chunkId
-            ? { ...prev, fullContent: content }
-            : prev
-        );
-      }
-    } catch { /* ignore */ }
-  }, [notebookId]);
-
-  const handleCitationLeave = useCallback(() => {
-    setHoveredCitation(null);
-  }, []);
-
   // ─── Export ────────────────────────────────────────────────────────────────
 
   const handleExport = useCallback(async () => {
@@ -1296,7 +1355,8 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   }
 
   return (
-    <div className="h-full flex flex-col bg-transparent">
+    <CitationProvider initialCitations={allCitations} onNavigateToSource={handleNavigateToSource}>
+      <div className="h-full flex flex-col bg-transparent">
       {/* Thread bar */}
       <div
         className="mx-auto flex w-full max-w-4xl flex-shrink-0 items-center gap-2 px-5 py-4 lg:px-8"
@@ -1514,7 +1574,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                       </div>
                     </div>
                   ) : msg.role === 'assistant' ? (
-                    renderMessageContent(msg.content)
+                    renderMessageWithCitations(msg.content, msg.citations)
                   ) : (
                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                   )}
@@ -1651,52 +1711,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                     </div>
                   )}
 
-                  {/* Citations */}
-                  {msg.citations.length > 0 && (
-                    <div className="mt-3 pt-2.5 border-t" style={{ borderColor: 'var(--notebook-border)' }}>
-                      <button
-                        onClick={() => setShowCitations(showCitations === msg.id ? null : msg.id)}
-                        className="flex items-center gap-1.5 text-xs font-medium opacity-70 hover:opacity-100 transition"
-                      >
-                        <Quote className="w-3 h-3" />
-                        {msg.citations.length} citation{msg.citations.length > 1 ? 's' : ''}
-                      </button>
 
-                      <AnimatePresence>
-                        {showCitations === msg.id && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="mt-2 space-y-2">
-                              {msg.citations.map((cit, i) => (
-                                <div
-                                  key={i}
-                                  className="p-2.5 rounded-lg text-xs cursor-pointer transition-all hover:ring-1 hover:ring-[var(--accent-primary)]"
-                                  style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)' }}
-                                  onMouseEnter={(e) => handleCitationHover(cit, e)}
-                                  onMouseLeave={handleCitationLeave}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-semibold">{cit.sourceTitle}</span>
-                                    <span
-                                      className="px-1.5 py-0.5 rounded-full text-xs font-bold"
-                                      style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
-                                    >
-                                      {(cit.relevance * 100).toFixed(0)}%
-                                    </span>
-                                  </div>
-                                  <p className="mt-1 line-clamp-2 opacity-75 leading-relaxed">{cit.excerpt}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  )}
                 </div>
               </motion.div>
             ))}
@@ -1847,39 +1862,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         </AnimatePresence>
       </div>
 
-      {/* Citation hover tooltip */}
-      <AnimatePresence>
-        {hoveredCitation && (
-          <motion.div
-            initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.95 }}
-            transition={{ duration: 0.1 }}
-            className="fixed z-50 max-w-md p-4 rounded-xl shadow-2xl pointer-events-none"
-            style={{
-              left: Math.min(hoveredCitation.x, window.innerWidth - 420),
-              top: Math.max(hoveredCitation.y - 200, 8),
-              backgroundColor: 'var(--bg-panel)',
-              border: '1px solid var(--border-focus)',
-              color: 'var(--text-primary)',
-            }}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <Quote className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-              <span className="text-xs font-semibold truncate">{hoveredCitation.citation.sourceTitle}</span>
-              <span
-                className="text-xs px-1.5 py-0.5 rounded-full font-bold flex-shrink-0"
-                style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
-              >
-                {(hoveredCitation.citation.relevance * 100).toFixed(0)}%
-              </span>
-            </div>
-            <p className="text-xs leading-relaxed whitespace-pre-wrap max-h-44 overflow-y-auto custom-scrollbar" style={{ color: 'var(--text-muted)' }}>
-              {hoveredCitation.fullContent}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
 
       {/* Input area — refined professional design */}
       <div
@@ -2078,6 +2061,17 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 <span style={{ color: 'var(--accent-primary)' }}> • {selectedSources.length} source{selectedSources.length > 1 ? 's' : ''}</span>
               )}
             </p>
+            {hasSources && (
+              <button
+                onClick={() => setShowAdvancedSearch(true)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--accent-subtle)]"
+                style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
+                title="Recherche avancée"
+              >
+                <Search className="w-3 h-3" />
+                <span>Recherche avancée</span>
+              </button>
+            )}
 
             {/* Personality selector */}
             <div className="relative">
@@ -2295,5 +2289,20 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         )}
       </AnimatePresence>
     </div>
+    <CitationSidebar
+      citations={allCitations}
+      isOpen={citationSidebarOpen}
+      onClose={() => setCitationSidebarOpen(false)}
+    />
+    {showAdvancedSearch && (
+      <AdvancedSearchBar
+        notebookId={notebookId}
+        onSearch={handleAdvancedSearch}
+        onClose={() => setShowAdvancedSearch(false)}
+        hasSources={hasSources}
+        sources={sources.map(s => ({ ...s, type: 'text' }))}
+      />
+    )}
+    </CitationProvider>
   );
 }
