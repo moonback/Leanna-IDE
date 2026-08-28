@@ -12,6 +12,7 @@ import {
   MessageCircle, ArrowDown, GitCompare, Zap, StickyNote, Volume2, Square,
   Copy, Check, RefreshCw, Pencil, StopCircle, ThumbsUp, ThumbsDown,
   Filter, X, MessageSquarePlus, ChevronDown, FolderOpen, Folder, FileDown,
+  ExternalLink,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -78,13 +79,13 @@ function renderMessageContent(content: string): JSX.Element {
                   className="flex items-center justify-between px-3 py-1.5"
                   style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-base)' }}
                 >
-                  <span className="text-xs font-mono font-medium uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-smfont-mono font-medium uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                     {lang}
                   </span>
                 </div>
               )}
               <pre
-                className="px-4 py-3 text-xs overflow-x-auto font-mono leading-relaxed"
+                className="px-4 py-3 text-smoverflow-x-auto font-mono leading-relaxed"
                 style={{ backgroundColor: 'var(--bg-base)', margin: 0 }}
               >
                 <code style={{ color: 'var(--text-secondary)' }}>{code}</code>
@@ -114,7 +115,7 @@ function renderMessageContent(content: string): JSX.Element {
                 }}
               >
                 {blockquoteLines.map((line, j) => (
-                  <p key={j} className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  <p key={j} className="text-smleading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                     {renderInlineMarkdown(line)}
                   </p>
                 ))}
@@ -204,7 +205,7 @@ function renderMessageContent(content: string): JSX.Element {
           // Headers
           if (line.startsWith('#### ')) {
             blocks.push(
-              <h4 key={`h4-${blockIdx++}`} className="text-xs font-bold mt-3 mb-1" style={{ color: 'var(--text-primary)' }}>
+              <h4 key={`h4-${blockIdx++}`} className="text-smfont-bold mt-3 mb-1" style={{ color: 'var(--text-primary)' }}>
                 {renderInlineMarkdown(line.slice(5))}
               </h4>
             );
@@ -212,7 +213,7 @@ function renderMessageContent(content: string): JSX.Element {
           }
           if (line.startsWith('### ')) {
             blocks.push(
-              <h3 key={`h3-${blockIdx++}`} className="text-xs font-bold mt-3 mb-1" style={{ color: 'var(--text-primary)' }}>
+              <h3 key={`h3-${blockIdx++}`} className="text-smfont-bold mt-3 mb-1" style={{ color: 'var(--text-primary)' }}>
                 {renderInlineMarkdown(line.slice(4))}
               </h3>
             );
@@ -243,7 +244,7 @@ function renderMessageContent(content: string): JSX.Element {
                   className="mt-[7px] w-1.5 h-1.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: 'var(--accent-primary)', opacity: 0.7 }}
                 />
-                <span className="text-xs leading-relaxed flex-1" style={{ color: 'var(--text-secondary)' }}>
+                <span className="text-smleading-relaxed flex-1" style={{ color: 'var(--text-secondary)' }}>
                   {renderInlineMarkdown(line.slice(2))}
                 </span>
               </div>
@@ -257,12 +258,12 @@ function renderMessageContent(content: string): JSX.Element {
             blocks.push(
               <div key={`ol-${blockIdx++}`} className="flex gap-2.5 pl-2 my-0.5">
                 <span
-                  className="text-xs font-bold min-w-[16px] mt-[2px] flex-shrink-0 text-center rounded"
+                  className="text-smfont-bold min-w-[16px] mt-[2px] flex-shrink-0 text-center rounded"
                   style={{ color: 'var(--accent-primary)' }}
                 >
                   {num}
                 </span>
-                <span className="text-xs leading-relaxed flex-1" style={{ color: 'var(--text-secondary)' }}>
+                <span className="text-smleading-relaxed flex-1" style={{ color: 'var(--text-secondary)' }}>
                   {renderInlineMarkdown(line.replace(/^\d+\.\s/, ''))}
                 </span>
               </div>
@@ -272,7 +273,7 @@ function renderMessageContent(content: string): JSX.Element {
 
           // Regular paragraph
           blocks.push(
-            <p key={`p-${blockIdx++}`} className="text-xs leading-[1.7]" style={{ color: 'var(--text-secondary)' }}>
+            <p key={`p-${blockIdx++}`} className="text-smleading-[1.7]" style={{ color: 'var(--text-secondary)' }}>
               {renderInlineMarkdown(line)}
             </p>
           );
@@ -322,7 +323,7 @@ function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
       tokens.push(
         <code
           key={`c-${keyIdx++}`}
-          className="px-1.5 py-0.5 rounded text-xs font-mono"
+          className="px-1.5 py-0.5 rounded text-smfont-mono"
           style={{ backgroundColor: 'rgba(0,0,0,0.15)', border: '1px solid var(--border-base)' }}
         >
           {match[6]}
@@ -1306,7 +1307,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         <div className="relative flex-1 min-w-0">
           <button
             onClick={() => setShowThreadList(!showThreadList)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-white/5 max-w-[250px]"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-smfont-medium transition-all hover:bg-white/5 max-w-[250px]"
             style={{ color: 'var(--text-primary)' }}
           >
             <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
@@ -1336,7 +1337,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                   >
                     <MessageCircle className="w-3 h-3 flex-shrink-0" style={{ color: activeThreadId === null ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
                     <span
-                      className="flex-1 text-xs font-medium"
+                      className="flex-1 text-smfont-medium"
                       style={{ color: activeThreadId === null ? 'var(--accent-primary)' : 'var(--text-primary)' }}
                     >
                       Conversation principale
@@ -1357,7 +1358,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                       >
                         <MessageCircle className="w-3 h-3 flex-shrink-0" style={{ color: thread.id === activeThreadId ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
                         <span
-                          className="flex-1 text-xs font-medium truncate"
+                          className="flex-1 text-smfont-medium truncate"
                           style={{ color: thread.id === activeThreadId ? 'var(--accent-primary)' : 'var(--text-primary)' }}
                         >
                           {thread.title}
@@ -1380,7 +1381,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
         {/* Token counter (estimated) */}
         <div
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-smfont-medium"
           style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-dimmed)' }}
           title="Estimation des tokens utilisés dans cette conversation"
         >
@@ -1393,7 +1394,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         {/* New thread button */}
         <button
           onClick={handleNewThread}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--accent-subtle)] active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-smfont-medium transition-all hover:bg-[var(--accent-subtle)] active:scale-95"
           style={{ color: 'var(--accent-primary)', border: '1px solid var(--border-base)' }}
           title="Nouvelle conversation"
         >
@@ -1430,7 +1431,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
             {/* Suggestions — 2 visibles + bouton pour en voir d'autres */}
             {suggestions.length > 0 && (
               <div className="w-full mt-4 space-y-3">
-                <p className="text-xs font-medium flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-smfont-medium flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
                   <Lightbulb className="w-3.5 h-3.5" />
                   Suggestions
                 </p>
@@ -1455,7 +1456,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 {suggestions.length > 2 && (
                   <button
                     onClick={() => setSuggestionOffset((prev) => (prev + 2) >= suggestions.length ? 0 : prev + 2)}
-                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors hover:opacity-80"
+                    className="flex items-center gap-1.5 text-smfont-medium px-3 py-1.5 rounded-full transition-colors hover:opacity-80"
                     style={{ color: 'var(--accent-primary)' }}
                   >
                     <RefreshCw className="w-3 h-3" />
@@ -1500,14 +1501,14 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                         <button
                           onClick={() => handleEditSubmit(msg.id)}
                           disabled={!editingContent.trim()}
-                          className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-40"
+                          className="px-3 py-1.5 rounded-full text-smfont-medium transition-colors disabled:opacity-40"
                           style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--text-primary)' }}
                         >
                           Renvoyer
                         </button>
                         <button
                           onClick={handleEditCancel}
-                          className="px-3 py-1.5 rounded-full text-xs font-medium notebook-chip"
+                          className="px-3 py-1.5 rounded-full text-smfont-medium notebook-chip"
                         >
                           Annuler
                         </button>
@@ -1521,182 +1522,296 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
                   {/* Actions bar */}
                   {editingMsgId !== msg.id && (
-                    <div className="flex items-center gap-2 mt-2.5 pt-1">
-                      <p className="text-xs opacity-40">
-                        {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+    <div className="flex flex-wrap items-center gap-2 mt-2.5 pt-1">
+      <p className="text-sm opacity-40">
+        {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+      </p>
 
-                      {/* Separator dot */}
-                      <span className="text-xs opacity-20">•</span>
+      {/* Separator dot */}
+      <span className="text-sm opacity-20" aria-hidden="true">•</span>
 
-                      {msg.role === 'assistant' && (
-                        <>
-                          {/* Copy */}
-                          <button
-                            onClick={() => handleCopy(msg.id, msg.content)}
-                            className={`flex items-center gap-1 text-xs transition-all ${copiedMsgId === msg.id ? 'opacity-100' : 'opacity-40 hover:opacity-100'}`}
-                            style={{ color: copiedMsgId === msg.id ? 'var(--color-success)' : undefined }}
-                            title="Copier la réponse"
-                          >
-                            {copiedMsgId === msg.id ? (
-                              <Check className="w-3 h-3" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                            <span>{copiedMsgId === msg.id ? 'Copié' : 'Copier'}</span>
-                          </button>
+      {msg.role === 'assistant' && (
+        <>
+          {/* Copy */}
+          <button
+            type="button"
+            onClick={() => handleCopy(msg.id, msg.content)}
+            className={`flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 ${
+              copiedMsgId === msg.id
+                ? 'opacity-100 bg-[var(--color-success)]/10'
+                : 'opacity-60 hover:opacity-100 hover:bg-[var(--notebook-hover)]'
+            }`}
+            style={{ color: copiedMsgId === msg.id ? 'var(--color-success)' : undefined }}
+            title="Copier la réponse"
+            aria-label={copiedMsgId === msg.id ? "Copié" : "Copier la réponse"}
+          >
+            {copiedMsgId === msg.id ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : (
+              <Copy className="w-3.5 h-3.5" />
+            )}
+            <span className="text-xs">{copiedMsgId === msg.id ? 'Copié' : 'Copier'}</span>
+          </button>
 
-                          {/* Retry */}
-                          <button
-                            onClick={() => handleRetry(msg.id)}
-                            disabled={loading}
-                            className="flex items-center gap-1 text-xs opacity-40 hover:opacity-100 transition-opacity disabled:opacity-20"
-                            title="Régénérer la réponse"
-                          >
-                            <RefreshCw className="w-3 h-3" />
-                            <span>Retry</span>
-                          </button>
+          {/* Retry */}
+          <button
+            type="button"
+            onClick={() => handleRetry(msg.id)}
+            disabled={loading}
+            className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-hover)] disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Régénérer la réponse"
+            aria-label="Régénérer la réponse"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span className="text-xs">Retry</span>
+          </button>
 
-                          {/* TTS */}
-                          <button
-                            onClick={() => handleTTS(msg.id, msg.content)}
-                            className={`flex items-center gap-1.5 text-xs transition-all rounded-md px-1.5 py-0.5 ${speakingMsgId === msg.id ? 'opacity-100 bg-[var(--accent-primary)]/10' : 'opacity-40 hover:opacity-100'}`}
-                            style={{ color: speakingMsgId === msg.id ? 'var(--accent-primary)' : undefined }}
-                            title={speakingMsgId === msg.id ? 'Arrêter la lecture' : 'Lire à voix haute (TTS IA)'}
-                          >
-                            {speakingMsgId === msg.id ? (
-                              <>
-                                <Square className="w-3 h-3" />
-                                <span className="flex items-center gap-[2px]">
-                                  <span className="w-[2px] h-2 bg-current rounded-full animate-[pulse_0.6s_ease-in-out_infinite]" />
-                                  <span className="w-[2px] h-3 bg-current rounded-full animate-[pulse_0.6s_ease-in-out_infinite_0.15s]" />
-                                  <span className="w-[2px] h-2.5 bg-current rounded-full animate-[pulse_0.6s_ease-in-out_infinite_0.3s]" />
-                                  <span className="w-[2px] h-2 bg-current rounded-full animate-[pulse_0.6s_ease-in-out_infinite_0.45s]" />
-                                </span>
-                                <span>Stop</span>
-                              </>
-                            ) : (
-                              <>
-                                <Volume2 className="w-3 h-3" />
-                                <span>Écouter</span>
-                              </>
-                            )}
-                          </button>
+          {/* TTS */}
+          <button
+            type="button"
+            onClick={() => handleTTS(msg.id, msg.content)}
+            className={`flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 ${
+              speakingMsgId === msg.id
+                ? 'opacity-100 bg-[var(--accent-primary)]/10'
+                : 'opacity-60 hover:opacity-100 hover:bg-[var(--notebook-hover)]'
+            }`}
+            style={{ color: speakingMsgId === msg.id ? 'var(--accent-primary)' : undefined }}
+            title={speakingMsgId === msg.id ? 'Arrêter la lecture' : 'Lire à voix haute (TTS IA)'}
+            aria-label={speakingMsgId === msg.id ? "Arrêter la lecture" : "Lire à voix haute"}
+          >
+            {speakingMsgId === msg.id ? (
+              <>
+                <Square className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1">
+                  <div className="flex gap-[2px]">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <span
+                        key={i}
+                        className="w-[2px] h-2 bg-current rounded-full"
+                        style={{ animationDelay: `${i * 0.15}s` }}
+                        aria-hidden="true"
+                      />
+                    ))}
+                  </div>
+                </span>
+                <span className="text-xs">Stop</span>
+              </>
+            ) : (
+              <>
+                <Volume2 className="w-3.5 h-3.5" />
+                <span className="text-xs">Écouter</span>
+              </>
+            )}
+          </button>
 
-                          {/* Save to notes */}
-                          <button
-                            onClick={() => handleSaveToNote(msg)}
-                            className="flex items-center gap-1 text-xs opacity-40 hover:opacity-100 transition-opacity"
-                            title="Sauvegarder dans les notes"
-                          >
-                            <StickyNote className="w-3 h-3" />
-                            <span>Note</span>
-                          </button>
+          {/* Save to notes */}
+          <button
+            type="button"
+            onClick={() => handleSaveToNote(msg)}
+            className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-hover)]"
+            title="Sauvegarder dans les notes"
+            aria-label="Sauvegarder dans les notes"
+          >
+            <StickyNote className="w-3.5 h-3.5" />
+            <span className="text-xs">Note</span>
+          </button>
 
-                          {/* Save as Markdown */}
-                          <button
-                            onClick={() => openFolderPicker(msg)}
-                            className="flex items-center gap-1 text-xs opacity-40 hover:opacity-100 transition-opacity"
-                            title="Enregistrer ce message en fichier Markdown (.md)"
-                          >
-                            <Download className="w-3 h-3" />
-                            <span>MD</span>
-                          </button>
+          {/* Save as Markdown */}
+          <button
+            type="button"
+            onClick={() => openFolderPicker(msg)}
+            className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-hover)]"
+            title="Enregistrer ce message en fichier Markdown (.md)"
+            aria-label="Enregistrer en Markdown"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="text-xs">MD</span>
+          </button>
 
-                          {/* Separator */}
-                          <span className="text-xs opacity-20">•</span>
+          {/* Separator */}
+          <span className="text-sm opacity-20" aria-hidden="true">•</span>
 
-                          {/* Feedback thumbs */}
-                          <button
-                            onClick={() => handleFeedback(msg.id, 'up')}
-                            className={`p-1 rounded transition-all ${feedbackMap[msg.id] === 'up' ? 'opacity-100' : 'opacity-30 hover:opacity-80'}`}
-                            style={{ color: feedbackMap[msg.id] === 'up' ? 'var(--color-success)' : undefined }}
-                            title="Bonne réponse"
-                          >
-                            <ThumbsUp className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => handleFeedback(msg.id, 'down')}
-                            className={`p-1 rounded transition-all ${feedbackMap[msg.id] === 'down' ? 'opacity-100' : 'opacity-30 hover:opacity-80'}`}
-                            style={{ color: feedbackMap[msg.id] === 'down' ? 'var(--color-error)' : undefined }}
-                            title="Mauvaise réponse"
-                          >
-                            <ThumbsDown className="w-3 h-3" />
-                          </button>
-                        </>
-                      )}
+          {/* Feedback thumbs */}
+          <div className="flex gap-0.5">
+            <button
+              type="button"
+              onClick={() => handleFeedback(msg.id, 'up')}
+              className={`p-1.5 rounded-md transition-all duration-200 ${
+                feedbackMap[msg.id] === 'up'
+                  ? 'opacity-100 bg-[var(--color-success)]/10'
+                  : 'opacity-60 hover:opacity-100 hover:bg-[var(--notebook-hover)]'
+              }`}
+              style={{ color: feedbackMap[msg.id] === 'up' ? 'var(--color-success)' : undefined }}
+              title="Bonne réponse"
+              aria-label="Bonne réponse"
+            >
+              <ThumbsUp className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleFeedback(msg.id, 'down')}
+              className={`p-1.5 rounded-md transition-all duration-200 ${
+                feedbackMap[msg.id] === 'down'
+                  ? 'opacity-100 bg-[var(--color-error)]/10'
+                  : 'opacity-60 hover:opacity-100 hover:bg-[var(--notebook-hover)]'
+              }`}
+              style={{ color: feedbackMap[msg.id] === 'down' ? 'var(--color-error)' : undefined }}
+              title="Mauvaise réponse"
+              aria-label="Mauvaise réponse"
+            >
+              <ThumbsDown className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </>
+      )}
 
-                      {msg.role === 'user' && (
-                        <>
-                          <button
-                            onClick={() => handleEditStart(msg.id, msg.content)}
-                            className="flex items-center gap-1 text-xs opacity-40 hover:opacity-100 transition-opacity"
-                            title="Modifier et renvoyer"
-                          >
-                            <Pencil className="w-3 h-3" />
-                            <span>Modifier</span>
-                          </button>
+      {msg.role === 'user' && (
+        <>
+          <button
+            type="button"
+            onClick={() => handleEditStart(msg.id, msg.content)}
+            className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-hover)]"
+            title="Modifier et renvoyer"
+            aria-label="Modifier le message"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            <span className="text-xs">Modifier</span>
+          </button>
 
-                          {/* Save user message as Markdown */}
-                          <button
-                            onClick={() => openFolderPicker(msg)}
-                            className="flex items-center gap-1 text-xs opacity-40 hover:opacity-100 transition-opacity"
-                            title="Enregistrer ce message en fichier Markdown (.md)"
-                          >
-                            <Download className="w-3 h-3" />
-                            <span>MD</span>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
+          {/* Save user message as Markdown */}
+          <button
+            type="button"
+            onClick={() => openFolderPicker(msg)}
+            className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-hover)]"
+            title="Enregistrer ce message en fichier Markdown (.md)"
+            aria-label="Enregistrer en Markdown"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="text-xs">MD</span>
+          </button>
+        </>
+      )}
+    </div>
+  )}
 
                   {/* Citations */}
                   {msg.citations.length > 0 && (
-                    <div className="mt-3 pt-2.5 border-t" style={{ borderColor: 'var(--notebook-border)' }}>
-                      <button
-                        onClick={() => setShowCitations(showCitations === msg.id ? null : msg.id)}
-                        className="flex items-center gap-1.5 text-xs font-medium opacity-70 hover:opacity-100 transition"
-                      >
-                        <Quote className="w-3 h-3" />
-                        {msg.citations.length} citation{msg.citations.length > 1 ? 's' : ''}
-                      </button>
+  <div className="mt-3 pt-2.5 border-t" style={{ borderColor: 'var(--notebook-border)' }}>
+    <button
+      type="button"
+      onClick={() => setShowCitations(showCitations === msg.id ? null : msg.id)}
+      className="flex items-center gap-1.5 text-sm font-medium transition-all duration-200 rounded-md px-2 py-1.5 opacity-70 hover:opacity-100 hover:bg-[var(--notebook-hover)]"
+      aria-expanded={showCitations === msg.id}
+      aria-controls={`citations-${msg.id}`}
+      aria-label={`${msg.citations.length} citation${msg.citations.length > 1 ? 's' : ''} disponibles`}
+    >
+      <Quote className="w-4 h-4" />
+      <span>
+        {msg.citations.length} citation{msg.citations.length > 1 ? 's' : ''}
+      </span>
+      <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showCitations === msg.id ? 'rotate-180' : ''}`} />
+    </button>
 
-                      <AnimatePresence>
-                        {showCitations === msg.id && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="mt-2 space-y-2">
-                              {msg.citations.map((cit, i) => (
-                                <div
-                                  key={i}
-                                  className="p-2.5 rounded-lg text-xs cursor-pointer transition-all hover:ring-1 hover:ring-[var(--accent-primary)]"
-                                  style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)' }}
-                                  onMouseEnter={(e) => handleCitationHover(cit, e)}
-                                  onMouseLeave={handleCitationLeave}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-semibold">{cit.sourceTitle}</span>
-                                    <span
-                                      className="px-1.5 py-0.5 rounded-full text-xs font-bold"
-                                      style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
-                                    >
-                                      {(cit.relevance * 100).toFixed(0)}%
-                                    </span>
-                                  </div>
-                                  <p className="mt-1 line-clamp-2 opacity-75 leading-relaxed">{cit.excerpt}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  )}
+    <AnimatePresence>
+      {showCitations === msg.id && (
+        <motion.div
+          id={`citations-${msg.id}`}
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="overflow-hidden"
+        >
+          {/* Conteneur scrollable avec hauteur max */}
+          <div
+            className="mt-3 space-y-3 max-h-96 overflow-y-auto custom-scrollbar"
+            onMouseLeave={() => {
+              // Ne pas fermer le tooltip si on quitte juste pour scroller
+              const relatedTarget = document.querySelector(`#citations-${msg.id} :hover`);
+              if (!relatedTarget) setHoveredCitation(null);
+            }}
+          >
+            {msg.citations.map((cit, i) => (
+              <div
+                key={cit.chunkId || i}
+                className="p-3 rounded-lg transition-all duration-200 hover:shadow-sm hover:ring-1 hover:ring-[var(--accent-primary)]/30"
+                style={{
+                  backgroundColor: 'var(--bg-base)',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                {/* Header avec titre + pertinence */}
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className="font-medium text-[var(--text-primary)] truncate">
+                    {cit.sourceTitle}
+                  </span>
+                  <span
+                    className="px-2 py-0.5 rounded-full text-xs font-semibold"
+                    style={{
+                      backgroundColor: 'var(--accent-subtle)',
+                      color: 'var(--accent-primary)',
+                    }}
+                  >
+                    {(cit.relevance * 100).toFixed(0)}% pertinent
+                  </span>
+                </div>
+
+                {/* Extrait avec affichage complet au clic */}
+                <p className="text-sm opacity-80 leading-relaxed line-clamp-3 cursor-pointer">
+                  {cit.excerpt}
+                </p>
+
+                {/* Bouton pour voir le détail */}
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const cached = chunkCache.current.get(cit.chunkId);
+                    if (cached) {
+                      setHoveredCitation({
+                        citation: cit,
+                        fullContent: cached,
+                        x: e.clientX,
+                        y: e.clientY,
+                      });
+                      return;
+                    }
+
+                    setHoveredCitation({
+                      citation: cit,
+                      fullContent: cit.excerpt,
+                      x: e.clientX,
+                      y: e.clientY,
+                    });
+
+                    try {
+                      const res = await fetch(`/api/notebooks/${notebookId}/chat/chunk/${cit.chunkId}`);
+                      if (res.ok) {
+                        const data = await res.json();
+                        const content = data.chunk?.content || cit.excerpt;
+                        chunkCache.current.set(cit.chunkId, content);
+                        setHoveredCitation({
+                          citation: cit,
+                          fullContent: content,
+                          x: e.clientX,
+                          y: e.clientY,
+                        });
+                      }
+                    } catch { /* ignore */ }
+                  }}
+                  className="text-xs opacity-60 hover:opacity-100 transition-opacity mt-1 flex items-center gap-1"
+                  style={{ color: 'var(--accent-primary)' }}
+                >
+                  Voir le détail <ExternalLink className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </div>
+)}
                 </div>
               </motion.div>
             ))}
@@ -1729,7 +1844,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               >
                 <button
                   onClick={handleStopStreaming}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95"
+                  className="flex items-center gap-2 px-4 py-2 rounded-full text-smfont-medium transition-all hover:scale-105 active:scale-95"
                   style={{
                     backgroundColor: 'var(--bg-panel)',
                     border: '1px solid var(--border-base)',
@@ -1789,7 +1904,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 transition={{ delay: 0.2 }}
                 className="space-y-3 pt-4 max-w-4xl mx-auto"
               >
-                <p className="text-xs font-medium flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-smfont-medium flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
                   <Lightbulb className="w-3.5 h-3.5" />
                   Questions de suivi
                 </p>
@@ -1814,7 +1929,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 {followUps.length > 2 && (
                   <button
                     onClick={() => setFollowUpOffset((prev) => (prev + 2) >= followUps.length ? 0 : prev + 2)}
-                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors hover:opacity-80"
+                    className="flex items-center gap-1.5 text-smfont-medium px-3 py-1.5 rounded-full transition-colors hover:opacity-80"
                     style={{ color: 'var(--accent-primary)' }}
                   >
                     <RefreshCw className="w-3 h-3" />
@@ -1866,15 +1981,15 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
           >
             <div className="flex items-center gap-2 mb-2">
               <Quote className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-              <span className="text-xs font-semibold truncate">{hoveredCitation.citation.sourceTitle}</span>
+              <span className="text-smfont-semibold truncate">{hoveredCitation.citation.sourceTitle}</span>
               <span
-                className="text-xs px-1.5 py-0.5 rounded-full font-bold flex-shrink-0"
+                className="text-smpx-1.5 py-0.5 rounded-full font-bold flex-shrink-0"
                 style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
               >
                 {(hoveredCitation.citation.relevance * 100).toFixed(0)}%
               </span>
             </div>
-            <p className="text-xs leading-relaxed whitespace-pre-wrap max-h-44 overflow-y-auto custom-scrollbar" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-smleading-relaxed whitespace-pre-wrap max-h-44 overflow-y-auto custom-scrollbar" style={{ color: 'var(--text-muted)' }}>
               {hoveredCitation.fullContent}
             </p>
           </motion.div>
@@ -1898,14 +2013,14 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               className="flex items-center gap-2 p-2.5 rounded-xl flex-wrap"
               style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
             >
-              <span className="text-xs font-semibold flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-smfont-semibold flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
                 Sources actives :
               </span>
               {sources.map(s => (
                 <button
                   key={s.id}
                   onClick={() => toggleSourceFilter(s.id)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all active:scale-95 ${
+                  className={`px-2.5 py-1 rounded-full text-smfont-medium transition-all active:scale-95 ${
                     selectedSources.includes(s.id) || selectedSources.length === 0
                       ? 'ring-1 ring-[var(--accent-primary)]'
                       : 'opacity-40'
@@ -1922,7 +2037,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               {selectedSources.length > 0 && (
                 <button
                   onClick={clearSourceFilter}
-                  className="px-2 py-1 rounded-full text-xs font-medium transition-all hover:bg-red-500/10"
+                  className="px-2 py-1 rounded-full text-smfont-medium transition-all hover:bg-red-500/10"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   <X className="w-3 h-3 inline mr-0.5" />
@@ -1949,7 +2064,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                   onClick={() => { setInput(''); handleSend(cmd.prompt); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[var(--accent-subtle)]"
                 >
-                  <code className="text-xs font-mono font-semibold" style={{ color: 'var(--accent-primary)' }}>
+                  <code className="text-smfont-mono font-semibold" style={{ color: 'var(--accent-primary)' }}>
                     {cmd.cmd}
                   </code>
                   <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -1983,7 +2098,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 <Filter className="w-4 h-4" />
                 {selectedSources.length > 0 && (
                   <span
-                    className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full text-xs font-bold flex items-center justify-center"
+                    className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full text-smfont-bold flex items-center justify-center"
                     style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
                   >
                     {selectedSources.length}
@@ -2083,7 +2198,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
             <div className="relative">
               <button
                 onClick={() => setShowPersonalityMenu(!showPersonalityMenu)}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--accent-subtle)]"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-smfont-medium transition-all hover:bg-[var(--accent-subtle)]"
                 style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
               >
                 <span>{currentPersonality.emoji}</span>
@@ -2101,7 +2216,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                     style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', transformOrigin: 'bottom left' }}
                   >
                     <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-base)' }}>
-                      <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Ton de l'assistant</p>
+                      <p className="text-smfont-semibold" style={{ color: 'var(--text-dimmed)' }}>Ton de l'assistant</p>
                     </div>
                     {personalities.map((p) => (
                       <button
@@ -2111,10 +2226,10 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                       >
                         <span className="text-sm">{p.emoji}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium" style={{ color: personality === p.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                          <p className="text-smfont-medium" style={{ color: personality === p.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
                             {p.label}
                           </p>
-                          <p className="text-xs truncate" style={{ color: 'var(--text-dimmed)' }}>{p.desc}</p>
+                          <p className="text-smtruncate" style={{ color: 'var(--text-dimmed)' }}>{p.desc}</p>
                         </div>
                         {personality === p.id && (
                           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--accent-primary)' }} />
@@ -2200,7 +2315,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               {/* Folder list */}
               <div className="px-4 py-3 max-h-56 overflow-y-auto custom-scrollbar">
                 {sandboxFolders.length === 0 ? (
-                  <p className="text-xs text-center py-4" style={{ color: 'var(--text-dimmed)' }}>
+                  <p className="text-smtext-center py-4" style={{ color: 'var(--text-dimmed)' }}>
                     Chargement des dossiers…
                   </p>
                 ) : (
@@ -2209,7 +2324,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                       <button
                         key={f.path}
                         onClick={() => { setSelectedFolder(f.path); setCustomFolderName(''); }}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-full text-left transition-all text-xs ${
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-full text-left transition-all text-sm${
                           selectedFolder === f.path && !customFolderName
                             ? 'ring-1 ring-[var(--accent-primary)]'
                             : 'hover:bg-[var(--accent-subtle)]'
@@ -2238,7 +2353,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
               {/* Custom folder input */}
               <div className="px-4 pb-3">
-                <p className="text-xs mb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-smmb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>
                   Ou saisir un chemin personnalisé
                 </p>
                 <input
@@ -2246,7 +2361,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                   value={customFolderName}
                   onChange={e => { setCustomFolderName(e.target.value); setSelectedFolder(''); }}
                   placeholder="ex: docs/notes"
-                  className="w-full px-3 py-2 rounded-full text-xs outline-none transition-all"
+                  className="w-full px-3 py-2 rounded-full text-smoutline-none transition-all"
                   style={{
                     backgroundColor: 'var(--bg-base)',
                     border: '1px solid var(--border-base)',
@@ -2271,7 +2386,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               <div className="flex items-center justify-end gap-2 px-4 pb-4">
                 <button
                   onClick={() => setFolderPickerMsg(null)}
-                  className="px-4 py-2 rounded-full text-xs font-medium transition-all hover:opacity-80"
+                  className="px-4 py-2 rounded-full text-smfont-medium transition-all hover:opacity-80"
                   style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
                 >
                   Annuler
@@ -2279,7 +2394,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 <button
                   onClick={handleSaveAsMarkdown}
                   disabled={savingMd || (selectedFolder === '' && !customFolderName.trim())}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-all disabled:opacity-40 hover:opacity-90 active:scale-95"
+                  className="flex items-center gap-2 px-4 py-2 rounded-full text-smfont-medium transition-all disabled:opacity-40 hover:opacity-90 active:scale-95"
                   style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
                 >
                   {savingMd ? (
