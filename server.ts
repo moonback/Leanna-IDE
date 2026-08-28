@@ -366,7 +366,7 @@ function getElectronAppRoot(): string {
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.VITE_SERVER_PORT) || 5000;
+  const PORT = Number(process.env.VITE_SERVER_PORT) || 4000;
 
   // --- Rate limiters, middlewares, fichiers statiques — extraits dans server/config/rateLimits.ts ---
   const isDev = process.env.NODE_ENV !== 'production';
@@ -554,7 +554,7 @@ async function startServer() {
   });
 
   // Gestion explicite des erreurs d'écoute TCP (port occupé, droits insuffisants, etc.)
-  // Plutôt qu'un stacktrace illisible "Error: listen EADDRINUSE :::5000", on donne
+  // Plutôt qu'un stacktrace illisible "Error: listen EADDRINUSE :::4000", on donne
   // un diagnostic ACTIONNABLE à l'utilisateur.
   server.on("error", (err: any) => {
     if (err.code === "EADDRINUSE") {
@@ -581,7 +581,7 @@ async function startServer() {
 
   // Vite middleware for development (import dynamique pour éviter le crash en production)
   // NOTE: Le serveur HTTP est créé AVANT Vite pour pouvoir passer `server` à
-  // hmr.server — cela attache le WebSocket HMR au même port (5000) au lieu
+  // hmr.server — cela attache le WebSocket HMR au même port (4000) au lieu
   // d'un port secondaire, évitant les erreurs « WebSocket connection failed ».
   // IMPORTANT : server.proxy est explicitement écrasé à {} en mode middleware.
   //   Sans ça, vite.config.ts définit un proxy "/api → localhost:<PORT>" qui,

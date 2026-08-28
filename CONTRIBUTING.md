@@ -86,7 +86,7 @@ OPENROUTER_API_KEY=votre_cle_openrouter
 GITHUB_TOKEN=votre_token_github
 
 # Configuration
-VITE_SERVER_PORT=5000
+VITE_SERVER_PORT=4000
 ENABLE_CHAIN_OF_THOUGHT=true
 FORCE_TIERED_TOOLS=true
 ```

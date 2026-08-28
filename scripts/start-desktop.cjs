@@ -13,7 +13,7 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
 }
 
-const port = process.env.VITE_SERVER_PORT || 5000;
+const port = process.env.VITE_SERVER_PORT || 4000;
 const isDebug = process.env.ELECTRON_DEBUG === '1' || process.argv.includes('--debug');
 
 console.log(`[Desktop Runner] Waiting for http://127.0.0.1:${port}...`);

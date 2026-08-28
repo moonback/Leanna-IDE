@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => {
       // Le mode middleware force déjà `proxy: {}` ; on conserve la même règle
       // en mode Vite autonome pour échouer proprement au lieu de boucler.
       host: '127.0.0.1',
-      port: configuredPort || 5000,
+      port: configuredPort || 4000,
       strictPort: true,
       hmr: process.env.DISABLE_HMR === 'true' ? false : true,
       watch: process.env.DISABLE_HMR === 'true' ? null : {

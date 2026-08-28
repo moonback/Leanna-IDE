@@ -267,7 +267,7 @@ Voir `.env.example` pour la liste complète. Voici les principales :
 | `GITHUB_TOKEN` | Token GitHub | ❌ |
 | `ENABLE_CHAIN_OF_THOUGHT` | Afficher le raisonnement IA (`true`/`false`) | ❌ |
 | `SANDBOX_EXIT_CODE` | Code de sécurité pour sortir du sandbox | ❌ |
-| `VITE_SERVER_PORT` | Port du serveur backend (défaut: 5000) | ❌ |
+| `VITE_SERVER_PORT` | Port du serveur backend (défaut: 4000) | ❌ |
 | `JARVIS_DEFAULT_WORKSPACE` | Chemin du workspace par défaut | ❌ |
 
 ### Pool de clés Gemini
@@ -284,7 +284,7 @@ Jarvis OS supporte un **pool de clés API** avec rotation automatique (round-rob
 npm run dev
 ```
 
-> **Serveur accessible** sur [http://localhost:5000](http://localhost:5000) (ou le port configuré dans `VITE_SERVER_PORT`).
+> **Serveur accessible** sur [http://localhost:4000](http://localhost:4000) (ou le port configuré dans `VITE_SERVER_PORT`).
 > **⚠️ Note** : Le backend Express intègre Vite en middleware. Utilisez **UNIQUEMENT** `npm run dev`, pas `vite dev` manuellement.
 
 ---

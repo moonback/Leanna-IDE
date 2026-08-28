@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 const path = require('path');
 dotenv.config({ path: path.join(__dirname, '.env.local') });
 dotenv.config({ path: path.join(__dirname, '.env') });
-const port = process.env.VITE_SERVER_PORT || 5000;
+const port = process.env.VITE_SERVER_PORT || 4000;
 const ws = new WebSocket(`ws://127.0.0.1:${port}/terminal`);
 let opened = false;
 
