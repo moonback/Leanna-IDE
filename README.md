@@ -1,4 +1,3 @@
-# Jarvis OS
 
 <!-- <p align="center">
   <img src="assets/images/header.png" alt="Jarvis OS" width="100%" />
