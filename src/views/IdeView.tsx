@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef, lazy, Suspense } from 'react';
 // Monaco Editor - lazy loaded to reduce initial bundle
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.Editor })));
 // Panels - lazy loaded
@@ -53,6 +53,8 @@ import { AgentFleetPanel } from '../components/panels/AgentFleetPanel';
 import { AssistantLogsPanel } from '../components/panels/AssistantLogsPanel';
 import { AgentActivityOverlay } from '../components/ide/AgentActivityOverlay';
 import { TemplateSelectorModal } from '../components/templates/TemplateSelectorModal';
+import TerminalPanel from '../components/panels/TerminalPanel';
+import type { TerminalPanelHandle } from '../components/panels/TerminalPanel';
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -174,6 +176,9 @@ export default function IdeView() {
   const [showHistory, setShowHistory] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [terminalDocked, setTerminalDocked] = useState(true); // Par défaut docké en bas
+  const terminalRef = useRef<TerminalPanelHandle | null>(null);
   const [selfEditingFile, setSelfEditingFile] = useState<string | null>(null);
   const [richDocument, setRichDocument] = useState<RichDocument | null>(null);
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
@@ -503,10 +508,35 @@ export default function IdeView() {
           setMarkdownPreview(v => !v);
         }
       }
+      // Terminal toggle (Ctrl+`)
+      if ((e.ctrlKey || e.metaKey) && e.key === '`') {
+        e.preventDefault();
+        setShowTerminal(v => !v);
+      }
+      // Terminal quick commands (Ctrl+1 to Ctrl+0)
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+        const commandMap: Record<string, string> = {
+          '1': 'npm run dev',
+          '2': 'npm install',
+          '3': 'npm run build',
+          '4': 'npm test',
+          '5': 'git status',
+          '6': 'git pull',
+          '7': 'clear',
+          '8': 'ls',
+          '9': 'pwd',
+          '0': 'cd ..',
+        };
+        const command = commandMap[e.key];
+        if (command && showTerminal && terminalRef.current) {
+          e.preventDefault();
+          terminalRef.current.executeCommand(command);
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saveActiveFile, formatDocument, fileSystem.activePath]);
+  }, [saveActiveFile, formatDocument, fileSystem.activePath, showTerminal]);
 
   // Prevent data loss
   useEffect(() => {
@@ -725,6 +755,8 @@ export default function IdeView() {
           setShowMemory(v => !v);
           if (!showMemory) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowNotebooks(false); }
         }}
+        showTerminal={showTerminal}
+        onToggleTerminal={() => setShowTerminal(v => !v)}
       />
 
       {/* File Explorer */}
@@ -1126,6 +1158,23 @@ export default function IdeView() {
         <AgentFleetPanel inline onClose={() => setShowFleet(false)} />
       )}
 
+      {/* Terminal Panel — floating overlay */}
+      {showTerminal && (
+        <TerminalPanel
+          ref={terminalRef}
+          onClose={() => setShowTerminal(false)}
+          isDocked={terminalDocked}
+          onToggleDock={() => setTerminalDocked(v => !v)}
+          onOpenBrowser={(url: string) => {
+            setShowBrowser(true);
+            setBrowserUrl(url);
+          }}
+          showExplorer={showExplorer}
+          devServerPort={ideSettings.devServerPort}
+          initialCwd={fileSystem.activePath ? fileSystem.activePath.replace(/[\\/][^\\/]+$/, '') : ''}
+        />
+      )}
+
       {/* Template Selector Modal */}
       <TemplateSelectorModal
         isOpen={showTemplateModal}
@@ -1143,3 +1192,4 @@ export default function IdeView() {
     </div>
   );
 }
+

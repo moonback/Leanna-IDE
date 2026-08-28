@@ -54,6 +54,7 @@ import { createUploadDocumentRouter } from "./server/routes/upload-document";
 import { createDocumentsRouter } from "./server/routes/documents";
 import skillsRouter from "./server/routes/skills";
 import mcpRouter from "./server/routes/mcp";
+import { createTerminalRouter, setupTerminalWebSocket } from "./server/routes/terminal";
 import memoriesRouter from "./server/routes/memories";
 import conversationsRouter from "./server/routes/conversations";
 import listsRouter from "./server/routes/lists";
@@ -459,6 +460,7 @@ async function startServer() {
   app.use("/api/memories", memoriesRouter);
   app.use("/api/conversations", conversationsRouter);
   app.use("/api/lists", listsRouter);
+  app.use("/api/terminal", createTerminalRouter({ apiToken }));
   app.use("/api/knowledge", knowledgeRouter);
   app.use("/api/knowledge", memoryRouter);
   app.use("/api/knowledge", impactRouter);
@@ -611,9 +613,12 @@ async function startServer() {
   // WebSocket server for Live API
   const wss = new WebSocketServer({ noServer: true });
 
-
   // WebSocket server for Sandbox file watching (real-time)
   const sandboxWss = new WebSocketServer({ noServer: true });
+
+  // WebSocket server for Terminal (PTY-like)
+  const terminalWss = new WebSocketServer({ noServer: true });
+  setupTerminalWebSocket(terminalWss, apiToken);
 
   // ── Agent Orchestrator: broadcaster d'événements vers les clients WebSocket ──
   agentOrchestrator.setEventBroadcaster((event) => {
@@ -680,6 +685,10 @@ async function startServer() {
     } else if (pathname === '/sandbox-watch') {
       sandboxWss.handleUpgrade(request, socket, head, (ws) => {
         sandboxWss.emit('connection', ws, request);
+      });
+    } else if (pathname === '/terminal') {
+      terminalWss.handleUpgrade(request, socket, head, (ws) => {
+        terminalWss.emit('connection', ws, request);
       });
     } else {
       // In dev, Vite's own upgrade listener (registered via hmr.server)
