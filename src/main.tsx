@@ -12,7 +12,6 @@ import { useLiveAPI } from './hooks/useLiveAPI';
 import { FloatingOrb } from './components/FloatingOrb';
 import { CriticalEditConfirm } from './components/CriticalEditConfirm';
 import { StartupProjectModal } from './components/StartupProjectModal';
-import { ChangelogBanner } from './components/ChangelogBanner';
 import { useProfile } from './context/UserProfileContext';
 import { Loader2 } from 'lucide-react';
 import { UnifiedSidebar } from './components/UnifiedSidebar';
@@ -504,8 +503,6 @@ function Layout() {
         <CriticalEditConfirm sendMessage={liveAPI.sendRawMessage} />
         {/* Modale de sélection du projet au démarrage */}
         <StartupProjectModal />
-        {/* Bandeau changelog — nouveau positionnement produit */}
-        <ChangelogBanner />
       </ScreenShareProvider>
     </LiveAPIContext.Provider>
   );

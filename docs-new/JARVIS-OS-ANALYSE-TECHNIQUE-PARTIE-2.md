@@ -1370,11 +1370,6 @@ Tous les panneaux suivent un pattern similaire :
 - **Props** : Aucun
 - **Logique** : Détection, liste, sélection, nouveau
 
-### 📁 ChangelogBanner
-- **Rôle** : Bandeau des nouveautés
-- **Props** : Aucun
-- **Logique** : Version, changelog, affichage, dismissible
-
 ---
 
 ## 6. **Analyse de la logique métier**
