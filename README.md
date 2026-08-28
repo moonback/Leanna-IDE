@@ -95,7 +95,7 @@ Conçu comme un **système d'exploitation desktop**, Jarvis OS combine :
 
 - **Éditeur Monaco** : Syntaxe, autocomplétion, multi-fichiers, multi-onglets.
 - **Explorateur de fichiers** : Arbre interactif avec filtres et recherche globale (`Ctrl+Shift+F`).
-- **Terminal intégré** : Terminal multi-onglets avec commandes favorites, historique, recherche et exécutions rapides via raccourcis clavier.
+- **Terminal intégré** : Terminal multi-onglets avec commandes favorites, historique, recherche et exécutions rapides via raccourcis clavier. **Sélecteur Workspace/Sandbox** pour choisir le contexte d'exécution des commandes.
 - **Mode Sandbox** : Environnement isolé (`.jarvis/sandbox/`) pour les modifications IA.
 - **Checkpoints Git** : Snapshot automatique avant modification avec possibilité de rollback.
 - **Validation stricte** : TypeScript, lint, analyse de sécurité avant merge.
@@ -121,6 +121,8 @@ Conçu comme un **système d'exploitation desktop**, Jarvis OS combine :
 | `Ctrl+0` | Remonter d'un répertoire (`cd ..`) |
 
 > **💡 Astuce** : Les commandes favorites et rapides dans le menu du terminal s'exécutent directement sans avoir à appuyer sur Entrée.
+> 
+> **⚡ Nouveauté** : Utilisez le **sélecteur Workspace/Sandbox** (icône 📁/📦) pour basculer entre l'exécution dans votre répertoire de projet réel ou dans l'environnement isolé du sandbox. Tous les onglets de terminal basculent automatiquement vers le répertoire correspondant.
 
 ---
 
