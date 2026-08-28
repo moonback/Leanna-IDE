@@ -96,7 +96,7 @@ function StatCard({
         >
           {icon}
         </span>
-        <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
           {label}
         </span>
       </div>
@@ -104,7 +104,7 @@ function StatCard({
         <span className="text-xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>
           {value}
         </span>
-        {sub && <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{sub}</span>}
+        {sub && <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{sub}</span>}
       </div>
     </div>
   );
@@ -126,11 +126,11 @@ function ServiceBadge({ name, label, ok }: ServiceHealth) {
         ? <CheckCircle2 size={14} style={{ color }} />
         : <XCircle size={14} style={{ color }} />
       }
-      <span className="text-[11px] font-semibold flex-1" style={{ color: 'var(--text-primary)' }}>
+      <span className="text-sm font-semibold flex-1" style={{ color: 'var(--text-primary)' }}>
         {label}
       </span>
       <span
-        className="text-[9px] font-bold uppercase tracking-wider"
+        className="text-xs font-bold uppercase tracking-wider"
         style={{ color }}
       >
         {ok ? 'OK' : 'DOWN'}
@@ -163,7 +163,7 @@ function HealthScoreRing({ score }: { score: number }) {
           </span>
         </div>
       </div>
-      <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+      <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
         Santé globale
       </span>
     </div>
@@ -178,10 +178,10 @@ function MemBar({ used, total }: { used: number; total: number }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+        <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
           {formatBytes(used)} / {formatBytes(total)}
         </span>
-        <span className="text-[10px] font-mono font-bold" style={{ color }}>
+        <span className="text-xs font-mono font-bold" style={{ color }}>
           {pct}%
         </span>
       </div>
@@ -276,10 +276,10 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
             <Activity size={14} />
           </span>
           <div className="flex flex-col leading-tight">
-            <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+            <span className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
               Santé Système
             </span>
-            <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
               {report ? relativeTime(report.generatedAt) : 'Chargement…'}
             </span>
           </div>
@@ -294,7 +294,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} style={{ color: 'var(--text-muted)' }} />
           </button>
           <label
-            className="flex items-center gap-1.5 px-2 h-7 rounded-lg text-[10px] cursor-pointer"
+            className="flex items-center gap-1.5 px-2 h-7 rounded-lg text-xs cursor-pointer"
             style={{
               backgroundColor: autoRefresh ? '#22d3ee15' : 'transparent',
               border: `1px solid ${autoRefresh ? '#22d3ee33' : 'var(--border-base)'}`,
@@ -320,7 +320,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
               className="p-1.5 rounded-lg hover:bg-white/5 transition flex items-center justify-center"
               title="Fermer"
             >
-              <span className="text-[12px] leading-none" style={{ color: 'var(--text-dimmed)' }}>✕</span>
+              <span className="text-sm leading-none" style={{ color: 'var(--text-dimmed)' }}>✕</span>
             </button>
           )}
         </div>
@@ -331,7 +331,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
         {loading && (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
             <Loader2 size={24} className="animate-spin" style={{ color: 'var(--text-dimmed)' }} />
-            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
               Analyse du système…
             </span>
           </div>
@@ -345,7 +345,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
             <div className="flex items-start gap-2">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-[11px] font-semibold">Erreur de chargement</p>
+                <p className="text-sm font-semibold">Erreur de chargement</p>
                 <p className="text-[10.5px] mt-1 opacity-90">{error}</p>
               </div>
             </div>
@@ -369,25 +369,25 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
             >
               <div className="flex items-center gap-2 mb-2">
                 <Server size={12} style={{ color: '#818cf8' }} />
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#818cf8' }}>
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#818cf8' }}>
                   Système & Runtime
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[10.5px]">
                 <div>
-                  <span className="text-[9px] uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Plateforme</span>
+                  <span className="text-xs uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Plateforme</span>
                   <p className="font-semibold font-mono truncate mt-0.5" style={{ color: 'var(--text-primary)' }}>{report.platform}</p>
                 </div>
                 <div>
-                  <span className="text-[9px] uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Architecture</span>
+                  <span className="text-xs uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Architecture</span>
                   <p className="font-semibold font-mono truncate mt-0.5" style={{ color: 'var(--text-primary)' }}>{report.arch}</p>
                 </div>
                 <div>
-                  <span className="text-[9px] uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Kernel</span>
+                  <span className="text-xs uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Kernel</span>
                   <p className="font-semibold font-mono truncate mt-0.5" style={{ color: 'var(--text-primary)' }}>{report.release}</p>
                 </div>
                 <div>
-                  <span className="text-[9px] uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Node.js</span>
+                  <span className="text-xs uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Node.js</span>
                   <p className="font-semibold font-mono truncate mt-0.5" style={{ color: 'var(--text-primary)' }}>{report.nodeVersion}</p>
                 </div>
               </div>
@@ -403,7 +403,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
             >
               <div className="flex items-center gap-2 mb-1">
                 <Cpu size={12} style={{ color: '#f59e0b' }} />
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#f59e0b' }}>
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#f59e0b' }}>
                   Ressources
                 </span>
               </div>
@@ -427,7 +427,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
               >
                 <div className="flex items-center gap-1.5 mb-2">
                   <MemoryStick size={12} style={{ color: 'var(--text-dimmed)' }} />
-                  <span className="text-[10px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                     Mémoire vive
                   </span>
                 </div>
@@ -448,7 +448,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
             >
               <div className="flex items-center gap-2 mb-2">
                 <Zap size={12} style={{ color: '#22d3ee' }} />
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#22d3ee' }}>
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#22d3ee' }}>
                   Services ({servicesOk}/{services.length})
                 </span>
               </div>
@@ -470,7 +470,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
               >
                 <div className="flex items-center gap-2 mb-2">
                   <Puzzle size={12} style={{ color: '#a78bfa' }} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#a78bfa' }}>
+                  <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#a78bfa' }}>
                     Skills actifs ({report.activeSkills.length})
                   </span>
                 </div>
@@ -478,7 +478,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
                   {report.activeSkills.map(s => (
                     <span
                       key={s}
-                      className="px-2 py-0.5 rounded-lg text-[10px] font-mono"
+                      className="px-2 py-0.5 rounded-lg text-xs font-mono"
                       style={{
                         backgroundColor: '#a78bfa10',
                         border: '1px solid #a78bfa22',
@@ -493,7 +493,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
             )}
 
             {/* Footer */}
-            <p className="text-[9px] text-center py-2" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-xs text-center py-2" style={{ color: 'var(--text-dimmed)' }}>
               Généré le {new Date(report.generatedAt).toLocaleString('fr-FR')}
               {autoRefresh && ' · Auto-rafraîchissement actif'}
             </p>

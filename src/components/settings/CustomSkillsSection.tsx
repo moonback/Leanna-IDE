@@ -402,7 +402,7 @@ export function CustomSkillsSection() {
     >
       {/* ── Header actions ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+        <p className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
           {skills.length} skill{skills.length !== 1 ? 's' : ''} au total
         </p>
         {formMode === 'idle' && (
@@ -411,7 +411,7 @@ export function CustomSkillsSection() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowImport(!showImport)}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold transition-colors"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
               style={{
                 backgroundColor: showImport ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
                 border: `1px solid ${showImport ? 'var(--accent-primary)' : 'var(--border-base)'}`,
@@ -425,7 +425,7 @@ export function CustomSkillsSection() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => { setShowImport(false); setFormMode('create'); }}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold transition-colors"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
               style={{
                 backgroundColor: 'var(--accent-primary)',
                 color: '#fff',
@@ -454,7 +454,7 @@ export function CustomSkillsSection() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileCode className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
-                  <h3 className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                     Importer un skill (copier-coller)
                   </h3>
                 </div>
@@ -463,7 +463,7 @@ export function CustomSkillsSection() {
                 </button>
               </div>
 
-              <p className="text-[9px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                 Colle ici le code d'un skill (JSON, TypeScript, ou format Claude Code). Le parser détecte automatiquement le format et pré-remplit le formulaire.
               </p>
 
@@ -472,7 +472,7 @@ export function CustomSkillsSection() {
                 onChange={e => setImportText(e.target.value)}
                 placeholder={'Exemples acceptés :\n\n• JSON : { "name": "mon_skill", "description": "...", "instruction": "..." }\n• TypeScript declarations\n• Claude Code MCP : { "tool_name": "...", "input_schema": {...} }'}
                 rows={8}
-                className="w-full rounded px-3 py-2.5 text-[11px] font-mono outline-none resize-y transition-all duration-150"
+                className="w-full rounded px-3 py-2.5 text-sm font-mono outline-none resize-y transition-all duration-150"
                 style={{
                   backgroundColor: 'var(--bg-input)',
                   border: '1px solid var(--border-base)',
@@ -497,7 +497,7 @@ export function CustomSkillsSection() {
                   whileTap={{ scale: 0.98 }}
                   onClick={handleImport}
                   disabled={!importText.trim()}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded text-[10px] font-semibold transition-colors disabled:opacity-40"
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition-colors disabled:opacity-40"
                   style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
                 >
                   <ClipboardPaste className="w-3 h-3" />
@@ -523,7 +523,7 @@ export function CustomSkillsSection() {
               style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>
+                <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                   {formMode === 'create' ? '✨ Nouveau skill' : '✏️ Modifier le skill'}
                 </h3>
                 <button onClick={resetForm} className="p-1 rounded hover:bg-black/10 transition-colors">
@@ -533,7 +533,7 @@ export function CustomSkillsSection() {
 
               {/* Name */}
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                   Nom (snake_case) *
                 </label>
                 <TextInput
@@ -545,7 +545,7 @@ export function CustomSkillsSection() {
 
               {/* Description */}
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                   Description (pour l'IA) *
                 </label>
                 <TextInput
@@ -557,7 +557,7 @@ export function CustomSkillsSection() {
 
               {/* Category */}
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                   Catégorie
                 </label>
                 <div className="flex gap-1.5 flex-wrap">
@@ -565,7 +565,7 @@ export function CustomSkillsSection() {
                     <button
                       key={cat.id}
                       onClick={() => setFormCategory(cat.id)}
-                      className="flex items-center gap-1 rounded px-2 py-1 text-[9px] font-medium transition-all"
+                      className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-all"
                       style={{
                         backgroundColor: formCategory === cat.id ? 'var(--accent-subtle)' : 'var(--bg-panel)',
                         border: `1px solid ${formCategory === cat.id ? 'var(--accent-primary)' : 'var(--border-base)'}`,
@@ -581,7 +581,7 @@ export function CustomSkillsSection() {
 
               {/* Instruction */}
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                   Instruction / Prompt *
                 </label>
                 <textarea
@@ -589,7 +589,7 @@ export function CustomSkillsSection() {
                   onChange={e => setFormInstruction(e.target.value)}
                   placeholder="Décris ce que l'IA doit faire quand ce skill est appelé..."
                   rows={4}
-                  className="w-full rounded px-2.5 py-2 text-[11px] font-mono outline-none resize-y transition-all duration-150"
+                  className="w-full rounded px-2.5 py-2 text-sm font-mono outline-none resize-y transition-all duration-150"
                   style={{
                     backgroundColor: 'var(--bg-input)',
                     border: '1px solid var(--border-base)',
@@ -604,12 +604,12 @@ export function CustomSkillsSection() {
               {/* Parameters */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                     Paramètres ({formParams.length})
                   </label>
                   <button
                     onClick={addParam}
-                    className="flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded transition-colors"
+                    className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded transition-colors"
                     style={{ color: 'var(--accent-primary)' }}
                   >
                     <Plus className="w-2.5 h-2.5" /> Ajouter
@@ -623,14 +623,14 @@ export function CustomSkillsSection() {
                     style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
                   >
                     <input
-                      className="col-span-3 rounded px-1.5 py-1 text-[10px] font-mono outline-none"
+                      className="col-span-3 rounded px-1.5 py-1 text-xs font-mono outline-none"
                       style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                       placeholder="nom"
                       value={param.name}
                       onChange={e => updateParam(idx, 'name', e.target.value)}
                     />
                     <select
-                      className="col-span-2 rounded px-1 py-1 text-[10px] outline-none"
+                      className="col-span-2 rounded px-1 py-1 text-xs outline-none"
                       style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                       value={param.type}
                       onChange={e => updateParam(idx, 'type', e.target.value)}
@@ -638,13 +638,13 @@ export function CustomSkillsSection() {
                       {PARAM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                     <input
-                      className="col-span-4 rounded px-1.5 py-1 text-[10px] outline-none"
+                      className="col-span-4 rounded px-1.5 py-1 text-xs outline-none"
                       style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                       placeholder="description"
                       value={param.description}
                       onChange={e => updateParam(idx, 'description', e.target.value)}
                     />
-                    <label className="col-span-2 flex items-center gap-1 text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                    <label className="col-span-2 flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                       <input
                         type="checkbox"
                         checked={param.required}
@@ -667,7 +667,7 @@ export function CustomSkillsSection() {
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   onClick={resetForm}
-                  className="px-3 py-1.5 rounded text-[10px] font-medium transition-colors"
+                  className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
                   style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
                 >
                   Annuler
@@ -676,7 +676,7 @@ export function CustomSkillsSection() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleSave}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded text-[10px] font-semibold transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition-colors"
                   style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
                 >
                   <Save className="w-3 h-3" />
@@ -697,7 +697,7 @@ export function CustomSkillsSection() {
       ) : skills.length === 0 ? (
         <div className="flex flex-col items-center py-8 gap-2">
           <Sparkles className="w-8 h-8 opacity-30" style={{ color: 'var(--text-muted)' }} />
-          <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             Aucun skill personnalisé. Crée ton premier !
           </p>
         </div>
@@ -722,10 +722,10 @@ export function CustomSkillsSection() {
                 <div className="flex items-center gap-2 px-3 py-2">
                   <CatIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                       {skill.name}
                     </p>
-                    <p className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
                       {skill.description}
                     </p>
                   </div>
@@ -780,23 +780,23 @@ export function CustomSkillsSection() {
                     >
                       <div className="px-3 pb-3 pt-1 flex flex-col gap-2" style={{ borderTop: '1px solid var(--border-base)' }}>
                         <div>
-                          <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-dimmed)' }}>
+                          <span className="text-xs font-bold uppercase" style={{ color: 'var(--text-dimmed)' }}>
                             Instruction
                           </span>
-                          <p className="text-[10px] font-mono mt-0.5 whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
+                          <p className="text-xs font-mono mt-0.5 whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
                             {skill.instruction}
                           </p>
                         </div>
                         {skill.parameters.length > 0 && (
                           <div>
-                            <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-dimmed)' }}>
+                            <span className="text-xs font-bold uppercase" style={{ color: 'var(--text-dimmed)' }}>
                               Paramètres
                             </span>
                             <div className="flex flex-wrap gap-1 mt-1">
                               {skill.parameters.map((p, i) => (
                                 <span
                                   key={i}
-                                  className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-mono"
+                                  className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-mono"
                                   style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', color: 'var(--text-secondary)' }}
                                 >
                                   {p.name}
@@ -807,7 +807,7 @@ export function CustomSkillsSection() {
                             </div>
                           </div>
                         )}
-                        <div className="flex items-center gap-3 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                        <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                           <span>Catégorie: {skill.category}</span>
                           <span>Créé: {new Date(skill.created_at).toLocaleDateString('fr-FR')}</span>
                         </div>
@@ -824,7 +824,7 @@ export function CustomSkillsSection() {
       {/* ── Info note ────────────────────────────────────────────────────────── */}
       <div className="flex items-start gap-2 mt-3 rounded-lg p-2.5" style={{ backgroundColor: 'var(--accent-subtle)' }}>
         <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--accent-primary)' }} />
-        <p className="text-[9px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
           Les skills personnalisés sont exposés à l'IA sous le préfixe <code className="font-mono">custom_</code>.
           Par exemple, un skill "resume_youtube" sera appelable via <code className="font-mono">custom_resume_youtube</code>.
           Ils sont rechargés dynamiquement — pas besoin de redémarrer.

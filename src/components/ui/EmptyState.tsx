@@ -37,9 +37,9 @@ export function EmptyState({
   size = 'md',
 }: EmptyStateProps) {
   const sizeConfig = {
-    sm: { icon: 32, title: 'text-[12px]', desc: 'text-[11px]', gap: 'gap-2', pad: 'p-4' },
-    md: { icon: 40, title: 'text-[13px]', desc: 'text-[12px]', gap: 'gap-3', pad: 'p-6' },
-    lg: { icon: 48, title: 'text-[15px]', desc: 'text-[13px]', gap: 'gap-4', pad: 'p-8' },
+    sm: { icon: 32, title: 'text-sm', desc: 'text-xs', gap: 'gap-2', pad: 'p-4' },
+    md: { icon: 40, title: 'text-base', desc: 'text-sm', gap: 'gap-3', pad: 'p-6' },
+    lg: { icon: 48, title: 'text-lg', desc: 'text-base', gap: 'gap-4', pad: 'p-8' },
   }[size];
 
   return (
@@ -50,7 +50,7 @@ export function EmptyState({
       className={`flex flex-col items-center justify-center text-center ${sizeConfig.gap} ${sizeConfig.pad}`}
     >
       <div
-        className="flex items-center justify-center rounded-2xl"
+        className="flex items-center justify-center rounded-lg"
         style={{
           width: sizeConfig.icon + 16,
           height: sizeConfig.icon + 16,
@@ -86,10 +86,10 @@ export function EmptyState({
             <button
               type="button"
               onClick={onAction}
-              className="px-4 py-2 rounded-lg text-[12px] font-medium transition-all duration-150"
+              className="px-4 py-2 rounded-md text-sm font-medium transition-all duration-150"
               style={{
                 backgroundColor: 'var(--accent-primary)',
-                color: '#ffffff',
+                color: 'var(--text-primary)',
               }}
               onMouseEnter={(e) => { e.currentTarget.style.filter = 'brightness(1.1)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.filter = 'brightness(1)'; }}
@@ -101,7 +101,7 @@ export function EmptyState({
             <button
               type="button"
               onClick={onSecondary}
-              className="px-3 py-2 rounded-lg text-[11px] font-medium transition-colors"
+              className="px-3 py-2 rounded-md text-xs font-medium transition-colors"
               style={{ color: 'var(--text-muted)' }}
               onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent-primary)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}

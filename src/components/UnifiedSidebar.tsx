@@ -101,7 +101,7 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
       {/* Mobile Toggle Button */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="md:hidden fixed top-3 left-3 z-50 p-2.5 rounded-xl border backdrop-blur-md text-[var(--text-primary)] transition-all duration-200 hover:bg-[var(--bg-secondary)] shadow-md"
+        className="md:hidden fixed top-3 left-3 z-50 p-2.5 rounded-md border text-[var(--text-primary)] transition-all duration-200 hover:bg-[var(--bg-secondary)] shadow-sm"
         style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
         aria-label="Menu principal"
       >
@@ -253,7 +253,7 @@ function BrandLogo({ theme, onNavigate }: { theme: string; onNavigate: () => voi
     >
       <motion.button
         type="button"
-        className="w-[38px] h-[38px] rounded-[14px] overflow-hidden flex items-center justify-center cursor-pointer transition-all duration-200"
+        className="w-[38px] h-[38px] rounded-md overflow-hidden flex items-center justify-center cursor-pointer transition-all duration-200"
         style={{
           background: 'var(--ide-sidebar-item-bg)',
           boxShadow: 'none',

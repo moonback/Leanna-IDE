@@ -45,10 +45,10 @@ const iconButtonVariants = cva({
       ],
       /** Destructif — rouge */
       danger: [
-        'bg-[rgba(239,68,68,0.10)]',
-        'text-[#ef4444]',
-        'ring-1 ring-red-500/20',
-        'hover:bg-[rgba(239,68,68,0.18)]',
+        'bg-[var(--color-error-subtle)]',
+        'text-[var(--color-error)]',
+        'ring-1 ring-[color-mix(in srgb, var(--color-error) 25%, transparent)]',
+        'hover:bg-[color-mix(in srgb, var(--color-error) 18%, transparent)]',
         'active:scale-95',
       ],
       /** Bouton principal mis en avant */
@@ -64,10 +64,10 @@ const iconButtonVariants = cva({
       'primary-danger': [
         'p-3.5',
         'rounded-2xl',
-        'bg-[rgba(239,68,68,0.12)]',
-        'text-[#ef4444]',
-        'ring-1 ring-red-500/20',
-        'hover:bg-[rgba(239,68,68,0.18)]',
+        'bg-[var(--color-error-subtle)]',
+        'text-[var(--color-error)]',
+        'ring-1 ring-[color-mix(in srgb, var(--color-error) 25%, transparent)]',
+        'hover:bg-[color-mix(in srgb, var(--color-error) 18%, transparent)]',
         'active:scale-95',
       ],
     },
@@ -108,17 +108,17 @@ export function IconButton({
     variant === 'active-glow'
       ? {
           boxShadow:
-            '0 0 0 4px rgba(56, 189, 248, 0.12), 0 8px 16px rgba(56, 189, 248, 0.2)',
+            '0 0 0 4px color-mix(in srgb, var(--accent-primary) 12%, transparent), 0 8px 16px color-mix(in srgb, var(--accent-primary) 20%, transparent)',
         }
       : variant === 'primary'
         ? {
             boxShadow:
-              '0 4px 14px rgba(59,130,246,.2), inset 0 1px 0 rgba(255,255,255,.15)',
+              '0 4px 14px color-mix(in srgb, var(--accent-primary) 20%, transparent), inset 0 1px 0 rgba(255,255,255,.15)',
           }
         : variant === 'primary-danger'
           ? {
               boxShadow:
-                '0 4px 14px rgba(239,68,68,.15), inset 0 1px 0 rgba(255,255,255,.1)',
+                '0 4px 14px color-mix(in srgb, var(--color-error) 15%, transparent), inset 0 1px 0 rgba(255,255,255,.1)',
             }
           : undefined;
 
@@ -148,9 +148,9 @@ export function IconButton({
             'absolute -top-11 left-1/2 -translate-x-1/2',
             'whitespace-nowrap',
             'px-3 py-1.5 rounded-lg',
-            'text-[11px] font-medium tracking-wide',
-            'bg-[#1e1e24]/95 text-white backdrop-blur-sm',
-            'shadow-xl',
+            'text-xs font-medium tracking-wide',
+            'bg-[var(--bg-panel)] text-[var(--text-primary)] backdrop-blur-sm',
+            'shadow-lg',
             'animate-fade-in',
             'z-50',
             'flex items-center gap-2',
@@ -158,13 +158,13 @@ export function IconButton({
         >
           <span>{tooltip}</span>
           {shortcut && (
-            <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[9px] font-mono font-bold tracking-wider">
+            <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[0.5625rem] font-mono font-bold tracking-wider">
               {shortcut}
             </kbd>
           )}
           {/* flèche */}
           <span
-            className="absolute left-1/2 -translate-x-1/2 -bottom-[4px] w-2 h-2 rotate-45 bg-[#1e1e24]/95"
+            className="absolute left-1/2 -translate-x-1/2 -bottom-[4px] w-2 h-2 rotate-45 bg-[var(--bg-panel)]"
             aria-hidden
           />
         </span>

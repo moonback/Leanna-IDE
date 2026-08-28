@@ -44,9 +44,9 @@ const CAPABILITY_PRESETS = [
 const AVATAR_OPTIONS = ['🤖', '🧠', '⚡', '🔧', '🎯', '🛡️', '📝', '🔍', '🚀', '💡', '🎨', '🏗️', '📊', '🔬', '🌐', '🗂️'];
 
 const COLOR_OPTIONS = [
-  '#60a5fa', '#4ade80', '#f87171', '#fbbf24', '#a78bfa',
-  '#f97316', '#38bdf8', '#f472b6', '#34d399', '#a855f7',
-  '#14b8a6', '#e879f9', '#fb923c', '#22d3ee', '#84cc16',
+  'var(--accent-secondary)', 'var(--color-success)', 'var(--color-error)', 'var(--color-warning)', 'var(--color-accent-alt)',
+  'var(--color-warning)', 'var(--accent-primary)', 'var(--color-error)', 'var(--color-success)', 'var(--color-accent-alt)',
+  'var(--accent-secondary)', 'var(--color-accent-alt)', 'var(--color-warning)', 'var(--accent-secondary)', 'var(--color-success)',
 ];
 
 const MODEL_OPTIONS = [
@@ -63,7 +63,7 @@ const EMPTY_DRAFT: CustomAgentDraft = {
   role: '',
   description: '',
   avatar: '🤖',
-  color: '#60a5fa',
+  color: 'var(--accent-secondary)',
   systemPrompt: '',
   capabilities: [],
   tools: [],
@@ -122,7 +122,7 @@ export function AgentBuilderPanel({ inline, onClose }: AgentBuilderPanelProps) {
         role: data.agent.role || '',
         description: data.agent.description || '',
         avatar: data.agent.avatar || '🤖',
-        color: data.agent.color || '#60a5fa',
+        color: data.agent.color || 'var(--accent-secondary)',
         systemPrompt: data.agent.systemPrompt || '',
         capabilities: data.agent.capabilities || [],
         tools: data.agent.tools || [],
@@ -255,7 +255,7 @@ export function AgentBuilderPanel({ inline, onClose }: AgentBuilderPanelProps) {
             <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
               Agent Builder
             </h2>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
               style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
               {agents.length} agent{agents.length !== 1 ? 's' : ''}
             </span>
@@ -344,24 +344,24 @@ function AgentListView({
       <div className="flex items-center gap-2 px-5 py-3 border-b" style={{ borderColor: 'var(--border-base)' }}>
         <button
           onClick={onNew}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all hover:scale-105"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all hover:scale-105"
           style={{
             backgroundColor: 'var(--accent-primary)',
-            color: '#fff',
-            boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+            color: 'white',
+            boxShadow: '0 2px 8px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
           }}
         >
           <Plus size={13} /> Nouvel Agent
         </button>
         <div className="flex-1" />
         <button onClick={onImport}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-colors hover:bg-white/8"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-white/8"
           style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}>
           <Upload size={11} /> Importer
         </button>
         {agents.length > 0 && (
           <button onClick={onExport}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-colors hover:bg-white/8"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-white/8"
             style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}>
             <Download size={11} /> Exporter
           </button>
@@ -372,7 +372,7 @@ function AgentListView({
       <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-base)', backgroundColor: 'rgba(99,102,241,0.03)' }}>
         <div className="flex items-center gap-1.5 mb-2">
           <Sparkles size={12} style={{ color: 'var(--accent-primary)' }} />
-          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--accent-primary)' }}>
+          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--accent-primary)' }}>
             Génération IA
           </span>
         </div>
@@ -383,7 +383,7 @@ function AgentListView({
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onAiGenerate(); } }}
             placeholder="Décris l'agent que tu veux... ex: Un agent qui review mon code TypeScript et détecte les bugs"
             disabled={aiGenerating}
-            className="flex-1 px-3 py-2 rounded-lg text-[11px] outline-none transition-all focus:ring-2 disabled:opacity-50"
+            className="flex-1 px-3 py-2 rounded-lg text-sm outline-none transition-all focus:ring-2 disabled:opacity-50"
             style={{
               backgroundColor: 'var(--bg-input)',
               border: '1px solid var(--border-base)',
@@ -393,11 +393,11 @@ function AgentListView({
           <button
             onClick={onAiGenerate}
             disabled={aiGenerating || !aiPrompt.trim()}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-semibold transition-all hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
             style={{
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              color: '#fff',
-              boxShadow: '0 2px 12px rgba(99,102,241,0.3)',
+              background: 'linear-gradient(135deg, var(--accent-primary), var(--color-accent-alt))',
+              color: 'white',
+              boxShadow: '0 2px 12px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
             }}
           >
             {aiGenerating ? (
@@ -413,8 +413,8 @@ function AgentListView({
           </button>
         </div>
         {aiError && (
-          <div className="mt-2 flex items-center gap-1.5 text-[10px] px-2.5 py-1.5 rounded-lg"
-            style={{ backgroundColor: 'rgba(248,113,113,0.1)', color: '#f87171' }}>
+          <div className="mt-2 flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg"
+            style={{ backgroundColor: 'var(--color-error-subtle)', color: 'var(--color-error)' }}>
             <AlertTriangle size={11} /> {aiError}
           </div>
         )}
@@ -456,14 +456,14 @@ function EmptyState({ onNew }: { onNew: () => void }) {
         <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
           Aucun agent personnalisé
         </h3>
-        <p className="text-[11px] max-w-[280px]" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-sm max-w-[280px]" style={{ color: 'var(--text-muted)' }}>
           Crée ton premier agent avec des instructions, outils et comportements sur-mesure.
         </p>
       </div>
       <button
         onClick={onNew}
-        className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-semibold transition-all hover:scale-105"
-        style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+        className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105"
+        style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
       >
         <Sparkles size={13} /> Créer un agent
       </button>
@@ -506,14 +506,14 @@ function AgentCard({
             style={{ backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(2px)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <AlertTriangle size={14} style={{ color: '#f87171' }} />
-            <span className="text-[10px] font-medium" style={{ color: '#f87171' }}>Supprimer ?</span>
+            <AlertTriangle size={14} style={{ color: 'var(--color-error)' }} />
+            <span className="text-xs font-medium" style={{ color: 'var(--color-error)' }}>Supprimer ?</span>
             <button onClick={onConfirmDelete}
-              className="px-2 py-1 rounded text-[10px] font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30">
+              className="px-2 py-1 rounded text-xs font-semibold bg-[var(--color-error-subtle)] text-[var(--color-error)] hover:bg-[color-mix(in srgb, var(--color-error) 30%, transparent)]">
               Oui
             </button>
             <button onClick={onCancelDelete}
-              className="px-2 py-1 rounded text-[10px] font-semibold bg-white/10 hover:bg-white/20"
+              className="px-2 py-1 rounded text-xs font-semibold bg-white/10 hover:bg-white/20"
               style={{ color: 'var(--text-muted)' }}>
               Non
             </button>
@@ -531,25 +531,25 @@ function AgentCard({
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h4 className="text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+            <h4 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
               {agent.name}
             </h4>
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium uppercase"
+            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium uppercase"
               style={{ backgroundColor: `${agent.color}20`, color: agent.color }}>
               {agent.role}
             </span>
           </div>
-          <p className="text-[10px] mt-0.5 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs mt-0.5 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
             {agent.description || 'Aucune description'}
           </p>
           <div className="flex items-center gap-2 mt-2">
-            <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5"
+            <span className="text-xs px-1.5 py-0.5 rounded bg-white/5"
               style={{ color: 'var(--text-muted)' }}>
               {agent.tools.length} outil{agent.tools.length !== 1 ? 's' : ''}
             </span>
             {agent.autoDelegate && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded"
-                style={{ backgroundColor: 'rgba(74,222,128,0.1)', color: '#4ade80' }}>
+              <span className="text-xs px-1.5 py-0.5 rounded"
+                style={{ backgroundColor: 'var(--color-success-subtle)', color: 'var(--color-success)' }}>
                 Auto-délégation
               </span>
             )}
@@ -563,8 +563,8 @@ function AgentCard({
             style={{ color: 'var(--text-muted)' }}>
             <Copy size={12} />
           </button>
-          <button onClick={onDelete} className="p-1 rounded hover:bg-red-500/20" title="Supprimer"
-            style={{ color: '#f87171' }}>
+          <button onClick={onDelete} className="p-1 rounded hover:bg-[var(--color-error-subtle)]" title="Supprimer"
+            style={{ color: 'var(--color-error)' }}>
             <Trash2 size={12} />
           </button>
         </div>
@@ -609,7 +609,7 @@ function AgentEditorView({
       <div className="flex items-center gap-1 px-5 py-2 border-b overflow-x-auto"
         style={{ borderColor: 'var(--border-base)' }}>
         <button onClick={onCancel}
-          className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-medium mr-2 transition-colors hover:bg-white/8"
+          className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium mr-2 transition-colors hover:bg-white/8"
           style={{ color: 'var(--text-muted)' }}>
           <RotateCcw size={11} /> Retour
         </button>
@@ -618,7 +618,7 @@ function AgentEditorView({
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
             style={{
               color: activeTab === tab.id ? 'var(--accent-primary)' : 'var(--text-muted)',
               backgroundColor: activeTab === tab.id ? 'var(--accent-subtle)' : 'transparent',
@@ -632,10 +632,10 @@ function AgentEditorView({
         <button
           onClick={onSave}
           disabled={!isValid}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-40"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-40"
           style={{
             backgroundColor: isValid ? 'var(--accent-primary)' : 'var(--bg-input)',
-            color: isValid ? '#fff' : 'var(--text-muted)',
+            color: isValid ? 'white' : 'var(--text-muted)',
           }}
         >
           <Save size={12} />
@@ -678,7 +678,7 @@ function TabIdentity({ draft, updateDraft }: { draft: CustomAgentDraft; updateDr
             value={draft.name}
             onChange={(e) => updateDraft('name', e.target.value)}
             placeholder="Ex: CodeReviewer, DocWriter..."
-            className="w-full px-3 py-2 rounded-lg text-[12px] outline-none transition-all focus:ring-2"
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all focus:ring-2"
             style={{
               backgroundColor: 'var(--bg-input)',
               border: '1px solid var(--border-base)',
@@ -691,7 +691,7 @@ function TabIdentity({ draft, updateDraft }: { draft: CustomAgentDraft; updateDr
             value={draft.role}
             onChange={(e) => updateDraft('role', e.target.value)}
             placeholder="Ex: reviewer, optimizer, designer..."
-            className="w-full px-3 py-2 rounded-lg text-[12px] outline-none transition-all focus:ring-2"
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all focus:ring-2"
             style={{
               backgroundColor: 'var(--bg-input)',
               border: '1px solid var(--border-base)',
@@ -708,7 +708,7 @@ function TabIdentity({ draft, updateDraft }: { draft: CustomAgentDraft; updateDr
           onChange={(e) => updateDraft('description', e.target.value)}
           placeholder="Décris ce que fait cet agent..."
           rows={3}
-          className="w-full px-3 py-2 rounded-lg text-[12px] outline-none resize-none transition-all focus:ring-2"
+          className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none transition-all focus:ring-2"
           style={{
             backgroundColor: 'var(--bg-input)',
             border: '1px solid var(--border-base)',
@@ -764,17 +764,17 @@ function TabIdentity({ draft, updateDraft }: { draft: CustomAgentDraft; updateDr
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {draft.name || 'Nom de l\'agent'}
               </span>
               {draft.role && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium uppercase"
+                <span className="text-xs px-1.5 py-0.5 rounded-full font-medium uppercase"
                   style={{ backgroundColor: `${draft.color}20`, color: draft.color }}>
                   {draft.role}
                 </span>
               )}
             </div>
-            <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
               {draft.description || 'Description de l\'agent...'}
             </p>
           </div>
@@ -858,12 +858,12 @@ Propose des améliorations structurelles justifiées.`,
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
       {/* Templates */}
       <div className="flex items-center justify-between">
-        <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+        <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
           Prompt Système
         </label>
         <button
           onClick={() => setShowTemplates(!showTemplates)}
-          className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg transition-colors hover:bg-white/8"
+          className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg transition-colors hover:bg-white/8"
           style={{ color: 'var(--accent-primary)' }}
         >
           <Sparkles size={11} /> Modèles
@@ -887,7 +887,7 @@ Propose des améliorations structurelles justifiées.`,
                     updateDraft('systemPrompt', t.prompt);
                     setShowTemplates(false);
                   }}
-                  className="p-2.5 rounded-lg text-left text-[10px] transition-all hover:scale-[1.02]"
+                  className="p-2.5 rounded-lg text-left text-xs transition-all hover:scale-[1.02]"
                   style={{
                     backgroundColor: 'var(--bg-input)',
                     border: '1px solid var(--border-base)',
@@ -908,7 +908,7 @@ Propose des améliorations structurelles justifiées.`,
         onChange={(e) => updateDraft('systemPrompt', e.target.value)}
         placeholder="Instructions personnalisées pour l'agent...&#10;&#10;Décris son comportement, ses contraintes, son style de réponse..."
         rows={18}
-        className="w-full px-4 py-3 rounded-xl text-[12px] leading-relaxed outline-none resize-none font-mono transition-all focus:ring-2"
+        className="w-full px-4 py-3 rounded-xl text-sm leading-relaxed outline-none resize-none font-mono transition-all focus:ring-2"
         style={{
           backgroundColor: 'var(--bg-input)',
           border: '1px solid var(--border-base)',
@@ -916,10 +916,10 @@ Propose des améliorations structurelles justifiées.`,
         }}
       />
       <div className="flex items-center justify-between">
-        <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
           {draft.systemPrompt.length} caractères
         </span>
-        <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
           Markdown supporté
         </span>
       </div>
@@ -964,7 +964,7 @@ function TabTools({ draft, updateDraft }: { draft: CustomAgentDraft; updateDraft
             <button
               key={preset.id}
               onClick={() => applyPreset(preset)}
-              className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all hover:scale-105"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
               style={{
                 backgroundColor: 'var(--bg-input)',
                 border: '1px solid var(--border-base)',
@@ -988,7 +988,7 @@ function TabTools({ draft, updateDraft }: { draft: CustomAgentDraft; updateDraft
                 <button
                   key={tool.id}
                   onClick={() => toggleTool(tool.id)}
-                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-[10px] font-medium transition-all text-left"
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium transition-all text-left"
                   style={{
                     backgroundColor: selected ? `${draft.color}15` : 'var(--bg-input)',
                     border: selected ? `1px solid ${draft.color}50` : '1px solid var(--border-base)',
@@ -1000,7 +1000,7 @@ function TabTools({ draft, updateDraft }: { draft: CustomAgentDraft; updateDraft
                       backgroundColor: selected ? draft.color : 'transparent',
                       border: selected ? 'none' : '1px solid var(--border-base)',
                     }}>
-                    {selected && <Check size={10} color="#fff" />}
+                    {selected && <Check size={10} color="white" />}
                   </div>
                   {tool.label}
                 </button>
@@ -1017,7 +1017,7 @@ function TabTools({ draft, updateDraft }: { draft: CustomAgentDraft; updateDraft
           onChange={(e) => updateDraft('capabilities', e.target.value.split('\n').filter(Boolean))}
           placeholder="Ex: Analyse de performance&#10;Génération de diagrammes&#10;Refactoring TypeScript"
           rows={4}
-          className="w-full px-3 py-2 rounded-lg text-[11px] outline-none resize-none font-mono transition-all focus:ring-2"
+          className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none font-mono transition-all focus:ring-2"
           style={{
             backgroundColor: 'var(--bg-input)',
             border: '1px solid var(--border-base)',
@@ -1041,7 +1041,7 @@ function TabSettings({ draft, updateDraft }: { draft: CustomAgentDraft; updateDr
         <select
           value={draft.model}
           onChange={(e) => updateDraft('model', e.target.value)}
-          className="w-full px-3 py-2 rounded-lg text-[12px] outline-none"
+          className="w-full px-3 py-2 rounded-lg text-sm outline-none"
           style={{
             backgroundColor: 'var(--bg-input)',
             border: '1px solid var(--border-base)',
@@ -1065,7 +1065,7 @@ function TabSettings({ draft, updateDraft }: { draft: CustomAgentDraft; updateDr
           onChange={(e) => updateDraft('temperature', parseFloat(e.target.value))}
           className="w-full accent-blue-500"
         />
-        <div className="flex justify-between text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>
+        <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
           <span>Précis (0)</span>
           <span>Équilibré (0.7)</span>
           <span>Créatif (2)</span>
@@ -1081,7 +1081,7 @@ function TabSettings({ draft, updateDraft }: { draft: CustomAgentDraft; updateDr
           min={1024}
           max={128000}
           step={1024}
-          className="w-full px-3 py-2 rounded-lg text-[12px] outline-none"
+          className="w-full px-3 py-2 rounded-lg text-sm outline-none"
           style={{
             backgroundColor: 'var(--bg-input)',
             border: '1px solid var(--border-base)',
@@ -1114,7 +1114,7 @@ function TabSettings({ draft, updateDraft }: { draft: CustomAgentDraft; updateDr
           onChange={(e) => updateDraft('defaultTimeoutMs', parseInt(e.target.value))}
           className="w-full accent-blue-500"
         />
-        <div className="flex justify-between text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>
+        <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
           <span>10s</span>
           <span>5min</span>
         </div>
@@ -1126,14 +1126,14 @@ function TabSettings({ draft, updateDraft }: { draft: CustomAgentDraft; updateDr
           value={draft.triggerKeywords.join(', ')}
           onChange={(e) => updateDraft('triggerKeywords', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
           placeholder="Ex: review, optimize, refactor..."
-          className="w-full px-3 py-2 rounded-lg text-[12px] outline-none"
+          className="w-full px-3 py-2 rounded-lg text-sm outline-none"
           style={{
             backgroundColor: 'var(--bg-input)',
             border: '1px solid var(--border-base)',
             color: 'var(--text-primary)',
           }}
         />
-        <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
           L'agent sera automatiquement sélectionné quand ces mots apparaissent dans une demande
         </p>
       </FieldGroup>
@@ -1149,7 +1149,7 @@ function TabSettings({ draft, updateDraft }: { draft: CustomAgentDraft; updateDr
             <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
               style={{ left: draft.autoDelegate ? '18px' : '2px' }} />
           </div>
-          <span className="text-[11px]" style={{ color: 'var(--text-primary)' }}>
+          <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
             Permettre à cet agent de déléguer à d'autres agents
           </span>
         </label>
@@ -1165,10 +1165,10 @@ function TabSettings({ draft, updateDraft }: { draft: CustomAgentDraft; updateDr
 function FieldGroup({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1"
+      <label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1"
         style={{ color: 'var(--text-muted)' }}>
         {label}
-        {required && <span style={{ color: '#f87171' }}>*</span>}
+        {required && <span style={{ color: 'var(--color-error)' }}>*</span>}
       </label>
       {children}
     </div>

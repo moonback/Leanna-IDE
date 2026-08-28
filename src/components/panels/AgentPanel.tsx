@@ -97,7 +97,7 @@ function StatusBadge({ status }: { status: string }) {
   };
   const c = config[status] ?? config.pending;
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-wider"
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold uppercase tracking-wider"
       style={{ color: c.color, backgroundColor: c.bg }}>
       {c.icon}{c.label}
     </span>
@@ -234,7 +234,7 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
         </div>
         {/* Quick stats */}
         <div className="flex items-center gap-3 px-3 pb-2">
-          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px]"
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs"
             style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)', color: 'var(--accent-primary)' }}>
             <Users size={8} />
             <span className="font-bold">{allowedCount}</span>
@@ -292,8 +292,8 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
                 <Users size={14} style={{ color: 'var(--accent-primary)' }} />
               </div>
               <div>
-                <h2 className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>Agents</h2>
-                <span className="text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Agents</h2>
+                <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                   {liveRunning + delegatedRunning} actifs
                 </span>
               </div>
@@ -317,7 +317,7 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
 
   return (
     <Panel title="Agents" icon={<Users className="w-4 h-4" />}
-      actions={<span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-dimmed)' }}>
+      actions={<span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-dimmed)' }}>
         {liveRunning + delegatedRunning} actifs
       </span>}>
       {content}
@@ -332,7 +332,7 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
 function StatPill({ icon, value, label, color }: { icon: React.ReactNode; value: number; label: string; color: string }) {
   if (value === 0) return null;
   return (
-    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px]"
+    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs"
       style={{ backgroundColor: `${color}12`, color }}>
       {icon}
       <span className="font-bold">{value}</span>
@@ -344,7 +344,7 @@ function StatPill({ icon, value, label, color }: { icon: React.ReactNode; value:
 function TabBtn({ active, onClick, count, children }: { active: boolean; onClick: () => void; count: number; children: React.ReactNode }) {
   return (
     <button onClick={onClick}
-      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold transition-colors"
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors"
       style={{
         color: active ? 'var(--accent-primary)' : 'var(--text-dimmed)',
         backgroundColor: active ? 'var(--accent-subtle)' : 'transparent',
@@ -397,7 +397,7 @@ function RosterTab({ allowedRoles, activeRoles }: { allowedRoles: AgentRole[]; a
             {/* Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-semibold" style={{ color: isAllowed ? 'var(--text-primary)' : 'var(--text-dimmed)' }}>
+                <span className="text-sm font-semibold" style={{ color: isAllowed ? 'var(--text-primary)' : 'var(--text-dimmed)' }}>
                   {agent.label}
                 </span>
                 {isActive && (
@@ -407,7 +407,7 @@ function RosterTab({ allowedRoles, activeRoles }: { allowedRoles: AgentRole[]; a
                   </span>
                 )}
               </div>
-              <p className="text-[9px] mt-0.5 truncate" style={{ color: 'var(--text-dimmed)' }}>
+              <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-dimmed)' }}>
                 {agent.desc}
               </p>
             </div>
@@ -415,12 +415,12 @@ function RosterTab({ allowedRoles, activeRoles }: { allowedRoles: AgentRole[]; a
             {/* Status */}
             <div className="flex-shrink-0">
               {isAllowed ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold"
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold"
                   style={{ backgroundColor: 'rgba(74,222,128,0.1)', color: '#4ade80' }}>
                   <CheckCircle2 size={9} /> Disponible
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold"
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold"
                   style={{ backgroundColor: 'rgba(113,113,122,0.1)', color: 'var(--text-dimmed)' }}>
                   <XCircle size={9} /> Désactivé
                 </span>
@@ -431,7 +431,7 @@ function RosterTab({ allowedRoles, activeRoles }: { allowedRoles: AgentRole[]; a
       })}
 
       {/* Footer hint */}
-      <p className="text-center text-[9px] pt-3 pb-1" style={{ color: 'var(--text-dimmed)' }}>
+      <p className="text-center text-xs pt-3 pb-1" style={{ color: 'var(--text-dimmed)' }}>
         Gérez les agents dans <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>Paramètres → Agents</span>
       </p>
     </div>
@@ -500,12 +500,12 @@ function AgentGroupCard({ agentId, activities, expanded, onToggle }: {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-semibold" style={{ color: meta.color }}>{meta.label}</span>
-            <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs font-semibold" style={{ color: meta.color }}>{meta.label}</span>
+            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
               {done.length}/{activities.length} terminé{done.length > 1 ? 's' : ''}
             </span>
           </div>
-          <div className="text-[9px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
             {lastActivity?.label}
             {lastActivity?.args && (
               <span className="ml-1 opacity-60">→ {formatArgs(lastActivity.args)}</span>
@@ -540,7 +540,7 @@ function AgentGroupCard({ agentId, activities, expanded, onToggle }: {
             exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="px-2 pb-2 space-y-0.5 pt-1" style={{ borderTop: '1px solid var(--border-base)' }}>
               <div className="px-2 py-1 mb-1">
-                <p className="text-[9px] italic" style={{ color: 'var(--text-dimmed)' }}>{meta.description}</p>
+                <p className="text-xs italic" style={{ color: 'var(--text-dimmed)' }}>{meta.description}</p>
               </div>
               {activities.slice(-15).map(activity => (
                 <ToolActivityRow key={activity.id} activity={activity} color={meta.color} />
@@ -567,7 +567,7 @@ function ToolActivityRow({ activity, color }: { activity: ToolActivityEntry; col
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
-          <span className="text-[9px] font-mono font-medium truncate" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-xs font-mono font-medium truncate" style={{ color: 'var(--text-muted)' }}>
             {activity.label}
           </span>
           {elapsed && (
@@ -594,7 +594,7 @@ function ToolActivityRow({ activity, color }: { activity: ToolActivityEntry; col
 function RunningElapsed({ startTime }: { startTime: number }) {
   const elapsed = useElapsed(startTime, true);
   return (
-    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md flex-shrink-0"
+    <span className="text-xs font-mono px-1.5 py-0.5 rounded-md flex-shrink-0"
       style={{ backgroundColor: 'rgba(56,189,248,0.1)', color: '#38bdf8' }}>
       ⏱ {elapsed || '0s'}
     </span>
@@ -651,23 +651,23 @@ function DelegatedTaskCard({ task, expanded, onToggle }: {
             <Icon size={13} style={{ color: meta.color }} />}
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-[10px] font-semibold truncate block" style={{ color: 'var(--text-primary)' }}>
+          <span className="text-xs font-semibold truncate block" style={{ color: 'var(--text-primary)' }}>
             {task.title}
           </span>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[9px] font-medium" style={{ color: meta.color }}>{task.agentName}</span>
+            <span className="text-xs font-medium" style={{ color: meta.color }}>{task.agentName}</span>
             <span className="text-[8px] opacity-50">•</span>
-            <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{timeLabel(task.timestamp)}</span>
+            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{timeLabel(task.timestamp)}</span>
             {task.durationMs ? (
               <>
                 <span className="text-[8px] opacity-50">•</span>
-                <span className="text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>{formatDuration(task.durationMs)}</span>
+                <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>{formatDuration(task.durationMs)}</span>
               </>
             ) : null}
             {task.steps.length > 0 && (
               <>
                 <span className="text-[8px] opacity-50">•</span>
-                <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{task.steps.length} étape{task.steps.length > 1 ? 's' : ''}</span>
+                <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{task.steps.length} étape{task.steps.length > 1 ? 's' : ''}</span>
               </>
             )}
           </div>
@@ -690,17 +690,17 @@ function DelegatedTaskCard({ task, expanded, onToggle }: {
               {/* Role description */}
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md" style={{ backgroundColor: `${meta.color}08` }}>
                 <Icon size={10} style={{ color: meta.color }} />
-                <span className="text-[9px]" style={{ color: meta.color }}>{meta.description}</span>
+                <span className="text-xs" style={{ color: meta.color }}>{meta.description}</span>
               </div>
 
               {/* Steps timeline */}
               {task.steps.length > 0 && (
                 <div className="space-y-0.5 ml-1">
-                  <p className="text-[9px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Étapes :</p>
+                  <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Étapes :</p>
                   {task.steps.map((step, i) => (
                     <div key={i} className="flex items-start gap-1.5 pl-2" style={{ borderLeft: `2px solid ${meta.color}30` }}>
                       <span className="text-[8px] font-mono flex-shrink-0 mt-0.5" style={{ color: meta.color }}>{i + 1}.</span>
-                      <span className="text-[9px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>{step}</span>
+                      <span className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{step}</span>
                     </div>
                   ))}
                 </div>
@@ -708,20 +708,20 @@ function DelegatedTaskCard({ task, expanded, onToggle }: {
 
               {/* Detail */}
               {task.detail && task.steps.length === 0 && (
-                <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>{task.detail}</p>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{task.detail}</p>
               )}
 
               {/* Summary */}
               {task.summary && (
                 <div className="px-2 py-1.5 rounded-md" style={{ backgroundColor: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.15)' }}>
-                  <p className="text-[9px] font-semibold mb-0.5" style={{ color: '#4ade80' }}>Résumé</p>
-                  <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-primary)' }}>{task.summary}</p>
+                  <p className="text-xs font-semibold mb-0.5" style={{ color: '#4ade80' }}>Résumé</p>
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>{task.summary}</p>
                 </div>
               )}
 
               {/* Empty state */}
               {!task.detail && !task.summary && task.steps.length === 0 && (
-                <p className="text-[10px] italic" style={{ color: 'var(--text-dimmed)' }}>
+                <p className="text-xs italic" style={{ color: 'var(--text-dimmed)' }}>
                   {isRunning
                     ? 'Exécution en cours… Les étapes apparaîtront au fur et à mesure.'
                     : 'Aucun détail disponible.'}
@@ -745,8 +745,8 @@ function EmptyState({ message, sub }: { message: string; sub: string }) {
         <Users size={18} style={{ color: 'var(--text-dimmed)' }} />
       </div>
       <div className="text-center px-4">
-        <p className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>{message}</p>
-        <p className="text-[9px] mt-1 leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>{sub}</p>
+        <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{message}</p>
+        <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>{sub}</p>
       </div>
     </div>
   );

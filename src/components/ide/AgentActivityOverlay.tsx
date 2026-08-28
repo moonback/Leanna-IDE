@@ -185,7 +185,7 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions }: AgentActi
             initial={{ opacity: 0, y: 10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, y: 10, height: 0 }}
-            className="w-72 rounded-xl overflow-hidden shadow-2xl backdrop-blur-xl"
+            className="w-72 rounded-xl overflow-hidden shadow-2xl backdrop-blur-sm"
             style={{
               backgroundColor: 'var(--bg-panel)',
               border: '1px solid var(--border-base)',

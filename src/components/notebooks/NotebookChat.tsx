@@ -1963,7 +1963,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
         {/* Main input container */}
         <div
-          className="relative mx-auto flex max-w-4xl items-end gap-0 rounded-[28px] transition-shadow duration-200 focus-within:ring-2"
+          className="relative mx-auto flex max-w-4xl items-end gap-0 rounded-xl transition-shadow duration-200 focus-within:ring-2"
           style={{
             backgroundColor: 'var(--notebook-surface)',
             border: '1px solid var(--notebook-border)',

@@ -185,7 +185,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
       {/* Modal panel */}
       <div
         ref={modalRef}
-        className="relative w-full max-w-2xl max-h-[84vh] overflow-hidden flex flex-col rounded-[28px] shadow-2xl"
+        className="relative w-full max-w-2xl max-h-[84vh] overflow-hidden flex flex-col rounded-2xl shadow-2xl"
         style={{
           background: 'var(--bg-secondary)',
           border: '1px solid var(--border-base)',

@@ -119,9 +119,9 @@ export function StatusBadge({
   const displayLabel = label ?? config.label;
   const isAnimated = status === 'running' || pulse;
   const dotSize = size === 'sm' ? 6 : 8;
-  const fontSize = size === 'sm' ? '10px' : '11px';
-  const iconSize = size === 'sm' ? 10 : 12;
-  const padding = size === 'sm' ? '2px 6px' : '3px 8px';
+  const fontSize = size === 'sm' ? '0.75rem' : '0.875rem'; // text-sm (12px) / text-base (14px)
+  const iconSize = size === 'sm' ? 12 : 14;
+  const padding = size === 'sm' ? '0.125rem 0.375rem' : '0.25rem 0.5rem'; // ~2px 6px / ~4px 8px
 
   if (dotOnly) {
     return (

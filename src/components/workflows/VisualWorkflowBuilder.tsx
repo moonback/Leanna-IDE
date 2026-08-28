@@ -244,12 +244,12 @@ export function VisualWorkflowBuilder({ isOpen, onClose, onSaved }: VisualWorkfl
                           </span>
                           <div>
                             <h4 className="text-sm font-bold text-[var(--text-primary)]">{step.label || step.action}</h4>
-                            <p className="text-[11px] font-mono text-[var(--text-muted)]">{step.action}</p>
+                            <p className="text-xs font-mono text-[var(--text-muted)]">{step.action}</p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--bg-ctrl)] text-[var(--text-muted)] border border-[var(--border-base)]">
+                          <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--bg-ctrl)] text-[var(--text-muted)] border border-[var(--border-base)]">
                             ID: {step.id}
                           </span>
                           {steps.length > 1 && (
@@ -265,9 +265,9 @@ export function VisualWorkflowBuilder({ isOpen, onClose, onSaved }: VisualWorkfl
                       </div>
 
                       {/* Code snippet preview */}
-                      <div className="mt-2.5 pt-2 border-t border-[var(--border-base)] flex items-center justify-between text-[10px] text-[var(--text-muted)] font-mono">
+                      <div className="mt-2.5 pt-2 border-t border-[var(--border-base)] flex items-center justify-between text-xs text-[var(--text-muted)] font-mono">
                         <span className="truncate max-w-[320px]">Args: {step.argsString.replace(/\s+/g, ' ')}</span>
-                        <span className={`px-1.5 py-0.5 rounded font-sans text-[9px] ${
+                        <span className={`px-1.5 py-0.5 rounded font-sans text-xs ${
                           step.onError === 'retry' ? 'bg-amber-500/10 text-amber-500' : step.onError === 'skip' ? 'bg-gray-500/10 text-gray-400' : 'bg-red-500/10 text-red-400'
                         }`}>
                           onError: {step.onError}
@@ -306,7 +306,7 @@ export function VisualWorkflowBuilder({ isOpen, onClose, onSaved }: VisualWorkfl
                     onChange={e => updateSelectedStep('id', e.target.value)}
                     className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-[var(--border-base)] bg-[var(--bg-base)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   />
-                  <p className="text-[10px] text-[var(--text-muted)] mt-1">Utilisable comme template: <code className="text-[var(--accent-primary)] font-mono">{`{{steps.${currentStep.id}.result}}`}</code></p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">Utilisable comme template: <code className="text-[var(--accent-primary)] font-mono">{`{{steps.${currentStep.id}.result}}`}</code></p>
                 </div>
 
                 <div>
@@ -331,7 +331,7 @@ export function VisualWorkflowBuilder({ isOpen, onClose, onSaved }: VisualWorkfl
 
                   {/* Actions suggestions */}
                   <div className="space-y-1">
-                    <span className="text-[10px] font-semibold text-[var(--text-muted)]">Actions fréquentes :</span>
+                    <span className="text-xs font-semibold text-[var(--text-muted)]">Actions fréquentes :</span>
                     <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto p-1 border border-[var(--border-base)] rounded-lg bg-[var(--bg-base)]">
                       {COMMON_ACTIONS.map(act => (
                         <button
@@ -343,7 +343,7 @@ export function VisualWorkflowBuilder({ isOpen, onClose, onSaved }: VisualWorkfl
                               updateSelectedStep('label', act.label);
                             }
                           }}
-                          className={`text-[9px] px-2 py-1 rounded transition-colors text-left truncate max-w-full ${
+                          className={`text-xs px-2 py-1 rounded transition-colors text-left truncate max-w-full ${
                             currentStep.action === act.action
                               ? 'bg-[var(--accent-primary)] text-white'
                               : 'bg-[var(--bg-ctrl)] text-[var(--text-secondary)] hover:bg-[var(--ctrl-hover)]'
@@ -368,7 +368,7 @@ export function VisualWorkflowBuilder({ isOpen, onClose, onSaved }: VisualWorkfl
                     onChange={e => updateSelectedStep('argsString', e.target.value)}
                     className="w-full p-2.5 text-xs font-mono rounded-lg border border-[var(--border-base)] bg-[var(--bg-base)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] leading-relaxed"
                   />
-                  <div className="p-2 rounded bg-[var(--bg-ctrl)] border border-[var(--border-base)] mt-1.5 text-[10px] text-[var(--text-muted)] space-y-1">
+                  <div className="p-2 rounded bg-[var(--bg-ctrl)] border border-[var(--border-base)] mt-1.5 text-xs text-[var(--text-muted)] space-y-1">
                     <p className="font-semibold text-[var(--text-secondary)]">Variables disponibles :</p>
                     <p><code className="text-[var(--accent-primary)]">{`{{prev.result}}`}</code> : Résultat étape précédente</p>
                     <p><code className="text-[var(--accent-primary)]">{`{{steps.ID.result}}`}</code> : Résultat par ID d'étape</p>

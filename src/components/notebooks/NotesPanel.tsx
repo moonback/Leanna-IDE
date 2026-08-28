@@ -268,7 +268,7 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
     return (
       <div className="h-full overflow-y-auto custom-scrollbar px-4 pb-4">
         {compactNotes.length === 0 ? (
-          <div className="rounded-[var(--notebook-radius-lg)] bg-[var(--notebook-surface)] p-5 text-sm text-[var(--text-muted)]">
+          <div className="rounded-xl bg-[var(--notebook-surface)] p-5 text-sm text-[var(--text-muted)]">
 Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtront ici.          </div>
         ) : (
           <div className="space-y-3">

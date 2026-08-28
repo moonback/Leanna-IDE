@@ -143,7 +143,7 @@ export function SidePanel({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]"
+              className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
               onClick={pinned ? undefined : onClose}
             />
           )}

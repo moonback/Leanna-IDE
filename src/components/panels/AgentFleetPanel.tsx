@@ -273,7 +273,7 @@ export function AgentFleetPanel({ inline = false, onClose }: AgentFleetPanelProp
           <button
             key={id}
             onClick={() => setTab(id)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
             style={{
               color: tab === id ? 'var(--accent-primary)' : 'var(--text-dimmed)',
               backgroundColor: tab === id ? 'var(--accent-subtle)' : 'transparent',
@@ -312,7 +312,7 @@ export function AgentFleetPanel({ inline = false, onClose }: AgentFleetPanelProp
 
       {/* Error */}
       {error && (
-        <div className="mx-3 mt-2 px-3 py-2 rounded-lg text-[10px] flex items-center gap-2"
+        <div className="mx-3 mt-2 px-3 py-2 rounded-lg text-xs flex items-center gap-2"
           style={{ backgroundColor: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', color: '#f87171' }}>
           <AlertTriangle size={11} />
           <span>{error}</span>
@@ -390,8 +390,8 @@ export function AgentFleetPanel({ inline = false, onClose }: AgentFleetPanelProp
                 <Users size={15} style={{ color: 'var(--accent-primary)' }} />
               </div>
               <div>
-                <h2 className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Flotte d'Agents</h2>
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Flotte d'Agents</h2>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   {totalActive > 0 ? `${totalActive} agent${totalActive > 1 ? 's' : ''} actif${totalActive > 1 ? 's' : ''}` : 'Tous au repos'}
                 </span>
               </div>
@@ -425,7 +425,7 @@ function FleetSummary({ summary, recommendation }: {
   return (
     <div className="rounded-xl px-3.5 py-3" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           {summary.online}/{summary.totalAgents} en ligne
         </span>
         <div className="flex gap-1.5">
@@ -435,7 +435,7 @@ function FleetSummary({ summary, recommendation }: {
         </div>
       </div>
       {recommendation && (
-        <p className="text-[9px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>{recommendation}</p>
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{recommendation}</p>
       )}
     </div>
   );
@@ -462,11 +462,11 @@ function AgentCard({ agent }: { agent: AgentStat }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{meta.label}</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{meta.label}</span>
           <StatusDot status={agent.status} />
-          <span className="text-[9px] capitalize" style={{ color: 'var(--text-dimmed)' }}>{agent.status}</span>
+          <span className="text-xs capitalize" style={{ color: 'var(--text-dimmed)' }}>{agent.status}</span>
         </div>
-        <div className="text-[9px] mt-0.5 flex gap-3" style={{ color: 'var(--text-muted)' }}>
+        <div className="text-xs mt-0.5 flex gap-3" style={{ color: 'var(--text-muted)' }}>
           {agent.runningTasks > 0 && <span className="flex items-center gap-1"><Loader2 size={8} className="animate-spin" />{agent.runningTasks} en cours</span>}
           {agent.queuedTasks > 0 && <span className="flex items-center gap-1"><Clock size={8} />{agent.queuedTasks} en queue</span>}
           {agent.delegationSuccess > 0 && <span style={{ color: '#4ade80' }}>✓ {agent.delegationSuccess}</span>}
@@ -498,16 +498,16 @@ function BusMessageRow({ msg }: { msg: BusMessage }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[9px] font-bold" style={{ color }}>{msg.type.replace(/_/g, ' ')}</span>
-          <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{msg.from}</span>
+          <span className="text-xs font-bold" style={{ color }}>{msg.type.replace(/_/g, ' ')}</span>
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{msg.from}</span>
           <ArrowRight size={8} style={{ color: 'var(--text-dimmed)' }} />
-          <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{msg.to}</span>
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{msg.to}</span>
           {msg.isAutonomous && (
             <span className="text-[7px] font-bold px-1 py-0.5 rounded uppercase"
               style={{ backgroundColor: 'rgba(249,115,22,0.12)', color: '#f97316' }}>auto</span>
           )}
         </div>
-        <p className="text-[9px] truncate mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{msg.summary}</p>
+        <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{msg.summary}</p>
       </div>
       <span className="text-[8px] font-mono flex-shrink-0 mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{time}</span>
     </div>
@@ -524,8 +524,8 @@ function MetricsView({ metrics }: { metrics: BusMetrics }) {
       {/* Success rate */}
       <div className="rounded-xl p-3.5" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>Taux de succès</span>
-          <span className="text-[14px] font-bold font-mono" style={{ color: rateColor }}>{rate}%</span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Taux de succès</span>
+          <span className="text-base font-bold font-mono" style={{ color: rateColor }}>{rate}%</span>
         </div>
         <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-input)' }}>
           <motion.div
@@ -549,9 +549,9 @@ function MetricsView({ metrics }: { metrics: BusMetrics }) {
           <div key={label} className="rounded-xl px-3 py-2.5" style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)' }}>
             <div className="flex items-center gap-1.5 mb-1">
               <Icon size={10} style={{ color: value > 0 ? color : 'var(--text-dimmed)' }} />
-              <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{label}</span>
+              <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{label}</span>
             </div>
-            <span className="text-[14px] font-bold font-mono" style={{ color: value > 0 ? color : 'var(--text-primary)' }}>{value}</span>
+            <span className="text-base font-bold font-mono" style={{ color: value > 0 ? color : 'var(--text-primary)' }}>{value}</span>
           </div>
         ))}
       </div>
@@ -559,9 +559,9 @@ function MetricsView({ metrics }: { metrics: BusMetrics }) {
       {/* Dead-letter detail */}
       {deadLetterEntries.length > 0 && (
         <div className="rounded-xl p-3" style={{ backgroundColor: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.15)' }}>
-          <p className="text-[9px] font-semibold mb-2" style={{ color: '#f87171' }}>⚠️ Messages non délivrés</p>
+          <p className="text-xs font-semibold mb-2" style={{ color: '#f87171' }}>⚠️ Messages non délivrés</p>
           {deadLetterEntries.map(([role, count]) => (
-            <div key={role} className="flex items-center justify-between py-1 text-[9px]">
+            <div key={role} className="flex items-center justify-between py-1 text-xs">
               <span style={{ color: 'var(--text-muted)' }}>{role}</span>
               <span className="font-mono font-bold" style={{ color: '#f87171' }}>{count}</span>
             </div>
@@ -572,10 +572,10 @@ function MetricsView({ metrics }: { metrics: BusMetrics }) {
       {/* Message type distribution */}
       {Object.keys(metrics.byMessageType).length > 0 && (
         <div>
-          <p className="text-[9px] font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Par type</p>
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Par type</p>
           <div className="space-y-1">
             {Object.entries(metrics.byMessageType).map(([type, count]) => (
-              <div key={type} className="flex items-center gap-2 text-[9px]">
+              <div key={type} className="flex items-center gap-2 text-xs">
                 <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
                   style={{ backgroundColor: TYPE_COLOR[type] ?? '#94a3b8' }} />
                 <span className="flex-1" style={{ color: 'var(--text-muted)' }}>{type.replace(/_/g, ' ')}</span>
@@ -602,7 +602,7 @@ function LoadingState() {
   return (
     <div className="flex flex-col items-center justify-center py-12 gap-3">
       <Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
-      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Chargement…</p>
+      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Chargement…</p>
     </div>
   );
 }
@@ -614,8 +614,8 @@ function EmptyState({ icon: Icon, title, sub }: { icon: any; title: string; sub:
         style={{ backgroundColor: 'var(--bg-input)' }}>
         <Icon size={18} style={{ color: 'var(--text-dimmed)' }} />
       </div>
-      <p className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>{title}</p>
-      <p className="text-[9px] leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>{sub}</p>
+      <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{title}</p>
+      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>{sub}</p>
     </div>
   );
 }

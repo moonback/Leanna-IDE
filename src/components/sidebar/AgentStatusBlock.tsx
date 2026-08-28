@@ -124,7 +124,7 @@ export function AgentStatusBlock({
             <button
               type="button"
               onClick={toggleMenu}
-              className="absolute top-[6px] right-[4px] w-[14px] h-[14px] flex items-center justify-center rounded-sm transition-all"
+              className="absolute top-1.5 right-1 w-3.5 h-3.5 flex items-center justify-center rounded-sm transition-all"
               style={{
                 color: assistantMenuOpen ? 'var(--accent-primary)' : 'var(--text-dimmed)',
                 backgroundColor: assistantMenuOpen ? 'var(--accent-subtle)' : 'transparent',
@@ -143,7 +143,7 @@ export function AgentStatusBlock({
           {/* Working pulse */}
           {assistantConnected && assistantWorking && (
             <motion.div
-              className="absolute bottom-[1px] left-1/2 -translate-x-1/2 w-[14px] h-[2px] rounded-full"
+              className="absolute bottom-px left-1/2 -translate-x-1/2 w-3.5 h-px rounded-full"
               style={{ backgroundColor: 'var(--accent-primary)' }}
               animate={{ opacity: [0.3, 1, 0.3], scaleX: [0.5, 1, 0.5] }}
               transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
@@ -178,7 +178,7 @@ export function AgentStatusBlock({
                     icon={item.icon}
                     label={item.label}
                     active={item.stateKey ? Boolean(stateRecord[item.stateKey]) : false}
-                    dot={item.dotStateKey ? (Boolean(stateRecord[item.dotStateKey]) ? '#0ea5e9' : undefined) : undefined}
+                    dot={item.dotStateKey ? (Boolean(stateRecord[item.dotStateKey]) ? 'var(--accent-secondary)' : undefined) : undefined}
                     onClick={() => {
                       if (item.actionKey && actionsRecord[item.actionKey]) {
                         actionsRecord[item.actionKey]();

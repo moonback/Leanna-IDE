@@ -199,7 +199,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                       height="18"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="white"
+                      stroke="var(--text-primary)"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -424,7 +424,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                     border: '1px solid color-mix(in srgb, var(--color-error) 35%, transparent)',
                     background:
                       'linear-gradient(135deg, var(--color-error), color-mix(in srgb, var(--color-error) 75%, black))',
-                    color: '#fff',
+                    color: 'var(--text-primary)',
                     fontSize: '12px',
                     fontWeight: 700,
                     fontFamily: '"DM Sans", system-ui, sans-serif',
