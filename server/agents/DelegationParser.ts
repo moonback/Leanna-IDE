@@ -10,7 +10,7 @@
  */
 
 import type { AgentRole, TaskPriority } from "./types";
-import { DELEGATION_MATRIX } from "./AgentCommunication";
+import { DELEGATION_MATRIX, isDelegationAllowed } from "./AgentCommunication";
 import { listAgentRoles } from "./roles";
 import { createLogger } from "../utils/logger";
 
@@ -139,9 +139,8 @@ export class DelegationParser {
       };
     }
 
-    // Validation matrice
-    const allowed = DELEGATION_MATRIX[fromRole] ?? [];
-    if (!allowed.some((d) => d.targetRole === targetRole)) {
+    // Validation matrice (inclut support des agents personnalisés)
+    if (!isDelegationAllowed(fromRole, targetRole)) {
       return {
         warning: `Bloc #${blockIndex}: [${fromRole}] → [${targetRole}] non autorisé par la matrice`,
       };
@@ -194,8 +193,8 @@ export class DelegationParser {
     const validRoles = getValidRoles();
     if (!targetRole || !validRoles.has(targetRole)) return null;
 
-    const allowed = DELEGATION_MATRIX[fromRole] ?? [];
-    if (!allowed.some((d) => d.targetRole === targetRole)) return null;
+    // Validation matrice (inclut support des agents personnalisés)
+    if (!isDelegationAllowed(fromRole, targetRole)) return null;
 
     const reason = fields["raison"] ?? fields["reason"] ?? fields["motif"] ?? "";
     if (!reason) return null;

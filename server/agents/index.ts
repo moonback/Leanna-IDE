@@ -45,6 +45,7 @@ export {
   listAgentRoles,
   hasAgent
 } from "./roles";
+export { isDelegationAllowed } from "./AgentCommunication";
 
 // Dynamic Agent Registry
 export { DynamicAgentRegistry, dynamicAgentRegistry } from "./DynamicAgentRegistry";

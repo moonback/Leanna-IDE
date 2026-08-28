@@ -5,25 +5,44 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 export type ResponseStyle = 'concise' | 'balanced' | 'detailed';
 export type Language      = 'fr' | 'en' | 'es' | 'de' | 'pt';
 export type AIProvider    = 'gemini' | 'openrouter';
-export type AgentRole =
-  | 'coder'
-  | 'refactor'
-  | 'debugger'
-  | 'reviewer'
-  | 'tester'
-  | 'security'
-  | 'architect'
-  | 'writer'
-  | 'formatter'
-  | 'researcher'
-  | 'proofreader'
-  | 'translator'
-  | 'summarizer'
-  | 'planner';
+
+// Rôles d'agents statiques (prédéfini)
+export const STATIC_AGENT_ROLES = [
+  'coder', 'refactor', 'debugger', 'reviewer', 'tester', 'security', 'architect',
+  'writer', 'formatter', 'researcher', 'proofreader', 'translator', 'summarizer', 'planner',
+] as const;
+
+// Type pour les rôles d'agents (statiques + dynamiques)
+export type StaticAgentRole = (typeof STATIC_AGENT_ROLES)[number];
+export type AgentRole = StaticAgentRole | string;
+
+// Configuration d'un agent personnalisé
+export interface CustomAgentConfig {
+  id: string;
+  role: string;
+  name: string;
+  description: string;
+  avatar?: string;
+  color?: string;
+  systemPrompt?: string;
+  capabilities?: string[];
+  tools?: string[];
+  temperature?: number;
+  maxTokens?: number;
+  maxConcurrency?: number;
+  defaultTimeoutMs?: number;
+  triggerKeywords?: string[];
+  autoDelegate?: boolean;
+  model?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface AgentsConfig {
   enabled: boolean;
   allowedRoles: AgentRole[];
+  // Agents personnalisés créés par l'utilisateur
+  customAgents?: CustomAgentConfig[];
 }
 
 export interface UserProfile {
