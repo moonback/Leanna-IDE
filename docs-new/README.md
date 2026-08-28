@@ -62,7 +62,7 @@ Jarvis OS est **l'IDE du futur** : un environnement de développement **intellig
 
 ## 📖 Présentation
 
-**Jarvis OS est un IDE auto-référentiel** : un environnement de développement **intelligent** où l'assistant IA intégré (**Leanna par défaut**) peut **lire, comprendre et modifier le code source de l'application elle-même**.
+**Jarvis OS est un IDE auto-référentiel** : un environnement de développement **intelligent** où l'assistant IA intégré (**Leanna par défaut**) peut **lire, comprendre et modifier le code source de votre application**.
 
 Conçu comme un **système d'exploitation desktop**, Jarvis OS combine :
 
@@ -72,9 +72,6 @@ Conçu comme un **système d'exploitation desktop**, Jarvis OS combine :
 - 📚 Des **notebooks RAG** (style NotebookLM) avec ingestion de sources et chat avec citations.
 - 🧠 Un **moteur de connaissances** avec indexation sémantique du workspace.
 - 🔒 Un **sandbox isolé** pour les modifications assistées avec validation avant merge.
-
-> **📌 Positionnement produit (v0.5.0)** :
-> Jarvis OS ne gère désormais **que son propre code source**. Chaque modification est protégée par un **checkpoint Git**, garantissant une **sécurité et une traçabilité totales**.
 
 ---
 
@@ -106,7 +103,7 @@ Conçu comme un **système d'exploitation desktop**, Jarvis OS combine :
 
 ### 🤖 Assistant Code (Leanna)
 
-Accès direct au code source via **20+ outils** pour une assistance complète :
+Accès direct au code source de votre app via **20+ outils** pour une assistance complète :
 
 #### 📖 Lecture
 - `read_project_file` : Lecture partielle ou complète avec numéros de ligne et hash MD5.
