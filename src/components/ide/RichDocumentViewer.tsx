@@ -174,9 +174,9 @@ export interface RichDocument {
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
 const CHART_COLORS = [
-  '#6366f1', '#22d3ee', '#34d399', '#f59e0b',
-  '#f87171', '#a78bfa', '#fb923c', '#4ade80',
-  '#38bdf8', '#e879f9',
+  'var(--color-accent-alt)', 'var(--accent-secondary)', 'var(--color-success)', 'var(--color-warning)',
+  'var(--color-error)', 'var(--color-accent-alt)', 'var(--color-warning)', 'var(--color-success)',
+  'var(--accent-primary)', 'var(--color-accent-alt)',
 ];
 
 function getColor(index: number, override?: string): string {
@@ -215,7 +215,7 @@ function ChartSizePicker({
         <button
           key={s}
           onClick={() => onChange(s)}
-          className="px-2 py-0.5 text-[9px] font-mono uppercase transition-colors"
+          className="px-2 py-0.5 text-xs font-mono uppercase transition-colors"
           style={{
             backgroundColor: value === s ? 'var(--accent-primary)' : 'transparent',
             color: value === s ? 'white' : 'var(--text-dimmed)',
@@ -319,7 +319,7 @@ function TableRenderer({ block }: { block: TableBlock }) {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filtrer…"
-            className="bg-transparent outline-none w-24 text-[11px]"
+            className="bg-transparent outline-none w-24 text-sm"
             style={{ color: 'var(--text-primary)' }}
           />
           {filter && (
@@ -336,7 +336,7 @@ function TableRenderer({ block }: { block: TableBlock }) {
           style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
         >
           <FileDown size={12} />
-          <span className="text-[10px] font-medium">CSV</span>
+          <span className="text-xs font-medium">CSV</span>
         </button>
       </div>
 
@@ -360,7 +360,7 @@ function TableRenderer({ block }: { block: TableBlock }) {
               <tr>
                 <td
                   colSpan={block.columns.length}
-                  className="px-4 py-5 text-center text-[11px]"
+                  className="px-4 py-5 text-center text-sm"
                   style={{ color: 'var(--text-dimmed)' }}
                 >
                   Aucun résultat pour « {filter} »
@@ -382,7 +382,7 @@ function TableRenderer({ block }: { block: TableBlock }) {
                       onClick={() => handleCellCopy(cell)}
                       title="Cliquer pour copier"
                       style={{
-                        color: copiedCell === String(cell) ? '#34d399' : 'var(--text-primary)',
+                        color: copiedCell === String(cell) ? 'var(--color-success)' : 'var(--text-primary)',
                         borderBottom:
                           ri < filteredRows.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                         transition: 'color 0.2s',
@@ -399,7 +399,7 @@ function TableRenderer({ block }: { block: TableBlock }) {
       </div>
 
       {filter && (
-        <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-dimmed)' }}>
+        <p className="text-xs mt-1.5" style={{ color: 'var(--text-dimmed)' }}>
           {filteredRows.length} / {block.rows.length} ligne
           {block.rows.length > 1 ? 's' : ''}
         </p>
@@ -638,7 +638,7 @@ function PieChartRenderer({ block }: { block: PieChartBlock }) {
                   <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
                     {entry.value.toLocaleString('fr-FR')}
                   </span>
-                  <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                     {pct}%
                   </span>
                 </div>
@@ -650,7 +650,7 @@ function PieChartRenderer({ block }: { block: PieChartBlock }) {
             style={{ borderTop: '1px solid var(--border-subtle)' }}
           >
             <span
-              className="flex-1 text-[10px] uppercase tracking-wide"
+              className="flex-1 text-xs uppercase tracking-wide"
               style={{ color: 'var(--text-dimmed)' }}
             >
               Total
@@ -688,7 +688,7 @@ function CardRenderer({ block }: { block: CardBlock }) {
         </div>
         {block.badge && (
           <span
-            className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+            className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
             style={{
               backgroundColor: block.badge.color ? `${block.badge.color}22` : 'var(--bg-tertiary)',
               color: block.badge.color ?? 'var(--accent-primary)',
@@ -710,7 +710,7 @@ function CardRenderer({ block }: { block: CardBlock }) {
             }}
           >
             <p
-              className="text-[10px] uppercase tracking-wide mb-0.5"
+              className="text-xs uppercase tracking-wide mb-0.5"
               style={{ color: 'var(--text-dimmed)' }}
             >
               {field.label}
@@ -744,7 +744,7 @@ function ListRenderer({ block }: { block: ListBlock }) {
             style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }}
           >
             <span
-              className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5"
+              className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold mt-0.5"
               style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-primary)' }}
             >
               {block.ordered ? i + 1 : (item.icon ?? '•')}
@@ -754,14 +754,14 @@ function ListRenderer({ block }: { block: ListBlock }) {
                 {item.text}
               </p>
               {item.sub && (
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
+                <p className="text-sm mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
                   {item.sub}
                 </p>
               )}
             </div>
             {item.badge && (
               <span
-                className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0"
+                className="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0"
                 style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
               >
                 {item.badge}
@@ -799,7 +799,7 @@ function TextRenderer({ block }: { block: TextBlock }) {
           onClick={copy}
           className="p-1 rounded hover:bg-white/10 transition-colors"
           title={copied ? 'Copié !' : 'Copier'}
-          style={{ color: copied ? '#34d399' : 'var(--text-dimmed)' }}
+          style={{ color: copied ? 'var(--color-success)' : 'var(--text-dimmed)' }}
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
         </button>
@@ -831,7 +831,7 @@ function CodeRenderer({ block }: { block: CodeBlock }) {
         <div className="flex-1" />
         {block.language && (
           <span
-            className="text-[10px] font-mono px-2 py-0.5 rounded-full"
+            className="text-xs font-mono px-2 py-0.5 rounded-full"
             style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-primary)' }}
           >
             {block.language}
@@ -841,7 +841,7 @@ function CodeRenderer({ block }: { block: CodeBlock }) {
           onClick={copy}
           className="p-1 rounded hover:bg-white/10 transition-colors"
           title={copied ? 'Copié !' : 'Copier le code'}
-          style={{ color: copied ? '#34d399' : 'var(--text-dimmed)' }}
+          style={{ color: copied ? 'var(--color-success)' : 'var(--text-dimmed)' }}
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
         </button>
@@ -851,7 +851,7 @@ function CodeRenderer({ block }: { block: CodeBlock }) {
         style={{ border: '1px solid var(--border-base)', backgroundColor: 'rgba(0,0,0,0.28)' }}
       >
         <pre
-          className="p-4 text-[12px] font-mono overflow-x-auto custom-scrollbar"
+          className="p-4 text-sm font-mono overflow-x-auto custom-scrollbar"
           style={{ color: 'var(--text-primary)', lineHeight: 1.65, margin: 0 }}
         >
           <code>{block.content}</code>
@@ -884,12 +884,12 @@ function ProgressRenderer({ block }: { block: ProgressBlock }) {
                   {item.value.toLocaleString('fr-FR')}
                   {item.unit ? ` ${item.unit}` : ''}
                   {item.max !== undefined && (
-                    <span className="font-normal text-[10px] ml-1" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="font-normal text-xs ml-1" style={{ color: 'var(--text-dimmed)' }}>
                       / {item.max.toLocaleString('fr-FR')}
                       {item.unit ? ` ${item.unit}` : ''}
                     </span>
                   )}
-                  <span className="font-normal text-[10px] ml-1.5" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="font-normal text-xs ml-1.5" style={{ color: 'var(--text-dimmed)' }}>
                     ({pct.toFixed(0)}%)
                   </span>
                 </span>
@@ -918,10 +918,10 @@ function ProgressRenderer({ block }: { block: ProgressBlock }) {
 // ─── TimelineRenderer ────────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<string, string> = {
-  done:     '#34d399',
+  done:     'var(--color-success)',
   current:  'var(--accent-primary)',
   upcoming: 'var(--border-base)',
-  error:    '#f87171',
+  error:    'var(--color-error)',
 };
 
 function TimelineRenderer({ block }: { block: TimelineBlock }) {
@@ -970,7 +970,7 @@ function TimelineRenderer({ block }: { block: TimelineBlock }) {
                   </span>
                   {event.badge && (
                     <span
-                      className="text-[9px] font-semibold px-1.5 py-px rounded-full"
+                      className="text-xs font-semibold px-1.5 py-px rounded-full"
                       style={{
                         backgroundColor: `${color}22`,
                         color,
@@ -981,14 +981,14 @@ function TimelineRenderer({ block }: { block: TimelineBlock }) {
                     </span>
                   )}
                   <span
-                    className="ml-auto text-[10px] tabular-nums flex-shrink-0"
+                    className="ml-auto text-xs tabular-nums flex-shrink-0"
                     style={{ color: 'var(--text-dimmed)' }}
                   >
                     {event.date}
                   </span>
                 </div>
                 {event.description && (
-                  <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-sm mt-0.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                     {event.description}
                   </p>
                 )}
@@ -1021,7 +1021,7 @@ function StatGridRenderer({ block }: { block: StatGridBlock }) {
           const color = item.color ?? getColor(i);
           const changeUp = (item.change ?? 0) > 0;
           const changeDown = (item.change ?? 0) < 0;
-          const changeColor = changeUp ? '#34d399' : changeDown ? '#f87171' : 'var(--text-dimmed)';
+          const changeColor = changeUp ? 'var(--color-success)' : changeDown ? 'var(--color-error)' : 'var(--text-dimmed)';
 
           return (
             <div
@@ -1033,7 +1033,7 @@ function StatGridRenderer({ block }: { block: StatGridBlock }) {
               }}
             >
               <p
-                className="text-[10px] uppercase tracking-wide mb-2"
+                className="text-xs uppercase tracking-wide mb-2"
                 style={{ color: 'var(--text-dimmed)' }}
               >
                 {item.icon ? `${item.icon} ` : ''}{item.label}
@@ -1057,11 +1057,11 @@ function StatGridRenderer({ block }: { block: StatGridBlock }) {
                   ) : (
                     <Minus size={11} style={{ color: changeColor, flexShrink: 0 }} />
                   )}
-                  <span className="text-[11px] font-medium" style={{ color: changeColor }}>
+                  <span className="text-sm font-medium" style={{ color: changeColor }}>
                     {changeUp ? '+' : ''}{item.change}%
                   </span>
                   {item.changeLabel && (
-                    <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                       {item.changeLabel}
                     </span>
                   )}
@@ -1131,7 +1131,7 @@ function RichBlock({ block, index }: { block: RichBlock; index: number }) {
         style={{ borderBottom: collapsed ? 'none' : '1px solid var(--border-subtle)' }}
       >
         <span
-          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+          className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
           style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-primary)' }}
         >
           <BlockIcon type={block.type} />
@@ -1227,7 +1227,7 @@ function SaveModal({
             <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
               Enregistrer dans le workspace
             </p>
-            <p className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-sm" style={{ color: 'var(--text-dimmed)' }}>
               Le fichier sera sauvegardé via le sandbox
             </p>
           </div>
@@ -1242,7 +1242,7 @@ function SaveModal({
 
         {/* Path input */}
         <div className="mb-3">
-          <label className="text-[11px] font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+          <label className="text-sm font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
             Chemin du fichier (relatif au projet)
           </label>
           <div
@@ -1256,13 +1256,13 @@ function SaveModal({
               onChange={(e) => setPath(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={status !== 'idle'}
-              className="flex-1 bg-transparent outline-none text-[12px] font-mono"
+              className="flex-1 bg-transparent outline-none text-sm font-mono"
               style={{ color: 'var(--text-primary)' }}
               placeholder="docs/rapport.rich.json"
               spellCheck={false}
             />
           </div>
-          <p className="text-[10px] mt-1" style={{ color: 'var(--text-dimmed)' }}>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-dimmed)' }}>
             Extension recommandée : <span className="font-mono" style={{ color: 'var(--accent-primary)' }}>.rich.json</span>
           </p>
         </div>
@@ -1270,8 +1270,8 @@ function SaveModal({
         {/* Status */}
         {status === 'success' && (
           <div
-            className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-[12px]"
-            style={{ backgroundColor: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)', color: '#34d399' }}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-sm"
+            style={{ backgroundColor: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)', color: 'var(--color-success)' }}
           >
             <CheckCircle2 size={13} />
             <span>Fichier sauvegardé avec succès</span>
@@ -1279,8 +1279,8 @@ function SaveModal({
         )}
         {status === 'error' && (
           <div
-            className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-[12px]"
-            style={{ backgroundColor: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-sm"
+            style={{ backgroundColor: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--color-error)' }}
           >
             <AlertCircle size={13} />
             <span className="break-words">{error ?? 'Erreur de sauvegarde'}</span>
@@ -1303,7 +1303,7 @@ function SaveModal({
             <button
               onClick={onCancel}
               className="px-4 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              style={{ backgroundColor: 'rgba(52,211,153,0.2)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }}
+              style={{ backgroundColor: 'rgba(52,211,153,0.2)', color: 'var(--color-success)', border: '1px solid rgba(52,211,153,0.3)' }}
             >
               Fermer
             </button>
@@ -1416,13 +1416,13 @@ export const RichDocumentViewer = memo(function RichDocumentViewer({ document, o
             {document.title}
           </p>
           {document.subtitle && (
-            <p className="text-[11px] truncate" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-sm truncate" style={{ color: 'var(--text-dimmed)' }}>
               {document.subtitle}
             </p>
           )}
         </div>
         {document.createdAt && (
-          <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
             {new Date(document.createdAt).toLocaleString('fr-FR', {
               dateStyle: 'short',
               timeStyle: 'short',
@@ -1480,7 +1480,7 @@ export const RichDocumentViewer = memo(function RichDocumentViewer({ document, o
             backgroundColor: 'var(--bg-secondary)',
           }}
         >
-          <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
             {document.blocks.length} bloc{document.blocks.length > 1 ? 's' : ''}
           </span>
           {Object.entries(
@@ -1491,7 +1491,7 @@ export const RichDocumentViewer = memo(function RichDocumentViewer({ document, o
           ).map(([type, count]) => (
             <span
               key={type}
-              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full flex-shrink-0"
+              className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full flex-shrink-0"
               style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
             >
               <BlockIcon type={type as RichBlockType} />

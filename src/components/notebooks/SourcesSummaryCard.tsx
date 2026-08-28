@@ -125,7 +125,7 @@ export function SourcesSummaryCard({ notebookId, sourcesCount, sourcesHash }: Pr
               )}
 
               {error && (
-                <p className="text-xs py-1.5" style={{ color: 'var(--color-error, #ef4444)' }}>
+                <p className="text-xs py-1.5" style={{ color: 'var(--color-error)' }}>
                   {error}
                 </p>
               )}

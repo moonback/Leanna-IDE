@@ -187,7 +187,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
     window.open(blobUrl, '_blank');
   }, [blobUrl]);
 
-  const accentColor = '#3b82f6';
+  const accentColor = 'var(--accent-primary)';
 
   return (
     <AnimatePresence>
@@ -373,7 +373,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                   {(doc.type === 'infographic' || doc.type === 'mindmap') && (
                     <p
                       className="text-xs px-3 py-2 rounded-full leading-relaxed"
-                      style={{ backgroundColor: '#f59e0b10', color: '#f59e0b', border: '1px solid #f59e0b30' }}
+                      style={{ backgroundColor: 'var(--color-warning)10', color: 'var(--color-warning)', border: '1px solid var(--color-warning)30' }}
                     >
                       ⚠️ Ce type de document peut produire des slides limitées. Les types Résumé, FAQ, Rapport donnent de meilleurs résultats.
                     </p>
@@ -473,7 +473,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                   onClick={handleGenerate}
                   disabled={loading}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ backgroundColor: accentColor, color: '#fff' }}
+                  style={{ backgroundColor: accentColor, color: 'white' }}
                 >
                   {loading ? (
                     <>

@@ -41,7 +41,7 @@ export function ScreenShareCapture() {
                   alt={src.name}
                   className="w-full rounded object-cover aspect-video"
                 />
-                <span className="text-[10px] truncate w-full text-center" style={{ color: 'var(--text-muted)' }}>
+                <span className="text-sm truncate w-full text-center" style={{ color: 'var(--text-muted)' }}>
                   {src.name}
                 </span>
               </button>
@@ -52,7 +52,7 @@ export function ScreenShareCapture() {
 
       {/* Badge ÉCRAN LIVE */}
       {isSharing && (
-        <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm text-purple-400 text-[10px] font-bold px-2 py-1 rounded-full border border-purple-500/30">
+        <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm text-purple-400 text-sm font-bold px-2 py-1 rounded-full border border-purple-500/30">
           <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse" />
           ÉCRAN
         </div>
@@ -60,7 +60,7 @@ export function ScreenShareCapture() {
 
       {/* Compteur de frames */}
       {isSharing && frameCount > 0 && (
-        <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-sm text-green-400 text-[10px] font-mono px-2 py-1 rounded-full">
+        <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-sm text-green-400 text-sm font-mono px-2 py-1 rounded-full">
           {frameCount} frames
         </div>
       )}
@@ -76,7 +76,7 @@ export function ScreenShareCapture() {
           </p>
           <button
             onClick={openSourcePicker}
-            className="text-[11px] px-3 py-1 rounded-lg border transition-colors hover:border-purple-500/60"
+            className="text-xs px-3 py-1 rounded-lg border transition-colors hover:border-purple-500/60"
             style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
           >
             Changer de source

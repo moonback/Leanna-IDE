@@ -103,13 +103,13 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
       <div className="space-y-2">
         <div
           className="px-4 py-3 rounded-xl text-xs"
-          style={{ backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}
+          style={{ backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error)' }}
         >
           ⚠️ Impossible de rendre le diagramme : {error}
         </div>
         {/* Afficher le code source en fallback */}
         <pre
-          className="px-4 py-3 rounded-xl text-[11px] overflow-x-auto font-mono"
+          className="px-4 py-3 rounded-xl text-xs overflow-x-auto font-mono"
           style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
         >
           <code>{code}</code>
@@ -141,7 +141,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
     >
       <div className="flex items-center justify-between gap-3 px-3 py-2 border-b" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>Carte mentale interactive</p>
+          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Carte mentale interactive</p>
           <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Utilisez le zoom et faites défiler pour explorer les branches.</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">

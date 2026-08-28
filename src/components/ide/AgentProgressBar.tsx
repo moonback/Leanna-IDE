@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   CheckCircle2, AlertCircle, Loader2, ChevronDown, X, Clock,
   FileText, FilePen, Search, Trash2, Globe, Brain, Users,
@@ -80,13 +80,13 @@ function getCat(tool: string): ToolCategory {
 
 const CAT_COLOR: Record<ToolCategory, string> = {
   'file-read':   'var(--accent-primary)',
-  'file-write':  '#22c55e',
-  'file-delete': '#ef4444',
-  'search':      '#f59e0b',
-  'web':         '#6366f1',
-  'agent':       '#ec4899',
-  'reasoning':   '#a855f7',
-  'memory':      '#14b8a6',
+  'file-write':  'var(--color-success)',
+  'file-delete': 'var(--color-error)',
+  'search':      'var(--color-warning)',
+  'web':         'var(--accent-secondary)',
+  'agent':       'var(--color-accent-alt)',
+  'reasoning':   'var(--accent-primary)',
+  'memory':      'var(--accent-secondary)',
   'system':      'var(--text-muted)',
   'other':       'var(--text-dimmed)',
 };
@@ -139,10 +139,10 @@ const CatIcon = memo(function CatIcon({ tool, size = 10 }: { tool: string; size?
 // ─── ReasoningPanel ───────────────────────────────────────────────────────────
 
 const COMPLEXITY_LABEL: Record<string, { label: string; color: string }> = {
-  simple:   { label: 'Direct',           color: '#94a3b8' },
-  moderate: { label: 'Chain of Thought', color: '#60a5fa' },
-  complex:  { label: 'CoT complet',      color: '#a78bfa' },
-  critical: { label: 'Tree-of-Thought',  color: '#f97316' },
+  simple:   { label: 'Direct',           color: 'var(--text-muted)' },
+  moderate: { label: 'Chain of Thought', color: 'var(--accent-secondary)' },
+  complex:  { label: 'CoT complet',      color: 'var(--color-accent-alt)' },
+  critical: { label: 'Tree-of-Thought',  color: 'var(--color-warning)' },
 };
 
 const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?: ReasoningState }) {
@@ -158,7 +158,7 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
   return (
     <div
       className="border-t"
-      style={{ borderColor: 'rgba(168,85,247,0.15)', backgroundColor: 'rgba(168,85,247,0.03)' }}
+      style={{ borderColor: 'color-mix(in srgb, var(--color-accent-alt) 15%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-accent-alt) 3%, transparent)' }}
     >
       {/* Header */}
       <div className="flex items-center gap-1.5 px-3 py-1.5">
@@ -166,21 +166,25 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
           animate={reasoning.active && !reduceMotion ? { rotate: 360 } : {}}
           transition={reasoning.active && !reduceMotion ? { duration: 2, repeat: Infinity, ease: 'linear' } : {}}
         >
-          <Brain style={{ width: 10, height: 10, color: '#a855f7' }} />
+          <Brain style={{ width: 10, height: 10, color: 'var(--color-accent-alt)' }} />
         </motion.div>
-        <span className="text-[0.625rem] tracking-wide font-medium" style={{ color: '#a855f7' }}>
+        <span className="text-sm tracking-wide font-medium" style={{ color: 'var(--color-accent-alt)' }}>
           {reasoning.strategyLabel ?? 'Raisonnement'}
         </span>
         {meta && (
           <span
-            className="text-[0.5rem] tracking-wide px-1 py-px rounded font-mono"
-            style={{ backgroundColor: meta.color + '22', color: meta.color, border: `1px solid ${meta.color}44` }}
+            className="text-xs tracking-wide px-1 py-px rounded font-mono"
+            style={{
+              backgroundColor: 'color-mix(in srgb, ' + meta.color + ' 14%, transparent)',
+              color: meta.color,
+              border: '1px solid color-mix(in srgb, ' + meta.color + ' 25%, transparent)'
+            }}
           >
             {meta.label}
           </span>
         )}
         {total > 0 && (
-          <span className="ml-auto text-[0.5625rem] tracking-wide tabular-nums font-mono" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="ml-auto text-xs tracking-wide tabular-nums font-mono" style={{ color: 'var(--text-dimmed)' }}>
             {doneCount}/{total}
           </span>
         )}
@@ -193,7 +197,7 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
             const isRun = step.status === 'running';
             const isDone = step.status === 'done';
             const isFail = step.status === 'failed';
-            const color = isRun ? '#a855f7' : isDone ? '#22c55e' : isFail ? '#ef4444' : '#64748b';
+            const color = isRun ? 'var(--color-accent-alt)' : isDone ? 'var(--color-success)' : isFail ? 'var(--color-error)' : 'var(--text-muted)';
             return (
               <div key={step.index} className="flex items-baseline gap-2">
                 {isRun
@@ -205,13 +209,13 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
                       : <div className="w-1 h-1 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: color }} />
                 }
                 <span
-                  className="text-[0.625rem] tracking-wide leading-snug truncate"
+                  className="text-sm tracking-wide leading-snug truncate"
                   style={{ color: isRun ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: isRun ? 600 : 400 }}
                 >
                   {step.label}
                 </span>
                 {step.durationMs !== undefined && (
-                  <span className="text-[0.5625rem] tracking-wide tabular-nums font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs tracking-wide tabular-nums font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
                     {step.durationMs < 1000 ? `${step.durationMs}ms` : `${(step.durationMs / 1000).toFixed(1)}s`}
                   </span>
                 )}
@@ -225,20 +229,20 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
         <div className="flex items-center gap-1.5 px-3 pb-2">
           {reduceMotion ? (
             [0, 1, 2].map(i => (
-              <div key={i} className="w-1 h-1 rounded-full" style={{ backgroundColor: '#a855f7', opacity: 0.6 }} />
+              <div key={i} className="w-1 h-1 rounded-full" style={{ backgroundColor: 'var(--color-accent-alt)', opacity: 0.6 }} />
             ))
           ) : (
             [0, 1, 2].map(i => (
               <motion.div
                 key={i}
                 className="w-1 h-1 rounded-full"
-                style={{ backgroundColor: '#a855f7' }}
+                style={{ backgroundColor: 'var(--color-accent-alt)' }}
                 animate={{ opacity: [0.3, 1, 0.3] }}
                 transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.18 }}
               />
             ))
           )}
-          <span className="text-[0.5625rem] tracking-wide" style={{ color: 'var(--text-dimmed)' }}>Analyse…</span>
+          <span className="text-xs tracking-wide" style={{ color: 'var(--text-dimmed)' }}>Analyse…</span>
         </div>
       )}
     </div>
@@ -294,7 +298,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
 
   if (!connected || steps.length === 0) return null;
 
-  const accentColor = isWorking ? 'var(--accent-primary)' : errorCount > 0 ? '#f59e0b' : '#22c55e';
+  const accentColor = isWorking ? 'var(--accent-primary)' : errorCount > 0 ? 'var(--color-warning)' : 'var(--color-success)';
 
   return (
     <div
@@ -340,9 +344,9 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
             style={{ width: 12, height: 12, color: 'var(--accent-primary)' }}
           />
         ) : errorCount > 0 ? (
-          <AlertCircle style={{ width: 12, height: 12, color: '#f59e0b', flexShrink: 0 }} />
+          <AlertCircle style={{ width: 12, height: 12, color: 'var(--color-warning)', flexShrink: 0 }} />
         ) : (
-          <CheckCircle2 style={{ width: 12, height: 12, color: '#22c55e', flexShrink: 0 }} />
+          <CheckCircle2 style={{ width: 12, height: 12, color: 'var(--color-success)', flexShrink: 0 }} />
         )}
 
         {/* Main label */}
@@ -350,13 +354,13 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
           {isWorking ? (
             <>
               <CatIcon tool={runningStep.tool} size={10} />
-              <span className="text-[0.6875rem] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+              <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                 {runningStep.label}
               </span>
               <span
-                className="text-[0.5625rem] tracking-wide font-mono px-1 py-px rounded flex-shrink-0"
+                className="text-xs tracking-wide font-mono px-1 py-px rounded flex-shrink-0"
                 style={{
-                  backgroundColor: CAT_COLOR[getCat(runningStep.tool)] + '1a',
+                  backgroundColor: 'color-mix(in srgb, ' + CAT_COLOR[getCat(runningStep.tool)] + ' 10%, transparent)',
                   color: CAT_COLOR[getCat(runningStep.tool)],
                 }}
               >
@@ -364,7 +368,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
               </span>
             </>
           ) : (
-            <span className="text-[0.6875rem] font-medium" style={{ color: 'var(--text-secondary)' }}>
+            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
               Terminé
             </span>
           )}
@@ -373,23 +377,23 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
         {/* Right-side meta */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {isWorking && (
-            <span className="text-[0.5625rem] tracking-wide tabular-nums font-mono" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs tracking-wide tabular-nums font-mono" style={{ color: 'var(--text-dimmed)' }}>
               {msElapsed(runningStep.timestamp)}
             </span>
           )}
           <span
-            className="text-[0.5625rem] tracking-wide tabular-nums font-mono px-1.5 py-px rounded"
+            className="text-xs tracking-wide tabular-nums font-mono px-1.5 py-px rounded"
             style={{
               backgroundColor: 'var(--bg-surface)',
-              color: errorCount > 0 ? '#f59e0b' : 'var(--text-muted)',
+              color: errorCount > 0 ? 'var(--color-warning)' : 'var(--text-muted)',
               border: '1px solid var(--border-base)',
             }}
           >
             {doneCount}/{total}
-            {errorCount > 0 && <span style={{ color: '#ef4444' }}> ·{errorCount}err</span>}
+            {errorCount > 0 && <span style={{ color: 'var(--color-error)' }}> ·{errorCount}err</span>}
           </span>
           {!isWorking && (
-            <span className="text-[0.5625rem] tracking-wide tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs tracking-wide tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
               {totalDur}
             </span>
           )}
@@ -427,11 +431,11 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
           >
             {/* Stats strip */}
             <div
-              className="flex items-center gap-3 px-3 py-1 border-y text-[0.5625rem] tracking-wide font-mono tabular-nums"
+              className="flex items-center gap-3 px-3 py-1 border-y text-xs tracking-wide font-mono tabular-nums"
               style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-surface)', color: 'var(--text-dimmed)' }}
             >
-              <span style={{ color: '#22c55e' }}>{doneCount} ok</span>
-              {errorCount > 0 && <span style={{ color: '#ef4444' }}>{errorCount} err</span>}
+              <span style={{ color: 'var(--color-success)' }}>{doneCount} ok</span>
+              {errorCount > 0 && <span style={{ color: 'var(--color-error)' }}>{errorCount} err</span>}
               <span>{total} étape{total > 1 ? 's' : ''}</span>
               <span className="ml-auto flex items-center gap-1">
                 <Clock style={{ width: 9, height: 9 }} />
@@ -461,7 +465,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
                       ) : status === 'done' ? (
                         <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: catColor, opacity: 0.7 }} />
                       ) : status === 'error' ? (
-                        <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--color-error)' }} />
                       ) : (
                         <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--border-base)' }} />
                       )}
@@ -479,10 +483,10 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
                       <div className="flex items-baseline gap-1.5 min-w-0">
                         <CatIcon tool={step.tool} size={9} />
                         <span
-                          className="text-[0.625rem] flex-1 truncate leading-tight"
+                          className="text-sm flex-1 truncate leading-tight"
                           style={{
                             color: status === 'running' ? 'var(--text-primary)'
-                              : status === 'error' ? '#ef4444'
+                              : status === 'error' ? 'var(--color-error)'
                               : 'var(--text-secondary)',
                             fontWeight: status === 'running' ? 600 : 400,
                           }}
@@ -490,9 +494,9 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
                           {step.label}
                         </span>
                         {dur
-                          ? <span className="text-[0.5rem] tracking-wide tabular-nums font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>{dur}</span>
+                          ? <span className="text-xs tracking-wide tabular-nums font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>{dur}</span>
                           : status === 'running'
-                            ? <span className="text-[0.5rem] tracking-wide tabular-nums font-mono flex-shrink-0" style={{ color: catColor }}>{msElapsed(step.timestamp)}</span>
+                            ? <span className="text-xs tracking-wide tabular-nums font-mono flex-shrink-0" style={{ color: catColor }}>{msElapsed(step.timestamp)}</span>
                             : null
                         }
                         {step.detail && (
@@ -502,7 +506,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
 
                       {/* Tool tag — only for non-trivial categories */}
                       {getCat(step.tool) !== 'other' && (
-                        <span className="text-[0.5rem] tracking-wide font-mono" style={{ color: catColor, opacity: 0.55 }}>
+                        <span className="text-xs tracking-wide font-mono" style={{ color: catColor, opacity: 0.55 }}>
                           {CAT_LABEL[getCat(step.tool)]}
                         </span>
                       )}
@@ -518,7 +522,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
                             className="overflow-hidden"
                           >
                             <pre
-                              className="mt-1 p-1.5 text-[0.5625rem] tracking-wide leading-relaxed whitespace-pre-wrap break-all font-mono rounded"
+                              className="mt-1 p-1.5 text-xs tracking-wide leading-relaxed whitespace-pre-wrap break-all font-mono rounded"
                               style={{
                                 color: 'var(--text-muted)',
                                 backgroundColor: 'var(--bg-input)',

@@ -7,23 +7,23 @@ import {
 // ── Couleurs par extension ─────────────────────────────────────────────────
 const EXT_COLOR: Record<string, string> = {
   // TypeScript
-  ts: '#3178c6', tsx: '#3178c6',
+  ts: 'var(--accent-primary)', tsx: 'var(--accent-primary)',
   // JavaScript
-  js: '#f7df1e', jsx: '#f7df1e', cjs: '#f7df1e', mjs: '#f7df1e',
+  js: 'var(--color-warning)', jsx: 'var(--color-warning)', cjs: 'var(--color-warning)', mjs: 'var(--color-warning)',
   // Markup / style
-  html: '#e44d26', css: '#264de4', scss: '#c6538c', sass: '#c6538c',
+  html: 'var(--color-warning)', css: 'var(--accent-primary)', scss: 'var(--color-accent-alt)', sass: 'var(--color-accent-alt)',
   // Data
-  json: '#cbcb41', yaml: '#cc3e44', yml: '#cc3e44', sql: '#e38c00',
+  json: 'var(--color-warning)', yaml: 'var(--color-error)', yml: 'var(--color-error)', sql: 'var(--color-warning)',
   // Doc
-  md: '#ffffff', txt: '#9ca3af',
+  md: 'white', txt: 'var(--text-muted)',
   // Config / env
-  env: '#eab308', gitignore: '#f05032', lock: '#6b7280',
+  env: 'var(--color-warning)', gitignore: 'var(--color-error)', lock: 'var(--text-muted)',
   // Python
-  py: '#3572a5',
+  py: 'var(--accent-primary)',
   // Shell
-  sh: '#89e051', bash: '#89e051',
+  sh: 'var(--color-success)', bash: 'var(--color-success)',
   // Other
-  cjs_: '#f7df1e',
+  cjs_: 'var(--color-warning)',
 };
 
 // ── Icône par extension ────────────────────────────────────────────────────
@@ -49,16 +49,16 @@ export function FileIcon({ filePath, size = 15 }: FileIconProps) {
 
   // Cas spéciaux par nom de fichier
   if (name === '.env' || name.startsWith('.env.')) {
-    return <Settings size={size} color="#eab308" />;
+    return <Settings size={size} color="var(--color-warning)" />;
   }
   if (name === '.gitignore') {
-    return <File size={size} color="#f05032" />;
+    return <File size={size} color="var(--color-error)" />;
   }
   if (name === 'package.json' || name === 'package-lock.json') {
-    return <FileJson size={size} color="#cb3837" />;
+    return <FileJson size={size} color="var(--color-error)" />;
   }
   if (name === 'tsconfig.json' || name === 'vite.config.ts') {
-    return <Settings size={size} color="#3178c6" />;
+    return <Settings size={size} color="var(--accent-primary)" />;
   }
 
   const parts = name.split('.');

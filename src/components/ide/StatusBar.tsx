@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, memo } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 import {
   LoaderCircle,
@@ -174,7 +174,7 @@ export const StatusBar = memo(function StatusBar({
   return (
     <>
       <div
-        className="group/bar flex items-center gap-3 px-4 h-8 border-t select-none text-[11px]"
+        className="group/bar flex items-center gap-3 px-4 h-8 border-t select-none text-sm"
         style={{
           borderColor: 'var(--border-base)',
           backgroundColor: 'var(--bg-secondary)',
@@ -187,28 +187,29 @@ export const StatusBar = memo(function StatusBar({
           <button
             type="button"
             onClick={() => onToggleSandbox?.()}
-            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover,rgba(128,128,128,0.12))]"
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
             title={sandboxActive ? 'Sandbox actif' : 'Sandbox inactif'}
           >
               <motion.div 
-                className={`w-2 h-2 rounded-full ${sandboxActive ? 'bg-emerald-500' : 'bg-gray-400'}`}
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: sandboxActive ? 'var(--color-success)' : 'var(--text-muted)' }}
                 animate={{ scale: sandboxActive ? [1, 1.2, 1] : 1 }}
                 transition={{ type: 'spring', bounce: 0.5, duration: 0.4 }}
               />
-            <span style={{ color: sandboxActive ? 'var(--color-success, #059669)' : 'var(--text-muted)' }} className="font-medium">
+            <span style={{ color: sandboxActive ? 'var(--color-success)' : 'var(--text-muted)' }} className="font-medium">
               {sandboxLabel}
             </span>
           </button>
 
 
           {/* Séparateur */}
-          <div className="w-px h-4 bg-[var(--border-base)] opacity-40" />
+          <div className="w-px h-4" style={{ backgroundColor: 'var(--border-base)', opacity: 0.4 }} />
 
           {/* AI Model — compact, clickable */}
           <button
             type="button"
             onClick={() => setShowModelPicker(true)}
-            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover,rgba(128,128,128,0.12))]"
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
             style={{ color: 'var(--text-muted)' }}
             title="Changer de modèle IA"
           >
@@ -224,13 +225,13 @@ export const StatusBar = memo(function StatusBar({
           <button
             type="button"
             onClick={onToggleMcp}
-            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover,rgba(128,128,128,0.12))]"
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
             title={`MCP: ${mcpStatus}`}
           >
-            <div className={`w-2 h-2 rounded-full ${
-              mcpStatus === 'ok' ? 'bg-emerald-500' :
-              mcpStatus === 'error' ? 'bg-red-500' : 'bg-gray-400'
-            }`} />
+            <div className="w-2 h-2 rounded-full" style={{
+              backgroundColor: mcpStatus === 'ok' ? 'var(--color-success)' :
+              mcpStatus === 'error' ? 'var(--color-error)' : 'var(--text-muted)'
+            }} />
             <span style={{ color: 'var(--text-muted)' }} className="font-medium">MCP</span>
           </button>
 
@@ -239,7 +240,7 @@ export const StatusBar = memo(function StatusBar({
             <button
               type="button"
               onClick={onToggleAgents}
-              className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover,rgba(128,128,128,0.12))]"
+              className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
               title="Ouvrir le panneau Agents"
             >
               <Users size={12} style={{ color: 'var(--accent-primary)' }} />
@@ -252,10 +253,10 @@ export const StatusBar = memo(function StatusBar({
             <button
               type="button"
               onClick={onToggleFleet}
-              className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover,rgba(128,128,128,0.12))]"
+              className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
               title="Ouvrir la flotte d'agents"
             >
-              <Radio size={12} style={{ color: '#a78bfa' }} />
+              <Radio size={12} style={{ color: 'var(--color-accent-alt)' }} />
               <span style={{ color: 'var(--text-muted)' }} className="font-medium">Flotte</span>
             </button>
           )}
@@ -264,10 +265,10 @@ export const StatusBar = memo(function StatusBar({
           <button
             type="button"
             onClick={onToggleLogs}
-            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover,rgba(128,128,128,0.12))]"
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
             title="Ouvrir les logs de l'assistant et des agents"
           >
-            <ScrollText size={12} style={{ color: '#38bdf8' }} />
+            <ScrollText size={12} style={{ color: 'var(--accent-secondary)' }} />
             <span style={{ color: 'var(--text-muted)' }} className="font-medium">Logs</span>
           </button>
         </div>
@@ -279,7 +280,7 @@ export const StatusBar = memo(function StatusBar({
         <div className="flex items-center gap-3">
           {/* Busy indicator */}
           {assistantBusy && (
-            <span className="flex items-center gap-1.5 text-amber-600 font-medium">
+            <span className="flex items-center gap-1.5 font-medium" style={{ color: 'var(--color-warning)' }}>
               <LoaderCircle size={11} className="animate-spin" />
               <span>Traitement…</span>
             </span>
@@ -291,29 +292,30 @@ export const StatusBar = memo(function StatusBar({
               {dirty ? (
                 <>
                   <div className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span style={{ color: 'var(--color-warning, #d97706)' }}>Modifié</span>
+                  <span style={{ color: 'var(--color-warning)' }}>Modifié</span>
                 </>
               ) : (
                 <>
               <motion.div 
-                className={`w-2 h-2 rounded-full ${dirty ? "bg-amber-500" : "bg-emerald-500"}`}
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: dirty ? 'var(--color-warning)' : 'var(--color-success)' }}
                 animate={{ opacity: dirty ? [1, 0.5, 1] : 1 }}
                 transition={dirty ? { repeat: Infinity, duration: 1.5 } : { duration: 0.3 }}
               />
-                  <span style={{ color: 'var(--color-success, #059669)' }}>Sauvé</span>
+                  <span style={{ color: 'var(--color-success)' }}>Sauvé</span>
                 </>
               )}
             </span>
           )}
               
           {/* Séparateur */}
-          <div className="w-px h-4 bg-[var(--border-base)] opacity-40" />
+          <div className="w-px h-4" style={{ backgroundColor: 'var(--border-base)', opacity: 0.4 }} />
 
           {/* Tokens — clickable */}
           <button
             type="button"
             onClick={() => setShowDetailModal(true)}
-            className="relative flex items-center gap-2.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover,rgba(128,128,128,0.12))]"
+            className="relative flex items-center gap-2.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
             style={{ color: 'var(--text-muted)' }}
             title={`Tokens : ${formatExactTokenCount(tokenUsage.totalTokens)} · Contexte : ${formatExactTokenCount(promptContext.currentSize)} / ${formatExactTokenCount(promptContext.maxSize)}`}
           >
@@ -326,12 +328,12 @@ export const StatusBar = memo(function StatusBar({
               {formatTokenCount(promptContext.currentSize)}/{formatTokenCount(promptContext.maxSize)}
             </span>
             {suggestion && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--color-warning)' }} />
             )}
           </button>
 
           {/* Séparateur */}
-          <div className="w-px h-4 bg-[var(--border-base)] opacity-40" />
+          <div className="w-px h-4" style={{ backgroundColor: 'var(--border-base)', opacity: 0.4 }} />
 
           {/* Édition */}
           {/* <div className="flex items-center gap-2 font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>
@@ -340,7 +342,7 @@ export const StatusBar = memo(function StatusBar({
             {typeof line === 'number' && typeof column === 'number' && (
               <button
                 onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', ...(navigator.platform.includes('Mac') ? { metaKey: true } : { ctrlKey: true }) }))}
-                className="hover:text-[var(--text-primary)] transition-colors duration-150"
+                className="hover:text-primary transition-colors duration-150"
                 title="Aller à la ligne..."
               >
                 Ln {line}, Col {column}
@@ -349,14 +351,16 @@ export const StatusBar = memo(function StatusBar({
           </div> */}
 
           {/* Séparateur */}
-          <div className="w-px h-4 bg-[var(--border-base)] opacity-40" />
+          <div className="w-px h-4" style={{ backgroundColor: 'var(--border-base)', opacity: 0.4 }} />
 
           {/* Reset — discret, visible on hover */}
           <button
             type="button"
             onClick={() => setShowResetConfirm(true)}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity duration-300 hover:bg-amber-500/10 hover:text-amber-600"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded opacity-0 group-hover/bar:opacity-100 transition-all duration-300 hover:bg-[var(--color-warning-subtle)]"
             style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-warning)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
             title="Réinitialiser le sandbox"
           >
             <RefreshCcw size={10} strokeWidth={1.8} />
@@ -367,7 +371,7 @@ export const StatusBar = memo(function StatusBar({
           <button
             type="button"
             onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true }))}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded font-mono transition-colors duration-150 hover:text-[var(--text-primary)]"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded font-mono transition-colors duration-150 hover:text-primary"
             style={{ color: 'var(--text-dimmed)' }}
           >
             <kbd className="opacity-60">{modifierKey}</kbd>
@@ -394,14 +398,14 @@ export const StatusBar = memo(function StatusBar({
           >
             <div className="flex items-center justify-between gap-3 px-5 py-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(251,146,60,0.12)' }}>
-                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--color-warning-subtle)' }}>
+                  <AlertTriangle className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
                 </div>
                 <div className="text-left">
                   <h3 id="reset-confirm-title" className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                     Confirmer la réinitialisation
                   </h3>
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
                     Supprimez toutes les modifications en cours et restaurez l'état d'origine.
                   </p>
                 </div>
@@ -454,7 +458,7 @@ export const StatusBar = memo(function StatusBar({
                 onClick={handleConfirmReset}
                 disabled={resetCode.length !== 6}
                 className="rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ backgroundColor: 'var(--color-warning)', color: '#ffffff' }}
+                style={{ backgroundColor: 'var(--color-warning)', color: 'var(--text-primary)' }}
               >
                 Réinitialiser
               </button>

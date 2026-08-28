@@ -17,22 +17,22 @@ export function ModeToggleButton({ mode, onToggle }: ModeToggleButtonProps) {
 
   return (
     <div
-      className="relative w-full h-[44px] flex items-center justify-center"
+      className="relative w-full h-11 flex items-center justify-center"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       <motion.button
         whileTap={{ scale: 0.85 }}
         onClick={onToggle}
-        className="w-[36px] h-[20px] rounded-full relative flex items-center overflow-hidden flex-shrink-0"
+        className="w-9 h-5 rounded-full relative flex items-center overflow-hidden flex-shrink-0"
         style={{
           backgroundColor: isFull
-            ? 'color-mix(in srgb, #fbbf24 18%, transparent)'
-            : 'color-mix(in srgb, #60a5fa 18%, transparent)',
-          border: `1px solid ${isFull ? '#fbbf2450' : '#60a5fa50'}`,
+            ? 'color-mix(in srgb, var(--color-warning) 18%, transparent)'
+            : 'color-mix(in srgb, var(--color-info) 18%, transparent)',
+          border: `1px solid ${isFull ? 'color-mix(in srgb, var(--color-warning) 31%, transparent)' : 'color-mix(in srgb, var(--color-info) 31%, transparent)'}`,
           boxShadow: isFull
-            ? '0 0 8px #fbbf2430'
-            : '0 0 8px #60a5fa30',
+            ? '0 0 8px color-mix(in srgb, var(--color-warning) 19%, transparent)'
+            : '0 0 8px color-mix(in srgb, var(--color-info) 19%, transparent)',
           transition: 'background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
         }}
         title={`Mode actuel : ${isFull ? '⚡ Agent' : '💬 Chat'} — clic pour basculer`}
@@ -40,9 +40,9 @@ export function ModeToggleButton({ mode, onToggle }: ModeToggleButtonProps) {
       >
         {/* Track labels */}
         <span
-          className="absolute left-[4px] text-[6px] font-bold uppercase tracking-wide pointer-events-none select-none"
+          className="absolute left-1 text-xs font-bold uppercase tracking-wide pointer-events-none select-none"
           style={{
-            color: isFull ? '#fbbf24' : 'transparent',
+            color: isFull ? 'var(--color-warning)' : 'transparent',
             transition: 'color 0.2s ease',
           }}
           aria-hidden="true"
@@ -50,9 +50,9 @@ export function ModeToggleButton({ mode, onToggle }: ModeToggleButtonProps) {
           ⚡
         </span>
         <span
-          className="absolute right-[4px] text-[6px] font-bold uppercase tracking-wide pointer-events-none select-none"
+          className="absolute right-1 text-xs font-bold uppercase tracking-wide pointer-events-none select-none"
           style={{
-            color: !isFull ? '#60a5fa' : 'transparent',
+            color: !isFull ? 'var(--color-info)' : 'transparent',
             transition: 'color 0.2s ease',
           }}
           aria-hidden="true"
@@ -62,12 +62,12 @@ export function ModeToggleButton({ mode, onToggle }: ModeToggleButtonProps) {
 
         {/* Thumb */}
         <motion.div
-          className="w-[14px] h-[14px] rounded-full absolute top-[2px]"
-          animate={{ left: isFull ? '2px' : '20px' }}
+          className="w-3.5 h-3.5 rounded-full absolute top-0.5"
+          animate={{ left: isFull ? '0.5' : '5' }}
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
           style={{
-            backgroundColor: isFull ? '#fbbf24' : '#60a5fa',
-            boxShadow: isFull ? '0 0 8px #fbbf2480' : '0 0 8px #60a5fa80',
+            backgroundColor: isFull ? 'var(--color-warning)' : 'var(--color-info)',
+            boxShadow: isFull ? '0 0 8px color-mix(in srgb, var(--color-warning) 50%, transparent)' : '0 0 8px color-mix(in srgb, var(--color-info) 50%, transparent)',
           }}
         />
       </motion.button>
@@ -85,22 +85,22 @@ export function ModeToggleButton({ mode, onToggle }: ModeToggleButtonProps) {
             role="tooltip"
           >
             <div
-              className="absolute top-1/2 -left-[4px] -translate-y-1/2"
+              className="absolute top-1/2 -left-1 -translate-y-1/2"
               style={{
                 width: 0, height: 0,
-                borderTop: '4px solid transparent',
-                borderBottom: '4px solid transparent',
-                borderRight: '4px solid var(--border-strong)',
+                borderTop: '1px solid transparent',
+                borderBottom: '1px solid transparent',
+                borderRight: '1px solid var(--border-strong)',
               }}
               aria-hidden="true"
             />
             <div
-              className="absolute top-1/2 -left-[2px] -translate-y-1/2"
+              className="absolute top-1/2 -left-0.5 -translate-y-1/2"
               style={{
                 width: 0, height: 0,
-                borderTop: '3px solid transparent',
-                borderBottom: '3px solid transparent',
-                borderRight: '3px solid var(--bg-ctrl)',
+                borderTop: '0.75px solid transparent',
+                borderBottom: '0.75px solid transparent',
+                borderRight: '0.75px solid var(--bg-ctrl)',
               }}
               aria-hidden="true"
             />
@@ -113,8 +113,8 @@ export function ModeToggleButton({ mode, onToggle }: ModeToggleButtonProps) {
                 backdropFilter: 'blur(12px)',
               }}
             >
-              <span className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>
-                Mode : <span style={{ color: isFull ? '#fbbf24' : '#60a5fa' }}>{isFull ? '⚡ Agent' : '💬 Chat'}</span>
+              <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                Mode : <span style={{ color: isFull ? 'var(--color-warning)' : 'var(--color-info)' }}>{isFull ? '⚡ Agent' : '💬 Chat'}</span>
               </span>
             </div>
           </motion.div>

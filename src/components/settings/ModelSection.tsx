@@ -37,7 +37,7 @@ function Slider({ value, onChange, min, max, step, label, hint, lowLabel, highLa
             key={value}
             initial={{ scale: 1.1 }}
             animate={{ scale: 1 }}
-            className="min-w-[3.2rem] rounded-lg px-2 py-0.5 text-center text-[11px] font-mono font-bold"
+            className="min-w-[3.2rem] rounded-lg px-2 py-0.5 text-center text-xs font-mono font-bold"
             style={{
               backgroundColor: 'var(--accent-subtle)',
               color: 'var(--accent-primary)',
@@ -49,8 +49,8 @@ function Slider({ value, onChange, min, max, step, label, hint, lowLabel, highLa
         </div>
         {(lowLabel || highLabel) && (
           <div className="flex justify-between px-0.5">
-            {lowLabel && <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{lowLabel}</span>}
-            {highLabel && <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{highLabel}</span>}
+            {lowLabel && <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{lowLabel}</span>}
+            {highLabel && <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{highLabel}</span>}
           </div>
         )}
       </div>
@@ -59,9 +59,9 @@ function Slider({ value, onChange, min, max, step, label, hint, lowLabel, highLa
 }
 
 const PRESETS = [
-  { label: 'Précis',     icon: Zap,       temp: 0.3,  topP: 0.80, color: '#10b981', desc: 'Factuel & fiable' },
-  { label: 'Équilibré',  icon: Scale,     temp: 0.9,  topP: 0.95, color: '#0ea5e9', desc: 'Polyvalent' },
-  { label: 'Créatif',    icon: Lightbulb, temp: 1.4,  topP: 1.00, color: '#a855f7', desc: 'Imaginatif' },
+  { label: 'Précis',     icon: Zap,       temp: 0.3,  topP: 0.80, color: 'var(--color-success)', desc: 'Factuel & fiable' },
+  { label: 'Équilibré',  icon: Scale,     temp: 0.9,  topP: 0.95, color: 'var(--color-info)', desc: 'Polyvalent' },
+  { label: 'Créatif',    icon: Lightbulb, temp: 1.4,  topP: 1.00, color: 'var(--color-accent-alt)', desc: 'Imaginatif' },
 ];
 
 export function ModelSection() {
@@ -110,7 +110,7 @@ export function ModelSection() {
                 setField('temperature', preset.temp);
                 setField('topP', preset.topP);
               }}
-              className="flex flex-col items-center gap-1.5 rounded-xl px-3 py-3 text-[10px] font-semibold transition-all duration-200"
+              className="flex flex-col items-center gap-1.5 rounded-xl px-3 py-3 text-sm font-semibold transition-all duration-200"
               style={{
                 backgroundColor: isActive
                   ? `${preset.color}20`
@@ -125,7 +125,7 @@ export function ModelSection() {
                 <Icon className="h-3.5 w-3.5" style={{ color: isActive ? preset.color : 'var(--text-muted)' }} />
               </div>
               <span>{preset.label}</span>
-              <span className="text-[8px] font-normal opacity-70">{preset.desc}</span>
+              <span className="text-xs font-normal opacity-70">{preset.desc}</span>
             </motion.button>
           );
         })}

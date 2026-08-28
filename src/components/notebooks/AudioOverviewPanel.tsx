@@ -513,7 +513,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
             onClick={handleGenerate}
             disabled={generating || selectedSourceIds.length === 0}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-50 shadow-sm"
-            style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+            style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
           >
             {generating ? (
               <>
@@ -557,7 +557,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                         <Play className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                           {ov.title}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -575,7 +575,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDelete(ov.id); }}
                     className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10"
-                    style={{ color: '#ef4444' }}
+                    style={{ color: 'var(--color-error)' }}
                     title="Supprimer"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -621,7 +621,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                     className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all active:scale-95"
                     style={{
                       backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                      color: '#ef4444',
+                      color: 'var(--color-error)',
                       border: '1px solid rgba(239, 68, 68, 0.3)',
                     }}
                     title="Arrêter la lecture"
@@ -635,9 +635,9 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                     disabled={ttsLoading}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
                     style={{
-                      backgroundColor: '#10b98120',
-                      color: '#10b981',
-                      border: '1px solid #10b98140',
+                      backgroundColor: 'var(--color-success)20',
+                      color: 'var(--color-success)',
+                      border: '1px solid var(--color-success)40',
                     }}
                     title="Écouter le podcast (TTS)"
                   >
@@ -655,9 +655,9 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                   disabled={downloading}
                   className="flex items-center gap-1.5 px-2.5 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
                   style={{
-                    backgroundColor: '#f59e0b10',
-                    color: '#f59e0b',
-                    border: '1px solid #f59e0b40',
+                    backgroundColor: 'var(--color-warning)10',
+                    color: 'var(--color-warning)',
+                    border: '1px solid var(--color-warning)40',
                   }}
                   title="Enregistrer dans la sandbox"
                 >
@@ -683,7 +683,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                   className="flex items-center gap-1.5 px-2.5 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
                   style={{
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    color: '#ef4444',
+                    color: 'var(--color-error)',
                     border: '1px solid rgba(239, 68, 68, 0.3)',
                   }}
                   title="Supprimer"
@@ -699,7 +699,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="flex flex-col gap-2 px-4 py-3 rounded-xl"
-                style={{ backgroundColor: '#10b98108', border: '1px solid #10b98125' }}
+                style={{ backgroundColor: 'var(--color-success)08', border: '1px solid var(--color-success)25' }}
               >
                 {/* Top row: waveform + progress */}
                 <div className="flex items-center gap-3">
@@ -709,7 +709,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                       <motion.div
                         key={i}
                         className="w-[3px] rounded-full"
-                        style={{ backgroundColor: '#10b981' }}
+                        style={{ backgroundColor: 'var(--color-success)' }}
                         animate={{
                           height: ['8px', '16px', '10px', '18px', '8px'],
                         }}
@@ -728,7 +728,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                     <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
                       <motion.div
                         className="h-full rounded-full"
-                        style={{ background: 'linear-gradient(90deg, #10b981, #34d399)' }}
+                        style={{ background: 'linear-gradient(90deg, var(--color-success), var(--color-success))' }}
                         animate={{ width: `${(ttsProgress / ttsTotalLines) * 100}%` }}
                         transition={{ duration: 0.3, ease: 'easeOut' }}
                       />
@@ -736,7 +736,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                   </div>
 
                   {/* Progress count */}
-                  <span className="text-xs font-semibold flex-shrink-0 tabular-nums" style={{ color: '#10b981' }}>
+                  <span className="text-xs font-semibold flex-shrink-0 tabular-nums" style={{ color: 'var(--color-success)' }}>
                     {ttsProgress}/{ttsTotalLines}
                   </span>
                 </div>
@@ -750,7 +750,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95"
                       style={{
                         backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                        color: '#ef4444',
+                        color: 'var(--color-error)',
                         border: '1px solid rgba(239, 68, 68, 0.2)',
                       }}
                     >
@@ -762,7 +762,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                     <button
                       onClick={cycleSpeed}
                       className="px-2.5 py-1.5 rounded-full text-xs font-bold transition-all hover:bg-white/5 active:scale-95"
-                      style={{ color: '#10b981', border: '1px solid #10b98130' }}
+                      style={{ color: 'var(--color-success)', border: '1px solid var(--color-success)30' }}
                       title="Changer la vitesse"
                     >
                       {playbackSpeed}×
@@ -824,24 +824,24 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                       className={`flex gap-3 ${isSam ? 'flex-row-reverse' : ''}`}
                     >
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 shadow-sm ${isCurrentLine ? 'animate-pulse' : ''}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm ${isCurrentLine ? 'animate-pulse' : ''}`}
                         style={{
-                          backgroundColor: isAlex ? '#60a5fa20' : '#34d39920',
-                          color: isAlex ? '#60a5fa' : '#34d399',
-                          border: `1.5px solid ${isCurrentLine ? (isAlex ? '#60a5fa' : '#34d399') : (isAlex ? '#60a5fa40' : '#34d39940')}`,
+                          backgroundColor: isAlex ? 'var(--accent-primary)20' : 'var(--color-success)20',
+                          color: isAlex ? 'var(--accent-primary)' : 'var(--color-success)',
+                          border: `1.5px solid ${isCurrentLine ? (isAlex ? 'var(--accent-primary)' : 'var(--color-success)') : (isAlex ? 'var(--accent-primary)40' : 'var(--color-success)40')}`,
                         }}
                       >
                         {speaker[0]}
                       </div>
                       <div className="max-w-[80%]">
-                        <p className="text-xs font-semibold mb-1 px-1" style={{ color: isAlex ? '#60a5fa' : '#34d399' }}>
+                        <p className="text-xs font-semibold mb-1 px-1" style={{ color: isAlex ? 'var(--accent-primary)' : 'var(--color-success)' }}>
                           {speaker}
                         </p>
                         <div
                           className={`p-3.5 rounded-2xl text-xs leading-relaxed ${isAlex ? 'rounded-tl-md' : 'rounded-tr-md'} transition-all`}
                           style={{
-                            backgroundColor: isCurrentLine ? (isAlex ? '#60a5fa10' : '#34d39910') : 'var(--bg-panel)',
-                            border: `1px solid ${isCurrentLine ? (isAlex ? '#60a5fa40' : '#34d39940') : 'var(--border-base)'}`,
+                            backgroundColor: isCurrentLine ? (isAlex ? 'var(--accent-primary)10' : 'var(--color-success)10') : 'var(--bg-panel)',
+                            border: `1px solid ${isCurrentLine ? (isAlex ? 'var(--accent-primary)40' : 'var(--color-success)40') : 'var(--border-base)'}`,
                             color: 'var(--text-primary)',
                           }}
                         >

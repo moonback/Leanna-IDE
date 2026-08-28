@@ -110,7 +110,7 @@ function InteractiveFeedbackStyles() {
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
     <kbd
-      className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 text-[9px] font-mono font-semibold tracking-wide"
+      className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 text-xs font-mono font-semibold tracking-wide"
       style={{
         color: 'var(--text-dimmed)',
         backgroundColor: 'var(--bg-input)',
@@ -289,12 +289,12 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
           {/* ── Header : Salutation ── */}
           <motion.div className="mb-10" {...makeEntranceProps(0)}>
             <h1
-              className="text-[28px] sm:text-[34px] font-semibold tracking-[-0.025em] leading-tight"
+              className="text-xl sm:text-2xl font-semibold tracking-[-0.025em] leading-tight"
               style={{ color: 'var(--text-primary)' }}
             >
               {profile.userName ? `${greeting}, ${profile.userName}` : greeting}
             </h1>
-            <p className="mt-2 text-[14px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--text-muted)' }}>
               {connected
                 ? <><span style={{ color: 'var(--color-success)' }}>●</span> {profile.aiName || 'Leanna'} est connectée et prête.</>
                 : <><span style={{ color: 'var(--text-dimmed)' }}>○</span> {profile.aiName || 'Leanna'} est en attente de connexion.</>
@@ -349,14 +349,14 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             <motion.div {...makeEntranceProps(0.16)}>
               <div className="flex items-center justify-between mb-3">
                 <h2
-                  className="text-[11px] font-semibold uppercase tracking-[0.08em]"
+                  className="text-xs font-semibold uppercase tracking-[0.08em]"
                   style={{ color: 'var(--text-dimmed)' }}
                 >
                   Fichiers récents
                 </h2>
                 <button
                   onClick={clearRecentFiles}
-                  className="ai-interactive ai-clear-btn flex items-center gap-1 text-[10px] px-2 py-1 rounded-md"
+                  className="ai-interactive ai-clear-btn flex items-center gap-1 text-sm px-2 py-1 rounded-md"
                   style={{ color: 'var(--text-dimmed)' }}
                 >
                   <Trash2 size={9} />
@@ -381,15 +381,15 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                       }}
                     >
                       <FileText size={13} style={{ color: 'var(--text-dimmed)' }} className="flex-shrink-0" />
-                      <span className="text-[12px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                      <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                         {fileName}
                       </span>
-                      <span className="text-[10px] font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>
+                      <span className="text-sm font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>
                         {dirPath}
                       </span>
                       {language && (
                         <span
-                          className="ai-recent-lang ml-auto text-[9px] font-mono px-1.5 py-0.5 rounded opacity-0 transition-opacity flex-shrink-0"
+                          className="ai-recent-lang ml-auto text-xs font-mono px-1.5 py-0.5 rounded opacity-0 transition-opacity flex-shrink-0"
                           style={{
                             backgroundColor: 'var(--bg-input)',
                             color: 'var(--text-muted)',
@@ -419,7 +419,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             transition={{ delay: 0.3, duration: prefersReducedMotion ? 0.15 : 0.4 }}
           >
             {/* Workspace info */}
-            <div className="flex items-center gap-3 text-[10.5px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+            <div className="flex items-center gap-3 text-sm font-mono" style={{ color: 'var(--text-dimmed)' }}>
               {ws.workspace && (
                 <span className="flex items-center gap-1.5">
                   <FolderOpen size={11} />
@@ -487,19 +487,19 @@ function ActionCard({ icon: Icon, title, description, shortcut, onClick, primary
       >
         <Icon
           size={16}
-          style={{ color: primary ? '#ffffff' : 'var(--accent-primary)' }}
+          style={{ color: primary ? 'whitefff' : 'var(--accent-primary)' }}
         />
       </div>
 
       <div className="flex-1 min-w-0">
         <div
-          className="text-[12.5px] font-semibold leading-tight"
-          style={{ color: primary ? '#ffffff' : 'var(--text-primary)' }}
+          className="text-sm font-semibold leading-tight"
+          style={{ color: primary ? 'whitefff' : 'var(--text-primary)' }}
         >
           {title}
         </div>
         <div
-          className="text-[10.5px] mt-0.5 leading-snug"
+          className="text-sm mt-0.5 leading-snug"
           style={{ color: primary ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }}
         >
           {description}
@@ -509,7 +509,7 @@ function ActionCard({ icon: Icon, title, description, shortcut, onClick, primary
       {shortcut && (
         <div className="flex-shrink-0 mt-0.5">
           {primary ? (
-            <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-white/15 text-white/80">
+            <span className="text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-white/15 text-white/80">
               {shortcut}
             </span>
           ) : (
@@ -528,7 +528,7 @@ function QuickLink({ label, onClick, shortcut }: { label: string; onClick: () =>
     <button
       type="button"
       onClick={onClick}
-      className="ai-interactive ai-quicklink flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-medium"
+      className="ai-interactive ai-quicklink flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium"
       style={{ color: 'var(--text-dimmed)' }}
     >
       {label}

@@ -142,11 +142,11 @@ export function SafeguardsSection() {
           {config.criticalFiles.map(file => (
             <span
               key={file}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-mono"
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-mono"
               style={{
-                backgroundColor: 'color-mix(in srgb, #f59e0b 10%, transparent)',
-                border: '1px solid color-mix(in srgb, #f59e0b 25%, transparent)',
-                color: '#fbbf24',
+                backgroundColor: 'color-mix(in srgb, var(--color-warning) 10%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)',
+                color: 'var(--color-warning)',
               }}
             >
               <FileWarning className="w-3 h-3" />
@@ -167,17 +167,17 @@ export function SafeguardsSection() {
           className="flex items-center justify-center gap-2 w-full rounded-xl px-4 py-3 text-xs font-semibold transition-all duration-200 disabled:opacity-60"
           style={{
             backgroundColor: validationStatus === 'pass'
-              ? 'color-mix(in srgb, #4ade80 12%, transparent)'
+              ? 'color-mix(in srgb, var(--color-success) 12%, transparent)'
               : validationStatus === 'fail'
-              ? 'color-mix(in srgb, #ef4444 12%, transparent)'
+              ? 'color-mix(in srgb, var(--color-error) 12%, transparent)'
               : 'var(--bg-secondary)',
             border: `1px solid ${
-              validationStatus === 'pass' ? 'color-mix(in srgb, #4ade80 30%, transparent)'
-              : validationStatus === 'fail' ? 'color-mix(in srgb, #ef4444 30%, transparent)'
+              validationStatus === 'pass' ? 'color-mix(in srgb, var(--color-success) 30%, transparent)'
+              : validationStatus === 'fail' ? 'color-mix(in srgb, var(--color-error) 30%, transparent)'
               : 'var(--border-base)'
             }`,
-            color: validationStatus === 'pass' ? '#4ade80'
-              : validationStatus === 'fail' ? '#f87171'
+            color: validationStatus === 'pass' ? 'var(--color-success)'
+              : validationStatus === 'fail' ? 'var(--color-error)'
               : 'var(--text-primary)',
           }}
         >
@@ -211,11 +211,11 @@ export function SafeguardsSection() {
                 className="w-3.5 h-3.5 border-2 rounded-full"
                 style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }}
               />
-              <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>Chargement…</span>
+              <span className="text-sm" style={{ color: 'var(--text-dimmed)' }}>Chargement…</span>
             </div>
           )}
           {!loadingCheckpoints && checkpoints.length === 0 && (
-            <p className="text-[10px] text-center py-3" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-sm text-center py-3" style={{ color: 'var(--text-dimmed)' }}>
               Aucun checkpoint disponible.
             </p>
           )}
@@ -233,26 +233,26 @@ export function SafeguardsSection() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <History className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-                      <span className="text-[10px] font-mono font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                      <span className="text-sm font-mono font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                         {cp.hash.slice(0, 7)}
                       </span>
                     </div>
-                    <p className="text-[9px] mt-0.5 truncate pl-5" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-xs mt-0.5 truncate pl-5" style={{ color: 'var(--text-muted)' }}>
                       {cp.message}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className="text-[8px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                       <Clock className="w-2.5 h-2.5 inline mr-0.5" />
                       {cp.date ? new Date(cp.date).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                     </span>
                     <button
                       type="button"
                       onClick={() => rollbackTo(cp.hash)}
-                      className="p-1 rounded-md transition-colors hover:bg-[color-mix(in_srgb,#f59e0b_12%,transparent)]"
+                      className="p-1 rounded-md transition-colors hover:bg-[color-mix(in_srgb,var(--color-warning)_12%,transparent)]"
                       title="Revenir à ce checkpoint"
                     >
-                      <RotateCcw className="w-3 h-3" style={{ color: '#fbbf24' }} />
+                      <RotateCcw className="w-3 h-3" style={{ color: 'var(--color-warning)' }} />
                     </button>
                   </div>
                 </motion.li>

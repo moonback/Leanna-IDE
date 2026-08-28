@@ -16,10 +16,10 @@ interface AssistantLogsPanelProps {
 }
 
 const LEVEL_COLORS: Record<LogLevel, string> = {
-  debug: '#94a3b8',
-  info: '#38bdf8',
-  warn: '#fbbf24',
-  error: '#f87171',
+  debug: 'var(--text-muted)',
+  info: 'var(--color-info)',
+  warn: 'var(--color-warning)',
+  error: 'var(--color-error)',
 };
 
 function formatTime(timestamp: string): string {
@@ -88,7 +88,7 @@ export function AssistantLogsPanel({ onClose }: AssistantLogsPanelProps) {
         <header className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-base)' }}>
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--accent-subtle)' }}><ScrollText size={16} style={{ color: 'var(--accent-primary)' }} /></div>
-            <div><h2 className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Logs Assistant</h2><p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Session active · 1 000 entrées retenues côté serveur</p></div>
+            <div><h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Logs Assistant</h2><p className="text-xs" style={{ color: 'var(--text-muted)' }}>Session active · 1 000 entrées retenues côté serveur</p></div>
           </div>
           <div className="flex items-center gap-1">
             <button type="button" onClick={load} className="p-2 rounded-lg hover:bg-white/10" title="Rafraîchir" aria-label="Rafraîchir les logs"><RefreshCw size={14} className={loading ? 'animate-spin' : ''} /></button>
@@ -96,15 +96,15 @@ export function AssistantLogsPanel({ onClose }: AssistantLogsPanelProps) {
           </div>
         </header>
         <div className="flex gap-2 p-3" style={{ borderBottom: '1px solid var(--border-base)' }}>
-          <select value={scope} onChange={(event) => setScope(event.target.value as LogScope)} className="rounded-md px-2 py-1.5 text-[11px]" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }} aria-label="Source des logs"><option value="all">Tous</option><option value="assistant">Assistant</option><option value="agents">Agents</option></select>
-          <select value={level} onChange={(event) => setLevel(event.target.value as LogLevel | '')} className="rounded-md px-2 py-1.5 text-[11px]" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }} aria-label="Niveau de log"><option value="">Tous niveaux</option><option value="debug">Debug</option><option value="info">Info</option><option value="warn">Avertissements</option><option value="error">Erreurs</option></select>
-          <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filtrer les messages…" className="min-w-0 flex-1 rounded-md px-2 py-1.5 text-[11px]" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }} />
+          <select value={scope} onChange={(event) => setScope(event.target.value as LogScope)} className="rounded-md px-2 py-1.5 text-xs" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }} aria-label="Source des logs"><option value="all">Tous</option><option value="assistant">Assistant</option><option value="agents">Agents</option></select>
+          <select value={level} onChange={(event) => setLevel(event.target.value as LogLevel | '')} className="rounded-md px-2 py-1.5 text-xs" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }} aria-label="Niveau de log"><option value="">Tous niveaux</option><option value="debug">Debug</option><option value="info">Info</option><option value="warn">Avertissements</option><option value="error">Erreurs</option></select>
+          <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filtrer les messages…" className="min-w-0 flex-1 rounded-md px-2 py-1.5 text-xs" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }} />
         </div>
-        {error && <div className="mx-3 mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-[10px]" style={{ backgroundColor: 'rgba(248,113,113,0.08)', color: '#f87171' }}><AlertTriangle size={12} />{error}</div>}
+        {error && <div className="mx-3 mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 8%, transparent)', color: 'var(--color-error)' }}><AlertTriangle size={12} />{error}</div>}
         <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar" role="log" aria-live="polite">
-          {!loading && visibleEntries.length === 0 ? <div className="flex h-40 flex-col items-center justify-center gap-2" style={{ color: 'var(--text-dimmed)' }}><Bot size={22} /><p className="text-[11px]">Aucun log correspondant pour cette session.</p></div> : <div className="space-y-1">{visibleEntries.map((entry, index) => <div key={`${entry.timestamp}-${entry.module}-${index}`} className="grid grid-cols-[58px_110px_1fr] gap-2 rounded px-2 py-1.5 font-mono text-[10px] leading-relaxed hover:bg-white/5"><span style={{ color: 'var(--text-dimmed)' }}>{formatTime(entry.timestamp)}</span><span className="truncate font-semibold" style={{ color: LEVEL_COLORS[entry.level] }}>{entry.module}</span><span className="break-words" style={{ color: 'var(--text-secondary)' }}>{entry.message}</span></div>)}</div>}
+          {!loading && visibleEntries.length === 0 ? <div className="flex h-40 flex-col items-center justify-center gap-2" style={{ color: 'var(--text-dimmed)' }}><Bot size={22} /><p className="text-xs">Aucun log correspondant pour cette session.</p></div> : <div className="space-y-1">{visibleEntries.map((entry, index) => <div key={`${entry.timestamp}-${entry.module}-${index}`} className="grid grid-cols-[58px_110px_1fr] gap-2 rounded px-2 py-1.5 font-mono text-xs leading-relaxed hover:bg-white/5"><span style={{ color: 'var(--text-dimmed)' }}>{formatTime(entry.timestamp)}</span><span className="truncate font-semibold" style={{ color: LEVEL_COLORS[entry.level] }}>{entry.module}</span><span className="break-words" style={{ color: 'var(--text-secondary)' }}>{entry.message}</span></div>)}</div>}
         </div>
-        <footer className="px-4 py-2 text-[9px]" style={{ borderTop: '1px solid var(--border-base)', color: 'var(--text-dimmed)' }}>Les messages sont assainis, mais restent des données non fiables. Rafraîchissement toutes les 15 secondes tant que ce panneau est ouvert.</footer>
+        <footer className="px-4 py-2 text-xs" style={{ borderTop: '1px solid var(--border-base)', color: 'var(--text-dimmed)' }}>Les messages sont assainis, mais restent des données non fiables. Rafraîchissement toutes les 15 secondes tant que ce panneau est ouvert.</footer>
       </section>
     </div>
   );

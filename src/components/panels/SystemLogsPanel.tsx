@@ -8,9 +8,9 @@ import type { LogEntry } from '../../hooks/useLiveAPI';
 // Colour per log type
 const LOG_COLORS: Record<LogEntry['type'], string> = {
   system: 'var(--text-secondary)',
-  action: '#38bdf8',   // sky-400 — always visible on both themes
-  error:  '#f87171',   // red-400
-  info:   '#34d399',   // emerald-400
+  action: 'var(--accent-primary)',   // sky-400 — always visible on both themes
+  error:  'var(--color-error)',   // red-400
+  info:   'var(--color-success)',   // emerald-400
 };
 
 const LOG_PREFIXES: Record<LogEntry['type'], string> = {
@@ -60,7 +60,7 @@ export const SystemLogsPanel = React.memo(function SystemLogsPanel({ logs, onCle
         {logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 py-4">
             <Monitor className="w-6 h-6" style={{ color: 'var(--text-dimmed)' }} />
-            <p className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
               En attente de connexion...
             </p>
           </div>
@@ -72,7 +72,7 @@ export const SystemLogsPanel = React.memo(function SystemLogsPanel({ logs, onCle
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.15 }}
-                className="flex items-start gap-2 font-mono text-[10px] leading-tight pl-1 py-0.5 rounded"
+                className="flex items-start gap-2 font-mono text-sm leading-tight pl-1 py-0.5 rounded"
               >
                 {/* Prefix icon */}
                 <span className="flex-shrink-0 w-3 text-center" style={{ color: LOG_COLORS[log.type] }}>

@@ -27,7 +27,7 @@ export function ViewHeader({ title, icon: Icon, description, badge, actions }: V
       {/* Left — Icon + Title + Badge + Description */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md"
           style={{ backgroundColor: 'var(--accent-subtle)' }}
         >
           <Icon aria-hidden="true" className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
@@ -43,7 +43,7 @@ export function ViewHeader({ title, icon: Icon, description, badge, actions }: V
             </h1>
             {badge && (
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none whitespace-nowrap"
+                className="flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium leading-none whitespace-nowrap"
                 style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
               >
                 {badge}

@@ -44,7 +44,7 @@ export function SidebarSection({ config, state, actions, assistantConnected }: S
 
         // Regular button
         const isActive = item.stateKey ? Boolean(state[item.stateKey]) : false;
-        const dot = item.dotStateKey && state[item.dotStateKey] ? '#4ade80' : undefined;
+        const dot = item.dotStateKey && state[item.dotStateKey] ? 'var(--color-success)' : undefined;
         const handler = item.actionKey ? actions[item.actionKey] : undefined;
 
         // Show a subtle blue dot for assistant-required items when connected but not active

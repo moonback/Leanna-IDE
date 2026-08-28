@@ -11,24 +11,24 @@ function formatTokens(n: number): string {
 
 const LEVEL_STYLES = {
   ok: {
-    bar: 'linear-gradient(90deg, #10b981, #06b6d4)',
-    bg: '#e6fffa', // Fond clair pour OK
-    border: '#b2f2bb', // Bordure claire
-    text: '#0ca678', // Texte vert plus sombre
+    bar: 'linear-gradient(90deg, var(--color-success), var(--color-info))',
+    bg: 'color-mix(in srgb, var(--color-info) 10%, transparent)', // Fond clair pour OK
+    border: 'color-mix(in srgb, var(--color-success) 30%, transparent)', // Bordure claire
+    text: 'var(--color-success)', // Texte vert
     label: 'Normal',
   },
   warn: {
-    bar: 'linear-gradient(90deg, #f59e0b, #fb923c)',
-    bg: '#fff9db', // Fond clair pour Warn
-    border: '#ffe066', // Bordure claire
-    text: '#e67700', // Texte orange plus sombre
+    bar: 'linear-gradient(90deg, var(--color-warning), var(--color-accent-alt))',
+    bg: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', // Fond clair pour Warn
+    border: 'color-mix(in srgb, var(--color-warning) 30%, transparent)', // Bordure claire
+    text: 'var(--color-warning)', // Texte orange
     label: 'Élevé',
   },
   critical: {
-    bar: 'linear-gradient(90deg, #ef4444, #dc2626)',
-    bg: '#fff5f5', // Fond clair pour Critical
-    border: '#ffc9c9', // Bordure claire
-    text: '#e03131', // Texte rouge plus sombre
+    bar: 'linear-gradient(90deg, var(--color-error), var(--color-error))',
+    bg: 'color-mix(in srgb, var(--color-error) 5%, transparent)', // Fond clair pour Critical
+    border: 'color-mix(in srgb, var(--color-error) 15%, transparent)', // Bordure claire
+    text: 'var(--color-error)', // Texte rouge
     label: 'Critique',
   },
 } as const;
@@ -58,26 +58,26 @@ export function PromptContextIndicator({ context, connected = false }: PromptCon
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="flex items-center gap-1.5 min-w-0">
           <Gauge size={12} style={{ color: styles.text, flexShrink: 0 }} />
-          <span className="text-[10px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+          <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
             Contexte prompt
           </span>
           {connected && (
             <span
-              className="inline-flex items-center rounded-full px-1.5 py-[1px] text-[8px] font-bold uppercase tracking-wide"
+              className="inline-flex items-center rounded-full px-1.5 py-[1px] text-xs font-bold uppercase tracking-wide"
               style={{ backgroundColor: styles.bg, color: styles.text }}
             >
               live
             </span>
           )}
         </div>
-        <span className="text-[9px] font-bold tabular-nums flex-shrink-0" style={{ color: styles.text }}>
+        <span className="text-xs font-bold tabular-nums flex-shrink-0" style={{ color: styles.text }}>
           {hasData ? `${context.percent}%` : '—'}
         </span>
       </div>
 
       <div
         className="h-1.5 rounded-full overflow-hidden mb-1.5"
-        style={{ backgroundColor: 'rgba(0,0,0,0.06)' }}
+        style={{ backgroundColor: 'color-mix(in srgb, black 2.4%, transparent)' }}
       >
         <div
           className="h-full rounded-full transition-all duration-500"
@@ -89,13 +89,13 @@ export function PromptContextIndicator({ context, connected = false }: PromptCon
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[9px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>
           {hasData
             ? `${formatTokens(context.currentSize)} / ${formatTokens(context.maxSize)} tokens`
             : 'En attente de connexion…'}
         </span>
         {hasData && (
-          <span className="text-[9px] font-medium" style={{ color: styles.text }}>
+          <span className="text-xs font-medium" style={{ color: styles.text }}>
             {styles.label}
             {context.turns > 0 ? ` · ${context.turns} tour${context.turns > 1 ? 's' : ''}` : ''}
           </span>
@@ -104,7 +104,7 @@ export function PromptContextIndicator({ context, connected = false }: PromptCon
 
       {context.suggestion && context.level !== 'ok' && (
         <div
-          className="flex items-start gap-1.5 mt-2 px-2 py-1.5 rounded-lg text-[9-xs]"
+          className="flex items-start gap-1.5 mt-2 px-2 py-1.5 rounded-lg text-xs"
           style={{ backgroundColor: 'rgba(0,0,0,0.04)', color: 'var(--text-muted)' }}
         >
           {context.level === 'critical'
@@ -128,11 +128,11 @@ export function PromptContextIndicator({ context, connected = false }: PromptCon
             }
           }}
           disabled={summarizing || !connected}
-          className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all disabled:opacity-50"
+          className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50"
           style={{
-            backgroundColor: 'rgba(14,165,233,0.08)',
-            border: '1px solid rgba(14,165,233,0.2)',
-            color: '#0e97a0',
+            backgroundColor: 'color-mix(in srgb, var(--color-info) 8%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--color-info) 20%, transparent)',
+            color: 'var(--color-info)',
           }}
         >
           {summarizing ? (

@@ -85,8 +85,8 @@ export function Tooltip({
             className={clsx(
               'absolute z-[200] pointer-events-none',
               'whitespace-nowrap px-2.5 py-1.5 rounded-lg',
-              'text-[11px] font-medium',
-              'shadow-lg',
+              'text-xs font-medium',
+              'shadow-lg backdrop-blur-sm',
               'flex items-center gap-2',
               positionStyles[position],
             )}
@@ -94,13 +94,13 @@ export function Tooltip({
               backgroundColor: 'var(--bg-elevated)',
               color: 'var(--text-primary)',
               border: '1px solid var(--border-base)',
-              boxShadow: 'var(--shadow-md)',
+              boxShadow: 'var(--shadow-lg)',
             }}
           >
             <span>{content}</span>
             {shortcut && (
               <kbd
-                className="px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold"
+                className="px-1.5 py-0.5 rounded text-xs font-mono font-semibold"
                 style={{
                   backgroundColor: 'var(--bg-input)',
                   color: 'var(--text-muted)',

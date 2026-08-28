@@ -45,7 +45,7 @@ export function AIConnectionBanner({
             style={{ backgroundColor: 'var(--status-running-bg)' }}
           >
             <StatusBadge status={working ? 'running' : 'connected'} dotOnly pulse={working} />
-            <span className="text-[10px] font-medium truncate" style={{ color: 'var(--text-secondary)' }}>
+            <span className="text-sm font-medium truncate" style={{ color: 'var(--text-secondary)' }}>
               {working ? 'En cours…' : muted ? 'Muet' : 'Prêt'}
             </span>
           </div>
@@ -58,7 +58,7 @@ export function AIConnectionBanner({
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-base)'; }}
           >
             <WifiOff size={12} style={{ color: 'var(--text-muted)' }} />
-            <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
               Connecter
             </span>
           </button>
@@ -87,22 +87,22 @@ export function AIConnectionBanner({
             </div>
             <div className="flex-1 min-w-0">
               <h4
-                className="text-[12px] font-semibold mb-0.5"
+                className="text-sm font-semibold mb-0.5"
                 style={{ color: 'var(--text-primary)' }}
               >
                 {aiName} est hors ligne
               </h4>
-              <p className="text-[11px] leading-relaxed mb-2.5" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs leading-relaxed mb-2.5" style={{ color: 'var(--text-muted)' }}>
                 Connectez l'assistant pour accéder au chat vocal, à l'édition de code assistée et aux agents automatiques.
               </p>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={onConnect}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                   style={{
                     backgroundColor: 'var(--accent-primary)',
-                    color: '#ffffff',
+                    color: 'whitefff',
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.filter = 'brightness(1.1)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.filter = 'brightness(1)'; }}
@@ -114,7 +114,7 @@ export function AIConnectionBanner({
                   <button
                     type="button"
                     onClick={onSettings}
-                    className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
+                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
                     style={{ color: 'var(--text-muted)' }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent-primary)'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
@@ -138,10 +138,10 @@ export function AIConnectionBanner({
           <div className="flex items-center gap-2.5">
             <BrainCircuit size={14} style={{ color: 'var(--accent-primary)' }} />
             <div className="flex-1 min-w-0">
-              <span className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>
+              <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
                 {aiName}
               </span>
-              <span className="text-[10px] ml-2" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-sm ml-2" style={{ color: 'var(--text-muted)' }}>
                 {working ? 'travaille…' : muted ? 'muet' : 'prêt'}
               </span>
             </div>

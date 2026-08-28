@@ -240,21 +240,21 @@ function toDataNode(
 
   // Diff color coding & background highlight
   const diffColor = diffStatus === 'added'
-    ? '#22c55e'
+    ? 'var(--color-success)'
     : diffStatus === 'modified'
-      ? '#f59e0b'
+      ? 'var(--color-warning)'
       : diffStatus === 'deleted'
-        ? '#ef4444'
+        ? 'var(--color-error)'
         : undefined;
 
   const rowBg = isDragTarget
     ? 'color-mix(in srgb, var(--accent-primary) 15%, transparent)'
     : diffStatus === 'modified'
-      ? 'color-mix(in srgb, #f59e0b 8%, transparent)'
+      ? 'color-mix(in srgb, var(--color-warning) 8%, transparent)'
       : diffStatus === 'added'
-        ? 'color-mix(in srgb, #22c55e 8%, transparent)'
+        ? 'color-mix(in srgb, var(--color-success) 8%, transparent)'
         : diffStatus === 'deleted'
-          ? 'color-mix(in srgb, #ef4444 8%, transparent)'
+          ? 'color-mix(in srgb, var(--color-error) 8%, transparent)'
           : 'transparent';
 
   const activateRow = () => {
@@ -267,7 +267,7 @@ function toDataNode(
       role="treeitem"
       tabIndex={0}
       aria-expanded={entry.type === 'directory' ? isExpanded : undefined}
-      className="flex items-center gap-1.5 py-1 px-2 text-[12px] cursor-pointer select-none relative group transition-colors duration-150 rounded-md"
+      className="flex items-center gap-1.5 py-1 px-2 text-sm cursor-pointer select-none relative group transition-colors duration-150 rounded-md"
       style={{
         paddingLeft: `${8 + depth * 14}px`,
         color: diffColor || 'var(--text-primary)',
@@ -338,12 +338,12 @@ function toDataNode(
 
         {/* Diff stats indicators (+lines / -lines / badge) */}
         {diffStatus && (
-          <div className="ml-auto flex items-center gap-1 text-[10px] font-mono shrink-0 pl-1">
+          <div className="ml-auto flex items-center gap-1 text-sm font-mono shrink-0 pl-1">
             {additions > 0 && (
               <span
-                className="font-bold px-1.5 py-0.5 rounded text-[10px]"
+                className="font-bold px-1.5 py-0.5 rounded text-sm"
                 style={{
-                  color: '#22c55e',
+                  color: 'var(--color-success)',
                   backgroundColor: 'rgba(34, 197, 94, 0.18)',
                   border: '1px solid rgba(34, 197, 94, 0.3)',
                 }}
@@ -354,9 +354,9 @@ function toDataNode(
             )}
             {deletions > 0 && (
               <span
-                className="font-bold px-1.5 py-0.5 rounded text-[10px]"
+                className="font-bold px-1.5 py-0.5 rounded text-sm"
                 style={{
-                  color: '#ef4444',
+                  color: 'var(--color-error)',
                   backgroundColor: 'rgba(239, 68, 68, 0.18)',
                   border: '1px solid rgba(239, 68, 68, 0.3)',
                 }}
@@ -367,7 +367,7 @@ function toDataNode(
             )}
             {additions === 0 && deletions === 0 && (
               <span
-                className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded"
+                className="text-xs font-bold uppercase px-1.5 py-0.5 rounded"
                 style={{
                   color: diffColor,
                   backgroundColor: `color-mix(in srgb, ${diffColor} 18%, transparent)`,
@@ -763,15 +763,15 @@ const FileExplorer = memo(function FileExplorer({
             <FolderInput size={12} />
           </button>
           <div className="min-w-0">
-            <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-secondary)' }}>
+            <span className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>
               📁 Explorer
             </span>
-            <div className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }} title={currentDir ? currentDir : 'Racine'}>
+            <div className="text-xs truncate" style={{ color: 'var(--text-muted)' }} title={currentDir ? currentDir : 'Racine'}>
               {currentDir === '.' ? 'Racine' : currentDir}
             </div>
           </div>
           {!loading && (
-            <span className="text-[9px] px-1.5 rounded-md" style={{ color: 'var(--text-dimmed)', background: 'var(--bg-input)' }}>
+            <span className="text-xs px-1.5 rounded-md" style={{ color: 'var(--text-dimmed)', background: 'var(--bg-input)' }}>
               {fileCount}
             </span>
           )}
@@ -780,7 +780,7 @@ const FileExplorer = memo(function FileExplorer({
           {currentDir && currentDir !== '.' && (
             <button
               onClick={() => onNavigate(currentDir.split('/').slice(0, -1).join('/') || '.')}
-              className="flex items-center rounded-md px-2 py-0.5 text-[9px] font-semibold transition-colors hover:bg-[var(--bg-panel)]"
+              className="flex items-center rounded-md px-2 py-0.5 text-xs font-semibold transition-colors hover:bg-[var(--bg-panel)]"
               style={{ color: 'var(--accent-primary)' }}
               title="Remonter d'un niveau"
             >
@@ -791,7 +791,7 @@ const FileExplorer = memo(function FileExplorer({
           <div className="flex items-center gap-1">
             {sandboxActive ? (
               <span
-                className="text-[8px] px-1.5 py-0.5 rounded-md font-bold flex items-center gap-0.5 shadow-sm border border-success-subtle bg-success-subtle text-success"
+                className="text-xs px-1.5 py-0.5 rounded-md font-bold flex items-center gap-0.5 shadow-sm border border-success-subtle bg-success-subtle text-success"
                 title="Mode Sandbox actif"
               >
                 <Shield size={8} />
@@ -799,7 +799,7 @@ const FileExplorer = memo(function FileExplorer({
               </span>
             ) : (
               <span
-                className="text-[8px] px-1.5 py-0.5 rounded-md font-bold flex items-center gap-0.5 border border-[rgba(156,163,175,0.15)] bg-[rgba(156,163,175,0.08)] text-[var(--text-muted)]"
+                className="text-xs px-1.5 py-0.5 rounded-md font-bold flex items-center gap-0.5 border border-[rgba(156,163,175,0.15)] bg-[rgba(156,163,175,0.08)] text-[var(--text-muted)]"
                 title="Mode Sandbox inactif"
               >
                 <Shield size={8} />
@@ -876,7 +876,7 @@ const FileExplorer = memo(function FileExplorer({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Filtrer les fichiers…"
-                className="flex-1 bg-transparent text-[12px] outline-none placeholder:opacity-40"
+                className="flex-1 bg-transparent text-sm outline-none placeholder:opacity-40"
                 style={{ color: 'var(--text-primary)' }}
               />
               {searchQuery && (
@@ -898,7 +898,7 @@ const FileExplorer = memo(function FileExplorer({
             </div>
             {searchQuery && (
               <div
-                className="px-3 py-0.5 text-[9px] border-b"
+                className="px-3 py-0.5 text-xs border-b"
                 style={{
                   borderColor: 'var(--border-base)',
                   color: 'var(--text-dimmed)',
@@ -915,7 +915,7 @@ const FileExplorer = memo(function FileExplorer({
       {/* Sort indicator (non-default) */}
       {sortMode !== 'name-asc' && !searchQuery && !showSearch && (
         <div
-          className="flex items-center gap-1 px-3 py-0.5 text-[9px] border-b"
+          className="flex items-center gap-1 px-3 py-0.5 text-xs border-b"
           style={{
             borderColor: 'var(--border-base)',
             backgroundColor: 'color-mix(in srgb, var(--accent-primary) 8%, transparent)',
@@ -953,18 +953,18 @@ const FileExplorer = memo(function FileExplorer({
             >
               <Folder size={20} style={{ color: 'var(--accent-primary)' }} />
             </div>
-            <p className="text-[12px] font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
               Dossier vide
             </p>
-            <p className="text-[10px] mb-4 leading-normal opacity-60" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-sm mb-4 leading-normal opacity-60" style={{ color: 'var(--text-muted)' }}>
               Créez un fichier ou ouvrez un projet.
             </p>
             <button
               onClick={onCreateFile}
-              className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-semibold transition hover:opacity-95"
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold transition hover:opacity-95"
               style={{
                 backgroundColor: 'var(--accent-primary)',
-                color: '#fff',
+                color: 'white',
                 borderRadius: 'var(--radius-sm)',
               }}
             >
@@ -975,7 +975,7 @@ const FileExplorer = memo(function FileExplorer({
         ) : processedTree.length === 0 && searchQuery ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
             <Search size={24} className="mb-3 opacity-30" style={{ color: 'var(--text-muted)' }} />
-            <p className="text-[12px] opacity-60" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-sm opacity-60" style={{ color: 'var(--text-muted)' }}>
               Aucun fichier ne correspond à «{searchQuery}»
             </p>
           </div>
@@ -987,19 +987,19 @@ const FileExplorer = memo(function FileExplorer({
                 className="flex items-center gap-1.5 px-3 py-1 border-b sticky top-0 z-10"
                 style={{
                   borderColor: 'var(--border-base)',
-                  backgroundColor: 'color-mix(in srgb, var(--color-success, #22c55e) 6%, var(--bg-sidebar))',
+                  backgroundColor: 'color-mix(in srgb, var(--color-success, var(--color-success)) 6%, var(--bg-sidebar))',
                 }}
               >
-                <Shield size={10} style={{ color: 'var(--color-success, #22c55e)' }} />
-                <span className="text-[10px] font-semibold" style={{ color: 'var(--color-success, #22c55e)' }}>
+                <Shield size={10} style={{ color: 'var(--color-success, var(--color-success))' }} />
+                <span className="text-sm font-semibold" style={{ color: 'var(--color-success, var(--color-success))' }}>
                   Sandbox
                 </span>
                 {effectiveDiffPaths && effectiveDiffPaths.size > 0 && (
                   <span
-                    className="text-[9px] px-1.5 rounded-full ml-auto"
+                    className="text-xs px-1.5 rounded-full ml-auto"
                     style={{
-                      backgroundColor: 'color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent)',
-                      color: 'var(--color-warning, #f59e0b)',
+                      backgroundColor: 'color-mix(in srgb, var(--color-warning, var(--color-warning)) 15%, transparent)',
+                      color: 'var(--color-warning, var(--color-warning))',
                     }}
                   >
                     {effectiveDiffPaths.size} diff{effectiveDiffPaths.size > 1 ? 's' : ''}
@@ -1034,18 +1034,18 @@ const FileExplorer = memo(function FileExplorer({
                     {showWorkspace ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
                   </span>
                   <FolderInput size={10} style={{ color: 'var(--accent-primary)' }} />
-                  <span className="text-[10px] font-semibold" style={{ color: 'var(--accent-primary)' }}>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--accent-primary)' }}>
                     Dossiers Réels
                   </span>
-                  {/* <span className="text-[9px] opacity-50 ml-1" style={{ color: 'var(--text-muted)' }}>
+                  {/* <span className="text-xs opacity-50 ml-1" style={{ color: 'var(--text-muted)' }}>
                     (fichiers réels)
                   </span> */}
                   {sandboxModifiedCount > 0 ? (
                     <span
-                      className="ml-auto text-[9px] px-1.5 py-0.5 rounded font-medium flex items-center gap-1"
+                      className="ml-auto text-xs px-1.5 py-0.5 rounded font-medium flex items-center gap-1"
                       style={{
-                        backgroundColor: 'color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent)',
-                        color: 'var(--color-warning, #f59e0b)',
+                        backgroundColor: 'color-mix(in srgb, var(--color-warning, var(--color-warning)) 15%, transparent)',
+                        color: 'var(--color-warning, var(--color-warning))',
                       }}
                       title="Cliquez sur un fichier pour examiner et valider les modifications"
                     >
@@ -1054,10 +1054,10 @@ const FileExplorer = memo(function FileExplorer({
                     </span>
                   ) : (
                     <span
-                      className="ml-auto text-[9px] px-1.5 py-0.5 rounded font-medium flex items-center gap-1"
+                      className="ml-auto text-xs px-1.5 py-0.5 rounded font-medium flex items-center gap-1"
                       style={{
-                        backgroundColor: 'color-mix(in srgb, var(--color-success, #22c55e) 15%, transparent)',
-                        color: 'var(--color-success, #22c55e)',
+                        backgroundColor: 'color-mix(in srgb, var(--color-success, var(--color-success)) 15%, transparent)',
+                        color: 'var(--color-success, var(--color-success))',
                       }}
                       title="Tous les fichiers sont validés et synchronisés sur le workspace réel"
                     >

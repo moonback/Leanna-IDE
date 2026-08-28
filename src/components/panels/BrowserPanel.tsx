@@ -374,7 +374,7 @@ export function BrowserPanel({
       ].join(';');
       cur.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">'
         + '<filter id="cs"><feDropShadow dx="1" dy="1" stdDeviation="1.5" flood-opacity="0.4"/></filter>'
-        + '<polygon points="4,2 4,18 8,14 11,20 13,19 10,13 16,13" fill="white" stroke="#333" stroke-width="1" filter="url(#cs)"/>'
+        + '<polygon points="4,2 4,18 8,14 11,20 13,19 10,13 16,13" fill="white" stroke="var(--text-muted)" stroke-width="1" filter="url(#cs)"/>'
         + '</svg>';
       document.body.appendChild(cur);
     })()`;
@@ -1279,7 +1279,7 @@ export function BrowserPanel({
           <div className="flex items-center gap-1.5 min-w-0">
             <Globe size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
             <span
-              className="text-[11px] font-semibold truncate"
+              className="text-sm font-semibold truncate"
               style={{ color: 'var(--text-primary)' }}
               title={pageTitle || 'Navigateur'}
             >
@@ -1288,11 +1288,11 @@ export function BrowserPanel({
             {/* Badge Leanna pilote */}
             {assistantNavActive && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium"
                 style={{
-                  backgroundColor: 'rgba(139,92,246,0.15)',
-                  color: '#a78bfa',
-                  border: '1px solid rgba(139,92,246,0.3)',
+                  backgroundColor: 'color-mix(in srgb, var(--color-accent-alt) 15%, transparent)',
+                  color: 'var(--color-accent-alt)',
+                  border: '1px solid color-mix(in srgb, var(--color-accent-alt) 30%, transparent)',
                 }}
               >
                 <Bot size={10} />
@@ -1369,9 +1369,9 @@ export function BrowserPanel({
             }}
           >
             {secure ? (
-              <Lock size={11} style={{ color: '#4ade80', flexShrink: 0 }} aria-label="Connexion sécurisée" />
+              <Lock size={11} style={{ color: 'var(--color-success)', flexShrink: 0 }} aria-label="Connexion sécurisée" />
             ) : (
-              <AlertTriangle size={11} style={{ color: '#f59e0b', flexShrink: 0 }} aria-label="Connexion non sécurisée" />
+              <AlertTriangle size={11} style={{ color: 'var(--color-warning)', flexShrink: 0 }} aria-label="Connexion non sécurisée" />
             )}
             <input
               ref={inputRef}
@@ -1380,7 +1380,7 @@ export function BrowserPanel({
               onChange={e => setInputValue(e.target.value)}
               onKeyDown={handleInputKeyDown}
               onFocus={e => e.target.select()}
-              className="flex-1 bg-transparent outline-none text-[11px] min-w-0"
+              className="flex-1 bg-transparent outline-none text-sm min-w-0"
               style={{ color: 'var(--text-primary)' }}
               placeholder="Entrez une URL ou une recherche…"
               aria-label="Barre d'adresse"
@@ -1393,11 +1393,11 @@ export function BrowserPanel({
       {/* ── Error banner ── */}
       {loadError && (
         <div
-          className="flex items-center gap-2 px-3 py-2 text-[11px] flex-shrink-0"
+          className="flex items-center gap-2 px-3 py-2 text-sm flex-shrink-0"
           style={{
-            backgroundColor: 'rgba(239,68,68,0.1)',
-            borderBottom: '1px solid rgba(239,68,68,0.25)',
-            color: '#f87171',
+            backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+            borderBottom: '1px solid color-mix(in srgb, var(--color-error) 25%, transparent)',
+            color: 'var(--color-error)',
           }}
         >
           <AlertTriangle size={12} />

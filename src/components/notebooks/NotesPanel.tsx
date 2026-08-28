@@ -69,7 +69,7 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
       id: 'cornell',
       label: 'Méthode Cornell',
       icon: Layout,
-      color: '#3b82f6',
+      color: 'var(--accent-primary)',
       title: 'Notes Cornell — ',
       content: `## Questions / Indices\n\n- \n- \n\n## Notes principales\n\n\n\n## Résumé\n\n`,
     },
@@ -77,7 +77,7 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
       id: 'resume',
       label: 'Résumé',
       icon: FileText,
-      color: '#10b981',
+      color: 'var(--color-success)',
       title: 'Résumé — ',
       content: `## Points clés\n\n1. \n2. \n3. \n\n## Détails\n\n\n\n## Conclusion\n\n`,
     },
@@ -85,7 +85,7 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
       id: 'todo',
       label: 'To-do / Actions',
       icon: ListChecks,
-      color: '#f59e0b',
+      color: 'var(--color-warning)',
       title: 'Actions — ',
       content: `## À faire\n\n- [ ] \n- [ ] \n- [ ] \n\n## En cours\n\n- [ ] \n\n## Terminé\n\n- [x] \n`,
     },
@@ -93,7 +93,7 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
       id: 'meeting',
       label: 'Compte-rendu',
       icon: BookOpen,
-      color: '#8b5cf6',
+      color: 'var(--color-accent-alt)',
       title: 'Réunion — ',
       content: `## Participants\n\n- \n\n## Ordre du jour\n\n1. \n\n## Décisions\n\n- \n\n## Actions à suivre\n\n- [ ] \n\n## Prochaine réunion\n\n`,
     },
@@ -268,7 +268,7 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
     return (
       <div className="h-full overflow-y-auto custom-scrollbar px-4 pb-4">
         {compactNotes.length === 0 ? (
-          <div className="rounded-[var(--notebook-radius-lg)] bg-[var(--notebook-surface)] p-5 text-sm text-[var(--text-muted)]">
+          <div className="rounded-xl bg-[var(--notebook-surface)] p-5 text-sm text-[var(--text-muted)]">
 Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtront ici.          </div>
         ) : (
           <div className="space-y-3">
@@ -303,7 +303,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
             }
           }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold transition-all active:scale-95 shadow-sm"
-          style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+          style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
         >
           <Plus className="w-4 h-4" />
           Nouvelle note
@@ -332,7 +332,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                   <button
                     key={tpl.id}
                     onClick={() => applyTemplate(tpl)}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-[11px] transition-colors hover:bg-[var(--accent-subtle)]"
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs transition-colors hover:bg-[var(--accent-subtle)]"
                   >
                     <tpl.icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: tpl.color }} />
                     <span style={{ color: 'var(--text-primary)' }}>{tpl.label}</span>
@@ -341,7 +341,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                 <div className="border-t border-[var(--border-base)] my-1" />
                 <button
                   onClick={() => { setShowTemplates(false); setShowTemplateModal(true); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-[11px] font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--accent-subtle)]"
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--accent-subtle)]"
                 >
                   <Sparkles className="w-3.5 h-3.5 flex-shrink-0 text-[var(--accent-primary)]" />
                   <span>Bibliothèque complète...</span>
@@ -359,7 +359,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Rechercher dans les notes..."
-            className="w-full pl-9 pr-3 py-2 rounded-full text-[11px] outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
+            className="w-full pl-9 pr-3 py-2 rounded-full text-xs outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
             style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
           />
         </div>
@@ -478,7 +478,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                     onClick={() => editingId ? handleUpdate(editingId) : handleCreate()}
                     disabled={!title.trim()}
                     className="flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold disabled:opacity-40 transition-all active:scale-95"
-                    style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                    style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
                   >
                     <Save className="w-3.5 h-3.5" />
                     {editingId ? 'Mettre à jour' : 'Créer'}
@@ -550,7 +550,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                       </p>
                     </div>
                     {note.content && (
-                      <p className="text-[11px] mt-1.5 whitespace-pre-wrap line-clamp-4 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                      <p className="text-xs mt-1.5 whitespace-pre-wrap line-clamp-4 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                         {note.content}
                       </p>
                     )}

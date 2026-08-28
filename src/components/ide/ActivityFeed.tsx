@@ -44,13 +44,13 @@ function getIcon(type: FeedEntry['type']) {
 
 function getColor(type: FeedEntry['type']) {
   switch (type) {
-    case 'file': return '#60a5fa';
-    case 'git': return '#f472b6';
-    case 'terminal': return '#fbbf24';
-    case 'search': return '#34d399';
-    case 'web': return '#38bdf8';
-    case 'memory': return '#a855f7';
-    case 'reasoning': return '#f97316';
+    case 'file': return 'var(--accent-primary)';
+    case 'git': return 'var(--color-error)';
+    case 'terminal': return 'var(--color-warning)';
+    case 'search': return 'var(--color-success)';
+    case 'web': return 'var(--accent-primary)';
+    case 'memory': return 'var(--color-accent-alt)';
+    case 'reasoning': return 'var(--color-warning)';
     default: return 'var(--accent-primary)';
   }
 }
@@ -153,9 +153,9 @@ export function ActivityFeed({ steps, connected }: ActivityFeedProps) {
         {runningCount > 0 ? (
           <Loader2 size={11} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
         ) : (
-          <Activity size={11} style={{ color: '#34d399' }} />
+          <Activity size={11} style={{ color: 'var(--color-success)' }} />
         )}
-        <span className="text-[10px] font-semibold flex-1" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-sm font-semibold flex-1" style={{ color: 'var(--text-muted)' }}>
           {runningCount > 0 ? `${runningCount} en cours` : `${doneCount} terminée${doneCount > 1 ? 's' : ''}`}
         </span>
         <ChevronDown
@@ -211,26 +211,26 @@ function FeedRow({ entry }: { entry: FeedEntry }) {
         )}
       </div>
       <span
-        className="text-[10px] flex-1 truncate"
+        className="text-sm flex-1 truncate"
         style={{ color: isRunning ? 'var(--text-primary)' : 'var(--text-muted)' }}
       >
         {entry.title}
       </span>
       {entry.count > 1 && (
         <span
-          className="text-[8px] font-bold px-1 py-0.5 rounded"
+          className="text-xs font-bold px-1 py-0.5 rounded"
           style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}
         >
           {entry.count}
         </span>
       )}
-      <span className="text-[9px] font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+      <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
         {timeLabel(entry.timestamp)}
       </span>
       {isRunning ? (
         <div className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0" style={{ backgroundColor: color }} />
       ) : (
-        <CheckCircle2 size={8} className="flex-shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" style={{ color: '#34d399' }} />
+        <CheckCircle2 size={8} className="flex-shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" style={{ color: 'var(--color-success)' }} />
       )}
     </motion.div>
   );

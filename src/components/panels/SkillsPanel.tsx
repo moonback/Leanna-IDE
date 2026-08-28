@@ -30,14 +30,14 @@ function StatusBadge({ status, enabled }: { status: string; enabled: boolean }) 
 
   const label = !isConfigured ? 'Auth requise' : enabled ? 'Actif' : 'Inactif';
   const color = !isConfigured
-    ? 'var(--color-warning, #f59e0b)'
+    ? 'var(--color-warning, var(--color-warning))'
     : enabled
-      ? 'var(--color-success, #10b981)'
+      ? 'var(--color-success, var(--color-success))'
       : 'var(--text-dimmed)';
 
   return (
     <span
-      className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
+      className="inline-flex items-center gap-1 text-sm font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
       style={{
         color,
         backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
@@ -64,9 +64,9 @@ export const SkillsPanel = React.memo(function SkillsPanel({ skills, enabledSkil
       icon={<Zap className="w-4 h-4" />}
       actions={
         <span
-          className="text-[11px] font-mono px-2 py-0.5 rounded-full"
+          className="text-xs font-mono px-2 py-0.5 rounded-full"
           style={{
-            color: 'var(--color-success, #10b981)',
+            color: 'var(--color-success, var(--color-success))',
             backgroundColor: 'rgba(16,185,129,0.1)',
             border: '1px solid rgba(16,185,129,0.25)',
           }}
@@ -121,7 +121,7 @@ export const SkillsPanel = React.memo(function SkillsPanel({ skills, enabledSkil
                 />
               ) : (
                 <span
-                  className="text-[10px] font-medium px-2 py-1 rounded-lg"
+                  className="text-sm font-medium px-2 py-1 rounded-lg"
                   style={{
                     color: 'var(--text-dimmed)',
                     backgroundColor: 'var(--bg-secondary)',

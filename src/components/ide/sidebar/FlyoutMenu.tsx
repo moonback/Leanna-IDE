@@ -15,16 +15,13 @@ export function FlyoutMenu({ children, align = 'center' }: FlyoutMenuProps) {
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: -12, scale: 0.92 }}
       transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-      className="absolute left-full ml-2 flex flex-col z-50 overflow-hidden"
+      className="absolute left-full ml-2 flex flex-col z-50 overflow-hidden rounded-2xl backdrop-blur-sm"
       style={{
         ...(align === 'bottom' ? { bottom: 0 } : { top: '50%', transform: 'translateY(-50%)' }),
         minWidth: '220px',
         backgroundColor: 'var(--ide-panel-bg)',
         border: '1px solid var(--ide-shell-border)',
-        borderRadius: '18px',
-        boxShadow: '0 18px 48px rgba(0,0,0,0.18)',
-        backdropFilter: 'blur(18px)',
-        WebkitBackdropFilter: 'blur(18px)',
+        boxShadow: 'var(--shadow-lg)',
       }}
     >
       {children}
@@ -41,7 +38,7 @@ export function FlyoutHeader({ children }: { children: React.ReactNode }) {
       style={{ borderBottom: '1px solid var(--ide-shell-border)' }}
     >
       <span
-        className="text-[9.5px] font-bold uppercase tracking-[0.15em]"
+        className="text-xs font-bold uppercase tracking-[0.15em]"
         style={{ color: 'var(--text-muted)' }}
       >
         {children}
@@ -59,18 +56,18 @@ interface FlyoutItemProps {
   onClick: () => void;
   danger?: boolean;
   mono?: boolean;
-  /** Optional color dot indicator (e.g. '#0ea5e9') */
+  /** Optional color dot indicator (e.g. 'var(--color-info)') */
   dot?: string;
 }
 
 export function FlyoutItem({ icon: Icon, label, active, onClick, danger, mono, dot }: FlyoutItemProps) {
   return (
     <button
-      className={`group flex items-center gap-3 px-3 py-2 text-left w-full transition duration-[250ms] ${mono ? 'font-mono text-[11px]' : 'text-[11.5px]'}`}
+      className={`group flex items-center gap-3 px-3 py-2 text-left w-full transition duration-250 ${mono ? 'font-mono text-sm' : 'text-sm'}`}
       style={{
         color: danger ? 'var(--color-error)' : active ? 'var(--text-primary)' : 'var(--text-secondary)',
         backgroundColor: active ? 'var(--ide-sidebar-active)' : 'transparent',
-        margin: '0.25rem 0.25rem',
+        margin: '0.25rem',
         width: 'calc(100% - 0.5rem)',
         borderRadius: '12px',
       }}
@@ -84,10 +81,10 @@ export function FlyoutItem({ icon: Icon, label, active, onClick, danger, mono, d
     >
       {/* Icon badge */}
       <div
-        className="w-[26px] h-[26px] rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-100"
+        className="w-6.5 h-6.5 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-100"
         style={{
           backgroundColor: danger
-            ? 'color-mix(in srgb, var(--color-error) 12%, transparent)'
+            ? 'var(--color-error-subtle)'
             : active
               ? 'var(--accent-subtle)'
               : 'var(--ide-sidebar-item-bg)' ,
@@ -118,7 +115,7 @@ export function FlyoutItem({ icon: Icon, label, active, onClick, danger, mono, d
 
       {active && !dot && (
         <div
-          className="w-[6px] h-[6px] rounded-full flex-shrink-0"
+          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
           style={{
             backgroundColor: 'var(--accent-primary)',
             boxShadow: 'none',

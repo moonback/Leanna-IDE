@@ -45,12 +45,12 @@ export function AuditSection() {
                   initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.02 }}
                   className="rounded-lg p-2.5" style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{entry.action}</span>
-                    <span className="text-[9px] font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{entry.action}</span>
+                    <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
                       {new Date(entry.timestamp).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <div className="mt-0.5 text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{entry.target}</div>
+                  <div className="mt-0.5 text-sm truncate" style={{ color: 'var(--text-muted)' }}>{entry.target}</div>
                 </motion.li>
               ))}
             </ul>

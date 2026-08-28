@@ -40,15 +40,15 @@ export function DataSection() {
           {!confirmOpen ? (
             <motion.button type="button" onClick={() => setConfirmOpen(true)} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
               className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold transition-all duration-200"
-              style={{ backgroundColor: 'color-mix(in srgb, #ef4444 10%, transparent)', border: '1px solid color-mix(in srgb, #ef4444 30%, transparent)', color: '#f87171' }}>
+              style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 30%, transparent)', color: 'var(--color-error)' }}>
               <Trash2 className="h-3.5 w-3.5" /> Vider l'historique des conversations
             </motion.button>
           ) : (
-            <div className="rounded-xl p-4" style={{ backgroundColor: 'color-mix(in srgb, #ef4444 8%, var(--bg-secondary))', border: '1px solid color-mix(in srgb, #ef4444 25%, transparent)' }}>
-              <p className="mb-3 text-[11px] font-medium" style={{ color: '#f87171' }}>⚠️ Toutes les conversations seront supprimées définitivement.</p>
+            <div className="rounded-xl p-4" style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 8%, var(--bg-secondary))', border: '1px solid color-mix(in srgb, var(--color-error) 25%, transparent)' }}>
+              <p className="mb-3 text-xs font-medium" style={{ color: 'var(--color-error)' }}>⚠️ Toutes les conversations seront supprimées définitivement.</p>
               <div className="flex gap-2">
                 <motion.button type="button" onClick={handleClear} disabled={clearing} whileTap={{ scale: 0.97 }}
-                  className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" style={{ backgroundColor: '#ef4444' }}>
+                  className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--color-error)' }}>
                   {clearing ? 'Suppression…' : 'Confirmer'}
                 </motion.button>
                 <motion.button type="button" onClick={() => { setConfirmOpen(false); setResult(null); }} disabled={clearing} whileTap={{ scale: 0.97 }}
@@ -63,8 +63,8 @@ export function DataSection() {
         <AnimatePresence>
           {result && (
             <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-              className="rounded-lg px-3 py-2 text-[11px] font-medium"
-              style={{ backgroundColor: result.type === 'success' ? 'color-mix(in srgb, #4ade80 10%, transparent)' : 'color-mix(in srgb, #ef4444 10%, transparent)', color: result.type === 'success' ? '#4ade80' : '#f87171' }}>
+              className="rounded-lg px-3 py-2 text-xs font-medium"
+              style={{ backgroundColor: result.type === 'success' ? 'color-mix(in srgb, var(--color-success) 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)', color: result.type === 'success' ? 'var(--color-success)' : 'var(--color-error)' }}>
               {result.type === 'success' ? '✓' : '✗'} {result.message}
             </motion.div>
           )}
@@ -74,15 +74,15 @@ export function DataSection() {
           {!confirmMemory ? (
             <motion.button type="button" onClick={() => setConfirmMemory(true)} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
               className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold transition-all duration-200"
-              style={{ backgroundColor: 'color-mix(in srgb, #f59e0b 10%, transparent)', border: '1px solid color-mix(in srgb, #f59e0b 30%, transparent)', color: '#fbbf24' }}>
+              style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)', color: 'var(--color-warning)' }}>
               <Trash2 className="h-3.5 w-3.5" /> Vider la mémoire
             </motion.button>
           ) : (
-            <div className="rounded-xl p-4" style={{ backgroundColor: 'color-mix(in srgb, #f59e0b 8%, var(--bg-secondary))', border: '1px solid color-mix(in srgb, #f59e0b 25%, transparent)' }}>
-              <p className="mb-3 text-[11px] font-medium" style={{ color: '#fbbf24' }}>⚠️ Toutes les mémoires seront supprimées définitivement.</p>
+            <div className="rounded-xl p-4" style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 8%, var(--bg-secondary))', border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)' }}>
+              <p className="mb-3 text-xs font-medium" style={{ color: 'var(--color-warning)' }}>⚠️ Toutes les mémoires seront supprimées définitivement.</p>
               <div className="flex gap-2">
                 <motion.button type="button" onClick={handleClearMemory} disabled={clearingMemory} whileTap={{ scale: 0.97 }}
-                  className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" style={{ backgroundColor: '#f59e0b' }}>
+                  className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--color-warning)' }}>
                   {clearingMemory ? 'Suppression…' : 'Confirmer'}
                 </motion.button>
                 <motion.button type="button" onClick={() => { setConfirmMemory(false); setMemoryResult(null); }} disabled={clearingMemory} whileTap={{ scale: 0.97 }}
@@ -97,8 +97,8 @@ export function DataSection() {
         <AnimatePresence>
           {memoryResult && (
             <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-              className="rounded-lg px-3 py-2 text-[11px] font-medium"
-              style={{ backgroundColor: memoryResult.type === 'success' ? 'color-mix(in srgb, #4ade80 10%, transparent)' : 'color-mix(in srgb, #ef4444 10%, transparent)', color: memoryResult.type === 'success' ? '#4ade80' : '#f87171' }}>
+              className="rounded-lg px-3 py-2 text-xs font-medium"
+              style={{ backgroundColor: memoryResult.type === 'success' ? 'color-mix(in srgb, var(--color-success) 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)', color: memoryResult.type === 'success' ? 'var(--color-success)' : 'var(--color-error)' }}>
               {memoryResult.type === 'success' ? '✓' : '✗'} {memoryResult.message}
             </motion.div>
           )}

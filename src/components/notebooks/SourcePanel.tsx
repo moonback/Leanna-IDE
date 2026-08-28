@@ -54,8 +54,8 @@ const TYPE_ICONS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  pdf: '#ef4444', text: '#6b7280', markdown: '#8b5cf6', url: '#3b82f6',
-  html: '#06b6d4', youtube: '#ef4444', audio: '#f59e0b', docx: '#2563eb', image: '#10b981',
+  pdf: 'var(--color-error)', text: 'var(--text-muted)', markdown: 'var(--color-accent-alt)', url: 'var(--accent-primary)',
+  html: 'var(--accent-secondary)', youtube: 'var(--color-error)', audio: 'var(--color-warning)', docx: 'var(--accent-primary)', image: 'var(--color-success)',
 };
 
 const ACCEPTED_EXTENSIONS = '.pdf,.txt,.md,.html,.docx,.doc,.rtf,.csv,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg';
@@ -475,7 +475,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-4 py-4 flex-shrink-0 border-b border-[var(--notebook-border)]">
           <div className="min-w-0">
-            <p className="text-[10px] uppercase font-semibold" style={{ color: 'var(--text-dimmed)', letterSpacing: '0.08em' }}>Sources</p>
+            <p className="text-sm uppercase font-semibold" style={{ color: 'var(--text-dimmed)', letterSpacing: '0.08em' }}>Sources</p>
             <h2 className="text-sm font-semibold truncate text-[var(--text-primary)]">
               {sources.length} document{sources.length !== 1 ? 's' : ''}
             </h2>
@@ -508,7 +508,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                     onClick={handleDeleteSelected}
                     disabled={uploading}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-50"
-                    style={{ backgroundColor: 'var(--red-500)', color: '#ed0a0a' }}
+                    style={{ backgroundColor: 'var(--red-500)', color: 'var(--color-error)' }}
                   >
                     {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                     <span>Supprimer ({selectedSources.length})</span>
@@ -536,7 +536,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                       title={confirmDeleteAll ? 'Cliquez pour confirmer' : 'Supprimer toutes les sources'}
                       aria-label="Supprimer toutes les sources"
                     >
-                      <Trash2 className="h-4 w-4" style={{ color: confirmDeleteAll ? '#14c929' : '#f87171' }} />
+                      <Trash2 className="h-4 w-4" style={{ color: confirmDeleteAll ? 'var(--color-success)' : 'var(--color-error)' }} />
                     </motion.button>
                   )}
                   <motion.button
@@ -545,7 +545,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium disabled:opacity-70"
-                    style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                    style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
                   >
                     {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                     <span>Ajouter</span>
@@ -605,7 +605,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="flex items-center gap-1.5 mt-1 px-3.5 py-2 rounded-full text-xs font-medium"
-                style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
               >
                 <Plus className="h-3.5 w-3.5" />
                 Ajouter une source
@@ -678,17 +678,17 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                       {/* File type icon */}
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm"
-                        style={{ backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}14` }}
+                        style={{ backgroundColor: `${TYPE_COLORS[source.type] || 'var(--text-muted)'}14` }}
                       >
                         {TYPE_ICONS[source.type] || '📎'}
                       </div>
 
                       {/* Text content */}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                        <p className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                           {source.title}
                         </p>
-                        <p className="mt-0.5 truncate text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+                        <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-dimmed)' }}>
                           {source.type} · {source.wordCount?.toLocaleString()} mots
                         </p>
                       </div>
@@ -795,13 +795,13 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
             >
               <div className="flex items-center gap-2">
                 {uploadDone === uploadQueue.length ? (
-                  <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success, #22c55e)' }} />
+                  <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
                 ) : (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
                 )}
-                <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                   Upload {uploadDone}/{uploadQueue.length}
-                  {uploadErrors > 0 && <span style={{ color: 'var(--color-error, #ef4444)' }}> · {uploadErrors} erreur{uploadErrors > 1 ? 's' : ''}</span>}
+                  {uploadErrors > 0 && <span style={{ color: 'var(--color-error)' }}> · {uploadErrors} erreur{uploadErrors > 1 ? 's' : ''}</span>}
                 </p>
               </div>
               {/* Progress bar */}
@@ -816,12 +816,12 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
               </div>
               <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
                 {uploadQueue.map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 text-[11px]">
+                  <div key={i} className="flex items-center gap-2 text-xs">
                     {f.status === 'pending' && <Loader2 className="w-3 h-3 opacity-30 flex-shrink-0" />}
                     {f.status === 'uploading' && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
-                    {f.status === 'success' && <CheckCircle2 className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-success, #22c55e)' }} />}
-                    {f.status === 'error' && <XCircle className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-error, #ef4444)' }} />}
-                    <span className="truncate flex-1" style={{ color: f.status === 'error' ? 'var(--color-error, #ef4444)' : 'var(--text-primary)' }}>
+                    {f.status === 'success' && <CheckCircle2 className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-success)' }} />}
+                    {f.status === 'error' && <XCircle className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-error)' }} />}
+                    <span className="truncate flex-1" style={{ color: f.status === 'error' ? 'var(--color-error)' : 'var(--text-primary)' }}>
                       {f.name}
                     </span>
                     {f.error && <span className="text-xs opacity-60 truncate max-w-[150px]" title={f.error}>{f.error}</span>}
@@ -935,7 +935,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                   onClick={handleDeleteSelected}
                   disabled={uploading}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium disabled:opacity-50"
-                  style={{ backgroundColor: 'var(--red-500)', color: '#df0a0a' }}
+                  style={{ backgroundColor: 'var(--red-500)', color: 'var(--color-error)' }}
                 >
                   {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                   Supprimer
@@ -1248,7 +1248,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                   {/* Type icon with color indicator */}
                   <div
                     className="flex flex-col items-center gap-1 flex-shrink-0 w-9 h-9 rounded-full justify-center"
-                    style={{ backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}14` }}
+                    style={{ backgroundColor: `${TYPE_COLORS[source.type] || 'var(--text-muted)'}14` }}
                   >
                     <span className="text-base leading-none">{TYPE_ICONS[source.type] || '📎'}</span>
                   </div>
@@ -1259,14 +1259,14 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                         {source.title}
                       </p>
                       <span
-                        className="text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase flex-shrink-0"
-                        style={{ letterSpacing: '0.03em', backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}15`, color: TYPE_COLORS[source.type] || 'var(--text-dimmed)' }}
+                        className="text-sm px-1.5 py-0.5 rounded-full font-bold uppercase flex-shrink-0"
+                        style={{ letterSpacing: '0.03em', backgroundColor: `${TYPE_COLORS[source.type] || 'var(--text-muted)'}15`, color: TYPE_COLORS[source.type] || 'var(--text-dimmed)' }}
                       >
                         {source.type}
                       </span>
                     </div>
 
-                    <p className="text-[11px] mt-1 leading-relaxed line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-xs mt-1 leading-relaxed line-clamp-2" style={{ color: 'var(--text-muted)' }}>
                       {source.summary}
                     </p>
 
@@ -1281,7 +1281,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                           className="overflow-hidden"
                         >
                           <div
-                            className="mt-2 p-3 rounded-xl text-[11px] leading-relaxed max-h-60 overflow-y-auto custom-scrollbar whitespace-pre-wrap"
+                            className="mt-2 p-3 rounded-xl text-xs leading-relaxed max-h-60 overflow-y-auto custom-scrollbar whitespace-pre-wrap"
                             style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-secondary)' }}
                           >
                             {loadingPreview ? (

@@ -143,15 +143,15 @@ function highlightSyntax(text: string): Array<{ text: string; color: string }> {
     }
 
     if (match[1]) {
-      spans.push({ text: match[0], color: '#0f766e' });
+      spans.push({ text: match[0], color: 'var(--color-success)' });
     } else if (match[2]) {
-      spans.push({ text: match[0], color: '#7c3aed' });
+      spans.push({ text: match[0], color: 'var(--color-accent-alt)' });
     } else if (match[3] || match[4]) {
-      spans.push({ text: match[0], color: '#6b7280' });
+      spans.push({ text: match[0], color: 'var(--text-muted)' });
     } else if (match[5]) {
-      spans.push({ text: match[0], color: '#0369a1' });
+      spans.push({ text: match[0], color: 'var(--accent-primary)' });
     } else if (match[6]) {
-      spans.push({ text: match[0], color: '#78716c' });
+      spans.push({ text: match[0], color: 'var(--text-muted)' });
     } else {
       spans.push({ text: match[0], color: '' });
     }
@@ -172,14 +172,14 @@ function highlightSyntax(text: string): Array<{ text: string; color: string }> {
 
 const StatusBadge = memo(function StatusBadge({ status }: { status: FileDiff['status'] }) {
   const config = {
-    added: { label: 'Ajouté', color: '#4ade80', bg: 'rgba(74,222,128,0.1)' },
-    modified: { label: 'Modifié', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)' },
-    deleted: { label: 'Supprimé', color: '#f87171', bg: 'rgba(248,113,113,0.1)' },
+    added: { label: 'Ajouté', color: 'var(--color-success)', bg: 'rgba(74,222,128,0.1)' },
+    modified: { label: 'Modifié', color: 'var(--color-warning)', bg: 'rgba(251,191,36,0.1)' },
+    deleted: { label: 'Supprimé', color: 'var(--color-error)', bg: 'rgba(248,113,113,0.1)' },
   }[status];
 
   return (
     <span
-      className="rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
+      className="rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wider"
       style={{ color: config.color, backgroundColor: config.bg }}
     >
       {config.label}
@@ -202,7 +202,7 @@ const SyntaxLine = memo(function SyntaxLine({
             <mark
               key={i}
               className="rounded-sm px-[2px] py-[1px]"
-              style={{ backgroundColor: 'rgba(217,119,6,0.3)', color: '#92400e', textDecoration: 'none' }}
+              style={{ backgroundColor: 'rgba(217,119,6,0.3)', color: 'var(--color-error)', textDecoration: 'none' }}
             >
               {seg.text}
             </mark>
@@ -254,7 +254,7 @@ const FileList = memo(function FileList({
       ) : files.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-32 gap-2">
           <FileCode2 size={20} style={{ color: 'var(--text-dimmed)' }} />
-          <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             Aucune modification
           </p>
         </div>
@@ -263,7 +263,7 @@ const FileList = memo(function FileList({
           {files.map((file) => {
             const isSelected = selectedPath === file.path;
             const Icon = file.status === 'added' ? FilePlus2 : file.status === 'deleted' ? FileX2 : FileCode2;
-            const iconColor = file.status === 'added' ? '#4ade80' : file.status === 'deleted' ? '#f87171' : '#fbbf24';
+            const iconColor = file.status === 'added' ? 'var(--color-success)' : file.status === 'deleted' ? 'var(--color-error)' : 'var(--color-warning)';
 
             return (
               <button
@@ -278,13 +278,13 @@ const FileList = memo(function FileList({
                 <Icon size={13} style={{ color: iconColor, flexShrink: 0 }} />
                 <div className="flex-1 min-w-0">
                   <span
-                    className="text-[11px] font-medium truncate block"
+                    className="text-sm font-medium truncate block"
                     style={{ color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)' }}
                   >
                     {file.path.split('/').pop()}
                   </span>
                   <span
-                    className="text-[9px] truncate block opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-xs truncate block opacity-0 group-hover:opacity-100 transition-opacity"
                     style={{ color: 'var(--text-dimmed)' }}
                   >
                     {file.path}
@@ -769,11 +769,11 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
         style={{ borderBottom: '1px solid var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
       >
         <div className="flex items-center gap-3">
-          <h2 className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
             Modifications Sandbox
           </h2>
           <span
-            className="text-[11px] font-medium rounded-full px-2.5 py-0.5"
+            className="text-sm font-medium rounded-full px-2.5 py-0.5"
             style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-muted)' }}
           >
             {files.length} fichier{files.length > 1 ? 's' : ''}
@@ -784,7 +784,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
           {/* Mode toggle */}
           <button
             onClick={() => setDiffMode((prev) => (prev === 'side-by-side' ? 'unified' : 'side-by-side'))}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all hover:bg-white/5"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/5"
             style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
             title={`Mode: ${diffMode === 'side-by-side' ? 'Côte à côte' : 'Unifié'} (M)`}
           >
@@ -803,7 +803,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
               >
                 <ChevronUp size={12} style={{ color: 'var(--text-muted)' }} />
               </button>
-              <span className="text-[10px] font-mono tabular-nums px-1" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-xs font-mono tabular-nums px-1" style={{ color: 'var(--text-muted)' }}>
                 {currentChunkIdx + 1}/{totalChunks}
               </span>
               <button
@@ -822,10 +822,10 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
             <button
               onClick={handleAcceptAll}
               disabled={isBusy}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
               style={{
                 backgroundColor: 'rgba(74,222,128,0.1)',
-                color: '#4ade80',
+                color: 'var(--color-success)',
                 border: '1px solid rgba(74,222,128,0.2)',
               }}
               title="Accepter toutes les modifications"
@@ -837,10 +837,10 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
             <button
               onClick={handleRejectAll}
               disabled={isBusy}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
               style={{
                 backgroundColor: 'rgba(248,113,113,0.1)',
-                color: '#f87171',
+                color: 'var(--color-error)',
                 border: '1px solid rgba(248,113,113,0.2)',
               }}
               title="Rejeter toutes les modifications"
@@ -884,10 +884,10 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
             className="absolute top-14 right-4 z-50 rounded-xl p-4 shadow-xl"
             style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}
           >
-            <p className="text-[11px] font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
               Raccourcis clavier
             </p>
-            <div className="space-y-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            <div className="space-y-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
               <div className="flex justify-between gap-6">
                 <span>Accepter fichier</span>
                 <kbd className="font-mono px-1.5 py-0.5 rounded bg-white/5">A</kbd>
@@ -937,11 +937,11 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
               backgroundColor:
                 feedback.type === 'success' ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)',
               border: `1px solid ${feedback.type === 'success' ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`,
-              color: feedback.type === 'success' ? '#4ade80' : '#f87171',
+              color: feedback.type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
             }}
           >
             {feedback.type === 'success' ? <Check size={13} /> : <XCircle size={13} />}
-            <span className="text-[11px] font-medium">{feedback.msg}</span>
+            <span className="text-sm font-medium">{feedback.msg}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -962,17 +962,17 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
               className="flex items-center gap-3 px-4 py-2 flex-shrink-0"
               style={{ borderBottom: '1px solid var(--border-base)', backgroundColor: 'rgba(0,0,0,0.15)' }}
             >
-              <span className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-sm font-mono" style={{ color: 'var(--text-muted)' }}>
                 {selectedFile}
               </span>
               {selectedFileStatus && <StatusBadge status={selectedFileStatus} />}
               {stats.added > 0 && (
-                <span className="text-[10px] font-mono font-medium" style={{ color: '#4ade80' }}>
+                <span className="text-xs font-mono font-medium" style={{ color: 'var(--color-success)' }}>
                   +{stats.added}
                 </span>
               )}
               {stats.removed > 0 && (
-                <span className="text-[10px] font-mono font-medium" style={{ color: '#f87171' }}>
+                <span className="text-xs font-mono font-medium" style={{ color: 'var(--color-error)' }}>
                   -{stats.removed}
                 </span>
               )}
@@ -981,10 +981,10 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                 <button
                   onClick={() => selectedFile && handleAcceptFile(selectedFile)}
                   disabled={isBusy}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-50 hover:brightness-110"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 hover:brightness-110"
                   style={{
                     backgroundColor: 'rgba(74,222,128,0.12)',
-                    color: '#4ade80',
+                    color: 'var(--color-success)',
                     border: '1px solid rgba(74,222,128,0.25)',
                   }}
                   title="Accepter ce fichier (A)"
@@ -995,10 +995,10 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                 <button
                   onClick={() => selectedFile && handleRejectFile(selectedFile)}
                   disabled={isBusy}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-50 hover:brightness-110"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 hover:brightness-110"
                   style={{
                     backgroundColor: 'rgba(248,113,113,0.12)',
-                    color: '#f87171',
+                    color: 'var(--color-error)',
                     border: '1px solid rgba(248,113,113,0.25)',
                   }}
                   title="Rejeter ce fichier (R)"
@@ -1017,7 +1017,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
             </div>
           ) : !selectedFile ? (
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-[12px]" style={{ color: 'var(--text-dimmed)' }}>
+              <p className="text-sm" style={{ color: 'var(--text-dimmed)' }}>
                 Sélectionnez un fichier pour voir les modifications
               </p>
             </div>
@@ -1032,14 +1032,14 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                   className="px-3 py-1.5 flex-shrink-0"
                   style={{ backgroundColor: 'rgba(220,38,38,0.08)', borderBottom: '1px solid var(--border-base)' }}
                 >
-                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#b91c1c' }}>
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-error)' }}>
                     Avant (Original)
                   </span>
                 </div>
                 <div
                   ref={leftScrollRef}
                   onScroll={() => handleScroll('left')}
-                  className="flex-1 overflow-auto custom-scrollbar font-mono text-[12px] leading-[20px]"
+                  className="flex-1 overflow-auto custom-scrollbar font-mono text-sm leading-[20px]"
                 >
                   {leftLines.map((line, idx) => (
                     <div
@@ -1059,7 +1059,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                       >
                         {line.num ?? ''}
                       </span>
-                      <span className="flex-1 whitespace-pre pr-4" style={{ color: line.type === 'removed' ? '#b91c1c' : 'var(--text-primary)' }}>
+                      <span className="flex-1 whitespace-pre pr-4" style={{ color: line.type === 'removed' ? 'var(--color-error)' : 'var(--text-primary)' }}>
                         <SyntaxLine content={line.content} segments={line.wordSegments} />
                       </span>
                     </div>
@@ -1072,14 +1072,14 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                   className="px-3 py-1.5 flex-shrink-0"
                   style={{ backgroundColor: 'rgba(22,163,74,0.08)', borderBottom: '1px solid var(--border-base)' }}
                 >
-                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#15803d' }}>
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-success)' }}>
                     Après (Sandbox)
                   </span>
                 </div>
                 <div
                   ref={rightScrollRef}
                   onScroll={() => handleScroll('right')}
-                  className="flex-1 overflow-auto custom-scrollbar font-mono text-[12px] leading-[20px]"
+                  className="flex-1 overflow-auto custom-scrollbar font-mono text-sm leading-[20px]"
                 >
                   {rightLines.map((line, idx) => (
                     <div
@@ -1099,7 +1099,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                       >
                         {line.num ?? ''}
                       </span>
-                      <span className="flex-1 whitespace-pre pr-4" style={{ color: line.type === 'added' ? '#15803d' : 'var(--text-primary)' }}>
+                      <span className="flex-1 whitespace-pre pr-4" style={{ color: line.type === 'added' ? 'var(--color-success)' : 'var(--text-primary)' }}>
                         <SyntaxLine content={line.content} segments={line.wordSegments} />
                       </span>
                     </div>
@@ -1111,7 +1111,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
             /* ─── Unified mode ─── */
             <div
               ref={unifiedScrollRef}
-              className="flex-1 overflow-auto custom-scrollbar font-mono text-[12px] leading-[20px]"
+              className="flex-1 overflow-auto custom-scrollbar font-mono text-sm leading-[20px]"
             >
               {diffLines.map((line, idx) => {
                 const prefix = line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' ';
@@ -1122,7 +1122,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                     ? 'rgba(220,38,38,0.12)'
                     : 'transparent';
                 const textColor =
-                  line.type === 'added' ? '#15803d' : line.type === 'removed' ? '#b91c1c' : 'var(--text-primary)';
+                  line.type === 'added' ? 'var(--color-success)' : line.type === 'removed' ? 'var(--color-error)' : 'var(--text-primary)';
                 const numColor =
                   line.type === 'added'
                     ? 'rgba(22,163,74,0.7)'
@@ -1174,19 +1174,19 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
         className="flex items-center gap-6 px-4 py-2 flex-shrink-0"
         style={{ borderTop: '1px solid var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
       >
-        <span className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
           <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: 'rgba(220,38,38,0.25)' }} />
           Supprimé
         </span>
-        <span className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
           <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: 'rgba(22,163,74,0.25)' }} />
           Ajouté
         </span>
-        <span className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
           <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: 'rgba(217,119,6,0.35)' }} />
           Mot modifié
         </span>
-        <span className="ml-auto text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+        <span className="ml-auto text-xs" style={{ color: 'var(--text-dimmed)' }}>
           ? pour les raccourcis • {diffMode === 'side-by-side' ? 'Gauche: original • Droite: sandbox' : 'Diff unifié'}
         </span>
       </div>

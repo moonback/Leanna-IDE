@@ -136,9 +136,9 @@ export function TemplateSelectorModal({
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
           className="w-full max-w-5xl h-[85vh] max-h-[800px] flex flex-col rounded-2xl overflow-hidden shadow-2xl border"
           style={{
-            backgroundColor: 'var(--bg-panel, #0f172a)',
-            borderColor: 'var(--border-base, #1e293b)',
-            color: 'var(--text-primary, #f8fafc)',
+            backgroundColor: 'var(--bg-panel)',
+            borderColor: 'var(--border-base)',
+            color: 'var(--text-primary)',
           }}
         >
           {/* ═══ HEADER ═══ */}
@@ -185,7 +185,7 @@ export function TemplateSelectorModal({
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-2.5 py-1 text-[11px] rounded-lg font-medium transition-all ${
+                    className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-all ${
                       selectedCategory === cat
                         ? 'bg-[var(--accent-primary)] text-white'
                         : 'bg-white/5 hover:bg-white/10 text-[var(--text-muted)]'
@@ -216,11 +216,11 @@ export function TemplateSelectorModal({
                           <IconComp className="w-4 h-4 text-[var(--accent-primary)]" />
                           <span className="text-xs font-semibold text-[var(--text-primary)]">{template.title}</span>
                         </div>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-[var(--text-muted)] font-mono">
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-[var(--text-muted)] font-mono">
                           {template.badge}
                         </span>
                       </div>
-                      <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-[var(--text-muted)] line-clamp-2 leading-relaxed">
                         {template.description}
                       </p>
                     </button>

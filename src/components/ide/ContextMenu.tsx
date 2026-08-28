@@ -123,7 +123,7 @@ export function ContextMenu({ target, x, y, activeFilePath, clipboardEntry, assi
     >
       {/* Header — nom cible */}
       <div
-        className="truncate px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-widest"
+        className="truncate px-3 pb-1.5 pt-2 text-xs font-semibold uppercase tracking-widest"
         style={{ color: 'var(--text-muted)' }}
         title={target.path}
       >
@@ -133,7 +133,7 @@ export function ContextMenu({ target, x, y, activeFilePath, clipboardEntry, assi
       {/* Indicateur clipboard actif */}
       {clipboardEntry && (
         <div
-          className="mx-2 mb-1 px-2 py-0.5 rounded text-[9px] flex items-center gap-1.5"
+          className="mx-2 mb-1 px-2 py-0.5 rounded text-xs flex items-center gap-1.5"
           style={{
             backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
             color: 'var(--accent-primary)',
@@ -155,7 +155,7 @@ export function ContextMenu({ target, x, y, activeFilePath, clipboardEntry, assi
             <button
               className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm transition hover:bg-white/10"
               style={{
-                color: action.danger ? '#f87171' : disabled ? 'var(--text-muted)' : 'var(--text-primary)',
+                color: action.danger ? 'var(--color-error)' : disabled ? 'var(--text-muted)' : 'var(--text-primary)',
                 opacity: disabled ? 0.4 : 1,
                 cursor: disabled ? 'not-allowed' : 'pointer',
               }}
@@ -163,7 +163,7 @@ export function ContextMenu({ target, x, y, activeFilePath, clipboardEntry, assi
               title={disabled ? 'Assistant non connecté' : undefined}
               onClick={() => { if (!disabled) { onAction(action.id, target); onClose(); } }}
             >
-              <span style={{ color: action.danger ? '#f87171' : 'var(--text-muted)' }}>
+              <span style={{ color: action.danger ? 'var(--color-error)' : 'var(--text-muted)' }}>
                 {action.icon}
               </span>
               {action.label}

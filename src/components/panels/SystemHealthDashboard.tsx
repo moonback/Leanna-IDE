@@ -47,15 +47,15 @@ function formatUptime(hours: number): string {
 }
 
 function scoreColor(score: number): string {
-  if (score >= 80) return '#4ade80';
-  if (score >= 50) return '#facc15';
-  return '#f87171';
+  if (score >= 80) return 'var(--color-success)';
+  if (score >= 50) return 'var(--color-warning)';
+  return 'var(--color-error)';
 }
 
 function memColor(pct: number): string {
-  if (pct > 85) return '#f87171';
-  if (pct > 60) return '#facc15';
-  return '#4ade80';
+  if (pct > 85) return 'var(--color-error)';
+  if (pct > 60) return 'var(--color-warning)';
+  return 'var(--color-success)';
 }
 
 function relativeTime(dateStr: string): string {
@@ -85,18 +85,18 @@ function StatCard({
     <div
       className="rounded-2xl p-3.5 flex flex-col gap-2"
       style={{
-        backgroundColor: `${color}0B`,
-        border: `1px solid ${color}22`,
+        backgroundColor: 'color-mix(in srgb, ' + color + ' 7%, transparent)',
+        border: '1px solid color-mix(in srgb, ' + color + ' 13%, transparent)',
       }}
     >
       <div className="flex items-center gap-2">
         <span
           className="w-7 h-7 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: `${color}1A`, color }}
+          style={{ backgroundColor: 'color-mix(in srgb, ' + color + ' 10%, transparent)', color }}
         >
           {icon}
         </span>
-        <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
           {label}
         </span>
       </div>
@@ -104,7 +104,7 @@ function StatCard({
         <span className="text-xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>
           {value}
         </span>
-        {sub && <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{sub}</span>}
+        {sub && <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{sub}</span>}
       </div>
     </div>
   );
@@ -113,7 +113,7 @@ function StatCard({
 // ─── Service Badge ───────────────────────────────────────────────────────────
 
 function ServiceBadge({ name, label, ok }: ServiceHealth) {
-  const color = ok ? '#4ade80' : '#f87171';
+  const color = ok ? 'var(--color-success)' : 'var(--color-error)';
   return (
     <div
       className="flex items-center gap-2 px-3 py-2 rounded-xl"
@@ -126,11 +126,11 @@ function ServiceBadge({ name, label, ok }: ServiceHealth) {
         ? <CheckCircle2 size={14} style={{ color }} />
         : <XCircle size={14} style={{ color }} />
       }
-      <span className="text-[11px] font-semibold flex-1" style={{ color: 'var(--text-primary)' }}>
+      <span className="text-sm font-semibold flex-1" style={{ color: 'var(--text-primary)' }}>
         {label}
       </span>
       <span
-        className="text-[9px] font-bold uppercase tracking-wider"
+        className="text-xs font-bold uppercase tracking-wider"
         style={{ color }}
       >
         {ok ? 'OK' : 'DOWN'}
@@ -163,7 +163,7 @@ function HealthScoreRing({ score }: { score: number }) {
           </span>
         </div>
       </div>
-      <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+      <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
         Santé globale
       </span>
     </div>
@@ -178,10 +178,10 @@ function MemBar({ used, total }: { used: number; total: number }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+        <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
           {formatBytes(used)} / {formatBytes(total)}
         </span>
-        <span className="text-[10px] font-mono font-bold" style={{ color }}>
+        <span className="text-xs font-mono font-bold" style={{ color }}>
           {pct}%
         </span>
       </div>
@@ -271,15 +271,15 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
         <div className="flex items-center gap-2">
           <span
             className="w-7 h-7 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: '#4ade801A', color: '#4ade80' }}
+            style={{ backgroundColor: 'color-mix(in srgb, var(--color-success) 10%, transparent)', color: 'var(--color-success)' }}
           >
             <Activity size={14} />
           </span>
           <div className="flex flex-col leading-tight">
-            <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+            <span className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
               Santé Système
             </span>
-            <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
               {report ? relativeTime(report.generatedAt) : 'Chargement…'}
             </span>
           </div>
@@ -294,17 +294,17 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} style={{ color: 'var(--text-muted)' }} />
           </button>
           <label
-            className="flex items-center gap-1.5 px-2 h-7 rounded-lg text-[10px] cursor-pointer"
+            className="flex items-center gap-1.5 px-2 h-7 rounded-lg text-xs cursor-pointer"
             style={{
-              backgroundColor: autoRefresh ? '#22d3ee15' : 'transparent',
-              border: `1px solid ${autoRefresh ? '#22d3ee33' : 'var(--border-base)'}`,
-              color: autoRefresh ? '#22d3ee' : 'var(--text-muted)',
+              backgroundColor: autoRefresh ? 'color-mix(in srgb, var(--accent-secondary) 9%, transparent)' : 'transparent',
+              border: `1px solid ${autoRefresh ? 'color-mix(in srgb, var(--accent-secondary) 20%, transparent)' : 'var(--border-base)'}`,
+              color: autoRefresh ? 'var(--accent-secondary)' : 'var(--text-muted)',
             }}
             title="Actualisation auto toutes les 30s"
           >
             <span
               className="w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: autoRefresh ? '#22d3ee' : 'var(--text-dimmed)' }}
+              style={{ backgroundColor: autoRefresh ? 'var(--accent-secondary)' : 'var(--text-dimmed)' }}
             />
             Auto
             <input
@@ -320,7 +320,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
               className="p-1.5 rounded-lg hover:bg-white/5 transition flex items-center justify-center"
               title="Fermer"
             >
-              <span className="text-[12px] leading-none" style={{ color: 'var(--text-dimmed)' }}>✕</span>
+              <span className="text-sm leading-none" style={{ color: 'var(--text-dimmed)' }}>✕</span>
             </button>
           )}
         </div>
@@ -331,7 +331,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
         {loading && (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
             <Loader2 size={24} className="animate-spin" style={{ color: 'var(--text-dimmed)' }} />
-            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
               Analyse du système…
             </span>
           </div>
@@ -340,13 +340,13 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
         {error && !loading && (
           <div
             className="p-4 rounded-2xl"
-            style={{ backgroundColor: '#f8717110', border: '1px solid #f8717133', color: '#f87171' }}
+            style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 20%, transparent)', color: 'var(--color-error)' }}
           >
             <div className="flex items-start gap-2">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-[11px] font-semibold">Erreur de chargement</p>
-                <p className="text-[10.5px] mt-1 opacity-90">{error}</p>
+                <p className="text-sm font-semibold">Erreur de chargement</p>
+                <p className="text-sm mt-1 opacity-90">{error}</p>
               </div>
             </div>
           </div>
@@ -363,31 +363,31 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
             <div
               className="rounded-2xl p-3.5 space-y-2"
               style={{
-                backgroundColor: '#818cf80B',
-                border: '1px solid #818cf822',
+                backgroundColor: 'color-mix(in srgb, var(--accent-primary) 7%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent-primary) 13%, transparent)',
               }}
             >
               <div className="flex items-center gap-2 mb-2">
-                <Server size={12} style={{ color: '#818cf8' }} />
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#818cf8' }}>
+                <Server size={12} style={{ color: 'var(--accent-primary)' }} />
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--accent-primary)' }}>
                   Système & Runtime
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[10.5px]">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <div>
-                  <span className="text-[9px] uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Plateforme</span>
+                  <span className="text-xs uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Plateforme</span>
                   <p className="font-semibold font-mono truncate mt-0.5" style={{ color: 'var(--text-primary)' }}>{report.platform}</p>
                 </div>
                 <div>
-                  <span className="text-[9px] uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Architecture</span>
+                  <span className="text-xs uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Architecture</span>
                   <p className="font-semibold font-mono truncate mt-0.5" style={{ color: 'var(--text-primary)' }}>{report.arch}</p>
                 </div>
                 <div>
-                  <span className="text-[9px] uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Kernel</span>
+                  <span className="text-xs uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Kernel</span>
                   <p className="font-semibold font-mono truncate mt-0.5" style={{ color: 'var(--text-primary)' }}>{report.release}</p>
                 </div>
                 <div>
-                  <span className="text-[9px] uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Node.js</span>
+                  <span className="text-xs uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Node.js</span>
                   <p className="font-semibold font-mono truncate mt-0.5" style={{ color: 'var(--text-primary)' }}>{report.nodeVersion}</p>
                 </div>
               </div>
@@ -397,13 +397,13 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
             <div
               className="rounded-2xl p-3.5 space-y-2"
               style={{
-                backgroundColor: '#f59e0b0B',
-                border: '1px solid #f59e0b22',
+                backgroundColor: 'color-mix(in srgb, var(--color-warning) 7%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--color-warning) 13%, transparent)',
               }}
             >
               <div className="flex items-center gap-2 mb-1">
-                <Cpu size={12} style={{ color: '#f59e0b' }} />
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#f59e0b' }}>
+                <Cpu size={12} style={{ color: 'var(--color-warning)' }} />
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--color-warning)' }}>
                   Ressources
                 </span>
               </div>
@@ -412,22 +412,22 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
                   icon={<Cpu size={14} />}
                   label="CPU"
                   value={`${report.cpus} cœurs`}
-                  color="#f59e0b"
+                  color="var(--color-warning)"
                 />
                 <StatCard
                   icon={<Clock size={14} />}
                   label="Uptime"
                   value={formatUptime(report.uptimeHours)}
-                  color="#22d3ee"
+                  color="var(--accent-secondary)"
                 />
               </div>
               <div
                 className="rounded-xl p-3"
-                style={{ backgroundColor: '#f59e0b08', border: '1px solid #f59e0b15' }}
+                style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 3%, transparent)', border: '1px solid color-mix(in srgb, var(--color-warning) 6%, transparent)' }}
               >
                 <div className="flex items-center gap-1.5 mb-2">
                   <MemoryStick size={12} style={{ color: 'var(--text-dimmed)' }} />
-                  <span className="text-[10px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                     Mémoire vive
                   </span>
                 </div>
@@ -442,13 +442,13 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
             <div
               className="rounded-2xl p-3.5 space-y-2"
               style={{
-                backgroundColor: '#22d3ee0B',
-                border: '1px solid #22d3ee22',
+                backgroundColor: 'color-mix(in srgb, var(--accent-secondary) 3%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent-secondary) 9%, transparent)',
               }}
             >
               <div className="flex items-center gap-2 mb-2">
-                <Zap size={12} style={{ color: '#22d3ee' }} />
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#22d3ee' }}>
+                <Zap size={12} style={{ color: 'var(--accent-secondary)' }} />
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--accent-secondary)' }}>
                   Services ({servicesOk}/{services.length})
                 </span>
               </div>
@@ -464,13 +464,13 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
               <div
                 className="rounded-2xl p-3.5 space-y-2"
                 style={{
-                  backgroundColor: '#a78bfa0B',
-                  border: '1px solid #a78bfa22',
+                  backgroundColor: 'color-mix(in srgb, var(--color-accent-alt) 3%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--color-accent-alt) 9%, transparent)',
                 }}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <Puzzle size={12} style={{ color: '#a78bfa' }} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#a78bfa' }}>
+                  <Puzzle size={12} style={{ color: 'var(--color-accent-alt)' }} />
+                  <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--color-accent-alt)' }}>
                     Skills actifs ({report.activeSkills.length})
                   </span>
                 </div>
@@ -478,11 +478,11 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
                   {report.activeSkills.map(s => (
                     <span
                       key={s}
-                      className="px-2 py-0.5 rounded-lg text-[10px] font-mono"
+                      className="px-2 py-0.5 rounded-lg text-xs font-mono"
                       style={{
-                        backgroundColor: '#a78bfa10',
-                        border: '1px solid #a78bfa22',
-                        color: '#a78bfa',
+                        backgroundColor: 'color-mix(in srgb, var(--color-accent-alt) 4%, transparent)',
+                        border: '1px solid color-mix(in srgb, var(--color-accent-alt) 9%, transparent)',
+                        color: 'var(--color-accent-alt)',
                       }}
                     >
                       {s}
@@ -493,7 +493,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
             )}
 
             {/* Footer */}
-            <p className="text-[9px] text-center py-2" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-xs text-center py-2" style={{ color: 'var(--text-dimmed)' }}>
               Généré le {new Date(report.generatedAt).toLocaleString('fr-FR')}
               {autoRefresh && ' · Auto-rafraîchissement actif'}
             </p>

@@ -112,10 +112,10 @@ export function DiffViewer({ filePath, currentContent, theme = 'vs-dark', onClos
                     body: JSON.stringify({ path: filePath, content: currentContent }),
                   }).then(() => onClose());
                 }}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium transition hover:opacity-90"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition hover:opacity-90"
                 style={{
                   backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                  color: '#4ade80',
+                  color: 'var(--color-success)',
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid rgba(34, 197, 94, 0.2)',
                 }}
@@ -130,10 +130,10 @@ export function DiffViewer({ filePath, currentContent, theme = 'vs-dark', onClos
                   window.dispatchEvent(new CustomEvent('jarvis-ide-file-changed', { detail: { path: filePath } }));
                   onClose();
                 }}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium transition hover:opacity-90"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition hover:opacity-90"
                 style={{
                   backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                  color: '#f87171',
+                  color: 'var(--color-error)',
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid rgba(239, 68, 68, 0.2)',
                 }}
@@ -147,7 +147,7 @@ export function DiffViewer({ filePath, currentContent, theme = 'vs-dark', onClos
           <button
             onClick={loadSavedContent}
             disabled={loading}
-            className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] transition hover:bg-white/10 disabled:opacity-50"
+            className="flex items-center gap-1.5 px-2 py-1.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
             title="Actualiser"
             style={{ borderRadius: 'var(--radius-md)' }}
           >

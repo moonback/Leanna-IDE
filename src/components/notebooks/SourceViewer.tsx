@@ -31,8 +31,8 @@ const TYPE_ICONS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  pdf: '#ef4444', text: '#6b7280', markdown: '#8b5cf6', url: '#3b82f6',
-  html: '#06b6d4', youtube: '#ef4444', audio: '#f59e0b', docx: '#2563eb', image: '#10b981',
+  pdf: 'var(--color-error)', text: 'var(--text-muted)', markdown: 'var(--color-accent-alt)', url: 'var(--accent-primary)',
+  html: 'var(--accent-secondary)', youtube: 'var(--color-error)', audio: 'var(--color-warning)', docx: 'var(--accent-primary)', image: 'var(--color-success)',
 };
 
 export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
@@ -98,7 +98,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
               <span
                 className="text-xs px-2 py-0.5 rounded-full font-bold uppercase flex-shrink-0"
                 style={{
-                  backgroundColor: `${TYPE_COLORS[source.type] || '#6b7280'}15`,
+                  backgroundColor: `${TYPE_COLORS[source.type] || 'var(--text-muted)'}15`,
                   color: TYPE_COLORS[source.type] || 'var(--text-dimmed)',
                 }}
               >
@@ -133,7 +133,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
                 className="px-2.5 py-1.5 text-xs font-semibold transition-colors"
                 style={{
                   backgroundColor: viewMode === 'visual' ? 'var(--accent-primary)' : 'transparent',
-                  color: viewMode === 'visual' ? '#fff' : 'var(--text-muted)',
+                  color: viewMode === 'visual' ? 'white' : 'var(--text-muted)',
                 }}
               >
                 🌍 Visuel
@@ -143,7 +143,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
                 className="px-2.5 py-1.5 text-xs font-semibold transition-colors"
                 style={{
                   backgroundColor: viewMode === 'text' ? 'var(--accent-primary)' : 'transparent',
-                  color: viewMode === 'text' ? '#fff' : 'var(--text-muted)',
+                  color: viewMode === 'text' ? 'white' : 'var(--text-muted)',
                 }}
               >
                 📄 Texte
@@ -192,12 +192,12 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
-            <FileText className="w-8 h-8" style={{ color: 'var(--color-error, #ef4444)' }} />
-            <p className="text-sm" style={{ color: 'var(--color-error, #ef4444)' }}>{error}</p>
+            <FileText className="w-8 h-8" style={{ color: 'var(--color-error)' }} />
+            <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>
             <button
               onClick={fetchContent}
               className="px-4 py-2 rounded-full text-xs font-semibold transition active:scale-95"
-              style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+              style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
             >
               Réessayer
             </button>
@@ -230,9 +230,9 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
                 style={{
-                  backgroundColor: '#10b98120',
-                  color: '#10b981',
-                  border: '1px solid #10b98140',
+                  backgroundColor: 'var(--color-success)20',
+                  color: 'var(--color-success)',
+                  border: '1px solid var(--color-success)40',
                 }}
               >
                 📥 Télécharger l'image
@@ -242,11 +242,11 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
             {/* AI description */}
             {content && (
               <div className="space-y-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-dimmed)' }}>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-dimmed)' }}>
                   🤖 Description IA
                 </p>
                 <div
-                  className="prose prose-sm max-w-none text-[13px] leading-relaxed whitespace-pre-wrap p-4 rounded-xl border"
+                  className="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap p-4 rounded-xl border"
                   style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)' }}
                 >
                   {content}
@@ -258,7 +258,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
           <div className="h-full flex flex-col gap-3">
             <div
               className="flex-1 rounded-2xl overflow-hidden border shadow-sm"
-              style={{ borderColor: 'var(--border-base)', backgroundColor: '#fff' }}
+              style={{ borderColor: 'var(--border-base)', backgroundColor: 'white' }}
             >
               <iframe
                 srcDoc={htmlData}

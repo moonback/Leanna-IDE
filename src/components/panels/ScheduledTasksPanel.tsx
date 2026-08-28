@@ -48,7 +48,7 @@ export const ScheduledTasksPanel = React.memo(function ScheduledTasksPanel({ tas
     <Panel title="Tâches planifiées" icon={<Clock3 className="w-4 h-4" />}>
       <div className="flex flex-col gap-2">
         {tasks.length === 0 ? (
-          <div className="rounded-xl border px-3 py-3 text-[11px]" style={{ borderColor: 'var(--border-base)', color: 'var(--text-dimmed)' }}>
+          <div className="rounded-xl border px-3 py-3 text-xs" style={{ borderColor: 'var(--border-base)', color: 'var(--text-dimmed)' }}>
             Aucune tâche planifiée pour le moment.
           </div>
         ) : (
@@ -59,10 +59,10 @@ export const ScheduledTasksPanel = React.memo(function ScheduledTasksPanel({ tas
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{task.name}</span>
-                    <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>{formatInterval(task.intervalMs)}</span>
+                    <span className="text-sm font-mono" style={{ color: 'var(--text-dimmed)' }}>{formatInterval(task.intervalMs)}</span>
                   </div>
-                  <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{task.description || task.actionName}</div>
-                  <div className="flex items-center gap-2 mt-1 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{task.description || task.actionName}</div>
+                  <div className="flex items-center gap-2 mt-1 text-sm" style={{ color: 'var(--text-dimmed)' }}>
                     <span className="inline-flex items-center gap-1"><Circle className="w-2.5 h-2.5" style={{ color: 'var(--accent-primary)' }} />{task.actionName}</span>
                     <span>•</span>
                     <span>Dernière exécution: {formatRelative(task.lastRunAt)}</span>
@@ -72,7 +72,7 @@ export const ScheduledTasksPanel = React.memo(function ScheduledTasksPanel({ tas
                       type="button"
                       onClick={() => runAction(`/api/automation/scheduled-tasks/${task.id}/toggle`)}
                       disabled={busyId === task.id}
-                      className="rounded-md border px-2 py-1 text-[10px] font-semibold disabled:opacity-50"
+                      className="rounded-md border px-2 py-1 text-sm font-semibold disabled:opacity-50"
                       style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
                     >
                       {task.enabled === false ? 'Reprendre' : 'Pause'}
@@ -81,7 +81,7 @@ export const ScheduledTasksPanel = React.memo(function ScheduledTasksPanel({ tas
                       type="button"
                       onClick={() => runAction(`/api/automation/scheduled-tasks/${task.id}/run`)}
                       disabled={busyId === task.id}
-                      className="rounded-md border px-2 py-1 text-[10px] font-semibold disabled:opacity-50"
+                      className="rounded-md border px-2 py-1 text-sm font-semibold disabled:opacity-50"
                       style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
                     >
                       Exécuter
@@ -90,7 +90,7 @@ export const ScheduledTasksPanel = React.memo(function ScheduledTasksPanel({ tas
                       type="button"
                       onClick={() => runAction(`/api/automation/scheduled-tasks/${task.id}`, 'DELETE')}
                       disabled={busyId === task.id}
-                      className="rounded-md border px-2 py-1 text-[10px] font-semibold disabled:opacity-50"
+                      className="rounded-md border px-2 py-1 text-sm font-semibold disabled:opacity-50"
                       style={{ borderColor: 'var(--border-base)', color: 'var(--accent-primary)' }}
                     >
                       Supprimer

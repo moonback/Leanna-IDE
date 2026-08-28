@@ -149,7 +149,7 @@ export function SelfRootSection() {
                 onChange={e => { setPathInput(e.target.value); setFeedback(null); }}
                 onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
                 placeholder="C:\Users\...\mon-projet"
-                className="w-full rounded-lg border pl-8 pr-3 py-2 text-[11px] font-mono transition-colors focus:ring-1 focus:ring-[var(--accent-primary)]"
+                className="w-full rounded-lg border pl-8 pr-3 py-2 text-xs font-mono transition-colors focus:ring-1 focus:ring-[var(--accent-primary)]"
                 style={{
                   backgroundColor: 'var(--bg-input)',
                   borderColor: 'var(--border-base)',
@@ -163,7 +163,7 @@ export function SelfRootSection() {
               <button
                 type="button"
                 onClick={handleBrowse}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-colors hover:opacity-80 flex-shrink-0"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors hover:opacity-80 flex-shrink-0"
                 style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--accent-primary)' }}
                 title="Parcourir"
               >
@@ -182,8 +182,8 @@ export function SelfRootSection() {
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               whileTap={{ scale: 0.97 }}
-              className="flex items-center justify-center gap-2 w-full rounded-lg py-2.5 mt-2 text-[11px] font-bold transition-all disabled:opacity-50"
-              style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+              className="flex items-center justify-center gap-2 w-full rounded-lg py-2.5 mt-2 text-xs font-bold transition-all disabled:opacity-50"
+              style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
             >
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               {saving ? 'Application…' : 'Appliquer le nouveau chemin'}
@@ -198,7 +198,7 @@ export function SelfRootSection() {
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
-              className="rounded-lg px-3 py-2 text-[11px] font-medium"
+              className="rounded-lg px-3 py-2 text-xs font-medium"
               style={{
                 backgroundColor: feedback.type === 'success'
                   ? 'color-mix(in srgb, var(--color-success) 10%, transparent)'
@@ -229,9 +229,9 @@ export function SelfRootSection() {
             <InfoRow label="Statut" value={
               <span className="flex items-center gap-1.5">
                 {status.gitStatus === 'clean' ? (
-                  <><CheckCircle2 className="w-3 h-3" style={{ color: '#4ade80' }} /> Propre</>
+                  <><CheckCircle2 className="w-3 h-3" style={{ color: 'var(--color-success)' }} /> Propre</>
                 ) : status.gitStatus === 'dirty' ? (
-                  <><AlertTriangle className="w-3 h-3" style={{ color: '#f59e0b' }} /> Modifié</>
+                  <><AlertTriangle className="w-3 h-3" style={{ color: 'var(--color-warning)' }} /> Modifié</>
                 ) : (
                   <span style={{ color: 'var(--text-dimmed)' }}>Inconnu</span>
                 )}
@@ -243,7 +243,7 @@ export function SelfRootSection() {
             <div className="flex justify-end mt-1">
               <button
                 onClick={fetchStatus}
-                className="flex items-center gap-1 text-[9px] font-medium transition-colors hover:opacity-80"
+                className="flex items-center gap-1 text-xs font-medium transition-colors hover:opacity-80"
                 style={{ color: 'var(--text-muted)' }}
               >
                 <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Rafraîchir
@@ -259,8 +259,8 @@ export function SelfRootSection() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="rounded-lg px-3 py-2 text-[11px] font-medium"
-              style={{ backgroundColor: 'color-mix(in srgb, #f59e0b 10%, transparent)', color: '#fbbf24' }}
+              className="rounded-lg px-3 py-2 text-xs font-medium"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', color: 'var(--color-warning)' }}
             >
               ⚠️ {error}
             </motion.div>
@@ -289,15 +289,15 @@ export function SelfRootSection() {
               <div className="flex items-center gap-3 mb-4">
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: 'color-mix(in srgb, #f59e0b 15%, transparent)' }}
+                  style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 15%, transparent)' }}
                 >
-                  <ShieldAlert className="w-5 h-5" style={{ color: '#f59e0b' }} />
+                  <ShieldAlert className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                     Changement de repo
                   </h3>
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                     Confirmer le changement du répertoire de travail
                   </p>
                 </div>
@@ -310,14 +310,14 @@ export function SelfRootSection() {
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-[10px] font-medium flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Avant</span>
-                    <span className="text-[10px] font-mono truncate" style={{ color: 'var(--text-secondary)' }}>
+                    <span className="text-sm font-medium flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Avant</span>
+                    <span className="text-sm font-mono truncate" style={{ color: 'var(--text-secondary)' }}>
                       {status?.rootPath || '—'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-[10px] font-medium flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Après</span>
-                    <span className="text-[11px] font-mono font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    <span className="text-sm font-medium flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Après</span>
+                    <span className="text-xs font-mono font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                       {pendingPath}
                     </span>
                   </div>
@@ -347,7 +347,7 @@ export function SelfRootSection() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
                   className="flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold text-white transition-all"
-                  style={{ backgroundColor: '#f59e0b', boxShadow: '0 4px 12px rgba(245,158,11,0.3)' }}
+                  style={{ backgroundColor: 'var(--color-warning)', boxShadow: '0 4px 12px rgba(245,158,11,0.3)' }}
                 >
                   <Check className="w-3.5 h-3.5" />
                   Confirmer

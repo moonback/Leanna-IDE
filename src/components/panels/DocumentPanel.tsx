@@ -238,7 +238,7 @@ export function DocumentPanel() {
           <span className="text-xs font-bold tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
             Documents
           </span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-dimmed)' }}>
+          <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-dimmed)' }}>
             {documents.length}
           </span>
         </div>
@@ -283,7 +283,7 @@ export function DocumentPanel() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className="px-2.5 py-1 rounded-md text-[10px] font-medium transition"
+            className="px-2.5 py-1 rounded-md text-xs font-medium transition"
             style={{
               backgroundColor: activeTab === tab ? 'var(--accent-primary-15)' : 'transparent',
               color: activeTab === tab ? 'var(--accent-primary)' : 'var(--text-muted)',
@@ -311,7 +311,7 @@ export function DocumentPanel() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 placeholder="Rechercher dans les documents…"
-                className="flex-1 bg-transparent text-[11px] outline-none"
+                className="flex-1 bg-transparent text-sm outline-none"
                 style={{ color: 'var(--text-primary)' }}
               />
               {searchResults !== null && (
@@ -330,14 +330,14 @@ export function DocumentPanel() {
           className="px-3 py-2 flex items-center gap-2 flex-shrink-0"
           style={{ backgroundColor: 'var(--accent-primary-10)', borderBottom: '1px solid var(--border-base)' }}
         >
-          <span className="text-[10px] font-medium" style={{ color: 'var(--accent-primary)' }}>
+          <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
             {selectedDocs.size} sélectionné{selectedDocs.size > 1 ? 's' : ''}
           </span>
           <div className="flex-1" />
           <button
             onClick={handleAnalyzeLinks}
             disabled={analyzing || selectedDocs.size < 2}
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition disabled:opacity-30"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition disabled:opacity-30"
             style={{ backgroundColor: 'var(--accent-primary-15)', color: 'var(--accent-primary)' }}
             title="Analyser les liens entre les documents sélectionnés"
           >
@@ -347,7 +347,7 @@ export function DocumentPanel() {
           <button
             onClick={handleSynthesize}
             disabled={analyzing}
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition disabled:opacity-30"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition disabled:opacity-30"
             style={{ backgroundColor: 'var(--accent-primary-15)', color: 'var(--accent-primary)' }}
             title="Générer une synthèse croisée"
           >
@@ -367,8 +367,8 @@ export function DocumentPanel() {
             className="px-3 py-2 flex-shrink-0"
           >
             <div
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px]"
-              style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#f87171' }}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 20%, transparent)', color: 'var(--color-error)' }}
             >
               <AlertCircle size={11} />
               <span className="flex-1 truncate">{error}</span>
@@ -409,7 +409,7 @@ export function DocumentPanel() {
           <button
             onClick={handleAnalyzeLinks}
             disabled={analyzing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition disabled:opacity-30"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
             style={{ backgroundColor: 'var(--accent-primary-15)', color: 'var(--accent-primary)' }}
           >
             {analyzing ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
@@ -443,10 +443,10 @@ function DocumentList({ documents, selectedDocs, expandedDoc, onToggleSelect, on
           <FileText size={20} style={{ color: 'var(--text-dimmed)' }} />
         </div>
         <div>
-          <p className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
             Aucun document
           </p>
-          <p className="text-[10px] mt-1" style={{ color: 'var(--text-dimmed)' }}>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-dimmed)' }}>
             Uploadez des PDF, images ou fichiers texte pour les analyser et croiser.
           </p>
         </div>
@@ -503,15 +503,15 @@ function DocumentItem({ doc, selected, expanded, onToggleSelect, onToggleExpand,
             backgroundColor: selected ? 'var(--accent-primary)' : 'transparent',
           }}
         >
-          {selected && <span className="text-[8px] text-white font-bold">✓</span>}
+          {selected && <span className="text-xs text-white font-bold">✓</span>}
         </button>
 
         {/* Icon */}
         <div className="flex-shrink-0">
           {isImage ? (
-            <FileImage size={13} style={{ color: '#a78bfa' }} />
+            <FileImage size={13} style={{ color: 'var(--color-accent-alt)' }} />
           ) : (
-            <FileText size={13} style={{ color: '#60a5fa' }} />
+            <FileText size={13} style={{ color: 'var(--color-info)' }} />
           )}
         </div>
 
@@ -519,14 +519,14 @@ function DocumentItem({ doc, selected, expanded, onToggleSelect, onToggleExpand,
         <button onClick={onToggleExpand} className="flex-1 text-left min-w-0">
           <div className="flex items-center gap-1.5">
             {expanded ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
-            <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+            <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
               {doc.fileName}
             </span>
           </div>
           <div className="flex items-center gap-2 mt-0.5 ml-3">
-            <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{dateStr}</span>
+            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{dateStr}</span>
             {doc.keywords.length > 0 && (
-              <span className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
                 {doc.keywords.slice(0, 3).join(', ')}
               </span>
             )}
@@ -539,7 +539,7 @@ function DocumentItem({ doc, selected, expanded, onToggleSelect, onToggleExpand,
           className="p-1 rounded opacity-0 group-hover:opacity-100 transition hover:bg-red-500/10"
           title="Supprimer"
         >
-          <Trash2 size={11} style={{ color: '#f87171' }} />
+          <Trash2 size={11} style={{ color: 'var(--color-error)' }} />
         </button>
       </div>
 
@@ -553,7 +553,7 @@ function DocumentItem({ doc, selected, expanded, onToggleSelect, onToggleExpand,
             className="overflow-hidden"
           >
             <div className="mt-2 ml-6 pl-2" style={{ borderLeft: '1px solid var(--border-base)' }}>
-              <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                 {doc.summary}
               </p>
               {doc.tags.length > 0 && (
@@ -562,7 +562,7 @@ function DocumentItem({ doc, selected, expanded, onToggleSelect, onToggleExpand,
                   {doc.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="text-[9px] px-1.5 py-0.5 rounded-full"
+                      className="text-xs px-1.5 py-0.5 rounded-full"
                       style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
                     >
                       {tag}
@@ -590,7 +590,7 @@ function LinksList({ links, documents }: LinksListProps) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center gap-3">
         <Link2 size={20} style={{ color: 'var(--text-dimmed)' }} />
-        <p className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+        <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
           Aucun lien détecté. Lancez une analyse pour découvrir les connexions.
         </p>
       </div>
@@ -600,11 +600,11 @@ function LinksList({ links, documents }: LinksListProps) {
   const getDocName = (id: string) => documents.find((d) => d.id === id)?.fileName || id;
 
   const linkTypeColors: Record<string, string> = {
-    thematic: '#60a5fa',
-    complementary: '#34d399',
-    contradictory: '#f87171',
-    sequential: '#fbbf24',
-    reference: '#a78bfa',
+    thematic: 'var(--color-info)',
+    complementary: 'var(--color-success)',
+    contradictory: 'var(--color-error)',
+    sequential: 'var(--color-warning)',
+    reference: 'var(--color-accent-alt)',
   };
 
   const linkTypeLabels: Record<string, string> = {
@@ -625,24 +625,24 @@ function LinksList({ links, documents }: LinksListProps) {
         >
           <div className="flex items-center gap-2 mb-1.5">
             <span
-              className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+              className="text-xs px-1.5 py-0.5 rounded-full font-medium"
               style={{
-                backgroundColor: `${linkTypeColors[link.linkType] || '#6b7280'}20`,
-                color: linkTypeColors[link.linkType] || '#6b7280',
+                backgroundColor: `${linkTypeColors[link.linkType] || 'var(--text-muted)'}20`,
+                color: linkTypeColors[link.linkType] || 'var(--text-muted)',
               }}
             >
               {linkTypeLabels[link.linkType] || link.linkType}
             </span>
-            <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
               {Math.round(link.confidence * 100)}%
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+          <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
             <span className="font-medium truncate max-w-[40%]">{getDocName(link.docA)}</span>
             <Link2 size={9} style={{ color: 'var(--text-dimmed)' }} />
             <span className="font-medium truncate max-w-[40%]">{getDocName(link.docB)}</span>
           </div>
-          <p className="text-[9px] mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
             {link.description}
           </p>
         </div>
@@ -663,10 +663,10 @@ function AnalysisView({ result }: AnalysisViewProps) {
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center gap-3">
         <Sparkles size={20} style={{ color: 'var(--text-dimmed)' }} />
         <div>
-          <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
             Pas encore d'analyse
           </p>
-          <p className="text-[10px] mt-1" style={{ color: 'var(--text-dimmed)' }}>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-dimmed)' }}>
             Sélectionnez des documents et lancez une analyse ou une synthèse.
           </p>
         </div>
@@ -679,14 +679,14 @@ function AnalysisView({ result }: AnalysisViewProps) {
       {/* Documents analyzed */}
       {result.documents_analyzed.length > 0 && (
         <div>
-          <p className="text-[9px] font-medium uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-dimmed)' }}>
+          <p className="text-xs font-medium uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-dimmed)' }}>
             Documents analysés
           </p>
           <div className="flex flex-wrap gap-1">
             {result.documents_analyzed.map((d) => (
               <span
                 key={d.id}
-                className="text-[9px] px-2 py-0.5 rounded-full"
+                className="text-xs px-2 py-0.5 rounded-full"
                 style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
               >
                 {d.fileName}
@@ -699,12 +699,12 @@ function AnalysisView({ result }: AnalysisViewProps) {
       {/* Links found */}
       {result.links.length > 0 && (
         <div>
-          <p className="text-[9px] font-medium uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-dimmed)' }}>
+          <p className="text-xs font-medium uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-dimmed)' }}>
             {result.links.length} lien{result.links.length > 1 ? 's' : ''} trouvé{result.links.length > 1 ? 's' : ''}
           </p>
           <div className="space-y-1.5">
             {result.links.map((link, idx) => (
-              <div key={idx} className="text-[10px] flex items-start gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <div key={idx} className="text-xs flex items-start gap-1.5" style={{ color: 'var(--text-secondary)' }}>
                 <Link2 size={9} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
                 <span>{link.description}</span>
               </div>
@@ -716,11 +716,11 @@ function AnalysisView({ result }: AnalysisViewProps) {
       {/* Synthesis */}
       {result.synthesis && (
         <div>
-          <p className="text-[9px] font-medium uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-dimmed)' }}>
+          <p className="text-xs font-medium uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-dimmed)' }}>
             Synthèse
           </p>
           <div
-            className="text-[10px] leading-relaxed whitespace-pre-wrap rounded-lg p-3"
+            className="text-xs leading-relaxed whitespace-pre-wrap rounded-lg p-3"
             style={{
               color: 'var(--text-secondary)',
               backgroundColor: 'var(--bg-secondary)',

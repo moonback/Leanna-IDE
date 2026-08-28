@@ -65,32 +65,32 @@ interface Props {
 }
 
 const DOC_TYPES = [
-  { key: 'full-report', label: 'Rapport complet', icon: FileBarChart, desc: 'Rapport pro : résumé exécutif, analyse, recommandations', color: '#dc2626' },
-  { key: 'summary', label: 'Résumé', icon: FileText, desc: 'Synthèse structurée des sources', color: '#3b82f6' },
-  { key: 'faq', label: 'FAQ', icon: HelpCircle, desc: '15-20 questions/réponses', color: '#8b5cf6' },
-  { key: 'study-guide', label: 'Guide d\'étude', icon: GraduationCap, desc: 'Concepts, quiz, résumé', color: '#10b981' },
-  { key: 'briefing', label: 'Briefing', icon: Briefcase, desc: 'Document exécutif concis', color: '#f59e0b' },
-  { key: 'timeline', label: 'Chronologie', icon: Clock, desc: 'Événements et jalons', color: '#ef4444' },
-  { key: 'outline', label: 'Plan', icon: List, desc: 'Structure hiérarchique', color: '#06b6d4' },
-  { key: 'mindmap', label: 'Carte mentale', icon: Brain, desc: 'Mindmap visuelle Mermaid', color: '#ec4899' },
-  { key: 'infographic', label: 'Infographie', icon: Lightbulb, desc: 'Visuel professionnel généré par IA', color: '#f97316' },
-  { key: 'swot', label: 'Analyse SWOT', icon: Target, desc: 'Forces, Faiblesses, Opportunités, Menaces', color: '#14b8a6' },
-  { key: 'glossary', label: 'Glossaire', icon: BookOpen, desc: 'Termes techniques définis', color: '#6366f1' },
-  { key: 'roadmap', label: 'Roadmap', icon: Zap, desc: 'Roadmap projet auto-générée (business plan, étude de marché)', color: '#f97316' },
+  { key: 'full-report', label: 'Rapport complet', icon: FileBarChart, desc: 'Rapport pro : résumé exécutif, analyse, recommandations', color: 'var(--color-error)' },
+  { key: 'summary', label: 'Résumé', icon: FileText, desc: 'Synthèse structurée des sources', color: 'var(--accent-primary)' },
+  { key: 'faq', label: 'FAQ', icon: HelpCircle, desc: '15-20 questions/réponses', color: 'var(--color-accent-alt)' },
+  { key: 'study-guide', label: 'Guide d\'étude', icon: GraduationCap, desc: 'Concepts, quiz, résumé', color: 'var(--color-success)' },
+  { key: 'briefing', label: 'Briefing', icon: Briefcase, desc: 'Document exécutif concis', color: 'var(--color-warning)' },
+  { key: 'timeline', label: 'Chronologie', icon: Clock, desc: 'Événements et jalons', color: 'var(--color-error)' },
+  { key: 'outline', label: 'Plan', icon: List, desc: 'Structure hiérarchique', color: 'var(--accent-secondary)' },
+  { key: 'mindmap', label: 'Carte mentale', icon: Brain, desc: 'Mindmap visuelle Mermaid', color: 'var(--color-error)' },
+  { key: 'infographic', label: 'Infographie', icon: Lightbulb, desc: 'Visuel professionnel généré par IA', color: 'var(--color-warning)' },
+  { key: 'swot', label: 'Analyse SWOT', icon: Target, desc: 'Forces, Faiblesses, Opportunités, Menaces', color: 'var(--color-info)' },
+  { key: 'glossary', label: 'Glossaire', icon: BookOpen, desc: 'Termes techniques définis', color: 'var(--color-accent-alt)' },
+  { key: 'roadmap', label: 'Roadmap', icon: Zap, desc: 'Roadmap projet auto-générée (business plan, étude de marché)', color: 'var(--color-warning)' },
 ];
 
 /** Types de RAPPORTS disponibles dans le modal */
 const REPORT_TYPES = [
-  { key: 'report-business', label: 'Business Plan', icon: Briefcase, desc: 'Vision, modèle économique, stratégie et projections', color: '#f59e0b' },
-  { key: 'report-market', label: 'Étude de marché', icon: Target, desc: 'Taille du marché, segments, tendances, concurrence', color: '#14b8a6' },
-  { key: 'report-technical', label: 'Rapport technique', icon: FileBarChart, desc: 'Architecture, choix techniques, spécifications', color: '#3b82f6' },
-  { key: 'report-competitive', label: 'Analyse concurrentielle', icon: Target, desc: 'Positionnement, forces/faiblesses des concurrents', color: '#8b5cf6' },
-  { key: 'report-financial', label: 'Rapport financier', icon: FileBarChart, desc: 'Projections, coûts, rentabilité, KPIs', color: '#10b981' },
-  { key: 'report-marketing', label: 'Plan marketing', icon: Sparkles, desc: 'Stratégie d\'acquisition, canaux, messaging', color: '#ec4899' },
-  { key: 'report-product', label: 'Rapport produit', icon: List, desc: 'Roadmap, fonctionnalités, priorisation, UX', color: '#06b6d4' },
-  { key: 'report-risk', label: 'Analyse des risques', icon: Target, desc: 'Risques identifiés, probabilité, mitigation', color: '#ef4444' },
-  { key: 'report-executive', label: 'Synthèse exécutive', icon: Briefcase, desc: 'Résumé décisionnel pour dirigeants', color: '#dc2626' },
-  { key: 'report-project', label: 'Rapport de projet', icon: Clock, desc: 'Avancement, livrables, jalons, blocages', color: '#6366f1' },
+  { key: 'report-business', label: 'Business Plan', icon: Briefcase, desc: 'Vision, modèle économique, stratégie et projections', color: 'var(--color-warning)' },
+  { key: 'report-market', label: 'Étude de marché', icon: Target, desc: 'Taille du marché, segments, tendances, concurrence', color: 'var(--color-info)' },
+  { key: 'report-technical', label: 'Rapport technique', icon: FileBarChart, desc: 'Architecture, choix techniques, spécifications', color: 'var(--accent-primary)' },
+  { key: 'report-competitive', label: 'Analyse concurrentielle', icon: Target, desc: 'Positionnement, forces/faiblesses des concurrents', color: 'var(--color-accent-alt)' },
+  { key: 'report-financial', label: 'Rapport financier', icon: FileBarChart, desc: 'Projections, coûts, rentabilité, KPIs', color: 'var(--color-success)' },
+  { key: 'report-marketing', label: 'Plan marketing', icon: Sparkles, desc: 'Stratégie d\'acquisition, canaux, messaging', color: 'var(--color-error)' },
+  { key: 'report-product', label: 'Rapport produit', icon: List, desc: 'Roadmap, fonctionnalités, priorisation, UX', color: 'var(--accent-secondary)' },
+  { key: 'report-risk', label: 'Analyse des risques', icon: Target, desc: 'Risques identifiés, probabilité, mitigation', color: 'var(--color-error)' },
+  { key: 'report-executive', label: 'Synthèse exécutive', icon: Briefcase, desc: 'Résumé décisionnel pour dirigeants', color: 'var(--color-error)' },
+  { key: 'report-project', label: 'Rapport de projet', icon: Clock, desc: 'Avancement, livrables, jalons, blocages', color: 'var(--color-accent-alt)' },
 ];
 
 /** Render markdown-like content with Mermaid diagram support */
@@ -112,7 +112,7 @@ function renderGeneratedContent(content: string): JSX.Element {
           return (
             <pre
               key={i}
-              className="px-4 py-3 rounded-xl text-[11px] overflow-x-auto font-mono"
+              className="px-4 py-3 rounded-xl text-xs overflow-x-auto font-mono"
               style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
             >
               <code>{code}</code>
@@ -135,7 +135,7 @@ function renderGeneratedContent(content: string): JSX.Element {
                   </div>
                 );
               }
-              if (line.startsWith('#### ')) return <h5 key={j} className="text-[11px] font-bold mt-3 mb-0.5" style={{ color: 'var(--text-primary)' }}>{line.slice(5)}</h5>;
+              if (line.startsWith('#### ')) return <h5 key={j} className="text-xs font-bold mt-3 mb-0.5" style={{ color: 'var(--text-primary)' }}>{line.slice(5)}</h5>;
               if (line.startsWith('### ')) return <h4 key={j} className="text-xs font-bold mt-4 mb-1" style={{ color: 'var(--text-primary)' }}>{line.slice(4)}</h4>;
               if (line.startsWith('## ')) return <h3 key={j} className="text-sm font-bold mt-5 mb-1.5" style={{ color: 'var(--text-primary)' }}>{line.slice(3)}</h3>;
               if (line.startsWith('# ')) return <h2 key={j} className="text-base font-bold mt-6 mb-2" style={{ color: 'var(--text-primary)' }}>{line.slice(2)}</h2>;
@@ -235,9 +235,9 @@ function renderInfographicContent(content: string): JSX.Element {
           onClick={handleDownload}
           className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
           style={{
-            backgroundColor: '#f9731620',
-            color: '#f97316',
-            border: '1px solid #f9731640',
+            backgroundColor: 'color-mix(in srgb, var(--color-warning) 12%, transparent)',
+            color: 'var(--color-warning)',
+            border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)',
           }}
         >
           📥 Télécharger PNG
@@ -362,7 +362,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
   // Fonction utilitaire pour obtenir la couleur d'un type de document
   const getDocTypeColor = useCallback((typeKey: string) => {
     const docType = DOC_TYPES.find(t => t.key === typeKey) || REPORT_TYPES.find(t => t.key === typeKey);
-    return docType?.color || '#6b7280';
+    return docType?.color || 'var(--text-muted)';
   }, []);
 
   // Motion : spring critically-damped par défaut, fondu court si l'utilisateur
@@ -802,7 +802,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
           <button
             onClick={() => setShowCustomPrompt(!showCustomPrompt)}
             className="notebook-chip"
-            style={showCustomPrompt || customInstructions.trim() ? { borderColor: '#f59e0b', color: '#f59e0b', background: 'rgba(245,158,11,0.08)' } : {}}
+            style={showCustomPrompt || customInstructions.trim() ? { borderColor: 'var(--color-warning)', color: 'var(--color-warning)', background: 'color-mix(in srgb, var(--color-warning) 8%, transparent)' } : {}}
           >
             <PenLine className="w-3 h-3" />
             Prompt
@@ -925,7 +925,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                               ) : task.status === 'completed' ? (
                                 <CheckCircle2 className="w-2.5 h-2.5" style={{ color }} />
                               ) : task.status === 'error' ? (
-                                <X className="w-2.5 h-2.5" style={{ color: '#ef4444' }} />
+                                <X className="w-2.5 h-2.5" style={{ color: 'var(--color-error)' }} />
                               ) : (
                                 <Icon className="w-2.5 h-2.5" style={{ color }} />
                               )}
@@ -961,7 +961,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                                 className="p-1 rounded hover:bg-white/5 transition-colors"
                                 title="Réessayer"
                               >
-                                <RefreshCw className="w-2.5 h-2.5" style={{ color: '#f59e0b' }} />
+                                <RefreshCw className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} />
                               </button>
                             )}
                             {index > 0 && task.status === 'pending' && (
@@ -973,7 +973,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                                 className="p-1 rounded hover:bg-white/5 transition-colors"
                                 title="Annuler"
                               >
-                                <X className="w-2.5 h-2.5" style={{ color: '#ef4444' }} />
+                                <X className="w-2.5 h-2.5" style={{ color: 'var(--color-error)' }} />
                               </button>
                             )}
                           </div>
@@ -1045,7 +1045,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 onChange={e => setCustomInstructions(e.target.value)}
                 placeholder="Ex: Ton formel, focus technique, ajoute des exemples..."
                 rows={2}
-                className="w-full px-3 py-2.5 rounded-full text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[#f59e0b]"
+                className="w-full px-3 py-2.5 rounded-full text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[var(--color-warning)]"
                 style={{
                   backgroundColor: 'var(--bg-panel)',
                   border: '1px solid var(--border-base)',
@@ -1077,26 +1077,26 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
             disabled={sources.length === 0}
             className="w-full flex items-center gap-2.5 p-2.5 rounded-lg border transition-all disabled:opacity-40 active:scale-[0.98] hover:shadow-sm"
             style={{
-              borderColor: '#dc262630',
-              backgroundColor: '#dc262608',
+              borderColor: 'color-mix(in srgb, var(--color-error) 25%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--color-error) 8%, transparent)',
             }}
             title="Choisir un type de rapport • Suggestions IA incluses"
           >
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: '#dc262612', border: '1px solid #dc262625' }}
+              style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 25%, transparent)' }}
             >
-              <FileBarChart className="w-4 h-4" style={{ color: '#dc2626' }} />
+              <FileBarChart className="w-4 h-4" style={{ color: 'var(--color-error)' }} />
             </div>
             <div className="min-w-0 flex-1 text-left">
-              <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                 Rapport complet
               </p>
-              <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
                 Types avancés
               </p>
             </div>
-            <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#dc2626' }} />
+            <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-error)' }} />
           </button>
 
           {/* Types rapides — 3 par ligne — Design compact et moderne */}
@@ -1138,7 +1138,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   </div>
 
                   {/* Label — Plus petit et centré */}
-                  <span className="text-[10px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                  <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                     {label}
                   </span>
 
@@ -1211,15 +1211,21 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className="text-xs px-2 py-0.5 rounded-full font-bold uppercase"
-                    style={{
-                      backgroundColor: `${(DOC_TYPES.find(t => t.key === selectedDoc.type) || REPORT_TYPES.find(t => t.key === selectedDoc.type))?.color || '#6b7280'}15`,
-                      color: (DOC_TYPES.find(t => t.key === selectedDoc.type) || REPORT_TYPES.find(t => t.key === selectedDoc.type))?.color || 'var(--text-dimmed)',
-                    }}
-                  >
-                    {(DOC_TYPES.find(t => t.key === selectedDoc.type) || REPORT_TYPES.find(t => t.key === selectedDoc.type))?.label || selectedDoc.type}
-                  </span>
+                  {(() => {
+                    const docType = DOC_TYPES.find(t => t.key === selectedDoc.type) || REPORT_TYPES.find(t => t.key === selectedDoc.type);
+                    const docColor = docType?.color || 'var(--text-muted)';
+                    return (
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full font-bold uppercase"
+                        style={{
+                          backgroundColor: `color-mix(in srgb, ${docColor} 15%, transparent)`,
+                          color: docColor,
+                        }}
+                      >
+                        {docType?.label || selectedDoc.type}
+                      </span>
+                    );
+                  })()}
                   <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                     {new Date(selectedDoc.createdAt).toLocaleString('fr-FR')}
                   </span>
@@ -1271,7 +1277,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                   <button
                     onClick={() => setShowSlideModal(true)}
                     className="p-2 rounded-lg border transition-all hover:bg-white/5 active:scale-95"
-                    style={{ borderColor: '#3b82f640', color: '#3b82f6' }}
+                    style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 25%, transparent)', color: 'var(--accent-primary)' }}
                     title="Générer une présentation Reveal.js"
                   >
                     <Presentation className="w-3.5 h-3.5" />
@@ -1336,7 +1342,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
             {sources.length === 0 && (
               <p
                 className="text-xs px-4 py-2 rounded-full"
-                style={{ backgroundColor: '#f59e0b10', color: '#f59e0b', border: '1px solid #f59e0b30' }}
+                style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', color: 'var(--color-warning)', border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)' }}
               >
                 ⚠️ Ajoutez des sources dans l'onglet Sources pour commencer
               </p>
@@ -1372,9 +1378,9 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               <div className="flex items-center gap-3 px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border-base)' }}>
                 <div
                   className="w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: '#dc262612', border: '1px solid #dc262625' }}
+                  style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 25%, transparent)' }}
                 >
-                  <FileBarChart className="w-5 h-5" style={{ color: '#dc2626' }} />
+                  <FileBarChart className="w-5 h-5" style={{ color: 'var(--color-error)' }} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
@@ -1400,13 +1406,13 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 {/* Suggestions IA */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <Lightbulb className="w-4 h-4" style={{ color: '#f59e0b' }} />
+                    <Lightbulb className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
                     <h3 className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                       Suggestions pour vos sources
                     </h3>
-                    {loadingSuggestions && <Loader2 className="w-3 h-3 animate-spin" style={{ color: '#f59e0b' }} />}
+                    {loadingSuggestions && <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--color-warning)' }} />}
                     {!loadingSuggestions && suggestions.length > 0 && (
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#f59e0b15', color: '#f59e0b' }}>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 15%, transparent)', color: 'var(--color-warning)' }}>
                         {suggestions.length} suggestions
                       </span>
                     )}
@@ -1414,7 +1420,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                       <button
                         onClick={loadSuggestions}
                         className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-white/5 active:scale-95"
-                        style={{ border: '1px solid var(--border-base)', color: '#f59e0b' }}
+                        style={{ border: '1px solid var(--border-base)', color: 'var(--color-warning)' }}
                         title="Demander de nouvelles suggestions"
                       >
                         <RefreshCw className="w-3 h-3" />
@@ -1425,9 +1431,9 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
                   {loadingSuggestions && (
                     <div className="flex items-center gap-3 p-4 rounded-xl" style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}>
-                      <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#f59e0b' }} />
+                      <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--color-warning)' }} />
                       <div>
-                        <p className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>Analyse de vos sources en cours…</p>
+                        <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Analyse de vos sources en cours…</p>
                         <p className="text-xs mt-0.5" style={{ color: 'var(--text-dimmed)' }}>L'IA identifie les rapports les plus pertinents</p>
                       </div>
                     </div>
@@ -1452,21 +1458,26 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                           >
                             <div
                               className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-                              style={{ backgroundColor: `${docType?.color || '#6b7280'}12`, border: `1px solid ${docType?.color || '#6b7280'}25` }}
+                              style={{ backgroundColor: `color-mix(in srgb, ${docType?.color || 'var(--text-muted)'} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${docType?.color || 'var(--text-muted)'} 25%, transparent)` }}
                             >
-                              <SugIcon className="w-4 h-4" style={{ color: docType?.color || '#6b7280' }} />
+                              <SugIcon className="w-4 h-4" style={{ color: docType?.color || 'var(--text-muted)' }} />
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
-                                <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                                   {suggestion.title}
                                 </p>
-                                <span
-                                  className="text-xs px-1.5 py-0.5 rounded-full font-bold"
-                                  style={{ backgroundColor: `${docType?.color || '#6b7280'}15`, color: docType?.color || '#6b7280' }}
-                                >
-                                  {suggestion.relevance}% pertinent
-                                </span>
+                                {(() => {
+                                  const docColor = docType?.color || 'var(--text-muted)';
+                                  return (
+                                    <span
+                                      className="text-xs px-1.5 py-0.5 rounded-full font-bold"
+                                      style={{ backgroundColor: `color-mix(in srgb, ${docColor} 15%, transparent)`, color: docColor }}
+                                    >
+                                      {suggestion.relevance}% pertinent
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                                 {suggestion.reason}
@@ -1474,7 +1485,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                             </div>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1">
                               <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>Générer</span>
-                              <Zap className="w-3.5 h-3.5" style={{ color: '#f59e0b' }} />
+                              <Zap className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />
                             </div>
                           </button>
                         );
@@ -1569,8 +1580,8 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f9731615' }}>
-                    <Lightbulb className="w-4.5 h-4.5" style={{ color: '#f97316' }} />
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 15%, transparent)' }}>
+                    <Lightbulb className="w-4.5 h-4.5" style={{ color: 'var(--color-warning)' }} />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Créer une infographie</h3>
@@ -1604,9 +1615,9 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                         onClick={() => setInfraOrientation(opt.key)}
                         className="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl text-xs font-medium transition-all"
                         style={{
-                          backgroundColor: infraOrientation === opt.key ? '#f9731612' : 'var(--bg-base)',
-                          color: infraOrientation === opt.key ? '#f97316' : 'var(--text-muted)',
-                          border: `1.5px solid ${infraOrientation === opt.key ? '#f97316' : 'var(--border-base)'}`,
+                          backgroundColor: infraOrientation === opt.key ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--bg-base)',
+                          color: infraOrientation === opt.key ? 'var(--color-warning)' : 'var(--text-muted)',
+                          border: `1.5px solid ${infraOrientation === opt.key ? 'var(--color-warning)' : 'var(--border-base)'}`,
                         }}
                       >
                         <span className="text-lg">{opt.icon}</span>
@@ -1636,9 +1647,9 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                         onClick={() => setInfraLang(opt.key)}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all"
                         style={{
-                          backgroundColor: infraLang === opt.key ? '#f9731612' : 'var(--bg-base)',
-                          color: infraLang === opt.key ? '#f97316' : 'var(--text-muted)',
-                          border: `1px solid ${infraLang === opt.key ? '#f97316' : 'var(--border-base)'}`,
+                          backgroundColor: infraLang === opt.key ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--bg-base)',
+                          color: infraLang === opt.key ? 'var(--color-warning)' : 'var(--text-muted)',
+                          border: `1px solid ${infraLang === opt.key ? 'var(--color-warning)' : 'var(--border-base)'}`,
                         }}
                       >
                         <span>{opt.flag}</span>
@@ -1670,9 +1681,9 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                         onClick={() => setInfraStyle(opt.key)}
                         className="flex items-center gap-2 px-2.5 py-2 rounded-full text-xs font-medium transition-all"
                         style={{
-                          backgroundColor: infraStyle === opt.key ? '#f9731612' : 'var(--bg-base)',
-                          color: infraStyle === opt.key ? '#f97316' : 'var(--text-muted)',
-                          border: `1px solid ${infraStyle === opt.key ? '#f97316' : 'var(--border-base)'}`,
+                          backgroundColor: infraStyle === opt.key ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--bg-base)',
+                          color: infraStyle === opt.key ? 'var(--color-warning)' : 'var(--text-muted)',
+                          border: `1px solid ${infraStyle === opt.key ? 'var(--color-warning)' : 'var(--border-base)'}`,
                         }}
                       >
                         <span>{opt.emoji}</span>
@@ -1696,9 +1707,9 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                         onClick={() => setInfraDetail(opt.key)}
                         className="flex-1 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-full text-xs font-medium transition-all"
                         style={{
-                          backgroundColor: infraDetail === opt.key ? '#f9731612' : 'var(--bg-base)',
-                          color: infraDetail === opt.key ? '#f97316' : 'var(--text-muted)',
-                          border: `1.5px solid ${infraDetail === opt.key ? '#f97316' : 'var(--border-base)'}`,
+                          backgroundColor: infraDetail === opt.key ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--bg-base)',
+                          color: infraDetail === opt.key ? 'var(--color-warning)' : 'var(--text-muted)',
+                          border: `1.5px solid ${infraDetail === opt.key ? 'var(--color-warning)' : 'var(--border-base)'}`,
                         }}
                       >
                         <span className="font-semibold">{opt.label}</span>
@@ -1752,7 +1763,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 <button
                   onClick={handleInfographicGenerate}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold transition-all active:scale-95 shadow-sm"
-                  style={{ backgroundColor: '#f97316', color: '#fff' }}
+                  style={{ backgroundColor: 'var(--color-warning)', color: 'white' }}
                 >
                   <Lightbulb className="w-3.5 h-3.5" />
                   Générer l'infographie

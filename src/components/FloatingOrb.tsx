@@ -72,10 +72,10 @@ export function FloatingOrb() {
             width: 12,
             height: 12,
             backgroundColor: isConnected
-              ? '#34d399'
+              ? 'var(--color-success)'
               : isConnecting
-              ? '#fbbf24'
-              : '#52525b',
+              ? 'var(--color-warning)'
+              : 'var(--text-muted)',
             border: '2px solid rgba(15, 15, 20, 0.9)',
           }}
           animate={isConnected || isConnecting ? { scale: [1, 1.3, 1] } : {}}
@@ -84,10 +84,10 @@ export function FloatingOrb() {
 
         {/* Provider badge */}
         <div
-          className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[8px] font-mono font-bold uppercase tracking-wide select-none pointer-events-none"
+          className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs font-mono font-bold uppercase tracking-wide select-none pointer-events-none"
           style={{
             backgroundColor: profile.textProvider === 'openrouter' ? 'rgba(168, 85, 247, 0.9)' : 'rgba(34, 197, 94, 0.9)',
-            color: '#fff',
+            color: 'white',
             boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
           }}
         >

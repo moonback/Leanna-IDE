@@ -102,7 +102,7 @@ export function OpenRouterSection() {
                 }}
               >
                 <span className="text-base mb-1">{p.label}</span>
-                <span className="text-[9px] opacity-70 font-normal">{p.desc}</span>
+                <span className="text-xs opacity-70 font-normal">{p.desc}</span>
               </motion.button>
             );
           })}
@@ -133,8 +133,8 @@ export function OpenRouterSection() {
                   whileTap={{ scale: 0.95 }}
                   onClick={testConnection}
                   disabled={testing || !profile.openrouterApiKey}
-                  className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50"
-                  style={{ backgroundColor: testResult === 'success' ? '#4ade80' : testResult === 'error' ? '#f87171' : 'var(--accent-primary)' }}
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  style={{ backgroundColor: testResult === 'success' ? 'var(--color-success)' : testResult === 'error' ? 'var(--color-error)' : 'var(--accent-primary)' }}
                 >
                   {testing ? (
                     <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8 }} className="h-3 w-3 rounded-full border-2 border-white border-t-transparent" />
@@ -159,7 +159,7 @@ export function OpenRouterSection() {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Rechercher un modèle..."
-                  className="w-full rounded-lg pl-8 pr-3 py-2 text-[11px] outline-none transition-all duration-200"
+                  className="w-full rounded-lg pl-8 pr-3 py-2 text-xs outline-none transition-all duration-200"
                   style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                 />
               </div>
@@ -184,20 +184,20 @@ export function OpenRouterSection() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-semibold truncate" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                          <span className="text-xs font-semibold truncate" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
                             {model.name}
                           </span>
                           {model.free && (
-                            <span className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
-                              style={{ backgroundColor: 'color-mix(in srgb, #4ade80 15%, transparent)', color: '#4ade80' }}>
+                            <span className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold"
+                              style={{ backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)', color: 'var(--color-success)' }}>
                               <Zap size={8} /> GRATUIT
                             </span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{model.provider}</span>
-                          <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>•</span>
-                          <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{model.desc}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{model.provider}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>•</span>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{model.desc}</span>
                         </div>
                       </div>
                       {active && (
@@ -216,7 +216,7 @@ export function OpenRouterSection() {
                 value={profile.openrouterModel}
                 onChange={e => setField('openrouterModel', e.target.value)}
                 placeholder="ex: anthropic/claude-sonnet-4"
-                className="w-full rounded-lg px-3 py-2 text-[11px] font-mono outline-none transition-all duration-200"
+                className="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none transition-all duration-200"
                 style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                 onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; }}
                 onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-base)'; }}
@@ -228,7 +228,7 @@ export function OpenRouterSection() {
 
       {/* Info */}
       <div className="mt-2 rounded-xl p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--accent-primary) 15%, transparent)' }}>
-        <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           💡 <strong>Note :</strong> La voix Live utilise toujours Gemini. Le provider texte contrôle les requêtes de chat écrites et l'analyse de code.
         </p>
       </div>
@@ -254,17 +254,17 @@ export function OpenRouterSection() {
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-semibold truncate" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                    <span className="text-xs font-semibold truncate" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
                       {model.name}
                     </span>
                     {model.free && (
-                      <span className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
-                        style={{ backgroundColor: 'color-mix(in srgb, #4ade80 15%, transparent)', color: '#4ade80' }}>
+                      <span className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold"
+                        style={{ backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)', color: 'var(--color-success)' }}>
                         <Zap size={8} /> GRATUIT
                       </span>
                     )}
                   </div>
-                  <span className="text-[9px] mt-0.5 block" style={{ color: 'var(--text-dimmed)' }}>{model.desc}</span>
+                  <span className="text-xs mt-0.5 block" style={{ color: 'var(--text-dimmed)' }}>{model.desc}</span>
                 </div>
                 {active && <Check size={14} style={{ color: 'var(--accent-primary)' }} />}
               </motion.button>
@@ -276,7 +276,7 @@ export function OpenRouterSection() {
           value={profile.openrouterImageModel}
           onChange={e => setField('openrouterImageModel', e.target.value)}
           placeholder="ex: google/gemini-2.5-flash-image"
-          className="mt-2 w-full rounded-lg px-3 py-2 text-[11px] font-mono outline-none transition-all duration-200"
+          className="mt-2 w-full rounded-lg px-3 py-2 text-xs font-mono outline-none transition-all duration-200"
           style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
           onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; }}
           onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-base)'; }}

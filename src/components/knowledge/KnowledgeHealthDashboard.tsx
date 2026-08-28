@@ -156,7 +156,7 @@ export function KnowledgeHealthDashboard() {
         <button
           onClick={fetchHealth}
           className="mt-4 px-4 py-2 text-xs font-semibold rounded-xl transition-all"
-          style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+          style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
         >
           Réessayer
         </button>
@@ -212,9 +212,9 @@ export function KnowledgeHealthDashboard() {
           </div>
           <p className="text-xs flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
             <Folder className="w-3.5 h-3.5 opacity-70" />
-            <span>Workspace : <code className="px-1.5 py-0.5 rounded text-[11px]" style={{ backgroundColor: 'var(--bg-base)' }}>{workspace.activeWorkspace}</code></span>
+            <span>Workspace : <code className="px-1.5 py-0.5 rounded text-xs" style={{ backgroundColor: 'var(--bg-base)' }}>{workspace.activeWorkspace}</code></span>
             {workspace.sandboxActive && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              <span className="px-2 py-0.5 rounded text-sm font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                 Sandbox Actif
               </span>
             )}
@@ -235,7 +235,7 @@ export function KnowledgeHealthDashboard() {
             onClick={handleReindex}
             disabled={reindexing}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs transition-all shadow-lg shadow-indigo-500/10 active:scale-95 disabled:opacity-50"
-            style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+            style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
           >
             <Zap className={`w-3.5 h-3.5 ${reindexing ? 'animate-bounce' : ''}`} />
             {reindexing ? 'Réindexation...' : 'Réindexer le projet'}
@@ -278,7 +278,7 @@ export function KnowledgeHealthDashboard() {
               {kg.totalEntities.toLocaleString()} entités • {kg.totalLines.toLocaleString()} lignes
             </p>
           </div>
-          <div className="pt-2 border-t text-[11px] flex justify-between" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+          <div className="pt-2 border-t text-xs flex justify-between" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
             <span>Exports : {kg.totalExports}</span>
             <span>Imports : {kg.totalImports}</span>
           </div>
@@ -336,7 +336,7 @@ export function KnowledgeHealthDashboard() {
               {dg.cycleCount === 0 ? 'Aucune dépendance circulaire' : 'Implications sur la maintenabilité'}
             </p>
           </div>
-          <div className="pt-2 border-t text-[11px] flex justify-between" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+          <div className="pt-2 border-t text-xs flex justify-between" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
             <span>Statut : {dg.cycleCount === 0 ? 'Sain' : 'Attention'}</span>
             <span>DFS Inspector : Actif</span>
           </div>
@@ -364,7 +364,7 @@ export function KnowledgeHealthDashboard() {
               )}
             </p>
           </div>
-          <div className="pt-2 border-t text-[11px] flex justify-between" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+          <div className="pt-2 border-t text-xs flex justify-between" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
             <span>Auto-scan : {docsData?.extractor?.watching ? 'ON' : 'OFF'}</span>
             <button
               onClick={handleReextract}
@@ -461,7 +461,7 @@ export function KnowledgeHealthDashboard() {
                   Object.entries(pm.categoryBreakdown).map(([cat, count]) => (
                     <div key={cat} className="flex items-center justify-between text-xs">
                       <span className="capitalize" style={{ color: 'var(--text-muted)' }}>{cat}</span>
-                      <span className="font-semibold px-2 py-0.5 rounded-full text-[10px]" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
+                      <span className="font-semibold px-2 py-0.5 rounded-full text-sm" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
                         {count} fait{count > 1 ? 's' : ''}
                       </span>
                     </div>
@@ -500,7 +500,7 @@ export function KnowledgeHealthDashboard() {
               <button
                 onClick={handleReextract}
                 disabled={reextracting}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all"
                 style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
               >
                 <RefreshCw className={`w-3 h-3 ${reextracting ? 'animate-spin' : ''}`} />
@@ -523,17 +523,17 @@ export function KnowledgeHealthDashboard() {
                             {doc.fileName}
                           </span>
                           <span
-                            className="px-1.5 py-0.5 rounded text-[9px] font-mono flex-shrink-0"
+                            className="px-1.5 py-0.5 rounded text-xs font-mono flex-shrink-0"
                             style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' }}
                           >
                             {doc.mimeType.split('/')[1] || doc.mimeType}
                           </span>
                         </div>
-                        <p className="text-[10px] mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                        <p className="text-sm mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
                           {doc.summary}
                         </p>
                       </div>
-                      <span className="text-[9px] flex-shrink-0 font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                      <span className="text-xs flex-shrink-0 font-mono" style={{ color: 'var(--text-dimmed)' }}>
                         {(doc.textLength / 1000).toFixed(1)}k
                       </span>
                     </div>
@@ -542,7 +542,7 @@ export function KnowledgeHealthDashboard() {
                         {doc.tags.slice(0, 5).map((tag, i) => (
                           <span
                             key={i}
-                            className="px-1.5 py-0.5 rounded text-[9px]"
+                            className="px-1.5 py-0.5 rounded text-xs"
                             style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)', color: 'var(--accent-primary)' }}
                           >
                             {tag}
@@ -562,7 +562,7 @@ export function KnowledgeHealthDashboard() {
               </div>
             )}
 
-            <div className="pt-3 border-t text-[10px] flex items-center gap-4" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+            <div className="pt-3 border-t text-sm flex items-center gap-4" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
               <span>
                 Formats supportés : <code>.md</code> <code>.txt</code> <code>.rst</code> <code>.adoc</code> <code>.tex</code> <code>.yaml</code> <code>.csv</code>
               </span>

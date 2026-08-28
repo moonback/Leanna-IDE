@@ -66,11 +66,11 @@ function timeAgo(dateStr: string): string {
 
 function langColor(lang: string | null): string {
   const colors: Record<string, string> = {
-    TypeScript: '#3178c6', JavaScript: '#f7df1e', Python: '#3572A5',
-    Rust: '#dea584', Go: '#00ADD8', Java: '#b07219', 'C#': '#178600',
-    HTML: '#e34c26', CSS: '#563d7c', Shell: '#89e051',
+    TypeScript: 'var(--accent-primary)', JavaScript: 'var(--color-warning)', Python: 'var(--accent-primary)',
+    Rust: 'var(--color-warning)', Go: 'var(--accent-primary)', Java: 'var(--color-warning)', 'C#': 'var(--color-success)',
+    HTML: 'var(--color-warning)', CSS: 'var(--color-accent-alt)', Shell: 'var(--color-success)',
   };
-  return colors[lang || ''] || '#8b949e';
+  return colors[lang || ''] || 'var(--text-muted)';
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -259,7 +259,7 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
             GitHub
           </span>
           {repoOwner && repoName && (
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1" style={{ backgroundColor: 'rgba(14,165,233,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(14,165,233,0.2)' }}>
+            <span className="text-sm font-mono px-1.5 py-0.5 rounded flex items-center gap-1" style={{ backgroundColor: 'rgba(14,165,233,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(14,165,233,0.2)' }}>
               {repoOwner}/{repoName}
             </span>
           )}
@@ -289,7 +289,7 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className="flex-1 flex items-center justify-center gap-1 px-2 py-2 text-[10px] font-semibold transition-all border-b-2"
+            className="flex-1 flex items-center justify-center gap-1 px-2 py-2 text-sm font-semibold transition-all border-b-2"
             style={{
               borderColor: tab === key ? 'var(--accent-primary)' : 'transparent',
               color: tab === key ? 'var(--accent-primary)' : 'var(--text-dimmed)',
@@ -302,7 +302,7 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
 
       {/* Error */}
       {error && (
-        <div className="mx-3 mt-2 px-2 py-1.5 rounded text-[10px]" style={{ backgroundColor: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.15)' }}>
+        <div className="mx-3 mt-2 px-2 py-1.5 rounded text-sm" style={{ backgroundColor: 'rgba(239,68,68,0.08)', color: 'var(--color-error)', border: '1px solid rgba(239,68,68,0.15)' }}>
           {error}
         </div>
       )}
@@ -312,7 +312,7 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
         <div className="flex flex-col items-center justify-center flex-1 px-4 py-8 text-center">
           <Github size={32} style={{ color: 'var(--text-dimmed)' }} className="mb-3" />
           <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>GitHub non configuré</p>
-          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             Ajoutez votre GITHUB_TOKEN dans les paramètres pour accéder à vos repos, issues et PRs.
           </p>
         </div>
@@ -330,7 +330,7 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Rechercher des repos..."
-                  className="flex-1 px-2 py-1 rounded text-[11px] focus:outline-none"
+                  className="flex-1 px-2 py-1 rounded text-xs focus:outline-none"
                   style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                   onKeyDown={(e) => e.key === 'Enter' && searchRepos()}
                 />
@@ -347,32 +347,32 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
                 >
                   <div className="flex items-center gap-2">
                     <FolderOpen size={12} style={{ color: 'var(--accent-primary)' }} />
-                    <span className="text-[11px] font-medium truncate flex-1" style={{ color: 'var(--text-primary)' }}>
+                    <span className="text-xs font-medium truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                       {repo.full_name}
                     </span>
                     {repo.private && (
-                      <span className="text-[8px] px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: 'var(--text-dimmed)' }}>privé</span>
+                      <span className="text-xs px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: 'var(--text-dimmed)' }}>privé</span>
                     )}
                   </div>
                   {repo.description && (
-                    <p className="text-[10px] mt-0.5 truncate pl-5" style={{ color: 'var(--text-muted)' }}>{repo.description}</p>
+                    <p className="text-sm mt-0.5 truncate pl-5" style={{ color: 'var(--text-muted)' }}>{repo.description}</p>
                   )}
                   <div className="flex items-center gap-3 mt-1 pl-5">
                     {repo.language && (
-                      <span className="flex items-center gap-1 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                      <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: langColor(repo.language) }} />
                         {repo.language}
                       </span>
                     )}
-                    <span className="flex items-center gap-0.5 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="flex items-center gap-0.5 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                       <Star size={9} /> {repo.stars}
                     </span>
-                    <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(repo.updated_at)}</span>
+                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(repo.updated_at)}</span>
                   </div>
                 </button>
               ))}
               {repos.length === 0 && !loading && !error && (
-                <p className="text-center text-[10px] py-6" style={{ color: 'var(--text-dimmed)' }}>Aucun repo</p>
+                <p className="text-center text-sm py-6" style={{ color: 'var(--text-dimmed)' }}>Aucun repo</p>
               )}
             </div>
           )}
@@ -383,7 +383,7 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
               {!repoOwner || !repoName ? (
                 <div className="text-center py-6">
                   <AlertCircle size={20} className="mx-auto mb-2" style={{ color: 'var(--text-dimmed)' }} />
-                  <p className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <p className="text-sm" style={{ color: 'var(--text-dimmed)' }}>
                     Sélectionnez un repo dans l'onglet Repos
                   </p>
                 </div>
@@ -397,20 +397,20 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
                       rel="noopener noreferrer"
                       className="flex items-start gap-2 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors mb-1"
                     >
-                      <AlertCircle size={12} className="mt-0.5 flex-shrink-0" style={{ color: issue.state === 'open' ? '#3fb950' : '#f85149' }} />
+                      <AlertCircle size={12} className="mt-0.5 flex-shrink-0" style={{ color: issue.state === 'open' ? 'var(--color-success)' : 'var(--color-error)' }} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                        <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
                           #{issue.number} {issue.title}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{issue.author}</span>
-                          <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(issue.created_at)}</span>
-                          {issue.comments > 0 && <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>💬{issue.comments}</span>}
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{issue.author}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(issue.created_at)}</span>
+                          {issue.comments > 0 && <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>💬{issue.comments}</span>}
                         </div>
                         {issue.labels.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {issue.labels.slice(0, 3).map((l) => (
-                              <span key={l} className="text-[8px] px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
+                              <span key={l} className="text-xs px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
                                 {l}
                               </span>
                             ))}
@@ -421,7 +421,7 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
                     </a>
                   ))}
                   {issues.length === 0 && !loading && (
-                    <p className="text-center text-[10px] py-4" style={{ color: 'var(--text-dimmed)' }}>Aucune issue ouverte</p>
+                    <p className="text-center text-sm py-4" style={{ color: 'var(--text-dimmed)' }}>Aucune issue ouverte</p>
                   )}
                 </>
               )}
@@ -434,7 +434,7 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
               {!repoOwner || !repoName ? (
                 <div className="text-center py-6">
                   <GitPullRequest size={20} className="mx-auto mb-2" style={{ color: 'var(--text-dimmed)' }} />
-                  <p className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <p className="text-sm" style={{ color: 'var(--text-dimmed)' }}>
                     Sélectionnez un repo dans l'onglet Repos
                   </p>
                 </div>
@@ -448,24 +448,24 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
                       rel="noopener noreferrer"
                       className="flex items-start gap-2 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors mb-1"
                     >
-                      <GitPullRequest size={12} className="mt-0.5 flex-shrink-0" style={{ color: pr.state === 'open' ? '#3fb950' : '#a371f7' }} />
+                      <GitPullRequest size={12} className="mt-0.5 flex-shrink-0" style={{ color: pr.state === 'open' ? 'var(--color-success)' : 'var(--color-accent-alt)' }} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                        <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
                           #{pr.number} {pr.title}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{pr.author}</span>
-                          <span className="text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{pr.author}</span>
+                          <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                             {pr.head} → {pr.base}
                           </span>
-                          {pr.draft && <span className="text-[8px] px-1 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--text-dimmed)' }}>draft</span>}
+                          {pr.draft && <span className="text-xs px-1 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--text-dimmed)' }}>draft</span>}
                         </div>
                       </div>
                       <ExternalLink size={10} style={{ color: 'var(--text-dimmed)' }} className="flex-shrink-0 mt-1" />
                     </a>
                   ))}
                   {prs.length === 0 && !loading && (
-                    <p className="text-center text-[10px] py-4" style={{ color: 'var(--text-dimmed)' }}>Aucune PR ouverte</p>
+                    <p className="text-center text-sm py-4" style={{ color: 'var(--text-dimmed)' }}>Aucune PR ouverte</p>
                   )}
                 </>
               )}
@@ -482,19 +482,19 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
                 >
                   <Bell size={12} className="mt-0.5 flex-shrink-0" style={{ color: n.unread ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-medium truncate" style={{ color: n.unread ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                    <p className="text-xs font-medium truncate" style={{ color: n.unread ? 'var(--text-primary)' : 'var(--text-muted)' }}>
                       {n.title}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{n.repo}</span>
-                      <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{n.reason}</span>
-                      <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(n.updated_at)}</span>
+                      <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{n.repo}</span>
+                      <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{n.reason}</span>
+                      <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(n.updated_at)}</span>
                     </div>
                   </div>
                 </div>
               ))}
               {notifications.length === 0 && !loading && (
-                <p className="text-center text-[10px] py-4" style={{ color: 'var(--text-dimmed)' }}>Aucune notification</p>
+                <p className="text-center text-sm py-4" style={{ color: 'var(--text-dimmed)' }}>Aucune notification</p>
               )}
             </div>
           )}

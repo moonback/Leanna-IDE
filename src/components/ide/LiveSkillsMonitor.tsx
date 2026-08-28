@@ -145,19 +145,19 @@ interface SkillMeta {
 }
 
 const SKILL_META: Record<string, SkillMeta> = {
-  codebase:   { label: 'Codebase',     desc: 'Lecture, écriture et navigation de fichiers',  icon: Code,      color: '#60a5fa' },
-  time:       { label: 'Horloge',      desc: 'Date et heure système',                       icon: Clock,     color: '#fbbf24' },
-  weather:    { label: 'Météo',        desc: 'Conditions météo',                            icon: CloudRain, color: '#38bdf8' },
-  github:     { label: 'GitHub',       desc: 'Repos, issues, PRs',                          icon: Github,    color: '#a78bfa' },
-  memory:     { label: 'Mémoire',      desc: 'Mémoire persistante',                         icon: Database,  color: '#c084fc' },
-  automation: { label: 'Automation',   desc: 'Navigation web et extraction',                icon: Globe,     color: '#34d399' },
-  list:       { label: 'Listes',       desc: 'Gestion de listes',                           icon: List,      color: '#fb923c' },
-  system:     { label: 'Système',      desc: 'Commandes OS et apps',                        icon: Monitor,   color: '#94a3b8' },
-  reasoning:  { label: 'Raisonnement', desc: 'Tâches complexes déléguées',                  icon: Brain,     color: '#f97316' },
-  history:    { label: 'Historique',    desc: 'Conversations passées',                       icon: BookOpen,  color: '#a78bfa' },
-  git:        { label: 'Git',          desc: 'Contrôle de version',                         icon: GitBranch, color: '#f87171' },
-  guidelines: { label: 'Guidelines',   desc: 'Standards du projet',                         icon: Zap,        color: '#10b981' },
-  richDocument: { label: 'Doc Riche',  desc: 'Tableaux, graphiques et fiches interactifs',   icon: TrendingUp, color: '#6366f1' },
+  codebase:   { label: 'Codebase',     desc: 'Lecture, écriture et navigation de fichiers',  icon: Code,      color: 'var(--accent-primary)' },
+  time:       { label: 'Horloge',      desc: 'Date et heure système',                       icon: Clock,     color: 'var(--color-warning)' },
+  weather:    { label: 'Météo',        desc: 'Conditions météo',                            icon: CloudRain, color: 'var(--accent-primary)' },
+  github:     { label: 'GitHub',       desc: 'Repos, issues, PRs',                          icon: Github,    color: 'var(--color-accent-alt)' },
+  memory:     { label: 'Mémoire',      desc: 'Mémoire persistante',                         icon: Database,  color: 'var(--color-accent-alt)' },
+  automation: { label: 'Automation',   desc: 'Navigation web et extraction',                icon: Globe,     color: 'var(--color-success)' },
+  list:       { label: 'Listes',       desc: 'Gestion de listes',                           icon: List,      color: 'var(--color-warning)' },
+  system:     { label: 'Système',      desc: 'Commandes OS et apps',                        icon: Monitor,   color: 'var(--text-muted)' },
+  reasoning:  { label: 'Raisonnement', desc: 'Tâches complexes déléguées',                  icon: Brain,     color: 'var(--color-warning)' },
+  history:    { label: 'Historique',    desc: 'Conversations passées',                       icon: BookOpen,  color: 'var(--color-accent-alt)' },
+  git:        { label: 'Git',          desc: 'Contrôle de version',                         icon: GitBranch, color: 'var(--color-error)' },
+  guidelines: { label: 'Guidelines',   desc: 'Standards du projet',                         icon: Zap,        color: 'var(--color-success)' },
+  richDocument: { label: 'Doc Riche',  desc: 'Tableaux, graphiques et fiches interactifs',   icon: TrendingUp, color: 'var(--color-accent-alt)' },
 };
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -258,21 +258,21 @@ export function LiveSkillsMonitor() {
         onClick={() => setExpanded(v => !v)}
       >
         <div className="relative flex-shrink-0">
-          <Activity className="w-3.5 h-3.5" style={{ color: activeCount > 0 ? '#34d399' : 'var(--text-muted)' }} />
+          <Activity className="w-3.5 h-3.5" style={{ color: activeCount > 0 ? 'var(--color-success)' : 'var(--text-muted)' }} />
           {activeCount > 0 && (
             <motion.div
               className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: '#34d399' }}
+              style={{ backgroundColor: 'var(--color-success)' }}
               animate={{ scale: [1, 1.5, 1] }}
               transition={{ duration: 1, repeat: Infinity }}
             />
           )}
         </div>
-        <span className="text-[11px] font-bold uppercase tracking-wider flex-1" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-xs font-bold uppercase tracking-wider flex-1" style={{ color: 'var(--text-muted)' }}>
           Skills Live
         </span>
         {total > 0 && (
-          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{ color: 'var(--text-dimmed)', backgroundColor: 'var(--bg-input)' }}>
+          <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ color: 'var(--text-dimmed)', backgroundColor: 'var(--bg-input)' }}>
             {total}
           </span>
         )}
@@ -289,7 +289,7 @@ export function LiveSkillsMonitor() {
             <div className="flex items-center justify-between px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)' }}>
               <Stat label="Appels" value={String(total)} color="var(--text-primary)" />
               <Stat label="Skills" value={String(skillUsages.length)} color="var(--accent-primary)" />
-              <Stat label="Actifs" value={String(activeCount)} color={activeCount > 0 ? '#34d399' : 'var(--text-dimmed)'} />
+              <Stat label="Actifs" value={String(activeCount)} color={activeCount > 0 ? 'var(--color-success)' : 'var(--text-dimmed)'} />
               <Stat label="Durée" value={sessionMs > 0 ? fmtDuration(sessionMs) : '—'} color="var(--text-primary)" />
             </div>
           )}
@@ -299,7 +299,7 @@ export function LiveSkillsMonitor() {
             {skillUsages.length === 0 ? (
               <div className="text-center py-6 px-3">
                 <Zap className="w-6 h-6 mx-auto mb-2 opacity-15" style={{ color: 'var(--text-muted)' }} />
-                <p className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                <p className="text-sm" style={{ color: 'var(--text-dimmed)' }}>
                   Les skills apparaîtront en temps réel
                 </p>
               </div>
@@ -340,7 +340,7 @@ export function LiveSkillsMonitor() {
                 {skillUsages.map(u => {
                   const m = SKILL_META[u.skillId] || SKILL_META.system;
                   return (
-                    <span key={u.skillId} className="flex items-center gap-1 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                    <span key={u.skillId} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                       <span className="w-1.5 h-1.5 rounded-sm inline-block" style={{ backgroundColor: m.color }} />
                       {m.label} {Math.round((u.callCount / total) * 100)}%
                     </span>
@@ -360,8 +360,8 @@ export function LiveSkillsMonitor() {
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="text-center px-1">
-      <div className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>{label}</div>
-      <div className="text-[13px] font-bold tabular-nums leading-tight" style={{ color }}>{value}</div>
+      <div className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>{label}</div>
+      <div className="text-sm font-bold tabular-nums leading-tight" style={{ color }}>{value}</div>
     </div>
   );
 }
@@ -405,16 +405,16 @@ function SkillRow({ usage, index, total, isOpen, onToggle }: SkillRowProps) {
         </div>
 
         <div className="flex-1 min-w-0">
-          <span className="text-[11px] font-medium block truncate" style={{ color: usage.isActive ? meta.color : 'var(--text-primary)' }}>
+          <span className="text-xs font-medium block truncate" style={{ color: usage.isActive ? meta.color : 'var(--text-primary)' }}>
             {meta.label}
           </span>
-          <span className="text-[9px] block" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="text-xs block" style={{ color: 'var(--text-dimmed)' }}>
             {usage.tools.length} outil{usage.tools.length > 1 ? 's' : ''} · {timeAgo(usage.lastUsed)} · {pct}%
           </span>
         </div>
 
         <span
-          className="text-[10px] font-bold tabular-nums px-1.5 rounded"
+          className="text-sm font-bold tabular-nums px-1.5 rounded"
           style={{ color: meta.color, backgroundColor: `${meta.color}12` }}
         >
           {usage.callCount}×
@@ -433,29 +433,29 @@ function SkillRow({ usage, index, total, isOpen, onToggle }: SkillRowProps) {
           >
             <div className="px-3 py-2 space-y-2" style={{ backgroundColor: 'var(--bg-secondary, rgba(0,0,0,0.15))' }}>
               {/* Description */}
-              <p className="text-[10px] italic" style={{ color: 'var(--text-muted)' }}>{meta.desc}</p>
+              <p className="text-sm italic" style={{ color: 'var(--text-muted)' }}>{meta.desc}</p>
 
               {/* Metrics */}
               <div className="flex gap-3">
-                <span className="flex items-center gap-1 text-[10px]" style={{ color: meta.color }}>
+                <span className="flex items-center gap-1 text-sm" style={{ color: meta.color }}>
                   <TrendingUp className="w-3 h-3" /> {usage.callCount} appel{usage.callCount > 1 ? 's' : ''}
                 </span>
-                <span className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="flex items-center gap-1 text-sm" style={{ color: 'var(--text-muted)' }}>
                   <Timer className="w-3 h-3" /> {dur > 0 ? fmtDuration(dur) : '<1s'}
                 </span>
-                <span className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="flex items-center gap-1 text-sm" style={{ color: 'var(--text-muted)' }}>
                   <Clock className="w-3 h-3" /> {fmtTime(usage.firstUsed)}
                 </span>
               </div>
 
               {/* Tools badges */}
               <div>
-                <div className="text-[9px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-dimmed)' }}>Outils</div>
+                <div className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-dimmed)' }}>Outils</div>
                 <div className="flex flex-wrap gap-1">
                   {usage.tools.map(tool => {
                     const cnt = usage.calls.filter(c => c.tool === tool).length;
                     return (
-                      <span key={tool} className="text-[9px] px-1.5 py-0.5 rounded" style={{ backgroundColor: `${meta.color}10`, color: meta.color, border: `1px solid ${meta.color}20` }}>
+                      <span key={tool} className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${meta.color}10`, color: meta.color, border: `1px solid ${meta.color}20` }}>
                         {TOOL_DISPLAY[tool] || tool}{cnt > 1 ? ` ×${cnt}` : ''}
                       </span>
                     );
@@ -465,7 +465,7 @@ function SkillRow({ usage, index, total, isOpen, onToggle }: SkillRowProps) {
 
               {/* Recent calls */}
               <div>
-                <div className="text-[9px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-dimmed)' }}>Récent</div>
+                <div className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-dimmed)' }}>Récent</div>
                 <div className="space-y-0.5 max-h-24 overflow-y-auto">
                   {[...usage.calls].reverse().slice(0, 6).map((c, i) => (
                     <div key={i} className="flex items-center gap-1.5">
@@ -473,10 +473,10 @@ function SkillRow({ usage, index, total, isOpen, onToggle }: SkillRowProps) {
                         ? <Loader2 className="w-2 h-2 animate-spin flex-shrink-0" style={{ color: meta.color }} />
                         : <CheckCircle2 className="w-2 h-2 flex-shrink-0" style={{ color: 'var(--text-dimmed)', opacity: 0.4 }} />
                       }
-                      <span className="text-[9px] flex-1 truncate" style={{ color: c.status === 'running' ? meta.color : 'var(--text-muted)' }}>
+                      <span className="text-xs flex-1 truncate" style={{ color: c.status === 'running' ? meta.color : 'var(--text-muted)' }}>
                         {c.label}
                       </span>
-                      <span className="text-[8px] tabular-nums flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+                      <span className="text-xs tabular-nums flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
                         {fmtTime(c.timestamp)}
                       </span>
                     </div>

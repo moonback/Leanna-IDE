@@ -29,7 +29,7 @@ export function AutomationPanel({ onClose }: AutomationPanelProps) {
       <div className="flex-1 min-h-0 w-full overflow-hidden">
         <Suspense fallback={
           <div className="flex items-center justify-center h-full w-full">
-            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Chargement…</span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Chargement…</span>
           </div>
         }>
           <AutomationView />

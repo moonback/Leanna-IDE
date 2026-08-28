@@ -42,7 +42,7 @@ function CompactSelect({ value, onChange, children, label }: { value: string | n
       value={value}
       onChange={(event) => onChange(event.target.value)}
       aria-label={label}
-      className="rounded-md border px-2 py-1 text-[11px] outline-none transition-colors"
+      className="rounded-md border px-2 py-1 text-xs outline-none transition-colors"
       style={{
         backgroundColor: 'var(--bg-input)',
         borderColor: 'var(--border-base)',
@@ -127,7 +127,7 @@ export function SettingsPanel({ settings, onUpdateSetting, onClose }: SettingsPa
       <aside className="flex w-48 flex-shrink-0 flex-col border-r" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}>
         <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ borderColor: 'var(--border-base)' }}>
           <SlidersHorizontal size={14} style={{ color: 'var(--accent-primary)' }} />
-          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>Réglages éditeur</span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Réglages éditeur</span>
         </div>
 
         <div className="flex-1 overflow-y-auto py-2">
@@ -148,8 +148,8 @@ export function SettingsPanel({ settings, onUpdateSetting, onClose }: SettingsPa
               >
                 <Icon size={15} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[11px] font-medium truncate">{cat.label}</div>
-                  <div className="text-[9px] truncate opacity-60">{cat.description}</div>
+                  <div className="text-xs font-medium truncate">{cat.label}</div>
+                  <div className="text-xs truncate opacity-60">{cat.description}</div>
                 </div>
                 {active && <Check size={12} className="flex-shrink-0" />}
               </button>
@@ -160,7 +160,7 @@ export function SettingsPanel({ settings, onUpdateSetting, onClose }: SettingsPa
         <div className="border-t px-3 py-2" style={{ borderColor: 'var(--border-base)' }}>
           <button
             onClick={handleReset}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[10px] transition hover:bg-white/10"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition hover:bg-white/10"
             style={{ color: 'var(--text-muted)' }}
           >
             <RotateCcw size={12} />
@@ -174,10 +174,10 @@ export function SettingsPanel({ settings, onUpdateSetting, onClose }: SettingsPa
         {/* Header avec recherche */}
         <header className="flex items-center gap-3 border-b px-4 py-2.5" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}>
           <div className="flex-1 min-w-0">
-            <h3 className="text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+            <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
               {CATEGORIES.find(c => c.id === activeTab)?.label || 'Réglages'}
             </h3>
-            <p className="text-[10px] truncate opacity-60" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-sm truncate opacity-60" style={{ color: 'var(--text-muted)' }}>
               {CATEGORIES.find(c => c.id === activeTab)?.description || ''}
             </p>
           </div>
@@ -189,7 +189,7 @@ export function SettingsPanel({ settings, onUpdateSetting, onClose }: SettingsPa
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher… (Ctrl+F)"
-              className="w-44 rounded-md border bg-transparent py-1 pl-7 pr-2 text-[11px] outline-none transition-colors"
+              className="w-44 rounded-md border bg-transparent py-1 pl-7 pr-2 text-xs outline-none transition-colors"
               style={{
                 borderColor: searchQuery ? 'var(--accent-primary)' : 'var(--border-base)',
                 color: 'var(--text-primary)',
@@ -233,10 +233,10 @@ function AppearanceSettings({ settings, onUpdateSetting }: { settings: IdeSettin
     <SectionCard icon={Palette} title="Apparence" description="Personnalisez le thème et les affichages">
       <div className="mb-3 grid grid-cols-2 gap-2">
         {([
-          { value: 'vs-dark', label: 'Sombre',   color: '#202124' },
-          { value: 'vs',      label: 'Clair',    color: '#f4f4f4' },
-          { value: 'hc-black',label: 'HC noir',  color: '#000000' },
-          { value: 'hc-light',label: 'HC clair', color: '#ffffff' },
+          { value: 'vs-dark', label: 'Sombre',   color: 'var(--bg-panel)' },
+          { value: 'vs',      label: 'Clair',    color: 'var(--bg-panel)' },
+          { value: 'hc-black',label: 'HC noir',  color: 'var(--bg-base)' },
+          { value: 'hc-light',label: 'HC clair', color: 'white' },
         ] as { value: IdeSettings['theme']; label: string; color: string }[]).map((theme) => {
           const active = settings.theme === theme.value;
           return (
@@ -245,7 +245,7 @@ function AppearanceSettings({ settings, onUpdateSetting }: { settings: IdeSettin
               style={{ borderColor: active ? 'var(--accent-primary)' : 'var(--border-base)', backgroundColor: active ? 'var(--accent-subtle)' : 'var(--bg-input)' }}
             >
               <span className="h-3.5 w-3.5 rounded-full border" style={{ backgroundColor: theme.color, borderColor: 'var(--border-base)' }} />
-              <span className="flex-1 text-[10px] font-medium" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{theme.label}</span>
+              <span className="flex-1 text-sm font-medium" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{theme.label}</span>
               {active && <Check size={10} style={{ color: 'var(--accent-primary)' }} />}
             </button>
           );
@@ -269,7 +269,7 @@ function TextSettings({ settings, onUpdateSetting }: { settings: IdeSettings; on
           <button onClick={() => onUpdateSetting('fontSize', Math.max(10, settings.fontSize - 1))} className="p-1 hover:bg-white/10 rounded-l-md" style={{ color: 'var(--text-muted)' }}>
             <Minus size={11} />
           </button>
-          <span className="w-7 text-center font-mono text-[11px]" style={{ color: 'var(--text-primary)' }}>{settings.fontSize}</span>
+          <span className="w-7 text-center font-mono text-xs" style={{ color: 'var(--text-primary)' }}>{settings.fontSize}</span>
           <button onClick={() => onUpdateSetting('fontSize', Math.min(24, settings.fontSize + 1))} className="p-1 hover:bg-white/10 rounded-r-md" style={{ color: 'var(--text-muted)' }}>
             <Plus size={11} />
           </button>
@@ -299,7 +299,7 @@ function EditorSettings({ settings, onUpdateSetting }: { settings: IdeSettings; 
         <Toggle checked={settings.stickyScroll} onChange={(v) => onUpdateSetting('stickyScroll', v)} />
       </SettingRow>
       <div className="mt-3 rounded-lg p-2" style={{ backgroundColor: 'var(--bg-input)' }}>
-        <p className="text-[9px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Les changements sont appliqués instantanément à l'éditeur actif.
         </p>
       </div>
@@ -323,8 +323,8 @@ function ShortcutsSection() {
       <div className="grid grid-cols-1 gap-1">
         {shortcuts.map(([action, shortcut]) => (
           <div key={action} className="flex items-center justify-between gap-2 border-b py-1.5 last:border-b-0" style={{ borderColor: 'var(--border-base)' }}>
-            <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{action}</span>
-            <kbd className="rounded border px-1.5 py-0.5 font-mono text-[8px]" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-input)', color: 'var(--text-muted)' }}>
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{action}</span>
+            <kbd className="rounded border px-1.5 py-0.5 font-mono text-xs" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-input)', color: 'var(--text-muted)' }}>
               {shortcut}
             </kbd>
           </div>
@@ -332,7 +332,7 @@ function ShortcutsSection() {
       </div>
       <div className="mt-2 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
         <Eye size={11} />
-        <span className="text-[9px]">Ces raccourcis sont actifs dans l'éditeur</span>
+        <span className="text-xs">Ces raccourcis sont actifs dans l'éditeur</span>
       </div>
     </SectionCard>
   );
@@ -364,28 +364,28 @@ function ClearConversationsCard() {
 
   return (
     <SectionCard icon={Database} title="Stockage" description="Gérez les données stockées dans Supabase">
-      <p className="mb-3 text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+      <p className="mb-3 text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
         La suppression est irréversible : toutes les conversations et messages seront définitivement effacés.
       </p>
       {!confirmOpen ? (
         <button onClick={() => setConfirmOpen(true)}
-          className="w-full rounded-md border px-3 py-2 text-[10px] font-medium transition hover:opacity-80"
-          style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-input)', color: '#f87171' }}
+          className="w-full rounded-md border px-3 py-2 text-sm font-medium transition hover:opacity-80"
+          style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-input)', color: 'var(--color-error)' }}
         >
           Vider l'historique des conversations
         </button>
       ) : (
         <div className="space-y-2">
-          <p className="text-[10px] font-medium" style={{ color: '#f87171' }}>Confirmer la suppression définitive ?</p>
+          <p className="text-sm font-medium" style={{ color: 'var(--color-error)' }}>Confirmer la suppression définitive ?</p>
           <div className="flex gap-2">
             <button onClick={handleClear} disabled={clearing}
-              className="flex-1 rounded-md px-2 py-1.5 text-[10px] font-medium text-white transition hover:opacity-80 disabled:opacity-50"
-              style={{ backgroundColor: '#ef4444' }}
+              className="flex-1 rounded-md px-2 py-1.5 text-sm font-medium text-white transition hover:opacity-80 disabled:opacity-50"
+              style={{ backgroundColor: 'var(--color-error)' }}
             >
               {clearing ? 'Suppression…' : 'Confirmer'}
             </button>
             <button onClick={() => setConfirmOpen(false)} disabled={clearing}
-              className="flex-1 rounded-md border px-2 py-1.5 text-[10px] font-medium transition hover:opacity-80 disabled:opacity-50"
+              className="flex-1 rounded-md border px-2 py-1.5 text-sm font-medium transition hover:opacity-80 disabled:opacity-50"
               style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
             >
               Annuler
@@ -394,7 +394,7 @@ function ClearConversationsCard() {
         </div>
       )}
       {result && (
-        <p className="mt-2 text-[10px] font-medium" style={{ color: result.type === 'success' ? '#4ade80' : '#f87171' }}>
+        <p className="mt-2 text-sm font-medium" style={{ color: result.type === 'success' ? 'var(--color-success)' : 'var(--color-error)' }}>
           {result.message}
         </p>
       )}
@@ -412,8 +412,8 @@ function SectionCard({ icon: Icon, title, description, children }: { icon: typeo
           <Icon size={14} style={{ color: 'var(--accent-primary)' }} />
         </div>
         <div>
-          <h4 className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h4>
-          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{description}</p>
+          <h4 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h4>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{description}</p>
         </div>
       </div>
       <div className="flex flex-col gap-1">{children}</div>
@@ -425,8 +425,8 @@ function SettingRow({ label, description, children }: { label: string; descripti
   return (
     <div className="flex items-center justify-between gap-3 border-b py-2 last:border-b-0" style={{ borderColor: 'var(--border-base)' }}>
       <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{label}</p>
-        <p className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>{description}</p>
+        <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{label}</p>
+        <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{description}</p>
       </div>
       <div className="flex-shrink-0">{children}</div>
     </div>

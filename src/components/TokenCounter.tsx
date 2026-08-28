@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Hash, TrendingUp, ArrowUp, ArrowDown, Clock, Sparkles, AlertTriangle, Gauge, Zap } from 'lucide-react';
 import { useLiveAPIContext } from '../context/LiveAPIContext';
 import { useProfile } from '../context/UserProfileContext';
@@ -136,12 +136,12 @@ export function TokenCounter() {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className={`px-2.5 py-1.5 rounded-xl text-[10px] font-semibold tracking-wide select-none flex items-center gap-1.5 cursor-pointer transition-all duration-200 active:scale-95 ${animate ? 'scale-110 shadow-orange-200' : 'hover:scale-105'}`}
+        className={`px-2.5 py-1.5 rounded-xl text-sm font-semibold tracking-wide select-none flex items-center gap-1.5 cursor-pointer transition-all duration-200 active:scale-95 ${animate ? 'scale-110 shadow-orange-200' : 'hover:scale-105'}`}
         style={{
           background: totalTokens > 0
             ? 'linear-gradient(135deg, rgba(251,146,60,0.08), rgba(251,146,60,0.15))'
             : 'linear-gradient(135deg, rgba(0,0,0,0.03), rgba(0,0,0,0.06))',
-          color: totalTokens > 0 ? '#c2410c' : 'rgba(0,0,0,0.45)',
+          color: totalTokens > 0 ? 'var(--color-warning)' : 'rgba(0,0,0,0.45)',
           border: `1px solid ${totalTokens > 0 ? 'rgba(251,146,60,0.2)' : 'rgba(0,0,0,0.06)'}`,
           boxShadow: totalTokens > 0 ? '0 2px 8px rgba(251,146,60,0.08)' : 'none',
         }}
@@ -152,7 +152,7 @@ export function TokenCounter() {
         <Hash className="w-3 h-3" />
         <span className="font-bold tabular-nums">{formatNumber(totalTokens)}</span>
         {lastUsage && (
-          <span className="text-[9px] opacity-60">
+          <span className="text-xs opacity-60">
             (+{formatNumber(lastUsage.totalTokens)})
           </span>
         )}
@@ -181,7 +181,7 @@ export function TokenCounter() {
                   <TrendingUp className="w-4 h-4 text-orange-600" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Tokens session</p>
+                  <p className="text-sm font-bold uppercase tracking-widest text-gray-400">Tokens session</p>
                   <p className="text-lg font-black text-gray-800 tabular-nums leading-tight">
                     {totalTokens.toLocaleString()}
                   </p>
@@ -193,7 +193,7 @@ export function TokenCounter() {
                 <div className="px-3 py-2 rounded-xl bg-blue-50/60">
                   <div className="flex items-center gap-1 text-blue-600 mb-0.5">
                     <ArrowUp className="w-3 h-3" />
-                    <span className="text-[9px] font-bold uppercase tracking-wider">Prompt</span>
+                    <span className="text-xs font-bold uppercase tracking-wider">Prompt</span>
                   </div>
                   <p className="text-sm font-bold text-blue-800 tabular-nums">
                     {formatNumber(totalPromptTokens)}
@@ -202,7 +202,7 @@ export function TokenCounter() {
                 <div className="px-3 py-2 rounded-xl bg-emerald-50/60">
                   <div className="flex items-center gap-1 text-emerald-600 mb-0.5">
                     <ArrowDown className="w-3 h-3" />
-                    <span className="text-[9px] font-bold uppercase tracking-wider">Réponse</span>
+                    <span className="text-xs font-bold uppercase tracking-wider">Réponse</span>
                   </div>
                   <p className="text-sm font-bold text-emerald-800 tabular-nums">
                     {formatNumber(totalCompletionTokens)}
@@ -214,7 +214,7 @@ export function TokenCounter() {
             {/* Historique des dernières requêtes */}
             {history.length > 0 && (
               <div className="px-4 pt-2 pb-3 border-t border-gray-100/80">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-2">
                   Dernières requêtes ({history.length})
                 </p>
                 <div className="max-h-36 overflow-y-auto space-y-1 scrollbar-thin pr-1">
@@ -228,8 +228,8 @@ export function TokenCounter() {
             {/* Aucune donnée */}
             {history.length === 0 && (
               <div className="px-4 pb-4 text-center">
-                <p className="text-[11px] text-gray-400">Aucune requête enregistrée</p>
-                <p className="text-[10px] text-gray-300 mt-0.5">Les tokens apparaîtront après la première interaction</p>
+                <p className="text-xs text-gray-400">Aucune requête enregistrée</p>
+                <p className="text-sm text-gray-300 mt-0.5">Les tokens apparaîtront après la première interaction</p>
               </div>
             )}
 
@@ -237,18 +237,18 @@ export function TokenCounter() {
             <div className="px-4 pt-2 pb-3 border-t border-gray-100/80">
               <div className="flex items-center gap-1.5 mb-2">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Optimisation</p>
+                <p className="text-sm font-bold uppercase tracking-widest text-gray-400">Optimisation</p>
               </div>
 
               {loadingOpt && (
-                <p className="text-[11px] text-gray-400 animate-pulse">Analyse en cours...</p>
+                <p className="text-xs text-gray-400 animate-pulse">Analyse en cours...</p>
               )}
 
               {optimization && !loadingOpt && (
                 <div className="space-y-2">
                   {/* Jauge d'utilisation du contexte */}
                   <div>
-                    <div className="flex items-center justify-between text-[10px] mb-1">
+                    <div className="flex items-center justify-between text-sm mb-1">
                       <span className="text-gray-500 flex items-center gap-1">
                         <Gauge className="w-3 h-3" /> Contexte de base
                       </span>
@@ -261,8 +261,8 @@ export function TokenCounter() {
                         className="h-full rounded-full"
                         style={{
                           background: optimization.totalBaseTokens / optimization.modelBudget.maxTotal > 0.7
-                            ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
-                            : 'linear-gradient(90deg, #10b981, #06b6d4)',
+                            ? 'linear-gradient(90deg, var(--color-warning), var(--color-error))'
+                            : 'linear-gradient(90deg, var(--color-success), var(--accent-secondary))',
                         }}
                         initial={false}
                         animate={{
@@ -275,7 +275,7 @@ export function TokenCounter() {
                         }
                       />
                     </div>
-                    <div className="flex justify-between mt-1 text-[9px] text-gray-400">
+                    <div className="flex justify-between mt-1 text-xs text-gray-400">
                       <span>Prompt: {formatNumber(optimization.systemPromptTokens)}</span>
                       <span>Mémoire: {formatNumber(optimization.memoryTokens)}</span>
                       <span>Dispo: {formatNumber(optimization.availableForConversation)}</span>
@@ -283,7 +283,7 @@ export function TokenCounter() {
 
                     {/* Économies affichées si mode compact actif */}
                     {optimization.compactEnabled && optimization.savedTokens && optimization.savedTokens > 0 && (
-                      <div className="flex items-center gap-1 mt-1.5 text-[9px] text-emerald-700 bg-emerald-50/80 px-2 py-1 rounded-md">
+                      <div className="flex items-center gap-1 mt-1.5 text-xs text-emerald-700 bg-emerald-50/80 px-2 py-1 rounded-md">
                         <Zap className="w-2.5 h-2.5" />
                         <span className="font-semibold">−{formatNumber(optimization.savedTokens)} tokens économisés (compact)</span>
                       </div>
@@ -296,7 +296,7 @@ export function TokenCounter() {
                       {optimization.suggestions.map((s, i) => (
                         <div
                           key={i}
-                          className="flex items-start gap-1.5 text-[10px] text-amber-700 bg-amber-50/60 px-2 py-1.5 rounded-lg"
+                          className="flex items-start gap-1.5 text-sm text-amber-700 bg-amber-50/60 px-2 py-1.5 rounded-lg"
                         >
                           <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
                           <span>{s}</span>
@@ -306,7 +306,7 @@ export function TokenCounter() {
                   )}
 
                   {optimization.suggestions.length === 0 && (
-                    <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 bg-emerald-50/60 px-2 py-1.5 rounded-lg">
+                    <div className="flex items-center gap-1.5 text-sm text-emerald-700 bg-emerald-50/60 px-2 py-1.5 rounded-lg">
                       <Sparkles className="w-3 h-3" />
                       <span>Utilisation optimale des tokens</span>
                     </div>
@@ -319,7 +319,7 @@ export function TokenCounter() {
                       setField('compactPrompt', !profile.compactPrompt);
                       setTimeout(() => { save(); loadOptimization(); }, 100);
                     }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[11px] font-medium transition-all cursor-pointer mt-1 active:scale-[0.98] ${
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer mt-1 active:scale-[0.98] ${
                       profile.compactPrompt
                         ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200'
                         : 'bg-gray-50/80 text-gray-600 hover:bg-gray-100'
@@ -329,7 +329,7 @@ export function TokenCounter() {
                       <Zap className="w-3.5 h-3.5" />
                       Mode compact (−40% tokens prompt)
                     </span>
-                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                    <span className={`px-1.5 py-0.5 rounded text-xs font-bold uppercase ${
                       profile.compactPrompt ? 'bg-emerald-200 text-emerald-900' : 'bg-gray-200 text-gray-500'
                     }`}>
                       {profile.compactPrompt ? 'ON' : 'OFF'}
@@ -351,7 +351,7 @@ function TokenUsageRow({ usage }: { usage: TokenUsage }) {
   return (
     <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-gray-50/80 transition-colors">
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 text-[11px]">
+        <div className="flex items-center gap-2 text-xs">
           <span className="text-blue-600 font-medium tabular-nums">
             ↑{formatNumber(usage.promptTokens)}
           </span>
@@ -363,7 +363,7 @@ function TokenUsageRow({ usage }: { usage: TokenUsage }) {
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-1 text-[9px] text-gray-400 flex-shrink-0">
+      <div className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
         <Clock className="w-2.5 h-2.5" />
         {timeAgo(usage.timestamp)}
       </div>

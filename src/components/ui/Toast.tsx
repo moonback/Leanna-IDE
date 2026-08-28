@@ -31,10 +31,10 @@ const ICONS: Record<ToastType, React.ComponentType<{ className?: string; style?:
 };
 
 const COLORS: Record<ToastType, { bg: string; border: string; icon: string }> = {
-  success: { bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.3)', icon: 'var(--color-success)' },
-  error:   { bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.3)',  icon: 'var(--color-error)'   },
-  warning: { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)', icon: 'var(--color-warning)' },
-  info:    { bg: 'rgba(14,165,233,0.12)', border: 'rgba(14,165,233,0.3)', icon: 'var(--color-info)'    },
+  success: { bg: 'var(--color-success-subtle)', border: 'color-mix(in srgb, var(--color-success) 25%, transparent)', icon: 'var(--color-success)' },
+  error:   { bg: 'var(--color-error-subtle)',   border: 'color-mix(in srgb, var(--color-error) 25%, transparent)',   icon: 'var(--color-error)' },
+  warning: { bg: 'var(--color-warning-subtle)', border: 'color-mix(in srgb, var(--color-warning) 25%, transparent)', icon: 'var(--color-warning)' },
+  info:    { bg: 'var(--color-info-subtle)',    border: 'color-mix(in srgb, var(--color-info) 25%, transparent)',    icon: 'var(--color-info)' },
 };
 
 const AUTO_DISMISS_MS = 4000;
@@ -102,7 +102,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 animate={{ opacity: 1, x: 0,  scale: 1    }}
                 exit={{    opacity: 0, x: 40, scale: 0.96 }}
                 transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl backdrop-blur-xl shadow-xl"
+                className="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-2xl backdrop-blur-sm shadow-2xl"
                 style={{
                   backgroundColor: c.bg,
                   border: `1px solid ${c.border}`,

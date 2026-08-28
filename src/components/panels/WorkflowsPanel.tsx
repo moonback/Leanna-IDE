@@ -65,11 +65,11 @@ interface WorkflowsPanelProps {
 function statusIcon(status?: string | null, size = 'w-3.5 h-3.5') {
   switch (status) {
     case 'success':
-      return <CheckCircle2 className={size} style={{ color: '#22c55e' }} />;
+      return <CheckCircle2 className={size} style={{ color: 'var(--color-success)' }} />;
     case 'partial':
-      return <AlertTriangle className={size} style={{ color: '#f59e0b' }} />;
+      return <AlertTriangle className={size} style={{ color: 'var(--color-warning)' }} />;
     case 'failed':
-      return <XCircle className={size} style={{ color: '#ef4444' }} />;
+      return <XCircle className={size} style={{ color: 'var(--color-error)' }} />;
     case 'running':
       return <Loader2 className={`${size} animate-spin`} style={{ color: 'var(--accent-primary)' }} />;
     default:
@@ -89,9 +89,9 @@ function statusLabel(status?: string | null) {
 
 function statusColor(status?: string | null) {
   switch (status) {
-    case 'success': return '#22c55e';
-    case 'partial': return '#f59e0b';
-    case 'failed':  return '#ef4444';
+    case 'success': return 'var(--color-success)';
+    case 'partial': return 'var(--color-warning)';
+    case 'failed':  return 'var(--color-error)';
     case 'running': return 'var(--accent-primary)';
     default:        return 'var(--text-dimmed)';
   }
@@ -100,13 +100,13 @@ function statusColor(status?: string | null) {
 function stepStatusIcon(status: string) {
   switch (status) {
     case 'success':
-      return <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#22c55e' }} />;
+      return <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />;
     case 'running':
       return <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />;
     case 'failed':
-      return <XCircle className="w-3.5 h-3.5" style={{ color: '#ef4444' }} />;
+      return <XCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />;
     case 'skipped':
-      return <ChevronRight className="w-3.5 h-3.5" style={{ color: '#6b7280' }} />;
+      return <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />;
     default:
       return <Clock className="w-3.5 h-3.5" style={{ color: 'var(--text-dimmed)', opacity: 0.4 }} />;
   }
@@ -179,14 +179,14 @@ function ActiveRunTracker({ run }: { run: WorkflowRunState }) {
               </span>
               <div className="flex items-center gap-2">
                 <span
-                  className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                  className="text-xs font-bold uppercase px-2 py-0.5 rounded-full"
                   style={{ backgroundColor: `${color}20`, color }}
                 >
                   {statusLabel(run.status)}
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-3 mt-1 text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+            <div className="flex items-center gap-3 mt-1 text-sm" style={{ color: 'var(--text-dimmed)' }}>
               <span className="inline-flex items-center gap-1">
                 <Timer className="w-3 h-3" />
                 {formatElapsed(run.elapsedMs)}
@@ -196,7 +196,7 @@ function ActiveRunTracker({ run }: { run: WorkflowRunState }) {
                 Étape {run.currentStepIndex + 1}/{run.totalSteps}
               </span>
               {!isFinished && run.currentStepAction && (
-                <span className="inline-flex items-center gap-1 font-mono text-[10px]" style={{ color }}>
+                <span className="inline-flex items-center gap-1 font-mono text-xs" style={{ color }}>
                   <Zap className="w-3 h-3" />
                   {run.currentStepAction}
                 </span>
@@ -227,7 +227,7 @@ function ActiveRunTracker({ run }: { run: WorkflowRunState }) {
           </motion.div>
         </div>
         <div className="flex justify-between mt-1">
-          <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
             {run.progress}%
           </span>
         </div>
@@ -260,14 +260,14 @@ function ActiveRunTracker({ run }: { run: WorkflowRunState }) {
                   {idx < run.steps.length - 1 && (
                     <div
                       className="w-px h-2 mt-0.5"
-                      style={{ backgroundColor: isDone ? '#22c55e' : 'var(--border-base)' }}
+                      style={{ backgroundColor: isDone ? 'var(--color-success)' : 'var(--border-base)' }}
                     />
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <span
-                    className="text-[11px] font-semibold block truncate"
+                    className="text-sm font-semibold block truncate"
                     style={{
                       color: isActive ? color : 'var(--text-primary)',
                     }}
@@ -275,19 +275,19 @@ function ActiveRunTracker({ run }: { run: WorkflowRunState }) {
                     {step.label || step.action}
                   </span>
                   {step.label && (
-                    <span className="text-[9px] font-mono block" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs font-mono block" style={{ color: 'var(--text-dimmed)' }}>
                       {step.action}
                     </span>
                   )}
                   {step.error && (
-                    <span className="text-[9px] block mt-0.5 truncate" style={{ color: '#ef4444' }} title={step.error}>
+                    <span className="text-xs block mt-0.5 truncate" style={{ color: 'var(--color-error)' }} title={step.error}>
                       ⚠ {step.error}
                     </span>
                   )}
                 </div>
 
                 {step.durationMs != null && (
-                  <span className="text-[9px] font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
                     {formatElapsed(step.durationMs)}
                   </span>
                 )}
@@ -376,14 +376,14 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsBuilderOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-bold transition-all bg-[var(--accent-subtle)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-white border border-[var(--border-base)] shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all bg-[var(--accent-subtle)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-white border border-[var(--border-base)] shadow-sm"
               title="Créer un workflow visuel low-code"
             >
               <Plus className="w-3.5 h-3.5" /> Nouveau Workflow Visuel
             </button>
             {activeRuns.some(r => r.status === 'running') && (
               <span
-                className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full animate-pulse"
+                className="text-xs font-bold uppercase px-2 py-0.5 rounded-full animate-pulse"
                 style={{ backgroundColor: 'rgba(14,165,233,0.15)', color: 'var(--accent-primary)' }}
               >
                 {activeRuns.filter(r => r.status === 'running').length} en cours
@@ -395,12 +395,12 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
               disabled={!connected}
               whileHover={{ scale: connected ? 1.05 : 1 }}
               whileTap={{ scale: connected ? 0.95 : 1 }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-40"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
               style={{
                 background: connected
-                  ? 'linear-gradient(135deg, var(--accent-primary), #7c3aed)'
+                  ? 'linear-gradient(135deg, var(--accent-primary), var(--color-accent-alt))'
                   : 'var(--bg-secondary)',
-                color: connected ? '#fff' : 'var(--text-muted)',
+                color: connected ? 'white' : 'var(--text-muted)',
                 boxShadow: connected ? '0 2px 8px rgba(14,165,233,0.3)' : 'none',
               }}
               title={connected ? 'Créer un workflow avec l\'assistant' : 'Connectez l\'assistant pour créer un workflow'}
@@ -430,7 +430,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
         {activeRuns.length > 0 && workflows.length > 0 && (
           <div className="flex items-center gap-3 py-1">
             <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
-            <span className="text-[9px] uppercase font-bold tracking-widest" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs uppercase font-bold tracking-widest" style={{ color: 'var(--text-dimmed)' }}>
               Tous les workflows
             </span>
             <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
@@ -453,7 +453,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
             </div>
             <div>
               <p className="text-xs font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>Aucun workflow configuré</p>
-              <p className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>L'assistant peut t'en créer un en quelques questions.</p>
+              <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>L'assistant peut t'en créer un en quelques questions.</p>
             </div>
             <motion.button
               id="workflow-create-assistant-empty-btn"
@@ -461,12 +461,12 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
               disabled={!connected}
               whileHover={{ scale: connected ? 1.04 : 1 }}
               whileTap={{ scale: connected ? 0.96 : 1 }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-semibold transition-all disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
               style={{
                 background: connected
-                  ? 'linear-gradient(135deg, var(--accent-primary), #7c3aed)'
+                  ? 'linear-gradient(135deg, var(--accent-primary), var(--color-accent-alt))'
                   : 'var(--bg-secondary)',
-                color: connected ? '#fff' : 'var(--text-muted)',
+                color: connected ? 'white' : 'var(--text-muted)',
                 boxShadow: connected ? '0 4px 14px rgba(14,165,233,0.25)' : 'none',
               }}
               aria-label="Créer un workflow guidé via l'assistant"
@@ -475,7 +475,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
               Créer un workflow avec l'assistant
             </motion.button>
             {!connected && (
-              <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>Connectez l'assistant pour commencer</p>
+              <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Connectez l'assistant pour commencer</p>
             )}
           </motion.div>
         ) : (
@@ -515,21 +515,21 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                       <div className="flex-1 min-w-0">
                         {/* Title row */}
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[13px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                          <span className="text-base font-bold truncate" style={{ color: 'var(--text-primary)' }}>
                             {wf.name}
                           </span>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {!wf.enabled && (
                               <span
-                                className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded"
-                                style={{ backgroundColor: 'rgba(107,114,128,0.15)', color: '#6b7280' }}
+                                className="text-xs font-bold uppercase px-1.5 py-0.5 rounded"
+                                style={{ backgroundColor: 'rgba(107,114,128,0.15)', color: 'var(--text-muted)' }}
                               >
                                 Pausé
                               </span>
                             )}
                             {wf.schedule && (
                               <span
-                                className="text-[9px] font-mono px-2 py-0.5 rounded-full"
+                                className="text-xs font-mono px-2 py-0.5 rounded-full"
                                 style={{
                                   backgroundColor: 'rgba(14, 165, 233, 0.1)',
                                   color: 'var(--accent-primary)',
@@ -543,13 +543,13 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                         </div>
 
                         {wf.description && (
-                          <p className="text-[11px] mt-1 line-clamp-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                          <p className="text-sm mt-1 line-clamp-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                             {wf.description}
                           </p>
                         )}
 
                         {/* Meta row */}
-                        <div className="flex items-center gap-3 mt-2 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                        <div className="flex items-center gap-3 mt-2 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                           <span className="inline-flex items-center gap-1">
                             <Hash className="w-3 h-3" />
                             {wf.steps.length} étape{wf.steps.length > 1 ? 's' : ''}
@@ -585,7 +585,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                             type="button"
                             onClick={() => runAction(`/api/workflows/${wf.id}/run`)}
                             disabled={busyId !== null || isRunning}
-                            className="rounded-lg border px-3 py-1.5 text-[10px] font-bold disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors hover:bg-[var(--bg-primary)]"
+                            className="rounded-lg border px-3 py-1.5 text-xs font-bold disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors hover:bg-[var(--bg-primary)]"
                             style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
                           >
                             {isRunning ? (
@@ -598,7 +598,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                             type="button"
                             onClick={() => runAction(`/api/workflows/${wf.id}/toggle`, 'POST', { enabled: !wf.enabled })}
                             disabled={busyId !== null}
-                            className="rounded-lg border px-3 py-1.5 text-[10px] font-bold disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors hover:bg-[var(--bg-primary)]"
+                            className="rounded-lg border px-3 py-1.5 text-xs font-bold disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors hover:bg-[var(--bg-primary)]"
                             style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
                           >
                             <Pause className="w-3 h-3" />
@@ -607,7 +607,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                           <button
                             type="button"
                             onClick={() => toggleExpand(wf.id)}
-                            className="rounded-lg border px-3 py-1.5 text-[10px] font-bold inline-flex items-center gap-1.5 transition-colors hover:bg-[var(--bg-primary)]"
+                            className="rounded-lg border px-3 py-1.5 text-xs font-bold inline-flex items-center gap-1.5 transition-colors hover:bg-[var(--bg-primary)]"
                             style={{ borderColor: 'var(--border-base)', color: 'var(--text-dimmed)' }}
                           >
                             {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
@@ -617,8 +617,8 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                             type="button"
                             onClick={() => runAction(`/api/workflows/${wf.id}`, 'DELETE')}
                             disabled={busyId !== null || isRunning}
-                            className="rounded-lg border px-3 py-1.5 text-[10px] font-bold disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors hover:bg-red-500/5"
-                            style={{ borderColor: 'var(--border-base)', color: '#ef4444' }}
+                            className="rounded-lg border px-3 py-1.5 text-xs font-bold disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors hover:bg-red-500/5"
+                            style={{ borderColor: 'var(--border-base)', color: 'var(--color-error)' }}
                           >
                             <Trash2 className="w-3 h-3" /> Supprimer
                           </button>
@@ -642,11 +642,11 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                           style={{ borderColor: 'var(--border-base)', backgroundColor: 'rgba(0,0,0,0.04)' }}
                         >
                           <div className="flex items-center justify-between mb-2.5">
-                            <div className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-dimmed)' }}>
+                            <div className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-dimmed)' }}>
                               Pipeline — {wf.steps.length} étapes
                             </div>
                             {wf.schedule && (
-                              <span className="text-[9px] font-mono px-2 py-0.5 rounded-full"
+                              <span className="text-xs font-mono px-2 py-0.5 rounded-full"
                                 style={{ backgroundColor: 'rgba(14,165,233,0.08)', color: 'var(--accent-primary)' }}>
                                 Toutes les {wf.schedule}
                               </span>
@@ -672,7 +672,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                                     stepStatusIcon(liveStatus)
                                   ) : (
                                     <span
-                                      className="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+                                      className="w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0"
                                       style={{ backgroundColor: 'rgba(14,165,233,0.1)', color: 'var(--accent-primary)' }}
                                     >
                                       {idx + 1}
@@ -680,28 +680,28 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                                   )}
                                   <div className="flex-1 min-w-0">
                                     <span
-                                      className="text-[11px] font-semibold block truncate"
+                                      className="text-sm font-semibold block truncate"
                                       style={{ color: isStepActive ? 'var(--accent-primary)' : 'var(--text-primary)' }}
                                     >
                                       {step.label || step.action}
                                     </span>
                                     {step.label && (
-                                      <span className="text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                                      <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                                         {step.action}
                                       </span>
                                     )}
                                   </div>
                                   {liveStep?.durationMs != null && (
-                                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                                    <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                                       {formatElapsed(liveStep.durationMs)}
                                     </span>
                                   )}
                                   {step.onError && step.onError !== 'stop' && (
                                     <span
-                                      className="text-[8px] px-1.5 py-0.5 rounded font-mono font-bold"
+                                      className="text-xs px-1.5 py-0.5 rounded font-mono font-bold"
                                       style={{
                                         backgroundColor: step.onError === 'retry' ? 'rgba(245,158,11,0.12)' : 'rgba(107,114,128,0.12)',
-                                        color: step.onError === 'retry' ? '#f59e0b' : '#6b7280',
+                                        color: step.onError === 'retry' ? 'var(--color-warning)' : 'var(--text-muted)',
                                       }}
                                     >
                                       {step.onError === 'retry' ? '↻ retry' : '→ skip'}

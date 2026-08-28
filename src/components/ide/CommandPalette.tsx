@@ -330,7 +330,7 @@ export function CommandPalette({
                   <span className="truncate font-medium" style={{ color: 'var(--text-primary)' }}>
                     {file.name}
                   </span>
-                  <span className="truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
                     {file.path}
                   </span>
                 </div>
@@ -355,7 +355,7 @@ export function CommandPalette({
               return grouped.map((group) => (
                 <div key={group.category}>
                   <div className="px-3 pt-2 pb-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                       {group.category}
                     </span>
                   </div>
@@ -372,14 +372,14 @@ export function CommandPalette({
                       <div className="flex flex-1 flex-col min-w-0">
                         <span style={{ color: 'var(--text-primary)' }}>{cmd.label}</span>
                         {cmd.description && (
-                          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                             {cmd.description}
                           </span>
                         )}
                       </div>
                       {cmd.shortcut && (
                         <kbd
-                          className="px-1.5 py-0.5 text-[10px]"
+                          className="px-1.5 py-0.5 text-sm"
                           style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', borderRadius: 'var(--radius-sm)' }}
                         >
                           {cmd.shortcut}
@@ -395,7 +395,7 @@ export function CommandPalette({
 
         {/* Footer hint */}
         <div
-          className="flex items-center gap-3 border-t px-3 py-2 text-[11px]"
+          className="flex items-center gap-3 border-t px-3 py-2 text-xs"
           style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
         >
           <span className="flex items-center gap-1"><ArrowUp size={10} /><ArrowDown size={10} /> naviguer</span>

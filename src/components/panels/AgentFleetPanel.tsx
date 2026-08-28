@@ -77,22 +77,22 @@ interface IncomingAgentEvent {
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const ROLE_META: Record<string, { icon: any; color: string; label: string }> = {
-  test:      { icon: FlaskConical, color: '#4ade80', label: 'Tests' },
-  docs:      { icon: FileText,     color: '#60a5fa', label: 'Docs' },
-  refactor:  { icon: RefreshCw,    color: '#fbbf24', label: 'Refactor' },
-  security:  { icon: Shield,       color: '#f87171', label: 'Sécurité' },
-  review:    { icon: Eye,          color: '#a78bfa', label: 'Review' },
-  architect: { icon: Building2,    color: '#f97316', label: 'Architect' },
+  test:      { icon: FlaskConical, color: 'var(--color-success)', label: 'Tests' },
+  docs:      { icon: FileText,     color: 'var(--color-info)', label: 'Docs' },
+  refactor:  { icon: RefreshCw,    color: 'var(--color-warning)', label: 'Refactor' },
+  security:  { icon: Shield,       color: 'var(--color-error)', label: 'Sécurité' },
+  review:    { icon: Eye,          color: 'var(--color-accent-alt)', label: 'Review' },
+  architect: { icon: Building2,    color: 'var(--color-warning)', label: 'Architect' },
 };
 
 const TYPE_COLOR: Record<string, string> = {
-  task_request:          '#60a5fa',
-  task_response:         '#4ade80',
-  collaboration_request: '#f97316',
-  status_query:          '#94a3b8',
-  status_response:       '#94a3b8',
-  broadcast:             '#fbbf24',
-  event:                 '#a78bfa',
+  task_request:          'var(--color-info)',
+  task_response:         'var(--color-success)',
+  collaboration_request: 'var(--color-warning)',
+  status_query:          'var(--text-muted)',
+  status_response:       'var(--text-muted)',
+  broadcast:             'var(--color-warning)',
+  event:                 'var(--color-accent-alt)',
 };
 
 function apiHeaders(): Record<string, string> {
@@ -273,7 +273,7 @@ export function AgentFleetPanel({ inline = false, onClose }: AgentFleetPanelProp
           <button
             key={id}
             onClick={() => setTab(id)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
             style={{
               color: tab === id ? 'var(--accent-primary)' : 'var(--text-dimmed)',
               backgroundColor: tab === id ? 'var(--accent-subtle)' : 'transparent',
@@ -283,8 +283,8 @@ export function AgentFleetPanel({ inline = false, onClose }: AgentFleetPanelProp
             {label}
             {badge !== undefined && badge > 0 && (
               <span
-                className="min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-[8px] font-bold"
-                style={{ backgroundColor: tab === id ? 'var(--accent-primary)' : 'var(--border-base)', color: tab === id ? '#fff' : 'var(--text-muted)' }}
+                className="min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-xs font-bold"
+                style={{ backgroundColor: tab === id ? 'var(--accent-primary)' : 'var(--border-base)', color: tab === id ? 'white' : 'var(--text-muted)' }}
               >
                 {badge > 99 ? '99+' : badge}
               </span>
@@ -298,7 +298,7 @@ export function AgentFleetPanel({ inline = false, onClose }: AgentFleetPanelProp
           title={notificationsEnabled ? 'Désactiver notifications' : 'Activer notifications'}
         >
           {notificationsEnabled
-            ? <Bell size={11} style={{ color: '#4ade80' }} />
+            ? <Bell size={11} style={{ color: 'var(--color-success)' }} />
             : <BellOff size={11} style={{ color: 'var(--text-dimmed)' }} />}
         </button>
         <button
@@ -312,8 +312,8 @@ export function AgentFleetPanel({ inline = false, onClose }: AgentFleetPanelProp
 
       {/* Error */}
       {error && (
-        <div className="mx-3 mt-2 px-3 py-2 rounded-lg text-[10px] flex items-center gap-2"
-          style={{ backgroundColor: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', color: '#f87171' }}>
+        <div className="mx-3 mt-2 px-3 py-2 rounded-lg text-xs flex items-center gap-2"
+          style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 20%, transparent)', color: 'var(--color-error)' }}>
           <AlertTriangle size={11} />
           <span>{error}</span>
         </div>
@@ -390,8 +390,8 @@ export function AgentFleetPanel({ inline = false, onClose }: AgentFleetPanelProp
                 <Users size={15} style={{ color: 'var(--accent-primary)' }} />
               </div>
               <div>
-                <h2 className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Flotte d'Agents</h2>
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Flotte d'Agents</h2>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   {totalActive > 0 ? `${totalActive} agent${totalActive > 1 ? 's' : ''} actif${totalActive > 1 ? 's' : ''}` : 'Tous au repos'}
                 </span>
               </div>
@@ -425,24 +425,24 @@ function FleetSummary({ summary, recommendation }: {
   return (
     <div className="rounded-xl px-3.5 py-3" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           {summary.online}/{summary.totalAgents} en ligne
         </span>
         <div className="flex gap-1.5">
-          {summary.idle > 0 && <Pill label={`${summary.idle} libres`} color="#4ade80" />}
-          {summary.busy > 0 && <Pill label={`${summary.busy} occupés`} color="#fbbf24" />}
-          {summary.overloaded > 0 && <Pill label={`${summary.overloaded} surchargés`} color="#f87171" />}
+          {summary.idle > 0 && <Pill label={`${summary.idle} libres`} color="var(--color-success)" />}
+          {summary.busy > 0 && <Pill label={`${summary.busy} occupés`} color="var(--color-warning)" />}
+          {summary.overloaded > 0 && <Pill label={`${summary.overloaded} surchargés`} color="var(--color-error)" />}
         </div>
       </div>
       {recommendation && (
-        <p className="text-[9px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>{recommendation}</p>
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{recommendation}</p>
       )}
     </div>
   );
 }
 
 function AgentCard({ agent }: { agent: AgentStat }) {
-  const meta = ROLE_META[agent.role] ?? { icon: Users, color: '#94a3b8', label: agent.role };
+  const meta = ROLE_META[agent.role] ?? { icon: Users, color: 'var(--text-muted)', label: agent.role };
   const Icon = meta.icon;
   const isActive = agent.status === 'busy' || agent.status === 'overloaded';
 
@@ -462,14 +462,14 @@ function AgentCard({ agent }: { agent: AgentStat }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{meta.label}</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{meta.label}</span>
           <StatusDot status={agent.status} />
-          <span className="text-[9px] capitalize" style={{ color: 'var(--text-dimmed)' }}>{agent.status}</span>
+          <span className="text-xs capitalize" style={{ color: 'var(--text-dimmed)' }}>{agent.status}</span>
         </div>
-        <div className="text-[9px] mt-0.5 flex gap-3" style={{ color: 'var(--text-muted)' }}>
+        <div className="text-xs mt-0.5 flex gap-3" style={{ color: 'var(--text-muted)' }}>
           {agent.runningTasks > 0 && <span className="flex items-center gap-1"><Loader2 size={8} className="animate-spin" />{agent.runningTasks} en cours</span>}
           {agent.queuedTasks > 0 && <span className="flex items-center gap-1"><Clock size={8} />{agent.queuedTasks} en queue</span>}
-          {agent.delegationSuccess > 0 && <span style={{ color: '#4ade80' }}>✓ {agent.delegationSuccess}</span>}
+          {agent.delegationSuccess > 0 && <span style={{ color: 'var(--color-success)' }}>✓ {agent.delegationSuccess}</span>}
         </div>
       </div>
     </div>
@@ -477,17 +477,17 @@ function AgentCard({ agent }: { agent: AgentStat }) {
 }
 
 function StatusDot({ status }: { status: AgentStat['status'] }) {
-  const colors: Record<string, string> = { idle: '#4ade80', busy: '#fbbf24', overloaded: '#f87171', offline: '#475569' };
+  const colors: Record<string, string> = { idle: 'var(--color-success)', busy: 'var(--color-warning)', overloaded: 'var(--color-error)', offline: 'var(--text-dimmed)' };
   return (
     <span
       className={`w-2 h-2 rounded-full flex-shrink-0 ${status === 'busy' || status === 'overloaded' ? 'animate-pulse' : ''}`}
-      style={{ backgroundColor: colors[status] ?? '#475569' }}
+      style={{ backgroundColor: colors[status] ?? 'var(--text-dimmed)' }}
     />
   );
 }
 
 function BusMessageRow({ msg }: { msg: BusMessage }) {
-  const color = TYPE_COLOR[msg.type] ?? '#94a3b8';
+  const color = TYPE_COLOR[msg.type] ?? 'var(--text-muted)';
   const time = new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   return (
@@ -498,25 +498,25 @@ function BusMessageRow({ msg }: { msg: BusMessage }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[9px] font-bold" style={{ color }}>{msg.type.replace(/_/g, ' ')}</span>
-          <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{msg.from}</span>
+          <span className="text-xs font-bold" style={{ color }}>{msg.type.replace(/_/g, ' ')}</span>
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{msg.from}</span>
           <ArrowRight size={8} style={{ color: 'var(--text-dimmed)' }} />
-          <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{msg.to}</span>
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{msg.to}</span>
           {msg.isAutonomous && (
-            <span className="text-[7px] font-bold px-1 py-0.5 rounded uppercase"
-              style={{ backgroundColor: 'rgba(249,115,22,0.12)', color: '#f97316' }}>auto</span>
+            <span className="text-xs font-bold px-1 py-0.5 rounded uppercase"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 12%, transparent)', color: 'var(--color-warning)' }}>auto</span>
           )}
         </div>
-        <p className="text-[9px] truncate mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{msg.summary}</p>
+        <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{msg.summary}</p>
       </div>
-      <span className="text-[8px] font-mono flex-shrink-0 mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{time}</span>
+      <span className="text-xs font-mono flex-shrink-0 mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{time}</span>
     </div>
   );
 }
 
 function MetricsView({ metrics }: { metrics: BusMetrics }) {
   const rate = metrics.successRatePercent ?? Math.round((metrics.successRate ?? 1) * 100);
-  const rateColor = rate >= 95 ? '#4ade80' : rate >= 80 ? '#fbbf24' : '#f87171';
+  const rateColor = rate >= 95 ? 'var(--color-success)' : rate >= 80 ? 'var(--color-warning)' : 'var(--color-error)';
   const deadLetterEntries = Object.entries(metrics.deadLetterQueue ?? {});
 
   return (
@@ -524,8 +524,8 @@ function MetricsView({ metrics }: { metrics: BusMetrics }) {
       {/* Success rate */}
       <div className="rounded-xl p-3.5" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>Taux de succès</span>
-          <span className="text-[14px] font-bold font-mono" style={{ color: rateColor }}>{rate}%</span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Taux de succès</span>
+          <span className="text-base font-bold font-mono" style={{ color: rateColor }}>{rate}%</span>
         </div>
         <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-input)' }}>
           <motion.div
@@ -541,29 +541,29 @@ function MetricsView({ metrics }: { metrics: BusMetrics }) {
       {/* Key metrics grid */}
       <div className="grid grid-cols-2 gap-2">
         {[
-          { label: 'Messages', value: metrics.totalMessages, icon: Mail, color: '#60a5fa' },
-          { label: 'Subscriptions', value: metrics.activeSubscriptions, icon: Radio, color: '#a78bfa' },
-          { label: 'En attente', value: metrics.pendingRequests, icon: Clock, color: '#fbbf24' },
-          { label: 'Dead-letter', value: deadLetterEntries.reduce((a, [, v]) => a + v, 0), icon: Inbox, color: '#f87171' },
+          { label: 'Messages', value: metrics.totalMessages, icon: Mail, color: 'var(--color-info)' },
+          { label: 'Subscriptions', value: metrics.activeSubscriptions, icon: Radio, color: 'var(--color-accent-alt)' },
+          { label: 'En attente', value: metrics.pendingRequests, icon: Clock, color: 'var(--color-warning)' },
+          { label: 'Dead-letter', value: deadLetterEntries.reduce((a, [, v]) => a + v, 0), icon: Inbox, color: 'var(--color-error)' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="rounded-xl px-3 py-2.5" style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)' }}>
             <div className="flex items-center gap-1.5 mb-1">
               <Icon size={10} style={{ color: value > 0 ? color : 'var(--text-dimmed)' }} />
-              <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{label}</span>
+              <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{label}</span>
             </div>
-            <span className="text-[14px] font-bold font-mono" style={{ color: value > 0 ? color : 'var(--text-primary)' }}>{value}</span>
+            <span className="text-base font-bold font-mono" style={{ color: value > 0 ? color : 'var(--text-primary)' }}>{value}</span>
           </div>
         ))}
       </div>
 
       {/* Dead-letter detail */}
       {deadLetterEntries.length > 0 && (
-        <div className="rounded-xl p-3" style={{ backgroundColor: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.15)' }}>
-          <p className="text-[9px] font-semibold mb-2" style={{ color: '#f87171' }}>⚠️ Messages non délivrés</p>
+        <div className="rounded-xl p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 15%, transparent)' }}>
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--color-error)' }}>⚠️ Messages non délivrés</p>
           {deadLetterEntries.map(([role, count]) => (
-            <div key={role} className="flex items-center justify-between py-1 text-[9px]">
+            <div key={role} className="flex items-center justify-between py-1 text-xs">
               <span style={{ color: 'var(--text-muted)' }}>{role}</span>
-              <span className="font-mono font-bold" style={{ color: '#f87171' }}>{count}</span>
+              <span className="font-mono font-bold" style={{ color: 'var(--color-error)' }}>{count}</span>
             </div>
           ))}
         </div>
@@ -572,12 +572,12 @@ function MetricsView({ metrics }: { metrics: BusMetrics }) {
       {/* Message type distribution */}
       {Object.keys(metrics.byMessageType).length > 0 && (
         <div>
-          <p className="text-[9px] font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Par type</p>
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Par type</p>
           <div className="space-y-1">
             {Object.entries(metrics.byMessageType).map(([type, count]) => (
-              <div key={type} className="flex items-center gap-2 text-[9px]">
+              <div key={type} className="flex items-center gap-2 text-xs">
                 <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                  style={{ backgroundColor: TYPE_COLOR[type] ?? '#94a3b8' }} />
+                  style={{ backgroundColor: TYPE_COLOR[type] ?? 'var(--text-muted)' }} />
                 <span className="flex-1" style={{ color: 'var(--text-muted)' }}>{type.replace(/_/g, ' ')}</span>
                 <span className="font-mono font-bold" style={{ color: 'var(--text-primary)' }}>{count}</span>
               </div>
@@ -591,7 +591,7 @@ function MetricsView({ metrics }: { metrics: BusMetrics }) {
 
 function Pill({ label, color }: { label: string; color: string }) {
   return (
-    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold"
+    <span className="px-1.5 py-0.5 rounded-full text-xs font-bold"
       style={{ backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)`, color }}>
       {label}
     </span>
@@ -602,7 +602,7 @@ function LoadingState() {
   return (
     <div className="flex flex-col items-center justify-center py-12 gap-3">
       <Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
-      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Chargement…</p>
+      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Chargement…</p>
     </div>
   );
 }
@@ -614,8 +614,8 @@ function EmptyState({ icon: Icon, title, sub }: { icon: any; title: string; sub:
         style={{ backgroundColor: 'var(--bg-input)' }}>
         <Icon size={18} style={{ color: 'var(--text-dimmed)' }} />
       </div>
-      <p className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>{title}</p>
-      <p className="text-[9px] leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>{sub}</p>
+      <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{title}</p>
+      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>{sub}</p>
     </div>
   );
 }

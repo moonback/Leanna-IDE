@@ -34,31 +34,31 @@ interface Props {
 
 // Types de documents
 const DOC_TYPES = [
-  { key: 'full-report', label: 'Rapport complet', icon: FileText, color: '#dc2626' },
-  { key: 'summary', label: 'Résumé', icon: FileText, color: '#3b82f6' },
-  { key: 'faq', label: 'FAQ', icon: HelpCircle, color: '#8b5cf6' },
-  { key: 'study-guide', label: 'Guide d\'étude', icon: GraduationCap, color: '#10b981' },
-  { key: 'briefing', label: 'Briefing', icon: Briefcase, color: '#f59e0b' },
-  { key: 'timeline', label: 'Chronologie', icon: Clock, color: '#ef4444' },
-  { key: 'outline', label: 'Plan', icon: List, color: '#06b6d4' },
-  { key: 'mindmap', label: 'Carte mentale', icon: Brain, color: '#ec4899' },
-  { key: 'infographic', label: 'Infographie', icon: Lightbulb, color: '#f97316' },
-  { key: 'swot', label: 'Analyse SWOT', icon: Target, color: '#14b8a6' },
-  { key: 'glossary', label: 'Glossaire', icon: BookOpen, color: '#6366f1' },
-  { key: 'roadmap', label: 'Roadmap', icon: Zap, color: '#f97316' },
+  { key: 'full-report', label: 'Rapport complet', icon: FileText, color: 'var(--color-error)' },
+  { key: 'summary', label: 'Résumé', icon: FileText, color: 'var(--accent-primary)' },
+  { key: 'faq', label: 'FAQ', icon: HelpCircle, color: 'var(--color-accent-alt)' },
+  { key: 'study-guide', label: 'Guide d\'étude', icon: GraduationCap, color: 'var(--color-success)' },
+  { key: 'briefing', label: 'Briefing', icon: Briefcase, color: 'var(--color-warning)' },
+  { key: 'timeline', label: 'Chronologie', icon: Clock, color: 'var(--color-error)' },
+  { key: 'outline', label: 'Plan', icon: List, color: 'var(--accent-secondary)' },
+  { key: 'mindmap', label: 'Carte mentale', icon: Brain, color: 'var(--color-error)' },
+  { key: 'infographic', label: 'Infographie', icon: Lightbulb, color: 'var(--color-warning)' },
+  { key: 'swot', label: 'Analyse SWOT', icon: Target, color: 'var(--color-info)' },
+  { key: 'glossary', label: 'Glossaire', icon: BookOpen, color: 'var(--color-accent-alt)' },
+  { key: 'roadmap', label: 'Roadmap', icon: Zap, color: 'var(--color-warning)' },
 ];
 
 const REPORT_TYPES = [
-  { key: 'report-business', label: 'Business Plan', icon: Briefcase, color: '#f59e0b' },
-  { key: 'report-market', label: 'Étude de marché', icon: Target, color: '#14b8a6' },
-  { key: 'report-technical', label: 'Rapport technique', icon: FileText, color: '#3b82f6' },
-  { key: 'report-competitive', label: 'Analyse concurrentielle', icon: Target, color: '#8b5cf6' },
-  { key: 'report-financial', label: 'Rapport financier', icon: FileText, color: '#10b981' },
-  { key: 'report-marketing', label: 'Plan marketing', icon: Sparkles, color: '#ec4899' },
-  { key: 'report-product', label: 'Rapport produit', icon: List, color: '#06b6d4' },
-  { key: 'report-risk', label: 'Analyse des risques', icon: Target, color: '#ef4444' },
-  { key: 'report-executive', label: 'Synthèse exécutive', icon: Briefcase, color: '#dc2626' },
-  { key: 'report-project', label: 'Rapport de projet', icon: Clock, color: '#6366f1' },
+  { key: 'report-business', label: 'Business Plan', icon: Briefcase, color: 'var(--color-warning)' },
+  { key: 'report-market', label: 'Étude de marché', icon: Target, color: 'var(--color-info)' },
+  { key: 'report-technical', label: 'Rapport technique', icon: FileText, color: 'var(--accent-primary)' },
+  { key: 'report-competitive', label: 'Analyse concurrentielle', icon: Target, color: 'var(--color-accent-alt)' },
+  { key: 'report-financial', label: 'Rapport financier', icon: FileText, color: 'var(--color-success)' },
+  { key: 'report-marketing', label: 'Plan marketing', icon: Sparkles, color: 'var(--color-error)' },
+  { key: 'report-product', label: 'Rapport produit', icon: List, color: 'var(--accent-secondary)' },
+  { key: 'report-risk', label: 'Analyse des risques', icon: Target, color: 'var(--color-error)' },
+  { key: 'report-executive', label: 'Synthèse exécutive', icon: Briefcase, color: 'var(--color-error)' },
+  { key: 'report-project', label: 'Rapport de projet', icon: Clock, color: 'var(--color-accent-alt)' },
 ];
 
 /**
@@ -113,7 +113,7 @@ export function HistoryPanel({ notebookId, sources, onRefresh, onViewDoc }: Prop
   // Fonction utilitaire pour obtenir la couleur d'un type de document
   const getDocTypeColor = useCallback((typeKey: string) => {
     const docType = DOC_TYPES.find(t => t.key === typeKey) || REPORT_TYPES.find(t => t.key === typeKey);
-    return docType?.color || '#6b7280';
+    return docType?.color || 'var(--text-muted)';
   }, []);
 
   // Fonction utilitaire pour obtenir l'icône d'un type de document
@@ -204,7 +204,7 @@ export function HistoryPanel({ notebookId, sources, onRefresh, onViewDoc }: Prop
               .map(doc => {
                 const docType = DOC_TYPES.find(t => t.key === doc.type) || REPORT_TYPES.find(t => t.key === doc.type);
                 const DocIcon = docType?.icon || Sparkles;
-                const color = docType?.color || '#6b7280';
+                const color = docType?.color || 'var(--text-muted)';
                 const label = docType?.label || doc.type;
                 
                 return (
@@ -285,7 +285,7 @@ export function HistoryPanel({ notebookId, sources, onRefresh, onViewDoc }: Prop
                           className="p-1.5 opacity-0 group-hover:opacity-100 rounded hover:bg-red-500/10 transition-all"
                           title="Supprimer"
                         >
-                          <Trash2 className="w-3.5 h-3.5" style={{ color: '#ef4444' }} />
+                          <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
                         </button>
                       </div>
                     </div>

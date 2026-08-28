@@ -84,7 +84,7 @@ function renderMessageContent(content: string): JSX.Element {
                 </div>
               )}
               <pre
-                className="px-4 py-3 text-[11px] overflow-x-auto font-mono leading-relaxed"
+                className="px-4 py-3 text-xs overflow-x-auto font-mono leading-relaxed"
                 style={{ backgroundColor: 'var(--bg-base)', margin: 0 }}
               >
                 <code style={{ color: 'var(--text-secondary)' }}>{code}</code>
@@ -132,7 +132,7 @@ function renderMessageContent(content: string): JSX.Element {
 
             blocks.push(
               <div key={`tbl-${blockIdx++}`} className="overflow-x-auto my-2 rounded-lg" style={{ border: '1px solid var(--border-base)' }}>
-                <table className="w-full text-[11px]">
+                <table className="w-full text-xs">
                   <thead>
                     <tr style={{ backgroundColor: 'var(--bg-secondary)' }}>
                       {headerRow.map((cell, ci) => (
@@ -204,7 +204,7 @@ function renderMessageContent(content: string): JSX.Element {
           // Headers
           if (line.startsWith('#### ')) {
             blocks.push(
-              <h4 key={`h4-${blockIdx++}`} className="text-[11px] font-bold mt-3 mb-1" style={{ color: 'var(--text-primary)' }}>
+              <h4 key={`h4-${blockIdx++}`} className="text-xs font-bold mt-3 mb-1" style={{ color: 'var(--text-primary)' }}>
                 {renderInlineMarkdown(line.slice(5))}
               </h4>
             );
@@ -220,7 +220,7 @@ function renderMessageContent(content: string): JSX.Element {
           }
           if (line.startsWith('## ')) {
             blocks.push(
-              <h2 key={`h2-${blockIdx++}`} className="text-[13px] font-bold mt-4 mb-1.5" style={{ color: 'var(--text-primary)' }}>
+              <h2 key={`h2-${blockIdx++}`} className="text-sm font-bold mt-4 mb-1.5" style={{ color: 'var(--text-primary)' }}>
                 {renderInlineMarkdown(line.slice(3))}
               </h2>
             );
@@ -1306,7 +1306,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         <div className="relative flex-1 min-w-0">
           <button
             onClick={() => setShowThreadList(!showThreadList)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all hover:bg-white/5 max-w-[250px]"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-white/5 max-w-[250px]"
             style={{ color: 'var(--text-primary)' }}
           >
             <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
@@ -1336,7 +1336,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                   >
                     <MessageCircle className="w-3 h-3 flex-shrink-0" style={{ color: activeThreadId === null ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
                     <span
-                      className="flex-1 text-[11px] font-medium"
+                      className="flex-1 text-xs font-medium"
                       style={{ color: activeThreadId === null ? 'var(--accent-primary)' : 'var(--text-primary)' }}
                     >
                       Conversation principale
@@ -1357,7 +1357,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                       >
                         <MessageCircle className="w-3 h-3 flex-shrink-0" style={{ color: thread.id === activeThreadId ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
                         <span
-                          className="flex-1 text-[11px] font-medium truncate"
+                          className="flex-1 text-xs font-medium truncate"
                           style={{ color: thread.id === activeThreadId ? 'var(--accent-primary)' : 'var(--text-primary)' }}
                         >
                           {thread.title}
@@ -1384,7 +1384,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
           style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-dimmed)' }}
           title="Estimation des tokens utilisés dans cette conversation"
         >
-          <span style={{ color: messages.length > 40 ? '#ef4444' : messages.length > 20 ? '#f59e0b' : 'var(--text-dimmed)' }}>
+          <span style={{ color: messages.length > 40 ? 'var(--color-error)' : messages.length > 20 ? 'var(--color-warning)' : 'var(--text-dimmed)' }}>
             ~{Math.round(messages.reduce((acc, m) => acc + m.content.length / 4, 0)).toLocaleString()}
           </span>
           <span>tokens</span>
@@ -1501,7 +1501,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                           onClick={() => handleEditSubmit(msg.id)}
                           disabled={!editingContent.trim()}
                           className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-40"
-                          style={{ backgroundColor: 'var(--notebook-accent)', color: '#1b1b1f' }}
+                          style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--text-primary)' }}
                         >
                           Renvoyer
                         </button>
@@ -1535,7 +1535,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                           <button
                             onClick={() => handleCopy(msg.id, msg.content)}
                             className={`flex items-center gap-1 text-xs transition-all ${copiedMsgId === msg.id ? 'opacity-100' : 'opacity-40 hover:opacity-100'}`}
-                            style={{ color: copiedMsgId === msg.id ? '#10b981' : undefined }}
+                            style={{ color: copiedMsgId === msg.id ? 'var(--color-success)' : undefined }}
                             title="Copier la réponse"
                           >
                             {copiedMsgId === msg.id ? (
@@ -1610,7 +1610,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                           <button
                             onClick={() => handleFeedback(msg.id, 'up')}
                             className={`p-1 rounded transition-all ${feedbackMap[msg.id] === 'up' ? 'opacity-100' : 'opacity-30 hover:opacity-80'}`}
-                            style={{ color: feedbackMap[msg.id] === 'up' ? '#10b981' : undefined }}
+                            style={{ color: feedbackMap[msg.id] === 'up' ? 'var(--color-success)' : undefined }}
                             title="Bonne réponse"
                           >
                             <ThumbsUp className="w-3 h-3" />
@@ -1618,7 +1618,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                           <button
                             onClick={() => handleFeedback(msg.id, 'down')}
                             className={`p-1 rounded transition-all ${feedbackMap[msg.id] === 'down' ? 'opacity-100' : 'opacity-30 hover:opacity-80'}`}
-                            style={{ color: feedbackMap[msg.id] === 'down' ? '#ef4444' : undefined }}
+                            style={{ color: feedbackMap[msg.id] === 'down' ? 'var(--color-error)' : undefined }}
                             title="Mauvaise réponse"
                           >
                             <ThumbsDown className="w-3 h-3" />
@@ -1729,7 +1729,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               >
                 <button
                   onClick={handleStopStreaming}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-medium transition-all hover:scale-105 active:scale-95"
+                  className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95"
                   style={{
                     backgroundColor: 'var(--bg-panel)',
                     border: '1px solid var(--border-base)',
@@ -1737,7 +1737,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                     boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                   }}
                 >
-                  <StopCircle className="w-3.5 h-3.5" style={{ color: '#ef4444' }} />
+                  <StopCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
                   Arrêter la génération
                 </button>
               </motion.div>
@@ -1751,7 +1751,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 className="flex justify-start"
               >
                 <div
-                  className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-[11px]"
+                  className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs"
                   style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }}
                 >
                   <Telescope className="w-4 h-4 animate-pulse" />
@@ -1839,7 +1839,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               whileTap={{ scale: 0.88 }}
               onClick={scrollToBottom}
               className="fixed bottom-28 right-8 p-2.5 rounded-full shadow-lg z-30 hover:opacity-90 transition-opacity duration-150"
-              style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+              style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
             >
               <ArrowDown className="w-4 h-4" />
             </motion.button>
@@ -1866,7 +1866,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
           >
             <div className="flex items-center gap-2 mb-2">
               <Quote className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-              <span className="text-[11px] font-semibold truncate">{hoveredCitation.citation.sourceTitle}</span>
+              <span className="text-xs font-semibold truncate">{hoveredCitation.citation.sourceTitle}</span>
               <span
                 className="text-xs px-1.5 py-0.5 rounded-full font-bold flex-shrink-0"
                 style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
@@ -1874,7 +1874,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 {(hoveredCitation.citation.relevance * 100).toFixed(0)}%
               </span>
             </div>
-            <p className="text-[11px] leading-relaxed whitespace-pre-wrap max-h-44 overflow-y-auto custom-scrollbar" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs leading-relaxed whitespace-pre-wrap max-h-44 overflow-y-auto custom-scrollbar" style={{ color: 'var(--text-muted)' }}>
               {hoveredCitation.fullContent}
             </p>
           </motion.div>
@@ -1949,7 +1949,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                   onClick={() => { setInput(''); handleSend(cmd.prompt); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[var(--accent-subtle)]"
                 >
-                  <code className="text-[11px] font-mono font-semibold" style={{ color: 'var(--accent-primary)' }}>
+                  <code className="text-xs font-mono font-semibold" style={{ color: 'var(--accent-primary)' }}>
                     {cmd.cmd}
                   </code>
                   <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -1963,7 +1963,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
 
         {/* Main input container */}
         <div
-          className="relative mx-auto flex max-w-4xl items-end gap-0 rounded-[28px] transition-shadow duration-200 focus-within:ring-2"
+          className="relative mx-auto flex max-w-4xl items-end gap-0 rounded-xl transition-shadow duration-200 focus-within:ring-2"
           style={{
             backgroundColor: 'var(--notebook-surface)',
             border: '1px solid var(--notebook-border)',
@@ -1984,7 +1984,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 {selectedSources.length > 0 && (
                   <span
                     className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full text-xs font-bold flex items-center justify-center"
-                    style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                    style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
                   >
                     {selectedSources.length}
                   </span>
@@ -2029,7 +2029,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               whileTap={!loading ? { scale: 0.88 } : undefined}
               transition={{ duration: 0.1 }}
               className="p-2 rounded-lg disabled:opacity-25 hover:bg-amber-500/10 transition-colors duration-150"
-              style={{ color: '#f59e0b' }}
+              style={{ color: 'var(--color-warning)' }}
               title="Extraire les insights clés"
             >
               <Zap className="w-4 h-4" />
@@ -2042,7 +2042,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 whileTap={!loading ? { scale: 0.88 } : undefined}
                 transition={{ duration: 0.1 }}
                 className="p-2 rounded-lg disabled:opacity-25 hover:bg-violet-500/10 transition-colors duration-150"
-                style={{ color: '#8b5cf6' }}
+                style={{ color: 'var(--color-accent-alt)' }}
                 title="Comparer les sources"
               >
                 <GitCompare className="w-4 h-4" />
@@ -2061,7 +2061,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               className="p-2.5 rounded-full disabled:opacity-30 transition-colors duration-150"
               style={{
                 backgroundColor: input.trim() && !loading ? 'var(--notebook-accent)' : 'var(--notebook-surface-muted)',
-                color: input.trim() && !loading ? '#1b1b1f' : 'var(--text-dimmed)',
+                color: input.trim() && !loading ? 'var(--text-primary)' : 'var(--text-dimmed)',
               }}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -2180,7 +2180,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                     <FileDown className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                   </div>
                   <div>
-                    <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                       Enregistrer en Markdown
                     </p>
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -2200,7 +2200,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               {/* Folder list */}
               <div className="px-4 py-3 max-h-56 overflow-y-auto custom-scrollbar">
                 {sandboxFolders.length === 0 ? (
-                  <p className="text-[11px] text-center py-4" style={{ color: 'var(--text-dimmed)' }}>
+                  <p className="text-xs text-center py-4" style={{ color: 'var(--text-dimmed)' }}>
                     Chargement des dossiers…
                   </p>
                 ) : (
@@ -2209,7 +2209,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                       <button
                         key={f.path}
                         onClick={() => { setSelectedFolder(f.path); setCustomFolderName(''); }}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-full text-left transition-all text-[11px] ${
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-full text-left transition-all text-xs ${
                           selectedFolder === f.path && !customFolderName
                             ? 'ring-1 ring-[var(--accent-primary)]'
                             : 'hover:bg-[var(--accent-subtle)]'
@@ -2246,7 +2246,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                   value={customFolderName}
                   onChange={e => { setCustomFolderName(e.target.value); setSelectedFolder(''); }}
                   placeholder="ex: docs/notes"
-                  className="w-full px-3 py-2 rounded-full text-[11px] outline-none transition-all"
+                  className="w-full px-3 py-2 rounded-full text-xs outline-none transition-all"
                   style={{
                     backgroundColor: 'var(--bg-base)',
                     border: '1px solid var(--border-base)',
@@ -2271,7 +2271,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               <div className="flex items-center justify-end gap-2 px-4 pb-4">
                 <button
                   onClick={() => setFolderPickerMsg(null)}
-                  className="px-4 py-2 rounded-full text-[11px] font-medium transition-all hover:opacity-80"
+                  className="px-4 py-2 rounded-full text-xs font-medium transition-all hover:opacity-80"
                   style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
                 >
                   Annuler
@@ -2279,8 +2279,8 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 <button
                   onClick={handleSaveAsMarkdown}
                   disabled={savingMd || (selectedFolder === '' && !customFolderName.trim())}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-medium transition-all disabled:opacity-40 hover:opacity-90 active:scale-95"
-                  style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-all disabled:opacity-40 hover:opacity-90 active:scale-95"
+                  style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
                 >
                   {savingMd ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

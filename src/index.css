@@ -4,7 +4,26 @@
   /* Typography */
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+/* Typography Scale (REM-based, 16px = 1rem) */
+--text-xs:    0.625rem;   /* 10px  - Captions, hints */
+--text-sm:    0.75rem;    /* 12px  - Secondary text */
+--text-base:  0.875rem;   /* 14px  - Body (markdown) */
+--text-lg:    1rem;       /* 16px  - Default */
+--text-xl:    1.125rem;   /* 18px  - Headings */
+--text-2xl:   1.25rem;    /* 20px  - Titres */
+--text-3xl:   1.5rem;     /* 24px  - Grandes sections */
 
+/* Font weights */
+--font-light: 300;
+--font-normal: 400;
+--font-medium: 500;
+--font-semibold: 600;
+--font-bold: 700;
+
+/* Line heights */
+--leading-tight: 1.25;
+--leading-normal: 1.5;
+--leading-relaxed: 1.75;
   /* Border radius scale — IDE-pro feel (tight, technical) */
   --radius-xs:   2px;
   --radius-sm:   4px;
@@ -106,6 +125,16 @@
   --color-error:    #fb7185;
   --color-info:     #67e8f9;
 
+  /* Semantic colours — subtle variants (12% opacity backgrounds) */
+  --color-success-subtle: color-mix(in srgb, var(--color-success) 12%, transparent);
+  --color-warning-subtle: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
+  --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
+
+  /* Accent alternative — secondary highlight color */
+  --color-accent-alt: #a78bfa;
+  --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
+
   /* Orb — vibrant multi-state glow */
   --orb-glow-active: rgba(129, 140, 248, 0.5);
   --gradient-from:   rgba(49, 46, 129, 0.3);
@@ -192,6 +221,16 @@
   --color-error:    #dc2626;
   --color-info:     #0891b2;
 
+  /* Semantic colours — subtle variants (12% opacity backgrounds) */
+  --color-success-subtle: color-mix(in srgb, var(--color-success) 12%, transparent);
+  --color-warning-subtle: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
+  --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
+
+  /* Accent alternative — secondary highlight color */
+  --color-accent-alt: #6366f1;
+  --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
+
   /* Orb */
   --orb-glow-active: rgba(79, 70, 229, 0.35);
   --gradient-from:   rgba(79, 70, 229, 0.08);
@@ -275,6 +314,16 @@
   --color-error:    #ff0055;
   --color-info:     #00f0ff;
 
+  /* Semantic colours — subtle variants (12% opacity backgrounds) */
+  --color-success-subtle: color-mix(in srgb, var(--color-success) 12%, transparent);
+  --color-warning-subtle: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
+  --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
+
+  /* Accent alternative — secondary highlight color */
+  --color-accent-alt: #e056fd;
+  --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
+
   --orb-idle:      #00f0ff;
   --orb-online:    #38bdf8;
   --orb-listening: #ff0080;
@@ -340,6 +389,16 @@
   --color-error:    #dc322f;
   --color-info:     #268bd2;
 
+  /* Semantic colours — subtle variants (12% opacity backgrounds) */
+  --color-success-subtle: color-mix(in srgb, var(--color-success) 12%, transparent);
+  --color-warning-subtle: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
+  --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
+
+  /* Accent alternative — secondary highlight color */
+  --color-accent-alt: #6c71c4;
+  --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
+
   --orb-idle:      #b58900;
   --orb-online:    #859900;
   --orb-listening: #268bd2;
@@ -404,6 +463,16 @@
   --color-warning:  #ffff00;
   --color-error:    #ff0000;
   --color-info:     #00ffff;
+
+  /* Semantic colours — subtle variants (12% opacity backgrounds) */
+  --color-success-subtle: color-mix(in srgb, var(--color-success) 12%, transparent);
+  --color-warning-subtle: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
+  --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
+
+  /* Accent alternative — secondary highlight color */
+  --color-accent-alt: #ff00ff;
+  --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
 
   --orb-idle:      #ffff00;
   --orb-online:    #00ff00;
@@ -488,6 +557,7 @@ body {
   animation: var(--animate-skeleton);
   border-radius: var(--radius-sm);
 }
+
 .skeleton-text {
   height: 12px;
   margin-bottom: 8px;
@@ -606,6 +676,21 @@ body {
   color: var(--color-info);
   border: 1px solid color-mix(in srgb, var(--color-info) 25%, transparent);
 }
+
+/* ── Accent Alternative ── */
+.text-accent-alt            { color: var(--color-accent-alt); }
+.bg-accent-alt-subtle      { background-color: var(--color-accent-alt-subtle); }
+.badge-accent-alt {
+  background-color: var(--color-accent-alt-subtle);
+  color: var(--color-accent-alt);
+  border: 1px solid color-mix(in srgb, var(--color-accent-alt) 25%, transparent);
+}
+
+/* ── Token-based subtle variants (using new CSS tokens) ── */
+.bg-success-subtle-token  { background-color: var(--color-success-subtle); }
+.bg-warning-subtle-token  { background-color: var(--color-warning-subtle); }
+.bg-error-subtle-token    { background-color: var(--color-error-subtle); }
+.bg-info-subtle-token     { background-color: var(--color-info-subtle); }
 
 /* ── Feedback banner (success/error/warning) ── */
 .feedback-banner {

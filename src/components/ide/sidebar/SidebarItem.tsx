@@ -57,7 +57,7 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
       <AnimatePresence>
         {hovered && !active && (
           <motion.div
-            className="absolute inset-y-[4px] inset-x-[7px] rounded-[14px] pointer-events-none"
+            className="absolute inset-y-[4px] inset-x-[7px] rounded-md pointer-events-none"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -71,7 +71,7 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
         type="button"
         onClick={handleClick}
         whileTap={{ scale: 0.92 }}
-        className={`flex items-center relative overflow-hidden ${expanded ? 'w-full px-3 gap-2.5 rounded-[14px] h-[36px]' : 'w-[40px] h-[40px] justify-center rounded-[15px] mx-auto'}`}
+        className={`flex items-center relative overflow-hidden ${expanded ? 'w-full px-3 gap-2.5 rounded-md h-[36px]' : 'w-[40px] h-[40px] justify-center rounded-md mx-auto'}`}
         style={{
           backgroundColor: active ? 'var(--ide-sidebar-active)' : 'transparent',
           border: active ? '1px solid var(--ide-shell-border)' : '1px solid transparent',
@@ -86,7 +86,7 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
         <AnimatePresence>
           {ripple && (
             <motion.div
-              className="absolute inset-0 rounded-[14px] pointer-events-none"
+              className="absolute inset-0 rounded-md pointer-events-none"
               initial={{ opacity: 0.35, scale: 0.5 }}
               animate={{ opacity: 0, scale: 2 }}
               exit={{ opacity: 0 }}
@@ -118,7 +118,7 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
         {/* Expanded mode: label text */}
         {expanded && (
           <span
-            className="text-[11px] font-medium truncate flex-1 text-left sidebar-item-label"
+            className="text-sm font-medium truncate flex-1 text-left sidebar-item-label"
             style={{
               color: active ? 'var(--accent-primary)' : hovered ? 'var(--text-primary)' : 'var(--text-secondary)',
               opacity: 1,
@@ -132,7 +132,7 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
         {/* Expanded mode: shortcut */}
         {expanded && shortcut && (
           <kbd
-            className="text-[9px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+            className="text-xs font-mono px-1.5 py-0.5 rounded flex-shrink-0"
             style={{
               backgroundColor: 'var(--bg-input)',
               color: 'var(--text-dimmed)',
@@ -216,7 +216,7 @@ export function SidebarStatusIndicator({
       <motion.button
         whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.9 }}
-        className="jarvis-ai-status flex items-center justify-center w-[42px] h-[42px] rounded-[16px] relative overflow-hidden"
+        className="jarvis-ai-status flex items-center justify-center w-[42px] h-[42px] rounded-md relative overflow-hidden"
         style={{
           backgroundColor: 'var(--nav-active-bg)',
           border: '1px solid var(--accent-primary)',
@@ -234,7 +234,7 @@ export function SidebarStatusIndicator({
       >
         {/* Pulsing ring */}
         <motion.div
-          className="absolute inset-0 rounded-[14px] pointer-events-none"
+          className="absolute inset-0 rounded-md pointer-events-none"
           style={{ border: '1px solid var(--accent-primary)' }}
           animate={{ scale: [1, 1.18, 1], opacity: [0.15, 0.45, 0.15] }}
           transition={{ duration: working ? 1.4 : 2.8, repeat: Infinity, ease: 'easeInOut' }}
@@ -261,15 +261,15 @@ export function SidebarStatusIndicator({
         <div className="absolute top-[4px] right-[4px]">
           <motion.div
             className="absolute inset-0 w-[7px] h-[7px] rounded-full"
-            style={{ backgroundColor: muted ? '#f59e0b' : working ? 'var(--accent-primary)' : '#10b981' }}
+            style={{ backgroundColor: muted ? 'var(--color-warning)' : working ? 'var(--accent-primary)' : 'var(--color-success)' }}
             animate={{ scale: [1, 2.5, 1], opacity: [0.45, 0, 0.45] }}
             transition={{ duration: working ? 1 : 2.4, repeat: Infinity, ease: 'easeInOut' }}
           />
           <div
             className="w-[7px] h-[7px] rounded-full relative"
             style={{
-              backgroundColor: muted ? '#f59e0b' : working ? 'var(--accent-primary)' : '#10b981',
-              boxShadow: `0 0 6px ${muted ? '#f59e0b80' : working ? 'var(--accent-glow)' : '#10b98180'}`,
+              backgroundColor: muted ? 'var(--color-warning)' : working ? 'var(--accent-primary)' : 'var(--color-success)',
+              boxShadow: `0 0 6px ${muted ? 'color-mix(in srgb, var(--color-warning) 50%, transparent)' : working ? 'var(--accent-glow)' : 'color-mix(in srgb, var(--color-success) 50%, transparent)'}`,
             }}
           />
         </div>
@@ -282,16 +282,16 @@ export function SidebarStatusIndicator({
     <motion.button
       whileHover={{ scale: 1.12 }}
       whileTap={{ scale: 0.88 }}
-      className="jarvis-ai-status flex items-center justify-center w-[42px] h-[42px] rounded-[16px] relative overflow-hidden"
+      className="jarvis-ai-status flex items-center justify-center w-[42px] h-[42px] rounded-md relative overflow-hidden"
       style={{
         background: hovered
-          ? 'linear-gradient(135deg, rgba(56,189,248,0.22) 0%, rgba(168,85,247,0.18) 50%, rgba(56,189,248,0.22) 100%)'
-          : 'linear-gradient(135deg, rgba(56,189,248,0.12) 0%, rgba(168,85,247,0.08) 50%, rgba(56,189,248,0.12) 100%)',
+          ? 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 22%, transparent) 0%, color-mix(in srgb, var(--color-accent-alt) 18%, transparent) 50%, color-mix(in srgb, var(--accent-primary) 22%, transparent) 100%)'
+          : 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 12%, transparent) 0%, color-mix(in srgb, var(--color-accent-alt) 8%, transparent) 50%, color-mix(in srgb, var(--accent-primary) 12%, transparent) 100%)',
         border: '1.5px solid',
-        borderColor: hovered ? 'rgba(56,189,248,0.6)' : 'rgba(56,189,248,0.35)',
+        borderColor: hovered ? 'color-mix(in srgb, var(--accent-primary) 60%, transparent)' : 'color-mix(in srgb, var(--accent-primary) 35%, transparent)',
         boxShadow: hovered
-          ? '0 0 20px rgba(56,189,248,0.25), 0 0 40px rgba(168,85,247,0.12), inset 0 1px 0 rgba(255,255,255,0.1)'
-          : '0 0 12px rgba(56,189,248,0.12), 0 4px 16px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.06)',
+          ? '0 0 20px color-mix(in srgb, var(--accent-primary) 25%, transparent), 0 0 40px color-mix(in srgb, var(--color-accent-alt) 12%, transparent), inset 0 1px 0 rgba(255,255,255,0.1)'
+          : '0 0 12px color-mix(in srgb, var(--accent-primary) 12%, transparent), 0 4px 16px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.06)',
         cursor: 'pointer',
         transition: 'background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
       }}
@@ -305,7 +305,7 @@ export function SidebarStatusIndicator({
     >
       {/* Animated gradient sweep */}
       <motion.div
-        className="absolute inset-0 rounded-[16px] pointer-events-none"
+        className="absolute inset-0 rounded-md pointer-events-none"
         style={{
           background: 'linear-gradient(90deg, transparent 0%, rgba(56,189,248,0.15) 50%, transparent 100%)',
           backgroundSize: '200% 100%',
@@ -316,7 +316,7 @@ export function SidebarStatusIndicator({
 
       {/* Outer breathing ring — invitation pulse */}
       <motion.div
-        className="absolute inset-[-3px] rounded-[18px] pointer-events-none"
+        className="absolute inset-[-3px] rounded-md pointer-events-none"
         style={{
           border: '1.5px solid rgba(56,189,248,0.3)',
           background: 'transparent',
@@ -335,7 +335,7 @@ export function SidebarStatusIndicator({
 
       {/* Second ring — staggered for depth */}
       <motion.div
-        className="absolute inset-[-6px] rounded-[20px] pointer-events-none"
+        className="absolute inset-[-6px] rounded-md pointer-events-none"
         style={{
           border: '1px solid rgba(56,189,248,0.15)',
           background: 'transparent',
@@ -358,9 +358,9 @@ export function SidebarStatusIndicator({
         <MessageCirclePlus
           size={19}
           style={{
-            color: hovered ? '#38bdf8' : 'var(--accent-primary)',
+            color: hovered ? 'var(--accent-hover)' : 'var(--accent-primary)',
             filter: hovered
-              ? 'drop-shadow(0 0 10px rgba(56,189,248,0.7)) drop-shadow(0 0 20px rgba(168,85,247,0.3))'
+              ? 'drop-shadow(0 0 10px color-mix(in srgb, var(--accent-primary) 70%, transparent)) drop-shadow(0 0 20px color-mix(in srgb, var(--accent-secondary) 30%, transparent))'
               : 'drop-shadow(0 0 5px var(--accent-glow))',
             transition: 'color 0.2s ease, filter 0.3s ease',
           }}
@@ -372,11 +372,11 @@ export function SidebarStatusIndicator({
         className="absolute bottom-[2px] right-[2px] w-[11px] h-[11px] rounded-full flex items-center justify-center"
         style={{
           background: hovered
-            ? 'linear-gradient(135deg, #38bdf8, #a855f7)'
+            ? 'linear-gradient(135deg, var(--accent-hover), var(--color-accent-alt))'
             : 'var(--accent-primary)',
           boxShadow: hovered
-            ? '0 0 8px rgba(56,189,248,0.6), 0 0 16px rgba(168,85,247,0.3)'
-            : '0 0 6px rgba(56,189,248,0.4)',
+            ? '0 0 8px color-mix(in srgb, var(--accent-primary) 60%, transparent), 0 0 16px color-mix(in srgb, var(--color-accent-alt) 30%, transparent)'
+            : '0 0 6px color-mix(in srgb, var(--accent-primary) 40%, transparent)',
           transition: 'background 0.3s ease, box-shadow 0.3s ease',
         }}
         animate={{
@@ -385,7 +385,7 @@ export function SidebarStatusIndicator({
         }}
         transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
       >
-        <span className="text-[7px] font-black text-white leading-none select-none" aria-hidden="true">+</span>
+        <span className="text-xs font-black leading-none select-none" style={{ color: 'var(--text-primary)' }} aria-hidden="true">+</span>
       </motion.div>
 
       {/* Hover sparkle particles */}
@@ -394,7 +394,7 @@ export function SidebarStatusIndicator({
           <>
             <motion.div
               className="absolute w-[3px] h-[3px] rounded-full pointer-events-none"
-              style={{ backgroundColor: '#38bdf8', top: '6px', left: '8px' }}
+              style={{ backgroundColor: 'var(--accent-hover)', top: '6px', left: '8px' }}
               initial={{ opacity: 0, scale: 0 }}
               animate={{ opacity: [0, 1, 0], scale: [0, 1.5, 0], y: [-2, -8] }}
               exit={{ opacity: 0 }}
@@ -402,7 +402,7 @@ export function SidebarStatusIndicator({
             />
             <motion.div
               className="absolute w-[2px] h-[2px] rounded-full pointer-events-none"
-              style={{ backgroundColor: '#a855f7', top: '10px', right: '7px' }}
+              style={{ backgroundColor: 'var(--color-accent-alt)', top: '10px', right: '7px' }}
               initial={{ opacity: 0, scale: 0 }}
               animate={{ opacity: [0, 1, 0], scale: [0, 1.8, 0], y: [-1, -6] }}
               exit={{ opacity: 0 }}
@@ -410,7 +410,7 @@ export function SidebarStatusIndicator({
             />
             <motion.div
               className="absolute w-[2px] h-[2px] rounded-full pointer-events-none"
-              style={{ backgroundColor: '#38bdf8', bottom: '8px', left: '6px' }}
+              style={{ backgroundColor: 'var(--accent-hover)', bottom: '8px', left: '6px' }}
               initial={{ opacity: 0, scale: 0 }}
               animate={{ opacity: [0, 0.8, 0], scale: [0, 1.3, 0], y: [0, -5] }}
               exit={{ opacity: 0 }}

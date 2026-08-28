@@ -29,35 +29,35 @@ const ROLE_META: Record<string, {
   description: string;
 }> = {
   // Code & Ingénierie
-  coder:       { icon: Code2,        color: '#38bdf8', label: 'Développeur',     description: 'Écriture & modification de code' },
-  refactor:    { icon: Sparkles,     color: '#818cf8', label: 'Refactorisation', description: 'Clean code & modularité' },
-  debugger:    { icon: Bug,          color: '#f87171', label: 'Débogueur',       description: 'Diagnostic & correctifs' },
-  reviewer:    { icon: CheckCheck,   color: '#34d399', label: 'Revue de Code',   description: 'Audit & qualité logicielle' },
-  tester:      { icon: FlaskConical, color: '#fb923c', label: 'QA & Tests',      description: 'Tests automatisés & couverture' },
-  security:    { icon: ShieldAlert,  color: '#e879f9', label: 'Sécurité & Audit',description: 'Vulnérabilités & secrets' },
-  architect:   { icon: Network,      color: '#2dd4bf', label: 'Architecte',      description: 'Conception & modélisation' },
+  coder:       { icon: Code2,        color: 'var(--accent-secondary)', label: 'Développeur',     description: 'Écriture & modification de code' },
+  refactor:    { icon: Sparkles,     color: 'var(--accent-primary)', label: 'Refactorisation', description: 'Clean code & modularité' },
+  debugger:    { icon: Bug,          color: 'var(--color-error)', label: 'Débogueur',       description: 'Diagnostic & correctifs' },
+  reviewer:    { icon: CheckCheck,   color: 'var(--color-success)', label: 'Revue de Code',   description: 'Audit & qualité logicielle' },
+  tester:      { icon: FlaskConical, color: 'var(--color-warning)', label: 'QA & Tests',      description: 'Tests automatisés & couverture' },
+  security:    { icon: ShieldAlert,  color: 'var(--color-info)', label: 'Sécurité & Audit', description: 'Vulnérabilités & secrets' },
+  architect:   { icon: Network,      color: 'var(--color-info)', label: 'Architecte',      description: 'Conception & modélisation' },
 
   // Rédaction & Documents
-  writer:      { icon: PenTool,      color: '#60a5fa', label: 'Rédacteur',       description: 'Rédaction de documents' },
-  formatter:   { icon: AlignLeft,    color: '#4ade80', label: 'Mise en forme',   description: 'Formatage & structure' },
-  researcher:  { icon: Search,       color: '#a78bfa', label: 'Recherche',       description: 'Collecte & synthèse' },
-  proofreader: { icon: SpellCheck,   color: '#fbbf24', label: 'Correcteur',      description: 'Orthographe & grammaire' },
-  translator:  { icon: Languages,    color: '#f472b6', label: 'Traducteur',      description: 'Traduction & localisation' },
-  summarizer:  { icon: FileText,     color: '#f97316', label: 'Synthèse',        description: 'Résumés & condensés' },
-  planner:     { icon: ListTree,     color: '#14b8a6', label: 'Planificateur',   description: 'Plans & outlines' },
+  writer:      { icon: PenTool,      color: 'var(--color-info)', label: 'Rédacteur',       description: 'Rédaction de documents' },
+  formatter:   { icon: AlignLeft,    color: 'var(--color-success)', label: 'Mise en forme',   description: 'Formatage & structure' },
+  researcher:  { icon: Search,       color: 'var(--color-accent-alt)', label: 'Recherche',       description: 'Collecte & synthèse' },
+  proofreader: { icon: SpellCheck,   color: 'var(--color-warning)', label: 'Correcteur',      description: 'Orthographe & grammaire' },
+  translator:  { icon: Languages,    color: 'var(--accent-secondary)', label: 'Traducteur',      description: 'Traduction & localisation' },
+  summarizer:  { icon: FileText,     color: 'var(--color-warning)', label: 'Synthèse',        description: 'Résumés & condensés' },
+  planner:     { icon: ListTree,     color: 'var(--color-info)', label: 'Planificateur',   description: 'Plans & outlines' },
 
   // Activités & outils
-  code:     { icon: Code,         color: '#60a5fa', label: 'Code',         description: 'Lecture/écriture de fichiers' },
-  files:    { icon: FileText,     color: '#4ade80', label: 'Fichiers',     description: 'Gestion de fichiers' },
-  git:      { icon: GitBranch,    color: '#f472b6', label: 'Git',          description: 'Contrôle de version' },
-  web:      { icon: Globe,        color: '#34d399', label: 'Web',          description: 'Navigation web' },
-  memory:   { icon: Database,     color: '#a855f7', label: 'Mémoire',     description: 'Mémoire persistante' },
-  reasoning:{ icon: Brain,        color: '#f97316', label: 'Raisonnement', description: 'Réflexion et planification' },
-  mission:  { icon: Target,       color: '#38bdf8', label: 'Mission',     description: 'Mission autonome' },
+  code:     { icon: Code,         color: 'var(--color-info)', label: 'Code',         description: 'Lecture/écriture de fichiers' },
+  files:    { icon: FileText,     color: 'var(--color-success)', label: 'Fichiers',     description: 'Gestion de fichiers' },
+  git:      { icon: GitBranch,    color: 'var(--accent-secondary)', label: 'Git',          description: 'Contrôle de version' },
+  web:      { icon: Globe,        color: 'var(--color-success)', label: 'Web',          description: 'Navigation web' },
+  memory:   { icon: Database,     color: 'var(--color-accent-alt)', label: 'Mémoire',     description: 'Mémoire persistante' },
+  reasoning:{ icon: Brain,        color: 'var(--color-warning)', label: 'Raisonnement', description: 'Réflexion et planification' },
+  mission:  { icon: Target,       color: 'var(--accent-secondary)', label: 'Mission',     description: 'Mission autonome' },
 };
 
 function getRoleMeta(role: string) {
-  return ROLE_META[role] ?? { icon: Bot, color: '#94a3b8', label: role, description: '' };
+  return ROLE_META[role] ?? { icon: Bot, color: 'var(--text-muted)', label: role, description: '' };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -66,21 +66,21 @@ function getRoleMeta(role: string) {
 
 const AGENT_ROSTER: { id: AgentRole; label: string; desc: string; icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>; color: string }[] = [
   // Code & Ingénierie
-  { id: 'coder',       label: 'Développeur',     desc: 'Écriture et modification de code typé',       icon: Code2,        color: '#38bdf8' },
-  { id: 'refactor',    label: 'Refactorisation', desc: 'Clean code, architecture & modularité',        icon: Sparkles,     color: '#818cf8' },
-  { id: 'debugger',    label: 'Débogueur',       desc: 'Diagnostic de bugs & patches chirurgicaux',     icon: Bug,          color: '#f87171' },
-  { id: 'reviewer',    label: 'Revue de Code',   desc: 'Audit qualité, détection d\'anti-patterns',    icon: CheckCheck,   color: '#34d399' },
-  { id: 'tester',      label: 'QA & Tests',      desc: 'Création & exécution de tests automatisés',    icon: FlaskConical, color: '#fb923c' },
-  { id: 'security',    label: 'Sécurité & Audit',desc: 'Détection failles OWASP, fuites de secrets',   icon: ShieldAlert,  color: '#e879f9' },
-  { id: 'architect',   label: 'Architecte',      desc: 'Conception système, interfaces & modèles',    icon: Network,      color: '#2dd4bf' },
+  { id: 'coder',       label: 'Développeur',     desc: 'Écriture et modification de code typé',       icon: Code2,        color: 'var(--accent-secondary)' },
+  { id: 'refactor',    label: 'Refactorisation', desc: 'Clean code, architecture & modularité',        icon: Sparkles,     color: 'var(--accent-primary)' },
+  { id: 'debugger',    label: 'Débogueur',       desc: 'Diagnostic de bugs & patches chirurgicaux',     icon: Bug,          color: 'var(--color-error)' },
+  { id: 'reviewer',    label: 'Revue de Code',   desc: 'Audit qualité, détection d\'anti-patterns',    icon: CheckCheck,   color: 'var(--color-success)' },
+  { id: 'tester',      label: 'QA & Tests',      desc: 'Création & exécution de tests automatisés',    icon: FlaskConical, color: 'var(--color-warning)' },
+  { id: 'security',    label: 'Sécurité & Audit',desc: 'Détection failles OWASP, fuites de secrets',   icon: ShieldAlert,  color: 'var(--color-info)' },
+  { id: 'architect',   label: 'Architecte',      desc: 'Conception système, interfaces & modèles',    icon: Network,      color: 'var(--color-info)' },
   // Rédaction & Documentation
-  { id: 'writer',      label: 'Rédacteur',       desc: 'Rédaction de documents & articles',            icon: PenTool,      color: '#60a5fa' },
-  { id: 'formatter',   label: 'Mise en Forme',   desc: 'Formatage & structure Markdown',               icon: AlignLeft,    color: '#4ade80' },
-  { id: 'researcher',  label: 'Recherche',       desc: 'Collecte & synthèse d\'informations',          icon: Search,       color: '#a78bfa' },
-  { id: 'proofreader', label: 'Correcteur',      desc: 'Orthographe, grammaire, style',                icon: SpellCheck,   color: '#fbbf24' },
-  { id: 'translator',  label: 'Traducteur',      desc: 'Traduction & localisation',                    icon: Languages,    color: '#f472b6' },
-  { id: 'summarizer',  label: 'Synthèse',        desc: 'Résumés & condensés',                          icon: FileText,     color: '#f97316' },
-  { id: 'planner',     label: 'Planificateur',   desc: 'Plans & outlines de documents',                icon: ListTree,     color: '#14b8a6' },
+  { id: 'writer',      label: 'Rédacteur',       desc: 'Rédaction de documents & articles',            icon: PenTool,      color: 'var(--color-info)' },
+  { id: 'formatter',   label: 'Mise en Forme',   desc: 'Formatage & structure Markdown',               icon: AlignLeft,    color: 'var(--color-success)' },
+  { id: 'researcher',  label: 'Recherche',       desc: 'Collecte & synthèse d\'informations',          icon: Search,       color: 'var(--color-accent-alt)' },
+  { id: 'proofreader', label: 'Correcteur',      desc: 'Orthographe, grammaire, style',                icon: SpellCheck,   color: 'var(--color-warning)' },
+  { id: 'translator',  label: 'Traducteur',      desc: 'Traduction & localisation',                    icon: Languages,    color: 'var(--accent-secondary)' },
+  { id: 'summarizer',  label: 'Synthèse',        desc: 'Résumés & condensés',                          icon: FileText,     color: 'var(--color-warning)' },
+  { id: 'planner',     label: 'Planificateur',   desc: 'Plans & outlines de documents',                icon: ListTree,     color: 'var(--color-info)' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -89,15 +89,15 @@ const AGENT_ROSTER: { id: AgentRole; label: string; desc: string; icon: React.Co
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { color: string; bg: string; label: string; icon: React.ReactNode }> = {
-    pending:   { color: 'var(--text-muted)', bg: 'rgba(113,113,122,0.15)', label: 'Attente', icon: <Clock size={9} /> },
-    running:   { color: '#38bdf8', bg: 'rgba(56,189,248,0.15)', label: 'En cours', icon: <Loader2 size={9} className="animate-spin" /> },
-    completed: { color: '#4ade80', bg: 'rgba(74,222,128,0.12)', label: 'OK', icon: <CheckCircle2 size={9} /> },
-    failed:    { color: '#f87171', bg: 'rgba(248,113,113,0.12)', label: 'Erreur', icon: <XCircle size={9} /> },
-    done:      { color: '#4ade80', bg: 'rgba(74,222,128,0.12)', label: 'OK', icon: <CheckCircle2 size={9} /> },
+    pending:   { color: 'var(--text-muted)', bg: 'var(--bg-input)', label: 'Attente', icon: <Clock size={9} /> },
+    running:   { color: 'var(--accent-secondary)', bg: 'var(--color-info-subtle)', label: 'En cours', icon: <Loader2 size={9} className="animate-spin" /> },
+    completed: { color: 'var(--color-success)', bg: 'var(--color-success-subtle)', label: 'OK', icon: <CheckCircle2 size={9} /> },
+    failed:    { color: 'var(--color-error)', bg: 'var(--color-error-subtle)', label: 'Erreur', icon: <XCircle size={9} /> },
+    done:      { color: 'var(--color-success)', bg: 'var(--color-success-subtle)', label: 'OK', icon: <CheckCircle2 size={9} /> },
   };
   const c = config[status] ?? config.pending;
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-wider"
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold uppercase tracking-wider"
       style={{ color: c.color, backgroundColor: c.bg }}>
       {c.icon}{c.label}
     </span>
@@ -234,15 +234,15 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
         </div>
         {/* Quick stats */}
         <div className="flex items-center gap-3 px-3 pb-2">
-          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px]"
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs"
             style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)', color: 'var(--accent-primary)' }}>
             <Users size={8} />
             <span className="font-bold">{allowedCount}</span>
             <span className="opacity-70">/{totalAgents} dispo</span>
           </div>
-          <StatPill icon={<Loader2 size={8} className="animate-spin" />} value={liveRunning + delegatedRunning} label="actifs" color="#38bdf8" />
-          <StatPill icon={<CheckCircle2 size={8} />} value={totalDone + delegatedDone} label="terminés" color="#4ade80" />
-          {delegatedFailed > 0 && <StatPill icon={<XCircle size={8} />} value={delegatedFailed} label="erreurs" color="#f87171" />}
+          <StatPill icon={<Loader2 size={8} className="animate-spin" />} value={liveRunning + delegatedRunning} label="actifs" color="var(--accent-secondary)" />
+          <StatPill icon={<CheckCircle2 size={8} />} value={totalDone + delegatedDone} label="terminés" color="var(--color-success)" />
+          {delegatedFailed > 0 && <StatPill icon={<XCircle size={8} />} value={delegatedFailed} label="erreurs" color="var(--color-error)" />}
         </div>
       </div>
 
@@ -292,8 +292,8 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
                 <Users size={14} style={{ color: 'var(--accent-primary)' }} />
               </div>
               <div>
-                <h2 className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>Agents</h2>
-                <span className="text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Agents</h2>
+                <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                   {liveRunning + delegatedRunning} actifs
                 </span>
               </div>
@@ -317,7 +317,7 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
 
   return (
     <Panel title="Agents" icon={<Users className="w-4 h-4" />}
-      actions={<span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-dimmed)' }}>
+      actions={<span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-dimmed)' }}>
         {liveRunning + delegatedRunning} actifs
       </span>}>
       {content}
@@ -332,8 +332,8 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
 function StatPill({ icon, value, label, color }: { icon: React.ReactNode; value: number; label: string; color: string }) {
   if (value === 0) return null;
   return (
-    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px]"
-      style={{ backgroundColor: `${color}12`, color }}>
+    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs"
+      style={{ backgroundColor: 'color-mix(in srgb, ' + color + ' 7%, transparent)', color }}>
       {icon}
       <span className="font-bold">{value}</span>
       <span className="opacity-70">{label}</span>
@@ -344,14 +344,14 @@ function StatPill({ icon, value, label, color }: { icon: React.ReactNode; value:
 function TabBtn({ active, onClick, count, children }: { active: boolean; onClick: () => void; count: number; children: React.ReactNode }) {
   return (
     <button onClick={onClick}
-      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold transition-colors"
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors"
       style={{
         color: active ? 'var(--accent-primary)' : 'var(--text-dimmed)',
         backgroundColor: active ? 'var(--accent-subtle)' : 'transparent',
       }}>
       {children}
       {count > 0 && (
-        <span className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold"
+        <span className="w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
           style={{ backgroundColor: active ? 'var(--accent-primary)' : 'var(--text-dimmed)', color: 'var(--bg-panel)' }}>
           {count}
         </span>
@@ -390,24 +390,24 @@ function RosterTab({ allowedRoles, activeRoles }: { allowedRoles: AgentRole[]; a
               <Icon size={14} style={{ color: agent.color }} />
               {isActive && (
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
-                  style={{ backgroundColor: '#4ade80', borderColor: 'var(--bg-panel)' }} />
+                  style={{ backgroundColor: 'var(--color-success)', borderColor: 'var(--bg-panel)' }} />
               )}
             </div>
 
             {/* Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-semibold" style={{ color: isAllowed ? 'var(--text-primary)' : 'var(--text-dimmed)' }}>
+                <span className="text-sm font-semibold" style={{ color: isAllowed ? 'var(--text-primary)' : 'var(--text-dimmed)' }}>
                   {agent.label}
                 </span>
                 {isActive && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider"
-                    style={{ backgroundColor: 'rgba(56,189,248,0.12)', color: '#38bdf8' }}>
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider"
+                    style={{ backgroundColor: 'var(--color-info-subtle)', color: 'var(--accent-secondary)' }}>
                     <Loader2 size={7} className="animate-spin" /> en cours
                   </span>
                 )}
               </div>
-              <p className="text-[9px] mt-0.5 truncate" style={{ color: 'var(--text-dimmed)' }}>
+              <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-dimmed)' }}>
                 {agent.desc}
               </p>
             </div>
@@ -415,12 +415,12 @@ function RosterTab({ allowedRoles, activeRoles }: { allowedRoles: AgentRole[]; a
             {/* Status */}
             <div className="flex-shrink-0">
               {isAllowed ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold"
-                  style={{ backgroundColor: 'rgba(74,222,128,0.1)', color: '#4ade80' }}>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold"
+                  style={{ backgroundColor: 'var(--color-success-subtle)', color: 'var(--color-success)' }}>
                   <CheckCircle2 size={9} /> Disponible
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold"
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold"
                   style={{ backgroundColor: 'rgba(113,113,122,0.1)', color: 'var(--text-dimmed)' }}>
                   <XCircle size={9} /> Désactivé
                 </span>
@@ -431,7 +431,7 @@ function RosterTab({ allowedRoles, activeRoles }: { allowedRoles: AgentRole[]; a
       })}
 
       {/* Footer hint */}
-      <p className="text-center text-[9px] pt-3 pb-1" style={{ color: 'var(--text-dimmed)' }}>
+      <p className="text-center text-xs pt-3 pb-1" style={{ color: 'var(--text-dimmed)' }}>
         Gérez les agents dans <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>Paramètres → Agents</span>
       </p>
     </div>
@@ -493,19 +493,19 @@ function AgentGroupCard({ agentId, activities, expanded, onToggle }: {
           ) : (
             <Icon size={13} style={{ color: meta.color }} />
           )}
-          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-bold"
-            style={{ backgroundColor: meta.color, color: '#000' }}>
+          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-xs font-bold"
+            style={{ backgroundColor: meta.color, color: 'var(--text-primary)' }}>
             {activities.length}
           </span>
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-semibold" style={{ color: meta.color }}>{meta.label}</span>
-            <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs font-semibold" style={{ color: meta.color }}>{meta.label}</span>
+            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
               {done.length}/{activities.length} terminé{done.length > 1 ? 's' : ''}
             </span>
           </div>
-          <div className="text-[9px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
             {lastActivity?.label}
             {lastActivity?.args && (
               <span className="ml-1 opacity-60">→ {formatArgs(lastActivity.args)}</span>
@@ -540,7 +540,7 @@ function AgentGroupCard({ agentId, activities, expanded, onToggle }: {
             exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="px-2 pb-2 space-y-0.5 pt-1" style={{ borderTop: '1px solid var(--border-base)' }}>
               <div className="px-2 py-1 mb-1">
-                <p className="text-[9px] italic" style={{ color: 'var(--text-dimmed)' }}>{meta.description}</p>
+                <p className="text-xs italic" style={{ color: 'var(--text-dimmed)' }}>{meta.description}</p>
               </div>
               {activities.slice(-15).map(activity => (
                 <ToolActivityRow key={activity.id} activity={activity} color={meta.color} />
@@ -563,28 +563,28 @@ function ToolActivityRow({ activity, color }: { activity: ToolActivityEntry; col
       <div className="flex-shrink-0 mt-0.5">
         {activity.status === 'running' ?
           <Loader2 size={9} className="animate-spin" style={{ color }} /> :
-          <CheckCircle2 size={9} style={{ color: '#4ade80' }} />}
+          <CheckCircle2 size={9} style={{ color: 'var(--color-success)' }} />}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
-          <span className="text-[9px] font-mono font-medium truncate" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-xs font-mono font-medium truncate" style={{ color: 'var(--text-muted)' }}>
             {activity.label}
           </span>
           {elapsed && (
-            <span className="text-[8px] font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
               {elapsed}
             </span>
           )}
         </div>
         {activity.args && (
-          <div className="text-[8px] font-mono truncate mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+          <div className="text-xs font-mono truncate mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
             style={{ color: 'var(--text-dimmed)' }}>
             <ArrowRight size={7} className="inline mr-0.5" />
             {formatArgs(activity.args)}
           </div>
         )}
       </div>
-      <span className="text-[8px] font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+      <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
         {timeLabel(activity.timestamp)}
       </span>
     </div>
@@ -594,8 +594,8 @@ function ToolActivityRow({ activity, color }: { activity: ToolActivityEntry; col
 function RunningElapsed({ startTime }: { startTime: number }) {
   const elapsed = useElapsed(startTime, true);
   return (
-    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md flex-shrink-0"
-      style={{ backgroundColor: 'rgba(56,189,248,0.1)', color: '#38bdf8' }}>
+    <span className="text-xs font-mono px-1.5 py-0.5 rounded-md flex-shrink-0"
+      style={{ backgroundColor: 'var(--color-info-subtle)', color: 'var(--accent-secondary)' }}>
       ⏱ {elapsed || '0s'}
     </span>
   );
@@ -651,23 +651,23 @@ function DelegatedTaskCard({ task, expanded, onToggle }: {
             <Icon size={13} style={{ color: meta.color }} />}
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-[10px] font-semibold truncate block" style={{ color: 'var(--text-primary)' }}>
+          <span className="text-xs font-semibold truncate block" style={{ color: 'var(--text-primary)' }}>
             {task.title}
           </span>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[9px] font-medium" style={{ color: meta.color }}>{task.agentName}</span>
-            <span className="text-[8px] opacity-50">•</span>
-            <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{timeLabel(task.timestamp)}</span>
+            <span className="text-xs font-medium" style={{ color: meta.color }}>{task.agentName}</span>
+            <span className="text-xs opacity-50">•</span>
+            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{timeLabel(task.timestamp)}</span>
             {task.durationMs ? (
               <>
-                <span className="text-[8px] opacity-50">•</span>
-                <span className="text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>{formatDuration(task.durationMs)}</span>
+                <span className="text-xs opacity-50">•</span>
+                <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>{formatDuration(task.durationMs)}</span>
               </>
             ) : null}
             {task.steps.length > 0 && (
               <>
-                <span className="text-[8px] opacity-50">•</span>
-                <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{task.steps.length} étape{task.steps.length > 1 ? 's' : ''}</span>
+                <span className="text-xs opacity-50">•</span>
+                <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{task.steps.length} étape{task.steps.length > 1 ? 's' : ''}</span>
               </>
             )}
           </div>
@@ -690,17 +690,17 @@ function DelegatedTaskCard({ task, expanded, onToggle }: {
               {/* Role description */}
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md" style={{ backgroundColor: `${meta.color}08` }}>
                 <Icon size={10} style={{ color: meta.color }} />
-                <span className="text-[9px]" style={{ color: meta.color }}>{meta.description}</span>
+                <span className="text-xs" style={{ color: meta.color }}>{meta.description}</span>
               </div>
 
               {/* Steps timeline */}
               {task.steps.length > 0 && (
                 <div className="space-y-0.5 ml-1">
-                  <p className="text-[9px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Étapes :</p>
+                  <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Étapes :</p>
                   {task.steps.map((step, i) => (
                     <div key={i} className="flex items-start gap-1.5 pl-2" style={{ borderLeft: `2px solid ${meta.color}30` }}>
-                      <span className="text-[8px] font-mono flex-shrink-0 mt-0.5" style={{ color: meta.color }}>{i + 1}.</span>
-                      <span className="text-[9px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>{step}</span>
+                      <span className="text-xs font-mono flex-shrink-0 mt-0.5" style={{ color: meta.color }}>{i + 1}.</span>
+                      <span className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{step}</span>
                     </div>
                   ))}
                 </div>
@@ -708,20 +708,20 @@ function DelegatedTaskCard({ task, expanded, onToggle }: {
 
               {/* Detail */}
               {task.detail && task.steps.length === 0 && (
-                <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>{task.detail}</p>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{task.detail}</p>
               )}
 
               {/* Summary */}
               {task.summary && (
-                <div className="px-2 py-1.5 rounded-md" style={{ backgroundColor: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.15)' }}>
-                  <p className="text-[9px] font-semibold mb-0.5" style={{ color: '#4ade80' }}>Résumé</p>
-                  <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-primary)' }}>{task.summary}</p>
+                <div className="px-2 py-1.5 rounded-md" style={{ backgroundColor: 'var(--color-success-subtle)', border: '1px solid var(--border-success-subtle)' }}>
+                  <p className="text-xs font-semibold mb-0.5" style={{ color: 'var(--color-success)' }}>Résumé</p>
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>{task.summary}</p>
                 </div>
               )}
 
               {/* Empty state */}
               {!task.detail && !task.summary && task.steps.length === 0 && (
-                <p className="text-[10px] italic" style={{ color: 'var(--text-dimmed)' }}>
+                <p className="text-xs italic" style={{ color: 'var(--text-dimmed)' }}>
                   {isRunning
                     ? 'Exécution en cours… Les étapes apparaîtront au fur et à mesure.'
                     : 'Aucun détail disponible.'}
@@ -745,8 +745,8 @@ function EmptyState({ message, sub }: { message: string; sub: string }) {
         <Users size={18} style={{ color: 'var(--text-dimmed)' }} />
       </div>
       <div className="text-center px-4">
-        <p className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>{message}</p>
-        <p className="text-[9px] mt-1 leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>{sub}</p>
+        <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{message}</p>
+        <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>{sub}</p>
       </div>
     </div>
   );
