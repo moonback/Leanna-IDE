@@ -18,6 +18,7 @@ import {
   ArrowRight, Layers,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
+import { CreateNotebookModal } from './CreateNotebookModal';
 
 interface NotebookSummary {
   id: string;
@@ -61,10 +62,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const prefersReducedMotion = useReducedMotion();
   const [notebooks, setNotebooks] = useState<NotebookSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newDescription, setNewDescription] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortBy>('updatedAt');
   const [sortDesc, setSortDesc] = useState(true);
@@ -108,29 +106,6 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
     });
     return result;
   }, [notebooks, searchQuery, sortBy, sortDesc]);
-
-  const handleCreate = useCallback(async () => {
-    if (!newTitle.trim()) return;
-    setCreating(true);
-    try {
-      const res = await fetch('/api/notebooks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTitle.trim(), description: newDescription.trim() }),
-      });
-      if (!res.ok) throw new Error('Erreur création');
-      const data = await res.json();
-      success(`Notebook "${data.notebook.title}" créé`);
-      setNewTitle('');
-      setNewDescription('');
-      setShowCreateForm(false);
-      await loadNotebooks();
-    } catch (e: any) {
-      toastError(e.message);
-    } finally {
-      setCreating(false);
-    }
-  }, [newTitle, newDescription, success, toastError, loadNotebooks]);
 
   const handleDeleteClick = useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -186,7 +161,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
           </div>
           <div className="flex items-center gap-2">
             <motion.button
-              onClick={() => setShowCreateForm(true)}
+              onClick={() => setShowCreateModal(true)}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               transition={SPRING_MOMENTUM}
@@ -278,93 +253,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
         </div>
       )}
 
-      {/* ─── Create Form ────────────────────────────────────── */}
-      <AnimatePresence>
-        {showCreateForm && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
-            className="overflow-hidden flex-shrink-0 px-6 lg:px-10"
-          >
-            <div
-              className="rounded-2xl p-6 mb-5 space-y-4"
-              style={{
-                background: 'linear-gradient(135deg, var(--notebook-card-bg) 0%, var(--notebook-surface) 100%)',
-                border: '1px solid var(--notebook-accent)',
-                boxShadow: '0 4px 24px rgba(59,130,246,0.08)',
-              }}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))' }}
-                >
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Nouveau notebook
-                </span>
-              </div>
-              <input
-                type="text"
-                value={newTitle}
-                onChange={e => setNewTitle(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                placeholder="Titre du notebook..."
-                autoFocus
-                className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-colors duration-150 focus:ring-2"
-                style={{
-                  backgroundColor: 'var(--notebook-surface-muted)',
-                  border: '1px solid var(--notebook-border)',
-                  color: 'var(--text-primary)',
-                  ['--tw-ring-color' as any]: 'var(--accent-primary)',
-                }}
-              />
-              <input
-                type="text"
-                value={newDescription}
-                onChange={e => setNewDescription(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                placeholder="Description (optionnel)"
-                className="w-full px-4 py-2.5 rounded-full text-sm outline-none transition-colors duration-150 focus:ring-2"
-                style={{
-                  backgroundColor: 'var(--notebook-surface-muted)',
-                  border: '1px solid var(--notebook-border)',
-                  color: 'var(--text-primary)',
-                  ['--tw-ring-color' as any]: 'var(--accent-primary)',
-                }}
-              />
-              <div className="flex items-center gap-3 pt-1">
-                <motion.button
-                  onClick={handleCreate}
-                  disabled={!newTitle.trim() || creating}
-                  whileHover={{ scale: newTitle.trim() ? 1.02 : 1 }}
-                  whileTap={{ scale: newTitle.trim() ? 0.97 : 1 }}
-                  transition={SPRING_MOMENTUM}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium disabled:opacity-40"
-                  style={{
-                    background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
-                    color: 'white',
-                  }}
-                >
-                  {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  Créer
-                </motion.button>
-                <motion.button
-                  onClick={() => { setShowCreateForm(false); setNewTitle(''); setNewDescription(''); }}
-                  whileTap={{ scale: 0.96 }}
-                  className="px-4 py-2.5 rounded-full text-sm font-medium"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Annuler
-                </motion.button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
 
       {/* ─── Notebook Cards ─────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto custom-scrollbar px-6 lg:px-10 pb-8">
@@ -433,7 +322,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             </div>
 
             <motion.button
-              onClick={() => setShowCreateForm(true)}
+              onClick={() => setShowCreateModal(true)}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.96 }}
               transition={SPRING_MOMENTUM}
@@ -567,6 +456,16 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
           </div>
         )}
       </div>
+
+      {/* ─── Create Notebook Modal ──────────────────────────── */}
+      <AnimatePresence>
+        {showCreateModal && (
+          <CreateNotebookModal
+            onClose={() => setShowCreateModal(false)}
+            onCreated={loadNotebooks}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ─── Delete Confirmation Modal ──────────────────────── */}
       <AnimatePresence>
