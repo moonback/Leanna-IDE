@@ -1148,6 +1148,7 @@ export default function IdeView() {
           }}
           showExplorer={showExplorer}
           devServerPort={ideSettings.devServerPort}
+          initialCwd={fileSystem.activePath ? fileSystem.activePath.replace(/[\\/][^\\/]+$/, '') : ''}
         />
       )}
 

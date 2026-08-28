@@ -11,6 +11,7 @@ interface TerminalPanelProps {
   onOpenBrowser?: (url: string) => void;
   showExplorer?: boolean;
   devServerPort?: number;
+  initialCwd?: string;
 }
 
 // Référence pour contrôler le terminal depuis l'extérieur
@@ -882,8 +883,8 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive,
 });
 
 // Composant principal
-const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onClose, isDocked, onOpenBrowser, showExplorer, devServerPort }, ref) => {
-  const [tabs, setTabs] = useState<TerminalTab[]>([{ id: '1', title: 'Terminal 1', shell: 'PowerShell', cwd: '' }]);
+const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onClose, isDocked, onOpenBrowser, showExplorer, devServerPort, initialCwd }, ref) => {
+  const [tabs, setTabs] = useState<TerminalTab[]>([{ id: '1', title: 'Terminal 1', shell: 'PowerShell', cwd: initialCwd ?? '' }]);
   const [activeTabId, setActiveTabId] = useState<string>('1');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -921,9 +922,9 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
 
   const addTab = useCallback(() => {
     const newId = String(Date.now());
-    setTabs(prev => [...prev, { id: newId, title: `Terminal ${prev.length + 1}`, shell: 'PowerShell', cwd: '' }]);
+    setTabs(prev => [...prev, { id: newId, title: `Terminal ${prev.length + 1}`, shell: 'PowerShell', cwd: initialCwd ?? '' }]);
     setActiveTabId(newId);
-  }, [tabs.length]);
+  }, [tabs.length, initialCwd]);
 
   const closeTab = useCallback((tabId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
