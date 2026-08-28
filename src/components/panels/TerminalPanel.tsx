@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useCallback, useState, memo } from 'react';
-import { X, Terminal, Play, Maximize, Minimize, Plus, Settings, ChevronDown, ChevronLeft, ChevronRight, Search, Trash2, Pencil, Copy, Check, AlertCircle, Loader2, Server, Folder, Command } from 'lucide-react';
+import React, { useEffect, useRef, useCallback, useState, memo, forwardRef, useImperativeHandle } from 'react';
+import { X, Terminal, Maximize, Minimize, Plus, ChevronDown, ChevronLeft, ChevronRight, Search, Trash2, Pencil, Copy, Check, AlertCircle, Server, Command } from 'lucide-react';
 import { useTerminal } from '../../hooks/useTerminal';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -11,8 +11,19 @@ interface TerminalPanelProps {
   showExplorer?: boolean;
 }
 
+// Référence pour contrôler le terminal depuis l'extérieur
+export interface TerminalPanelHandle {
+  executeCommand: (command: string) => void;
+  clearTerminal: () => void;
+  addTab: () => void;
+  closeTab: (tabId?: string) => void;
+  focus: () => void;
+  getActiveTabId: () => string | null;
+  getTabs: () => TerminalTab[];
+}
+
 // Types pour les onglets
-interface TerminalTab {
+export interface TerminalTab {
   id: string;
   title: string;
   shell: string;
@@ -310,9 +321,10 @@ interface TerminalTabPanelProps {
   onClear: () => void;
   onRename: (newTitle: string) => void;
   cwd: string;
+  onRegisterRef?: (tabId: string, ref: { executeCommand: (cmd: string) => void; clear: () => void; focus: () => void } | null) => void;
 }
 
-const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive, onSendInput, onClear, onRename, cwd }) => {
+const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive, onSendInput, onClear, onRename, cwd, onRegisterRef }) => {
   const [state, actions] = useTerminal(120, 40);
   const { isConnected, output, error, isConnecting } = state;
   const { sendInput, close: closeConnection, clear: clearTerminal } = actions;
@@ -327,6 +339,39 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive,
   const inputRef = useRef<HTMLInputElement>(null);
   const outputEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Exposer les méthodes pour ce tab
+  const executeCommandRef = useCallback((command: string) => {
+    if (isConnected && isActive) {
+      const trimmed = command.trim();
+      if (trimmed) {
+        sendInput(trimmed);
+        onSendInput(trimmed);
+      }
+    }
+  }, [isConnected, isActive, sendInput, onSendInput]);
+
+  const clearRef = useCallback(() => {
+    clearTerminal();
+    setNotification({ type: 'success', message: 'Terminal effacé' });
+    onClear();
+  }, [clearTerminal, onClear]);
+
+  const focusRef = useCallback(() => {
+    if (isActive && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isActive]);
+
+  // S'enregistrer auprès du parent
+  useEffect(() => {
+    if (onRegisterRef) {
+      const ref = { executeCommand: executeCommandRef, clear: clearRef, focus: focusRef };
+      onRegisterRef(tab.id, ref);
+      return () => onRegisterRef(tab.id, null);
+    }
+    return undefined;
+  }, [tab.id, onRegisterRef, executeCommandRef, clearRef, focusRef]);
 
   // Fermer la connexion quand l'onglet devient inactif
   useEffect(() => {
@@ -353,6 +398,7 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive,
       const timer = setTimeout(() => setNotification(null), 3000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [notification]);
 
   const handleSendInput = useCallback((input: string) => {
@@ -782,7 +828,7 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive,
 });
 
 // Composant principal
-const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onToggleDock, onOpenBrowser, showExplorer }) => {
+const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onClose, isDocked, onOpenBrowser, showExplorer }, ref) => {
   const [tabs, setTabs] = useState<TerminalTab[]>([{ id: '1', title: 'Terminal 1', shell: 'PowerShell', cwd: '' }]);
   const [activeTabId, setActiveTabId] = useState<string>('1');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -790,13 +836,13 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showShellSelector, setShowShellSelector] = useState(false);
   const [favoriteCommands, setFavoriteCommands] = useState<FavoriteCommand[]>(loadFavoriteCommands());
-  const [searchQuery, setSearchQuery] = useState('');
   const [searchMatches, setSearchMatches] = useState<number[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
   const [showSearch, setShowSearch] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const tabContainerRef = useRef<HTMLDivElement>(null);
+  const tabPanelRefs = useRef<Map<string, { executeCommand: (cmd: string) => void; clear: () => void; focus: () => void }>>(new Map());
 
   // Sauvegarder les commandes favorites quand elles changent
   useEffect(() => {
@@ -835,6 +881,47 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
     }
   }, [tabs, activeTabId]);
 
+  // Exposer les méthodes publiques via la ref
+  useImperativeHandle(ref, () => ({
+    executeCommand: (command: string) => {
+      const activeTab = tabs.find(t => t.id === activeTabId);
+      if (activeTab) {
+        const tabRef = tabPanelRefs.current.get(activeTab.id);
+        if (tabRef) {
+          tabRef.executeCommand(command);
+        }
+      }
+    },
+    clearTerminal: () => {
+      const activeTab = tabs.find(t => t.id === activeTabId);
+      if (activeTab) {
+        const tabRef = tabPanelRefs.current.get(activeTab.id);
+        if (tabRef) {
+          tabRef.clear();
+        }
+      }
+    },
+    addTab,
+    closeTab: (tabId?: string) => {
+      if (tabId) {
+        closeTab(tabId);
+      } else if (tabs.length > 1) {
+        closeTab(activeTabId);
+      }
+    },
+    focus: () => {
+      const activeTab = tabs.find(t => t.id === activeTabId);
+      if (activeTab) {
+        const tabRef = tabPanelRefs.current.get(activeTab.id);
+        if (tabRef) {
+          tabRef.focus();
+        }
+      }
+    },
+    getActiveTabId: () => activeTabId,
+    getTabs: () => tabs,
+  }), [tabs, activeTabId, addTab, closeTab]);
+
   const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);
   const toggleMinimize = useCallback(() => setIsMinimized(prev => !prev), []);
 
@@ -859,6 +946,15 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
     setTabs(prev => prev.map(tab =>
       tab.id === tabId ? { ...tab, title: newTitle } : tab
     ));
+  }, []);
+
+  // Gérer l'enregistrement des refs des tabs
+  const handleRegisterRef = useCallback((tabId: string, ref: { executeCommand: (cmd: string) => void; clear: () => void; focus: () => void } | null) => {
+    if (ref) {
+      tabPanelRefs.current.set(tabId, ref);
+    } else {
+      tabPanelRefs.current.delete(tabId);
+    }
   }, []);
 
   const handleCommandSent = useCallback((command: string) => {
@@ -933,7 +1029,6 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
       if (e.key === 'Escape' && showSearch) {
         e.preventDefault();
         setShowSearch(false);
-        setSearchQuery('');
         setSearchMatches([]);
         setCurrentMatchIndex(-1);
       }
@@ -945,7 +1040,6 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
 
   // Recherche dans le terminal
   const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
     if (query === '') {
       setSearchMatches([]);
       setCurrentMatchIndex(-1);
@@ -1293,7 +1387,7 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
                         </span>
                       </div>
                       <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                        {favoriteCommands.slice(0, 5).map((cmd, i) => (
+                        {favoriteCommands.slice(0, 5).map((cmd) => (
                           <button
                             key={cmd.id}
                             onClick={() => {
@@ -1535,6 +1629,7 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
               onClear={() => updateTabCwd(tab.id, '')}
               onRename={(newTitle) => renameTab(tab.id, newTitle)}
               cwd={tab.cwd}
+              onRegisterRef={handleRegisterRef}
             />
           ))}
         </div>
@@ -1556,16 +1651,18 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
             zIndex: 1001,
             boxShadow: 'var(--shadow-lg)',
           }}
-          onMouseEnter={e => (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)'}
-          onMouseLeave={e => (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-panel)'}
+          onMouseEnter={e => { (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)'; }}
+          onMouseLeave={e => { (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-panel)'; }}
         >
           <Minimize size={20} />
         </button>
       )}
     </motion.div>
   );
-};
+});
+
+TerminalPanel.displayName = 'TerminalPanel';
 
 export default memo(TerminalPanel);
-export type { TerminalTab, TerminalPanelProps };
+export type { TerminalPanelProps };
 export { DEFAULT_COMMANDS };
