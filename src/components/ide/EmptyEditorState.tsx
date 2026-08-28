@@ -277,8 +277,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
         className="absolute inset-0 pointer-events-none"
         style={{
           background: theme === 'dark'
-            ? 'radial-gradient(ellipse 70% 55% at 50% 30%, transparent 0%, var(--bg-base) 100%)'
-            : 'radial-gradient(ellipse 70% 55% at 50% 30%, transparent 0%, var(--bg-base) 100%)',
+            ? 'radial-gradient(ellipse 100% 100% at 20% 0%, transparent 0%, var(--bg-base) 100%)'
+            : 'radial-gradient(ellipse 100% 100% at 20% 0%, transparent 0%, var(--bg-base) 100%)',
         }}
       />
 
@@ -289,12 +289,12 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
           {/* ── Header : Salutation ── */}
           <motion.div className="mb-10" {...makeEntranceProps(0)}>
             <h1
-              className="text-xl sm:text-2xl font-semibold tracking-[-0.025em] leading-tight"
+              className="text-xl sm:text-3xl font-semibold tracking-[-0.025em] leading-tight"
               style={{ color: 'var(--text-primary)' }}
             >
               {profile.userName ? `${greeting}, ${profile.userName}` : greeting}
             </h1>
-            <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
               {connected
                 ? <><span style={{ color: 'var(--color-success)' }}>●</span> {profile.aiName || 'Leanna'} est connectée et prête.</>
                 : <><span style={{ color: 'var(--text-dimmed)' }}>○</span> {profile.aiName || 'Leanna'} est en attente de connexion.</>
@@ -310,11 +310,11 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             {/* Chat IA */}
             <ActionCard
               icon={MessageSquare}
-              title={connected ? 'Ouvrir le chat' : 'Connecter l\'IA'}
+              title={connected ? 'Ouvrir le chat' : 'Connecter ' +  (profile.aiName || 'l\'agent')}
               description={connected ? 'Session vocale et texte' : 'Démarrer une session avec ' + (profile.aiName || 'l\'agent')}
               shortcut={`${MOD}+L`}
               onClick={handleConnect}
-              primary
+              // primary
             />
 
             {/* Nouveau fichier */}
