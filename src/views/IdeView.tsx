@@ -53,6 +53,7 @@ import { AgentFleetPanel } from '../components/panels/AgentFleetPanel';
 import { AssistantLogsPanel } from '../components/panels/AssistantLogsPanel';
 import { AgentActivityOverlay } from '../components/ide/AgentActivityOverlay';
 import { TemplateSelectorModal } from '../components/templates/TemplateSelectorModal';
+import TerminalPanel from '../components/panels/TerminalPanel';
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -174,6 +175,8 @@ export default function IdeView() {
   const [showHistory, setShowHistory] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [terminalDocked, setTerminalDocked] = useState(true); // Par défaut docké en bas
   const [selfEditingFile, setSelfEditingFile] = useState<string | null>(null);
   const [richDocument, setRichDocument] = useState<RichDocument | null>(null);
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
@@ -503,6 +506,11 @@ export default function IdeView() {
           setMarkdownPreview(v => !v);
         }
       }
+      // Terminal toggle (Ctrl+`)
+      if ((e.ctrlKey || e.metaKey) && e.key === '`') {
+        e.preventDefault();
+        setShowTerminal(v => !v);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -725,6 +733,8 @@ export default function IdeView() {
           setShowMemory(v => !v);
           if (!showMemory) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowNotebooks(false); }
         }}
+        showTerminal={showTerminal}
+        onToggleTerminal={() => setShowTerminal(v => !v)}
       />
 
       {/* File Explorer */}
@@ -1124,6 +1134,20 @@ export default function IdeView() {
       {/* Fleet Panel — modal overlay */}
       {showFleet && (
         <AgentFleetPanel inline onClose={() => setShowFleet(false)} />
+      )}
+
+      {/* Terminal Panel — floating overlay */}
+      {showTerminal && (
+        <TerminalPanel
+          onClose={() => setShowTerminal(false)}
+          isDocked={terminalDocked}
+          onToggleDock={() => setTerminalDocked(v => !v)}
+          onOpenBrowser={(url: string) => {
+            setShowBrowser(true);
+            setBrowserUrl(url);
+          }}
+          showExplorer={showExplorer}
+        />
       )}
 
       {/* Template Selector Modal */}

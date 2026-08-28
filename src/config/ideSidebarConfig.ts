@@ -15,8 +15,8 @@ import {
   GitBranch, Camera, Monitor,
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Cable, Container, Bot, Crosshair, Database,
-  Activity, Wrench, Code2, Users, FileStack,
-  Wand2, BookOpen, Globe,
+  Activity, Wrench, Users, FileStack,
+  Wand2, BookOpen, Globe, Terminal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -83,6 +83,15 @@ export const sidebarSections: SidebarSectionConfig[] = [
             stateKey: 'showGlobalSearch',
             actionKey: 'onToggleSearch',
           },
+      {
+        id: 'terminal',
+        type: 'button',
+        icon: Terminal,
+        label: 'Terminal (Ctrl+`)',
+        shortcut: 'Ctrl+`',
+        stateKey: 'showTerminal',
+        actionKey: 'onToggleTerminal',
+      },
     ],
   },
 

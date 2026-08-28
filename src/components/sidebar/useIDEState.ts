@@ -29,6 +29,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     showMcp: props.showMcp ?? false,
     showFleet: props.showFleet ?? false,
     showBrowser: props.showBrowser ?? false,
+    showTerminal: props.showTerminal ?? false,
     visionEnabled: props.visionEnabled ?? false,
     screenShareEnabled: props.screenShareEnabled ?? false,
   }), [
@@ -37,8 +38,8 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.showSandbox, props.showWorkflow, props.showSkillsMonitor,
     props.showChat, props.showAgents, props.showAgentBuilder, props.showMissions,
     props.showKnowledge, props.showDocuments, props.showNotebooks, props.showSystemHealth, props.showMcp,
-    props.showFleet, props.showBrowser, props.visionEnabled,
-    props.screenShareEnabled,
+    props.showFleet, props.showBrowser, props.showTerminal,
+    props.visionEnabled, props.screenShareEnabled,
   ]);
 
   const actions: IDEPanelActions = useMemo(() => ({
@@ -60,6 +61,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     onToggleMcp: props.onToggleMcp ?? noop,
     onToggleFleet: props.onToggleFleet ?? noop,
     onToggleBrowser: props.onToggleBrowser ?? noop,
+    onToggleTerminal: props.onToggleTerminal ?? noop,
     onToggleVision: props.onToggleVision ?? noop,
     onToggleScreenShare: props.onToggleScreenShare ?? noop,
   }), [
@@ -68,7 +70,8 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.onToggleSandbox, props.onToggleWorkflow, props.onToggleSkillsMonitor,
     props.onToggleChat, props.onToggleAgents, props.onToggleAgentBuilder, props.onToggleMissions,
     props.onToggleKnowledge, props.onToggleNotebooks, props.onToggleDocuments, props.onToggleSystemHealth, props.onToggleMcp,
-    props.onToggleFleet, props.onToggleBrowser, props.onToggleVision, props.onToggleScreenShare,
+    props.onToggleFleet, props.onToggleBrowser, props.onToggleTerminal,
+    props.onToggleVision, props.onToggleScreenShare,
   ]);
 
   return { state, actions };
