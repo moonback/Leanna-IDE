@@ -153,7 +153,7 @@ export interface DelegationCapability {
   reason: string;
 }
 
-import { AGENT_ROLES } from "./types";
+import { STATIC_AGENT_ROLES } from "./types";
 
 /** Matrice de délégation : quels agents peuvent déléguer à qui */
 export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {
@@ -326,9 +326,10 @@ export const agentMessageSchema = z.object({
     "event",
     "broadcast",
   ]),
-  from: z.enum(AGENT_ROLES),
+  from: z.union([z.enum(STATIC_AGENT_ROLES), z.string()]),
   to: z.union([
-    z.enum(AGENT_ROLES),
+    z.enum(STATIC_AGENT_ROLES),
+    z.string(),
     z.literal("broadcast"),
   ]),
   priority: z.enum(["low", "medium", "high", "critical"]),

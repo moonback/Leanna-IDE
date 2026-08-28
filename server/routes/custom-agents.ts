@@ -1,11 +1,18 @@
 /**
  * Routes API pour la persistance des agents personnalisés dans .jarvis/custom-agents.json
+ * et leur enregistrement dans le DynamicAgentRegistry pour exécution.
  */
 
 import type { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import { SELF_ROOT } from "../utils/selfRoot";
+import { dynamicAgentRegistry } from "../agents/DynamicAgentRegistry";
+import { agentRegistry } from "../agents/AgentRegistry";
+import { getAgentDefinition } from "../agents/roles";
+import { createLogger } from "../utils/logger";
+
+const log = createLogger("CustomAgentsAPI");
 
 function getAgentsFilePath(): string {
   return path.join(SELF_ROOT, ".jarvis", "custom-agents.json");
@@ -35,8 +42,64 @@ function writeAgents(agents: any[]) {
   fs.writeFileSync(getAgentsFilePath(), JSON.stringify(agents, null, 2), "utf-8");
 }
 
+/**
+ * Charge et enregistre tous les agents personnalisés au démarrage.
+ * Doit être appelé après l'initialisation du AgentRegistry.
+ */
+export function initCustomAgents(): void {
+  try {
+    const agents = readAgents();
+    let registeredCount = 0;
+    
+    for (const agent of agents) {
+      if (!agent?.name || !agent?.role) continue;
+      
+      // Vérifier que le rôle n'existe pas déjà dans les statiques
+      if (getAgentDefinition(agent.role)) {
+        log.warn(`⚠️ Agent personnalisé "${agent.role}" ignoré : rôle statique existant`);
+        continue;
+      }
+      
+      // Vérifier que l'agent n'est pas déjà enregistré
+      if (dynamicAgentRegistry.hasAgent(agent.role)) {
+        continue;
+      }
+      
+      // Enregistrer dans le registre dynamique
+      dynamicAgentRegistry.registerAgent({
+        role: agent.role,
+        name: agent.name,
+        description: agent.description || '',
+        systemPrompt: agent.systemPrompt || '',
+        capabilities: agent.capabilities || agent.tools || [],
+        maxConcurrency: agent.maxConcurrency ?? 2,
+        defaultTimeoutMs: agent.defaultTimeoutMs ?? 60_000,
+        version: "1.0.0",
+        tags: agent.triggerKeywords || [],
+        isActive: true,
+        author: "agent-builder",
+        createdAt: agent.createdAt,
+        updatedAt: agent.updatedAt,
+      });
+      
+      // Démarrer l'agent si le AgentRegistry est initialisé
+      if (agentRegistry.isReady) {
+        agentRegistry.registerAndStartDynamicAgent(agent.role);
+      }
+      
+      registeredCount++;
+    }
+    
+    if (registeredCount > 0) {
+      log.info(`✅ ${registeredCount} agent(s) personnalisé(s) chargé(s) et enregistré(s)`);
+    }
+  } catch (err: any) {
+    log.error(`⚠️ Erreur lors du chargement des agents personnalisés: ${err.message}`);
+  }
+}
+
 /** GET /api/custom-agents — Liste tous les agents */
-export function handleListAgents(_req: Request, res: Response) {
+export function handleListAgents(_req: Request, res: Response): void {
   try {
     const agents = readAgents();
     res.json({ success: true, agents });
@@ -46,12 +109,27 @@ export function handleListAgents(_req: Request, res: Response) {
 }
 
 /** POST /api/custom-agents — Créer un nouvel agent */
-export function handleCreateAgent(req: Request, res: Response) {
+export function handleCreateAgent(req: Request, res: Response): void {
   try {
     const draft = req.body;
     if (!draft?.name || !draft?.role) {
       return res.status(400).json({ error: "name et role sont requis" });
     }
+    
+    // Vérifier que le rôle n'existe pas déjà dans les agents statiques
+    if (getAgentDefinition(draft.role)) {
+      return res.status(409).json({
+        error: `Le rôle "${draft.role}" est déjà utilisé par un agent statique`,
+      });
+    }
+    
+    // Vérifier que le rôle n'existe pas déjà dans les agents dynamiques
+    if (dynamicAgentRegistry.hasAgent(draft.role)) {
+      return res.status(409).json({
+        error: `Le rôle "${draft.role}" est déjà enregistré comme agent personnalisé`,
+      });
+    }
+    
     const agents = readAgents();
     const now = new Date().toISOString();
     const agent = {
@@ -62,6 +140,34 @@ export function handleCreateAgent(req: Request, res: Response) {
     };
     agents.push(agent);
     writeAgents(agents);
+    
+    // Enregistrer l'agent dans le registre dynamique
+    try {
+      dynamicAgentRegistry.registerAgent({
+        role: draft.role,
+        name: draft.name,
+        description: draft.description || '',
+        systemPrompt: draft.systemPrompt || '',
+        capabilities: draft.capabilities || draft.tools || [],
+        maxConcurrency: draft.maxConcurrency ?? 2,
+        defaultTimeoutMs: draft.defaultTimeoutMs ?? 60_000,
+        version: "1.0.0",
+        tags: draft.triggerKeywords || [],
+        isActive: true,
+        author: "agent-builder",
+      });
+      
+      // Démarrer l'agent si le AgentRegistry est initialisé
+      if (agentRegistry.isReady) {
+        agentRegistry.registerAndStartDynamicAgent(draft.role);
+      }
+      
+      log.info(`✅ Agent personnalisé "${draft.role}" créé et enregistré`);
+    } catch (registerErr: any) {
+      log.error(`⚠️ Erreur lors de l'enregistrement dynamique de "${draft.role}": ${registerErr.message}`);
+      // Ne pas échouer la création, mais logger l'erreur
+    }
+    
     res.json({ success: true, agent });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -69,13 +175,16 @@ export function handleCreateAgent(req: Request, res: Response) {
 }
 
 /** PUT /api/custom-agents/:id — Mettre à jour un agent */
-export function handleUpdateAgent(req: Request, res: Response) {
+export function handleUpdateAgent(req: Request, res: Response): void {
   try {
     const { id } = req.params;
     const updates = req.body;
     const agents = readAgents();
     const idx = agents.findIndex((a: any) => a.id === id);
-    if (idx === -1) return res.status(404).json({ error: "Agent non trouvé" });
+    if (idx === -1) {
+      res.status(404).json({ error: "Agent non trouvé" });
+      return;
+    }
 
     agents[idx] = { ...agents[idx], ...updates, updatedAt: new Date().toISOString() };
     writeAgents(agents);
@@ -86,15 +195,38 @@ export function handleUpdateAgent(req: Request, res: Response) {
 }
 
 /** DELETE /api/custom-agents/:id — Supprimer un agent */
-export function handleDeleteAgent(req: Request, res: Response) {
+export function handleDeleteAgent(req: Request, res: Response): void {
   try {
     const { id } = req.params;
     let agents = readAgents();
-    const before = agents.length;
+    const idx = agents.findIndex((a: any) => a.id === id);
+    if (idx === -1) {
+      res.status(404).json({ error: "Agent non trouvé" });
+      return;
+    }
+    
+    const agentToDelete = agents[idx];
+    const role = agentToDelete?.role;
+    
     agents = agents.filter((a: any) => a.id !== id);
-    if (agents.length === before) return res.status(404).json({ error: "Agent non trouvé" });
-
     writeAgents(agents);
+    
+    // Désenregistrer l'agent du registre dynamique
+    if (role && !getAgentDefinition(role)) {
+      try {
+        dynamicAgentRegistry.unregisterAgent(role);
+        
+        // Arrêter l'agent dans le AgentRegistry
+        if (agentRegistry.isReady) {
+          agentRegistry.unregisterDynamicAgent(role);
+        }
+        
+        log.info(`🗑️ Agent personnalisé "${role}" supprimé et désenregistré`);
+      } catch (unregisterErr: any) {
+        log.error(`⚠️ Erreur lors du désenregistrement de "${role}": ${unregisterErr.message}`);
+      }
+    }
+    
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -102,7 +234,7 @@ export function handleDeleteAgent(req: Request, res: Response) {
 }
 
 /** POST /api/custom-agents/import — Importer des agents depuis JSON */
-export function handleImportAgents(req: Request, res: Response) {
+export function handleImportAgents(req: Request, res: Response): void {
   try {
     const imported = req.body?.agents;
     if (!Array.isArray(imported)) return res.status(400).json({ error: "Format invalide, attendu { agents: [...] }" });
@@ -110,17 +242,57 @@ export function handleImportAgents(req: Request, res: Response) {
     const agents = readAgents();
     let count = 0;
     const now = new Date().toISOString();
+    
     for (const item of imported) {
       if (item?.name && item?.role) {
+        // Vérifier que le rôle n'existe pas déjà (statique ou dynamique)
+        if (getAgentDefinition(item.role)) {
+          log.warn(`⚠️ Impossible d'importer l'agent "${item.role}" : rôle déjà utilisé par un agent statique`);
+          continue;
+        }
+        
+        if (dynamicAgentRegistry.hasAgent(item.role)) {
+          log.warn(`⚠️ Impossible d'importer l'agent "${item.role}" : rôle déjà enregistré`);
+          continue;
+        }
+        
         agents.push({
           ...item,
           id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${count}`,
           createdAt: now,
           updatedAt: now,
         });
+        
+        // Enregistrer dans le registre dynamique
+        try {
+          dynamicAgentRegistry.registerAgent({
+            role: item.role,
+            name: item.name,
+            description: item.description || '',
+            systemPrompt: item.systemPrompt || '',
+            capabilities: item.capabilities || item.tools || [],
+            maxConcurrency: item.maxConcurrency ?? 2,
+            defaultTimeoutMs: item.defaultTimeoutMs ?? 60_000,
+            version: "1.0.0",
+            tags: item.triggerKeywords || [],
+            isActive: true,
+            author: "agent-builder",
+          });
+          
+          // Démarrer l'agent si le AgentRegistry est initialisé
+          if (agentRegistry.isReady) {
+            agentRegistry.registerAndStartDynamicAgent(item.role);
+          }
+          
+          log.info(`✅ Agent importé "${item.role}" enregistré`);
+        } catch (registerErr: any) {
+          log.error(`⚠️ Erreur lors de l'enregistrement de "${item.role}": ${registerErr.message}`);
+        }
+        
         count++;
       }
     }
+    
     writeAgents(agents);
     res.json({ success: true, count });
   } catch (err: any) {

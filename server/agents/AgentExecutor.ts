@@ -12,7 +12,7 @@
  */
 import { randomUUID } from "crypto";
 import type { AgentTask } from "./types";
-import { getAgentDefinition } from "./roles";
+import { getAgentDefinition, getAgentDefinitionOrThrow, hasAgent } from "./roles";
 import { PromptBuilder } from "./PromptBuilder";
 import { GeneratedFileWriter } from "./GeneratedFileWriter";
 import { ResultParser } from "./ResultParser";
@@ -130,9 +130,25 @@ export class AgentExecutor {
    * Modifie task.status, task.result, task.startedAt, task.completedAt in-place.
    */
   async execute(task: AgentTask): Promise<void> {
-    const agent = getAgentDefinition(task.role);
     const taskShortId = task.id.slice(0, 8);
+    const role = task.role;
 
+    // Vérifier si l'agent existe (statique ou dynamique)
+    if (!hasAgent(role)) {
+      log.error(`[task:${taskShortId}] Agent "${role}" non trouvé (statique ou dynamique)`);
+      task.status = "failed";
+      task.result = {
+        success: false,
+        summary: `Agent "${role}" introuvable`,
+        error: `Agent "${role}" non enregistré. Utilisez l'Agent Builder pour créer et enregistrer cet agent d'abord.`,
+        durationMs: 0,
+      };
+      this.notifier.notify(task, "failed");
+      return;
+    }
+
+    const agent = getAgentDefinitionOrThrow(role);
+    
     log.info(`[task:${taskShortId}] ▶ [${agent.name}] Démarrage tâche: "${task.title}"`);
 
     if (!this.skillHandler) {
@@ -862,6 +878,10 @@ ${truncated}
     if (delegations.length === 0) return [];
 
     const agent = getAgentDefinition(parentTask.role);
+    if (!agent) {
+      log.error(`[dispatchDelegations] Agent "${parentTask.role}" introuvable`);
+      return [];
+    }
     log.info(
       `🔀 [${agent.name}] ${delegations.length} délégation(s) détectée(s) à profondeur ${depth} — dispatch en cours...`
     );
@@ -900,6 +920,10 @@ ${truncated}
   ): Promise<string | null> {
     const taskId = randomUUID();
     const agent = getAgentDefinition(parentTask.role);
+    if (!agent) {
+      log.error(`[sendDelegation] Agent "${parentTask.role}" introuvable`);
+      return null;
+    }
     
     // Vérifier la limite de profondeur
     if (depth >= AgentExecutor.MAX_DELEGATION_DEPTH) {

@@ -1,21 +1,21 @@
 import { randomUUID } from "crypto";
-import { AGENT_REGISTRY, getAgentDefinition } from "./roles";
+import { getAgentDefinition, getAgentDefinitionOrThrow } from "./roles";
 import type {
   AgentRole,
   AgentTask,
-  TaskResult,
   TaskStatus,
   TaskPriority,
   OrchestrationPlan,
 } from "./types";
 import { AgentExecutor, SkillHandler } from "./AgentExecutor";
 import { TaskScheduler } from "./TaskScheduler";
-import { ProgressNotifier, ProgressCallback, EventBroadcaster, AgentEvent } from "./ProgressNotifier";
+import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier";
 import { AgentRegistry, agentRegistry } from "./AgentRegistry";
 import { agentMessageBus } from "./AgentMessageBus";
 import { COLLABORATION_PATTERNS } from "./AgentCommunication";
 import { agentPersistence } from "./AgentPersistence";
 import { createLogger } from "../utils/logger";
+import { initCustomAgents } from "../routes/custom-agents";
 
 // Ré-exporter pour compatibilité et usage externe
 export type { AgentEvent } from "./ProgressNotifier";
@@ -54,6 +54,9 @@ export class AgentOrchestrator {
     if (!this.registry.isReady) {
       this.registry.initialize(handler);
       log.info("🤖 Flotte d'agents autonomes initialisée");
+      
+      // Charger les agents personnalisés après l'initialisation
+      initCustomAgents();
     }
   }
 
@@ -79,7 +82,7 @@ export class AgentOrchestrator {
           // Encode les infos de bus dans le title pour parsing côté frontend
           title: `[bus] ${msg.from}→${msg.to} ${msg.type}`,
           status: "running",
-          agentName: getAgentDefinition(msg.from).name,
+          agentName: getAgentDefinition(msg.from)?.name ?? msg.from,
           // detail contient les infos de routage pour le composant fleet
           detail: `bus:${msg.type}:${msg.from}:${String(msg.to)}:${msg.metadata?.autonomous === true ? 'auto' : 'manual'}`,
           timestamp: msg.timestamp,
@@ -105,7 +108,7 @@ export class AgentOrchestrator {
     priority?: TaskPriority;
     timeoutMs?: number;
   }): Promise<AgentTask> {
-    const agent = getAgentDefinition(params.role);
+    const agent = getAgentDefinitionOrThrow(params.role);
     const currentRunning = this.executor.getRunningCount(params.role);
 
     log.info(`📋 Délégation → ${agent.name}: "${params.title}" (priorité: ${params.priority ?? "medium"})`);
@@ -182,7 +185,7 @@ export class AgentOrchestrator {
     // Seconde passe : créer les tâches et traduire les titres du même plan en IDs réels.
     for (let i = 0; i < params.tasks.length; i++) {
       const taskDef = params.tasks[i];
-      const agent = getAgentDefinition(taskDef.role);
+      const agent = getAgentDefinitionOrThrow(taskDef.role);
       const taskId = taskIds[i];
 
       const task: AgentTask = {

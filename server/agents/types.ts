@@ -5,7 +5,7 @@ import { z } from "zod";
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** Rôles d'agents spécialisés disponibles — ingénierie de code & rédaction de documents */
-export const AGENT_ROLES = [
+export const STATIC_AGENT_ROLES = [
   // Agents de Code & Ingénierie logicielle
   "coder",
   "refactor",
@@ -24,7 +24,13 @@ export const AGENT_ROLES = [
   "summarizer",
   "planner",
 ] as const;
-export type AgentRole = (typeof AGENT_ROLES)[number];
+
+/**
+ * AgentRole peut être soit un rôle statique prédéfini, soit un rôle dynamique
+ * enregistré via l'Agent Builder ou l'API.
+ * Le type est union pour supporter à la fois les rôles statiques et dynamiques.
+ */
+export type AgentRole = (typeof STATIC_AGENT_ROLES)[number] | string;
 
 /** Alias contrôlés acceptés aux frontières LLM. Aucun rôle n'est inventé. */
 const AGENT_ROLE_ALIASES: Readonly<Record<string, AgentRole>> = {
@@ -111,11 +117,22 @@ const AGENT_ROLE_ALIASES: Readonly<Record<string, AgentRole>> = {
   planification: "planner",
 };
 
-/** Normalise seulement les alias approuvés, puis laisse le schéma strict rejeter le reste. */
+/**
+ * Normalise seulement les alias approuvés, puis retourne la valeur normalisée.
+ * Pour les rôles dynamiques (non dans les aliases), retourne simplement la valeur
+ * normalisée (trim + lowercase).
+ */
 export function normalizeAgentRole(value: unknown): unknown {
   if (typeof value !== "string") return value;
   const normalized = value.trim().toLowerCase();
   return AGENT_ROLE_ALIASES[normalized] ?? normalized;
+}
+
+/**
+ * Vérifie si un rôle est un rôle statique prédéfini.
+ */
+export function isStaticAgentRole(role: string): boolean {
+  return STATIC_AGENT_ROLES.includes(role as (typeof STATIC_AGENT_ROLES)[number]);
 }
 
 /** Statuts possibles d'une tâche déléguée */
@@ -233,17 +250,33 @@ export interface OrchestrationPlan {
 // ─── Zod Schemas pour validation ──────────────────────────────────────────────
 
 const strictAgentRoleSchema = z.enum(
-  AGENT_ROLES,
+  STATIC_AGENT_ROLES,
   {
     errorMap: (_issue, ctx) => ({
       message:
         `Rôle invalide : "${ctx.data}". ` +
-        `Un seul rôle autorisé par tâche, parmi : ${AGENT_ROLES.join(", ")}.`,
+        `Un seul rôle autorisé par tâche, parmi : ${STATIC_AGENT_ROLES.join(", ")}.`,
     }),
   }
 );
 
-/** Accepte uniquement les rôles officiels et les alias explicitement approuvés. */
+/**
+ * Schéma pour les rôles dynamiques (strings arbitraires).
+ * Accepte n'importe quelle chaîne non-vide comme rôle potentiel.
+ */
+const dynamicAgentRoleSchema = z
+  .string()
+  .min(1, "Le rôle ne peut pas être vide")
+  .max(64, "Le rôle est trop long (max 64 caractères)")
+  .regex(
+    /^[a-zA-Z][a-zA-Z0-9_-]*$/,
+    "Le rôle doit commencer par une lettre et contenir uniquement des lettres, chiffres, underscores ou tirets"
+  );
+
+/**
+ * Accepte les rôles officiels, les alias explicitement approuvés, ou les rôles dynamiques valides.
+ * Le transform normalise les alias connus et laisse passer les autres.
+ */
 export const agentRoleSchema = z
   .union([
     strictAgentRoleSchema,
@@ -266,6 +299,7 @@ export const agentRoleSchema = z
       "synthese", "synthèse", "resume", "résumé",
       "plan", "outline", "planification",
     ]),
+    dynamicAgentRoleSchema,
   ])
   .transform((value): AgentRole => normalizeAgentRole(value) as AgentRole);
 

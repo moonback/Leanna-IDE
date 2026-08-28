@@ -1,4 +1,5 @@
 import type { AgentDefinition, AgentRole } from "./types";
+import { dynamicAgentRegistry } from "./DynamicAgentRegistry";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BASE COMMUNE – Règles fondamentales pour agents Jarvis-OS
@@ -1149,7 +1150,11 @@ ${SECTION_OUTPUT_FORMAT}
 
 // ─── Registry ──────────────────────────────────────────────────────────────────
 
-export const AGENT_REGISTRY: Record<AgentRole, AgentDefinition> = {
+/**
+ * Registry statique des agents prédéfinis.
+ * Ces agents sont toujours disponibles et ne peuvent pas être supprimés.
+ */
+export const STATIC_AGENT_REGISTRY: Record<string, AgentDefinition> = {
   // Code & Ingénierie
   coder: coderAgent,
   refactor: refactorAgent,
@@ -1169,10 +1174,62 @@ export const AGENT_REGISTRY: Record<AgentRole, AgentDefinition> = {
   planner: plannerAgent,
 };
 
-export function getAgentDefinition(role: AgentRole): AgentDefinition {
-  return AGENT_REGISTRY[role];
+/**
+ * Récupère la définition d'un agent, en regardant d'abord dans le registre dynamique,
+ * puis dans le registre statique.
+ * 
+ * @param role - Rôle de l'agent à récupérer
+ * @returns La définition de l'agent ou undefined si non trouvé
+ */
+export function getAgentDefinition(role: string): AgentDefinition | undefined {
+  // D'abord vérifier le registre dynamique
+  const dynamicAgent = dynamicAgentRegistry.getAgent(role);
+  if (dynamicAgent) {
+    return dynamicAgent as AgentDefinition;
+  }
+  
+  // Puis vérifier le registre statique
+  return STATIC_AGENT_REGISTRY[role as keyof typeof STATIC_AGENT_REGISTRY];
 }
 
+/**
+ * Récupère la définition d'un agent, avec une erreur si non trouvé.
+ * @param role - Rôle de l'agent
+ * @returns La définition de l'agent
+ * @throws Error si l'agent n'est pas trouvé
+ */
+export function getAgentDefinitionOrThrow(role: string): AgentDefinition {
+  const definition = getAgentDefinition(role);
+  if (!definition) {
+    throw new Error(
+      `Agent "${role}" introuvable. Vérifie que le rôle est correct ou que l'agent a été enregistré via l'Agent Builder.`
+    );
+  }
+  return definition;
+}
+
+/**
+ * Liste toutes les définitions d'agents (statiques + dynamiques).
+ */
 export function listAgentDefinitions(): AgentDefinition[] {
-  return Object.values(AGENT_REGISTRY);
+  const staticDefs = Object.values(STATIC_AGENT_REGISTRY);
+  const dynamicDefs = dynamicAgentRegistry.getAllAgents();
+  return [...staticDefs, ...dynamicDefs];
+}
+
+/**
+ * Liste uniquement les rôles des agents disponibles (statiques + dynamiques).
+ */
+export function listAgentRoles(): string[] {
+  const staticRoles = Object.keys(STATIC_AGENT_REGISTRY);
+  const dynamicRoles = dynamicAgentRegistry.getAllRoles();
+  return [...staticRoles, ...dynamicRoles];
+}
+
+/**
+ * Vérifie si un agent existe (statique ou dynamique).
+ */
+export function hasAgent(role: string): boolean {
+  return dynamicAgentRegistry.hasAgent(role) || 
+         (role in STATIC_AGENT_REGISTRY);
 }

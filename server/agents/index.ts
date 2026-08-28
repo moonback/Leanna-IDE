@@ -37,7 +37,17 @@ export { AgentRepairLoop } from "./AgentRepairLoop";
 export type { RepairAction, RepairDirective } from "./AgentRepairLoop";
 
 // Exports existants (inchangés)
-export { AGENT_REGISTRY, getAgentDefinition, listAgentDefinitions } from "./roles";
+export { 
+  STATIC_AGENT_REGISTRY, 
+  getAgentDefinition, 
+  getAgentDefinitionOrThrow,
+  listAgentDefinitions, 
+  listAgentRoles,
+  hasAgent
+} from "./roles";
+
+// Dynamic Agent Registry
+export { DynamicAgentRegistry, dynamicAgentRegistry } from "./DynamicAgentRegistry";
 export type {
   AgentRole,
   AgentTask,
