@@ -16,7 +16,7 @@ import {
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Cable, Container, Bot, Crosshair, Database,
   Activity, Wrench, Users, FileStack,
-  Wand2, BookOpen, Globe, Terminal,
+  Wand2, BookOpen, Globe, Terminal, Eye,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -91,6 +91,15 @@ export const sidebarSections: SidebarSectionConfig[] = [
         shortcut: 'Ctrl+`',
         stateKey: 'showTerminal',
         actionKey: 'onToggleTerminal',
+      },
+      {
+        id: 'browser',
+        type: 'button',
+        icon: Globe,
+        label: 'Preview (Ctrl+Shift+B)',
+        shortcut: 'Ctrl+Shift+B',
+        stateKey: 'showBrowser',
+        actionKey: 'onToggleBrowser',
       },
     ],
   },
@@ -170,14 +179,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
             stateKey: 'showSystemHealth',
             actionKey: 'onToggleSystemHealth',
           },
-          {
-            id: 'mcp',
-            type: 'button',
-            icon: Cable,
-            label: 'Serveurs MCP (outils externes)',
-            stateKey: 'showMcp',
-            actionKey: 'onToggleMcp',
-          },
+          // {
+          //   id: 'mcp',
+          //   type: 'button',
+          //   icon: Cable,
+          //   label: 'Serveurs MCP (outils externes)',
+          //   stateKey: 'showMcp',
+          //   actionKey: 'onToggleMcp',
+          // },
           {
             id: 'agent-builder',
             type: 'button',
@@ -185,14 +194,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Agent Builder (créer des agents)',
             stateKey: 'showAgentBuilder',
             actionKey: 'onToggleAgentBuilder',
-          },
-          {
-            id: 'browser',
-            type: 'button',
-            icon: Globe,
-            label: 'Navigateur intégré',
-            stateKey: 'showBrowser',
-            actionKey: 'onToggleBrowser',
           },
           {
             id: 'vision',

@@ -513,6 +513,19 @@ export default function IdeView() {
         e.preventDefault();
         setShowTerminal(v => !v);
       }
+      // Browser/Preview toggle (Ctrl+Shift+B)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+        e.preventDefault();
+        setShowBrowser(v => !v);
+        if (!showBrowser) {
+          // Ouvrir la preview du fichier actif si disponible
+          if (fileSystem.activePath) {
+            setBrowserUrl(`http://localhost:${SERVER_PORT}/workspace-preview/${encodeURIComponent(fileSystem.activePath)}`);
+          }
+        } else {
+          setBrowserUrl(undefined);
+        }
+      }
       // Terminal quick commands (Ctrl+1 to Ctrl+0)
       if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
         const commandMap: Record<string, string> = {
@@ -536,7 +549,7 @@ export default function IdeView() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saveActiveFile, formatDocument, fileSystem.activePath, showTerminal]);
+  }, [saveActiveFile, formatDocument, fileSystem.activePath, showTerminal, showBrowser]);
 
   // Prevent data loss
   useEffect(() => {
