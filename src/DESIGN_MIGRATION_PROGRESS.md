@@ -12,14 +12,16 @@
 - **Élimination des rounded-[...] arbitraires** - 13/13 occurrences corrigées
 
 ### 📈 En Progrès
-- **Élimination des text-[...] arbitraires** - 307/1060 corrigées (28.9%)
-- **Élimination des couleurs hex en dur** - 67/812 corrigées (8.2%)
+- **Élimination des text-[...] arbitraires** - 312/1060 corrigées (29.4%)
+- **Élimination des couleurs hex en dur** - 73/812 corrigées (9.0%)
 
 ---
 
 ## 🎯 Détail par Phase
 
 ### Phase 1: Fondations ✅
+### Phase 2: Primitives UI ✅
+### Phase 3: Coquille Applicative ✅
 
 | Tâche | Statut | Fichiers Modifiés |
 |-------|--------|------------------|
@@ -56,7 +58,7 @@
 
 ---
 
-### Phase 3: Coquille Applicative 🚧
+### Phase 3: Coquille Applicative ✅
 
 | Composant | Statut | Modifications |
 |-----------|--------|---------------|
@@ -67,12 +69,12 @@
 | AgentStatusBlock.tsx | ✅ | couleur hex (#0ea5e9) corrigée |
 | SidebarSection.tsx | ✅ | couleur hex (#4ade80) corrigée |
 | QuitConfirmDialog.tsx | ✅ | couleurs hex (#fff) corrigées |
-| StatusBar.tsx | ⏳ | À faire |
-| Breadcrumb.tsx | ⏳ | À faire |
-| EditorTabs.tsx | ⏳ | À faire |
-| CommandPalette.tsx | ⏳ | À faire |
+| StatusBar.tsx | ✅ | text-[11px] corrigé, couleurs hex (#a78bfa, #38bdf8, #ffffff), classes Tailwind |
+| Breadcrumb.tsx | ✅ | Aucun problème trouvé |
+| EditorTabs.tsx | ✅ | text-[11px] corrigé, h-[2px] → h-0.5 |
+| CommandPalette.tsx | ✅ | Aucun problème trouvé |
 
-**Progrès:** 7/10 fichiers corrigés
+**Progrès:** 10/10 fichiers corrigés
 
 ---
 
@@ -112,8 +114,8 @@ backdrop-blur non std  : X occurrences
 
 ### Après Migration (28 août 2026, actuel)
 ```
-text-[...] arbitraires : 753 (↓ 307)
-Couleurs hex en dur    : 745 (↓ 67)
+text-[...] arbitraires : 748 (↓ 312)
+Couleurs hex en dur    : 739 (↓ 73)
 rounded-[...] arbitraires : 0 (↓ 13, 100%)
 framer-motion usages   : 0 fichiers (↓ 3, 100%)
 backdrop-blur non std  : 0 occurrences (100%)
@@ -165,6 +167,10 @@ backdrop-blur non std  : 0 occurrences (100%)
 - `src/components/sidebar/AgentStatusBlock.tsx` ✅
 - `src/components/ide/sidebar/SidebarSection.tsx` ✅
 - `src/components/sidebar/QuitConfirmDialog.tsx` ✅
+- `src/components/ide/StatusBar.tsx` ✅
+- `src/components/Breadcrumb.tsx` ✅
+- `src/components/ide/EditorTabs.tsx` ✅
+- `src/components/CommandPalette.tsx` ✅
 
 ### Divers
 - `src/components/ide/AgentProgressBar.tsx` ✅ (migration motion)
@@ -212,12 +218,12 @@ grep -r "backdrop-blur" src/components/ --include="*.tsx" --include="*.ts" | gre
 
 - **Phase 1:** ✅ Complété (1-2 heures)
 - **Phase 2:** ✅ Complété (2-3 heures)
-- **Phase 3:** ~70% (2-3 heures estimées au total)
+- **Phase 3:** ✅ Complété (2-3 heures)
 - **Phase 4:** ~0% (5-8 heures estimées)
 - **Phase 5:** ~0% (3-5 heures estimées)
 
 **Total estimé:** 15-20 heures de travail
-**Progrès actuel:** ~40% (8-10 heures investies)
+**Progrès actuel:** ~50% (10-12 heures investies)
 
 ---
 

@@ -63,7 +63,7 @@ export function EditorTabs({
           return (
             <div
               key={file.path}
-              className="group flex items-center gap-2 h-full px-4 text-[11px] cursor-pointer relative border-r transition-all duration-150"
+              className="group flex items-center gap-2 h-full px-4 text-sm cursor-pointer relative border-r transition-all duration-150"
               style={{
                 borderColor: 'var(--border-base)',
                 backgroundColor: isActive ? 'var(--bg-base)' : 'transparent',
@@ -78,7 +78,7 @@ export function EditorTabs({
               {isActive && (
                 <motion.div
                   layoutId="active-tab-indicator"
-                  className="absolute top-0 left-0 right-0 h-[2px]" 
+                  className="absolute top-0 left-0 right-0 h-0.5" 
                   style={{ backgroundColor: 'var(--accent-primary)' }}
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                 />
