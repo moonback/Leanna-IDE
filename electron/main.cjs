@@ -202,7 +202,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('electron/get-project-root', async function () {
-    // IDE auto-référentiel : retourne toujours le dossier de l'app elle-même
+    // IDE : retourne toujours le dossier de l'app elle-même
     return process.env.ELECTRON_APP_PATH || app.getAppPath();
   });
 

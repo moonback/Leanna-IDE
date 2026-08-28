@@ -7,7 +7,7 @@ export interface WorkspaceData {
 }
 
 /**
- * Hook simplifié pour l'IDE auto-référentiel.
+ * Hook simplifié pour l'IDE .
  * Le workspace est verrouillé sur le propre code source de Jarvis-OS.
  * Plus de changement de workspace possible.
  */

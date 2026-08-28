@@ -1,4 +1,4 @@
-# Jarvis-OS — IDE auto-référentiel
+# Jarvis-OS — IDE 
 
 > Jarvis-OS ne lit, n'écrit et n'exécute **que sur son propre code source**. Ce document décrit l'architecture self-referential et explique comment étendre les skills en respectant le périmètre verrouillé.
 

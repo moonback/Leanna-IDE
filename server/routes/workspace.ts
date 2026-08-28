@@ -14,7 +14,7 @@ export function createWorkspaceRouter(getWorkspaceRoot: () => string): Router {
 
   router.post('/workspace', (_req: Request, res: Response) => {
     res.status(403).json({
-      error: "Jarvis-OS est un IDE auto-référentiel. Le workspace est verrouillé sur son propre code source.",
+      error: "Jarvis-OS est un IDE . Le workspace est verrouillé sur son propre code source.",
       workspace: SELF_ROOT,
     });
   });

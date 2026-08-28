@@ -27,7 +27,7 @@
 - [Présentation](#-présentation)
 - [Stack technique](#-stack-technique)
 - [Fonctionnalités principales](#-fonctionnalités-principales)
-  - [IDE Auto-Référentiel](#ide-auto-référentiel)
+  - [IDE ](#ide-)
   - [Assistant Code (Leanna)](#assistant-code-leanna)
   - [Système Multi-Agents](#système-multi-agents)
   - [Notebooks RAG](#notebooks-rag)
@@ -45,7 +45,7 @@
 
 ## 🌟 Pourquoi Jarvis OS ?
 
-Jarvis OS est **l'IDE du futur** : un environnement de développement **intelligent et auto-référentiel** où **l'IA Leanna et ses 14 agents spécialisés** collaborent avec toi pour :
+Jarvis OS est **l'IDE du futur** : un environnement de développement **intelligent** où **l'IA Leanna et ses 14 agents spécialisés** collaborent avec toi pour :
 
 - **Créer et modifier du code** de manière sécurisée et assistée.
 - **Comprendre et optimiser** ton projet grâce à une **indexation sémantique** du workspace.
@@ -62,7 +62,7 @@ Jarvis OS est **l'IDE du futur** : un environnement de développement **intellig
 
 ## 📖 Présentation
 
-**Jarvis OS est un IDE auto-référentiel** : un environnement de développement **intelligent** où l'assistant IA intégré (**Leanna par défaut**) peut **lire, comprendre et modifier le code source de votre application**.
+**Jarvis OS est un IDE ** : un environnement de développement **intelligent** où l'assistant IA intégré (**Leanna par défaut**) peut **lire, comprendre et modifier le code source de votre application**.
 
 Conçu comme un **système d'exploitation desktop**, Jarvis OS combine :
 
@@ -91,7 +91,7 @@ Conçu comme un **système d'exploitation desktop**, Jarvis OS combine :
 
 ## ✨ Fonctionnalités principales
 
-### 💻 IDE Auto-Référentiel
+### 💻 IDE 
 
 - **Éditeur Monaco** : Syntaxe, autocomplétion, multi-fichiers, multi-onglets.
 - **Explorateur de fichiers** : Arbre interactif avec filtres et recherche globale (`Ctrl+Shift+F`).

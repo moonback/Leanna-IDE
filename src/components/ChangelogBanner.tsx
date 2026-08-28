@@ -48,7 +48,7 @@ export function ChangelogBanner() {
 
           <div className="min-w-0">
             <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Nouveau : IDE auto-référentiel
+              Nouveau : IDE 
             </p>
             <p className="text-sm leading-snug" style={{ color: 'var(--text-muted)' }}>
               Jarvis ne gère désormais que son propre code source. Chaque modification est protégée par un checkpoint.
