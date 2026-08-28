@@ -50,10 +50,10 @@ export function AiSection() {
                   className="flex h-7 w-7 items-center justify-center rounded-full transition-all duration-200"
                   style={{ backgroundColor: isActive ? 'var(--accent-primary)' : 'var(--bg-panel)' }}
                 >
-                  <Volume2 className="w-3.5 h-3.5" style={{ color: isActive ? '#fff' : 'var(--accent-primary)' }} />
+                  <Volume2 className="w-3.5 h-3.5" style={{ color: isActive ? 'white' : 'var(--accent-primary)' }} />
                 </div>
-                <span className="text-[10px] font-semibold">{v.label}</span>
-                <span className="text-[8px] font-normal text-center leading-tight opacity-70">{v.desc}</span>
+                <span className="text-sm font-semibold">{v.label}</span>
+                <span className="text-xs font-normal text-center leading-tight opacity-70">{v.desc}</span>
               </motion.button>
             );
           })}

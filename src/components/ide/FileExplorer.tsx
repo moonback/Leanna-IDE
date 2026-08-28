@@ -272,7 +272,7 @@ const FileExplorer = memo(function FileExplorer({
         )}
 
         <div
-          className="flex items-center gap-1.5 py-1 px-2 text-[11px] cursor-pointer select-none relative group transition-colors duration-100"
+          className="flex items-center gap-1.5 py-1 px-2 text-xs cursor-pointer select-none relative group transition-colors duration-100"
           style={{
             paddingLeft: `${8 + depth * 12}px`,
             color: 'var(--text-primary)',
@@ -374,7 +374,7 @@ const FileExplorer = memo(function FileExplorer({
             } catch { /* best-effort */ }
             window.location.reload();
           }}
-          className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-[11px] font-semibold transition-colors hover:opacity-90 shadow-sm"
+          className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs font-semibold transition-colors hover:opacity-90 shadow-sm"
           style={{
             backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
             color: 'var(--accent-primary)',
@@ -392,8 +392,8 @@ const FileExplorer = memo(function FileExplorer({
         <div className="flex items-center gap-1.5">
           {sandboxActive ? (
             <span
-              className="flex items-center gap-0.5 text-[8px] px-1.5 py-0.5 rounded-md font-bold"
-              style={{ backgroundColor: 'color-mix(in srgb, #10b981 15%, transparent)', color: '#10b981' }}
+              className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-md font-bold"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)', color: 'var(--color-success)' }}
               title="Mode Sandbox actif — les modifications sont isolées"
             >
               <Shield size={9} />
@@ -401,7 +401,7 @@ const FileExplorer = memo(function FileExplorer({
             </span>
           ) : (
             <span
-              className="flex items-center gap-0.5 text-[8px] px-1.5 py-0.5 rounded-md font-bold"
+              className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-md font-bold"
               style={{ backgroundColor: 'color-mix(in srgb, var(--text-muted) 15%, transparent)', color: 'var(--text-muted)' }}
               title="Mode Sandbox inactif — modifications directes sur les fichiers locaux"
             >
@@ -428,7 +428,7 @@ const FileExplorer = memo(function FileExplorer({
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Filtrer les fichiers…"
-            className="flex-1 bg-transparent text-[11px] outline-none placeholder:opacity-40"
+            className="flex-1 bg-transparent text-xs outline-none placeholder:opacity-40"
             style={{ color: 'var(--text-primary)' }}
           />
           {searchQuery && (
@@ -481,7 +481,7 @@ const FileExplorer = memo(function FileExplorer({
       {/* Sort mode indicator (when not default) */}
       {sortMode !== 'name-asc' && !searchQuery && (
         <div
-          className="flex items-center gap-1 px-3 py-0.5 text-[9px] border-b"
+          className="flex items-center gap-1 px-3 py-0.5 text-xs border-b"
           style={{
             borderColor: 'var(--border-base)',
             backgroundColor: 'color-mix(in srgb, var(--accent-primary) 8%, transparent)',
@@ -503,7 +503,7 @@ const FileExplorer = memo(function FileExplorer({
       {/* Search result count */}
       {searchQuery && (
         <div
-          className="px-3 py-0.5 text-[9px] border-b"
+          className="px-3 py-0.5 text-xs border-b"
           style={{
             borderColor: 'var(--border-base)',
             color: 'var(--text-muted)',
@@ -534,18 +534,18 @@ const FileExplorer = memo(function FileExplorer({
             >
               <Folder size={16} style={{ color: 'var(--accent-primary)' }} />
             </div>
-            <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
               Aucun fichier
             </p>
-            <p className="text-[10px] mb-3.5 leading-normal opacity-60" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-sm mb-3.5 leading-normal opacity-60" style={{ color: 'var(--text-muted)' }}>
               Ouvrez un projet ou créez un fichier pour commencer.
             </p>
             <button
               onClick={onCreateFile}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold transition hover:opacity-95"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-sm font-semibold transition hover:opacity-95"
               style={{
                 backgroundColor: 'var(--accent-primary)',
-                color: '#fff',
+                color: 'white',
                 borderRadius: 'var(--radius-sm)',
               }}
             >
@@ -556,7 +556,7 @@ const FileExplorer = memo(function FileExplorer({
         ) : processedTree.length === 0 && searchQuery ? (
           <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
             <Search size={20} className="mb-2 opacity-30" style={{ color: 'var(--text-muted)' }} />
-            <p className="text-[11px] opacity-60" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs opacity-60" style={{ color: 'var(--text-muted)' }}>
               Aucun fichier ne correspond à «{searchQuery}»
             </p>
           </div>

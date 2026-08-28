@@ -24,7 +24,7 @@ export function Breadcrumb({ filePath, onNavigate, dirty }: BreadcrumbProps) {
   if (!filePath || segments.length === 0) {
     return (
       <div className="breadcrumb px-3 py-1.5">
-        <span className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+        <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
           Aucun fichier ouvert
         </span>
       </div>

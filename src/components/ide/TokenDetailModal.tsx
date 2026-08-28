@@ -205,7 +205,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
               <h2 id="modal-title" className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                 Détails du Système
               </h2>
-              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 Contexte & tokens • {history.length} requêtes
               </p>
             </div>
@@ -246,8 +246,8 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                   aria-hidden="true"
                 />
                 <span
-                  className="text-[11px] font-bold uppercase tracking-wider"
-                  style={{ color: 'var(--text-secondary, #a1a1aa)' }}
+                  className="text-xs font-bold uppercase tracking-wider"
+                  style={{ color: 'var(--text-secondary, var(--text-muted))' }}
                 >
                   Contexte du Prompt
                 </span>
@@ -259,7 +259,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                     : <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
                 )}
                 <span
-                  className="text-[12px] font-bold tabular-nums"
+                  className="text-sm font-bold tabular-nums"
                   style={{
                     color:
                       promptContext.level === 'critical'
@@ -286,10 +286,10 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                     width: `${Math.min(100, promptContext.percent)}%`,
                     background:
                       promptContext.level === 'critical'
-                        ? 'linear-gradient(90deg, #ef4444, #b91c1c)'
+                        ? 'linear-gradient(90deg, var(--color-error), var(--color-error))'
                         : promptContext.level === 'warn'
-                          ? 'linear-gradient(90deg, #f59e0b, #d97706)'
-                          : 'linear-gradient(90deg, #10b981, #06b6d4)',
+                          ? 'linear-gradient(90deg, var(--color-warning), var(--color-warning))'
+                          : 'linear-gradient(90deg, var(--color-success), var(--accent-secondary))',
                   }}
                   role="progressbar"
                   aria-valuenow={Math.min(100, promptContext.percent)}
@@ -299,8 +299,8 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                 />
               </div>
               <div
-                className="flex justify-between mt-1 text-[9px]"
-                style={{ color: 'var(--text-dimmed, #52525b)' }}
+                className="flex justify-between mt-1 text-xs"
+                style={{ color: 'var(--text-dimmed, var(--text-muted))' }}
               >
                 <span>{formatTokenCount(promptContext.currentSize)} utilisés</span>
                 <span>{formatTokenCount(promptContext.maxSize)} max</span>
@@ -309,7 +309,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
 
             {/* Turns */}
             {promptContext.turns > 0 && (
-              <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              <div className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--text-muted)' }}>
                 <MessageSquare className="w-3 h-3" aria-hidden="true" />
                 <span>{promptContext.turns} tour{promptContext.turns > 1 ? 's' : ''} dans le contexte</span>
               </div>
@@ -325,7 +325,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                 }}
               >
                 <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" aria-hidden="true" />
-                <span className="text-[10px]">{promptContext.suggestion}</span>
+                <span className="text-sm">{promptContext.suggestion}</span>
               </div>
             ) : promptContext.level === 'ok' && promptContext.currentSize > 0 ? (
               <div
@@ -336,7 +336,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                 }}
               >
                 <Sparkles className="w-3 h-3" aria-hidden="true" />
-                <span className="text-[10px]">Contexte en bonne santé</span>
+                <span className="text-sm">Contexte en bonne santé</span>
               </div>
             ) : null}
           </div>
@@ -348,8 +348,8 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
             <div className="flex items-center gap-2 justify-center mb-2">
               <TrendingUp className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} aria-hidden="true" />
               <span
-                className="text-[11px] font-bold uppercase tracking-wider"
-                style={{ color: 'var(--text-secondary, #a1a1aa)' }}
+                className="text-xs font-bold uppercase tracking-wider"
+                style={{ color: 'var(--text-secondary, var(--text-muted))' }}
               >
                 Utilisation des Tokens
               </span>
@@ -357,10 +357,10 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
             <p className="text-3xl font-black tabular-nums" style={{ color: 'var(--text-primary)' }}>
               {formatted.total}
             </p>
-            <p className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }} title="Valeur exacte">
+            <p className="text-sm font-mono" style={{ color: 'var(--text-dimmed)' }} title="Valeur exacte">
               {formatted.totalExact} exact
             </p>
-            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
               tokens utilisés cette session
             </p>
           </div>
@@ -376,7 +376,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
             >
               <div className="flex items-center gap-1.5 mb-1">
                 <ArrowUp className="w-3.5 h-3.5" style={{ color: 'var(--color-info)' }} aria-hidden="true" />
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-info)' }}>Prompt</span>
+                <span className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--color-info)' }}>Prompt</span>
               </div>
               <p className="text-lg font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{formatted.prompt}</p>
             </div>
@@ -389,7 +389,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
             >
               <div className="flex items-center gap-1.5 mb-1">
                 <ArrowDown className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} aria-hidden="true" />
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-success)' }}>Réponse</span>
+                <span className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--color-success)' }}>Réponse</span>
               </div>
               <p className="text-lg font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{formatted.completion}</p>
             </div>
@@ -406,14 +406,14 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
             >
               <div className="flex items-center gap-2 mb-2">
                 <Gauge className="w-4 h-4 text-cyan-400" aria-hidden="true" />
-                <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary, #a1a1aa)' }}>
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary, var(--text-muted))' }}>
                   Contexte
                 </span>
               </div>
 
               {/* Barre de progression */}
               <div>
-                <div className="flex justify-between text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>
+                <div className="flex justify-between text-sm mb-1" style={{ color: 'var(--text-muted)' }}>
                   <span>Base: {formatTokenCount(optimization.totalBaseTokens)}</span>
                   <span>Max: {formatTokenCount(optimization.modelBudget.maxTotal)}</span>
                 </div>
@@ -424,8 +424,8 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                       width: `${Math.min(100, (optimization.totalBaseTokens / optimization.modelBudget.maxTotal) * 100)}%`,
                       background:
                         optimization.totalBaseTokens / optimization.modelBudget.maxTotal > 0.7
-                          ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
-                          : 'linear-gradient(90deg, #10b981, #06b6d4)',
+                          ? 'linear-gradient(90deg, var(--color-warning), var(--color-error))'
+                          : 'linear-gradient(90deg, var(--color-success), var(--accent-secondary))',
                     }}
                     role="progressbar"
                     aria-valuenow={Math.min(100, (optimization.totalBaseTokens / optimization.modelBudget.maxTotal) * 100)}
@@ -433,7 +433,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                     aria-valuemax={100}
                   />
                 </div>
-                <div className="flex justify-between mt-1 text-[9px]" style={{ color: 'var(--text-dimmed, #52525b)' }}>
+                <div className="flex justify-between mt-1 text-xs" style={{ color: 'var(--text-dimmed, var(--text-muted))' }}>
                   <span>Prompt sys: {formatTokenCount(optimization.systemPromptTokens)}</span>
                   <span>Mémoire: {formatTokenCount(optimization.memoryTokens)}</span>
                   <span>Dispo: {formatTokenCount(optimization.availableForConversation)}</span>
@@ -450,7 +450,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                   }}
                 >
                   <Zap className="w-3 h-3" aria-hidden="true" />
-                  <span className="text-[10px] font-semibold">−{formatTokenCount(optimization.savedTokens)} économisés (mode compact)</span>
+                  <span className="text-sm font-semibold">−{formatTokenCount(optimization.savedTokens)} économisés (mode compact)</span>
                 </div>
               )}
 
@@ -467,7 +467,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                       }}
                     >
                       <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" aria-hidden="true" />
-                      <span className="text-[10px]">{suggestion}</span>
+                      <span className="text-sm">{suggestion}</span>
                     </div>
                   ))}
                 </div>
@@ -482,7 +482,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                   }}
                 >
                   <Sparkles className="w-3 h-3" aria-hidden="true" />
-                  <span className="text-[10px]">Utilisation optimale</span>
+                  <span className="text-sm">Utilisation optimale</span>
                 </div>
               )}
             </div>
@@ -513,7 +513,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
             type="button"
             onClick={handleToggleCompact}
             disabled={isPending}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-3xl text-[11px] font-medium transition-all ${isPending ? 'opacity-60 cursor-wait' : 'hover:shadow-sm'}`}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-3xl text-xs font-medium transition-all ${isPending ? 'opacity-60 cursor-wait' : 'hover:shadow-sm'}`}
             style={{
               border: profile.compactPrompt ? '1px solid rgba(16,185,129,0.24)' : '1px solid var(--border-base)',
               backgroundColor: profile.compactPrompt ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)',
@@ -526,7 +526,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
               Mode compact (−40% tokens prompt)
             </span>
             <span
-              className="px-2 py-0.5 rounded text-[9px] font-bold uppercase"
+              className="px-2 py-0.5 rounded text-xs font-bold uppercase"
               style={{
                 backgroundColor: profile.compactPrompt ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.08)',
                 color: profile.compactPrompt ? 'var(--color-success)' : 'var(--text-muted)',
@@ -539,7 +539,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
           {/* Historique */}
           {history.length > 0 && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-sm font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
                 Dernières requêtes ({history.length})
               </p>
               <div className="space-y-1 max-h-48 overflow-y-auto scrollbar-thin pr-1">
@@ -552,14 +552,14 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                       className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors"
                       style={{ backgroundColor: 'color-mix(in srgb, var(--bg-input) 80%, transparent)' }}
                     >
-                      <div className="flex-1 flex items-center gap-2 text-[11px] tabular-nums">
+                      <div className="flex-1 flex items-center gap-2 text-xs tabular-nums">
                         <span className="font-medium" style={{ color: 'var(--color-info)' }}>↑{formatTokenCount(usage.promptTokens)}</span>
                         <span className="font-medium" style={{ color: 'var(--color-success)' }}>↓{formatTokenCount(usage.completionTokens)}</span>
                         <span className="font-bold" style={{ color: 'var(--text-primary)' }}>
                           Σ{formatTokenCount(usage.totalTokens)}
                         </span>
                       </div>
-                      <span className="flex items-center gap-1 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                      <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                         <Clock className="w-2.5 h-2.5" aria-hidden="true" />
                         {timeAgo(usage.timestamp)}
                       </span>
@@ -572,10 +572,10 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
           {history.length === 0 && (
             <div className="text-center py-6">
               <Hash className="w-8 h-8 mx-auto mb-2 opacity-20" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
-              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 Aucune requête enregistrée
               </p>
-              <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
                 Les tokens apparaîtront après la première interaction
               </p>
             </div>

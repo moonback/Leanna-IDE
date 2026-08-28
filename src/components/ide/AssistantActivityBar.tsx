@@ -18,30 +18,30 @@ interface AssistantActivityBarProps {
 
 // ── Per-tool metadata ────────────────────────────────────────────────────────
 const TOOL_META: Record<string, { icon: React.ElementType; category: string; color: string }> = {
-  list_project_files:         { icon: FolderSearch, category: 'Fichiers',    color: '#60a5fa' },
-  read_project_file:          { icon: FileText,     category: 'Fichiers',    color: '#60a5fa' },
-  write_project_file:         { icon: FilePen,      category: 'Fichiers',    color: '#34d399' },
-  modify_project_file:        { icon: FilePen,      category: 'Fichiers',    color: '#34d399' },
-  search_in_files:            { icon: FileSearch,   category: 'Fichiers',    color: '#a78bfa' },
-  open_project_file:          { icon: FileCode,     category: 'Fichiers',    color: '#60a5fa' },
-  create_project_directory:   { icon: FolderPlus,   category: 'Fichiers',    color: '#34d399' },
-  rename_project_file:        { icon: FilePen,      category: 'Fichiers',    color: '#fbbf24' },
-  delete_project_file:        { icon: FileMinus,    category: 'Fichiers',    color: '#f87171' },
-  delete_project_folder:      { icon: FolderMinus,  category: 'Fichiers',    color: '#f87171' },
-  analyze_project_file:       { icon: FileSearch,   category: 'Fichiers',    color: '#a78bfa' },
-  get_workspace_info:         { icon: Info,         category: 'Workspace',   color: '#94a3b8' },
-  generate_codebase_markdown: { icon: RefreshCw,    category: 'Workspace',   color: '#fbbf24' },
-  open_ide:                   { icon: Terminal,     category: 'IDE',         color: '#60a5fa' },
-  save_memory:                { icon: Database,     category: 'Mémoire',     color: '#a78bfa' },
-  search_memory:              { icon: Brain,        category: 'Mémoire',     color: '#a78bfa' },
-  automation_navigate:        { icon: Globe,        category: 'Web',         color: '#34d399' },
-  automation_search:          { icon: Search,       category: 'Web',         color: '#34d399' },
-  automation_snapshot:        { icon: Globe,        category: 'Web',         color: '#60a5fa' },
-  automation_click:           { icon: Globe,        category: 'Web',         color: '#fbbf24' },
-  automation_type:            { icon: Globe,        category: 'Web',         color: '#fbbf24' },
-  automation_extract:         { icon: Globe,        category: 'Web',         color: '#60a5fa' },
-  reasoning_delegate_task:    { icon: Cpu,       category: 'Raisonnement',color: '#f97316' },
-  create_rich_document:       { icon: BarChart2,  category: 'Document',    color: '#6366f1' },
+  list_project_files:         { icon: FolderSearch, category: 'Fichiers',    color: 'var(--accent-primary)' },
+  read_project_file:          { icon: FileText,     category: 'Fichiers',    color: 'var(--accent-primary)' },
+  write_project_file:         { icon: FilePen,      category: 'Fichiers',    color: 'var(--color-success)' },
+  modify_project_file:        { icon: FilePen,      category: 'Fichiers',    color: 'var(--color-success)' },
+  search_in_files:            { icon: FileSearch,   category: 'Fichiers',    color: 'var(--color-accent-alt)' },
+  open_project_file:          { icon: FileCode,     category: 'Fichiers',    color: 'var(--accent-primary)' },
+  create_project_directory:   { icon: FolderPlus,   category: 'Fichiers',    color: 'var(--color-success)' },
+  rename_project_file:        { icon: FilePen,      category: 'Fichiers',    color: 'var(--color-warning)' },
+  delete_project_file:        { icon: FileMinus,    category: 'Fichiers',    color: 'var(--color-error)' },
+  delete_project_folder:      { icon: FolderMinus,  category: 'Fichiers',    color: 'var(--color-error)' },
+  analyze_project_file:       { icon: FileSearch,   category: 'Fichiers',    color: 'var(--color-accent-alt)' },
+  get_workspace_info:         { icon: Info,         category: 'Workspace',   color: 'var(--text-muted)' },
+  generate_codebase_markdown: { icon: RefreshCw,    category: 'Workspace',   color: 'var(--color-warning)' },
+  open_ide:                   { icon: Terminal,     category: 'IDE',         color: 'var(--accent-primary)' },
+  save_memory:                { icon: Database,     category: 'Mémoire',     color: 'var(--color-accent-alt)' },
+  search_memory:              { icon: Brain,        category: 'Mémoire',     color: 'var(--color-accent-alt)' },
+  automation_navigate:        { icon: Globe,        category: 'Web',         color: 'var(--color-success)' },
+  automation_search:          { icon: Search,       category: 'Web',         color: 'var(--color-success)' },
+  automation_snapshot:        { icon: Globe,        category: 'Web',         color: 'var(--accent-primary)' },
+  automation_click:           { icon: Globe,        category: 'Web',         color: 'var(--color-warning)' },
+  automation_type:            { icon: Globe,        category: 'Web',         color: 'var(--color-warning)' },
+  automation_extract:         { icon: Globe,        category: 'Web',         color: 'var(--accent-primary)' },
+  reasoning_delegate_task:    { icon: Cpu,       category: 'Raisonnement',color: 'var(--color-warning)' },
+  create_rich_document:       { icon: BarChart2,  category: 'Document',    color: 'var(--color-accent-alt)' },
 };
 
 // How long the panel lingers after the last step finishes before it
@@ -50,7 +50,7 @@ const TOOL_META: Record<string, { icon: React.ElementType; category: string; col
 const AUTO_HIDE_DELAY_MS = 4000;
 
 function getMeta(tool: string) {
-  return TOOL_META[tool] ?? { icon: Terminal, category: 'Outil', color: '#94a3b8' };
+  return TOOL_META[tool] ?? { icon: Terminal, category: 'Outil', color: 'var(--text-muted)' };
 }
 
 function elapsed(ts: Date): string {
@@ -99,11 +99,11 @@ const StepRow = memo(function StepRow({
           >
             {step.label}
           </span>
-          <span className="text-[10px] tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
+          <span className="text-sm tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
             {isRun ? elapsed(step.timestamp) : dur}
           </span>
         </div>
-        <span className="text-[10px]" style={{ color: isRun ? meta.color : 'var(--text-muted)', opacity: isRun ? 1 : 0.6 }}>
+        <span className="text-sm" style={{ color: isRun ? meta.color : 'var(--text-muted)', opacity: isRun ? 1 : 0.6 }}>
           {meta.category}
         </span>
       </div>
@@ -264,7 +264,7 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
                     exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
                     transition={{ type: 'spring', damping: 0.8, duration: 0.3 }}
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#34d399' }} />
+                    <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -280,17 +280,17 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
                   >
                     {runningStep.label}
                   </span>
-                  <span className="text-[10px] tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                  <span className="text-sm tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
                     {elapsed(runningStep.timestamp)}
                   </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium" style={{ color: '#34d399' }}>
+                  <span className="text-xs font-medium" style={{ color: 'var(--color-success)' }}>
                     Terminé
                   </span>
                   <span
-                    className="text-[10px] px-2 py-1 rounded-full"
+                    className="text-sm px-2 py-1 rounded-full"
                     style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
                   >
                     {doneCount} étape{doneCount > 1 ? 's' : ''}
@@ -365,11 +365,11 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
                     className="px-3 py-1.5 flex items-center justify-between"
                     style={{ borderTop: '1px solid var(--border-base)' }}
                   >
-                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
                       {steps.length} action{steps.length > 1 ? 's' : ''}
                     </span>
                     {!isWorking && (
-                      <span className="text-[10px]" style={{ color: '#34d399' }}>
+                      <span className="text-sm" style={{ color: 'var(--color-success)' }}>
                         ✓ Toutes terminées
                       </span>
                     )}

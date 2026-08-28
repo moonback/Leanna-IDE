@@ -143,15 +143,15 @@ function highlightSyntax(text: string): Array<{ text: string; color: string }> {
     }
 
     if (match[1]) {
-      spans.push({ text: match[0], color: '#0f766e' });
+      spans.push({ text: match[0], color: 'var(--color-success)' });
     } else if (match[2]) {
-      spans.push({ text: match[0], color: '#7c3aed' });
+      spans.push({ text: match[0], color: 'var(--color-accent-alt)' });
     } else if (match[3] || match[4]) {
-      spans.push({ text: match[0], color: '#6b7280' });
+      spans.push({ text: match[0], color: 'var(--text-muted)' });
     } else if (match[5]) {
-      spans.push({ text: match[0], color: '#0369a1' });
+      spans.push({ text: match[0], color: 'var(--accent-primary)' });
     } else if (match[6]) {
-      spans.push({ text: match[0], color: '#78716c' });
+      spans.push({ text: match[0], color: 'var(--text-muted)' });
     } else {
       spans.push({ text: match[0], color: '' });
     }
@@ -172,9 +172,9 @@ function highlightSyntax(text: string): Array<{ text: string; color: string }> {
 
 const StatusBadge = memo(function StatusBadge({ status }: { status: FileDiff['status'] }) {
   const config = {
-    added: { label: 'Ajouté', color: '#4ade80', bg: 'rgba(74,222,128,0.1)' },
-    modified: { label: 'Modifié', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)' },
-    deleted: { label: 'Supprimé', color: '#f87171', bg: 'rgba(248,113,113,0.1)' },
+    added: { label: 'Ajouté', color: 'var(--color-success)', bg: 'rgba(74,222,128,0.1)' },
+    modified: { label: 'Modifié', color: 'var(--color-warning)', bg: 'rgba(251,191,36,0.1)' },
+    deleted: { label: 'Supprimé', color: 'var(--color-error)', bg: 'rgba(248,113,113,0.1)' },
   }[status];
 
   return (
@@ -202,7 +202,7 @@ const SyntaxLine = memo(function SyntaxLine({
             <mark
               key={i}
               className="rounded-sm px-[2px] py-[1px]"
-              style={{ backgroundColor: 'rgba(217,119,6,0.3)', color: '#92400e', textDecoration: 'none' }}
+              style={{ backgroundColor: 'rgba(217,119,6,0.3)', color: 'var(--color-error)', textDecoration: 'none' }}
             >
               {seg.text}
             </mark>
@@ -263,7 +263,7 @@ const FileList = memo(function FileList({
           {files.map((file) => {
             const isSelected = selectedPath === file.path;
             const Icon = file.status === 'added' ? FilePlus2 : file.status === 'deleted' ? FileX2 : FileCode2;
-            const iconColor = file.status === 'added' ? '#4ade80' : file.status === 'deleted' ? '#f87171' : '#fbbf24';
+            const iconColor = file.status === 'added' ? 'var(--color-success)' : file.status === 'deleted' ? 'var(--color-error)' : 'var(--color-warning)';
 
             return (
               <button
@@ -825,7 +825,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
               style={{
                 backgroundColor: 'rgba(74,222,128,0.1)',
-                color: '#4ade80',
+                color: 'var(--color-success)',
                 border: '1px solid rgba(74,222,128,0.2)',
               }}
               title="Accepter toutes les modifications"
@@ -840,7 +840,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
               style={{
                 backgroundColor: 'rgba(248,113,113,0.1)',
-                color: '#f87171',
+                color: 'var(--color-error)',
                 border: '1px solid rgba(248,113,113,0.2)',
               }}
               title="Rejeter toutes les modifications"
@@ -937,7 +937,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
               backgroundColor:
                 feedback.type === 'success' ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)',
               border: `1px solid ${feedback.type === 'success' ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`,
-              color: feedback.type === 'success' ? '#4ade80' : '#f87171',
+              color: feedback.type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
             }}
           >
             {feedback.type === 'success' ? <Check size={13} /> : <XCircle size={13} />}
@@ -967,12 +967,12 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
               </span>
               {selectedFileStatus && <StatusBadge status={selectedFileStatus} />}
               {stats.added > 0 && (
-                <span className="text-xs font-mono font-medium" style={{ color: '#4ade80' }}>
+                <span className="text-xs font-mono font-medium" style={{ color: 'var(--color-success)' }}>
                   +{stats.added}
                 </span>
               )}
               {stats.removed > 0 && (
-                <span className="text-xs font-mono font-medium" style={{ color: '#f87171' }}>
+                <span className="text-xs font-mono font-medium" style={{ color: 'var(--color-error)' }}>
                   -{stats.removed}
                 </span>
               )}
@@ -984,7 +984,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 hover:brightness-110"
                   style={{
                     backgroundColor: 'rgba(74,222,128,0.12)',
-                    color: '#4ade80',
+                    color: 'var(--color-success)',
                     border: '1px solid rgba(74,222,128,0.25)',
                   }}
                   title="Accepter ce fichier (A)"
@@ -998,7 +998,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 hover:brightness-110"
                   style={{
                     backgroundColor: 'rgba(248,113,113,0.12)',
-                    color: '#f87171',
+                    color: 'var(--color-error)',
                     border: '1px solid rgba(248,113,113,0.25)',
                   }}
                   title="Rejeter ce fichier (R)"
@@ -1032,7 +1032,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                   className="px-3 py-1.5 flex-shrink-0"
                   style={{ backgroundColor: 'rgba(220,38,38,0.08)', borderBottom: '1px solid var(--border-base)' }}
                 >
-                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#b91c1c' }}>
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-error)' }}>
                     Avant (Original)
                   </span>
                 </div>
@@ -1059,7 +1059,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                       >
                         {line.num ?? ''}
                       </span>
-                      <span className="flex-1 whitespace-pre pr-4" style={{ color: line.type === 'removed' ? '#b91c1c' : 'var(--text-primary)' }}>
+                      <span className="flex-1 whitespace-pre pr-4" style={{ color: line.type === 'removed' ? 'var(--color-error)' : 'var(--text-primary)' }}>
                         <SyntaxLine content={line.content} segments={line.wordSegments} />
                       </span>
                     </div>
@@ -1072,7 +1072,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                   className="px-3 py-1.5 flex-shrink-0"
                   style={{ backgroundColor: 'rgba(22,163,74,0.08)', borderBottom: '1px solid var(--border-base)' }}
                 >
-                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#15803d' }}>
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-success)' }}>
                     Après (Sandbox)
                   </span>
                 </div>
@@ -1099,7 +1099,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                       >
                         {line.num ?? ''}
                       </span>
-                      <span className="flex-1 whitespace-pre pr-4" style={{ color: line.type === 'added' ? '#15803d' : 'var(--text-primary)' }}>
+                      <span className="flex-1 whitespace-pre pr-4" style={{ color: line.type === 'added' ? 'var(--color-success)' : 'var(--text-primary)' }}>
                         <SyntaxLine content={line.content} segments={line.wordSegments} />
                       </span>
                     </div>
@@ -1122,7 +1122,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
                     ? 'rgba(220,38,38,0.12)'
                     : 'transparent';
                 const textColor =
-                  line.type === 'added' ? '#15803d' : line.type === 'removed' ? '#b91c1c' : 'var(--text-primary)';
+                  line.type === 'added' ? 'var(--color-success)' : line.type === 'removed' ? 'var(--color-error)' : 'var(--text-primary)';
                 const numColor =
                   line.type === 'added'
                     ? 'rgba(22,163,74,0.7)'

@@ -176,7 +176,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               >
                 Notebooks
               </h1>
-              <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
                 {notebooks.length > 0
                   ? `${notebooks.length} notebook${notebooks.length !== 1 ? 's' : ''} · ${notebooks.reduce((a, n) => a + n.sourcesCount, 0)} sources`
                   : 'Recherche IA avec citations sur vos documents'
@@ -193,7 +193,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium"
               style={{
                 background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
-                color: '#fff',
+                color: 'white',
                 boxShadow: '0 2px 8px rgba(59,130,246,0.25)',
               }}
             >
@@ -346,7 +346,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                   className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium disabled:opacity-40"
                   style={{
                     background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
-                    color: '#fff',
+                    color: 'white',
                   }}
                 >
                   {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
@@ -427,7 +427,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 >
                   <Icon className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
                   <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{label}</span>
-                  <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{desc}</span>
+                  <span className="text-sm" style={{ color: 'var(--text-dimmed)' }}>{desc}</span>
                 </div>
               ))}
             </div>
@@ -440,7 +440,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium mt-4"
               style={{
                 background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
-                color: '#fff',
+                color: 'white',
                 boxShadow: '0 4px 16px rgba(59,130,246,0.3)',
               }}
             >
@@ -499,7 +499,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                       <div className="flex items-center gap-3 min-w-0">
                         <div
                           className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-lg"
-                          style={{ backgroundColor: `${nb.color || '#3b82f6'}15` }}
+                          style={{ backgroundColor: `${nb.color || 'var(--accent-primary)'}15` }}
                         >
                           {nb.icon || '📓'}
                         </div>
@@ -510,7 +510,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                           >
                             {nb.title}
                           </h3>
-                          <p className="text-[11px] mt-0.5 flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}>
+                          <p className="text-xs mt-0.5 flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}>
                             <Clock className="w-3 h-3" />
                             {timeAgo(nb.updatedAt)}
                           </p>
@@ -539,21 +539,21 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                     {/* Footer stats */}
                     <div className="flex items-center gap-2 mt-auto pt-2">
                       <span
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium"
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
                         style={{ backgroundColor: 'var(--notebook-surface-muted)', color: 'var(--text-secondary)' }}
                       >
                         <FileText className="w-3 h-3" />
                         {nb.sourcesCount}
                       </span>
                       <span
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium"
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
                         style={{ backgroundColor: 'var(--notebook-surface-muted)', color: 'var(--text-secondary)' }}
                       >
                         <MessageSquare className="w-3 h-3" />
                         {nb.notesCount}
                       </span>
                       <span
-                        className="ml-auto flex items-center gap-1 text-[11px] opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200"
+                        className="ml-auto flex items-center gap-1 text-xs opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200"
                         style={{ color: 'var(--accent-primary)' }}
                       >
                         Ouvrir
@@ -641,7 +641,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                   whileTap={{ scale: 0.95 }}
                   transition={SPRING_MOMENTUM}
                   className="px-5 py-2.5 rounded-full text-sm font-medium"
-                  style={{ backgroundColor: '#ef4444', color: '#fff', boxShadow: '0 2px 8px rgba(239,68,68,0.3)' }}
+                  style={{ backgroundColor: 'var(--color-error)', color: 'white', boxShadow: '0 2px 8px rgba(239,68,68,0.3)' }}
                 >
                   Supprimer
                 </motion.button>

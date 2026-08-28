@@ -8,9 +8,9 @@ import { ACCENTS } from './constants';
 // Additional accent colors with labels
 const EXTENDED_ACCENTS = [
   ...ACCENTS,
-  { label: 'Indigo', value: '#6366f1' },
-  { label: 'Teal',   value: '#14b8a6' },
-  { label: 'Orange', value: '#f97316' },
+  { label: 'Indigo', value: 'var(--color-accent-alt)' },
+  { label: 'Teal',   value: 'var(--color-info)' },
+  { label: 'Orange', value: 'var(--color-warning)' },
 ];
 
 export function AppearanceSection() {
@@ -59,14 +59,14 @@ export function AppearanceSection() {
               >
                 <div className="flex h-6 w-6 items-center justify-center rounded-lg flex-shrink-0"
                   style={{ backgroundColor: isActive ? 'var(--accent-primary)' : 'var(--bg-panel)' }}>
-                  <t.icon className="h-3.5 w-3.5" style={{ color: isActive ? '#fff' : 'var(--text-muted)' }} />
+                  <t.icon className="h-3.5 w-3.5" style={{ color: isActive ? 'white' : 'var(--text-muted)' }} />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold truncate"
+                  <p className="text-xs font-semibold truncate"
                     style={{ color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
                     {t.label}
                   </p>
-                  <p className="text-[9px] truncate" style={{ color: 'var(--text-dimmed)' }}>{t.desc}</p>
+                  <p className="text-xs truncate" style={{ color: 'var(--text-dimmed)' }}>{t.desc}</p>
                 </div>
               </motion.button>
             );
@@ -109,7 +109,7 @@ export function AppearanceSection() {
                     )}
                   </AnimatePresence>
                 </motion.button>
-                <span className="text-[8px]" style={{ color: 'var(--text-dimmed)' }}>{a.label}</span>
+                <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{a.label}</span>
               </div>
             );
           })}

@@ -88,14 +88,14 @@ export function CriticalEditConfirm({ sendMessage }: Props) {
             {/* Header */}
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: 'color-mix(in srgb, #f59e0b 15%, transparent)' }}>
-                <ShieldAlert className="w-5 h-5" style={{ color: '#f59e0b' }} />
+                style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 15%, transparent)' }}>
+                <ShieldAlert className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
               </div>
               <div>
                 <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                   Fichier critique
                 </h3>
-                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   L'IA demande à modifier un fichier protégé
                 </p>
               </div>
@@ -106,25 +106,25 @@ export function CriticalEditConfirm({ sendMessage }: Props) {
               style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>Opération</span>
-                  <span className="text-[11px] font-semibold rounded-lg px-2 py-0.5"
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Opération</span>
+                  <span className="text-xs font-semibold rounded-lg px-2 py-0.5"
                     style={{
-                      backgroundColor: 'color-mix(in srgb, #f59e0b 12%, transparent)',
-                      color: '#fbbf24',
+                      backgroundColor: 'color-mix(in srgb, var(--color-warning) 12%, transparent)',
+                      color: 'var(--color-warning)',
                     }}>
                     {OPERATION_LABELS[pending.operation] || pending.operation}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>Fichier</span>
-                  <span className="text-[11px] font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Fichier</span>
+                  <span className="text-xs font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>
                     {pending.filePath}
                   </span>
                 </div>
                 {pending.reason && (
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>Détail</span>
-                    <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                    <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Détail</span>
+                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                       {pending.reason}
                     </span>
                   </div>
@@ -134,18 +134,18 @@ export function CriticalEditConfirm({ sendMessage }: Props) {
 
             {/* Timer */}
             <div className="flex items-center gap-2 mb-4">
-              <Clock className="w-3.5 h-3.5" style={{ color: timeLeft <= 10 ? '#f87171' : 'var(--text-dimmed)' }} />
+              <Clock className="w-3.5 h-3.5" style={{ color: timeLeft <= 10 ? 'var(--color-error)' : 'var(--text-dimmed)' }} />
               <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)' }}>
                 <motion.div
                   className="h-full rounded-full"
-                  style={{ backgroundColor: timeLeft <= 10 ? '#f87171' : 'var(--accent-primary)' }}
+                  style={{ backgroundColor: timeLeft <= 10 ? 'var(--color-error)' : 'var(--accent-primary)' }}
                   initial={{ width: '100%' }}
                   animate={{ width: `${(timeLeft / (pending.timeoutMs / 1000)) * 100}%` }}
                   transition={{ duration: 1, ease: 'linear' }}
                 />
               </div>
-              <span className="text-[10px] font-mono min-w-[2.5rem] text-right"
-                style={{ color: timeLeft <= 10 ? '#f87171' : 'var(--text-dimmed)' }}>
+              <span className="text-sm font-mono min-w-[2.5rem] text-right"
+                style={{ color: timeLeft <= 10 ? 'var(--color-error)' : 'var(--text-dimmed)' }}>
                 {timeLeft}s
               </span>
             </div>
@@ -174,7 +174,7 @@ export function CriticalEditConfirm({ sendMessage }: Props) {
                 whileTap={{ scale: 0.97 }}
                 className="flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold text-white transition-all"
                 style={{
-                  backgroundColor: '#f59e0b',
+                  backgroundColor: 'var(--color-warning)',
                   boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
                 }}
               >
@@ -184,7 +184,7 @@ export function CriticalEditConfirm({ sendMessage }: Props) {
             </div>
 
             {/* Warning note */}
-            <p className="text-[9px] text-center mt-3 leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-xs text-center mt-3 leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
               Sans réponse, la modification sera automatiquement refusée après timeout.
             </p>
           </motion.div>

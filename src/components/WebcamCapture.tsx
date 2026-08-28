@@ -48,7 +48,7 @@ export function WebcamCapture({ onFrame }: { onFrame: (base64: string) => void }
       <canvas ref={canvasRef} className="hidden" />
 
       {/* LIVE badge — red is semantically correct regardless of theme */}
-      <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm text-red-400 text-[10px] font-bold px-2 py-1 rounded-full border border-red-500/30">
+      <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm text-red-400 text-sm font-bold px-2 py-1 rounded-full border border-red-500/30">
         <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
         LIVE
       </div>

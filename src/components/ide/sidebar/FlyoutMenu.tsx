@@ -56,7 +56,7 @@ interface FlyoutItemProps {
   onClick: () => void;
   danger?: boolean;
   mono?: boolean;
-  /** Optional color dot indicator (e.g. '#0ea5e9') */
+  /** Optional color dot indicator (e.g. 'var(--color-info)') */
   dot?: string;
 }
 

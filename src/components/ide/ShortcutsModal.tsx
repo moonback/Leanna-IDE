@@ -31,7 +31,7 @@ export function ShortcutsModal({ onClose }: ShortcutsModalProps) {
             </div>
             <div>
               <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Raccourcis clavier</h2>
-              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Commandes rapides de l'éditeur</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Commandes rapides de l'éditeur</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition" style={{ color: 'var(--text-muted)' }}>
@@ -64,12 +64,12 @@ export function ShortcutsModal({ onClose }: ShortcutsModalProps) {
             ]},
           ].map(({ category, items }) => (
             <div key={category} className="mb-4 last:mb-0">
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-dimmed)' }}>{category}</p>
+              <p className="text-sm font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-dimmed)' }}>{category}</p>
               <div className="space-y-1">
                 {items.map(({ label, key }) => (
                   <div key={label} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.02)' }}>
-                    <span className="text-[11px]" style={{ color: 'var(--text-primary)' }}>{label}</span>
-                    <kbd className="px-2 py-0.5 rounded text-[10px] font-mono font-medium" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}>
+                    <span className="text-xs" style={{ color: 'var(--text-primary)' }}>{label}</span>
+                    <kbd className="px-2 py-0.5 rounded text-sm font-mono font-medium" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}>
                       {key}
                     </kbd>
                   </div>

@@ -25,11 +25,11 @@ export function Section({ icon: Icon, title, description, children, badge }: {
               <Icon className="h-3.5 w-3.5" style={{ color: 'var(--accent-primary)' }} />
             </div>
             <div>
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-primary)' }}>
+              <h2 className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-primary)' }}>
                 {title}
               </h2>
               {description && (
-                <p className="mt-0.5 text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                <p className="mt-0.5 text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                   {description}
                 </p>
               )}
@@ -37,7 +37,7 @@ export function Section({ icon: Icon, title, description, children, badge }: {
           </div>
         </div>
         {badge && (
-          <span className="rounded-full px-2 py-0.5 text-[8px] font-mono font-semibold"
+          <span className="rounded-full px-2 py-0.5 text-xs font-mono font-semibold"
             style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
             {badge}
           </span>
@@ -57,7 +57,7 @@ export function SectionDivider({ label }: { label?: string }) {
   return (
     <div className="flex items-center gap-3 py-2">
       {label && (
-        <span className="text-[9px] font-mono tracking-wider font-bold"
+        <span className="text-xs font-mono tracking-wider font-bold"
           style={{ color: 'var(--text-dimmed)' }}>
           {label}
         </span>
@@ -91,13 +91,13 @@ export function Field({ label, hint, children, id, required }: {
   return (
     <div className="grid grid-cols-1 gap-3 rounded-xl border border-transparent px-0 py-2 md:grid-cols-[minmax(0,220px)_1fr] md:items-start">
       <div className="flex flex-col pr-2">
-        <label htmlFor={fieldId} className="text-[11px] font-semibold"
+        <label htmlFor={fieldId} className="text-xs font-semibold"
           style={{ color: 'var(--text-primary)' }}>
           {label}
           {required && <span className="ml-0.5" style={{ color: 'var(--color-error)' }}>*</span>}
         </label>
         {hint && (
-          <p id={hintId} className="mt-0.5 text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          <p id={hintId} className="mt-0.5 text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
             {hint}
           </p>
         )}
@@ -121,7 +121,7 @@ export function TextInput({ value, onChange, placeholder, ...props }: {
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded-xl px-3 py-2 text-[11px] font-mono outline-none transition-all duration-150"
+      className="w-full rounded-xl px-3 py-2 text-xs font-mono outline-none transition-all duration-150"
       style={{
         backgroundColor: 'var(--bg-input)',
         border: '1px solid var(--border-base)',
@@ -157,7 +157,7 @@ export function SecretInput({ value, onChange, placeholder, ...props }: {
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder ?? '••••••••'}
-        className="w-full rounded-xl px-3 py-2 pr-8 text-[11px] font-mono outline-none transition-all duration-150"
+        className="w-full rounded-xl px-3 py-2 pr-8 text-xs font-mono outline-none transition-all duration-150"
         style={{
           backgroundColor: 'var(--bg-input)',
           border: '1px solid var(--border-base)',
@@ -196,8 +196,8 @@ export function ToggleSwitch({ value, onChange, label, hint }: {
   return (
     <div className="grid grid-cols-1 gap-3 py-1.5 md:grid-cols-[minmax(0,220px)_1fr] md:items-center">
       <div className="flex flex-col pr-2">
-        <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</p>
-        {hint && <p className="mt-0.5 text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>{hint}</p>}
+        <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</p>
+        {hint && <p className="mt-0.5 text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>{hint}</p>}
       </div>
       <div className="md:col-span-1 flex items-center">
         <button
@@ -242,7 +242,7 @@ export function ChipGroup<T extends string>({ options, value, onChange, ...props
             role="radio"
             aria-checked={active}
             onClick={() => onChange(o.id)}
-            className="flex min-w-0 flex-col items-start rounded-xl border px-2.5 py-2 text-left text-[10px] transition-all duration-150"
+            className="flex min-w-0 flex-col items-start rounded-xl border px-2.5 py-2 text-left text-sm transition-all duration-150"
             style={{
               backgroundColor: active ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
               borderColor: active ? 'var(--accent-primary)' : 'var(--border-base)',
@@ -252,7 +252,7 @@ export function ChipGroup<T extends string>({ options, value, onChange, ...props
           >
             <span className="truncate font-semibold">{o.flag ? `${o.flag} ${o.label}` : o.label}</span>
             {o.desc && (
-              <span className="mt-0.5 truncate text-[8px] font-normal opacity-70 leading-tight">{o.desc}</span>
+              <span className="mt-0.5 truncate text-xs font-normal opacity-70 leading-tight">{o.desc}</span>
             )}
           </button>
         );
@@ -268,9 +268,9 @@ export function InfoRow({ label, value, mono = false }: {
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-1.5" style={{ borderBottom: '1px solid var(--border-base)' }}>
-      <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</span>
       <span
-        className={`text-[11px] ${mono ? 'font-mono' : 'font-medium'}`}
+        className={`text-xs ${mono ? 'font-mono' : 'font-medium'}`}
         style={{ color: 'var(--text-secondary)' }}
       >
         {value}

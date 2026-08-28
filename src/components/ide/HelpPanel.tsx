@@ -21,9 +21,9 @@ function Card({ icon: Icon, title, children }: { icon: LucideIcon; title: string
         <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: 'var(--accent-subtle)' }}>
           <Icon className="h-3 w-3" style={{ color: 'var(--accent-primary)' }} />
         </span>
-        <h3 className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
+        <h3 className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
       </div>
-      <div className="text-[10px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+      <div className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
         {children}
       </div>
     </section>
@@ -32,7 +32,7 @@ function Card({ icon: Icon, title, children }: { icon: LucideIcon; title: string
 
 function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="inline-block rounded border px-1 py-0.5 font-mono text-[9px]" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
+    <kbd className="inline-block rounded border px-1 py-0.5 font-mono text-xs" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}>
       {children}
     </kbd>
   );
@@ -45,7 +45,7 @@ export function HelpPanel({ onClose }: HelpPanelProps) {
       <div className="flex items-center justify-between border-b px-4 py-2.5 flex-shrink-0" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
         <div className="flex items-center gap-2">
           <Command className="h-3.5 w-3.5" style={{ color: 'var(--accent-primary)' }} />
-          <span className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>Centre d'aide</span>
+          <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Centre d'aide</span>
         </div>
         <button
           onClick={onClose}
@@ -141,7 +141,7 @@ export function HelpPanel({ onClose }: HelpPanelProps) {
 
         </div>
 
-        <p className="mt-4 text-center text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+        <p className="mt-4 text-center text-xs" style={{ color: 'var(--text-dimmed)' }}>
           Jarvis OS v0.1.0 · Alimenté par Gemini & Supabase
         </p>
       </div>

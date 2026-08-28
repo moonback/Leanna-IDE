@@ -19,9 +19,9 @@ import type { TranscriptEntry } from '../../hooks/useLiveAPI';
 // --- Styles Globaux ---
 const COLORS = {
   primary: 'var(--accent-primary)',
-  success: '#34d399',
-  warning: '#fbbf24',
-  error: '#ef4444',
+  success: 'var(--color-success)',
+  warning: 'var(--color-warning)',
+  error: 'var(--color-error)',
   muted: 'var(--text-muted)',
   dimmed: 'var(--text-dimmed)',
   bgPanel: 'var(--bg-panel)',
@@ -187,7 +187,7 @@ const ChatMessage = memo(function ChatMessage({
       </div>
       <div className={`max-w-[82%] ${isAssistant ? '' : 'text-right'}`}>
         <div
-          className="px-4 py-2.5 rounded-2xl text-[0.8125rem] leading-relaxed inline-block text-left"
+          className="px-4 py-2.5 rounded-2xl text-sm leading-relaxed inline-block text-left"
           style={{
             backgroundColor: bubbleStyle.bg,
             border: `1px solid ${bubbleStyle.border}`,
@@ -199,7 +199,7 @@ const ChatMessage = memo(function ChatMessage({
           {isAssistant ? <ChatMarkdown text={entry.text} /> : entry.text}
         </div>
         <span
-          className="text-[0.625rem] tracking-wide font-mono px-1 mt-1 block opacity-0 group-hover:opacity-100 transition-opacity"
+          className="text-xs tracking-wide font-mono px-1 mt-1 block opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ color: COLORS.dimmed }}
         >
           {entry.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
@@ -360,7 +360,7 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed }: InputAreaP
           placeholder={connected ? 'Message... (@ fichier, / skill)' : 'Connectez-vous d\'abord'}
           disabled={!canSend}
           rows={1}
-          className="flex-1 bg-transparent text-[0.8125rem] resize-none outline-none
+          className="flex-1 bg-transparent text-sm resize-none outline-none
                      placeholder:text-[var(--text-dimmed)] placeholder:opacity-60
                      min-h-[24px] max-h-[100px] leading-tight"
           style={{ color: COLORS.textPrimary, lineHeight: '1.5' }}
@@ -388,14 +388,14 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed }: InputAreaP
       <div className="flex items-center justify-between mt-2 px-1">
         <span
           id="chat-input-hints"
-          className="text-[0.625rem] tracking-wide"
+          className="text-xs tracking-wide"
           style={{ color: COLORS.dimmed }}
         >
           Enter = Envoyer | @ = Mention fichier | / = Commande | 📎 = Document
         </span>
         {connected && (
           <span
-            className="text-[0.625rem] tracking-wide flex items-center gap-2"
+            className="text-xs tracking-wide flex items-center gap-2"
             style={{ color: isBusy ? COLORS.primary : COLORS.success }}
           >
             <BreathingDots color={isBusy ? COLORS.primary : COLORS.success} reduceMotion={false} />
@@ -711,14 +711,14 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
 
         <div className="flex-1 min-w-0">
           <span
-            className="text-[0.8125rem] font-semibold block truncate"
+            className="text-sm font-semibold block truncate"
             style={{ color: COLORS.textPrimary }}
           >
             {profile?.aiName || 'Leanna'}
           </span>
           <div className="flex items-center gap-2">
             <span
-              className="text-[0.6875rem] truncate"
+              className="text-xs truncate"
               style={{
                 color: connected
                   ? COLORS.success
@@ -846,7 +846,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
               >
                 <BreathingDots color={COLORS.primary} reduceMotion={reduceMotion} />
                 <span
-                  className="text-[0.75rem]"
+                  className="text-sm"
                   style={{ color: COLORS.muted }}
                 >
                   Connexion en cours...
@@ -871,13 +871,13 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
                 </div>
                 <div className="text-center">
                   <p
-                    className="text-[0.875rem] font-medium mb-1"
+                    className="text-base font-medium mb-1"
                     style={{ color: COLORS.textPrimary }}
                   >
                     {connected ? 'Pret a vous aider' : 'Agent hors ligne'}
                   </p>
                   <p
-                    className="text-[0.75rem] max-w-[300px]"
+                    className="text-sm max-w-[300px]"
                     style={{ color: COLORS.muted }}
                   >
                     {connected
@@ -898,7 +898,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
               <div className="flex items-center gap-2.5 px-4 py-2">
                 <BreathingDots color={COLORS.primary} reduceMotion={reduceMotion} />
                 <span
-                  className="text-[0.75rem]"
+                  className="text-sm"
                   style={{ color: COLORS.muted }}
                 >
                   {profile?.aiName || 'Leanna'} refleichit...
@@ -922,13 +922,13 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
                       style={{ backgroundColor: COLORS.primary, opacity: 0.5 }}
                     />
                     <span
-                      className="text-[0.75rem] truncate ml-1.5"
+                      className="text-sm truncate ml-1.5"
                       style={{ color: COLORS.muted }}
                     >
                       {msg.displayText ?? msg.text}
                     </span>
                     <span
-                      className="text-[0.625rem] tracking-wide flex-shrink-0 ml-auto"
+                      className="text-xs tracking-wide flex-shrink-0 ml-auto"
                       style={{ color: COLORS.dimmed }}
                     >
                       en attente

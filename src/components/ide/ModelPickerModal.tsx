@@ -68,7 +68,7 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
               <h3 id="model-picker-title" className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                 Changer de modèle
               </h3>
-              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
                 Actuel : {currentModelName}
               </p>
             </div>
@@ -106,7 +106,7 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
                   }}
                 >
                   <span className="text-base mb-0.5">{p.label}</span>
-                  <span className="text-[9px] opacity-70 font-normal">{p.desc}</span>
+                  <span className="text-xs opacity-70 font-normal">{p.desc}</span>
                 </button>
               );
             })}
@@ -130,7 +130,7 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Rechercher un modèle..."
-                  className="w-full rounded-lg pl-8 pr-3 py-2 text-[11px] outline-none transition-all duration-200"
+                  className="w-full rounded-lg pl-8 pr-3 py-2 text-xs outline-none transition-all duration-200"
                   style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                   autoFocus
                 />
@@ -153,22 +153,22 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-semibold truncate" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                          <span className="text-xs font-semibold truncate" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
                             {model.name}
                           </span>
                           {model.free && (
                             <span
-                              className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
-                              style={{ backgroundColor: 'color-mix(in srgb, #4ade80 15%, transparent)', color: '#4ade80' }}
+                              className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold"
+                              style={{ backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)', color: 'var(--color-success)' }}
                             >
                               <Zap size={8} /> GRATUIT
                             </span>
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{model.provider}</span>
-                          <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>·</span>
-                          <span className="text-[9px] truncate" style={{ color: 'var(--text-dimmed)' }}>{model.desc}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{model.provider}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>·</span>
+                          <span className="text-xs truncate" style={{ color: 'var(--text-dimmed)' }}>{model.desc}</span>
                         </div>
                       </div>
                       {active && <Check size={14} style={{ color: 'var(--accent-primary)' }} />}
@@ -184,7 +184,7 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
 
               {/* Custom Model Input */}
               <div className="mt-2 pt-2 border-t" style={{ borderColor: 'var(--border-base)' }}>
-                <label className="text-[9px] font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>
                   Ou ID personnalisé :
                 </label>
                 <input
@@ -192,7 +192,7 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
                   value={selectedModel}
                   onChange={e => setSelectedModel(e.target.value)}
                   placeholder="ex: anthropic/claude-sonnet-4"
-                  className="w-full rounded-lg px-3 py-1.5 text-[10px] font-mono outline-none transition-all duration-200"
+                  className="w-full rounded-lg px-3 py-1.5 text-sm font-mono outline-none transition-all duration-200"
                   style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                 />
               </div>
@@ -209,7 +209,7 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
               <div className="rounded-xl p-4 text-center" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
                 <div className="text-2xl mb-2">🔮</div>
                 <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Gemini 2.0 Flash (Live)</p>
-                <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
                   Supporte la voix en temps réel, le texte et l'analyse de code.
                 </p>
               </div>
@@ -219,7 +219,7 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
 
         {/* Footer */}
         <div className="flex items-center justify-between px-5 py-3 border-t" style={{ borderColor: 'var(--border-base)' }}>
-          <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+          <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
             💡 La voix Live utilise toujours Gemini.
           </p>
           <div className="flex items-center gap-2">

@@ -68,8 +68,8 @@ export const CheckpointPanel = React.memo(function CheckpointPanel() {
       {/* Header */}
       <div className="flex items-center justify-between px-3.5 border-b" style={{ height: '35px', borderColor: 'var(--border-base)' }}>
         <div className="flex items-center gap-1.5">
-          <Shield size={12} style={{ color: '#a855f7' }} />
-          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+          <Shield size={12} style={{ color: 'var(--color-accent-alt)' }} />
+          <span className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
             Checkpoints
           </span>
         </div>
@@ -77,8 +77,8 @@ export const CheckpointPanel = React.memo(function CheckpointPanel() {
           <button
             onClick={handleValidate}
             disabled={validating}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition hover:bg-white/5"
-            style={{ color: '#4ade80' }}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium transition hover:bg-white/5"
+            style={{ color: 'var(--color-success)' }}
             title="Valider le build (tsc)"
           >
             {validating ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle2 size={10} />}
@@ -104,11 +104,11 @@ export const CheckpointPanel = React.memo(function CheckpointPanel() {
             className="overflow-hidden"
           >
             <div
-              className="px-3.5 py-2 text-[10px] border-b"
+              className="px-3.5 py-2 text-sm border-b"
               style={{
                 borderColor: 'var(--border-base)',
                 backgroundColor: validationResult.valid ? 'rgba(74,222,128,0.06)' : 'rgba(239,68,68,0.06)',
-                color: validationResult.valid ? '#4ade80' : '#f87171',
+                color: validationResult.valid ? 'var(--color-success)' : 'var(--color-error)',
               }}
             >
               {validationResult.valid ? (
@@ -121,7 +121,7 @@ export const CheckpointPanel = React.memo(function CheckpointPanel() {
                     <AlertCircle size={11} /> Build échoué
                   </span>
                   {validationResult.errors && (
-                    <pre className="mt-1 text-[9px] opacity-80 whitespace-pre-wrap max-h-20 overflow-y-auto">
+                    <pre className="mt-1 text-xs opacity-80 whitespace-pre-wrap max-h-20 overflow-y-auto">
                       {validationResult.errors.slice(0, 500)}
                     </pre>
                   )}
@@ -134,7 +134,7 @@ export const CheckpointPanel = React.memo(function CheckpointPanel() {
 
       {/* Rollback status */}
       {rollbackStatus && (
-        <div className="px-3.5 py-1.5 text-[10px] border-b" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+        <div className="px-3.5 py-1.5 text-sm border-b" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
           {rollbackStatus}
         </div>
       )}
@@ -148,7 +148,7 @@ export const CheckpointPanel = React.memo(function CheckpointPanel() {
         ) : checkpoints.length === 0 ? (
           <div className="text-center py-8 px-4">
             <Shield size={20} className="mx-auto mb-2 opacity-30" style={{ color: 'var(--text-muted)' }} />
-            <p className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-sm" style={{ color: 'var(--text-dimmed)' }}>
               Aucun checkpoint. Les modifications de l'IA créeront automatiquement des points de sauvegarde.
             </p>
           </div>
@@ -161,14 +161,14 @@ export const CheckpointPanel = React.memo(function CheckpointPanel() {
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
+                    <span className="text-sm font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
                       {cp.hash.slice(0, 8)}
                     </span>
-                    <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                       {new Date(cp.date).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
                     </span>
                   </div>
-                  <p className="text-[9px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
                     {cp.message.replace('[checkpoint] ', '').replace(/^\d{4}-\d{2}.*? — /, '')}
                   </p>
                 </div>
@@ -177,7 +177,7 @@ export const CheckpointPanel = React.memo(function CheckpointPanel() {
                   className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/10 transition"
                   title={`Rollback vers ${cp.hash.slice(0, 8)}`}
                 >
-                  <RotateCcw size={11} style={{ color: '#fbbf24' }} />
+                  <RotateCcw size={11} style={{ color: 'var(--color-warning)' }} />
                 </button>
               </div>
             ))}

@@ -174,9 +174,9 @@ export interface RichDocument {
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
 const CHART_COLORS = [
-  '#6366f1', '#22d3ee', '#34d399', '#f59e0b',
-  '#f87171', '#a78bfa', '#fb923c', '#4ade80',
-  '#38bdf8', '#e879f9',
+  'var(--color-accent-alt)', 'var(--accent-secondary)', 'var(--color-success)', 'var(--color-warning)',
+  'var(--color-error)', 'var(--color-accent-alt)', 'var(--color-warning)', 'var(--color-success)',
+  'var(--accent-primary)', 'var(--color-accent-alt)',
 ];
 
 function getColor(index: number, override?: string): string {
@@ -382,7 +382,7 @@ function TableRenderer({ block }: { block: TableBlock }) {
                       onClick={() => handleCellCopy(cell)}
                       title="Cliquer pour copier"
                       style={{
-                        color: copiedCell === String(cell) ? '#34d399' : 'var(--text-primary)',
+                        color: copiedCell === String(cell) ? 'var(--color-success)' : 'var(--text-primary)',
                         borderBottom:
                           ri < filteredRows.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                         transition: 'color 0.2s',
@@ -799,7 +799,7 @@ function TextRenderer({ block }: { block: TextBlock }) {
           onClick={copy}
           className="p-1 rounded hover:bg-white/10 transition-colors"
           title={copied ? 'Copié !' : 'Copier'}
-          style={{ color: copied ? '#34d399' : 'var(--text-dimmed)' }}
+          style={{ color: copied ? 'var(--color-success)' : 'var(--text-dimmed)' }}
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
         </button>
@@ -841,7 +841,7 @@ function CodeRenderer({ block }: { block: CodeBlock }) {
           onClick={copy}
           className="p-1 rounded hover:bg-white/10 transition-colors"
           title={copied ? 'Copié !' : 'Copier le code'}
-          style={{ color: copied ? '#34d399' : 'var(--text-dimmed)' }}
+          style={{ color: copied ? 'var(--color-success)' : 'var(--text-dimmed)' }}
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
         </button>
@@ -918,10 +918,10 @@ function ProgressRenderer({ block }: { block: ProgressBlock }) {
 // ─── TimelineRenderer ────────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<string, string> = {
-  done:     '#34d399',
+  done:     'var(--color-success)',
   current:  'var(--accent-primary)',
   upcoming: 'var(--border-base)',
-  error:    '#f87171',
+  error:    'var(--color-error)',
 };
 
 function TimelineRenderer({ block }: { block: TimelineBlock }) {
@@ -1021,7 +1021,7 @@ function StatGridRenderer({ block }: { block: StatGridBlock }) {
           const color = item.color ?? getColor(i);
           const changeUp = (item.change ?? 0) > 0;
           const changeDown = (item.change ?? 0) < 0;
-          const changeColor = changeUp ? '#34d399' : changeDown ? '#f87171' : 'var(--text-dimmed)';
+          const changeColor = changeUp ? 'var(--color-success)' : changeDown ? 'var(--color-error)' : 'var(--text-dimmed)';
 
           return (
             <div
@@ -1271,7 +1271,7 @@ function SaveModal({
         {status === 'success' && (
           <div
             className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-sm"
-            style={{ backgroundColor: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)', color: '#34d399' }}
+            style={{ backgroundColor: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)', color: 'var(--color-success)' }}
           >
             <CheckCircle2 size={13} />
             <span>Fichier sauvegardé avec succès</span>
@@ -1280,7 +1280,7 @@ function SaveModal({
         {status === 'error' && (
           <div
             className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-sm"
-            style={{ backgroundColor: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}
+            style={{ backgroundColor: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--color-error)' }}
           >
             <AlertCircle size={13} />
             <span className="break-words">{error ?? 'Erreur de sauvegarde'}</span>
@@ -1303,7 +1303,7 @@ function SaveModal({
             <button
               onClick={onCancel}
               className="px-4 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              style={{ backgroundColor: 'rgba(52,211,153,0.2)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }}
+              style={{ backgroundColor: 'rgba(52,211,153,0.2)', color: 'var(--color-success)', border: '1px solid rgba(52,211,153,0.3)' }}
             >
               Fermer
             </button>

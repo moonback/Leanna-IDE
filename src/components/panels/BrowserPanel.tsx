@@ -374,7 +374,7 @@ export function BrowserPanel({
       ].join(';');
       cur.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">'
         + '<filter id="cs"><feDropShadow dx="1" dy="1" stdDeviation="1.5" flood-opacity="0.4"/></filter>'
-        + '<polygon points="4,2 4,18 8,14 11,20 13,19 10,13 16,13" fill="white" stroke="#333" stroke-width="1" filter="url(#cs)"/>'
+        + '<polygon points="4,2 4,18 8,14 11,20 13,19 10,13 16,13" fill="white" stroke="var(--text-muted)" stroke-width="1" filter="url(#cs)"/>'
         + '</svg>';
       document.body.appendChild(cur);
     })()`;

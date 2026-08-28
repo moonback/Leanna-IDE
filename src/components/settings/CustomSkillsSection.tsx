@@ -428,7 +428,7 @@ export function CustomSkillsSection() {
               className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
               style={{
                 backgroundColor: 'var(--accent-primary)',
-                color: '#fff',
+                color: 'white',
               }}
             >
               <Plus className="w-3 h-3" />
@@ -486,7 +486,7 @@ export function CustomSkillsSection() {
               <div className="flex justify-between items-center">
                 <div className="flex gap-1.5 flex-wrap">
                   {['JSON', 'TypeScript', 'Claude Code', 'Gemini'].map(tag => (
-                    <span key={tag} className="rounded px-1.5 py-0.5 text-[8px] font-mono"
+                    <span key={tag} className="rounded px-1.5 py-0.5 text-xs font-mono"
                       style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', color: 'var(--text-dimmed)' }}>
                       {tag}
                     </span>
@@ -498,7 +498,7 @@ export function CustomSkillsSection() {
                   onClick={handleImport}
                   disabled={!importText.trim()}
                   className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition-colors disabled:opacity-40"
-                  style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                  style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
                 >
                   <ClipboardPaste className="w-3 h-3" />
                   Parser & importer
@@ -657,7 +657,7 @@ export function CustomSkillsSection() {
                       onClick={() => removeParam(idx)}
                       className="col-span-1 flex justify-center p-1 rounded hover:bg-red-500/10 transition-colors"
                     >
-                      <Trash2 className="w-3 h-3" style={{ color: 'var(--color-error, #ef4444)' }} />
+                      <Trash2 className="w-3 h-3" style={{ color: 'var(--color-error, var(--color-error))' }} />
                     </button>
                   </div>
                 ))}
@@ -677,7 +677,7 @@ export function CustomSkillsSection() {
                   whileTap={{ scale: 0.98 }}
                   onClick={handleSave}
                   className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition-colors"
-                  style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                  style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
                 >
                   <Save className="w-3 h-3" />
                   {formMode === 'create' ? 'Créer' : 'Enregistrer'}
@@ -754,7 +754,7 @@ export function CustomSkillsSection() {
                       className="p-1 rounded transition-colors hover:bg-red-500/10"
                       title="Supprimer"
                     >
-                      <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--color-error, #ef4444)' }} />
+                      <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--color-error, var(--color-error))' }} />
                     </button>
                     {/* Expand */}
                     <button
@@ -801,7 +801,7 @@ export function CustomSkillsSection() {
                                 >
                                   {p.name}
                                   <span style={{ color: 'var(--text-dimmed)' }}>:{p.type.toLowerCase()}</span>
-                                  {p.required && <span style={{ color: 'var(--color-error, #ef4444)' }}>*</span>}
+                                  {p.required && <span style={{ color: 'var(--color-error, var(--color-error))' }}>*</span>}
                                 </span>
                               ))}
                             </div>

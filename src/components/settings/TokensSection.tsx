@@ -119,16 +119,16 @@ export function TokensSection() {
       <div className="mb-4 rounded-xl p-3" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
         <div className="flex items-center justify-between mb-2">
           <div>
-            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
               Pool de clés Gemini
             </span>
-            <p className="text-[9px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
               Rotation automatique en cas de rate-limit (429)
             </p>
           </div>
           <motion.button type="button" onClick={() => setShowAddKey(!showAddKey)}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold text-white"
+            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-white"
             style={{ backgroundColor: 'var(--accent-primary)' }}>
             <Plus size={10} /> Ajouter
           </motion.button>
@@ -142,21 +142,21 @@ export function TokensSection() {
               <div className="flex flex-col gap-2 mt-2 mb-3 p-2.5 rounded-lg" style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)' }}>
                 <input type="text" value={newKeyLabel} onChange={e => setNewKeyLabel(e.target.value)}
                   placeholder="Label (ex: Compte perso, Compte pro…)" 
-                  className="rounded-lg px-2.5 py-1.5 text-[10px] outline-none"
+                  className="rounded-lg px-2.5 py-1.5 text-sm outline-none"
                   style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }} />
                 <input type="password" value={newKeyValue} onChange={e => setNewKeyValue(e.target.value)}
                   placeholder="Clé API Gemini (AIza…)" autoFocus
-                  className="rounded-lg px-2.5 py-1.5 text-[10px] font-mono outline-none"
+                  className="rounded-lg px-2.5 py-1.5 text-sm font-mono outline-none"
                   style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }} />
                 <div className="flex gap-2">
                   <motion.button type="button" onClick={handleAddGeminiKey} disabled={addingKey || !newKeyValue.trim()}
                     whileTap={{ scale: 0.95 }}
-                    className="rounded-lg px-3 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50"
+                    className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
                     style={{ backgroundColor: 'var(--accent-primary)' }}>
                     {addingKey ? '…' : 'Ajouter au pool'}
                   </motion.button>
                   <button type="button" onClick={() => { setShowAddKey(false); setNewKeyValue(''); setNewKeyLabel(''); }}
-                    className="rounded-lg px-2.5 py-1.5 text-[10px] font-medium"
+                    className="rounded-lg px-2.5 py-1.5 text-sm font-medium"
                     style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}>
                     Annuler
                   </button>
@@ -168,7 +168,7 @@ export function TokensSection() {
 
         {/* Key list */}
         {geminiKeys.length === 0 ? (
-          <p className="text-[10px] py-2" style={{ color: 'var(--text-dimmed)' }}>
+          <p className="text-sm py-2" style={{ color: 'var(--text-dimmed)' }}>
             Aucune clé dans le pool. La clé de l'environnement (.env) sera utilisée par défaut.
           </p>
         ) : (
@@ -181,10 +181,10 @@ export function TokensSection() {
                   opacity: gk.disabled ? 0.6 : 1,
                 }}>
                 <div className="flex-1 min-w-0">
-                  <span className="text-[10px] font-medium block truncate" style={{ color: 'var(--text-primary)' }}>
+                  <span className="text-sm font-medium block truncate" style={{ color: 'var(--text-primary)' }}>
                     {gk.label}
                   </span>
-                  <span className="text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                     {gk.preview}
                   </span>
                 </div>
@@ -194,13 +194,13 @@ export function TokensSection() {
                     className="p-1 rounded transition-colors hover:bg-[color-mix(in_srgb,var(--text-muted)_10%,transparent)]">
                     {gk.disabled 
                       ? <ToggleLeft size={14} style={{ color: 'var(--text-muted)' }} />
-                      : <ToggleRight size={14} style={{ color: '#4ade80' }} />
+                      : <ToggleRight size={14} style={{ color: 'var(--color-success)' }} />
                     }
                   </button>
                   <button type="button" onClick={() => handleRemoveGeminiKey(gk.index)}
                     title="Supprimer"
-                    className="p-1 rounded transition-colors hover:bg-[color-mix(in_srgb,#ef4444_10%,transparent)]">
-                    <Trash2 size={12} style={{ color: '#f87171' }} />
+                    className="p-1 rounded transition-colors hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)]">
+                    <Trash2 size={12} style={{ color: 'var(--color-error)' }} />
                   </button>
                 </div>
               </div>
@@ -215,44 +215,44 @@ export function TokensSection() {
           <div key={token.key} className="rounded-xl p-3"
             style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
             <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{token.label}</span>
-              <span className="rounded-full px-2 py-0.5 text-[9px] font-medium"
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{token.label}</span>
+              <span className="rounded-full px-2 py-0.5 text-xs font-medium"
                 style={{
-                  backgroundColor: !token.configured ? 'color-mix(in srgb, #f87171 12%, transparent)'
-                    : token.valid === true ? 'color-mix(in srgb, #4ade80 12%, transparent)'
-                    : token.valid === false ? 'color-mix(in srgb, #f59e0b 12%, transparent)'
-                    : 'color-mix(in srgb, #94a3b8 12%, transparent)',
-                  color: !token.configured ? '#f87171'
-                    : token.valid === true ? '#4ade80'
-                    : token.valid === false ? '#f59e0b' : '#94a3b8',
+                  backgroundColor: !token.configured ? 'color-mix(in srgb, var(--color-error) 12%, transparent)'
+                    : token.valid === true ? 'color-mix(in srgb, var(--color-success) 12%, transparent)'
+                    : token.valid === false ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)'
+                    : 'color-mix(in srgb, var(--text-muted) 12%, transparent)',
+                  color: !token.configured ? 'var(--color-error)'
+                    : token.valid === true ? 'var(--color-success)'
+                    : token.valid === false ? 'var(--color-warning)' : 'var(--text-muted)',
                 }}>
                 {!token.configured ? 'Non configuré' : token.valid === true ? '✓ Valide' : token.valid === false ? '✗ Invalide' : 'Vérification…'}
               </span>
             </div>
             {token.configured && editingKey !== token.key && (
-              <p className="text-[10px] font-mono mb-2" style={{ color: 'var(--text-dimmed)' }}>{token.preview}</p>
+              <p className="text-sm font-mono mb-2" style={{ color: 'var(--text-dimmed)' }}>{token.preview}</p>
             )}
             {editingKey === token.key ? (
               <div className="flex gap-2 mt-2">
                 <input type="password" value={editValue} onChange={e => setEditValue(e.target.value)}
                   placeholder="Nouvelle valeur…" autoFocus
-                  className="flex-1 rounded-lg px-2.5 py-1.5 text-[10px] outline-none"
+                  className="flex-1 rounded-lg px-2.5 py-1.5 text-sm outline-none"
                   style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }} />
                 <motion.button type="button" onClick={() => handleSave(token.key)} disabled={saving || !editValue.trim()}
                   whileTap={{ scale: 0.95 }}
-                  className="rounded-lg px-3 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50"
+                  className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
                   style={{ backgroundColor: 'var(--accent-primary)' }}>
                   {saving ? '…' : 'Enregistrer'}
                 </motion.button>
                 <button type="button" onClick={() => { setEditingKey(null); setEditValue(''); }}
-                  className="rounded-lg px-2.5 py-1.5 text-[10px] font-medium"
+                  className="rounded-lg px-2.5 py-1.5 text-sm font-medium"
                   style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}>
                   Annuler
                 </button>
               </div>
             ) : (
               <button type="button" onClick={() => { setEditingKey(token.key); setEditValue(''); }}
-                className="mt-1 text-[10px] font-medium transition-colors hover:underline"
+                className="mt-1 text-sm font-medium transition-colors hover:underline"
                 style={{ color: 'var(--accent-primary)' }}>
                 {token.configured ? 'Modifier' : 'Configurer'}
               </button>
@@ -262,11 +262,11 @@ export function TokensSection() {
         <AnimatePresence>
           {feedback && (
             <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-              className="col-span-2 rounded-lg px-3 py-2 text-[11px] font-medium"
+              className="col-span-2 rounded-lg px-3 py-2 text-xs font-medium"
               style={{
-                backgroundColor: feedback.type === 'success' ? 'color-mix(in srgb, #4ade80 10%, transparent)' : 'color-mix(in srgb, #ef4444 10%, transparent)',
-                color: feedback.type === 'success' ? '#4ade80' : '#f87171',
-                border: `1px solid ${feedback.type === 'success' ? 'color-mix(in srgb, #4ade80 25%, transparent)' : 'color-mix(in srgb, #ef4444 25%, transparent)'}`,
+                backgroundColor: feedback.type === 'success' ? 'color-mix(in srgb, var(--color-success) 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+                color: feedback.type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
+                border: `1px solid ${feedback.type === 'success' ? 'color-mix(in srgb, var(--color-success) 25%, transparent)' : 'color-mix(in srgb, var(--color-error) 25%, transparent)'}`,
               }}>
               {feedback.type === 'success' ? '✓' : '✗'} {feedback.message}
             </motion.div>

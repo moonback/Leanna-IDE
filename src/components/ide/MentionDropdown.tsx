@@ -36,7 +36,7 @@ export function MentionDropdown({ suggestions, selectedIndex, onSelect, onHover,
     >
       {/* Header */}
       <div
-        className="px-3 py-1.5 text-[9px] uppercase font-bold tracking-wider"
+        className="px-3 py-1.5 text-xs uppercase font-bold tracking-wider"
         style={{ color: 'var(--text-dimmed)', borderBottom: '1px solid var(--border-base)' }}
       >
         Fichiers & Dossiers
@@ -53,23 +53,23 @@ export function MentionDropdown({ suggestions, selectedIndex, onSelect, onHover,
           }}
         >
           {item.type === 'directory' ? (
-            <Folder size={12} style={{ color: '#f59e0b', flexShrink: 0 }} />
+            <Folder size={12} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
           ) : (
             <File size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           )}
           <div className="flex-1 min-w-0">
-            <span className="text-[11px] font-medium block truncate" style={{ color: 'var(--text-primary)' }}>
+            <span className="text-xs font-medium block truncate" style={{ color: 'var(--text-primary)' }}>
               <HighlightMatch text={item.name} query={query} />
             </span>
-            <span className="text-[9px] block truncate" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs block truncate" style={{ color: 'var(--text-dimmed)' }}>
               {item.path}
             </span>
           </div>
           <span
-            className="text-[9px] px-1.5 py-0.5 rounded flex-shrink-0"
+            className="text-xs px-1.5 py-0.5 rounded flex-shrink-0"
             style={{
               backgroundColor: item.type === 'directory' ? 'rgba(245,158,11,0.1)' : 'var(--accent-subtle)',
-              color: item.type === 'directory' ? '#f59e0b' : 'var(--text-dimmed)',
+              color: item.type === 'directory' ? 'var(--color-warning)' : 'var(--text-dimmed)',
             }}
           >
             {item.type === 'directory' ? 'dossier' : 'fichier'}

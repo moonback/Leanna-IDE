@@ -200,7 +200,7 @@ export function SidePanel({
                 </div>
               )}
               <h2
-                className="flex-1 text-[12px] font-semibold truncate"
+                className="flex-1 text-sm font-semibold truncate"
                 style={{ color: 'var(--text-primary)' }}
               >
                 {title}

@@ -171,7 +171,7 @@ export function StartupProjectModal() {
               </div>
               <div>
                 <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Workspace</h2>
-                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   Créez ou ouvrez un projet pour commencer.
                 </p>
               </div>
@@ -200,7 +200,7 @@ export function StartupProjectModal() {
                 whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
                 whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
                 transition={{ duration: 0.1 }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
                 style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
               >
                 <Plus className="w-4 h-4" />
@@ -208,7 +208,7 @@ export function StartupProjectModal() {
               </motion.button>
             )}
             <div>
-              <label className="text-[11px] font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
                 Chemin du projet existant
               </label>
               <div className="flex gap-2">
@@ -218,7 +218,7 @@ export function StartupProjectModal() {
                     onChange={e => { setInputPath(e.target.value); setError(null); }}
                     onKeyDown={e => { if (e.key === 'Enter') handleOpenProject(); }}
                     placeholder="C:\Users\...\votre-projet"
-                    className="w-full rounded-lg border pl-8 pr-3 py-2 text-[11px] font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
+                    className="w-full rounded-lg border pl-8 pr-3 py-2 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
                     style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)', outline: 'none' }}
                     autoFocus spellCheck={false} />
                 </div>
@@ -229,7 +229,7 @@ export function StartupProjectModal() {
                     whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
                     whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
                     transition={{ duration: 0.1 }}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-1"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-1"
                     style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--accent-primary)' }}
                   >
                     <Upload className="w-3.5 h-3.5" />Parcourir
@@ -247,9 +247,9 @@ export function StartupProjectModal() {
                   exit={{ opacity: 0, height: 0 }}
                   transition={INLINE_BANNER_TRANSITION}
                 >
-                  <label className="text-[11px] font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
                     URL du site associé
-                    <span className="ml-1.5 text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>(optionnel)</span>
+                    <span className="ml-1.5 text-sm font-normal" style={{ color: 'var(--text-muted)' }}>(optionnel)</span>
                   </label>
                   <div className="relative">
                     <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--text-dimmed)' }} />
@@ -259,10 +259,10 @@ export function StartupProjectModal() {
                       onChange={e => { setInputSiteUrl(e.target.value); setSiteUrlError(null); }}
                       onKeyDown={e => { if (e.key === 'Enter') handleOpenProject(); }}
                       placeholder="https://mon-site.com"
-                      className="w-full rounded-lg border pl-8 pr-3 py-2 text-[11px] font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
+                      className="w-full rounded-lg border pl-8 pr-3 py-2 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
                       style={{
                         backgroundColor: 'var(--bg-input)',
-                        borderColor: siteUrlError ? '#f87171' : 'var(--border-base)',
+                        borderColor: siteUrlError ? 'var(--color-error)' : 'var(--border-base)',
                         color: 'var(--text-primary)',
                         outline: 'none',
                       }}
@@ -276,14 +276,14 @@ export function StartupProjectModal() {
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
                         transition={INLINE_BANNER_TRANSITION}
-                        className="mt-1 text-[10px] overflow-hidden"
-                        style={{ color: '#f87171' }}
+                        className="mt-1 text-sm overflow-hidden"
+                        style={{ color: 'var(--color-error)' }}
                       >
                         {siteUrlError}
                       </motion.p>
                     )}
                   </AnimatePresence>
-                  <p className="mt-1 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <p className="mt-1 text-sm" style={{ color: 'var(--text-dimmed)' }}>
                     L'assistant pourra consulter ce site pour répondre à vos questions.
                   </p>
                 </motion.div>
@@ -294,7 +294,7 @@ export function StartupProjectModal() {
                   exit={{ opacity: 0, height: 0 }}
                   transition={INLINE_BANNER_TRANSITION}
                   onClick={() => setShowSiteUrl(true)}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-1"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-1"
                   style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                 >
                   <Globe className="w-4 h-4" />
@@ -311,8 +311,8 @@ export function StartupProjectModal() {
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={INLINE_BANNER_TRANSITION}
-                  className="rounded-lg px-3 py-2 text-[11px] font-medium flex items-center gap-2 overflow-hidden"
-                  style={{ backgroundColor: 'color-mix(in srgb, #f87171 10%, transparent)', color: '#f87171' }}
+                  className="rounded-lg px-3 py-2 text-xs font-medium flex items-center gap-2 overflow-hidden"
+                  style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)', color: 'var(--color-error)' }}
                 >
                   <ShieldAlert className="w-4 h-4 flex-shrink-0" />
                   <span>{error}</span>

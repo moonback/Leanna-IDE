@@ -65,11 +65,11 @@ interface WorkflowsPanelProps {
 function statusIcon(status?: string | null, size = 'w-3.5 h-3.5') {
   switch (status) {
     case 'success':
-      return <CheckCircle2 className={size} style={{ color: '#22c55e' }} />;
+      return <CheckCircle2 className={size} style={{ color: 'var(--color-success)' }} />;
     case 'partial':
-      return <AlertTriangle className={size} style={{ color: '#f59e0b' }} />;
+      return <AlertTriangle className={size} style={{ color: 'var(--color-warning)' }} />;
     case 'failed':
-      return <XCircle className={size} style={{ color: '#ef4444' }} />;
+      return <XCircle className={size} style={{ color: 'var(--color-error)' }} />;
     case 'running':
       return <Loader2 className={`${size} animate-spin`} style={{ color: 'var(--accent-primary)' }} />;
     default:
@@ -89,9 +89,9 @@ function statusLabel(status?: string | null) {
 
 function statusColor(status?: string | null) {
   switch (status) {
-    case 'success': return '#22c55e';
-    case 'partial': return '#f59e0b';
-    case 'failed':  return '#ef4444';
+    case 'success': return 'var(--color-success)';
+    case 'partial': return 'var(--color-warning)';
+    case 'failed':  return 'var(--color-error)';
     case 'running': return 'var(--accent-primary)';
     default:        return 'var(--text-dimmed)';
   }
@@ -100,13 +100,13 @@ function statusColor(status?: string | null) {
 function stepStatusIcon(status: string) {
   switch (status) {
     case 'success':
-      return <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#22c55e' }} />;
+      return <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />;
     case 'running':
       return <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />;
     case 'failed':
-      return <XCircle className="w-3.5 h-3.5" style={{ color: '#ef4444' }} />;
+      return <XCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />;
     case 'skipped':
-      return <ChevronRight className="w-3.5 h-3.5" style={{ color: '#6b7280' }} />;
+      return <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />;
     default:
       return <Clock className="w-3.5 h-3.5" style={{ color: 'var(--text-dimmed)', opacity: 0.4 }} />;
   }
@@ -260,7 +260,7 @@ function ActiveRunTracker({ run }: { run: WorkflowRunState }) {
                   {idx < run.steps.length - 1 && (
                     <div
                       className="w-px h-2 mt-0.5"
-                      style={{ backgroundColor: isDone ? '#22c55e' : 'var(--border-base)' }}
+                      style={{ backgroundColor: isDone ? 'var(--color-success)' : 'var(--border-base)' }}
                     />
                   )}
                 </div>
@@ -280,7 +280,7 @@ function ActiveRunTracker({ run }: { run: WorkflowRunState }) {
                     </span>
                   )}
                   {step.error && (
-                    <span className="text-xs block mt-0.5 truncate" style={{ color: '#ef4444' }} title={step.error}>
+                    <span className="text-xs block mt-0.5 truncate" style={{ color: 'var(--color-error)' }} title={step.error}>
                       ⚠ {step.error}
                     </span>
                   )}
@@ -398,9 +398,9 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
               style={{
                 background: connected
-                  ? 'linear-gradient(135deg, var(--accent-primary), #7c3aed)'
+                  ? 'linear-gradient(135deg, var(--accent-primary), var(--color-accent-alt))'
                   : 'var(--bg-secondary)',
-                color: connected ? '#fff' : 'var(--text-muted)',
+                color: connected ? 'white' : 'var(--text-muted)',
                 boxShadow: connected ? '0 2px 8px rgba(14,165,233,0.3)' : 'none',
               }}
               title={connected ? 'Créer un workflow avec l\'assistant' : 'Connectez l\'assistant pour créer un workflow'}
@@ -464,9 +464,9 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
               style={{
                 background: connected
-                  ? 'linear-gradient(135deg, var(--accent-primary), #7c3aed)'
+                  ? 'linear-gradient(135deg, var(--accent-primary), var(--color-accent-alt))'
                   : 'var(--bg-secondary)',
-                color: connected ? '#fff' : 'var(--text-muted)',
+                color: connected ? 'white' : 'var(--text-muted)',
                 boxShadow: connected ? '0 4px 14px rgba(14,165,233,0.25)' : 'none',
               }}
               aria-label="Créer un workflow guidé via l'assistant"
@@ -522,7 +522,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                             {!wf.enabled && (
                               <span
                                 className="text-xs font-bold uppercase px-1.5 py-0.5 rounded"
-                                style={{ backgroundColor: 'rgba(107,114,128,0.15)', color: '#6b7280' }}
+                                style={{ backgroundColor: 'rgba(107,114,128,0.15)', color: 'var(--text-muted)' }}
                               >
                                 Pausé
                               </span>
@@ -618,7 +618,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                             onClick={() => runAction(`/api/workflows/${wf.id}`, 'DELETE')}
                             disabled={busyId !== null || isRunning}
                             className="rounded-lg border px-3 py-1.5 text-xs font-bold disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors hover:bg-red-500/5"
-                            style={{ borderColor: 'var(--border-base)', color: '#ef4444' }}
+                            style={{ borderColor: 'var(--border-base)', color: 'var(--color-error)' }}
                           >
                             <Trash2 className="w-3 h-3" /> Supprimer
                           </button>
@@ -698,10 +698,10 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                                   )}
                                   {step.onError && step.onError !== 'stop' && (
                                     <span
-                                      className="text-[8px] px-1.5 py-0.5 rounded font-mono font-bold"
+                                      className="text-xs px-1.5 py-0.5 rounded font-mono font-bold"
                                       style={{
                                         backgroundColor: step.onError === 'retry' ? 'rgba(245,158,11,0.12)' : 'rgba(107,114,128,0.12)',
-                                        color: step.onError === 'retry' ? '#f59e0b' : '#6b7280',
+                                        color: step.onError === 'retry' ? 'var(--color-warning)' : 'var(--text-muted)',
                                       }}
                                     >
                                       {step.onError === 'retry' ? '↻ retry' : '→ skip'}

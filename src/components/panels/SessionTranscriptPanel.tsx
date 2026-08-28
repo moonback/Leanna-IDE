@@ -50,7 +50,7 @@ export const SessionTranscriptPanel = React.memo(function SessionTranscriptPanel
         {transcript.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2">
             <MessageSquare className="w-6 h-6" style={{ color: 'var(--text-dimmed)' }} />
-            <p className="text-[11px] text-center" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-xs text-center" style={{ color: 'var(--text-dimmed)' }}>
               La conversation apparaîtra ici.
             </p>
           </div>
@@ -95,13 +95,13 @@ export const SessionTranscriptPanel = React.memo(function SessionTranscriptPanel
                     >
                       {/* Speaker label */}
                       <span
-                        className="block text-[9px] font-mono uppercase tracking-wider mb-1 opacity-60"
+                        className="block text-xs font-mono uppercase tracking-wider mb-1 opacity-60"
                       >
                         {isAssistant ? profile.aiName || 'Leanna' : profile.userName || 'Vous'}
                       </span>
                       {entry.text}
                     </div>
-                    <span className="text-[9px] font-mono px-1" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs font-mono px-1" style={{ color: 'var(--text-dimmed)' }}>
                       {timeLabel(entry.timestamp)}
                     </span>
                   </div>

@@ -36,7 +36,7 @@ export function SlashCommandDropdown({ suggestions, selectedIndex, onSelect, onH
     >
       {/* Header */}
       <div
-        className="px-3 py-1.5 text-[9px] uppercase font-bold tracking-wider flex items-center gap-1.5"
+        className="px-3 py-1.5 text-xs uppercase font-bold tracking-wider flex items-center gap-1.5"
         style={{ color: 'var(--text-dimmed)', borderBottom: '1px solid var(--border-base)' }}
       >
         <Zap size={9} />
@@ -61,17 +61,17 @@ export function SlashCommandDropdown({ suggestions, selectedIndex, onSelect, onH
             }}
           >
             <span
-              className="text-[10px] font-bold"
-              style={{ color: index === selectedIndex ? '#fff' : 'var(--text-muted)' }}
+              className="text-sm font-bold"
+              style={{ color: index === selectedIndex ? 'white' : 'var(--text-muted)' }}
             >
               /
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <span className="text-[11px] font-medium block truncate" style={{ color: 'var(--text-primary)' }}>
+            <span className="text-xs font-medium block truncate" style={{ color: 'var(--text-primary)' }}>
               <HighlightMatch text={item.name} query={query} />
             </span>
-            <span className="text-[9px] block truncate" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs block truncate" style={{ color: 'var(--text-dimmed)' }}>
               {item.description}
             </span>
           </div>

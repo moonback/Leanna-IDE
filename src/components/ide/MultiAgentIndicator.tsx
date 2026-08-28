@@ -22,42 +22,42 @@ const TOOL_AGENTS: AgentDef[] = [
     id: 'code',
     name: 'Code',
     icon: Code,
-    color: '#60a5fa',
+    color: 'var(--accent-primary)',
     tools: ['read_project_file', 'write_project_file', 'modify_project_file', 'patch_project_file', 'analyze_project_file', 'search_in_files', 'read_file_outline'],
   },
   {
     id: 'files',
     name: 'Fichiers',
     icon: FileText,
-    color: '#4ade80',
+    color: 'var(--color-success)',
     tools: ['list_project_files', 'create_project_directory', 'rename_project_file', 'delete_project_file', 'delete_project_folder', 'open_project_file', 'get_workspace_info'],
   },
   {
     id: 'git',
     name: 'Git',
     icon: GitBranch,
-    color: '#f472b6',
+    color: 'var(--color-error)',
     tools: ['git_status', 'git_diff', 'git_stage', 'git_unstage', 'git_commit', 'git_push', 'git_pull', 'git_branches', 'git_switch_branch', 'git_log'],
   },
   {
     id: 'web',
     name: 'Web',
     icon: Globe,
-    color: '#34d399',
+    color: 'var(--color-success)',
     tools: ['automation_navigate', 'automation_click', 'automation_type', 'automation_extract', 'automation_search', 'automation_snapshot'],
   },
   {
     id: 'memory',
     name: 'Mémoire',
     icon: Database,
-    color: '#a855f7',
+    color: 'var(--color-accent-alt)',
     tools: ['save_memory', 'search_memory', 'search_history', 'get_conversation_context'],
   },
   {
     id: 'reasoning',
     name: 'Raisonnement',
     icon: Brain,
-    color: '#f97316',
+    color: 'var(--color-warning)',
     tools: ['reasoning_delegate_task', 'reasoning_think'],
   },
 ];
@@ -72,12 +72,12 @@ interface RoleAgentDef {
 }
 
 const ROLE_AGENTS: Record<string, RoleAgentDef> = {
-  test:     { id: 'role-test',     name: 'Tests',   icon: FlaskConical, color: '#4ade80' },
-  docs:     { id: 'role-docs',     name: 'Docs',    icon: FileText,     color: '#60a5fa' },
-  refactor: { id: 'role-refactor', name: 'Refactor', icon: RefreshCw,   color: '#fbbf24' },
-  security: { id: 'role-security', name: 'Sécu',    icon: Shield,       color: '#f87171' },
-  review:   { id: 'role-review',   name: 'Review',  icon: Eye,          color: '#a78bfa' },
-  architect:{ id: 'role-architect', name: 'Archi',   icon: Building2,    color: '#f97316' },
+  test:     { id: 'role-test',     name: 'Tests',   icon: FlaskConical, color: 'var(--color-success)' },
+  docs:     { id: 'role-docs',     name: 'Docs',    icon: FileText,     color: 'var(--accent-primary)' },
+  refactor: { id: 'role-refactor', name: 'Refactor', icon: RefreshCw,   color: 'var(--color-warning)' },
+  security: { id: 'role-security', name: 'Sécu',    icon: Shield,       color: 'var(--color-error)' },
+  review:   { id: 'role-review',   name: 'Review',  icon: Eye,          color: 'var(--color-accent-alt)' },
+  architect:{ id: 'role-architect', name: 'Archi',   icon: Building2,    color: 'var(--color-warning)' },
 };
 
 function getAgentForTool(tool: string): AgentDef | null {
@@ -237,7 +237,7 @@ export function MultiAgentIndicator({ steps }: MultiAgentIndicatorProps) {
         id: `mission-${missionId}`,
         name: entry.title.length > 12 ? entry.title.slice(0, 12) + '…' : entry.title,
         icon: Target,
-        color: '#38bdf8',
+        color: 'var(--accent-primary)',
         isActive: entry.expiresAt > now + 5000,
         expiresAt: entry.expiresAt,
       });
@@ -294,7 +294,7 @@ export function MultiAgentIndicator({ steps }: MultiAgentIndicatorProps) {
                 <Icon size={9} style={{ color: agent.color, opacity: 0.7 }} />
               )}
               <span
-                className="text-[8px] font-semibold uppercase whitespace-nowrap"
+                className="text-xs font-semibold uppercase whitespace-nowrap"
                 style={{ color: agent.color, opacity: agent.isActive ? 1 : 0.6 }}
               >
                 {agent.name}

@@ -20,15 +20,15 @@ const textStyles = {
 };
 
 const actionColors = {
-  created: '#4ade80',
-  modified: '#fbbf24',
-  deleted: '#f87171',
+  created: 'var(--color-success)',
+  modified: 'var(--color-warning)',
+  deleted: 'var(--color-error)',
   read: 'var(--accent-primary)',
-  install: '#4ade80',
-  update: '#fbbf24',
-  remove: '#f87171',
-  success: '#4ade80',
-  error: '#f87171',
+  install: 'var(--color-success)',
+  update: 'var(--color-warning)',
+  remove: 'var(--color-error)',
+  success: 'var(--color-success)',
+  error: 'var(--color-error)',
 };
 
 const badgeStyles = (color: string) => ({
@@ -71,14 +71,14 @@ export function FileCard({ path, action, linesAdded, linesRemoved, onClick }: Fi
       />
       <div className="flex-1 min-w-0">
         <span
-          className="text-[12px] font-medium block truncate"
+          className="text-sm font-medium block truncate"
           style={{ color: textStyles.primary }}
         >
           {fileName}
         </span>
         {dir && (
           <span
-            className="text-[10px] mt-0.5 block truncate"
+            className="text-sm mt-0.5 block truncate"
             style={{ color: textStyles.dimmed }}
           >
             {dir}
@@ -88,7 +88,7 @@ export function FileCard({ path, action, linesAdded, linesRemoved, onClick }: Fi
       <div className="flex items-center gap-2 flex-shrink-0">
         {typeof linesAdded === 'number' && linesAdded > 0 && (
           <span
-            className="text-[10px] font-mono"
+            className="text-sm font-mono"
             style={{ color: actionColors.created }}
           >
             +{linesAdded}
@@ -96,13 +96,13 @@ export function FileCard({ path, action, linesAdded, linesRemoved, onClick }: Fi
         )}
         {typeof linesRemoved === 'number' && linesRemoved > 0 && (
           <span
-            className="text-[10px] font-mono"
+            className="text-sm font-mono"
             style={{ color: actionColors.deleted }}
           >
             -{linesRemoved}
           </span>
         )}
-        <span className="text-[8px] font-semibold uppercase px-2 py-0.5 rounded-full" style={badgeStyles(actionColors[action])}>
+        <span className="text-xs font-semibold uppercase px-2 py-0.5 rounded-full" style={badgeStyles(actionColors[action])}>
           {actionLabels[action]}
         </span>
       </div>
@@ -140,14 +140,14 @@ export function CommandCard({ command, output, exitCode, onCopy }: CommandCardPr
           style={{ color: success ? actionColors.success : actionColors.error, flexShrink: 0 }}
         />
         <code
-          className="text-[11px] font-mono flex-1 truncate"
+          className="text-xs font-mono flex-1 truncate"
           style={{ color: textStyles.primary }}
         >
           {command}
         </code>
         {exitCode !== undefined && (
           <span
-            className="text-[9px] font-mono px-2 py-0.5 rounded-full"
+            className="text-xs font-mono px-2 py-0.5 rounded-full"
             style={badgeStyles(success ? actionColors.success : actionColors.error)}
           >
             {success ? '✓' : `exit ${exitCode}`}
@@ -185,7 +185,7 @@ export function CommandCard({ command, output, exitCode, onCopy }: CommandCardPr
           style={{ borderColor: 'var(--border-base)', backgroundColor: 'rgba(0, 0, 0, 0.15)' }}
         >
           <pre
-            className="text-[10px] font-mono whitespace-pre-wrap"
+            className="text-sm font-mono whitespace-pre-wrap"
             style={{ color: textStyles.muted, margin: 0 }}
           >
             {output}
@@ -220,29 +220,29 @@ export function DiffCard({ filePath, additions, deletions, onAccept, onReject, o
         className="flex items-center gap-3 px-4 py-2.5"
         style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}
       >
-        <GitBranch size={14} style={{ color: '#f472b6', flexShrink: 0 }} />
+        <GitBranch size={14} style={{ color: 'var(--color-error)', flexShrink: 0 }} />
         <div className="flex-1 min-w-0">
           <span
-            className="text-[12px] font-medium block truncate"
+            className="text-sm font-medium block truncate"
             style={{ color: textStyles.primary }}
           >
             {fileName}
           </span>
           <div className="flex items-center gap-2 mt-1">
             <span
-              className="text-[10px] font-mono"
+              className="text-sm font-mono"
               style={{ color: actionColors.created }}
             >
               +{additions}
             </span>
             <span
-              className="text-[10px] font-mono"
+              className="text-sm font-mono"
               style={{ color: actionColors.deleted }}
             >
               -{deletions}
             </span>
             <span
-              className="text-[9px]"
+              className="text-xs"
               style={{ color: textStyles.dimmed }}
             >
               lignes
@@ -259,7 +259,7 @@ export function DiffCard({ filePath, additions, deletions, onAccept, onReject, o
           {onView && (
             <button
               onClick={onView}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
                          hover:bg-white/8 transition-colors focus:outline-none focus:ring-1 focus:ring-white/20"
               style={{ color: textStyles.accent }}
             >
@@ -270,7 +270,7 @@ export function DiffCard({ filePath, additions, deletions, onAccept, onReject, o
           {onAccept && (
             <button
               onClick={onAccept}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
                          hover:bg-green-500/10 transition-colors focus:outline-none focus:ring-1 focus:ring-green-500/30"
               style={{ color: actionColors.created }}
             >
@@ -281,7 +281,7 @@ export function DiffCard({ filePath, additions, deletions, onAccept, onReject, o
           {onReject && (
             <button
               onClick={onReject}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
                          hover:bg-red-500/10 transition-colors focus:outline-none focus:ring-1 focus:ring-red-500/30"
               style={{ color: actionColors.deleted }}
             >
@@ -317,7 +317,7 @@ export function PackageCard({ name, version, action }: PackageCardProps) {
         style={{ color: actionColors[action], flexShrink: 0 }}
       />
       <span
-        className="text-[11px] font-mono flex-1 truncate"
+        className="text-xs font-mono flex-1 truncate"
         style={{ color: textStyles.primary }}
       >
         {name}
@@ -326,7 +326,7 @@ export function PackageCard({ name, version, action }: PackageCardProps) {
         )}
       </span>
       <span
-        className="text-[8px] font-semibold uppercase px-2 py-0.5 rounded-full"
+        className="text-xs font-semibold uppercase px-2 py-0.5 rounded-full"
         style={badgeStyles(actionColors[action])}
       >
         {labels[action]}
@@ -360,22 +360,22 @@ export function ChangesSummary({ files, onAcceptAll, onRejectAll, onViewFile }: 
                    hover:bg-white/5 transition-colors"
         onClick={() => setExpanded((v) => !v)}
       >
-        <GitBranch size={14} style={{ color: '#f472b6', flexShrink: 0 }} />
+        <GitBranch size={14} style={{ color: 'var(--color-error)', flexShrink: 0 }} />
         <span
-          className="text-[12px] font-semibold flex-1 truncate"
+          className="text-sm font-semibold flex-1 truncate"
           style={{ color: textStyles.primary }}
         >
           {files.length} fichier{files.length > 1 ? 's' : ''} modifié{files.length > 1 ? 's' : ''}
         </span>
         <div className="flex items-center gap-2 flex-shrink-0">
           <span
-            className="text-[10px] font-mono"
+            className="text-sm font-mono"
             style={{ color: actionColors.created }}
           >
             +{totalAdd}
           </span>
           <span
-            className="text-[10px] font-mono"
+            className="text-sm font-mono"
             style={{ color: actionColors.deleted }}
           >
             -{totalDel}
@@ -407,19 +407,19 @@ export function ChangesSummary({ files, onAcceptAll, onRejectAll, onViewFile }: 
               >
                 <FileText size={12} style={{ color: textStyles.muted, flexShrink: 0 }} />
                 <span
-                  className="text-[10px] flex-1 truncate"
+                  className="text-sm flex-1 truncate"
                   style={{ color: textStyles.primary }}
                 >
                   {name}
                 </span>
                 <span
-                  className="text-[9px] font-mono"
+                  className="text-xs font-mono"
                   style={{ color: actionColors.created }}
                 >
                   +{f.additions}
                 </span>
                 <span
-                  className="text-[9px] font-mono"
+                  className="text-xs font-mono"
                   style={{ color: actionColors.deleted }}
                 >
                   -{f.deletions}
@@ -438,7 +438,7 @@ export function ChangesSummary({ files, onAcceptAll, onRejectAll, onViewFile }: 
           {onAcceptAll && (
             <button
               onClick={onAcceptAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
                          hover:bg-green-500/10 transition-colors focus:outline-none focus:ring-1 focus:ring-green-500/30"
               style={{ color: actionColors.created }}
             >
@@ -449,7 +449,7 @@ export function ChangesSummary({ files, onAcceptAll, onRejectAll, onViewFile }: 
           {onRejectAll && (
             <button
               onClick={onRejectAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
                          hover:bg-red-500/10 transition-colors focus:outline-none focus:ring-1 focus:ring-red-500/30"
               style={{ color: actionColors.deleted }}
             >

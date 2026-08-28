@@ -165,19 +165,19 @@ export const WorkspacePanel = React.memo(function WorkspacePanel() {
                 }}
               >
                 {current.exists
-                  ? <CheckCircle2 className="w-4 h-4" style={{ color: '#4ade80' }} />
-                  : <AlertCircle  className="w-4 h-4" style={{ color: '#f87171' }} />
+                  ? <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
+                  : <AlertCircle  className="w-4 h-4" style={{ color: 'var(--color-error)' }} />
                 }
               </div>
               <div className="min-w-0 flex-1">
                 <p
-                  className="text-[11px] font-bold"
-                  style={{ color: current.exists ? '#4ade80' : '#f87171' }}
+                  className="text-xs font-bold"
+                  style={{ color: current.exists ? 'var(--color-success)' : 'var(--color-error)' }}
                 >
                   {current.exists ? 'Workspace actif' : 'Dossier introuvable'}
                 </p>
                 <p
-                  className="text-[11px] font-mono break-all mt-0.5 leading-snug"
+                  className="text-xs font-mono break-all mt-0.5 leading-snug"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   {current.workspace}
@@ -192,7 +192,7 @@ export const WorkspacePanel = React.memo(function WorkspacePanel() {
         <div>
           <label
             htmlFor="workspace-path-input"
-            className="block text-[11px] font-semibold mb-1.5"
+            className="block text-xs font-semibold mb-1.5"
             style={{ color: 'var(--text-muted)' }}
           >
             Nouveau chemin
@@ -242,7 +242,7 @@ export const WorkspacePanel = React.memo(function WorkspacePanel() {
               </button>
             )}
           </div>
-          <p id="workspace-path-help" className="text-[10px] mt-1.5" style={{ color: 'var(--text-dimmed)' }}>
+          <p id="workspace-path-help" className="text-sm mt-1.5" style={{ color: 'var(--text-dimmed)' }}>
             {canBrowse
               ? "Cliquez sur « Parcourir » ou saisissez le chemin absolu."
               : "Chemin absolu vers le dossier racine de l'application cible."
@@ -265,8 +265,8 @@ export const WorkspacePanel = React.memo(function WorkspacePanel() {
               }}
               role="alert"
             >
-              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#f87171' }} />
-              <p className="text-[11px]" style={{ color: '#f87171' }}>{error}</p>
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-error)' }} />
+              <p className="text-xs" style={{ color: 'var(--color-error)' }}>{error}</p>
             </motion.div>
           )}
 
@@ -283,8 +283,8 @@ export const WorkspacePanel = React.memo(function WorkspacePanel() {
               }}
               role="status"
             >
-              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#4ade80' }} />
-              <p className="text-[11px]" style={{ color: '#4ade80' }}>Workspace mis à jour avec succès.</p>
+              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
+              <p className="text-xs" style={{ color: 'var(--color-success)' }}>Workspace mis à jour avec succès.</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -311,7 +311,7 @@ export const WorkspacePanel = React.memo(function WorkspacePanel() {
         </motion.button>
 
         {/* ── Note ─────────────────────────────────────────── */}
-        <p className="text-[10px] text-center" style={{ color: 'var(--text-dimmed)' }}>
+        <p className="text-sm text-center" style={{ color: 'var(--text-dimmed)' }}>
           Le changement est actif immédiatement. L'IDE se recharge automatiquement.
         </p>
       </div>

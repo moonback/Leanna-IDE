@@ -100,7 +100,7 @@ export function Tooltip({
             <span>{content}</span>
             {shortcut && (
               <kbd
-                className="px-1.5 py-0.5 rounded text-[0.5625rem] font-mono font-semibold"
+                className="px-1.5 py-0.5 rounded text-xs font-mono font-semibold"
                 style={{
                   backgroundColor: 'var(--bg-input)',
                   color: 'var(--text-muted)',

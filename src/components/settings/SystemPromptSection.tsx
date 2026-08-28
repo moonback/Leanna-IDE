@@ -37,7 +37,7 @@ export function SystemPromptSection() {
               onChange={e => setField('customSystemPrompt', e.target.value)}
               placeholder="Ex : Tu es un expert en architecture logicielle. Tu privilégies toujours les design patterns SOLID. Tu réponds avec des exemples de code concrets..."
               rows={10}
-              className="w-full rounded-xl px-3 py-2.5 text-[11px] font-mono outline-none transition-all duration-150 resize-y min-h-[160px]"
+              className="w-full rounded-xl px-3 py-2.5 text-xs font-mono outline-none transition-all duration-150 resize-y min-h-[160px]"
               style={{
                 backgroundColor: 'var(--bg-input)',
                 border: '1px solid var(--border-base)',
@@ -61,7 +61,7 @@ export function SystemPromptSection() {
           {/* Actions bar */}
           <div className="flex items-center justify-between">
             <span
-              className="text-[9px] font-mono"
+              className="text-xs font-mono"
               style={{ color: charCount > 0 ? 'var(--text-muted)' : 'var(--text-dimmed)' }}
             >
               {charCount} caractère{charCount !== 1 ? 's' : ''}
@@ -74,14 +74,14 @@ export function SystemPromptSection() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 disabled={!charCount}
-                className="flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-medium transition-all disabled:opacity-30"
+                className="flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium transition-all disabled:opacity-30"
                 style={{
                   borderColor: 'var(--border-base)',
                   color: 'var(--text-secondary)',
                   backgroundColor: 'var(--bg-secondary)',
                 }}
               >
-                {copied ? <Check className="h-3 w-3" style={{ color: '#10b981' }} /> : <Copy className="h-3 w-3" />}
+                {copied ? <Check className="h-3 w-3" style={{ color: 'var(--color-success)' }} /> : <Copy className="h-3 w-3" />}
                 {copied ? 'Copié' : 'Copier'}
               </motion.button>
 
@@ -91,7 +91,7 @@ export function SystemPromptSection() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 disabled={!charCount}
-                className="flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-medium transition-all disabled:opacity-30"
+                className="flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium transition-all disabled:opacity-30"
                 style={{
                   borderColor: 'var(--border-base)',
                   color: 'var(--text-secondary)',
@@ -115,7 +115,7 @@ export function SystemPromptSection() {
           borderColor: 'var(--border-base)',
         }}
       >
-        <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           💡 Le prompt personnalisé est <strong>ajouté</strong> aux instructions de base de l'assistant.
           Il ne remplace pas le comportement par défaut mais le complète.
           Utilisez-le pour spécialiser l'IA sur un domaine, ajuster son ton, ou lui donner des consignes spécifiques à votre projet.

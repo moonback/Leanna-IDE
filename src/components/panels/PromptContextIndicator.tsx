@@ -104,7 +104,7 @@ export function PromptContextIndicator({ context, connected = false }: PromptCon
 
       {context.suggestion && context.level !== 'ok' && (
         <div
-          className="flex items-start gap-1.5 mt-2 px-2 py-1.5 rounded-lg text-[9-xs]"
+          className="flex items-start gap-1.5 mt-2 px-2 py-1.5 rounded-lg text-xs"
           style={{ backgroundColor: 'rgba(0,0,0,0.04)', color: 'var(--text-muted)' }}
         >
           {context.level === 'critical'

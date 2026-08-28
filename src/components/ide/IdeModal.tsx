@@ -154,7 +154,7 @@ export function IdeModal({ mode, onConfirm, onCancel }: IdeModalProps) {
                 </button>
                 <button type="submit"
                   className="rounded-lg px-3 py-1.5 text-sm transition hover:opacity-90"
-                  style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}>
+                  style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}>
                   {mode.type === 'rename' ? 'Renommer' : 'Créer'}
                 </button>
               </div>

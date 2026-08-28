@@ -224,7 +224,7 @@ export function GlobalSearch({ onOpenFile, onClose }: GlobalSearchProps) {
 
       {/* Results summary */}
       {query && !loading && (
-        <div className="px-3 pb-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        <div className="px-3 pb-1 text-xs" style={{ color: 'var(--text-muted)' }}>
           {error
             ? <span className="text-red-400">{error}</span>
             : `${totalMatches} résultat${totalMatches !== 1 ? 's' : ''} dans ${groups.length} fichier${groups.length !== 1 ? 's' : ''}`
@@ -250,7 +250,7 @@ export function GlobalSearch({ onOpenFile, onClose }: GlobalSearchProps) {
                 {group.file.split('/').pop()}
               </span>
               <span
-                className="rounded-full px-1.5 py-0.5 text-[10px]"
+                className="rounded-full px-1.5 py-0.5 text-sm"
                 style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}
               >
                 {group.matches.length}
@@ -266,7 +266,7 @@ export function GlobalSearch({ onOpenFile, onClose }: GlobalSearchProps) {
                 onClick={() => onOpenFile(match.file, match.line, match.column)}
               >
                 <span
-                  className="mt-0.5 shrink-0 w-7 text-right text-[11px]"
+                  className="mt-0.5 shrink-0 w-7 text-right text-xs"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   {match.line}

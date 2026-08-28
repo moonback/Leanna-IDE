@@ -174,7 +174,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
     return (
       <div className="flex items-center justify-center gap-2 py-10" style={{ color: 'var(--text-dimmed)' }}>
         <Loader2 size={14} className="animate-spin" />
-        <span className="text-[11px]">Chargement…</span>
+        <span className="text-xs">Chargement…</span>
       </div>
     );
   }
@@ -206,7 +206,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
               {status?.active ? 'Sandbox actif' : 'Sandbox inactif'}
             </span>
             {status?.active && <ShieldCheck size={12} style={{ color: 'var(--color-success)' }} />}
@@ -222,7 +222,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                 transition={spring}
-                className="text-[11px]"
+                className="text-xs"
                 style={{ color: 'var(--text-muted)' }}
               >
                 {status?.modifiedCount ?? 0} modification{(status?.modifiedCount ?? 0) > 1 ? 's' : ''}
@@ -306,20 +306,20 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                     if (e.key === 'Enter') handleDeactivate();
                     if (e.key === 'Escape') { setShowCodeInput(false); setSecurityCode(''); }
                   }}
-                  className="flex-1 bg-transparent outline-none text-[11px] font-mono tracking-[0.25em] text-center"
+                  className="flex-1 bg-transparent outline-none text-xs font-mono tracking-[0.25em] text-center"
                   style={{ color: 'var(--text-primary)' }}
                 />
                 <button
                   onClick={handleDeactivate}
                   disabled={securityCode.length !== 6}
-                  className="text-[9px] font-bold px-2 py-1 rounded transition-opacity disabled:opacity-30"
+                  className="text-xs font-bold px-2 py-1 rounded transition-opacity disabled:opacity-30"
                   style={{ color: 'var(--color-warning)' }}
                 >
                   OK
                 </button>
                 <button
                   onClick={() => { setShowCodeInput(false); setSecurityCode(''); }}
-                  className="text-[9px] px-1 py-0.5 rounded hover:bg-white/10"
+                  className="text-xs px-1 py-0.5 rounded hover:bg-white/10"
                   style={{ color: 'var(--text-dimmed)' }}
                 >
                   ✕
@@ -348,20 +348,20 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                     if (e.key === 'Enter') handleReset();
                     if (e.key === 'Escape') { setShowResetCodeInput(false); setResetCode(''); }
                   }}
-                  className="flex-1 bg-transparent outline-none text-[11px] font-mono tracking-[0.25em] text-center"
+                  className="flex-1 bg-transparent outline-none text-xs font-mono tracking-[0.25em] text-center"
                   style={{ color: 'var(--text-primary)' }}
                 />
                 <button
                   onClick={handleReset}
                   disabled={resetCode.length !== 6}
-                  className="text-[9px] font-bold px-2 py-1 rounded transition-opacity disabled:opacity-30"
+                  className="text-xs font-bold px-2 py-1 rounded transition-opacity disabled:opacity-30"
                   style={{ color: 'var(--color-warning)' }}
                 >
                   OK
                 </button>
                 <button
                   onClick={() => { setShowResetCodeInput(false); setResetCode(''); }}
-                  className="text-[9px] px-1 py-0.5 rounded hover:bg-white/10"
+                  className="text-xs px-1 py-0.5 rounded hover:bg-white/10"
                   style={{ color: 'var(--text-dimmed)' }}
                 >
                   ✕
@@ -394,7 +394,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             <button
               type="button"
               onClick={() => setShowAdvancedActions(value => !value)}
-              className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[11px] font-medium transition-colors hover:bg-white/5"
+              className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-xs font-medium transition-colors hover:bg-white/5"
               style={{ color: 'var(--text-muted)' }}
               aria-expanded={showAdvancedActions}
             >
@@ -462,11 +462,11 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             className="flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-white/5"
             aria-expanded={showModifiedFiles}
           >
-            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
               Fichiers modifiés
             </span>
             <span className="flex items-center gap-2">
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-input)' }}>
+              <span className="text-sm font-mono px-1.5 py-0.5 rounded" style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-input)' }}>
                 {status.modifiedFiles.length}
               </span>
               <ChevronDown size={13} style={{ color: 'var(--text-dimmed)', transform: showModifiedFiles ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .15s' }} />
@@ -494,7 +494,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                   style={{ borderLeft: '2px solid transparent' }}
                 >
                   <Icon size={11} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-                  <span className="text-[10px] font-mono truncate flex-1 transition-colors group-hover:text-[var(--text-primary)]" style={{ color: 'var(--text-secondary)' }}>
+                  <span className="text-sm font-mono truncate flex-1 transition-colors group-hover:text-[var(--text-primary)]" style={{ color: 'var(--text-secondary)' }}>
                     {f}
                   </span>
                 </button>
@@ -510,7 +510,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
 
       {/* ═══ Last sync ═══ */}
       {status?.lastSync && (
-        <p className="text-[9px] text-center mt-1" style={{ color: 'var(--text-dimmed)' }}>
+        <p className="text-xs text-center mt-1" style={{ color: 'var(--text-dimmed)' }}>
           Sync : {new Date(status.lastSync).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
         </p>
       )}
@@ -523,7 +523,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={spring}
-            className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-[10px] font-medium"
+            className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium"
             style={{
               backgroundColor: feedback.type === 'success'
                 ? 'color-mix(in srgb, var(--color-success) 8%, transparent)'
@@ -588,7 +588,7 @@ function ActionRow({ icon, label, color, onClick, busy, tooltip, highlight, tran
       >
         {busy ? <Loader2 size={11} className="animate-spin" /> : icon}
       </div>
-      <span className="text-[11px] font-medium transition-colors group-hover:text-[var(--text-primary)]" style={{ color: 'var(--text-secondary)' }}>
+      <span className="text-xs font-medium transition-colors group-hover:text-[var(--text-primary)]" style={{ color: 'var(--text-secondary)' }}>
         {label}
       </span>
     </motion.button>

@@ -18,22 +18,22 @@ interface AgentRoleMeta {
 
 const AGENT_ROLES: AgentRoleMeta[] = [
   // Code & Ingénierie logicielle
-  { id: 'coder',       label: 'Développeur',     desc: 'Écriture et modification de code typé',       icon: Code2,        color: '#38bdf8', category: 'code' },
-  { id: 'refactor',    label: 'Refactorisation', desc: 'Clean code, architecture & modularité',        icon: Sparkles,     color: '#818cf8', category: 'code' },
-  { id: 'debugger',    label: 'Débogueur',       desc: 'Diagnostic de bugs & patches chirurgicaux',     icon: Bug,          color: '#f87171', category: 'code' },
-  { id: 'reviewer',    label: 'Revue de Code',   desc: 'Audit qualité, détection d\'anti-patterns',    icon: CheckCheck,   color: '#34d399', category: 'code' },
-  { id: 'tester',      label: 'QA & Tests',      desc: 'Création & exécution de tests automatisés',    icon: FlaskConical, color: '#fb923c', category: 'code' },
-  { id: 'security',    label: 'Sécurité & Audit',desc: 'Détection failles OWASP, fuites de secrets',   icon: ShieldAlert,  color: '#e879f9', category: 'code' },
-  { id: 'architect',   label: 'Architecte',      desc: 'Conception système, interfaces & modèles',    icon: Network,      color: '#2dd4bf', category: 'code' },
+  { id: 'coder',       label: 'Développeur',     desc: 'Écriture et modification de code typé',       icon: Code2,        color: 'var(--accent-primary)', category: 'code' },
+  { id: 'refactor',    label: 'Refactorisation', desc: 'Clean code, architecture & modularité',        icon: Sparkles,     color: 'var(--color-accent-alt)', category: 'code' },
+  { id: 'debugger',    label: 'Débogueur',       desc: 'Diagnostic de bugs & patches chirurgicaux',     icon: Bug,          color: 'var(--color-error)', category: 'code' },
+  { id: 'reviewer',    label: 'Revue de Code',   desc: 'Audit qualité, détection d\'anti-patterns',    icon: CheckCheck,   color: 'var(--color-success)', category: 'code' },
+  { id: 'tester',      label: 'QA & Tests',      desc: 'Création & exécution de tests automatisés',    icon: FlaskConical, color: 'var(--color-warning)', category: 'code' },
+  { id: 'security',    label: 'Sécurité & Audit',desc: 'Détection failles OWASP, fuites de secrets',   icon: ShieldAlert,  color: 'var(--color-accent-alt)', category: 'code' },
+  { id: 'architect',   label: 'Architecte',      desc: 'Conception système, interfaces & modèles',    icon: Network,      color: 'var(--color-info)', category: 'code' },
 
   // Rédaction & Documentation
-  { id: 'writer',      label: 'Rédacteur',       desc: 'Rédaction de documents & articles',            icon: PenTool,      color: '#60a5fa', category: 'docs' },
-  { id: 'formatter',   label: 'Mise en Forme',   desc: 'Formatage & structure Markdown',               icon: AlignLeft,    color: '#4ade80', category: 'docs' },
-  { id: 'researcher',  label: 'Recherche',       desc: 'Collecte & synthèse d\'informations',          icon: Search,       color: '#a78bfa', category: 'docs' },
-  { id: 'proofreader', label: 'Correcteur',      desc: 'Orthographe, grammaire & style',               icon: SpellCheck,   color: '#fbbf24', category: 'docs' },
-  { id: 'translator',  label: 'Traducteur',      desc: 'Traduction & localisation multilingue',        icon: Languages,    color: '#f472b6', category: 'docs' },
-  { id: 'summarizer',  label: 'Synthèse',        desc: 'Résumés & condensés exécutifs',                icon: FileText,     color: '#f97316', category: 'docs' },
-  { id: 'planner',     label: 'Planificateur',   desc: 'Plans & outlines de documents',                icon: ListTree,     color: '#14b8a6', category: 'docs' },
+  { id: 'writer',      label: 'Rédacteur',       desc: 'Rédaction de documents & articles',            icon: PenTool,      color: 'var(--accent-primary)', category: 'docs' },
+  { id: 'formatter',   label: 'Mise en Forme',   desc: 'Formatage & structure Markdown',               icon: AlignLeft,    color: 'var(--color-success)', category: 'docs' },
+  { id: 'researcher',  label: 'Recherche',       desc: 'Collecte & synthèse d\'informations',          icon: Search,       color: 'var(--color-accent-alt)', category: 'docs' },
+  { id: 'proofreader', label: 'Correcteur',      desc: 'Orthographe, grammaire & style',               icon: SpellCheck,   color: 'var(--color-warning)', category: 'docs' },
+  { id: 'translator',  label: 'Traducteur',      desc: 'Traduction & localisation multilingue',        icon: Languages,    color: 'var(--color-error)', category: 'docs' },
+  { id: 'summarizer',  label: 'Synthèse',        desc: 'Résumés & condensés exécutifs',                icon: FileText,     color: 'var(--color-warning)', category: 'docs' },
+  { id: 'planner',     label: 'Planificateur',   desc: 'Plans & outlines de documents',                icon: ListTree,     color: 'var(--color-info)', category: 'docs' },
 ];
 
 export function AgentsSection() {
@@ -98,7 +98,7 @@ export function AgentsSection() {
             <button
               type="button"
               onClick={selectAll}
-              className="rounded-lg px-2.5 py-1 text-[9px] font-semibold transition-all duration-150 hover:scale-105"
+              className="rounded-lg px-2.5 py-1 text-xs font-semibold transition-all duration-150 hover:scale-105"
               style={{
                 backgroundColor: activeCount === totalCount ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
                 color: activeCount === totalCount ? 'var(--accent-primary)' : 'var(--text-muted)',
@@ -110,11 +110,11 @@ export function AgentsSection() {
             <button
               type="button"
               onClick={() => selectCategory('code')}
-              className="rounded-lg px-2.5 py-1 text-[9px] font-semibold transition-all duration-150 hover:scale-105"
+              className="rounded-lg px-2.5 py-1 text-xs font-semibold transition-all duration-150 hover:scale-105"
               style={{
-                backgroundColor: 'color-mix(in srgb, #38bdf8 12%, transparent)',
-                color: '#38bdf8',
-                border: '1px solid color-mix(in srgb, #38bdf8 30%, transparent)',
+                backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+                color: 'var(--accent-primary)',
+                border: '1px solid color-mix(in srgb, var(--accent-primary) 30%, transparent)',
               }}
             >
               + Tous Code ({codeRoles.length})
@@ -122,11 +122,11 @@ export function AgentsSection() {
             <button
               type="button"
               onClick={() => selectCategory('docs')}
-              className="rounded-lg px-2.5 py-1 text-[9px] font-semibold transition-all duration-150 hover:scale-105"
+              className="rounded-lg px-2.5 py-1 text-xs font-semibold transition-all duration-150 hover:scale-105"
               style={{
-                backgroundColor: 'color-mix(in srgb, #60a5fa 12%, transparent)',
-                color: '#60a5fa',
-                border: '1px solid color-mix(in srgb, #60a5fa 30%, transparent)',
+                backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+                color: 'var(--accent-primary)',
+                border: '1px solid color-mix(in srgb, var(--accent-primary) 30%, transparent)',
               }}
             >
               + Tous Rédaction ({docsRoles.length})
@@ -134,16 +134,16 @@ export function AgentsSection() {
             <button
               type="button"
               onClick={selectNone}
-              className="rounded-lg px-2.5 py-1 text-[9px] font-semibold transition-all duration-150 hover:scale-105"
+              className="rounded-lg px-2.5 py-1 text-xs font-semibold transition-all duration-150 hover:scale-105"
               style={{
-                backgroundColor: activeCount === 0 ? 'color-mix(in srgb, #f87171 10%, transparent)' : 'var(--bg-secondary)',
-                color: activeCount === 0 ? '#f87171' : 'var(--text-muted)',
+                backgroundColor: activeCount === 0 ? 'color-mix(in srgb, var(--color-error) 10%, transparent)' : 'var(--bg-secondary)',
+                color: activeCount === 0 ? 'var(--color-error)' : 'var(--text-muted)',
                 border: '1px solid var(--border-base)',
               }}
             >
               Tout désactiver
             </button>
-            <span className="ml-auto text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="ml-auto text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
               {activeCount}/{totalCount}
             </span>
           </div>
@@ -185,13 +185,13 @@ export function AgentsSection() {
 
                   <div className="flex-1 min-w-0">
                     <div
-                      className="text-[11px] font-semibold truncate transition-colors duration-200"
+                      className="text-xs font-semibold truncate transition-colors duration-200"
                       style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}
                     >
                       {role.label}
                     </div>
                     <div
-                      className="text-[9px] truncate leading-tight transition-colors duration-200"
+                      className="text-xs truncate leading-tight transition-colors duration-200"
                       style={{ color: isActive ? 'var(--text-muted)' : 'var(--text-dimmed)' }}
                     >
                       {role.desc}
@@ -247,13 +247,13 @@ export function AgentsSection() {
 
                   <div className="flex-1 min-w-0">
                     <div
-                      className="text-[11px] font-semibold truncate transition-colors duration-200"
+                      className="text-xs font-semibold truncate transition-colors duration-200"
                       style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}
                     >
                       {role.label}
                     </div>
                     <div
-                      className="text-[9px] truncate leading-tight transition-colors duration-200"
+                      className="text-xs truncate leading-tight transition-colors duration-200"
                       style={{ color: isActive ? 'var(--text-muted)' : 'var(--text-dimmed)' }}
                     >
                       {role.desc}
@@ -274,7 +274,7 @@ export function AgentsSection() {
 
           {/* Info hint */}
           <div
-            className="mt-3 rounded-lg p-2.5 text-[9px] leading-relaxed"
+            className="mt-3 rounded-lg p-2.5 text-xs leading-relaxed"
             style={{
               backgroundColor: 'var(--bg-secondary)',
               border: '1px solid var(--border-base)',
@@ -288,14 +288,14 @@ export function AgentsSection() {
 
       {!agents.enabled && (
         <div
-          className="rounded-xl p-3 text-[10px] leading-relaxed"
+          className="rounded-xl p-3 text-sm leading-relaxed"
           style={{
-            backgroundColor: 'color-mix(in srgb, #fbbf24 6%, transparent)',
-            border: '1px solid color-mix(in srgb, #fbbf24 20%, transparent)',
+            backgroundColor: 'color-mix(in srgb, var(--color-warning) 6%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--color-warning) 20%, transparent)',
             color: 'var(--text-secondary)',
           }}
         >
-          <strong style={{ color: '#fbbf24' }}>⚡ Mode Solo actif</strong>
+          <strong style={{ color: 'var(--color-warning)' }}>⚡ Mode Solo actif</strong>
           <br />
           L'assistant peut modifier, créer et supprimer des fichiers directement sans délégation.
           Activez les agents pour un workflow supervisé et collaboratif.

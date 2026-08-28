@@ -200,19 +200,19 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions }: AgentActi
                 style={{ borderBottom: '1px solid var(--border-base)' }}
               >
                 <div className="flex items-center gap-2">
-                  <Target size={11} style={{ color: '#38bdf8' }} />
-                  <span className="text-[10px] font-semibold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>
+                  <Target size={11} style={{ color: 'var(--accent-primary)' }} />
+                  <span className="text-sm font-semibold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>
                     {mission.title}
                   </span>
-                  <span className="text-[9px] font-mono font-bold"
-                    style={{ color: mission.confidence >= 0.7 ? '#4ade80' : mission.confidence >= 0.4 ? '#fbbf24' : '#f87171' }}>
+                  <span className="text-xs font-mono font-bold"
+                    style={{ color: mission.confidence >= 0.7 ? 'var(--color-success)' : mission.confidence >= 0.4 ? 'var(--color-warning)' : 'var(--color-error)' }}>
                     {Math.round(mission.confidence * 100)}%
                   </span>
                 </div>
                 {mission.currentGoal && (
                   <div className="flex items-center gap-1.5 mt-1 ml-5">
                     <Loader2 size={8} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
-                    <span className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>
+                    <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
                       {mission.currentGoal}
                     </span>
                   </div>
@@ -220,13 +220,13 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions }: AgentActi
                 {mission.lastAction && (
                   <div className="flex items-center gap-1.5 mt-0.5 ml-5">
                     <Zap size={8} style={{ color: 'var(--text-dimmed)' }} />
-                    <span className="text-[8px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                       {mission.lastAction}
                     </span>
                     {mission.lastDecision && mission.lastDecision !== 'continue' && (
-                      <span className="text-[8px] font-bold px-1 rounded"
+                      <span className="text-xs font-bold px-1 rounded"
                         style={{
-                          color: mission.lastDecision === 'retry' ? '#fbbf24' : '#f87171',
+                          color: mission.lastDecision === 'retry' ? 'var(--color-warning)' : 'var(--color-error)',
                           backgroundColor: mission.lastDecision === 'retry' ? 'rgba(251,191,36,0.1)' : 'rgba(248,113,113,0.1)',
                         }}>
                         {mission.lastDecision}
@@ -244,12 +244,12 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions }: AgentActi
                 className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-white/5 transition"
                 onClick={onOpenAgents}
               >
-                <Loader2 size={10} className="animate-spin" style={{ color: '#a855f7' }} />
+                <Loader2 size={10} className="animate-spin" style={{ color: 'var(--color-accent-alt)' }} />
                 <div className="flex-1 min-w-0">
-                  <span className="text-[10px] font-medium truncate block" style={{ color: 'var(--text-primary)' }}>
+                  <span className="text-sm font-medium truncate block" style={{ color: 'var(--text-primary)' }}>
                     {agent.agentName}
                   </span>
-                  <span className="text-[9px] truncate block" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs truncate block" style={{ color: 'var(--text-dimmed)' }}>
                     {agent.title}
                   </span>
                 </div>
@@ -281,16 +281,16 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions }: AgentActi
         <div className="flex items-center gap-1.5">
           {activeMissions.length > 0 && (
             <div className="flex items-center gap-1">
-              <Target size={10} style={{ color: '#38bdf8' }} />
-              <span className="text-[9px] font-bold" style={{ color: '#38bdf8' }}>
+              <Target size={10} style={{ color: 'var(--accent-primary)' }} />
+              <span className="text-xs font-bold" style={{ color: 'var(--accent-primary)' }}>
                 {activeMissions.length}
               </span>
             </div>
           )}
           {activeAgents.length > 0 && (
             <div className="flex items-center gap-1">
-              <Bot size={10} style={{ color: '#a855f7' }} />
-              <span className="text-[9px] font-bold" style={{ color: '#a855f7' }}>
+              <Bot size={10} style={{ color: 'var(--color-accent-alt)' }} />
+              <span className="text-xs font-bold" style={{ color: 'var(--color-accent-alt)' }}>
                 {activeAgents.length}
               </span>
             </div>
@@ -299,7 +299,7 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions }: AgentActi
 
         {/* Last event text */}
         {lastEvent && (
-          <span className="text-[9px] max-w-[140px] truncate" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-xs max-w-[140px] truncate" style={{ color: 'var(--text-muted)' }}>
             {lastEvent}
           </span>
         )}

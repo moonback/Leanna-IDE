@@ -57,30 +57,30 @@ interface WorkflowPanelProps {
 
 function statusColor(status?: string | null): string {
   switch (status) {
-    case 'success': return '#22c55e';
-    case 'partial': return '#f59e0b';
-    case 'failed':  return '#ef4444';
-    case 'running': return '#a78bfa';
+    case 'success': return 'var(--color-success)';
+    case 'partial': return 'var(--color-warning)';
+    case 'failed':  return 'var(--color-error)';
+    case 'running': return 'var(--color-accent-alt)';
     default:        return 'var(--text-dimmed)';
   }
 }
 
 function statusIcon(status?: string | null, size = 12) {
   switch (status) {
-    case 'success': return <CheckCircle2 size={size} style={{ color: '#22c55e' }} />;
-    case 'partial': return <AlertTriangle size={size} style={{ color: '#f59e0b' }} />;
-    case 'failed': return <XCircle size={size} style={{ color: '#ef4444' }} />;
-    case 'running': return <Loader2 size={size} className="animate-spin" style={{ color: '#a78bfa' }} />;
+    case 'success': return <CheckCircle2 size={size} style={{ color: 'var(--color-success)' }} />;
+    case 'partial': return <AlertTriangle size={size} style={{ color: 'var(--color-warning)' }} />;
+    case 'failed': return <XCircle size={size} style={{ color: 'var(--color-error)' }} />;
+    case 'running': return <Loader2 size={size} className="animate-spin" style={{ color: 'var(--color-accent-alt)' }} />;
     default: return <Clock size={size} style={{ color: 'var(--text-dimmed)' }} />;
   }
 }
 
 function stepStatusIcon(status: string) {
   switch (status) {
-    case 'success': return <CheckCircle2 size={11} style={{ color: '#22c55e' }} />;
-    case 'running': return <Loader2 size={11} className="animate-spin" style={{ color: '#a78bfa' }} />;
-    case 'failed': return <XCircle size={11} style={{ color: '#ef4444' }} />;
-    case 'skipped': return <SkipForward size={11} style={{ color: '#6b7280' }} />;
+    case 'success': return <CheckCircle2 size={11} style={{ color: 'var(--color-success)' }} />;
+    case 'running': return <Loader2 size={11} className="animate-spin" style={{ color: 'var(--color-accent-alt)' }} />;
+    case 'failed': return <XCircle size={11} style={{ color: 'var(--color-error)' }} />;
+    case 'skipped': return <SkipForward size={11} style={{ color: 'var(--text-muted)' }} />;
     default: return <Clock size={11} style={{ color: 'var(--text-muted)', opacity: 0.4 }} />;
   }
 }
@@ -217,19 +217,19 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
             className="w-6 h-6 rounded-md flex items-center justify-center"
             style={{ backgroundColor: 'rgba(167,139,250,0.1)' }}
           >
-            <WorkflowIcon size={13} style={{ color: '#a78bfa' }} />
+            <WorkflowIcon size={13} style={{ color: 'var(--color-accent-alt)' }} />
           </div>
-          <span className="text-[12px] font-bold" style={{ color: 'var(--text-primary)' }}>
+          <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
             Workflows
           </span>
-          <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full"
+          <span className="text-xs font-medium px-1.5 py-0.5 rounded-full"
             style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-dimmed)' }}>
             {workflows.length}
           </span>
           {runningRuns.length > 0 && (
             <span
-              className="text-[9px] font-bold px-2 py-0.5 rounded-full animate-pulse"
-              style={{ backgroundColor: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}
+              className="text-xs font-bold px-2 py-0.5 rounded-full animate-pulse"
+              style={{ backgroundColor: 'rgba(167,139,250,0.12)', color: 'var(--color-accent-alt)' }}
             >
               {runningRuns.length} actif{runningRuns.length > 1 ? 's' : ''}
             </span>
@@ -263,15 +263,15 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
           {runningRuns.map(run => (
             <div key={run.workflowId} className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2">
-                <Activity size={10} className="animate-pulse" style={{ color: '#a78bfa' }} />
-                <span className="text-[10px] font-bold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
+                <Activity size={10} className="animate-pulse" style={{ color: 'var(--color-accent-alt)' }} />
+                <span className="text-sm font-bold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                   {run.workflowName}
                 </span>
-                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded"
-                  style={{ backgroundColor: 'rgba(167,139,250,0.1)', color: '#a78bfa' }}>
+                <span className="text-xs font-mono px-1.5 py-0.5 rounded"
+                  style={{ backgroundColor: 'rgba(167,139,250,0.1)', color: 'var(--color-accent-alt)' }}>
                   {run.currentStepIndex + 1}/{run.totalSteps}
                 </span>
-                <span className="text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                   {formatElapsed(run.elapsedMs)}
                 </span>
               </div>
@@ -281,7 +281,7 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
                   className="h-full rounded-full relative overflow-hidden"
                   animate={{ width: `${run.progress}%` }}
                   transition={{ duration: 0.3, ease: 'easeOut' }}
-                  style={{ backgroundColor: '#a78bfa' }}
+                  style={{ backgroundColor: 'var(--color-accent-alt)' }}
                 >
                   <motion.div
                     className="absolute inset-0"
@@ -293,7 +293,7 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
               </div>
               {/* Current action */}
               {run.currentStepAction && (
-                <div className="flex items-center gap-1.5 text-[9px]" style={{ color: '#a78bfa' }}>
+                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-accent-alt)' }}>
                   <Zap size={9} />
                   <span className="font-mono truncate">{run.currentStepAction}</span>
                 </div>
@@ -313,12 +313,12 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
           <div className="flex flex-col items-center justify-center py-14 text-center gap-2 px-6">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, rgba(167,139,250,0.1), rgba(99,102,241,0.1))' }}>
-              <GitBranch size={18} style={{ color: '#a78bfa', opacity: 0.7 }} />
+              <GitBranch size={18} style={{ color: 'var(--color-accent-alt)', opacity: 0.7 }} />
             </div>
-            <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
               Aucun workflow configuré
             </p>
-            <p className="text-[9px] leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
               Demande à Jarvis d'en créer un via le chat.<br/>
               Les workflows automatisent des séquences d'actions.
             </p>
@@ -356,14 +356,14 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
                     <span
                       className="w-2 h-2 rounded-full flex-shrink-0"
                       style={{
-                        backgroundColor: wf.enabled ? color : '#6b7280',
+                        backgroundColor: wf.enabled ? color : 'var(--text-muted)',
                         boxShadow: isRunning ? `0 0 6px ${color}` : 'none',
                       }}
                     />
 
                     {/* Name */}
                     <span
-                      className="text-[11px] font-semibold truncate flex-1"
+                      className="text-xs font-semibold truncate flex-1"
                       style={{
                         color: wf.enabled ? 'var(--text-primary)' : 'var(--text-muted)',
                       }}
@@ -373,15 +373,15 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
 
                     {/* Schedule badge */}
                     {wf.schedule && (
-                      <span className="text-[8px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
-                        style={{ backgroundColor: 'rgba(167,139,250,0.08)', color: '#a78bfa' }}>
+                      <span className="text-xs font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+                        style={{ backgroundColor: 'rgba(167,139,250,0.08)', color: 'var(--color-accent-alt)' }}>
                         {wf.schedule}
                       </span>
                     )}
 
                     {/* Run time */}
                     {timeAgo(wf.last_run_at) && (
-                      <span className="text-[8px] flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+                      <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
                         {timeAgo(wf.last_run_at)}
                       </span>
                     )}
@@ -391,7 +391,7 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
                       onClick={(e) => { e.stopPropagation(); runWorkflow(wf.id); }}
                       disabled={isBusy || isRunning}
                       className="p-1 rounded-md transition opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-input)] disabled:opacity-30"
-                      style={{ color: '#22c55e' }}
+                      style={{ color: 'var(--color-success)' }}
                       title="Exécuter maintenant"
                       aria-label={`Exécuter ${wf.name}`}
                     >
@@ -414,14 +414,14 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
                           
                           {/* Description */}
                           {wf.description && (
-                            <p className="text-[9px] leading-relaxed pl-1 py-1.5 px-2.5 rounded-md"
+                            <p className="text-xs leading-relaxed pl-1 py-1.5 px-2.5 rounded-md"
                               style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-primary)' }}>
                               {wf.description}
                             </p>
                           )}
 
                           {/* Status summary bar */}
-                          <div className="flex items-center gap-3 text-[9px] px-1" style={{ color: 'var(--text-dimmed)' }}>
+                          <div className="flex items-center gap-3 text-xs px-1" style={{ color: 'var(--text-dimmed)' }}>
                             <span className="inline-flex items-center gap-1" style={{ color }}>
                               {statusIcon(displayStatus, 10)}
                               <span className="font-semibold">{statusLabel(displayStatus)}</span>
@@ -431,8 +431,8 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
                               {wf.steps.length} étape{wf.steps.length > 1 ? 's' : ''}
                             </span>
                             {!wf.enabled && (
-                              <span className="font-bold uppercase text-[8px] px-1.5 py-0.5 rounded"
-                                style={{ backgroundColor: 'rgba(107,114,128,0.1)', color: '#6b7280' }}>
+                              <span className="font-bold uppercase text-xs px-1.5 py-0.5 rounded"
+                                style={{ backgroundColor: 'rgba(107,114,128,0.1)', color: 'var(--text-muted)' }}>
                                 Pausé
                               </span>
                             )}
@@ -458,8 +458,8 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
                                   {/* Step number or live status */}
                                   {liveStatus ? stepStatusIcon(liveStatus) : (
                                     <span
-                                      className="w-4 h-4 rounded flex items-center justify-center text-[8px] font-bold flex-shrink-0"
-                                      style={{ backgroundColor: 'rgba(167,139,250,0.08)', color: '#a78bfa' }}
+                                      className="w-4 h-4 rounded flex items-center justify-center text-xs font-bold flex-shrink-0"
+                                      style={{ backgroundColor: 'rgba(167,139,250,0.08)', color: 'var(--color-accent-alt)' }}
                                     >
                                       {idx + 1}
                                     </span>
@@ -468,20 +468,20 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
                                   {/* Step label & action */}
                                   <div className="flex-1 min-w-0">
                                     <span
-                                      className="text-[10px] font-medium block truncate"
-                                      style={{ color: isStepActive ? '#a78bfa' : 'var(--text-primary)' }}
+                                      className="text-sm font-medium block truncate"
+                                      style={{ color: isStepActive ? 'var(--color-accent-alt)' : 'var(--text-primary)' }}
                                     >
                                       {step.label || step.action}
                                     </span>
                                     {step.label && (
-                                      <span className="text-[8px] font-mono block truncate"
+                                      <span className="text-xs font-mono block truncate"
                                         style={{ color: 'var(--text-dimmed)' }}>
                                         {step.action}
                                       </span>
                                     )}
                                     {/* Show error if failed */}
                                     {liveStep?.error && (
-                                      <span className="text-[8px] block mt-0.5 truncate" style={{ color: '#ef4444' }}
+                                      <span className="text-xs block mt-0.5 truncate" style={{ color: 'var(--color-error)' }}
                                         title={liveStep.error}>
                                         ⚠ {liveStep.error}
                                       </span>
@@ -490,15 +490,15 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
 
                                   {/* Duration or onError badge */}
                                   {liveStep?.durationMs != null ? (
-                                    <span className="text-[8px] font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+                                    <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
                                       {formatElapsed(liveStep.durationMs)}
                                     </span>
                                   ) : step.onError && step.onError !== 'stop' ? (
                                     <span
-                                      className="text-[7px] px-1.5 py-0.5 rounded font-mono font-bold flex-shrink-0"
+                                      className="text-xs px-1.5 py-0.5 rounded font-mono font-bold flex-shrink-0"
                                       style={{
                                         backgroundColor: step.onError === 'retry' ? 'rgba(245,158,11,0.1)' : 'rgba(107,114,128,0.1)',
-                                        color: step.onError === 'retry' ? '#f59e0b' : '#6b7280',
+                                        color: step.onError === 'retry' ? 'var(--color-warning)' : 'var(--text-muted)',
                                       }}
                                     >
                                       {step.onError}
@@ -514,8 +514,8 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
                             <button
                               onClick={() => runWorkflow(wf.id)}
                               disabled={isBusy || isRunning}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[9px] font-bold transition-colors hover:bg-[var(--bg-input)] disabled:opacity-30"
-                              style={{ color: '#22c55e', border: '1px solid var(--border-base)' }}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-bold transition-colors hover:bg-[var(--bg-input)] disabled:opacity-30"
+                              style={{ color: 'var(--color-success)', border: '1px solid var(--border-base)' }}
                               aria-label={`Exécuter ${wf.name}`}
                             >
                               {isRunning ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />}
@@ -524,7 +524,7 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
                             <button
                               onClick={() => toggleWorkflow(wf.id, !wf.enabled)}
                               disabled={isBusy}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[9px] font-bold transition-colors hover:bg-[var(--bg-input)] disabled:opacity-30"
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-bold transition-colors hover:bg-[var(--bg-input)] disabled:opacity-30"
                               style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
                               aria-label={wf.enabled ? 'Mettre en pause' : 'Reprendre'}
                             >
@@ -534,8 +534,8 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
                             <button
                               onClick={() => deleteWorkflow(wf.id)}
                               disabled={isBusy || isRunning}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[9px] font-bold transition-colors hover:bg-red-500/5 disabled:opacity-30 ml-auto"
-                              style={{ color: '#ef4444', border: '1px solid var(--border-base)' }}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-bold transition-colors hover:bg-red-500/5 disabled:opacity-30 ml-auto"
+                              style={{ color: 'var(--color-error)', border: '1px solid var(--border-base)' }}
                               aria-label={`Supprimer ${wf.name}`}
                             >
                               <Trash2 size={10} />
@@ -560,15 +560,15 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
           backgroundColor: 'var(--bg-base)',
         }}
       >
-        <span className="text-[9px] font-medium" style={{ color: 'var(--text-dimmed)' }}>
+        <span className="text-xs font-medium" style={{ color: 'var(--text-dimmed)' }}>
           {workflows.length} workflow{workflows.length !== 1 ? 's' : ''}
           {workflows.filter(w => w.enabled).length !== workflows.length && (
             <> · {workflows.filter(w => w.enabled).length} actif{workflows.filter(w => w.enabled).length > 1 ? 's' : ''}</>
           )}
         </span>
         {workflows.some(w => w.last_run_status === 'failed') && (
-          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded"
-            style={{ backgroundColor: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>
+          <span className="text-xs font-bold px-1.5 py-0.5 rounded"
+            style={{ backgroundColor: 'rgba(239,68,68,0.08)', color: 'var(--color-error)' }}>
             {workflows.filter(w => w.last_run_status === 'failed').length} en erreur
           </span>
         )}

@@ -24,11 +24,11 @@ export const RESPONSE_STYLES: { id: ResponseStyle; label: string; desc: string }
 ];
 
 export const ACCENTS = [
-  { label: 'Sky',     value: '#0ea5e9' },
-  { label: 'Violet',  value: '#8b5cf6' },
-  { label: 'Emerald', value: '#10b981' },
-  { label: 'Rose',    value: '#f43f5e' },
-  { label: 'Amber',   value: '#f59e0b' },
+  { label: 'Sky',     value: 'var(--color-info)' },
+  { label: 'Violet',  value: 'var(--color-accent-alt)' },
+  { label: 'Emerald', value: 'var(--color-success)' },
+  { label: 'Rose',    value: 'var(--color-error)' },
+  { label: 'Amber',   value: 'var(--color-warning)' },
 ];
 
 /**

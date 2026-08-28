@@ -104,11 +104,11 @@ export function DocumentUpload({ connected, onDocumentAnalyzed }: DocumentUpload
             className="absolute bottom-full left-0 right-0 mb-2 mx-2"
           >
             <div
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px]"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
               style={{
                 backgroundColor: 'rgba(239, 68, 68, 0.1)',
                 border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#f87171',
+                color: 'var(--color-error)',
               }}
             >
               <X size={12} className="flex-shrink-0 cursor-pointer" onClick={() => setError(null)} />
@@ -139,8 +139,8 @@ export function DocumentUpload({ connected, onDocumentAnalyzed }: DocumentUpload
                 className="flex items-center gap-2 px-3 py-2"
                 style={{ borderBottom: '1px solid var(--border-base)' }}
               >
-                <CheckCircle2 size={12} style={{ color: '#34d399' }} />
-                <span className="text-[11px] font-medium flex-1 truncate" style={{ color: 'var(--text-primary)' }}>
+                <CheckCircle2 size={12} style={{ color: 'var(--color-success)' }} />
+                <span className="text-xs font-medium flex-1 truncate" style={{ color: 'var(--text-primary)' }}>
                   {lastResult.fileName}
                 </span>
                 <button
@@ -152,7 +152,7 @@ export function DocumentUpload({ connected, onDocumentAnalyzed }: DocumentUpload
               </div>
               {/* Summary preview */}
               <div className="px-3 py-2 max-h-[120px] overflow-y-auto custom-scrollbar">
-                <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                   {lastResult.summary.slice(0, 400)}
                   {lastResult.summary.length > 400 && '…'}
                 </p>
@@ -163,13 +163,13 @@ export function DocumentUpload({ connected, onDocumentAnalyzed }: DocumentUpload
                 style={{ borderTop: '1px solid var(--border-base)' }}
               >
                 {getFileIcon(lastResult.mimeType)}
-                <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                   {lastResult.extractedTextLength > 0
                     ? `${(lastResult.extractedTextLength / 1000).toFixed(1)}k caractères extraits`
                     : 'Image analysée'
                   }
                 </span>
-                <span className="text-[9px] ml-auto" style={{ color: '#34d399' }}>
+                <span className="text-xs ml-auto" style={{ color: 'var(--color-success)' }}>
                   ✓ {lastResult.provider === 'openrouter' ? 'OpenRouter' : 'Gemini'}
                 </span>
               </div>
@@ -214,10 +214,10 @@ export function DropZoneOverlay({ isDragging }: DropZoneOverlayProps) {
             <Upload size={28} style={{ color: 'var(--accent-primary)' }} />
           </div>
           <div className="text-center">
-            <p className="text-[13px] font-semibold" style={{ color: 'var(--accent-primary)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--accent-primary)' }}>
               Déposez votre fichier
             </p>
-            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
               PDF, image ou texte — analysé par l'IA
             </p>
           </div>

@@ -75,7 +75,7 @@ export function AgentTaskCard({
             <StatusBadge status={status} size="sm" />
             {duration && (
               <span
-                className="text-[10px] font-mono tabular-nums"
+                className="text-sm font-mono tabular-nums"
                 style={{ color: 'var(--text-dimmed)' }}
               >
                 {duration}
@@ -83,7 +83,7 @@ export function AgentTaskCard({
             )}
           </div>
           <p
-            className="text-[12px] font-medium leading-snug line-clamp-2"
+            className="text-sm font-medium leading-snug line-clamp-2"
             style={{ color: 'var(--text-primary)' }}
           >
             {objective}
@@ -112,7 +112,7 @@ export function AgentTaskCard({
               {step.status === 'error' && <AlertCircle size={10} style={{ color: 'var(--color-error)' }} />}
               {step.status === 'pending' && <Clock size={10} style={{ color: 'var(--text-dimmed)' }} />}
               <span
-                className="text-[11px] flex-1 truncate"
+                className="text-xs flex-1 truncate"
                 style={{
                   color: step.status === 'running' ? 'var(--text-primary)' :
                          step.status === 'done' ? 'var(--text-secondary)' :
@@ -123,7 +123,7 @@ export function AgentTaskCard({
                 {step.label}
               </span>
               {step.duration && (
-                <span className="text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                   {step.duration}
                 </span>
               )}
@@ -139,7 +139,7 @@ export function AgentTaskCard({
             {files.slice(0, 5).map((file) => (
               <span
                 key={file}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm font-mono"
                 style={{
                   backgroundColor: 'var(--bg-input)',
                   color: 'var(--text-muted)',
@@ -151,7 +151,7 @@ export function AgentTaskCard({
               </span>
             ))}
             {files.length > 5 && (
-              <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-sm" style={{ color: 'var(--text-dimmed)' }}>
                 +{files.length - 5} fichiers
               </span>
             )}
@@ -162,7 +162,7 @@ export function AgentTaskCard({
       {/* Summary */}
       {summary && (
         <div className="px-4 py-2 border-t" style={{ borderColor: 'var(--border-base)' }}>
-          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
             {summary}
           </p>
         </div>
@@ -178,7 +178,7 @@ export function AgentTaskCard({
             <button
               type="button"
               onClick={onStop}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
               style={{
                 backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)',
                 color: 'var(--color-error)',
@@ -193,7 +193,7 @@ export function AgentTaskCard({
             <button
               type="button"
               onClick={onRetry}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
               style={{
                 backgroundColor: 'var(--accent-subtle)',
                 color: 'var(--accent-primary)',
@@ -208,7 +208,7 @@ export function AgentTaskCard({
             <button
               type="button"
               onClick={onViewDiff}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
               style={{
                 backgroundColor: 'var(--bg-input)',
                 color: 'var(--text-secondary)',

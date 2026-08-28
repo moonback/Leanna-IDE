@@ -77,7 +77,7 @@ export function ImagePreview({ filePath }: Props) {
       <div className="flex-1 flex flex-col items-center justify-center gap-3" style={{ backgroundColor: 'var(--bg-base)' }}>
         <ImageIcon className="w-10 h-10 opacity-30" style={{ color: 'var(--text-dimmed)' }} />
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Impossible de charger l'image</p>
-        <p className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>{error}</p>
+        <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{error}</p>
       </div>
     );
   }
@@ -93,12 +93,12 @@ export function ImagePreview({ filePath }: Props) {
         />
       )}
       <div className="flex items-center gap-3">
-        <p className="text-[10px] font-medium" style={{ color: 'var(--text-dimmed)' }}>
+        <p className="text-sm font-medium" style={{ color: 'var(--text-dimmed)' }}>
           {filePath.split('/').pop()}
         </p>
         <button
           onClick={handleDownload}
-          className="flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-medium transition-all hover:bg-white/5"
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all hover:bg-white/5"
           style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
         >
           <Download className="w-3 h-3" />

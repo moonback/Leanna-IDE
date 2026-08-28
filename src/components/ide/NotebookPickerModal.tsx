@@ -159,9 +159,9 @@ export function NotebookPickerModal({ filePath, fileName, onClose }: NotebookPic
             className="mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs"
             style={{
               backgroundColor: feedback.type === 'success'
-                ? 'color-mix(in srgb, #4ade80 15%, transparent)'
-                : 'color-mix(in srgb, #f87171 15%, transparent)',
-              color: feedback.type === 'success' ? '#4ade80' : '#f87171',
+                ? 'color-mix(in srgb, var(--color-success) 15%, transparent)'
+                : 'color-mix(in srgb, var(--color-error) 15%, transparent)',
+              color: feedback.type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
             }}
           >
             {feedback.type === 'success' ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
@@ -204,14 +204,14 @@ export function NotebookPickerModal({ filePath, fileName, onClose }: NotebookPic
                     <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                       {nb.title}
                     </div>
-                    <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
                       {nb.sourcesCount} source{nb.sourcesCount !== 1 ? 's' : ''}
                       {nb.description ? ` · ${nb.description}` : ''}
                     </div>
                   </div>
                   {isPresent && (
                     <span
-                      className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md flex-shrink-0"
+                      className="flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded-md flex-shrink-0"
                       style={{
                         backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
                         color: 'var(--accent-primary)',
