@@ -23,6 +23,7 @@ import type { TaskRequestPayload } from "./AgentCommunication";
 import { createLogger } from "../utils/logger";
 import { WorkspaceState, type VerificationRecord } from "./WorkspaceState";
 import { AgentRepairLoop } from "./AgentRepairLoop";
+// import { promptCache } from "../utils/promptCache"; // Prêt pour intégration future
 
 const log = createLogger("AgentExecutor");
 
@@ -49,6 +50,10 @@ interface ToolExecutionState {
   /** Authoritative disk observations and hash-bound verification evidence. */
   workspace: WorkspaceState;
   fileSnapshots: Map<string, string>;
+  /** Snapshots des fichiers au tour précédent pour le diff incrémental */
+  previousFileSnapshots: Map<string, string>;
+  /** Fichiers nouvellement lus ou modifiés dans ce tour */
+  newlyTouchedFiles: Set<string>;
 }
 
 // Seuls les appels structurés correspondant à des skills du workspace sont
@@ -93,6 +98,17 @@ export class AgentExecutor {
 
   /** Compteur de tâches en cours par rôle */
   private runningCount: Map<string, number> = new Map();
+  
+  /**
+   * Limite de profondeur maximale pour les délégations (évite les cascades infinies)
+   */
+  private static readonly MAX_DELEGATION_DEPTH = 4;
+  
+  /**
+   * Map pour suivre les chaînes de délégation actives et détecter les cycles
+   * Clé: parentTaskId, Valeur: Set des rôles déjà rencontrés dans cette chaîne
+   */
+  private delegationChains: Map<string, Set<string>> = new Map();
 
   constructor(notifier: ProgressNotifier) {
     this.notifier = notifier;
@@ -259,6 +275,8 @@ export class AgentExecutor {
         return result.content;
       }),
       fileSnapshots: new Map(),
+      previousFileSnapshots: new Map(),
+      newlyTouchedFiles: new Set(),
     };
 
     for (let turn = 0; turn < AgentExecutor.MAX_TOOL_TURNS; turn++) {
@@ -268,6 +286,10 @@ export class AgentExecutor {
       // Si on atteint l'avant-dernier tour, forcer la synthèse après exécution
       const isLastAllowedTurn = turn >= AgentExecutor.MAX_TOOL_TURNS - 2;
 
+      // Sauvegarder l'état précédent pour le diff incrémental
+      const filesBeforeTurn = new Map(state.fileSnapshots);
+      const newlyTouchedBeforeTurn = new Set(state.newlyTouchedFiles);
+
       const observationCountBefore = state.observations.length;
       await this.executeRequestedTools(agent, calls, state);
       const observations = state.observations
@@ -275,20 +297,34 @@ export class AgentExecutor {
         .join("\n")
         .slice(-AgentExecutor.MAX_OBSERVATION_CHARS);
 
-      // Construire le contexte des fichiers lus (workspace state persisté)
-      const fileContextSection = state.fileSnapshots.size > 0
-        ? [
-            "",
-            "## Fichiers en mémoire (état courant autoritaire pour apply_patch)",
-            ...[...state.fileSnapshots.entries()].map(([filePath, content]) => {
-              const truncated = content.length > AgentExecutor.MAX_FILE_CONTEXT_CHARS
-                ? content.slice(0, AgentExecutor.MAX_FILE_CONTEXT_CHARS) + `\n... [tronqué par sécurité — ${content.split("\n").length} lignes au total. Relis la section manquante avec read_project_file(full:true) ou startLine/endLine]`
-                : content;
-              return `### ${filePath}\n\`\`\`\n${truncated}\n\`\`\``;
-            }),
-            "",
-          ].join("\n")
-        : "";
+      // Identifier les fichiers nouvellement lus ou modifiés dans ce tour
+      const currentFiles = new Set([...state.filesRead, ...state.filesModified]);
+      const newlyTouchedThisTurn = new Set(
+        [...currentFiles].filter(f => 
+          !newlyTouchedBeforeTurn.has(f) || 
+          (state.fileSnapshots.get(f) !== filesBeforeTurn.get(f))
+        )
+      );
+      
+      // Mettre à jour les fichiers nouvellement touchés
+      newlyTouchedThisTurn.forEach(f => state.newlyTouchedFiles.add(f));
+
+      // Construire le contexte des fichiers lus avec DIFF INCréMENTAL
+      // Seul les fichiers NOUVELLEMENT lus ou MODIFIÉS sont envoyés en entier
+      // Les autres sont juste référencés avec leur hash pour vérification
+      const fileContextSection = this.buildIncrementalFileContext(
+        state.fileSnapshots,
+        newlyTouchedThisTurn
+      );
+
+      // Log pour le suivi des optimisations
+      if (turn > 0 && newlyTouchedThisTurn.size > 0) {
+        const totalFiles = state.fileSnapshots.size;
+        const savings = totalFiles - newlyTouchedThisTurn.size;
+        if (savings > 0) {
+          log.info(`[${agent.name}] Tour ${turn + 1}: Optimisation diff incrémental - ${newlyTouchedThisTurn.size}/${totalFiles} fichiers envoyés en entier (économie: ~${savings} fichiers)`);
+        }
+      }
 
       // ── Compter les lectures répétées sans écriture ──────────────────────
       const readsSinceWrite = state.filesRead.length - state.filesModified.length;
@@ -387,6 +423,83 @@ export class AgentExecutor {
       try { return JSON.parse(raw); } catch { /* not valid JSON */ }
     }
     return {};
+  }
+
+  /**
+   * Construit le contexte des fichiers avec diff incrémental.
+   * Seuls les fichiers nouvellement lus ou modifiés sont envoyés en entier.
+   * Les autres sont référencés avec leur hash SHA-256 pour vérification.
+   */
+  private buildIncrementalFileContext(
+    currentSnapshots: Map<string, string>,
+    newlyTouchedFiles: Set<string>
+  ): string {
+    if (currentSnapshots.size === 0) {
+      return "";
+    }
+
+    const parts: string[] = [
+      "",
+      "## Fichiers en mémoire (état courant autoritaire pour apply_patch)",
+    ];
+
+    // Fichiers nouvellement lus ou modifiés - envoyer le contenu complet
+    const newOrModifiedFiles: string[] = [];
+    newlyTouchedFiles.forEach(filePath => {
+      const content = currentSnapshots.get(filePath);
+      if (content) {
+        const truncated = content.length > AgentExecutor.MAX_FILE_CONTEXT_CHARS
+          ? content.slice(0, AgentExecutor.MAX_FILE_CONTEXT_CHARS) + `
+... [tronqué par sécurité — ${content.split("\n").length} lignes au total. Relis la section manquante avec read_project_file(full:true) ou startLine/endLine]`
+          : content;
+        newOrModifiedFiles.push(`### ${filePath} (NOUVEAU/MODIFIÉ)
+\`\`\`
+${truncated}
+\`\`\``);
+      }
+    });
+
+    // Fichiers existants mais non modifiés - juste référencer avec hash
+    const unchangedFiles: string[] = [];
+    currentSnapshots.forEach((content, filePath) => {
+      if (!newlyTouchedFiles.has(filePath)) {
+        const hash = this.computeContentHash(content);
+        unchangedFiles.push(`### ${filePath} (inchangé - SHA-256: ${hash.slice(0, 16)}...)`);
+      }
+    });
+
+    if (newOrModifiedFiles.length > 0) {
+      parts.push("### Fichiers nouvellement lus ou modifiés :");
+      parts.push(...newOrModifiedFiles);
+    }
+
+    if (unchangedFiles.length > 0) {
+      parts.push("");
+      parts.push("### Fichiers inchangés (référence par hash) :");
+      parts.push(...unchangedFiles);
+    }
+
+    parts.push("");
+    
+    // Ajouter une note explicative pour le modèle
+    if (unchangedFiles.length > 0 && newlyTouchedFiles.size > 0) {
+      parts.push(
+        `✨ **Optimisation active** : Seuls les fichiers modifiés sont inclus en entier. ` +
+        `Les fichiers inchangés sont référencés par leur hash. ` +
+        `Utilise read_project_file pour relire un fichier spécifique si nécessaire.`
+      );
+      parts.push("");
+    }
+
+    return parts.join("\n");
+  }
+
+  /**
+   * Calcul un hash simple pour le contenu (pour référence)
+   */
+  private computeContentHash(content: string): string {
+    const { createHash } = require('crypto');
+    return createHash('sha256').update(content).digest('hex');
   }
 
   /** Parse un objet JSON en respectant les accolades imbriquées. */
@@ -733,7 +846,8 @@ export class AgentExecutor {
    */
   private async dispatchDelegations(
     parentTask: AgentTask,
-    resultText: string
+    resultText: string,
+    depth: number = 0
   ): Promise<string[]> {
     const { delegations, warnings } = this.delegationParser.parse(
       resultText,
@@ -749,14 +863,15 @@ export class AgentExecutor {
 
     const agent = getAgentDefinition(parentTask.role);
     log.info(
-      `🔀 [${agent.name}] ${delegations.length} délégation(s) détectée(s) — dispatch en cours...`
+      `🔀 [${agent.name}] ${delegations.length} délégation(s) détectée(s) à profondeur ${depth} — dispatch en cours...`
     );
 
     const subTaskIds: string[] = [];
+    const nextDepth = depth + 1;
 
     // Lancer toutes les délégations en parallèle (fire-and-forget)
     const dispatches = delegations.map((delegation) =>
-      this.sendDelegation(parentTask, delegation).then((taskId) => {
+      this.sendDelegation(parentTask, delegation, nextDepth).then((taskId) => {
         if (taskId) subTaskIds.push(taskId);
       })
     );
@@ -764,7 +879,7 @@ export class AgentExecutor {
     await Promise.allSettled(dispatches);
 
     log.info(
-      `[${agent.name}] ${subTaskIds.length}/${delegations.length} délégation(s) envoyée(s) sur le bus`
+      `[${agent.name}] ${subTaskIds.length}/${delegations.length} délégation(s) envoyée(s) sur le bus (profondeur: ${nextDepth})`
     );
 
     return subTaskIds;
@@ -773,13 +888,40 @@ export class AgentExecutor {
   /**
    * Envoie une délégation unique sur le bus de messages.
    * Retourne l'ID de la sous-tâche créée, ou null en cas d'erreur.
+   * 
+   * Implémente :
+   * - Détection de cycle : empêche A -> B -> A
+   * - Limite de profondeur : max 4 niveaux de délégation
    */
   private async sendDelegation(
     parentTask: AgentTask,
-    delegation: ParsedDelegation
+    delegation: ParsedDelegation,
+    depth: number = 0
   ): Promise<string | null> {
     const taskId = randomUUID();
     const agent = getAgentDefinition(parentTask.role);
+    
+    // Vérifier la limite de profondeur
+    if (depth >= AgentExecutor.MAX_DELEGATION_DEPTH) {
+      log.warn(
+        `[${agent.name}] Délégation rejetée : profondeur maximale atteinte (${AgentExecutor.MAX_DELEGATION_DEPTH}) - ` +
+        `chaîne: ${this.formatDelegationChain(parentTask.id)}`
+      );
+      return null;
+    }
+    
+    // Vérifier les cycles dans la chaîne de délégation
+    const chain = this.getDelegationChain(parentTask.id);
+    if (chain.has(delegation.targetRole)) {
+      log.warn(
+        `[${agent.name}] Délégation rejetée : cycle détecté - ${delegation.targetRole} est déjà dans la chaîne: ` +
+        `${Array.from(chain).join(' -> ')} -> ${delegation.targetRole}`
+      );
+      return null;
+    }
+    
+    // Enregistrer cette délégation dans la chaîne
+    this.addToDelegationChain(parentTask.id, delegation.targetRole);
 
     // Construire une description enrichie avec le contexte du parent
     const description = [
@@ -835,7 +977,43 @@ export class AgentExecutor {
         `[${agent.name}] Échec envoi délégation → [${delegation.targetRole}]: ${(err as Error).message}`
       );
       return null;
+    } finally {
+      // Nettoyer la chaîne après l'envoi (succès ou échec)
+      // La chaîne sera recréée si une nouvelle délégation part de cette tâche
+      this.delegationChains.delete(parentTask.id);
     }
+  }
+
+  /**
+   * Récupère la chaîne de délégation pour une tâche
+   */
+  private getDelegationChain(taskId: string): Set<string> {
+    let chain = this.delegationChains.get(taskId);
+    if (!chain) {
+      chain = new Set<string>();
+      this.delegationChains.set(taskId, chain);
+    }
+    return chain;
+  }
+
+  /**
+   * Ajoute un rôle à la chaîne de délégation
+   */
+  private addToDelegationChain(taskId: string, role: string): void {
+    let chain = this.delegationChains.get(taskId);
+    if (!chain) {
+      chain = new Set<string>();
+      this.delegationChains.set(taskId, chain);
+    }
+    chain.add(role);
+  }
+
+  /**
+   * Formate la chaîne de délégation pour le log
+   */
+  private formatDelegationChain(taskId: string): string {
+    const chain = this.delegationChains.get(taskId);
+    return chain ? Array.from(chain).join(' -> ') : taskId;
   }
 
   /**

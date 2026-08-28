@@ -181,54 +181,166 @@ export interface MemoryItem {
   content: string;
   created_at?: string;
   relevance?: number;
+  category?: string; // Catégorie de la mémoire (stack, architecture, convention, decision, etc.)
 }
 
-export function optimizeMemories(memories: MemoryItem[], budgetTokens: number): MemoryItem[] {
+// Catégories critiques qui doivent être préservées même si longues
+const CRITICAL_CATEGORIES = new Set(['architecture', 'decision', 'convention', 'security']);
+
+// Score minimum pour les catégories critiques - même avec une longueur élevée
+const CRITICAL_CATEGORY_MIN_SCORE = 50;
+
+/**
+ * Calcul le score d'une mémoire avec pondération améliorée
+ */
+function calculateMemoryScore(
+  memory: MemoryItem,
+  index: number,
+  totalMemories: number
+): number {
+  const lengthTokens = estimateTokens(memory.content);
+  
+  // 1. Récence (plus récent = plus important)
+  const recencyScore = (totalMemories - index) * 3;
+  
+  // 2. Pertinence explicite
+  const relevanceBonus = (memory.relevance ?? 1) * 15;
+  
+  // 3. Pénalisation de longueur - plus douce pour éviter d'éliminer les mémoires longues importantes
+  // Utiliser un facteur logarithmique plutôt que linéaire
+  const lengthPenalty = lengthTokens > 200 
+    ? Math.log10(lengthTokens) * 3 
+    : (lengthTokens > 100 ? Math.log10(lengthTokens) * 2 : 0);
+  
+  // 4. Bonus pour les catégories critiques
+  const categoryBonus = memory.category && CRITICAL_CATEGORIES.has(memory.category) 
+    ? 25 + (lengthTokens / 10) // Bonus proportionnel à la longueur pour les catégories critiques
+    : 0;
+  
+  // 5. Bonus pour les mémoires moyennes (100-500 tokens) - meilleur ratio info/tokens
+  const mediumSizeBonus = lengthTokens >= 100 && lengthTokens <= 500 ? 10 : 0;
+
+  const score = recencyScore + relevanceBonus - lengthPenalty + mediumSizeBonus + categoryBonus;
+  
+  // Score minimum pour les catégories critiques
+  if (memory.category && CRITICAL_CATEGORIES.has(memory.category)) {
+    return Math.max(score, CRITICAL_CATEGORY_MIN_SCORE);
+  }
+  
+  return score;
+}
+
+/**
+ * Optimise les mémoires avec un système de scoring amélioré
+ * 
+ * Améliorations vs version précédente :
+ * 1. Budget proportionnel au contexte total du modèle (via getProportionalMemoryBudget)
+ * 2. Score minimum pour les catégories critiques (architecture, decision, etc.)
+ * 3. Pénalisation de longueur plus douce (logarithmique)
+ * 4. Bonus pour les mémoires de taille moyenne (meilleur ratio info/tokens)
+ * 5. Meilleure pondération de la pertinence
+ */
+export function optimizeMemories(
+  memories: MemoryItem[], 
+  budgetTokens: number,
+  options: { model?: string; totalContextTokens?: number } = {}
+): MemoryItem[] {
   if (!memories.length) {
     logInfo('optimizeMemories: aucune mémoire à optimiser');
     return [];
   }
 
-  // Stratégie de score améliorée :
-  // 1. Récence (index inverse)
-  // 2. Pénalité de longueur : on favorise les mémoires plus courtes pour en garder plus
-  // 3. Score de pertinence explicite (si disponible)
-  const scored = memories.map((m, i) => {
-    const lengthTokens = estimateTokens(m.content);
-    const recencyScore = (memories.length - i) * 2;
-    // Pénalisation douce pour les très longues mémoires
-    const lengthPenalty = lengthTokens > 100 ? Math.log10(lengthTokens) * 5 : 0;
-    const relevanceBonus = (m.relevance ?? 1) * 10;
+  // Calculer un budget proportionnel si le contexte total est fourni
+  const effectiveBudget = getProportionalMemoryBudget(budgetTokens, options);
 
-    return {
-      ...m,
-      score: recencyScore + relevanceBonus - lengthPenalty + Math.max(0, 30 - lengthTokens / 10),
-    };
-  });
+  // Trier par score (meilleures mémoires en premier)
+  const scored = memories.map((m, i) => ({
+    ...m,
+    score: calculateMemoryScore(m, i, memories.length),
+  }));
 
   scored.sort((a, b) => b.score - a.score);
 
   const result: MemoryItem[] = [];
+  const skipped: MemoryItem[] = [];
   let usedTokens = 0;
 
+  // Première passe : essayer de garder toutes les mémoires
   for (const memory of scored) {
     const tokens = estimateTokens(memory.content);
-    if (usedTokens + tokens > budgetTokens) {
-      logInfo(`optimizeMemories: budget atteint, skip mémoire (${tokens} tokens)`, { usedTokens, budgetTokens });
-      break;
+    if (usedTokens + tokens <= effectiveBudget) {
+      result.push(memory);
+      usedTokens += tokens;
+    } else {
+      skipped.push(memory);
     }
-    result.push(memory);
-    usedTokens += tokens;
+  }
+
+  // Si on a dépassé le budget, essayer d'ajouter les mémoires critiques qui n'ont pas passé
+  if (skipped.length > 0 && result.length < scored.length) {
+    const criticalSkipped = skipped.filter(m => 
+      m.category && CRITICAL_CATEGORIES.has(m.category)
+    );
+    
+    for (const criticalMemory of criticalSkipped) {
+      const tokens = estimateTokens(criticalMemory.content);
+      if (usedTokens + tokens <= effectiveBudget) {
+        result.push(criticalMemory);
+        usedTokens += tokens;
+        // Retirer de skipped
+        const idx = skipped.indexOf(criticalMemory);
+        if (idx > -1) skipped.splice(idx, 1);
+      }
+    }
   }
 
   logSuccess('optimizeMemories: terminé', {
     kept: result.length,
-    dropped: memories.length - result.length,
+    dropped: skipped.length,
     tokensUsed: usedTokens,
-    budgetTokens,
+    budgetTokens: effectiveBudget,
+    criticalPreserved: result.filter(m => m.category && CRITICAL_CATEGORIES.has(m.category)).length,
   });
 
   return result;
+}
+
+/**
+ * Calcul un budget mémoire proportionnel au contexte total du modèle
+ * 
+ * Au lieu d'un budget fixe de 2-3k tokens, on utilise une proportion du contexte total.
+ * Par défaut : 10% du contexte total, avec un minimum de 2k et un maximum de 10k tokens.
+ */
+function getProportionalMemoryBudget(
+  baseBudget: number,
+  options: { model?: string; totalContextTokens?: number }
+): number {
+  const { model, totalContextTokens } = options;
+  
+  // Si on a le contexte total, calculer un budget proportionnel
+  if (totalContextTokens) {
+    // Utiliser 10-15% du contexte total pour la mémoire
+    const proportion = model?.includes('gemini') || model?.includes('claude') ? 0.15 : 0.10;
+    const proportionalBudget = Math.floor(totalContextTokens * proportion);
+    
+    // Appliquer des limites raisonnables
+    const minBudget = baseBudget; // 2k-3k selon le modèle
+    const maxBudget = Math.min(10_000, totalContextTokens * 0.2); // Max 10k ou 20% du contexte
+    
+    return Math.max(minBudget, Math.min(proportionalBudget, maxBudget));
+  }
+  
+  // Sinon, retourner le budget de base
+  return baseBudget;
+}
+
+/**
+ * Récupère le budget mémoire recommandé pour un modèle donné
+ * utile pour afficher dans les logs ou pour les tests
+ */
+export function getRecommendedMemoryBudget(model: string, totalContextTokens?: number): number {
+  const baseBudget = MODEL_BUDGETS[model]?.memory ?? 3_000;
+  return getProportionalMemoryBudget(baseBudget, { model, totalContextTokens });
 }
 
 export function formatMemoryContext(memories: MemoryItem[], budgetTokens: number): string {
@@ -260,7 +372,7 @@ export async function summarizeWithLLM(
   const {
     apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_FREE_API_KEY || '',
     model = 'openai/gpt-4o-mini',
-    baseUrl = 'https://openrouter.ai/api/v1',
+    // baseUrl = 'https://openrouter.ai/api/v1', // Pas utilisé actuellement, sera utilisé par generateText
   } = options;
 
   logInfo('summarizeWithLLM: début', { messageCount: messages.length, model, hasApiKey: !!apiKey });
