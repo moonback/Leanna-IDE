@@ -1,8 +1,8 @@
 # Jarvis OS
 
-<p align="center">
+<!-- <p align="center">
   <img src="assets/images/header.png" alt="Jarvis OS" width="100%" />
-</p>
+</p> -->
 
 <h1 align="center">Jarvis OS</h1>
 
