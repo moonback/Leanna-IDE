@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback, useState, memo, forwardRef, useI
 import { X, Terminal, Maximize, Minimize, Plus, ChevronDown, ChevronLeft, ChevronRight, Search, Trash2, Pencil, Copy, Check, AlertCircle, Server, Command } from 'lucide-react';
 import { useTerminal } from '../../hooks/useTerminal';
 import { motion, AnimatePresence } from 'motion/react';
+import { ideApi } from '../../services/ideApi';
 
 interface TerminalPanelProps {
   onClose: () => void;
@@ -323,9 +324,11 @@ interface TerminalTabPanelProps {
   onRename: (newTitle: string) => void;
   cwd: string;
   onRegisterRef?: (tabId: string, ref: { executeCommand: (cmd: string) => void; clear: () => void; focus: () => void } | null) => void;
+  onOpenBrowser?: (url: string) => void;
+  devServerPort?: number;
 }
 
-const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive, onSendInput, onClear, onRename, cwd, onRegisterRef }) => {
+const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive, onSendInput, onClear, onRename, cwd, onRegisterRef, onOpenBrowser, devServerPort }) => {
   const [state, actions] = useTerminal(120, 40);
   const { isConnected, output, error, isConnecting } = state;
   const { sendInput, close: closeConnection, clear: clearTerminal } = actions;
@@ -341,6 +344,52 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive,
   const outputEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Détecter le port du serveur dev à partir du package.json
+  const detectDevPort = useCallback(async (): Promise<number> => {
+    if (!cwd) return devServerPort ?? 5173;
+    
+    try {
+      const packageJsonPath = `${cwd}/package.json`;
+      const content = await ideApi.readFile(packageJsonPath);
+      const pkg = JSON.parse(content);
+      
+      // Vérifier les scripts pour un port personnalisé
+      const devScript = pkg.scripts?.dev || pkg.scripts?.['npm run dev'] || pkg.scripts?.start || '';
+      
+      // Extraire le port de la commande (ex: "vite dev --port 5173" ou "next dev -p 3000")
+      const portMatch = devScript.match(/--port\s+(\d+)|-p\s+(\d+)/);
+      if (portMatch) {
+        return Number(portMatch[1] || portMatch[2]);
+      }
+      
+      // Ports par défaut selon le framework
+      if (devScript.includes('vite') || devScript.includes('vite-dev-server')) {
+        return 5173;
+      }
+      if (devScript.includes('next') || devScript.includes('next dev')) {
+        return 3000;
+      }
+      if (devScript.includes('react-scripts') || devScript.includes('start')) {
+        return 3000;
+      }
+      
+      return devServerPort ?? 5173;
+    } catch {
+      // Si package.json n'existe pas ou ne peut pas être lu, utiliser le port par défaut
+      return devServerPort ?? 5173;
+    }
+  }, [cwd, devServerPort]);
+
+  // Ouvrir le navigateur avec le port détecté
+  const openDevServerBrowser = useCallback(async (command: string) => {
+    const trimmed = command.trim().toLowerCase();
+    const serverCommands = ['npm run dev', 'npm start', 'npm run serve', 'npm run preview'];
+    if (serverCommands.some(cmd => trimmed.includes(cmd)) && onOpenBrowser) {
+      const port = await detectDevPort();
+      setTimeout(() => onOpenBrowser(`http://localhost:${port}`), 2000);
+    }
+  }, [onOpenBrowser, detectDevPort]);
+
   // Exposer les méthodes pour ce tab
   const executeCommandRef = useCallback((command: string) => {
     if (isConnected && isActive) {
@@ -348,9 +397,11 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive,
       if (trimmed) {
         sendInput(trimmed);
         onSendInput(trimmed);
+        // Détecter et ouvrir le navigateur pour les commandes serveur
+        openDevServerBrowser(trimmed);
       }
     }
-  }, [isConnected, isActive, sendInput, onSendInput]);
+  }, [isConnected, isActive, sendInput, onSendInput, openDevServerBrowser]);
 
   const clearRef = useCallback(() => {
     clearTerminal();
@@ -410,9 +461,11 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive,
         onSendInput(trimmed);
         setHistory(prev => [...prev, trimmed]);
         setHistoryIndex(-1);
+        // Détecter et ouvrir le navigateur pour les commandes serveur
+        openDevServerBrowser(trimmed);
       }
     }
-  }, [isConnected, isActive, sendInput, onSendInput]);
+  }, [isConnected, isActive, sendInput, onSendInput, openDevServerBrowser]);
 
   const handleClearTerminal = useCallback(() => {
     clearTerminal();
@@ -959,12 +1012,8 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
   }, []);
 
   const handleCommandSent = useCallback((command: string) => {
-    const trimmed = command.trim().toLowerCase();
-    const serverCommands = ['npm run dev', 'npm start', 'npm run serve', 'npm run preview'];
-    if (serverCommands.some(cmd => trimmed.includes(cmd)) && onOpenBrowser) {
-      const port = devServerPort ?? 5173;
-      setTimeout(() => onOpenBrowser(`http://localhost:${port}`), 2000);
-    }
+    // La détection du port et l'ouverture du navigateur est gérée dans TerminalTabPanel
+    // qui a accès au cwd du projet
 
     // Ajouter à l'historique des commandes favorites
     setFavoriteCommands(prev => {
@@ -989,7 +1038,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
         return [newCommand, ...prev].slice(0, 20); // Garder max 20 commandes
       }
     });
-  }, [onOpenBrowser, devServerPort]);
+  }, []);
 
   const removeFromFavorites = useCallback((id: string) => {
     setFavoriteCommands(prev => prev.filter(c => c.id !== id));
@@ -1632,6 +1681,8 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
               onRename={(newTitle) => renameTab(tab.id, newTitle)}
               cwd={tab.cwd}
               onRegisterRef={handleRegisterRef}
+              onOpenBrowser={onOpenBrowser}
+              devServerPort={devServerPort}
             />
           ))}
         </div>
