@@ -133,6 +133,7 @@ export type SandboxStatus = {
   status: 'success' | 'error';
   sandbox?: {
     active: boolean;
+    path?: string;
     root?: string;
   };
 };

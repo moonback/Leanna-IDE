@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useCallback, useState, memo, forwardRef, useImperativeHandle } from 'react';
-import { X, Terminal, Maximize, Minimize, Plus, ChevronDown, ChevronLeft, ChevronRight, Search, Trash2, Pencil, Copy, Check, AlertCircle, Server, Command } from 'lucide-react';
+import { X, Terminal, Maximize, Minimize, Plus, ChevronDown, ChevronLeft, ChevronRight, Search, Trash2, Pencil, Copy, Check, AlertCircle, Server, Command, Folder, Box } from 'lucide-react';
 import { useTerminal } from '../../hooks/useTerminal';
 import { motion, AnimatePresence } from 'motion/react';
 import { ideApi } from '../../services/ideApi';
+import { sandboxApi } from '../../services/sandboxApi';
+
+type ExecutionMode = 'workspace' | 'sandbox';
 
 interface TerminalPanelProps {
   onClose: () => void;
@@ -432,6 +435,25 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive,
       closeConnection();
     }
   }, [isActive, closeConnection]);
+
+  // Envoyer cd vers le bon répertoire quand le terminal se connecte
+  const cdSentRef = useRef(false);
+  
+  // Réinitialiser cdSentRef quand cwd change
+  useEffect(() => {
+    cdSentRef.current = false;
+  }, [cwd]);
+  
+  useEffect(() => {
+    if (isConnected && isActive && cwd && !cdSentRef.current) {
+      cdSentRef.current = true;
+      // Utiliser cd avec le chemin absolu
+      const escapedCwd = cwd.replace(/\\/g, '/');
+      setTimeout(() => {
+        sendInput(`cd "${escapedCwd}"`);
+      }, 500); // Petit délai pour laisser le temps au terminal de s'initialiser
+    }
+  }, [isConnected, isActive, cwd, sendInput]);
 
   useEffect(() => {
     if (isActive && isConnected && inputRef.current) {
@@ -890,10 +912,13 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
   const [isMinimized, setIsMinimized] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showShellSelector, setShowShellSelector] = useState(false);
+  const [showExecutionModeSelector, setShowExecutionModeSelector] = useState(false);
   const [favoriteCommands, setFavoriteCommands] = useState<FavoriteCommand[]>(loadFavoriteCommands());
   const [searchMatches, setSearchMatches] = useState<number[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
   const [showSearch, setShowSearch] = useState(false);
+  const [executionMode, setExecutionMode] = useState<ExecutionMode>('workspace');
+  const [sandboxPath, setSandboxPath] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const tabContainerRef = useRef<HTMLDivElement>(null);
@@ -903,6 +928,35 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
   useEffect(() => {
     saveFavoriteCommands(favoriteCommands);
   }, [favoriteCommands]);
+
+  // Récupérer le chemin du sandbox
+  useEffect(() => {
+    const fetchSandboxPath = async () => {
+      try {
+        const status = await sandboxApi.getStatus(true);
+        if (status.sandbox?.active && (status.sandbox?.path || status.sandbox?.root)) {
+          setSandboxPath(status.sandbox.path || status.sandbox.root || null);
+        } else {
+          setSandboxPath(null);
+        }
+      } catch {
+        setSandboxPath(null);
+      }
+    };
+    fetchSandboxPath();
+
+    // Rafraîchir quand le sandbox change
+    const handleSandboxChange = () => {
+      fetchSandboxPath();
+    };
+    window.addEventListener('jarvis-sandbox-changed', handleSandboxChange);
+    window.addEventListener('jarvis-sandbox-file-changed', handleSandboxChange);
+    
+    return () => {
+      window.removeEventListener('jarvis-sandbox-changed', handleSandboxChange);
+      window.removeEventListener('jarvis-sandbox-file-changed', handleSandboxChange);
+    };
+  }, []);
 
   // Gérer le scroll horizontal des onglets avec la molette
   useEffect(() => {
@@ -920,11 +974,20 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
     return () => tabContainer.removeEventListener('wheel', handleWheel);
   }, []);
 
+  // Obtenir le cwd actuel selon le mode d'exécution
+  const getCurrentCwd = useCallback((): string => {
+    if (executionMode === 'sandbox' && sandboxPath) {
+      return sandboxPath;
+    }
+    return initialCwd ?? '';
+  }, [executionMode, sandboxPath, initialCwd]);
+
   const addTab = useCallback(() => {
     const newId = String(Date.now());
-    setTabs(prev => [...prev, { id: newId, title: `Terminal ${prev.length + 1}`, shell: 'PowerShell', cwd: initialCwd ?? '' }]);
+    const cwd = getCurrentCwd();
+    setTabs(prev => [...prev, { id: newId, title: `Terminal ${prev.length + 1}`, shell: 'PowerShell', cwd }]);
     setActiveTabId(newId);
-  }, [tabs.length, initialCwd]);
+  }, [tabs.length, getCurrentCwd]);
 
   const closeTab = useCallback((tabId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -935,6 +998,16 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
       setActiveTabId(newTabs[0]?.id || '1');
     }
   }, [tabs, activeTabId]);
+
+  // Changer le mode d'exécution et mettre à jour le cwd des onglets
+  const handleExecutionModeChange = useCallback((mode: ExecutionMode) => {
+    setExecutionMode(mode);
+    setShowExecutionModeSelector(false);
+    
+    // Mettre à jour le cwd de tous les onglets
+    const newCwd = mode === 'sandbox' && sandboxPath ? sandboxPath : initialCwd ?? '';
+    setTabs(prev => prev.map(tab => ({ ...tab, cwd: newCwd })));
+  }, [sandboxPath, initialCwd]);
 
   // Exposer les méthodes publiques via la ref
   useImperativeHandle(ref, () => ({
@@ -1176,7 +1249,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <Terminal size={16} style={{ color: 'var(--accent-primary)' }} />
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-primary)' }}>
-            Terminal{isMinimized && ' (minimisé)'}
+            Terminal{isMinimized ? ' (minimisé)' : sandboxPath ? ` (${executionMode === 'sandbox' ? 'Sandbox' : 'Workspace'})` : ''}
           </span>
         </div>
 
@@ -1388,6 +1461,104 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
             </AnimatePresence>
           </div>
 
+          {/* Sélecteur de mode d'exécution (Workspace/Sandbox) */}
+          {sandboxPath && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => !isMinimized && setShowExecutionModeSelector(!showExecutionModeSelector)}
+                title={`Mode d'exécution: ${executionMode === 'workspace' ? 'Workspace réel' : 'Sandbox'}`}
+                style={{
+                  padding: 'var(--space-1)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: executionMode === 'workspace' ? 'var(--text-muted)' : 'var(--color-success)',
+                  cursor: isMinimized ? 'default' : 'pointer',
+                  borderRadius: 'var(--radius-sm)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: isMinimized ? 0.5 : 1,
+                }}
+                onMouseEnter={e => {
+                  if (!isMinimized) (e.target as HTMLButtonElement).style.color = 'var(--text-primary)';
+                }}
+                onMouseLeave={e => {
+                  if (!isMinimized) (e.target as HTMLButtonElement).style.color = executionMode === 'workspace' ? 'var(--text-muted)' : 'var(--color-success)';
+                }}
+              >
+                {executionMode === 'workspace' ? <Folder size={14} /> : <Box size={14} />}
+                <ChevronDown size={10} />
+              </button>
+              <AnimatePresence>
+                {showExecutionModeSelector && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      zIndex: 200,
+                      minWidth: '160px',
+                      backgroundColor: 'var(--bg-panel)',
+                      border: '1px solid var(--border-base)',
+                      borderRadius: 'var(--radius-md)',
+                      boxShadow: 'var(--shadow-lg)',
+                      padding: 'var(--space-1)',
+                    }}
+                  >
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {[
+                        { value: 'workspace' as ExecutionMode, label: 'Workspace réel', icon: <Folder size={14} /> },
+                        { value: 'sandbox' as ExecutionMode, label: 'Sandbox', icon: <Box size={14} /> },
+                      ].map((mode, i) => {
+                        const isActive = executionMode === mode.value;
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => handleExecutionModeChange(mode.value)}
+                            style={{
+                              width: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--space-2)',
+                              padding: 'var(--space-2) var(--space-3)',
+                              border: 'none',
+                              background: isActive ? 'var(--bg-hover)' : 'transparent',
+                              color: 'var(--text-primary)',
+                              cursor: 'pointer',
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: 'var(--text-sm)',
+                              textAlign: 'left',
+                            }}
+                            onMouseEnter={e => {
+                              if (!isActive) {
+                                (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)';
+                              }
+                            }}
+                            onMouseLeave={e => {
+                              if (!isActive) {
+                                (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+                              }
+                            }}
+                            title={mode.label}
+                          >
+                            {mode.icon}
+                            <span>{mode.label}</span>
+                            {isActive && (
+                              <span style={{ marginLeft: 'auto', color: 'var(--color-success)' }}>✓</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
           {/* Bouton commandes */}
           <div style={{ position: 'relative' }}>
             <button
@@ -1480,7 +1651,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
                             <code style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
                               {cmd.command}
                             </code>
-                            <button
+                            <div
                               onClick={(e) => {
                                 e.stopPropagation();
                                 removeFromFavorites(cmd.id);
@@ -1494,11 +1665,20 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
                                 cursor: 'pointer',
                                 marginLeft: 'auto',
                               }}
-                              onMouseEnter={e2 => (e2.target as HTMLButtonElement).style.color = 'var(--color-error)'}
-                              onMouseLeave={e2 => (e2.target as HTMLButtonElement).style.color = 'var(--text-muted)'}
+                              onMouseEnter={e2 => (e2.target as HTMLDivElement).style.color = 'var(--color-error)'}
+                              onMouseLeave={e2 => (e2.target as HTMLDivElement).style.color = 'var(--text-muted)'}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  removeFromFavorites(cmd.id);
+                                }
+                              }}
                             >
                               <X size={12} />
-                            </button>
+                            </div>
                           </button>
                         ))}
                       </div>
