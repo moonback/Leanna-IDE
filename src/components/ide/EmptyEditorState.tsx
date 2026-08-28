@@ -270,7 +270,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          opacity: 0.22,
+          opacity: 0.8,
         }}
       />
       <div
