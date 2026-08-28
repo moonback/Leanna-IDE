@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
-import { X, Terminal, Play, Maximize, Minimize, Plus } from 'lucide-react';
+import { X, Terminal, Play, Maximize, Minimize, Plus, Settings, ChevronDown } from 'lucide-react';
 import { useTerminal } from '../../hooks/useTerminal';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -19,6 +19,114 @@ interface TerminalTab {
   cwd: string;
 }
 
+// Thèmes de couleurs pour le terminal
+interface TerminalTheme {
+  name: string;
+  background: string;
+  text: string;
+  primary: string;
+  secondary: string;
+  accent: string;
+  error: string;
+  success: string;
+  warning: string;
+  info: string;
+  cursor: string;
+  selection: string;
+  ansi: Record<string, string>;
+}
+
+// Thèmes disponibles
+const TERMINAL_THEMES: TerminalTheme[] = [
+  {
+    name: 'Dracula',
+    background: '#282a36',
+    text: '#f8f8f2',
+    primary: '#bd93f9',
+    secondary: '#44475a',
+    accent: '#ff79c6',
+    error: '#ff5555',
+    success: '#50fa7b',
+    warning: '#ffb86c',
+    info: '#8be9fd',
+    cursor: '#ffffff',
+    selection: 'rgba(255, 255, 255, 0.2)',
+    ansi: {
+      '0': '#282a36', '1': '#ff5555', '2': '#50fa7b', '3': '#ffb86c',
+      '4': '#8be9fd', '5': '#bd93f9', '6': '#8be9fd', '7': '#f8f8f2',
+      '8': '#44475a', '9': '#ff5555', '10': '#50fa7b', '11': '#ffb86c',
+      '12': '#8be9fd', '13': '#bd93f9', '14': '#50fa7b', '15': '#ffffff',
+    },
+  },
+  {
+    name: 'One Dark',
+    background: '#282c34',
+    text: '#abb2bf',
+    primary: '#61afef',
+    secondary: '#3e4451',
+    accent: '#c678dd',
+    error: '#e06c75',
+    success: '#98c379',
+    warning: '#d19a66',
+    info: '#569cd6',
+    cursor: '#ffffff',
+    selection: 'rgba(255, 255, 255, 0.2)',
+    ansi: {
+      '0': '#282c34', '1': '#e06c75', '2': '#98c379', '3': '#d19a66',
+      '4': '#569cd6', '5': '#c678dd', '6': '#61afef', '7': '#abb2bf',
+      '8': '#3e4451', '9': '#e06c75', '10': '#98c379', '11': '#d19a66',
+      '12': '#569cd6', '13': '#c678dd', '14': '#d4a77a', '15': '#ffffff',
+    },
+  },
+  {
+    name: 'Solarized Dark',
+    background: '#002b36',
+    text: '#839496',
+    primary: '#268bd2',
+    secondary: '#073642',
+    accent: '#dc322f',
+    error: '#dc322f',
+    success: '#859900',
+    warning: '#b58900',
+    info: '#268bd2',
+    cursor: '#ffffff',
+    selection: 'rgba(255, 255, 255, 0.2)',
+    ansi: {
+      '0': '#002b36', '1': '#dc322f', '2': '#859900', '3': '#b58900',
+      '4': '#268bd2', '5': '#d33682', '6': '#2aa198', '7': '#839496',
+      '8': '#073642', '9': '#dc322f', '10': '#859900', '11': '#b58900',
+      '12': '#268bd2', '13': '#d33682', '14': '#586e75', '15': '#fdf6e3',
+    },
+  },
+  {
+    name: 'Monokai',
+    background: '#272822',
+    text: '#f8f8f2',
+    primary: '#f92672',
+    secondary: '#3e3d32',
+    accent: '#a6e22e',
+    error: '#f92672',
+    success: '#a6e22e',
+    warning: '#e6db74',
+    info: '#66d9ef',
+    cursor: '#ffffff',
+    selection: 'rgba(255, 255, 255, 0.2)',
+    ansi: {
+      '0': '#272822', '1': '#f92672', '2': '#a6e22e', '3': '#e6db74',
+      '4': '#66d9ef', '5': '#ae81ff', '6': '#66d9ef', '7': '#f8f8f2',
+      '8': '#3e3d32', '9': '#f92672', '10': '#a6e22e', '11': '#e6db74',
+      '12': '#66d9ef', '13': '#ae81ff', '14': '#f4bf75', '15': '#ffffff',
+    },
+  },
+];
+
+// Options de shell
+const SHELL_OPTIONS = [
+  { value: 'PowerShell', label: 'PowerShell', command: 'pwsh.exe' },
+  { value: 'cmd', label: 'CMD', command: 'cmd.exe' },
+  { value: 'Git Bash', label: 'Git Bash', command: 'C:\\Program Files\\Git\\bin\\bash.exe' },
+];
+
 // Commandes personnalisées par défaut
 const DEFAULT_CUSTOM_COMMANDS = [
   { name: 'npm run dev', command: 'npm run dev', description: 'Démarrer le serveur de développement' },
@@ -30,19 +138,30 @@ const DEFAULT_CUSTOM_COMMANDS = [
   { name: 'clear', command: 'clear', description: 'Effacer le terminal' },
 ];
 
-// Formattage des couleurs ANSI
-function formatAnsiText(text: string): React.ReactNode {
-  const ansiColors: Record<string, string> = {
-    '30': '#000000', '31': '#ff5555', '32': '#50fa7b', '33': '#ffb86c',
-    '34': '#8be9fd', '35': '#ff79c6', '36': '#89ddff', '37': '#ffffff',
-    '90': '#4d4d4d', '91': '#ff6b81', '92': '#51cf66', '93': '#ffd43b',
-    '94': '#6b6bff', '95': '#ff6bcb', '96': '#6bffff',
+// Formattage des couleurs ANSI avec thème personnalisé
+function formatAnsiText(text: string, theme?: TerminalTheme): React.ReactNode {
+  // Couleurs ANSI par défaut (Dracula-like)
+  const defaultAnsiColors: Record<string, string> = {
+    '0': '#282a36', '1': '#ff5555', '2': '#50fa7b', '3': '#ffb86c',
+    '4': '#8be9fd', '5': '#bd93f9', '6': '#8be9fd', '7': '#f8f8f2',
+    '8': '#44475a', '9': '#ff5555', '10': '#50fa7b', '11': '#ffb86c',
+    '12': '#8be9fd', '13': '#bd93f9', '14': '#50fa7b', '15': '#ffffff',
+    '30': '#282a36', '31': '#ff5555', '32': '#50fa7b', '33': '#ffb86c',
+    '34': '#8be9fd', '35': '#bd93f9', '36': '#8be9fd', '37': '#f8f8f2',
+    '90': '#44475a', '91': '#ff5555', '92': '#50fa7b', '93': '#ffb86c',
+    '94': '#8be9fd', '95': '#bd93f9', '96': '#6bffff',
   };
+  
+  const ansiColors = theme?.ansi || defaultAnsiColors;
+  
   const styles: Record<string, React.CSSProperties> = {
     '1': { fontWeight: 'bold' },
     '2': { fontWeight: 'lighter' },
     '3': { fontStyle: 'italic' },
     '4': { textDecoration: 'underline' },
+    '5': { textDecoration: 'line-through' },
+    '7': { backgroundColor: theme?.selection || 'rgba(255, 255, 255, 0.2)' },
+    '8': { visibility: 'hidden' },
   };
 
   const parts = text.split(/(\x1b\[[0-9;]*m)/);
@@ -56,8 +175,12 @@ function formatAnsiText(text: string): React.ReactNode {
       const codes = code.split(';');
       for (const c of codes) {
         if (c === '0') { currentStyle = {}; }
-        else if (ansiColors[c]) { currentStyle.color = ansiColors[c]; }
-        else if (styles[c]) { currentStyle = { ...currentStyle, ...styles[c] }; }
+        else if (ansiColors[c]) { 
+          currentStyle.color = ansiColors[c]; 
+        }
+        else if (styles[c]) { 
+          currentStyle = { ...currentStyle, ...styles[c] }; 
+        }
       }
     } else if (part) {
       elements.push(Object.keys(currentStyle).length > 0 ? 
@@ -72,9 +195,10 @@ interface TerminalTabPanelProps {
   tab: TerminalTab;
   isActive: boolean;
   onSendInput: (input: string) => void;
+  theme?: TerminalTheme;
 }
 
-const TerminalTabPanel: React.FC<TerminalTabPanelProps> = ({ tab, isActive, onSendInput }) => {
+const TerminalTabPanel: React.FC<TerminalTabPanelProps> = ({ tab, isActive, onSendInput, theme }) => {
   // Seule la connexion WebSocket est établie quand l'onglet est actif
   const [state, actions] = useTerminal(120, 40);
   const { isConnected, output, error, isConnecting } = state;
@@ -85,6 +209,9 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = ({ tab, isActive, onSe
   const [historyIndex, setHistoryIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const outputEndRef = useRef<HTMLDivElement>(null);
+  
+  // Thème par défaut (Dracula)
+  const currentTheme = theme || TERMINAL_THEMES[0];
   
   // Fermer la connexion quand l'onglet devient inactif
   useEffect(() => {
@@ -143,45 +270,53 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = ({ tab, isActive, onSe
   if (!isActive) return null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--bg-input)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: currentTheme.background, borderRadius: '8px' }}>
       <div 
-        style={{ flex: 1, overflowY: 'auto', padding: '16px', fontFamily: 'Consolas, Monaco, \'Courier New\', monospace',
-          fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap', wordBreak: 'break-word', 
-          color: 'var(--text-primary)', userSelect: 'text' }}
+        style={{ flex: 1, overflowY: 'auto', padding: '20px', fontFamily: '"Cascadia Code PL", "Fira Code", Consolas, Monaco, \'Courier New\', monospace',
+          fontSize: '15px', lineHeight: '1.8', whiteSpace: 'pre-wrap', wordBreak: 'break-word', 
+          color: currentTheme.text, userSelect: 'text', fontWeight: 400 }}
         onCopy={(e) => {
           e.stopPropagation();
         }}
       >
         {output === '' && !isConnecting && !isConnected ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
-            {isConnecting ? 'Connecting to terminal...' : 'Terminal ready. Type a command and press Enter.'}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: currentTheme.secondary, fontStyle: 'italic' }}>
+            {isConnecting ? 'Connexion au terminal...' : 'Terminal prêt. Tapez une commande et appuyez sur Entrée.'}
           </div>
         ) : lines.map((line, index) => (
-          <div key={index} style={{ minHeight: '1.6em' }}>{formatAnsiText(line)}</div>
+          <div key={index} style={{ minHeight: '1.8em' }}>{formatAnsiText(line, currentTheme)}</div>
         ))}
-        {error && <div style={{ color: '#ff6b6b', marginTop: '8px', padding: '8px', backgroundColor: 'rgba(220, 53, 69, 0.1)',
-          borderRadius: '4px', fontSize: '13px', fontFamily: 'Consolas, Monaco, \'Courier New\', monospace' }}>
-          Error: {error}
+        {error && <div style={{ color: currentTheme.error, marginTop: '8px', padding: '12px', backgroundColor: 'rgba(255, 85, 85, 0.15)',
+          borderRadius: '6px', fontSize: '14px', fontFamily: '"Cascadia Code PL", Consolas, Monaco, \'Courier New\', monospace',
+          borderLeft: `4px solid ${currentTheme.error}` }}>
+          ⚠ Erreur: {error}
         </div>}
         <div ref={outputEndRef} />
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', backgroundColor: 'var(--bg-secondary)',
-        borderTop: '1px solid var(--border-base)' }}>
-        <span style={{ color: 'var(--accent-primary)', fontFamily: 'Consolas, Monaco, \'Courier New\', monospace',
-          fontSize: '14px', marginRight: '10px' }}>
-          {tab.title}$
+      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 20px', backgroundColor: currentTheme.secondary,
+        borderTop: `1px solid ${currentTheme.secondary}` }}>
+        <span style={{ color: currentTheme.accent, fontFamily: '"Cascadia Code PL", "Fira Code", Consolas, Monaco, \'Courier New\', monospace',
+          fontSize: '15px', marginRight: '12px', fontWeight: 600 }}>
+          {tab.title} 
+          {isConnected ? (
+            <span style={{ color: currentTheme.success }}>●</span>
+          ) : isConnecting ? (
+            <span style={{ color: currentTheme.warning }}>○</span>
+          ) : (
+            <span style={{ color: currentTheme.error }}>●</span>
+          )}
         </span>
         <input ref={inputRef} type="text" value={inputValue} onChange={e => setInputValue(e.target.value)}
           onKeyDown={handleInputKeyDown} disabled={!isConnected || isConnecting}
-          placeholder={!isConnected ? 'Connecting...' : 'Type a command...'}
-          style={{ flex: 1, border: 'none', background: 'transparent', fontFamily: 'Consolas, Monaco, \'Courier New\', monospace',
-            fontSize: '14px', color: 'var(--text-primary)', outline: 'none' }} />
+          placeholder={!isConnected ? 'Connexion...' : 'Tapez une commande...'}
+          style={{ flex: 1, border: 'none', background: 'transparent', fontFamily: '"Cascadia Code PL", "Fira Code", Consolas, Monaco, \'Courier New\', monospace',
+            fontSize: '15px', color: currentTheme.text, outline: 'none', caretColor: currentTheme.cursor }} />
         {inputValue && <button onClick={() => { setInputValue(''); setHistoryIndex(-1); }}
-          title="Clear input" style={{ padding: '6px', border: 'none', background: 'transparent', color: 'var(--text-muted)',
-            cursor: 'pointer', borderRadius: '4px' }}
-          onMouseEnter={e => (e.target as HTMLButtonElement).style.color = 'var(--text-primary)'}
-          onMouseLeave={e => (e.target as HTMLButtonElement).style.color = 'var(--text-muted)'}>
+          title="Effacer l'entrée" style={{ padding: '6px', border: 'none', background: 'transparent', color: currentTheme.text,
+            cursor: 'pointer', borderRadius: '4px', opacity: 0.7 }}
+          onMouseEnter={e => (e.target as HTMLButtonElement).style.opacity = '1'}
+          onMouseLeave={e => (e.target as HTMLButtonElement).style.opacity = '0.7'}>
           <X size={16} />
         </button>}
       </div>
@@ -195,6 +330,9 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
   const [activeTabId, setActiveTabId] = useState<string>('1');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState<TerminalTheme>(TERMINAL_THEMES[0]);
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [showShellSelector, setShowShellSelector] = useState(false);
 
   const addTab = useCallback(() => {
     const newId = String(tabs.length + 1);
@@ -209,6 +347,22 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
   }, [tabs, activeTabId]);
 
   const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);
+
+  const handleThemeChange = useCallback((theme: TerminalTheme) => {
+    setSelectedTheme(theme);
+    setShowThemeSelector(false);
+  }, []);
+
+  const handleShellChange = useCallback((shell: string) => {
+    setTabs(prev => prev.map(tab => 
+      activeTabId === tab.id ? { ...tab, shell } : tab
+    ));
+    setShowShellSelector(false);
+  }, [activeTabId]);
+
+  const getActiveTab = useCallback(() => {
+    return tabs.find(tab => tab.id === activeTabId);
+  }, [tabs, activeTabId]);
 
   const handleCommandSent = useCallback((command: string) => {
     const trimmed = command.trim().toLowerCase();
@@ -308,11 +462,89 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* Sélecteur de thème */}
           <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowCommandPalette(!showCommandPalette)} title="Commands"
+            <button onClick={() => setShowThemeSelector(!showThemeSelector)} title="Thèmes"
               style={{ padding: '4px', border: 'none', background: 'transparent', color: 'var(--text-muted)',
                 cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              onMouseEnter={e => (e.target as HTMLButtonElement).style.color = 'var(--text-primary)'}
+              onMouseEnter={e => (e.target as HTMLButtonElement).style.color = selectedTheme.primary}
+              onMouseLeave={e => (e.target as HTMLButtonElement).style.color = 'var(--text-muted)'}>
+              <div style={{ width: '14px', height: '14px', backgroundColor: selectedTheme.accent, borderRadius: '4px', border: '2px solid currentColor' }} />
+            </button>
+            <AnimatePresence>
+              {showThemeSelector && (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+                  style={{ position: 'absolute', top: '100%', right: 0, zIndex: 200, minWidth: '180px',
+                    backgroundColor: selectedTheme.background, border: `1px solid ${selectedTheme.secondary}`,
+                    borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', padding: '6px' }}>
+                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    {TERMINAL_THEMES.map((theme, i) => (
+                      <button key={i} onClick={() => handleThemeChange(theme)}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
+                          border: 'none', background: 'transparent', color: selectedTheme.text, cursor: 'pointer',
+                          borderRadius: '6px', fontSize: '12px', textAlign: 'left' }}
+                        onMouseEnter={e => (e.target as HTMLButtonElement).style.backgroundColor = selectedTheme.secondary}
+                        onMouseLeave={e => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
+                        title={theme.name}>
+                        <div style={{ width: '12px', height: '12px', backgroundColor: theme.accent, borderRadius: '3px' }} />
+                        <span style={{ fontSize: '11px' }}>{theme.name}</span>
+                        {selectedTheme.name === theme.name && (
+                          <span style={{ marginLeft: 'auto', color: theme.success }}>✓</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Sélecteur de shell */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowShellSelector(!showShellSelector)} title="Shell"
+              style={{ padding: '4px', border: 'none', background: 'transparent', color: 'var(--text-muted)',
+                cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onMouseEnter={e => (e.target as HTMLButtonElement).style.color = selectedTheme.primary}
+              onMouseLeave={e => (e.target as HTMLButtonElement).style.color = 'var(--text-muted)'}>
+              <Terminal size={12} />
+              <ChevronDown size={10} />
+            </button>
+            <AnimatePresence>
+              {showShellSelector && (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+                  style={{ position: 'absolute', top: '100%', right: 0, zIndex: 200, minWidth: '160px',
+                    backgroundColor: selectedTheme.background, border: `1px solid ${selectedTheme.secondary}`,
+                    borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', padding: '6px' }}>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    {SHELL_OPTIONS.map((shell, i) => {
+                      const activeShell = getActiveTab()?.shell || 'PowerShell';
+                      const isActive = activeShell === shell.value;
+                      return (
+                        <button key={i} onClick={() => handleShellChange(shell.value)}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
+                            border: 'none', background: 'transparent', color: selectedTheme.text, cursor: 'pointer',
+                            borderRadius: '6px', fontSize: '12px', textAlign: 'left' }}
+                          onMouseEnter={e => (e.target as HTMLButtonElement).style.backgroundColor = selectedTheme.secondary}
+                          onMouseLeave={e => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
+                          title={shell.label}>
+                          <span style={{ fontSize: '11px' }}>{shell.label}</span>
+                          {isActive && (
+                            <span style={{ marginLeft: 'auto', color: selectedTheme.success }}>✓</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowCommandPalette(!showCommandPalette)} title="Commandes"
+              style={{ padding: '4px', border: 'none', background: 'transparent', color: 'var(--text-muted)',
+                cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onMouseEnter={e => (e.target as HTMLButtonElement).style.color = selectedTheme.primary}
               onMouseLeave={e => (e.target as HTMLButtonElement).style.color = 'var(--text-muted)'}>
               <Play size={12} />
             </button>
@@ -372,7 +604,7 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
       {/* Tab Content */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         {tabs.map(tab => <TerminalTabPanel key={tab.id} tab={tab} isActive={activeTabId === tab.id}
-          onSendInput={handleCommandSent} />)}
+          onSendInput={handleCommandSent} theme={selectedTheme} />)}
       </div>
 
       {isFullscreen && (
