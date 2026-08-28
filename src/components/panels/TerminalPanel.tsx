@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
-import { X, Terminal, Play, Maximize, Minimize, Plus, Settings, ChevronDown } from 'lucide-react';
+import React, { useEffect, useRef, useCallback, useState, memo } from 'react';
+import { X, Terminal, Play, Maximize, Minimize, Plus, Settings, ChevronDown, ChevronLeft, ChevronRight, Search, Trash2, Pencil, Copy, Check, AlertCircle, Loader2, Server, Folder, Command } from 'lucide-react';
 import { useTerminal } from '../../hooks/useTerminal';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -19,106 +19,15 @@ interface TerminalTab {
   cwd: string;
 }
 
-// Thèmes de couleurs pour le terminal
-interface TerminalTheme {
+// Commande favorite
+interface FavoriteCommand {
+  id: string;
   name: string;
-  background: string;
-  text: string;
-  primary: string;
-  secondary: string;
-  accent: string;
-  error: string;
-  success: string;
-  warning: string;
-  info: string;
-  cursor: string;
-  selection: string;
-  ansi: Record<string, string>;
+  command: string;
+  description: string;
+  createdAt: number;
+  usageCount: number;
 }
-
-// Thèmes disponibles
-const TERMINAL_THEMES: TerminalTheme[] = [
-  {
-    name: 'Dracula',
-    background: '#282a36',
-    text: '#f8f8f2',
-    primary: '#bd93f9',
-    secondary: '#44475a',
-    accent: '#ff79c6',
-    error: '#ff5555',
-    success: '#50fa7b',
-    warning: '#ffb86c',
-    info: '#8be9fd',
-    cursor: '#ffffff',
-    selection: 'rgba(255, 255, 255, 0.2)',
-    ansi: {
-      '0': '#282a36', '1': '#ff5555', '2': '#50fa7b', '3': '#ffb86c',
-      '4': '#8be9fd', '5': '#bd93f9', '6': '#8be9fd', '7': '#f8f8f2',
-      '8': '#44475a', '9': '#ff5555', '10': '#50fa7b', '11': '#ffb86c',
-      '12': '#8be9fd', '13': '#bd93f9', '14': '#50fa7b', '15': '#ffffff',
-    },
-  },
-  {
-    name: 'One Dark',
-    background: '#282c34',
-    text: '#abb2bf',
-    primary: '#61afef',
-    secondary: '#3e4451',
-    accent: '#c678dd',
-    error: '#e06c75',
-    success: '#98c379',
-    warning: '#d19a66',
-    info: '#569cd6',
-    cursor: '#ffffff',
-    selection: 'rgba(255, 255, 255, 0.2)',
-    ansi: {
-      '0': '#282c34', '1': '#e06c75', '2': '#98c379', '3': '#d19a66',
-      '4': '#569cd6', '5': '#c678dd', '6': '#61afef', '7': '#abb2bf',
-      '8': '#3e4451', '9': '#e06c75', '10': '#98c379', '11': '#d19a66',
-      '12': '#569cd6', '13': '#c678dd', '14': '#d4a77a', '15': '#ffffff',
-    },
-  },
-  {
-    name: 'Solarized Dark',
-    background: '#002b36',
-    text: '#839496',
-    primary: '#268bd2',
-    secondary: '#073642',
-    accent: '#dc322f',
-    error: '#dc322f',
-    success: '#859900',
-    warning: '#b58900',
-    info: '#268bd2',
-    cursor: '#ffffff',
-    selection: 'rgba(255, 255, 255, 0.2)',
-    ansi: {
-      '0': '#002b36', '1': '#dc322f', '2': '#859900', '3': '#b58900',
-      '4': '#268bd2', '5': '#d33682', '6': '#2aa198', '7': '#839496',
-      '8': '#073642', '9': '#dc322f', '10': '#859900', '11': '#b58900',
-      '12': '#268bd2', '13': '#d33682', '14': '#586e75', '15': '#fdf6e3',
-    },
-  },
-  {
-    name: 'Monokai',
-    background: '#272822',
-    text: '#f8f8f2',
-    primary: '#f92672',
-    secondary: '#3e3d32',
-    accent: '#a6e22e',
-    error: '#f92672',
-    success: '#a6e22e',
-    warning: '#e6db74',
-    info: '#66d9ef',
-    cursor: '#ffffff',
-    selection: 'rgba(255, 255, 255, 0.2)',
-    ansi: {
-      '0': '#272822', '1': '#f92672', '2': '#a6e22e', '3': '#e6db74',
-      '4': '#66d9ef', '5': '#ae81ff', '6': '#66d9ef', '7': '#f8f8f2',
-      '8': '#3e3d32', '9': '#f92672', '10': '#a6e22e', '11': '#e6db74',
-      '12': '#66d9ef', '13': '#ae81ff', '14': '#f4bf75', '15': '#ffffff',
-    },
-  },
-];
 
 // Options de shell
 const SHELL_OPTIONS = [
@@ -127,8 +36,8 @@ const SHELL_OPTIONS = [
   { value: 'Git Bash', label: 'Git Bash', command: 'C:\\Program Files\\Git\\bin\\bash.exe' },
 ];
 
-// Commandes personnalisées par défaut
-const DEFAULT_CUSTOM_COMMANDS = [
+// Commandes par défaut
+const DEFAULT_COMMANDS = [
   { name: 'npm run dev', command: 'npm run dev', description: 'Démarrer le serveur de développement' },
   { name: 'npm install', command: 'npm install', description: 'Installer les dépendances' },
   { name: 'npm run build', command: 'npm run build', description: 'Builder le projet' },
@@ -136,32 +45,79 @@ const DEFAULT_CUSTOM_COMMANDS = [
   { name: 'git status', command: 'git status', description: 'Voir le statut Git' },
   { name: 'git pull', command: 'git pull', description: 'Mettre à jour depuis remote' },
   { name: 'clear', command: 'clear', description: 'Effacer le terminal' },
+  { name: 'ls', command: 'ls', description: 'Lister les fichiers' },
+  { name: 'pwd', command: 'pwd', description: 'Afficher le répertoire courant' },
+  { name: 'cd ..', command: 'cd ..', description: 'Remonter d\'un répertoire' },
 ];
 
-// Formattage des couleurs ANSI avec thème personnalisé
-function formatAnsiText(text: string, theme?: TerminalTheme): React.ReactNode {
-  // Couleurs ANSI par défaut (Dracula-like)
-  const defaultAnsiColors: Record<string, string> = {
-    '0': '#282a36', '1': '#ff5555', '2': '#50fa7b', '3': '#ffb86c',
-    '4': '#8be9fd', '5': '#bd93f9', '6': '#8be9fd', '7': '#f8f8f2',
-    '8': '#44475a', '9': '#ff5555', '10': '#50fa7b', '11': '#ffb86c',
-    '12': '#8be9fd', '13': '#bd93f9', '14': '#50fa7b', '15': '#ffffff',
-    '30': '#282a36', '31': '#ff5555', '32': '#50fa7b', '33': '#ffb86c',
-    '34': '#8be9fd', '35': '#bd93f9', '36': '#8be9fd', '37': '#f8f8f2',
-    '90': '#44475a', '91': '#ff5555', '92': '#50fa7b', '93': '#ffb86c',
-    '94': '#8be9fd', '95': '#bd93f9', '96': '#6bffff',
+// Charger les commandes favorites depuis localStorage
+const loadFavoriteCommands = (): FavoriteCommand[] => {
+  try {
+    const saved = localStorage.getItem('terminal_favorite_commands');
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
+
+// Sauvegarder les commandes favorites dans localStorage
+const saveFavoriteCommands = (commands: FavoriteCommand[]) => {
+  try {
+    localStorage.setItem('terminal_favorite_commands', JSON.stringify(commands));
+  } catch {
+    // Ignorer les erreurs de sauvegarde
+  }
+};
+
+// Formattage des couleurs ANSI avec le thème de l'app
+function formatAnsiText(text: string): React.ReactNode {
+  // Mapping des couleurs ANSI aux couleurs de l'app
+  const ansiColors: Record<string, string> = {
+    // Couleurs standard
+    '0': 'var(--text-primary)',      // Noir -> texte primaire
+    '1': 'var(--color-error)',        // Rouge
+    '2': 'var(--color-success)',      // Vert
+    '3': 'var(--color-warning)',      // Jaune
+    '4': 'var(--color-info)',         // Bleu
+    '5': 'var(--color-accent-alt)',   // Magenta
+    '6': 'var(--color-info)',         // Cyan
+    '7': 'var(--text-primary)',       // Blanc
+    // Couleurs claires
+    '8': 'var(--text-muted)',          // Noir clair
+    '9': 'var(--color-error)',        // Rouge clair
+    '10': 'var(--color-success)',      // Vert clair
+    '11': 'var(--color-warning)',      // Jaune clair
+    '12': 'var(--color-info)',         // Bleu clair
+    '13': 'var(--color-accent-alt)',   // Magenta clair
+    '14': 'var(--color-success)',      // Cyan clair
+    '15': 'var(--text-primary)',       // Blanc clair
+    // Couleurs 256 (extension)
+    '30': 'var(--text-primary)',
+    '31': 'var(--color-error)',
+    '32': 'var(--color-success)',
+    '33': 'var(--color-warning)',
+    '34': 'var(--color-info)',
+    '35': 'var(--color-accent-alt)',
+    '36': 'var(--color-info)',
+    '37': 'var(--text-primary)',
+    '90': 'var(--text-muted)',
+    '91': 'var(--color-error)',
+    '92': 'var(--color-success)',
+    '93': 'var(--color-warning)',
+    '94': 'var(--color-info)',
+    '95': 'var(--color-accent-alt)',
+    '96': 'var(--color-info)',
   };
-  
-  const ansiColors = theme?.ansi || defaultAnsiColors;
-  
+
   const styles: Record<string, React.CSSProperties> = {
-    '1': { fontWeight: 'bold' },
-    '2': { fontWeight: 'lighter' },
-    '3': { fontStyle: 'italic' },
-    '4': { textDecoration: 'underline' },
-    '5': { textDecoration: 'line-through' },
-    '7': { backgroundColor: theme?.selection || 'rgba(255, 255, 255, 0.2)' },
-    '8': { visibility: 'hidden' },
+    '0': {}, // Reset
+    '1': { fontWeight: '600' }, // Bold
+    '2': { fontWeight: '300' }, // Dim
+    '3': { fontStyle: 'italic' }, // Italic
+    '4': { textDecoration: 'underline' }, // Underline
+    '5': { textDecoration: 'line-through' }, // Blink (simulé)
+    '7': { backgroundColor: 'var(--bg-hover)', color: 'var(--text-primary)' }, // Inverse
+    '8': { visibility: 'hidden' }, // Hidden
   };
 
   const parts = text.split(/(\x1b\[[0-9;]*m)/);
@@ -174,45 +130,204 @@ function formatAnsiText(text: string, theme?: TerminalTheme): React.ReactNode {
       const code = part.slice(2, -1);
       const codes = code.split(';');
       for (const c of codes) {
-        if (c === '0') { currentStyle = {}; }
-        else if (ansiColors[c]) { 
-          currentStyle.color = ansiColors[c]; 
-        }
-        else if (styles[c]) { 
-          currentStyle = { ...currentStyle, ...styles[c] }; 
+        if (c === '0') {
+          currentStyle = {};
+        } else if (ansiColors[c]) {
+          currentStyle.color = ansiColors[c];
+        } else if (styles[c]) {
+          currentStyle = { ...currentStyle, ...styles[c] };
         }
       }
     } else if (part) {
-      elements.push(Object.keys(currentStyle).length > 0 ? 
+      elements.push(Object.keys(currentStyle).length > 0 ?
         <span key={i} style={currentStyle}>{part}</span> : part);
     }
   }
   return <>{elements}</>;
 }
 
+// Composant pour la barre de recherche
+interface SearchBarProps {
+  onSearch: (query: string) => void;
+  onClose: () => void;
+  onNext: () => void;
+  onPrev: () => void;
+  matchCount: number;
+  currentMatch: number;
+}
+
+const SearchBar: React.FC<SearchBarProps> = memo(({ onSearch, onClose, onNext, onPrev, matchCount, currentMatch }) => {
+  const [query, setQuery] = useState('');
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setQuery(value);
+    onSearch(value);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (matchCount > 0) {
+        onNext();
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      onPrev();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      onNext();
+    }
+  };
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 'var(--space-2)',
+      padding: 'var(--space-2) var(--space-3)',
+      backgroundColor: 'var(--bg-secondary)',
+      borderBottom: '1px solid var(--border-base)',
+      borderTop: '1px solid var(--border-base)',
+    }}>
+      <Search size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+      <input
+        type="text"
+        value={query}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        placeholder="Rechercher dans le terminal..."
+        autoFocus
+        style={{
+          flex: 1,
+          border: 'none',
+          background: 'transparent',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 'var(--text-sm)',
+          color: 'var(--text-primary)',
+          outline: 'none',
+        }}
+      />
+      {matchCount > 0 && (
+        <span style={{
+          fontSize: 'var(--text-xs)',
+          color: 'var(--text-muted)',
+          whiteSpace: 'nowrap',
+        }}>
+          {currentMatch + 1}/{matchCount}
+        </span>
+      )}
+      <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+        <button
+          onClick={onPrev}
+          disabled={currentMatch <= 0}
+          title="Précédent (Flèche haut)"
+          style={{
+            padding: 'var(--space-1)',
+            border: 'none',
+            background: 'transparent',
+            color: currentMatch <= 0 ? 'var(--text-dimmed)' : 'var(--text-muted)',
+            cursor: currentMatch <= 0 ? 'not-allowed' : 'pointer',
+            borderRadius: 'var(--radius-sm)',
+          }}
+          onMouseEnter={e => {
+            if (currentMatch > 0) {
+              (e.target as HTMLButtonElement).style.color = 'var(--text-primary)';
+              (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)';
+            }
+          }}
+          onMouseLeave={e => {
+            if (currentMatch > 0) {
+              (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+              (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+            }
+          }}
+        >
+          <ChevronLeft size={12} />
+        </button>
+        <button
+          onClick={onNext}
+          disabled={currentMatch >= matchCount - 1}
+          title="Suivant (Flèche bas)"
+          style={{
+            padding: 'var(--space-1)',
+            border: 'none',
+            background: 'transparent',
+            color: currentMatch >= matchCount - 1 ? 'var(--text-dimmed)' : 'var(--text-muted)',
+            cursor: currentMatch >= matchCount - 1 ? 'not-allowed' : 'pointer',
+            borderRadius: 'var(--radius-sm)',
+          }}
+          onMouseEnter={e => {
+            if (currentMatch < matchCount - 1) {
+              (e.target as HTMLButtonElement).style.color = 'var(--text-primary)';
+              (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)';
+            }
+          }}
+          onMouseLeave={e => {
+            if (currentMatch < matchCount - 1) {
+              (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+              (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+            }
+          }}
+        >
+          <ChevronRight size={12} />
+        </button>
+      </div>
+      <button
+        onClick={onClose}
+        title="Fermer (Échap)"
+        style={{
+          padding: 'var(--space-1)',
+          border: 'none',
+          background: 'transparent',
+          color: 'var(--text-muted)',
+          cursor: 'pointer',
+          borderRadius: 'var(--radius-sm)',
+        }}
+        onMouseEnter={e => {
+          (e.target as HTMLButtonElement).style.color = 'var(--color-error)';
+          (e.target as HTMLButtonElement).style.backgroundColor = 'var(--color-error-subtle)';
+        }}
+        onMouseLeave={e => {
+          (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+          (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+        }}
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+});
+
 // Composant pour un onglet individuel
 interface TerminalTabPanelProps {
   tab: TerminalTab;
   isActive: boolean;
   onSendInput: (input: string) => void;
-  theme?: TerminalTheme;
+  onClear: () => void;
+  onRename: (newTitle: string) => void;
+  cwd: string;
 }
 
-const TerminalTabPanel: React.FC<TerminalTabPanelProps> = ({ tab, isActive, onSendInput, theme }) => {
-  // Seule la connexion WebSocket est établie quand l'onglet est actif
+const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive, onSendInput, onClear, onRename, cwd }) => {
   const [state, actions] = useTerminal(120, 40);
   const { isConnected, output, error, isConnecting } = state;
-  const { sendInput, close: closeConnection } = actions;
+  const { sendInput, close: closeConnection, clear: clearTerminal } = actions;
 
   const [inputValue, setInputValue] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(tab.title);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const outputEndRef = useRef<HTMLDivElement>(null);
-  
-  // Thème par défaut (Dracula)
-  const currentTheme = theme || TERMINAL_THEMES[0];
-  
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Fermer la connexion quand l'onglet devient inactif
   useEffect(() => {
     if (!isActive) {
@@ -232,12 +347,31 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = ({ tab, isActive, onSe
     }
   }, [output, isActive]);
 
+  // Gérer les notifications
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
   const handleSendInput = useCallback((input: string) => {
     if (isConnected && isActive) {
-      sendInput(input);
-      onSendInput(input);
+      const trimmed = input.trim();
+      if (trimmed) {
+        sendInput(trimmed);
+        onSendInput(trimmed);
+        setHistory(prev => [...prev, trimmed]);
+        setHistoryIndex(-1);
+      }
     }
   }, [isConnected, isActive, sendInput, onSendInput]);
+
+  const handleClearTerminal = useCallback(() => {
+    clearTerminal();
+    setNotification({ type: 'success', message: 'Terminal effacé' });
+    onClear();
+  }, [clearTerminal, onClear]);
 
   const handleInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -262,99 +396,450 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = ({ tab, isActive, onSe
         setHistoryIndex(newIndex);
         setInputValue(newIndex === -1 ? '' : history[newIndex]);
       }
+    } else if (e.key === 'l' && e.ctrlKey) {
+      e.preventDefault();
+      handleClearTerminal();
+    } else if (e.key === 'c' && e.ctrlKey) {
+      // Copier la sélection
+      navigator.clipboard.writeText(window.getSelection()?.toString() || '');
+    } else if (e.key === 'v' && e.ctrlKey) {
+      // Coller
+      navigator.clipboard.readText().then(text => {
+        setInputValue(prev => prev + text);
+      });
     }
-  }, [inputValue, isConnected, handleSendInput, history, historyIndex]);
+  }, [inputValue, isConnected, handleSendInput, history, historyIndex, handleClearTerminal]);
+
+  const handleRename = useCallback(() => {
+    setIsRenaming(true);
+    setRenameValue(tab.title);
+  }, [tab.title]);
+
+  const handleRenameSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (renameValue.trim()) {
+      onRename(renameValue.trim());
+      setIsRenaming(false);
+    }
+  }, [renameValue, onRename]);
+
+  const handleRenameKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setIsRenaming(false);
+      setRenameValue(tab.title);
+    }
+  }, [tab.title]);
+
+  // Copier le texte sélectionné
+  const handleCopy = useCallback(() => {
+    const selection = window.getSelection()?.toString();
+    if (selection) {
+      navigator.clipboard.writeText(selection);
+      setNotification({ type: 'success', message: 'Copié dans le presse-papier' });
+    }
+  }, []);
 
   const lines = output.split('\n').filter(line => line !== '');
 
   if (!isActive) return null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: currentTheme.background, borderRadius: '8px' }}>
-      <div 
-        style={{ flex: 1, overflowY: 'auto', padding: '20px', fontFamily: '"Cascadia Code PL", "Fira Code", Consolas, Monaco, \'Courier New\', monospace',
-          fontSize: '15px', lineHeight: '1.8', whiteSpace: 'pre-wrap', wordBreak: 'break-word', 
-          color: currentTheme.text, userSelect: 'text', fontWeight: 400 }}
-        onCopy={(e) => {
-          e.stopPropagation();
+    <div
+      ref={containerRef}
+      data-tab-id={tab.id}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        width: '100%',
+        backgroundColor: 'var(--bg-base)',
+        overflow: 'hidden',
+      }}
+      onCopy={e => {
+        const selection = window.getSelection()?.toString();
+        if (selection) {
+          e.clipboardData.setData('text/plain', selection);
+          e.preventDefault();
+        }
+      }}
+    >
+      {/* Barre d'info - CWD */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-2)',
+        padding: 'var(--space-2) var(--space-3)',
+        backgroundColor: 'var(--bg-secondary)',
+        borderBottom: '1px solid var(--border-base)',
+        fontSize: 'var(--text-xs)',
+        color: 'var(--text-muted)',
+        overflow: 'hidden',
+        width: '100%',
+      }}>
+        <Server size={12} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {tab.shell} - {cwd || '~'}
+        </span>
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          {isConnected ? (
+            <span style={{ color: 'var(--color-success)', fontSize: '8px' }}>● Connected</span>
+          ) : isConnecting ? (
+            <span style={{ color: 'var(--color-warning)', fontSize: '8px' }}>○ Connecting...</span>
+          ) : (
+            <span style={{ color: 'var(--color-error)', fontSize: '8px' }}>● Disconnected</span>
+          )}
+          {isRenaming ? (
+            <form onSubmit={handleRenameSubmit} style={{ display: 'flex', gap: 'var(--space-1)' }}>
+              <input
+                type="text"
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                onKeyDown={handleRenameKeyDown}
+                autoFocus
+                style={{
+                  padding: 'var(--space-1) var(--space-2)',
+                  border: '1px solid var(--border-focus)',
+                  background: 'var(--bg-panel)',
+                  color: 'var(--text-primary)',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 'var(--text-xs)',
+                  borderRadius: 'var(--radius-sm)',
+                  outline: 'none',
+                }}
+              />
+              <button
+                type="submit"
+                title="Valider"
+                style={{
+                  padding: 'var(--space-1)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--color-success)',
+                  cursor: 'pointer',
+                  borderRadius: 'var(--radius-sm)',
+                }}
+              >
+                <Check size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsRenaming(false); setRenameValue(tab.title); }}
+                title="Annuler"
+                style={{
+                  padding: 'var(--space-1)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--color-error)',
+                  cursor: 'pointer',
+                  borderRadius: 'var(--radius-sm)',
+                }}
+              >
+                <X size={12} />
+              </button>
+            </form>
+          ) : (
+            <>
+              <button
+                onClick={handleRename}
+                title="Renommer"
+                style={{
+                  padding: 'var(--space-1)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  borderRadius: 'var(--radius-sm)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-1)',
+                }}
+                onMouseEnter={e => {
+                  (e.target as HTMLButtonElement).style.color = 'var(--text-primary)';
+                  (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)';
+                }}
+                onMouseLeave={e => {
+                  (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+                  (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+                }}
+              >
+                <Pencil size={12} />
+              </button>
+              <button
+                onClick={handleCopy}
+                title="Copier la sélection (Ctrl+C)"
+                style={{
+                  padding: 'var(--space-1)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  borderRadius: 'var(--radius-sm)',
+                }}
+                onMouseEnter={e => {
+                  (e.target as HTMLButtonElement).style.color = 'var(--text-primary)';
+                  (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)';
+                }}
+                onMouseLeave={e => {
+                  (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+                  (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+                }}
+              >
+                <Copy size={12} />
+              </button>
+              <button
+                onClick={handleClearTerminal}
+                title="Effacer (Ctrl+L)"
+                style={{
+                  padding: 'var(--space-1)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  borderRadius: 'var(--radius-sm)',
+                }}
+                onMouseEnter={e => {
+                  (e.target as HTMLButtonElement).style.color = 'var(--color-warning)';
+                  (e.target as HTMLButtonElement).style.backgroundColor = 'var(--color-warning-subtle)';
+                }}
+                onMouseLeave={e => {
+                  (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+                  (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+                }}
+              >
+                <Trash2 size={12} />
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+
+      {/* Zone de sortie du terminal */}
+      <div
+        style={{
+          flex: 1,
+          width: '100%',
+          overflowY: 'auto',
+          padding: 'var(--space-3)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 'var(--text-sm)',
+          lineHeight: 'var(--leading-normal)',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          color: 'var(--text-primary)',
+          userSelect: 'text',
+          textAlign: 'left',
+          backgroundColor: 'var(--bg-panel)',
         }}
+        onClick={() => inputRef.current?.focus()}
       >
         {output === '' && !isConnecting && !isConnected ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: currentTheme.secondary, fontStyle: 'italic' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            color: 'var(--text-muted)',
+            fontStyle: 'italic',
+          }}>
             {isConnecting ? 'Connexion au terminal...' : 'Terminal prêt. Tapez une commande et appuyez sur Entrée.'}
           </div>
-        ) : lines.map((line, index) => (
-          <div key={index} style={{ minHeight: '1.8em' }}>{formatAnsiText(line, currentTheme)}</div>
-        ))}
-        {error && <div style={{ color: currentTheme.error, marginTop: '8px', padding: '12px', backgroundColor: 'rgba(255, 85, 85, 0.15)',
-          borderRadius: '6px', fontSize: '14px', fontFamily: '"Cascadia Code PL", Consolas, Monaco, \'Courier New\', monospace',
-          borderLeft: `4px solid ${currentTheme.error}` }}>
-          ⚠ Erreur: {error}
-        </div>}
+        ) : (
+          lines.map((line, index) => (
+            <div key={index} style={{ minHeight: '1.5em', textAlign: 'left' }}>
+              {formatAnsiText(line.trimEnd())}
+            </div>
+          ))
+        )}
+        {error && (
+          <div style={{
+            color: 'var(--color-error)',
+            marginTop: 'var(--space-2)',
+            padding: 'var(--space-2) var(--space-3)',
+            backgroundColor: 'var(--color-error-subtle)',
+            borderRadius: 'var(--radius-sm)',
+            fontSize: 'var(--text-sm)',
+            fontFamily: 'var(--font-mono)',
+            borderLeft: '3px solid var(--color-error)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+          }}>
+            <AlertCircle size={14} />
+            <span>Erreur: {error}</span>
+          </div>
+        )}
         <div ref={outputEndRef} />
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 20px', backgroundColor: currentTheme.secondary,
-        borderTop: `1px solid ${currentTheme.secondary}` }}>
-        <span style={{ color: currentTheme.accent, fontFamily: '"Cascadia Code PL", "Fira Code", Consolas, Monaco, \'Courier New\', monospace',
-          fontSize: '15px', marginRight: '12px', fontWeight: 600 }}>
-          {tab.title} 
-          {isConnected ? (
-            <span style={{ color: currentTheme.success }}>●</span>
-          ) : isConnecting ? (
-            <span style={{ color: currentTheme.warning }}>○</span>
-          ) : (
-            <span style={{ color: currentTheme.error }}>●</span>
-          )}
+      {/* Barre de notification */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            style={{
+              padding: 'var(--space-2) var(--space-3)',
+              backgroundColor: notification.type === 'success' ? 'var(--color-success-subtle)' :
+                               notification.type === 'error' ? 'var(--color-error-subtle)' : 'var(--color-info-subtle)',
+              color: notification.type === 'success' ? 'var(--color-success)' :
+                     notification.type === 'error' ? 'var(--color-error)' : 'var(--color-info)',
+              fontSize: 'var(--text-xs)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              borderTop: '1px solid var(--border-base)',
+            }}
+          >
+            {notification.type === 'success' && <Check size={12} />}
+            {notification.type === 'error' && <AlertCircle size={12} />}
+            {notification.type === 'info' && <Command size={12} />}
+            <span>{notification.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Barre d'entrée */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: 'var(--space-2) var(--space-3)',
+        backgroundColor: 'var(--bg-secondary)',
+        borderTop: '1px solid var(--border-base)',
+        gap: 'var(--space-2)',
+        width: '100%',
+      }}>
+        <span style={{
+          color: 'var(--accent-primary)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 'var(--text-sm)',
+          fontWeight: 600,
+          whiteSpace: 'nowrap',
+        }}>
+          {tab.title}
         </span>
-        <input ref={inputRef} type="text" value={inputValue} onChange={e => setInputValue(e.target.value)}
-          onKeyDown={handleInputKeyDown} disabled={!isConnected || isConnecting}
+        <span style={{
+          color: 'var(--text-muted)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 'var(--text-sm)',
+          whiteSpace: 'nowrap',
+        }}>
+          {cwd || '~'}
+        </span>
+        <span style={{
+          color: isConnected ? 'var(--color-success)' : isConnecting ? 'var(--color-warning)' : 'var(--color-error)',
+          fontSize: 'var(--text-sm)',
+        }}>
+          {isConnected ? '✓' : isConnecting ? '⏳' : '✗'}
+        </span>
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputValue}
+          onChange={e => setInputValue(e.target.value)}
+          onKeyDown={handleInputKeyDown}
+          disabled={!isConnected || isConnecting}
           placeholder={!isConnected ? 'Connexion...' : 'Tapez une commande...'}
-          style={{ flex: 1, border: 'none', background: 'transparent', fontFamily: '"Cascadia Code PL", "Fira Code", Consolas, Monaco, \'Courier New\', monospace',
-            fontSize: '15px', color: currentTheme.text, outline: 'none', caretColor: currentTheme.cursor }} />
-        {inputValue && <button onClick={() => { setInputValue(''); setHistoryIndex(-1); }}
-          title="Effacer l'entrée" style={{ padding: '6px', border: 'none', background: 'transparent', color: currentTheme.text,
-            cursor: 'pointer', borderRadius: '4px', opacity: 0.7 }}
-          onMouseEnter={e => (e.target as HTMLButtonElement).style.opacity = '1'}
-          onMouseLeave={e => (e.target as HTMLButtonElement).style.opacity = '0.7'}>
-          <X size={16} />
-        </button>}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            border: 'none',
+            background: 'transparent',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'var(--text-sm)',
+            color: 'var(--text-primary)',
+            outline: 'none',
+            caretColor: 'var(--accent-primary)',
+          }}
+        />
+        {inputValue && (
+          <button
+            onClick={() => { setInputValue(''); setHistoryIndex(-1); }}
+            title="Effacer l'entrée"
+            style={{
+              padding: 'var(--space-1)',
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              borderRadius: 'var(--radius-sm)',
+            }}
+            onMouseEnter={e => {
+              (e.target as HTMLButtonElement).style.color = 'var(--color-error)';
+              (e.target as HTMLButtonElement).style.backgroundColor = 'var(--color-error-subtle)';
+            }}
+            onMouseLeave={e => {
+              (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+              (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+            }}
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
     </div>
   );
-};
+});
 
 // Composant principal
 const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onToggleDock, onOpenBrowser, showExplorer }) => {
   const [tabs, setTabs] = useState<TerminalTab[]>([{ id: '1', title: 'Terminal 1', shell: 'PowerShell', cwd: '' }]);
   const [activeTabId, setActiveTabId] = useState<string>('1');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [selectedTheme, setSelectedTheme] = useState<TerminalTheme>(TERMINAL_THEMES[0]);
-  const [showThemeSelector, setShowThemeSelector] = useState(false);
   const [showShellSelector, setShowShellSelector] = useState(false);
+  const [favoriteCommands, setFavoriteCommands] = useState<FavoriteCommand[]>(loadFavoriteCommands());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMatches, setSearchMatches] = useState<number[]>([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+  const [showSearch, setShowSearch] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const tabContainerRef = useRef<HTMLDivElement>(null);
+
+  // Sauvegarder les commandes favorites quand elles changent
+  useEffect(() => {
+    saveFavoriteCommands(favoriteCommands);
+  }, [favoriteCommands]);
+
+  // Gérer le scroll horizontal des onglets avec la molette
+  useEffect(() => {
+    const tabContainer = tabContainerRef.current;
+    if (!tabContainer) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault();
+        tabContainer.scrollLeft += e.deltaX;
+      }
+    };
+
+    tabContainer.addEventListener('wheel', handleWheel, { passive: false });
+    return () => tabContainer.removeEventListener('wheel', handleWheel);
+  }, []);
 
   const addTab = useCallback(() => {
-    const newId = String(tabs.length + 1);
-    setTabs(prev => [...prev, { id: newId, title: `Terminal ${tabs.length + 1}`, shell: 'PowerShell', cwd: '' }]);
+    const newId = String(Date.now());
+    setTabs(prev => [...prev, { id: newId, title: `Terminal ${prev.length + 1}`, shell: 'PowerShell', cwd: '' }]);
     setActiveTabId(newId);
   }, [tabs.length]);
 
-  const closeTab = useCallback((tabId: string) => {
+  const closeTab = useCallback((tabId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (tabs.length <= 1) return;
-    setTabs(prev => prev.filter(t => t.id !== tabId));
-    if (activeTabId === tabId) setActiveTabId(tabs[0]?.id || '1');
+    const newTabs = tabs.filter(t => t.id !== tabId);
+    setTabs(newTabs);
+    if (activeTabId === tabId) {
+      setActiveTabId(newTabs[0]?.id || '1');
+    }
   }, [tabs, activeTabId]);
 
   const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);
-
-  const handleThemeChange = useCallback((theme: TerminalTheme) => {
-    setSelectedTheme(theme);
-    setShowThemeSelector(false);
-  }, []);
+  const toggleMinimize = useCallback(() => setIsMinimized(prev => !prev), []);
 
   const handleShellChange = useCallback((shell: string) => {
-    setTabs(prev => prev.map(tab => 
+    setTabs(prev => prev.map(tab =>
       activeTabId === tab.id ? { ...tab, shell } : tab
     ));
     setShowShellSelector(false);
@@ -364,172 +849,378 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
     return tabs.find(tab => tab.id === activeTabId);
   }, [tabs, activeTabId]);
 
+  const updateTabCwd = useCallback((tabId: string, cwd: string) => {
+    setTabs(prev => prev.map(tab =>
+      tab.id === tabId ? { ...tab, cwd } : tab
+    ));
+  }, []);
+
+  const renameTab = useCallback((tabId: string, newTitle: string) => {
+    setTabs(prev => prev.map(tab =>
+      tab.id === tabId ? { ...tab, title: newTitle } : tab
+    ));
+  }, []);
+
   const handleCommandSent = useCallback((command: string) => {
     const trimmed = command.trim().toLowerCase();
     const serverCommands = ['npm run dev', 'npm start', 'npm run serve', 'npm run preview'];
     if (serverCommands.some(cmd => trimmed.includes(cmd)) && onOpenBrowser) {
-      setTimeout(() => onOpenBrowser('http://localhost:5173'), 2000);
+      setTimeout(() => onOpenBrowser('http://localhost:3000'), 2000);
     }
+
+    // Ajouter à l'historique des commandes favorites
+    setFavoriteCommands(prev => {
+      const existingIndex = prev.findIndex(c => c.command === command);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          usageCount: updated[existingIndex].usageCount + 1,
+          createdAt: Date.now(),
+        };
+        return updated.sort((a, b) => b.usageCount - a.usageCount || b.createdAt - a.createdAt);
+      } else {
+        const newCommand: FavoriteCommand = {
+          id: String(Date.now()),
+          name: command.split(' ')[0] || command,
+          command,
+          description: '',
+          createdAt: Date.now(),
+          usageCount: 1,
+        };
+        return [newCommand, ...prev].slice(0, 20); // Garder max 20 commandes
+      }
+    });
   }, [onOpenBrowser]);
 
+  const removeFromFavorites = useCallback((id: string) => {
+    setFavoriteCommands(prev => prev.filter(c => c.id !== id));
+  }, []);
+
+  // Navigation entre onglets avec Ctrl+Tab et Ctrl+Shift+Tab
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 't') { e.preventDefault(); addTab(); }
-      if (e.ctrlKey && e.key === 'w' && tabs.length > 1) { e.preventDefault(); closeTab(activeTabId); }
+      // Ctrl+T - Nouveau onglet
+      if (e.ctrlKey && e.key === 't') {
+        e.preventDefault();
+        addTab();
+      }
+      // Ctrl+W - Fermer onglet
+      if (e.ctrlKey && e.key === 'w' && tabs.length > 1) {
+        e.preventDefault();
+        closeTab(activeTabId);
+      }
+      // Ctrl+Tab - Onglet suivant
+      if (e.ctrlKey && e.key === 'Tab' && !e.shiftKey) {
+        e.preventDefault();
+        const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+        const nextIndex = (currentIndex + 1) % tabs.length;
+        setActiveTabId(tabs[nextIndex].id);
+      }
+      // Ctrl+Shift+Tab - Onglet précédent
+      if (e.ctrlKey && e.key === 'Tab' && e.shiftKey) {
+        e.preventDefault();
+        const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+        const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        setActiveTabId(tabs[prevIndex].id);
+      }
+      // Ctrl+F - Rechercher
+      if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        setShowSearch(true);
+      }
+      // Échap - Fermer la recherche
+      if (e.key === 'Escape' && showSearch) {
+        e.preventDefault();
+        setShowSearch(false);
+        setSearchQuery('');
+        setSearchMatches([]);
+        setCurrentMatchIndex(-1);
+      }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [addTab, closeTab, tabs.length, activeTabId]);
+  }, [addTab, closeTab, tabs, activeTabId, showSearch]);
+
+  // Recherche dans le terminal
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    if (query === '') {
+      setSearchMatches([]);
+      setCurrentMatchIndex(-1);
+      return;
+    }
+    setSearchMatches([]);
+    setCurrentMatchIndex(-1);
+  }, []);
+
+  const handleNextMatch = useCallback(() => {
+    if (searchMatches.length === 0) return;
+    setCurrentMatchIndex(prev => (prev + 1) % searchMatches.length);
+  }, [searchMatches]);
+
+  const handlePrevMatch = useCallback(() => {
+    if (searchMatches.length === 0) return;
+    setCurrentMatchIndex(prev => (prev - 1 + searchMatches.length) % searchMatches.length);
+  }, [searchMatches]);
+
+  const activeTab = getActiveTab();
 
   return (
-    <motion.div className="terminal-panel" style={{
-      backgroundColor: 'var(--bg-panel)', 
-      border: '1px solid var(--border-base)',
-      borderRadius: isFullscreen ? '0' : isDocked ? 'var(--radius-md) var(--radius-md) 0 0' : 'var(--radius-lg)',
-      display: 'flex', flexDirection: 'column', 
-      height: isFullscreen ? '100vh' : isDocked ? '40vh' : '60vh',
-      width: isFullscreen ? '100vw' : isDocked ? (showExplorer ? 'calc(100vw - 316px)' : 'calc(100vw - 56px)') : '70vw',
-      minHeight: isDocked ? '200px' : '400px',
-      maxHeight: isFullscreen ? 'none' : isDocked ? '70vh' : '80vh',
-      position: 'fixed',
-      top: isFullscreen ? 0 : isDocked ? undefined : '50%',
-      right: isFullscreen ? 0 : isDocked ? '0' : undefined,
-      left: isFullscreen ? 0 : isDocked ? (showExplorer ? '316px' : '56px') : '50%',
-      bottom: isFullscreen ? 0 : isDocked ? '0' : undefined,
-      zIndex: 1500,
-      boxShadow: isFullscreen ? 'none' : isDocked ? '0 -4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.3)',
-      transform: isDocked ? 'none' : 'translate(-50%, -50%)',
-      resize: isDocked ? 'vertical' : 'none',
-      overflow: 'hidden',
-    }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.2 }}>
+    <motion.div
+      className="terminal-panel"
+      ref={containerRef}
+      style={{
+        backgroundColor: 'var(--bg-panel)',
+        border: '1px solid var(--border-base)',
+        borderRadius: isFullscreen ? '0' : isMinimized ? 'var(--radius-md) var(--radius-md) 0 0' : isDocked ? 'var(--radius-md) var(--radius-md) 0 0' : 'var(--radius-lg)',
+        display: 'flex',
+        flexDirection: 'column',
+        height: isMinimized ? 'auto' : isFullscreen ? '100vh' : isDocked ? '40vh' : '60vh',
+        width: isFullscreen ? '100vw' : isMinimized ? (showExplorer ? 'calc(100vw - 316px)' : 'calc(100vw - 56px)') : isDocked ? (showExplorer ? 'calc(100vw - 316px)' : 'calc(100vw - 56px)') : '70vw',
+        minHeight: isMinimized ? '0' : isDocked ? '200px' : '400px',
+        maxHeight: isMinimized ? '40px' : isFullscreen ? 'none' : isDocked ? '70vh' : '80vh',
+        position: 'fixed',
+        top: isFullscreen ? 0 : isMinimized ? undefined : isDocked ? undefined : '50%',
+        right: isFullscreen ? 0 : isMinimized ? '0' : isDocked ? '0' : undefined,
+        left: isFullscreen ? 0 : isMinimized ? (showExplorer ? '316px' : '56px') : isDocked ? (showExplorer ? '316px' : '56px') : '50%',
+        bottom: isFullscreen ? 0 : isMinimized ? '0' : isDocked ? '0' : undefined,
+        zIndex: 1500,
+        boxShadow: isFullscreen ? 'none' : isMinimized ? '0 4px 12px rgba(0, 0, 0, 0.3)' : isDocked ? '0 -4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.3)',
+        transform: isMinimized ? 'none' : isDocked ? 'none' : 'translate(-50%, -50%)',
+        resize: isDocked ? 'vertical' : 'none',
+        overflow: 'hidden',
+        maxWidth: isFullscreen ? '100vw' : '100%',
+      }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.2 }}
+    >
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px',
-        backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-base)',
-        borderTopLeftRadius: isFullscreen ? 0 : 'var(--radius-lg)', borderTopRightRadius: isFullscreen ? 0 : 'var(--radius-lg)',
-        gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Terminal size={14} style={{ color: 'var(--accent-primary)' }} />
-          <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>Terminal</span>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: 'var(--space-2) var(--space-3)',
+          backgroundColor: 'var(--bg-secondary)',
+          borderBottom: '1px solid var(--border-base)',
+          borderTopLeftRadius: isFullscreen ? 0 : isMinimized ? 'var(--radius-md)' : 'var(--radius-lg)',
+          borderTopRightRadius: isFullscreen ? 0 : isMinimized ? 'var(--radius-md)' : 'var(--radius-lg)',
+          gap: 'var(--space-2)',
+          cursor: isMinimized ? 'pointer' : 'default',
+          width: '100%',
+        }}
+        onClick={isMinimized ? toggleMinimize : undefined}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <Terminal size={16} style={{ color: 'var(--accent-primary)' }} />
+          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-primary)' }}>
+            Terminal{isMinimized && ' (minimisé)'}
+          </span>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 }}>
-          {tabs.map(tab => (
-            <motion.div key={tab.id} onClick={() => setActiveTabId(tab.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', border: 'none',
+        {/* Barre d'onglets - avec scroll horizontal */}
+        <div
+          ref={tabContainerRef}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-1)',
+            flex: 1,
+            minWidth: 0,
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'var(--scroll-thumb) transparent',
+            padding: 'var(--space-1) 0',
+          }}
+        >
+          {tabs.map((tab, index) => (
+            <motion.div
+              key={tab.id}
+              onClick={() => !isMinimized && setActiveTabId(tab.id)}
+              onDoubleClick={() => !isMinimized && renameTab(tab.id, `Terminal ${index + 1}`)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-1)',
+                padding: 'var(--space-1) var(--space-3)',
+                border: 'none',
                 background: activeTabId === tab.id ? 'var(--bg-hover)' : 'transparent',
                 color: activeTabId === tab.id ? 'var(--text-primary)' : 'var(--text-muted)',
-                cursor: 'pointer', borderRadius: '6px', fontSize: '12px', minWidth: 0 }}
-              whileHover={{ background: 'var(--bg-hover)' }} whileTap={{ scale: 0.95 }}
+                cursor: isMinimized ? 'default' : 'pointer',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 'var(--text-sm)',
+                minWidth: 0,
+                opacity: isMinimized ? 0.6 : 1,
+                whiteSpace: 'nowrap',
+              }}
+              whileHover={!isMinimized ? { background: 'var(--bg-hover)' } : {}}
+              whileTap={!isMinimized ? { scale: 0.95 } : {}}
               role="button"
-              tabIndex={0}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTabId(tab.id); } }}
+              tabIndex={isMinimized ? -1 : 0}
+              onKeyDown={e => {
+                if (!isMinimized && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  setActiveTabId(tab.id);
+                }
+              }}
             >
-              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.title}</span>
-              <button 
-                onClick={e => { e.stopPropagation(); closeTab(tab.id); }}
-                title="Close tab"
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.title}</span>
+              <button
+                onClick={(e) => closeTab(tab.id, e)}
+                title="Fermer l'onglet (Ctrl+W)"
                 aria-label="Close tab"
-                style={{ 
-                  padding: '2px', 
-                  border: 'none', 
-                  background: 'transparent', 
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                disabled={tabs.length <= 1}
+                style={{
+                  padding: 'var(--space-1)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: tabs.length <= 1 ? 'var(--text-dimmed)' : 'var(--text-muted)',
+                  cursor: tabs.length <= 1 ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'center',
-                  borderRadius: '4px',
+                  borderRadius: 'var(--radius-xs)',
                 }}
-                onMouseEnter={e => (e.target as HTMLButtonElement).style.color = 'var(--color-danger)'}
-                onMouseLeave={e => (e.target as HTMLButtonElement).style.color = 'var(--text-muted)'}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); closeTab(tab.id); } }}
+                onMouseEnter={e => {
+                  if (tabs.length > 1) {
+                    (e.target as HTMLButtonElement).style.color = 'var(--color-danger)';
+                    (e.target as HTMLButtonElement).style.backgroundColor = 'var(--color-error-subtle)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (tabs.length > 1) {
+                    (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+                    (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+                  }
+                }}
               >
-                <X size={10} />
+                <X size={12} />
               </button>
             </motion.div>
           ))}
-          <button onClick={addTab} title="New tab (Ctrl+T)" style={{ padding: '4px 8px', border: 'none', background: 'transparent',
-            color: 'var(--text-muted)', cursor: 'pointer', borderRadius: '6px', display: 'flex',
-            alignItems: 'center', justifyContent: 'center' }}
-            onMouseEnter={e => { (e.target as HTMLButtonElement).style.color = 'var(--text-primary)';
-              (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)'; }}
-            onMouseLeave={e => { (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
-              (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'; }}>
-            <Plus size={12} />
+          <button
+            onClick={() => !isMinimized && addTab()}
+            title="Nouvel onglet (Ctrl+T)"
+            style={{
+              padding: 'var(--space-1) var(--space-2)',
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              cursor: isMinimized ? 'default' : 'pointer',
+              borderRadius: 'var(--radius-sm)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: isMinimized ? 0.5 : 1,
+              fontSize: 'var(--text-sm)',
+            }}
+            onMouseEnter={e => {
+              if (!isMinimized) {
+                (e.target as HTMLButtonElement).style.color = 'var(--text-primary)';
+                (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)';
+              }
+            }}
+            onMouseLeave={e => {
+              if (!isMinimized) {
+                (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+                (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+              }
+            }}
+          >
+            <Plus size={14} />
           </button>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {/* Sélecteur de thème */}
-          <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowThemeSelector(!showThemeSelector)} title="Thèmes"
-              style={{ padding: '4px', border: 'none', background: 'transparent', color: 'var(--text-muted)',
-                cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              onMouseEnter={e => (e.target as HTMLButtonElement).style.color = selectedTheme.primary}
-              onMouseLeave={e => (e.target as HTMLButtonElement).style.color = 'var(--text-muted)'}>
-              <div style={{ width: '14px', height: '14px', backgroundColor: selectedTheme.accent, borderRadius: '4px', border: '2px solid currentColor' }} />
-            </button>
-            <AnimatePresence>
-              {showThemeSelector && (
-                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-                  style={{ position: 'absolute', top: '100%', right: 0, zIndex: 200, minWidth: '180px',
-                    backgroundColor: selectedTheme.background, border: `1px solid ${selectedTheme.secondary}`,
-                    borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', padding: '6px' }}>
-                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {TERMINAL_THEMES.map((theme, i) => (
-                      <button key={i} onClick={() => handleThemeChange(theme)}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
-                          border: 'none', background: 'transparent', color: selectedTheme.text, cursor: 'pointer',
-                          borderRadius: '6px', fontSize: '12px', textAlign: 'left' }}
-                        onMouseEnter={e => (e.target as HTMLButtonElement).style.backgroundColor = selectedTheme.secondary}
-                        onMouseLeave={e => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
-                        title={theme.name}>
-                        <div style={{ width: '12px', height: '12px', backgroundColor: theme.accent, borderRadius: '3px' }} />
-                        <span style={{ fontSize: '11px' }}>{theme.name}</span>
-                        {selectedTheme.name === theme.name && (
-                          <span style={{ marginLeft: 'auto', color: theme.success }}>✓</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
           {/* Sélecteur de shell */}
           <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowShellSelector(!showShellSelector)} title="Shell"
-              style={{ padding: '4px', border: 'none', background: 'transparent', color: 'var(--text-muted)',
-                cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              onMouseEnter={e => (e.target as HTMLButtonElement).style.color = selectedTheme.primary}
-              onMouseLeave={e => (e.target as HTMLButtonElement).style.color = 'var(--text-muted)'}>
-              <Terminal size={12} />
+            <button
+              onClick={() => !isMinimized && setShowShellSelector(!showShellSelector)}
+              title="Changer de shell"
+              style={{
+                padding: 'var(--space-1)',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                cursor: isMinimized ? 'default' : 'pointer',
+                borderRadius: 'var(--radius-sm)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: isMinimized ? 0.5 : 1,
+              }}
+              onMouseEnter={e => {
+                if (!isMinimized) (e.target as HTMLButtonElement).style.color = 'var(--text-primary)';
+              }}
+              onMouseLeave={e => {
+                if (!isMinimized) (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+              }}
+            >
+              <Terminal size={14} />
               <ChevronDown size={10} />
             </button>
             <AnimatePresence>
               {showShellSelector && (
-                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-                  style={{ position: 'absolute', top: '100%', right: 0, zIndex: 200, minWidth: '160px',
-                    backgroundColor: selectedTheme.background, border: `1px solid ${selectedTheme.secondary}`,
-                    borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', padding: '6px' }}>
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    zIndex: 200,
+                    minWidth: '160px',
+                    backgroundColor: 'var(--bg-panel)',
+                    border: '1px solid var(--border-base)',
+                    borderRadius: 'var(--radius-md)',
+                    boxShadow: 'var(--shadow-lg)',
+                    padding: 'var(--space-1)',
+                  }}
+                >
                   <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                     {SHELL_OPTIONS.map((shell, i) => {
-                      const activeShell = getActiveTab()?.shell || 'PowerShell';
+                      const activeShell = activeTab?.shell || 'PowerShell';
                       const isActive = activeShell === shell.value;
                       return (
-                        <button key={i} onClick={() => handleShellChange(shell.value)}
-                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
-                            border: 'none', background: 'transparent', color: selectedTheme.text, cursor: 'pointer',
-                            borderRadius: '6px', fontSize: '12px', textAlign: 'left' }}
-                          onMouseEnter={e => (e.target as HTMLButtonElement).style.backgroundColor = selectedTheme.secondary}
-                          onMouseLeave={e => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
-                          title={shell.label}>
-                          <span style={{ fontSize: '11px' }}>{shell.label}</span>
+                        <button
+                          key={i}
+                          onClick={() => handleShellChange(shell.value)}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 'var(--space-2)',
+                            padding: 'var(--space-2) var(--space-3)',
+                            border: 'none',
+                            background: isActive ? 'var(--bg-hover)' : 'transparent',
+                            color: 'var(--text-primary)',
+                            cursor: 'pointer',
+                            borderRadius: 'var(--radius-sm)',
+                            fontSize: 'var(--text-sm)',
+                            textAlign: 'left',
+                          }}
+                          onMouseEnter={e => {
+                            if (!isActive) {
+                              (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)';
+                            }
+                          }}
+                          onMouseLeave={e => {
+                            if (!isActive) {
+                              (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+                            }
+                          }}
+                          title={shell.label}
+                        >
+                          <span>{shell.label}</span>
                           {isActive && (
-                            <span style={{ marginLeft: 'auto', color: selectedTheme.success }}>✓</span>
+                            <span style={{ marginLeft: 'auto', color: 'var(--color-success)' }}>✓</span>
                           )}
                         </button>
                       );
@@ -540,79 +1231,334 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
             </AnimatePresence>
           </div>
 
+          {/* Bouton commandes */}
           <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowCommandPalette(!showCommandPalette)} title="Commandes"
-              style={{ padding: '4px', border: 'none', background: 'transparent', color: 'var(--text-muted)',
-                cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              onMouseEnter={e => (e.target as HTMLButtonElement).style.color = selectedTheme.primary}
-              onMouseLeave={e => (e.target as HTMLButtonElement).style.color = 'var(--text-muted)'}>
-              <Play size={12} />
+            <button
+              onClick={() => !isMinimized && setShowCommandPalette(!showCommandPalette)}
+              title="Commandes favorites"
+              style={{
+                padding: 'var(--space-1)',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                cursor: isMinimized ? 'default' : 'pointer',
+                borderRadius: 'var(--radius-sm)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: isMinimized ? 0.5 : 1,
+              }}
+              onMouseEnter={e => {
+                if (!isMinimized) (e.target as HTMLButtonElement).style.color = 'var(--accent-primary)';
+              }}
+              onMouseLeave={e => {
+                if (!isMinimized) (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+              }}
+            >
+              <Command size={14} />
             </button>
             <AnimatePresence>
               {showCommandPalette && (
-                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-                  style={{ position: 'absolute', top: '100%', right: 0, zIndex: 100, minWidth: '200px',
-                    backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)',
-                    borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', padding: '6px' }}>
-                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {DEFAULT_CUSTOM_COMMANDS.map((cmd, i) => (
-                      <button key={i} onClick={() => { onClose(); setShowCommandPalette(false); }}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
-                          border: 'none', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer',
-                          borderRadius: '6px', fontSize: '12px', textAlign: 'left' }}
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    zIndex: 100,
+                    minWidth: '280px',
+                    maxWidth: '400px',
+                    backgroundColor: 'var(--bg-panel)',
+                    border: '1px solid var(--border-base)',
+                    borderRadius: 'var(--radius-md)',
+                    boxShadow: 'var(--shadow-lg)',
+                    padding: 'var(--space-2)',
+                  }}
+                >
+                  {/* Section Favorites */}
+                  {favoriteCommands.length > 0 && (
+                    <>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0 var(--space-1) var(--space-2)',
+                        borderBottom: '1px solid var(--border-base)',
+                        marginBottom: 'var(--space-2)',
+                      }}>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
+                          Commandes favorites
+                        </span>
+                      </div>
+                      <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                        {favoriteCommands.slice(0, 5).map((cmd, i) => (
+                          <button
+                            key={cmd.id}
+                            onClick={() => {
+                              const activeTabPanel = document.querySelector(`[data-tab-id="${activeTabId}"] input`) as HTMLInputElement;
+                              if (activeTabPanel) {
+                                activeTabPanel.value = cmd.command;
+                                activeTabPanel.focus();
+                              }
+                              setShowCommandPalette(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--space-2)',
+                              padding: 'var(--space-2)',
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--text-primary)',
+                              cursor: 'pointer',
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: 'var(--text-sm)',
+                              textAlign: 'left',
+                            }}
+                            onMouseEnter={e => (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)'}
+                            onMouseLeave={e => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
+                          >
+                            <code style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
+                              {cmd.command}
+                            </code>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFromFavorites(cmd.id);
+                              }}
+                              title="Retirer des favoris"
+                              style={{
+                                padding: 'var(--space-1)',
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--text-muted)',
+                                cursor: 'pointer',
+                                marginLeft: 'auto',
+                              }}
+                              onMouseEnter={e2 => (e2.target as HTMLButtonElement).style.color = 'var(--color-error)'}
+                              onMouseLeave={e2 => (e2.target as HTMLButtonElement).style.color = 'var(--text-muted)'}
+                            >
+                              <X size={12} />
+                            </button>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Section Toutes les commandes */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0 var(--space-1) var(--space-2)',
+                    borderBottom: '1px solid var(--border-base)',
+                    margin: favoriteCommands.length > 0 ? 'var(--space-2) 0' : '',
+                  }}>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
+                      Commandes rapides
+                    </span>
+                  </div>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    {DEFAULT_COMMANDS.slice(0, 8).map((cmd, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          const activeTabPanel = document.querySelector(`[data-tab-id="${activeTabId}"] input`) as HTMLInputElement;
+                          if (activeTabPanel) {
+                            activeTabPanel.value = cmd.command;
+                            activeTabPanel.focus();
+                          }
+                          setShowCommandPalette(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-2)',
+                          padding: 'var(--space-2)',
+                          border: 'none',
+                          background: 'transparent',
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: 'var(--text-sm)',
+                          textAlign: 'left',
+                        }}
                         onMouseEnter={e => (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)'}
-                        onMouseLeave={e => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}>
-                        <code style={{ fontSize: '11px', color: 'var(--accent-primary)' }}>{cmd.name}</code>
-                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: 'auto' }}>{cmd.description}</span>
+                        onMouseLeave={e => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
+                      >
+                        <code style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
+                          {cmd.command}
+                        </code>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                          {cmd.description}
+                        </span>
                       </button>
                     ))}
                   </div>
+
+                  {favoriteCommands.length === 0 && (
+                    <div style={{
+                      padding: 'var(--space-3)',
+                      textAlign: 'center',
+                      color: 'var(--text-muted)',
+                      fontSize: 'var(--text-sm)',
+                    }}>
+                      <p>Aucune commande favorite</p>
+                      <p style={{ fontSize: 'var(--text-xs)', marginTop: 'var(--space-1)' }}>
+                        Les commandes que vous utilisez fréquemment apparaîtront ici
+                      </p>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {!isFullscreen && onToggleDock && (
-            <button onClick={onToggleDock} title={isDocked ? 'Floating mode' : 'Dock to bottom'}
-              style={{ padding: '4px', border: 'none', background: 'transparent', color: 'var(--text-muted)',
-                cursor: 'pointer', borderRadius: '4px' }}
-              onMouseEnter={e => (e.target as HTMLButtonElement).style.color = 'var(--text-primary)'}
-              onMouseLeave={e => (e.target as HTMLButtonElement).style.color = 'var(--text-muted)'}>
-              {isDocked ? <Maximize size={14} /> : <Minimize size={14} />}
+          {/* Bouton de recherche */}
+          <button
+            onClick={() => !isMinimized && setShowSearch(!showSearch)}
+            title="Rechercher (Ctrl+F)"
+            style={{
+              padding: 'var(--space-1)',
+              border: 'none',
+              background: showSearch ? 'var(--bg-hover)' : 'transparent',
+              color: 'var(--text-muted)',
+              cursor: isMinimized ? 'default' : 'pointer',
+              borderRadius: 'var(--radius-sm)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: isMinimized ? 0.5 : 1,
+            }}
+            onMouseEnter={e => {
+              if (!isMinimized) (e.target as HTMLButtonElement).style.color = 'var(--accent-primary)';
+            }}
+            onMouseLeave={e => {
+              if (!isMinimized) (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+            }}
+          >
+            <Search size={14} />
+          </button>
+
+          <button
+            onClick={toggleMinimize}
+            title={isMinimized ? 'Restaurer' : 'Minimiser'}
+            style={{
+              padding: 'var(--space-1)',
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              borderRadius: 'var(--radius-sm)',
+            }}
+            onMouseEnter={e => (e.target as HTMLButtonElement).style.color = 'var(--text-primary)'}
+            onMouseLeave={e => (e.target as HTMLButtonElement).style.color = 'var(--text-muted)'}
+          >
+            {isMinimized ? <Maximize size={14} /> : <Minimize size={14} />}
+          </button>
+
+          {!isMinimized && (
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
+              style={{
+                padding: 'var(--space-1)',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                borderRadius: 'var(--radius-sm)',
+                opacity: isMinimized ? 0.5 : 1,
+              }}
+              onMouseEnter={e => {
+                if (!isMinimized) (e.target as HTMLButtonElement).style.color = 'var(--text-primary)';
+              }}
+              onMouseLeave={e => {
+                if (!isMinimized) (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+              }}
+            >
+              {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
             </button>
           )}
 
-          <button onClick={toggleFullscreen} title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-            style={{ padding: '4px', border: 'none', background: 'transparent', color: 'var(--text-muted)',
-              cursor: 'pointer', borderRadius: '4px' }}
-            onMouseEnter={e => (e.target as HTMLButtonElement).style.color = 'var(--text-primary)'}
-            onMouseLeave={e => (e.target as HTMLButtonElement).style.color = 'var(--text-muted)'}>
-            {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
-          </button>
-
-          <button onClick={onClose} title="Close" style={{ padding: '4px', border: 'none', background: 'transparent',
-            color: 'var(--text-muted)', cursor: 'pointer', borderRadius: '4px' }}
-            onMouseEnter={e => { (e.target as HTMLButtonElement).style.color = 'var(--color-danger)';
-              (e.target as HTMLButtonElement).style.backgroundColor = 'rgba(220, 53, 69, 0.1)'; }}
-            onMouseLeave={e => { (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
-              (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'; }}>
+          <button
+            onClick={onClose}
+            title="Fermer"
+            style={{
+              padding: 'var(--space-1)',
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              borderRadius: 'var(--radius-sm)',
+            }}
+            onMouseEnter={e => {
+              (e.target as HTMLButtonElement).style.color = 'var(--color-error)';
+              (e.target as HTMLButtonElement).style.backgroundColor = 'var(--color-error-subtle)';
+            }}
+            onMouseLeave={e => {
+              (e.target as HTMLButtonElement).style.color = 'var(--text-muted)';
+              (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+            }}
+          >
             <X size={14} />
           </button>
         </div>
       </div>
 
-      {/* Tab Content */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-        {tabs.map(tab => <TerminalTabPanel key={tab.id} tab={tab} isActive={activeTabId === tab.id}
-          onSendInput={handleCommandSent} theme={selectedTheme} />)}
-      </div>
+      {/* Barre de recherche */}
+      {showSearch && !isMinimized && (
+        <SearchBar
+          onSearch={handleSearch}
+          onClose={() => setShowSearch(false)}
+          onNext={handleNextMatch}
+          onPrev={handlePrevMatch}
+          matchCount={searchMatches.length}
+          currentMatch={currentMatchIndex}
+        />
+      )}
+
+      {/* Contenu des onglets - caché quand minimisé mais garde les connexions actives */}
+      {!isMinimized && (
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', width: '100%' }}>
+          {tabs.map(tab => (
+            <TerminalTabPanel
+              key={tab.id}
+              tab={tab}
+              isActive={activeTabId === tab.id}
+              onSendInput={handleCommandSent}
+              onClear={() => updateTabCwd(tab.id, '')}
+              onRename={(newTitle) => renameTab(tab.id, newTitle)}
+              cwd={tab.cwd}
+            />
+          ))}
+        </div>
+      )}
 
       {isFullscreen && (
-        <button onClick={toggleFullscreen} style={{ position: 'fixed', top: '16px', right: '16px', padding: '8px',
-          border: 'none', background: 'var(--bg-panel)', color: 'var(--text-primary)', cursor: 'pointer',
-          borderRadius: '8px', zIndex: 1001, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+        <button
+          onClick={toggleFullscreen}
+          style={{
+            position: 'fixed',
+            top: 'var(--space-4)',
+            right: 'var(--space-4)',
+            padding: 'var(--space-2)',
+            border: 'none',
+            background: 'var(--bg-panel)',
+            color: 'var(--text-primary)',
+            cursor: 'pointer',
+            borderRadius: 'var(--radius-md)',
+            zIndex: 1001,
+            boxShadow: 'var(--shadow-lg)',
+          }}
           onMouseEnter={e => (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-hover)'}
-          onMouseLeave={e => (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-panel)'}>
+          onMouseLeave={e => (e.target as HTMLButtonElement).style.backgroundColor = 'var(--bg-panel)'}
+        >
           <Minimize size={20} />
         </button>
       )}
@@ -620,6 +1566,6 @@ const TerminalPanel: React.FC<TerminalPanelProps> = ({ onClose, isDocked, onTogg
   );
 };
 
-export default React.memo(TerminalPanel);
+export default memo(TerminalPanel);
 export type { TerminalTab, TerminalPanelProps };
-export { DEFAULT_CUSTOM_COMMANDS };
+export { DEFAULT_COMMANDS };
