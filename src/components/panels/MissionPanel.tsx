@@ -68,9 +68,9 @@ interface ActionEntry {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function confidenceColor(conf: number): string {
-  if (conf >= 0.7) return '#4ade80';
-  if (conf >= 0.4) return '#fbbf24';
-  return '#f87171';
+  if (conf >= 0.7) return 'var(--color-success)';
+  if (conf >= 0.4) return 'var(--color-warning)';
+  return 'var(--color-error)';
 }
 
 function confidenceIcon(conf: number) {
@@ -81,27 +81,27 @@ function confidenceIcon(conf: number) {
 
 function statusIcon(status: string, size = 10) {
   switch (status) {
-    case 'in_progress': return <Loader2 size={size} className="animate-spin" style={{ color: '#38bdf8' }} />;
-    case 'completed': return <CheckCircle2 size={size} style={{ color: '#4ade80' }} />;
-    case 'failed': return <XCircle size={size} style={{ color: '#f87171' }} />;
-    case 'blocked': return <AlertTriangle size={size} style={{ color: '#fbbf24' }} />;
+    case 'in_progress': return <Loader2 size={size} className="animate-spin" style={{ color: 'var(--color-info)' }} />;
+    case 'completed': return <CheckCircle2 size={size} style={{ color: 'var(--color-success)' }} />;
+    case 'failed': return <XCircle size={size} style={{ color: 'var(--color-error)' }} />;
+    case 'blocked': return <AlertTriangle size={size} style={{ color: 'var(--color-warning)' }} />;
     default: return <Clock size={size} style={{ color: 'var(--text-dimmed)' }} />;
   }
 }
 
 function decisionBadge(decision: string) {
   const config: Record<string, { color: string; label: string; icon: React.ReactNode }> = {
-    continue: { color: '#4ade80', label: 'Continue', icon: <Play size={8} /> },
-    retry: { color: '#fbbf24', label: 'Retry', icon: <RotateCcw size={8} /> },
-    replan: { color: '#f97316', label: 'Replan', icon: <Brain size={8} /> },
-    escalate: { color: '#f87171', label: 'Escalade', icon: <AlertTriangle size={8} /> },
-    abort: { color: '#ef4444', label: 'Abort', icon: <XCircle size={8} /> },
+    continue: { color: 'var(--color-success)', label: 'Continue', icon: <Play size={8} /> },
+    retry: { color: 'var(--color-warning)', label: 'Retry', icon: <RotateCcw size={8} /> },
+    replan: { color: 'var(--color-warning)', label: 'Replan', icon: <Brain size={8} /> },
+    escalate: { color: 'var(--color-error)', label: 'Escalade', icon: <AlertTriangle size={8} /> },
+    abort: { color: 'var(--color-error)', label: 'Abort', icon: <XCircle size={8} /> },
   };
   const c = config[decision] ?? config.continue;
   return (
     <span
-      className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-bold uppercase"
-      style={{ color: c.color, backgroundColor: `${c.color}15` }}
+      className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-xs font-bold uppercase"
+      style={{ color: c.color, backgroundColor: `color-mix(in srgb, ${c.color} 6%, transparent)` }}
     >
       {c.icon} {c.label}
     </span>
@@ -270,9 +270,9 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
       {/* Header stats */}
       <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)' }}>
         <div className="flex items-center gap-1.5 flex-1">
-          <StatChip count={activeMissions.length} label="actives" color="#38bdf8" />
-          <StatChip count={completedMissions.filter(m => m.status === 'completed').length} label="ok" color="#4ade80" />
-          <StatChip count={completedMissions.filter(m => m.status === 'failed').length} label="err" color="#f87171" />
+          <StatChip count={activeMissions.length} label="actives" color="var(--color-info)" />
+          <StatChip count={completedMissions.filter(m => m.status === 'completed').length} label="ok" color="var(--color-success)" />
+          <StatChip count={completedMissions.filter(m => m.status === 'failed').length} label="err" color="var(--color-error)" />
         </div>
       </div>
 
@@ -305,7 +305,7 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
       title="Missions"
       icon={<Target className="w-4 h-4" />}
       actions={
-        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-dimmed)' }}>
+        <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-dimmed)' }}>
           {activeMissions.length} actives
         </span>
       }
@@ -322,8 +322,8 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
 function StatChip({ count, label, color }: { count: number; label: string; color: string }) {
   return (
     <div
-      className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono"
-      style={{ color, backgroundColor: `${color}12` }}
+      className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-mono"
+      style={{ color, backgroundColor: `color-mix(in srgb, ${color} 4.7%, transparent)` }}
     >
       <span className="font-bold">{count}</span>
       <span className="opacity-70">{label}</span>
@@ -357,8 +357,8 @@ function MissionCard({
       exit={{ opacity: 0, height: 0 }}
       className="rounded-xl overflow-hidden"
       style={{
-        backgroundColor: isActive ? 'rgba(56,189,248,0.04)' : 'var(--bg-input)',
-        border: `1px solid ${isActive ? 'rgba(56,189,248,0.2)' : 'var(--border-base)'}`,
+        backgroundColor: isActive ? 'color-mix(in srgb, var(--color-info) 4%, transparent)' : 'var(--bg-input)',
+        border: `1px solid ${isActive ? 'color-mix(in srgb, var(--color-info) 20%, transparent)' : 'var(--border-base)'}`,
       }}
     >
       {/* Mission header */}
@@ -373,7 +373,7 @@ function MissionCard({
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+          <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
             {mission.title}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
@@ -389,7 +389,7 @@ function MissionCard({
             {/* Confidence */}
             <div className="flex items-center gap-0.5" style={{ color: confColor }}>
               {confidenceIcon(mission.confidence)}
-              <span className="text-[9px] font-mono font-bold">
+              <span className="text-xs font-mono font-bold">
                 {Math.round(mission.confidence * 100)}%
               </span>
             </div>
@@ -414,16 +414,16 @@ function MissionCard({
             <div className="px-3 pb-3 space-y-1.5" style={{ borderTop: '1px solid var(--border-base)' }}>
               {/* Metrics row */}
               <div className="flex items-center gap-3 pt-2 pb-1">
-                <span className="text-[9px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
-                  Actions: <span style={{ color: '#4ade80' }}>{mission.metrics.successfulActions}✓</span>
-                  {' '}<span style={{ color: '#f87171' }}>{mission.metrics.failedActions}✗</span>
+                <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                  Actions: <span style={{ color: 'var(--color-success)' }}>{mission.metrics.successfulActions}✓</span>
+                  {' '}<span style={{ color: 'var(--color-error)' }}>{mission.metrics.failedActions}✗</span>
                   {' '}/ {mission.metrics.totalActions}
                 </span>
               </div>
 
               {/* Goals */}
               {mission.goals.length === 0 ? (
-                <div className="text-[9px] italic py-2" style={{ color: 'var(--text-dimmed)' }}>
+                <div className="text-xs italic py-2" style={{ color: 'var(--text-dimmed)' }}>
                   Planification en cours...
                 </div>
               ) : (
@@ -469,12 +469,12 @@ function GoalCard({
         onClick={onToggle}
       >
         <div className="flex-shrink-0">{statusIcon(goal.status, 10)}</div>
-        <span className="text-[10px] flex-1 truncate font-medium" style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+        <span className="text-xs flex-1 truncate font-medium" style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}>
           {goal.title}
         </span>
         {isActive && (
-          <span className="text-[8px] px-1 py-0.5 rounded font-bold uppercase"
-            style={{ color: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)' }}>
+          <span className="text-xs px-1 py-0.5 rounded font-bold uppercase"
+            style={{ color: 'var(--color-info)', backgroundColor: 'color-mix(in srgb, var(--color-info) 10%, transparent)' }}>
             actif
           </span>
         )}
@@ -508,17 +508,17 @@ function ActionRow({ action }: { action: ActionEntry }) {
     <div className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-white/5">
       <div className="flex-shrink-0">{statusIcon(action.status, 9)}</div>
       <Zap size={9} style={{ color: 'var(--accent-primary)' }} className="flex-shrink-0" />
-      <span className="text-[9px] font-mono flex-1 truncate" style={{ color: 'var(--text-muted)' }}>
+      <span className="text-xs font-mono flex-1 truncate" style={{ color: 'var(--text-muted)' }}>
         {action.skill}
       </span>
       {action.durationMs && (
-        <span className="text-[8px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+        <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
           {formatDuration(action.durationMs)}
         </span>
       )}
       {action.decision && decisionBadge(action.decision)}
       {action.confidence !== undefined && (
-        <span className="text-[8px] font-mono" style={{ color: confidenceColor(action.confidence) }}>
+        <span className="text-xs font-mono" style={{ color: confidenceColor(action.confidence) }}>
           {Math.round(action.confidence * 100)}%
         </span>
       )}
@@ -536,10 +536,10 @@ function EmptyMissionState() {
         <Target size={20} style={{ color: 'var(--text-dimmed)' }} />
       </div>
       <div className="text-center px-4">
-        <p className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
           Aucune mission active
         </p>
-        <p className="text-[9px] mt-1 leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
+        <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
           Les missions se déclenchent pour les tâches complexes multi-étapes.
           L'IA décompose, planifie, exécute et vérifie automatiquement.
         </p>

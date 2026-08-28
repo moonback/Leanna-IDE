@@ -89,7 +89,7 @@ export const MemoryPanel = React.memo(function MemoryPanel({
           {/* Compteur */}
           {memories.length > 0 && (
             <span
-              className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md tabular-nums"
+              className="text-xs font-semibold px-1.5 py-0.5 rounded-md tabular-nums"
               style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
             >
               {memories.length}
@@ -200,7 +200,7 @@ export const MemoryPanel = React.memo(function MemoryPanel({
               <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {query ? 'Aucune correspondance' : 'Aucun souvenir'}
               </p>
-              <p className="text-[11px] leading-relaxed max-w-[200px]" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-sm leading-relaxed max-w-[200px]" style={{ color: 'var(--text-muted)' }}>
                 {query
                   ? 'Essayez un autre terme.'
                   : 'Jarvis retient automatiquement les informations importantes.'}
@@ -241,11 +241,11 @@ export const MemoryPanel = React.memo(function MemoryPanel({
                       className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                       style={{ backgroundColor: 'var(--accent-primary)', boxShadow: '0 0 6px var(--accent-glow)' }}
                     />
-                    <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
                       {timeAgo(memory.created_at)}
                     </span>
                   </div>
-                  <span className="text-[9px] uppercase tracking-wider font-bold" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs uppercase tracking-wider font-bold" style={{ color: 'var(--text-dimmed)' }}>
                     long terme
                   </span>
                 </div>
@@ -257,8 +257,8 @@ export const MemoryPanel = React.memo(function MemoryPanel({
                   disabled={deleting === memory.id}
                   whileTap={{ scale: 0.85 }}
                   className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 p-1 rounded-md transition-opacity"
-                  style={{ color: 'var(--color-error, #ef4444)' }}
-                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.12)')}
+                  style={{ color: 'var(--color-error)' }}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--color-error) 12%, transparent)')}
                   onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}
                   aria-label="Supprimer"
                 >
@@ -275,7 +275,7 @@ export const MemoryPanel = React.memo(function MemoryPanel({
 
       {/* Footer — result count when filtering */}
       {query && filtered.length > 0 && (
-        <p className="mt-2 text-[10px] text-center" style={{ color: 'var(--text-dimmed)' }}>
+        <p className="mt-2 text-xs text-center" style={{ color: 'var(--text-dimmed)' }}>
           {filtered.length} résultat{filtered.length > 1 ? 's' : ''}
         </p>
       )}

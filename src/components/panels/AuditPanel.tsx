@@ -20,9 +20,9 @@ function statusIcon(step: AuditStep) {
     case 'running':
       return <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />;
     case 'done':
-      return <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#4ade80' }} />;
+      return <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />;
     case 'error':
-      return <AlertCircle className="w-3.5 h-3.5" style={{ color: '#f87171' }} />;
+      return <AlertCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />;
     default:
       return <Circle className="w-3.5 h-3.5" style={{ color: 'var(--text-dimmed)' }} />;
   }
@@ -42,14 +42,14 @@ function stepIcon(id: string) {
 function HealthBadge({ ok, label }: { ok: boolean; label: string }) {
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold"
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold"
       style={{
-        backgroundColor: ok ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)',
-        color: ok ? '#4ade80' : '#f87171',
-        border: `1px solid ${ok ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`,
+        backgroundColor: ok ? 'color-mix(in srgb, var(--color-success) 12%, transparent)' : 'color-mix(in srgb, var(--color-error) 12%, transparent)',
+        color: ok ? 'var(--color-success)' : 'var(--color-error)',
+        border: `1px solid ${ok ? 'color-mix(in srgb, var(--color-success) 30%, transparent)' : 'color-mix(in srgb, var(--color-error) 30%, transparent)'}`,
       }}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ok ? '#4ade80' : '#f87171' }} />
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ok ? 'var(--color-success)' : 'var(--color-error)' }} />
       {label}
     </span>
   );
@@ -57,7 +57,7 @@ function HealthBadge({ ok, label }: { ok: boolean; label: string }) {
 
 function MemBar({ used, total }: { used: number; total: number }) {
   const pct = total > 0 ? Math.round((used / total) * 100) : 0;
-  const color = pct > 85 ? '#f87171' : pct > 60 ? '#facc15' : '#4ade80';
+  const color = pct > 85 ? 'var(--color-error)' : pct > 60 ? 'var(--color-warning)' : 'var(--color-success)';
   return (
     <div className="flex items-center gap-2 mt-1">
       <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-base)' }}>
@@ -66,7 +66,7 @@ function MemBar({ used, total }: { used: number; total: number }) {
           style={{ width: `${pct}%`, backgroundColor: color }}
         />
       </div>
-      <span className="text-[10px] font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+      <span className="text-xs font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
         {pct}%
       </span>
     </div>
@@ -74,9 +74,9 @@ function MemBar({ used, total }: { used: number; total: number }) {
 }
 
 function scoreColor(score: number) {
-  if (score >= 80) return '#4ade80';
-  if (score >= 50) return '#facc15';
-  return '#f87171';
+  if (score >= 80) return 'var(--color-success)';
+  if (score >= 50) return 'var(--color-warning)';
+  return 'var(--color-error)';
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ export const AuditPanel = React.memo(function AuditPanel({
             <button
               onClick={onRunAudit}
               disabled={isRunning}
-              className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-all"
+              className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-lg transition-all"
               style={{
                 color: isRunning ? 'var(--text-dimmed)' : 'var(--bg-base)',
                 backgroundColor: isRunning ? 'var(--border-base)' : 'var(--accent-primary)',
@@ -129,7 +129,7 @@ export const AuditPanel = React.memo(function AuditPanel({
           {onOpenRouter && (
             <button
               onClick={onOpenRouter}
-              className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-colors"
+              className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-lg transition-colors"
               style={{
                 color: 'var(--accent-primary)',
                 border: '1px solid var(--accent-primary)',
@@ -149,10 +149,10 @@ export const AuditPanel = React.memo(function AuditPanel({
         {/* ── Progress bar ─────────────────────────────────── */}
         <div>
           <div className="flex justify-between items-center mb-1">
-            <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
               {allDone ? 'Audit terminé' : `Étape ${done} / ${total}`}
             </span>
-            <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
               {progress}%
             </span>
           </div>
@@ -176,7 +176,7 @@ export const AuditPanel = React.memo(function AuditPanel({
               borderColor: step.status === 'running'
                 ? 'var(--accent-primary)'
                 : step.status === 'error'
-                  ? 'rgba(248,113,113,0.5)'
+                  ? 'color-mix(in srgb, var(--color-error) 50%, transparent)'
                   : 'var(--border-base)',
               backgroundColor: 'var(--bg-secondary)',
             }}
@@ -191,7 +191,7 @@ export const AuditPanel = React.memo(function AuditPanel({
                   </span>
                   {step.value && (
                     <span
-                      className="ml-auto text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded"
+                      className="ml-auto text-xs font-mono font-semibold px-1.5 py-0.5 rounded"
                       style={{
                         backgroundColor: 'var(--border-base)',
                         color: 'var(--accent-primary)',
@@ -201,7 +201,7 @@ export const AuditPanel = React.memo(function AuditPanel({
                     </span>
                   )}
                 </div>
-                <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
                   {step.detail}
                 </div>
               </div>
@@ -299,7 +299,7 @@ export const AuditPanel = React.memo(function AuditPanel({
                   {report.activeSkills.map(s => (
                     <span
                       key={s}
-                      className="px-1.5 py-0.5 rounded text-[10px] font-mono"
+                      className="px-1.5 py-0.5 rounded text-xs font-mono"
                       style={{
                         backgroundColor: 'var(--border-base)',
                         color: 'var(--accent-primary)',
@@ -313,7 +313,7 @@ export const AuditPanel = React.memo(function AuditPanel({
             )}
 
             {/* Generated at */}
-            <p className="text-[10px] text-center" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="text-xs text-center" style={{ color: 'var(--text-dimmed)' }}>
               Généré le {new Date(report.generatedAt).toLocaleString('fr-FR')}
             </p>
           </>
@@ -328,8 +328,8 @@ export const AuditPanel = React.memo(function AuditPanel({
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{label}</p>
-      <p className="text-[11px] font-semibold font-mono truncate" style={{ color: 'var(--text-primary)' }}>
+      <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{label}</p>
+      <p className="text-sm font-semibold font-mono truncate" style={{ color: 'var(--text-primary)' }}>
         {value}
       </p>
     </div>

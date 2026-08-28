@@ -203,11 +203,11 @@ export const ConversationHistoryPanel = React.memo(function ConversationHistoryP
                     {conv.title || 'Conversation sans titre'}
                   </p>
                   <div className="flex items-center gap-2 mt-1.5">
-                    <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                       {timeAgo(conv.started_at)}
                     </span>
-                    <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>•</span>
-                    <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>•</span>
+                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                       {conv.message_count} msg
                     </span>
                   </div>
@@ -285,12 +285,12 @@ export const ConversationHistoryPanel = React.memo(function ConversationHistoryP
               )}
               <div className={`flex flex-col gap-0.5 max-w-[80%] ${isAssistant ? 'items-start' : 'items-end'}`}>
                 {!isConsecutive && (
-                  <span className="text-[8px] font-semibold uppercase tracking-wider px-0.5 mb-0.5" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs font-semibold uppercase tracking-wider px-0.5 mb-0.5" style={{ color: 'var(--text-dimmed)' }}>
                     {isAssistant ? 'Jarvis' : 'Vous'}
                   </span>
                 )}
                 <div
-                  className="px-3 py-2 text-[11px] leading-relaxed whitespace-pre-wrap"
+                  className="px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap"
                   style={{
                     backgroundColor: isAssistant ? 'var(--bg-secondary)' : 'var(--accent-subtle)',
                     border: `1px solid ${isAssistant ? 'var(--border-base)' : 'var(--border-focus)'}`,
@@ -303,7 +303,7 @@ export const ConversationHistoryPanel = React.memo(function ConversationHistoryP
                   {msg.content}
                 </div>
                 {!isConsecutive && (
-                  <span className="text-[9px] font-mono px-1" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs font-mono px-1" style={{ color: 'var(--text-dimmed)' }}>
                     {formatDate(msg.created_at)}
                   </span>
                 )}
@@ -327,7 +327,7 @@ export const ConversationHistoryPanel = React.memo(function ConversationHistoryP
         Retour
       </button>
 
-      <p className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+      <p className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
         {searchResults.length} résultat{searchResults.length !== 1 ? 's' : ''} pour "{searchQuery}"
       </p>
 
@@ -347,13 +347,13 @@ export const ConversationHistoryPanel = React.memo(function ConversationHistoryP
                 borderColor: 'var(--border-base)',
               }}
             >
-              <p className="text-[10px] font-medium truncate mb-1" style={{ color: 'var(--accent-primary)' }}>
+              <p className="text-xs font-medium truncate mb-1" style={{ color: 'var(--accent-primary)' }}>
                 {result.conversation_title || 'Conversation sans titre'}
               </p>
-              <p className="text-[11px] line-clamp-2 leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+              <p className="text-sm line-clamp-2 leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                 {result.content}
               </p>
-              <span className="text-[9px] font-mono mt-1 block" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs font-mono mt-1 block" style={{ color: 'var(--text-dimmed)' }}>
                 {formatDate(result.created_at)} • {result.role}
               </span>
             </button>

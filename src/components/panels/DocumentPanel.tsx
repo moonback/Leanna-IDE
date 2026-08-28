@@ -368,7 +368,7 @@ export function DocumentPanel() {
           >
             <div
               className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs"
-              style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#f87171' }}
+              style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 20%, transparent)', color: 'var(--color-error)' }}
             >
               <AlertCircle size={11} />
               <span className="flex-1 truncate">{error}</span>
@@ -503,15 +503,15 @@ function DocumentItem({ doc, selected, expanded, onToggleSelect, onToggleExpand,
             backgroundColor: selected ? 'var(--accent-primary)' : 'transparent',
           }}
         >
-          {selected && <span className="text-[8px] text-white font-bold">✓</span>}
+          {selected && <span className="text-xs text-white font-bold">✓</span>}
         </button>
 
         {/* Icon */}
         <div className="flex-shrink-0">
           {isImage ? (
-            <FileImage size={13} style={{ color: '#a78bfa' }} />
+            <FileImage size={13} style={{ color: 'var(--color-accent-alt)' }} />
           ) : (
-            <FileText size={13} style={{ color: '#60a5fa' }} />
+            <FileText size={13} style={{ color: 'var(--color-info)' }} />
           )}
         </div>
 
@@ -539,7 +539,7 @@ function DocumentItem({ doc, selected, expanded, onToggleSelect, onToggleExpand,
           className="p-1 rounded opacity-0 group-hover:opacity-100 transition hover:bg-red-500/10"
           title="Supprimer"
         >
-          <Trash2 size={11} style={{ color: '#f87171' }} />
+          <Trash2 size={11} style={{ color: 'var(--color-error)' }} />
         </button>
       </div>
 
@@ -600,11 +600,11 @@ function LinksList({ links, documents }: LinksListProps) {
   const getDocName = (id: string) => documents.find((d) => d.id === id)?.fileName || id;
 
   const linkTypeColors: Record<string, string> = {
-    thematic: '#60a5fa',
-    complementary: '#34d399',
-    contradictory: '#f87171',
-    sequential: '#fbbf24',
-    reference: '#a78bfa',
+    thematic: 'var(--color-info)',
+    complementary: 'var(--color-success)',
+    contradictory: 'var(--color-error)',
+    sequential: 'var(--color-warning)',
+    reference: 'var(--color-accent-alt)',
   };
 
   const linkTypeLabels: Record<string, string> = {
@@ -627,8 +627,8 @@ function LinksList({ links, documents }: LinksListProps) {
             <span
               className="text-xs px-1.5 py-0.5 rounded-full font-medium"
               style={{
-                backgroundColor: `${linkTypeColors[link.linkType] || '#6b7280'}20`,
-                color: linkTypeColors[link.linkType] || '#6b7280',
+                backgroundColor: `${linkTypeColors[link.linkType] || 'var(--text-muted)'}20`,
+                color: linkTypeColors[link.linkType] || 'var(--text-muted)',
               }}
             >
               {linkTypeLabels[link.linkType] || link.linkType}
