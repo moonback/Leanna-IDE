@@ -4,7 +4,26 @@
   /* Typography */
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+/* Typography Scale (REM-based, 16px = 1rem) */
+--text-xs:    0.625rem;   /* 10px  - Captions, hints */
+--text-sm:    0.75rem;    /* 12px  - Secondary text */
+--text-base:  0.875rem;   /* 14px  - Body (markdown) */
+--text-lg:    1rem;       /* 16px  - Default */
+--text-xl:    1.125rem;   /* 18px  - Headings */
+--text-2xl:   1.25rem;    /* 20px  - Titres */
+--text-3xl:   1.5rem;     /* 24px  - Grandes sections */
 
+/* Font weights */
+--font-light: 300;
+--font-normal: 400;
+--font-medium: 500;
+--font-semibold: 600;
+--font-bold: 700;
+
+/* Line heights */
+--leading-tight: 1.25;
+--leading-normal: 1.5;
+--leading-relaxed: 1.75;
   /* Border radius scale — IDE-pro feel (tight, technical) */
   --radius-xs:   2px;
   --radius-sm:   4px;
@@ -538,6 +557,7 @@ body {
   animation: var(--animate-skeleton);
   border-radius: var(--radius-sm);
 }
+
 .skeleton-text {
   height: 12px;
   margin-bottom: 8px;
