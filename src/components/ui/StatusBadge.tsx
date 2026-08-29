@@ -42,7 +42,7 @@ const STATUS_MAP: Record<StatusType, StatusConfig> = {
     label: 'En cours',
     color: 'var(--accent-primary)',
     bgColor: 'var(--accent-subtle)',
-    borderColor: 'rgba(99, 102, 241, 0.25)',
+    borderColor: 'rgba(0, 194, 255, 0.25)',
   },
   success: {
     icon: CheckCircle2,

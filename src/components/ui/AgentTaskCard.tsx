@@ -197,7 +197,7 @@ export function AgentTaskCard({
               style={{
                 backgroundColor: 'var(--accent-subtle)',
                 color: 'var(--accent-primary)',
-                border: '1px solid rgba(99, 102, 241, 0.25)',
+                border: '1px solid rgba(0, 194, 255, 0.25)',
               }}
             >
               <RotateCcw size={10} />

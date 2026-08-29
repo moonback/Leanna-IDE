@@ -214,7 +214,14 @@ export function KnowledgeHealthDashboard() {
             <Folder className="w-3.5 h-3.5 opacity-70" />
             <span>Workspace : <code className="px-1.5 py-0.5 rounded text-xs" style={{ backgroundColor: 'var(--bg-base)' }}>{workspace.activeWorkspace}</code></span>
             {workspace.sandboxActive && (
-              <span className="px-2 py-0.5 rounded text-sm font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              <span 
+                className="px-2 py-0.5 rounded text-sm font-semibold"
+                style={{
+                  backgroundColor: 'rgba(0, 194, 255, 0.2)',
+                  color: 'rgba(0, 194, 255, 0.7)',
+                  border: '1px solid rgba(0, 194, 255, 0.3)',
+                }}
+              >
                 Sandbox Actif
               </span>
             )}
@@ -234,7 +241,7 @@ export function KnowledgeHealthDashboard() {
           <button
             onClick={handleReindex}
             disabled={reindexing}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs transition-all shadow-lg shadow-indigo-500/10 active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs transition-all shadow-lg shadow-cyan-500/10 active:scale-95 disabled:opacity-50"
             style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
           >
             <Zap className={`w-3.5 h-3.5 ${reindexing ? 'animate-bounce' : ''}`} />
@@ -307,7 +314,7 @@ export function KnowledgeHealthDashboard() {
           <div className="space-y-1 pt-1">
             <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
               <div
-                className="h-full rounded-full transition-all bg-gradient-to-r from-purple-500 to-indigo-500"
+                className="h-full rounded-full transition-all bg-gradient-to-r from-cyan-500 to-blue-500"
                 style={{ width: `${Math.min(100, (pm.totalFacts / pm.maxFacts) * 100)}%` }}
               />
             </div>
@@ -430,7 +437,7 @@ export function KnowledgeHealthDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 rounded-2xl border space-y-3" style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
               <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                <HardDrive className="w-4 h-4 text-indigo-400" />
+                <HardDrive className="w-4 h-4" style={{ color: '#00c2ff' }} />
                 Détails de Persistance Disque
               </h3>
               <div className="space-y-2 text-xs" style={{ color: 'var(--text-muted)' }}>
