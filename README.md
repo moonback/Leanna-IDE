@@ -18,7 +18,7 @@
 <p align="center">
   <img src="assets/images/header.png" alt="Leanna OS" width="100%" />
 </p>
----
+
 
 ## 📌 Table des matières
 
