@@ -1,5 +1,5 @@
 import { Skill } from "./base.js";
-import { execFile } from "child_process";
+import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
 import path from "path";
@@ -43,21 +43,103 @@ const ALLOWED_NPM_SUBCOMMANDS = [
 // Seuls ces préfixes sont acceptés ; tout autre préfixe est rejeté.
 const RUN_ALLOWED_PREFIXES = ["npm ", "npx ", "node "] as const;
 
-// Sous-commandes npm qui NE nécessitent PAS de confirmation interactive
-// (lecture/exécution locale sans modification du disque/réseau).
-const NPM_NO_CONFIRM = new Set(["run", "test", "audit", "ls", "list", "outdated"]);
+// SECURITY (revue) : "run" et "test" exécutent du code arbitraire défini par le
+// projet (scripts npm), ce qui est potentiellement plus dangereux qu'un simple
+// "npm install <paquet connu>". On ne dispense donc de confirmation que les
+// sous-commandes strictement en lecture seule (aucune exécution de code du
+// projet, aucune modification du disque).
+const NPM_NO_CONFIRM = new Set(["ls", "list", "outdated"]);
 
 const RUN_TIMEOUT_MS = 120_000; // 2 minutes max
 
+// Scripts npm connus pour tourner indéfiniment (dev server, watcher, etc.).
+// Ces scripts sont lancés en arrière-plan (détachés) sans attendre leur fin.
+const LONG_RUNNING_SCRIPTS = new Set([
+    "dev", "start", "serve", "watch",
+    "storybook", "preview", "electron", "tauri"
+]);
+
+/**
+ * Détermine si "npm run <script>" est une commande longue durée (serveur de
+ * développement, watcher…). Si oui, elle doit être lancée de façon détachée
+ * plutôt qu'attendue avec execFileAsync.
+ */
+function isLongRunningNpmScript(parts: string[]): boolean {
+    // parts[0] === "npm", parts[1] === "run", parts[2] === <script>
+    if ((parts[1] ?? "").toLowerCase() !== "run") return false;
+    const script = (parts[2] ?? "").toLowerCase();
+    return LONG_RUNNING_SCRIPTS.has(script);
+}
+
+/**
+ * Lance un processus npm de longue durée de façon détachée et retourne
+ * immédiatement avec le PID. Le processus continue de tourner en arrière-plan
+ * même après la réponse de l'assistant.
+ */
+function spawnDetached(npmBin: string, args: string[], cwd: string): { pid: number | undefined } {
+    const child = spawn(npmBin, args, {
+        cwd,
+        detached: true,
+        stdio: "ignore",
+        shell: needsShellWrapper(npmBin),
+        env: { ...process.env },
+        windowsHide: false,
+    });
+    child.unref(); // Ne pas bloquer le process Node parent
+    return { pid: child.pid };
+}
+
+/**
+ * BUGFIX (spawn EINVAL sur Windows) : npm.cmd / npx.cmd sont des scripts batch,
+ * pas des exécutables natifs. CreateProcess ne peut pas les lancer directement,
+ * et depuis le correctif Node pour CVE-2024-27980 (Node ≥ 18.20.2 / 20.12.2 /
+ * 21.7.3), spawn/execFile en shell:false refuse désormais de le faire et lève
+ * EINVAL au lieu de risquer l'injection de commande.
+ *
+ * On active shell:true uniquement pour ces binaires .cmd sur Windows — avec un
+ * tableau d'arguments, Node échappe alors correctement chaque argument pour
+ * cmd.exe, donc pas de régression côté injection (contrairement à une
+ * concaténation manuelle en string, qui elle serait vulnérable).
+ */
+function needsShellWrapper(bin: string): boolean {
+    return os.platform() === "win32" && /\.cmd$/i.test(bin);
+}
+
 /**
  * Détermine si une commande npm nécessite une confirmation utilisateur.
- * Les commandes qui modifient node_modules (install, uninstall, update, ci) nécessitent
- * une confirmation explicite ; les scripts (run, test) et audits peuvent s'exécuter sans.
+ * Seules les commandes strictement en lecture (ls, list, outdated) sont
+ * dispensées de confirmation. Tout le reste — y compris "run"/"test", qui
+ * exécutent du code défini dans package.json — nécessite une confirmation
+ * explicite.
  */
 function npmNeedsConfirmation(parts: string[]): boolean {
     // parts[0] === "npm", parts[1] === subcommand
     const sub = (parts[1] ?? "").toLowerCase();
     return !NPM_NO_CONFIRM.has(sub);
+}
+
+/**
+ * Pour "npm run <script>" / "npm test", tente de récupérer le contenu réel
+ * du script depuis package.json afin de l'afficher dans la demande de
+ * confirmation. L'utilisateur voit ainsi ce qui va réellement s'exécuter,
+ * pas seulement le nom du script.
+ */
+async function describeNpmScript(root: string, parts: string[]): Promise<string> {
+    const sub = (parts[1] ?? "").toLowerCase();
+    const scriptName = sub === "test" ? "test" : (parts[2] ?? "");
+    if (!scriptName) return `npm ${parts.slice(1).join(" ")}`;
+
+    try {
+        const pkgRaw = await fs.promises.readFile(path.join(root, "package.json"), "utf8");
+        const pkg = JSON.parse(pkgRaw);
+        const scriptCmd = pkg?.scripts?.[scriptName];
+        if (scriptCmd) {
+            return `npm ${parts.slice(1).join(" ")}\n→ exécutera : ${truncate(String(scriptCmd), 300)}`;
+        }
+        return `npm ${parts.slice(1).join(" ")} (script "${scriptName}" introuvable dans package.json)`;
+    } catch {
+        return `npm ${parts.slice(1).join(" ")}`;
+    }
 }
 
 function truncate(str: string, max = 2000): string {
@@ -68,6 +150,22 @@ function asString(value: unknown, fallback = ""): string {
     return typeof value === "string" ? value : fallback;
 }
 
+/**
+ * Découpe une ligne de commande en tokens, en respectant les guillemets
+ * simples/doubles (ex: npm install "some package"). Contrairement à un
+ * simple split sur les espaces, ceci permet des arguments contenant des
+ * espaces sans casser le découpage.
+ */
+function splitCommandLine(cmd: string): string[] {
+    const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+    const parts: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(cmd))) {
+        parts.push(m[1] ?? m[2] ?? m[3]);
+    }
+    return parts;
+}
+
 // BUGFIX (injection de commande critique) : la regex précédente
 // `/[;&|`$<>]/` ne filtrait pas les retours à la ligne (\n, \r) ni les autres
 // caractères de contrôle. Comme la commande était ensuite exécutée via
@@ -76,17 +174,16 @@ function asString(value: unknown, fallback = ""): string {
 // commande arbitraire. On bloque désormais tout caractère de contrôle et les
 // métacaractères shell usuels (guillemets, glob, sous-shell, chemin parent).
 //
-// SECURITY (renforcement) : `^` et `%` ont été ajoutés à la liste. La
-// commande npm est exécutée via `execFile(..., { shell: true })`, qui sur
-// Windows invoque cmd.exe. Dans cmd.exe, `^` est le caractère d'échappement
-// (permettant de neutraliser un autre filtre) et `%VAR%` déclenche une
-// expansion de variable d'environnement (fuite d'information, voire
-// exécution si une variable contrôlée par l'attaquant existe). La virgule et
-// `@` sont également des séparateurs/opérateurs reconnus par cmd.exe dans
-// certains contextes et sont bloqués par prudence.
+// NOTE (revue) : la plupart des exécutions passent par execFile(..., { shell: false }),
+// donc l'essentiel de ces caractères n'est pas interprété par un shell — sauf
+// pour npm.cmd/npx.cmd sur Windows (voir needsShellWrapper), où shell:true est
+// utilisé avec un tableau d'arguments correctement échappé par Node. Ce filtre
+// reste une défense en profondeur. Le caractère '@' a été retiré du blocklist :
+// nécessaire pour les paquets scopés (ex: "@types/node") et le pin de version
+// (ex: "lodash@4.17.21"), sans risque réel ici.
 function isSafeShellCommand(command: string): boolean {
     if (/[\x00-\x1f\x7f]/.test(command)) return false; // \n \r \t et autres contrôles
-    return !/[;&|`$<>(){}[\]"'*?~!\\^%,@]/.test(command) && !command.includes("..");
+    return !/[;&|`$<>(){}[\]"'*?~!\\^%,]/.test(command) && !command.includes("..");
 }
 
 function globToRegex(glob: string): RegExp {
@@ -97,6 +194,92 @@ function globToRegex(glob: string): RegExp {
         .replace(/\[!(.*?)\]/g, '[^$1]')
         .replace(/\[(.*?)\]/g, '[$1]') + '$';
     return new RegExp(regexStr);
+}
+
+/**
+ * Exécute une sous-commande npm de façon centralisée : vérifie l'allowlist,
+ * demande confirmation si nécessaire, puis exécute via execFile. Factorisé
+ * pour éviter que run_project_command et system_execute_command divergent sur
+ * les règles de sécurité (c'était le cas avant cette revue).
+ */
+async function runNpmSubcommand(
+    parts: string[],
+    cwd: string,
+    toolContext: { emitToClient?: (data: any) => void } | undefined,
+    timeoutMs: number
+): Promise<any> {
+    const sub = (parts[1] ?? "").toLowerCase();
+
+    if (!sub || !ALLOWED_NPM_SUBCOMMANDS.includes(sub as any)) {
+        return { error: `Sous-commande npm non autorisée: "${sub}". Autorisées: ${ALLOWED_NPM_SUBCOMMANDS.join(", ")}` };
+    }
+
+    if (npmNeedsConfirmation(parts)) {
+        if (!toolContext?.emitToClient) {
+            return { error: "Confirmation interactive indisponible dans ce contexte. Exécutez la commande manuellement dans le terminal." };
+        }
+        const description = (sub === "run" || sub === "test")
+            ? await describeNpmScript(cwd, parts)
+            : `Exécuter dans le projet : npm ${parts.slice(1).join(" ")}`;
+
+        const approved = await requestConfirmation(
+            parts.join(" "),
+            "npm-command",
+            toolContext.emitToClient,
+            description
+        );
+        if (!approved) {
+            return { error: "Commande npm refusée par l'utilisateur ou expirée." };
+        }
+    }
+
+    console.log(`[System] Exécution npm: ${parts.join(" ")} (cwd: ${cwd})`);
+
+    try {
+        const npmBin = os.platform() === "win32" ? "npm.cmd" : "npm";
+
+        // Commandes longue durée : lancer en arrière-plan et répondre immédiatement.
+        if (isLongRunningNpmScript(parts)) {
+            const { pid } = spawnDetached(npmBin, parts.slice(1), cwd);
+            const scriptName = parts[2] ?? parts.slice(1).join(" ");
+            return {
+                status: "success",
+                command: parts.join(" "),
+                cwd,
+                pid: pid ?? null,
+                message: `Le script "${scriptName}" a été lancé en arrière-plan (PID: ${pid ?? "inconnu"}). Il tourne de façon indépendante — vous pouvez continuer à interagir normalement. Pour l'arrêter, fermez le terminal correspondant ou utilisez son PID.`,
+                stdout: "",
+                stderr: "",
+                exitCode: null,
+            };
+        }
+
+        const result = await execFileAsync(npmBin, parts.slice(1), {
+            cwd,
+            timeout: timeoutMs,
+            maxBuffer: MAX_BUFFER,
+            shell: needsShellWrapper(npmBin),
+            env: { ...process.env },
+        });
+        return {
+            status: "success",
+            command: parts.join(" "),
+            cwd,
+            stdout: truncate(result.stdout ?? "", 6000),
+            stderr: truncate(result.stderr ?? "", 3000),
+            exitCode: 0,
+        };
+    } catch (e: any) {
+        return {
+            status: "error",
+            command: parts.join(" "),
+            cwd,
+            stdout: truncate(e.stdout ?? "", 6000),
+            stderr: truncate(e.stderr ?? e.message ?? "", 3000),
+            exitCode: typeof e.code === "number" ? e.code : null,
+            error: e.killed ? `Commande interrompue (timeout ${timeoutMs / 1000}s dépassé)` : e.message,
+        };
+    }
 }
 
 export const systemSkill: Skill = {
@@ -135,7 +318,7 @@ export const systemSkill: Skill = {
         },
         {
             name: "run_project_command",
-            description: "Exécute une commande npm, npx ou node dans le workspace du projet et retourne stdout/stderr. Commandes autorisées : npm run <script>, npm install <pkg>, npm uninstall <pkg>, npm test, npm audit, npx <outil>, node <script.js>. Les commandes qui modifient node_modules (install, uninstall, update, ci) nécessitent une confirmation utilisateur interactive. Idéal pour lancer des builds, installer des dépendances, exécuter des scripts ou vérifier la compilation.",
+            description: "Exécute une commande npm, npx ou node dans le workspace du projet et retourne stdout/stderr. Commandes autorisées : npm run <script>, npm install <pkg>, npm uninstall <pkg>, npm test, npm audit, npx <outil>, node <script.js>. Les commandes npm qui exécutent du code du projet ou modifient node_modules (run, test, install, uninstall, update, ci, audit) nécessitent une confirmation utilisateur interactive ; seules ls/list/outdated en sont dispensées. Idéal pour lancer des builds, installer des dépendances, exécuter des scripts ou vérifier la compilation.",
             parameters: {
                 type: "OBJECT",
                 properties: {
@@ -153,12 +336,11 @@ export const systemSkill: Skill = {
         },
         {
             name: "system_execute_command",
-            description: "Exécute une commande shell restreinte (dir, ls, npm) sur le workspace du projet et retourne le résultat. Les commandes npm nécessitent que 'confirmed' soit explicitement à true (confirmation utilisateur préalable) — l'appel est refusé sinon.",
+            description: "Exécute une commande shell restreinte (dir, ls, npm) sur le workspace du projet et retourne le résultat. Toutes les commandes npm nécessitent une confirmation utilisateur interactive préalable (demandée automatiquement par l'outil).",
             parameters: {
                 type: "OBJECT",
                 properties: {
-                    command: { type: "STRING", description: "La commande shell restreinte à exécuter (dir, ls, ou npm sur le projet)" },
-                    confirmed: { type: "BOOLEAN", description: "Doit être true pour les commandes npm, attestant que l'utilisateur a explicitement confirmé l'exécution." }
+                    command: { type: "STRING", description: "La commande shell restreinte à exécuter (dir, ls, ou npm sur le projet)" }
                 },
                 required: ["command"]
             }
@@ -183,7 +365,7 @@ export const systemSkill: Skill = {
                         return { error: "Commande refusée : caractères shell dangereux détectés." };
                     }
 
-                    const parts = rawCmd.split(/\s+/);
+                    const parts = splitCommandLine(rawCmd);
                     const verb = parts[0].toLowerCase();
 
                     // Résoudre le cwd
@@ -197,20 +379,10 @@ export const systemSkill: Skill = {
                         cwdPath = resolved;
                     }
 
-                    // Les commandes npm qui modifient node_modules nécessitent une confirmation
-                    if (verb === "npm" && npmNeedsConfirmation(parts)) {
-                        if (!toolContext?.emitToClient) {
-                            return { error: "Confirmation interactive indisponible dans ce contexte. Exécutez la commande manuellement dans le terminal." };
-                        }
-                        const approved = await requestConfirmation(
-                            rawCmd,
-                            "npm-command",
-                            toolContext.emitToClient,
-                            `Exécuter dans le projet : ${rawCmd}`
-                        );
-                        if (!approved) {
-                            return { error: "Commande refusée par l'utilisateur." };
-                        }
+                    // Les commandes npm passent par le chemin centralisé : allowlist de
+                    // sous-commande + confirmation le cas échéant.
+                    if (verb === "npm") {
+                        return await runNpmSubcommand(parts, cwdPath, toolContext, RUN_TIMEOUT_MS);
                     }
 
                     console.log(`[System] run_project_command: ${rawCmd} (cwd: ${cwdPath})`);
@@ -219,14 +391,11 @@ export const systemSkill: Skill = {
                     let bin: string;
                     let binArgs: string[];
 
-                    if (verb === "npm") {
-                        bin = isWin ? "npm.cmd" : "npm";
-                        binArgs = parts.slice(1);
-                    } else if (verb === "npx") {
+                    if (verb === "npx") {
                         bin = isWin ? "npx.cmd" : "npx";
                         binArgs = parts.slice(1);
                     } else {
-                        // node
+                        // node : exécutable natif, jamais de .cmd, pas besoin de shell wrapper.
                         bin = isWin ? "node.exe" : "node";
                         binArgs = parts.slice(1);
                     }
@@ -236,7 +405,7 @@ export const systemSkill: Skill = {
                             cwd: cwdPath,
                             timeout: RUN_TIMEOUT_MS,
                             maxBuffer: MAX_BUFFER,
-                            shell: false,
+                            shell: needsShellWrapper(bin),
                             env: { ...process.env },
                         });
                         return {
@@ -357,72 +526,32 @@ export const systemSkill: Skill = {
                     const command = asString(args.command).trim();
                     if (!command) return { error: "Paramètre 'command' manquant ou vide." };
 
-                    const commandParts = command.split(/\s+/);
+                    const commandParts = splitCommandLine(command);
                     const verb = commandParts[0].toLowerCase();
                     const targetArg = commandParts.slice(1).join(" ").trim();
 
-                    if (!ALLOWED_COMMANDS.includes(verb as any)) {
+                    if (!(ALLOWED_COMMANDS as readonly string[]).includes(verb)) {
                         return { error: `Seules les commandes suivantes sont autorisées : ${ALLOWED_COMMANDS.join(", ")}. Uniquement sur des chemins à l'intérieur du projet.` };
                     }
 
                     // ── npm commands ───────────────────────────────────────────────
                     if (verb === "npm") {
-                        // SECURITY: args.confirmed was previously passed from the LLM
-                        // tool call and could be forged. We now require a real
-                        // interactive user confirmation via the WebSocket bridge.
-                        if (!toolContext?.emitToClient) {
-                            return { error: "Contexte de confirmation indisponible — aucune confirmation interactive n'est possible." };
-                        }
-
                         if (!isSafeShellCommand(command)) {
                             return { error: "Commande non autorisée : caractères shell dangereux détectés." };
                         }
 
-                        const npmSubcommand = commandParts[1]?.toLowerCase();
-
-                        if (!npmSubcommand || !ALLOWED_NPM_SUBCOMMANDS.includes(npmSubcommand as any)) {
-                            return { error: `Sous-commande npm non autorisée. Commandes autorisées : ${ALLOWED_NPM_SUBCOMMANDS.join(", ")}` };
-                        }
-
-                        const npmApproved = await requestConfirmation(
+                        // SECURITY: la confirmation utilisateur est systématiquement
+                        // requise pour toute sous-commande npm passée par cette voie
+                        // (aucune valeur "confirmed" n'est acceptée depuis l'appelant —
+                        // elle était auparavant fournie par le modèle et donc falsifiable).
+                        // La confirmation réelle passe par requestConfirmation via le
+                        // pont WebSocket, gérée dans runNpmSubcommand.
+                        return await runNpmSubcommand(
+                            commandParts,
                             getProjectRoot(),
-                            'npm-command',
-                            toolContext.emitToClient,
-                            `Exécuter npm ${commandParts.slice(1).join(" ")}`
+                            toolContext ? { emitToClient: toolContext.emitToClient } : undefined,
+                            120_000
                         );
-                        if (!npmApproved) {
-                            return { error: "Commande npm refusée par l'utilisateur ou expirée." };
-                        }
-
-                        console.log(`[System] Exécution npm: ${command} dans ${getProjectRoot()}`);
-                        // SECURITY (Audit §2) : Avertir si npm install avec des paquets spécifiques
-                        if ((npmSubcommand === "install" || npmSubcommand === "i") && commandParts.length > 2) {
-                            console.warn(`[System] ⚠️ npm install avec paquets spécifiques: ${commandParts.slice(2).join(" ")}`);
-                        }
-                        const NPM_TIMEOUT_MS = 120_000; // 2 minutes pour npm
-
-                        try {
-                            const npmBin = os.platform() === "win32" ? "npm.cmd" : "npm";
-                            const result = await execFileAsync(npmBin, commandParts.slice(1), {
-                                timeout: NPM_TIMEOUT_MS,
-                                maxBuffer: MAX_BUFFER,
-                                cwd: getProjectRoot(),
-                                shell: false
-                            });
-                            return {
-                                status: "success",
-                                stdout: truncate(result.stdout ?? "", 4000),
-                                stderr: truncate(result.stderr ?? "", 2000),
-                                error: null
-                            };
-                        } catch (error: any) {
-                            return {
-                                status: "error",
-                                stdout: truncate(error.stdout ?? "", 4000),
-                                stderr: truncate(error.stderr ?? "", 2000),
-                                error: error.killed ? "Commande interrompue (timeout dépassé — 2 min)" : error.message
-                            };
-                        }
                     }
 
                     // ── dir / ls commands ─────────────────────────────────────────
