@@ -1,5 +1,5 @@
 /**
- * documentTemplates.ts — Library of pre-built document templates for Jarvis-OS Phase 7.
+ * documentTemplates.ts — Library of pre-built document templates for Leanna Phase 7.
  */
 
 export interface DocumentTemplate {
@@ -151,7 +151,7 @@ Présentation générale du projet **{nom_projet}** :
 ## 🧩 2. Exigences Fonctionnelles (User Stories)
 
 ### EF-01 : Gestion du profil et des thèmes
-- **En tant qu' :** utilisateur de Jarvis-OS.
+- **En tant qu' :** utilisateur de Leanna.
 - **Je veux :** personnaliser le thème d'interface (Sombre, Clair, Cyberpunk, Sepia, High Contrast) et les couleurs d'accent.
 - **Afin de :** adapter mon environnement de travail à mon confort visuel.
 
@@ -235,7 +235,7 @@ interface TemplatePayload {
 ---
 
 ## 🔒 3. Authentification & Sécurité
-- En-tête requis : \`x-jarvis-token: <TOKEN_SECRETS>\`
+- En-tête requis : \`x-Leanna-token: <TOKEN_SECRETS>\`
 - Validation systématique des types de données en entrée.
 `,
   },

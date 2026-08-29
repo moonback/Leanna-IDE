@@ -196,7 +196,7 @@ export function BrowserPanel({
       setCanGoForward(wv.canGoForward());
 
       // Notifier l'app (utilisé par le skill pour confirmer la navigation)
-      window.dispatchEvent(new CustomEvent('jarvis-browser-navigated', {
+      window.dispatchEvent(new CustomEvent('Leanna-browser-navigated', {
         detail: { url },
       }));
     };
@@ -204,7 +204,7 @@ export function BrowserPanel({
     const onTitleUpdate = (e: Event) => {
       const title = (e as WebviewTitleEvent).title;
       setPageTitle(title);
-      window.dispatchEvent(new CustomEvent('jarvis-browser-title-updated', {
+      window.dispatchEvent(new CustomEvent('Leanna-browser-title-updated', {
         detail: { title, url: wv.getURL() },
       }));
     };
@@ -318,22 +318,22 @@ export function BrowserPanel({
 
       try {
         const raw = await wv.executeJavaScript(extractScript);
-        const token = localStorage.getItem('jarvis_api_token') || '';
+        const token = localStorage.getItem('Leanna_api_token') || '';
         await fetch('/api/browser/content-result', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { 'x-jarvis-token': token } : {}),
+            ...(token ? { 'x-Leanna-token': token } : {}),
           },
           body: JSON.stringify({ requestId: detail.requestId, result: raw, error: null }),
         });
       } catch (err: any) {
-        const token = localStorage.getItem('jarvis_api_token') || '';
+        const token = localStorage.getItem('Leanna_api_token') || '';
         await fetch('/api/browser/content-result', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { 'x-jarvis-token': token } : {}),
+            ...(token ? { 'x-Leanna-token': token } : {}),
           },
           body: JSON.stringify({ requestId: detail.requestId, result: null, error: err?.message ?? 'Erreur JS dans la webview' }),
         }).catch(() => {/* silent */});
@@ -343,12 +343,12 @@ export function BrowserPanel({
     // ── Helper générique : POST résultat d'action webview → backend
     const postActionResult = async (requestId: string, result: any, error: string | null = null) => {
       try {
-        const token = localStorage.getItem('jarvis_api_token') || '';
+        const token = localStorage.getItem('Leanna_api_token') || '';
         await fetch('/api/browser/action-result', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { 'x-jarvis-token': token } : {}),
+            ...(token ? { 'x-Leanna-token': token } : {}),
           },
           body: JSON.stringify({ requestId, result, error }),
         });
@@ -359,9 +359,9 @@ export function BrowserPanel({
     // Injecte (une seule fois) un curseur SVG flottant dans la page,
     // puis l'anime vers la position d'un élément cible avant une action.
     const CURSOR_INJECT_SCRIPT = `(function(){
-      if (document.getElementById('__jarvis_cursor')) return;
+      if (document.getElementById('__Leanna_cursor')) return;
       var cur = document.createElement('div');
-      cur.id = '__jarvis_cursor';
+      cur.id = '__Leanna_cursor';
       cur.style.cssText = [
         'position:fixed',
         'top:0','left:0',
@@ -388,7 +388,7 @@ export function BrowserPanel({
           var el = document.querySelector(${JSON.stringify(selector)});
           if (!el) return;
           var r = el.getBoundingClientRect();
-          var cur = document.getElementById('__jarvis_cursor');
+          var cur = document.getElementById('__Leanna_cursor');
           if (!cur) return;
           cur.style.left = (r.left + r.width / 2 - 4) + 'px';
           cur.style.top  = (r.top  + r.height / 2 - 2) + 'px';
@@ -682,7 +682,7 @@ export function BrowserPanel({
       try {
         await wv.executeJavaScript(CURSOR_INJECT_SCRIPT);
         await wv.executeJavaScript(
-          `(function(x,y){ var cur=document.getElementById('__jarvis_cursor'); if(cur){cur.style.left=x+'px';cur.style.top=y+'px';} })(${lx},${ly})`
+          `(function(x,y){ var cur=document.getElementById('__Leanna_cursor'); if(cur){cur.style.left=x+'px';cur.style.top=y+'px';} })(${lx},${ly})`
         );
       } catch {/* silent */}
     };
@@ -1207,49 +1207,49 @@ export function BrowserPanel({
       }
     };
 
-    window.addEventListener('jarvis-browser-navigate', handleNav);
-    window.addEventListener('jarvis-browser-scroll', handleScroll);
-    window.addEventListener('jarvis-browser-control', handleBrowserControl);
-    window.addEventListener('jarvis-browser-read-request', handleReadRequest as EventListener);
-    window.addEventListener('jarvis-browser-click', handleClick as EventListener);
-    window.addEventListener('jarvis-browser-type', handleType as EventListener);
-    window.addEventListener('jarvis-browser-get-links', handleGetLinks as EventListener);
-    window.addEventListener('jarvis-browser-snapshot', handleSnapshot as EventListener);
-    window.addEventListener('jarvis-browser-inspect', handleInspect as EventListener);
-    window.addEventListener('jarvis-browser-mouse-move', handleMouseMove as EventListener);
+    window.addEventListener('Leanna-browser-navigate', handleNav);
+    window.addEventListener('Leanna-browser-scroll', handleScroll);
+    window.addEventListener('Leanna-browser-control', handleBrowserControl);
+    window.addEventListener('Leanna-browser-read-request', handleReadRequest as EventListener);
+    window.addEventListener('Leanna-browser-click', handleClick as EventListener);
+    window.addEventListener('Leanna-browser-type', handleType as EventListener);
+    window.addEventListener('Leanna-browser-get-links', handleGetLinks as EventListener);
+    window.addEventListener('Leanna-browser-snapshot', handleSnapshot as EventListener);
+    window.addEventListener('Leanna-browser-inspect', handleInspect as EventListener);
+    window.addEventListener('Leanna-browser-mouse-move', handleMouseMove as EventListener);
     // Sprint 1 — J1 : Accessibilité
-    window.addEventListener('jarvis-browser-accessibility-snapshot', handleAccessibilitySnapshot as EventListener);
-    window.addEventListener('jarvis-browser-click-by-role', handleClickByRole as EventListener);
-    window.addEventListener('jarvis-browser-type-by-label', handleTypeByLabel as EventListener);
+    window.addEventListener('Leanna-browser-accessibility-snapshot', handleAccessibilitySnapshot as EventListener);
+    window.addEventListener('Leanna-browser-click-by-role', handleClickByRole as EventListener);
+    window.addEventListener('Leanna-browser-type-by-label', handleTypeByLabel as EventListener);
     // Sprint 1 — J2 : Robustesse
-    window.addEventListener('jarvis-browser-wait-for', handleWaitFor as EventListener);
+    window.addEventListener('Leanna-browser-wait-for', handleWaitFor as EventListener);
     // Sprint 1 — J3 : Actions primitives
-    window.addEventListener('jarvis-browser-get-element-text', handleGetElementText as EventListener);
-    window.addEventListener('jarvis-browser-get-element-attribute', handleGetElementAttribute as EventListener);
-    window.addEventListener('jarvis-browser-fill-form', handleFillForm as EventListener);
-    window.addEventListener('jarvis-browser-select-option', handleSelectOption as EventListener);
+    window.addEventListener('Leanna-browser-get-element-text', handleGetElementText as EventListener);
+    window.addEventListener('Leanna-browser-get-element-attribute', handleGetElementAttribute as EventListener);
+    window.addEventListener('Leanna-browser-fill-form', handleFillForm as EventListener);
+    window.addEventListener('Leanna-browser-select-option', handleSelectOption as EventListener);
     return () => {
-      window.removeEventListener('jarvis-browser-navigate', handleNav);
-      window.removeEventListener('jarvis-browser-scroll', handleScroll);
-      window.removeEventListener('jarvis-browser-control', handleBrowserControl);
-      window.removeEventListener('jarvis-browser-read-request', handleReadRequest as EventListener);
-      window.removeEventListener('jarvis-browser-click', handleClick as EventListener);
-      window.removeEventListener('jarvis-browser-type', handleType as EventListener);
-      window.removeEventListener('jarvis-browser-get-links', handleGetLinks as EventListener);
-      window.removeEventListener('jarvis-browser-snapshot', handleSnapshot as EventListener);
-      window.removeEventListener('jarvis-browser-inspect', handleInspect as EventListener);
-      window.removeEventListener('jarvis-browser-mouse-move', handleMouseMove as EventListener);
+      window.removeEventListener('Leanna-browser-navigate', handleNav);
+      window.removeEventListener('Leanna-browser-scroll', handleScroll);
+      window.removeEventListener('Leanna-browser-control', handleBrowserControl);
+      window.removeEventListener('Leanna-browser-read-request', handleReadRequest as EventListener);
+      window.removeEventListener('Leanna-browser-click', handleClick as EventListener);
+      window.removeEventListener('Leanna-browser-type', handleType as EventListener);
+      window.removeEventListener('Leanna-browser-get-links', handleGetLinks as EventListener);
+      window.removeEventListener('Leanna-browser-snapshot', handleSnapshot as EventListener);
+      window.removeEventListener('Leanna-browser-inspect', handleInspect as EventListener);
+      window.removeEventListener('Leanna-browser-mouse-move', handleMouseMove as EventListener);
       // Sprint 1 — J1 : Accessibilité
-      window.removeEventListener('jarvis-browser-accessibility-snapshot', handleAccessibilitySnapshot as EventListener);
-      window.removeEventListener('jarvis-browser-click-by-role', handleClickByRole as EventListener);
-      window.removeEventListener('jarvis-browser-type-by-label', handleTypeByLabel as EventListener);
+      window.removeEventListener('Leanna-browser-accessibility-snapshot', handleAccessibilitySnapshot as EventListener);
+      window.removeEventListener('Leanna-browser-click-by-role', handleClickByRole as EventListener);
+      window.removeEventListener('Leanna-browser-type-by-label', handleTypeByLabel as EventListener);
       // Sprint 1 — J2 : Robustesse
-      window.removeEventListener('jarvis-browser-wait-for', handleWaitFor as EventListener);
+      window.removeEventListener('Leanna-browser-wait-for', handleWaitFor as EventListener);
       // Sprint 1 — J3 : Actions primitives
-      window.removeEventListener('jarvis-browser-get-element-text', handleGetElementText as EventListener);
-      window.removeEventListener('jarvis-browser-get-element-attribute', handleGetElementAttribute as EventListener);
-      window.removeEventListener('jarvis-browser-fill-form', handleFillForm as EventListener);
-      window.removeEventListener('jarvis-browser-select-option', handleSelectOption as EventListener);
+      window.removeEventListener('Leanna-browser-get-element-text', handleGetElementText as EventListener);
+      window.removeEventListener('Leanna-browser-get-element-attribute', handleGetElementAttribute as EventListener);
+      window.removeEventListener('Leanna-browser-fill-form', handleFillForm as EventListener);
+      window.removeEventListener('Leanna-browser-select-option', handleSelectOption as EventListener);
     };
   }, [navigateTo]);  // ── Render ──────────────────────────────────────────────────────────────────
 

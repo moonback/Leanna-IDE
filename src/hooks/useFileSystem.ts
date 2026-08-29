@@ -91,8 +91,8 @@ export function useFileSystem() {
       loadWorkspaceTree();
       loadDiff(true);
     };
-    window.addEventListener('jarvis-sandbox-changed', handleSandboxChange);
-    return () => window.removeEventListener('jarvis-sandbox-changed', handleSandboxChange);
+    window.addEventListener('Leanna-sandbox-changed', handleSandboxChange);
+    return () => window.removeEventListener('Leanna-sandbox-changed', handleSandboxChange);
   }, [loadTree, loadWorkspaceTree, loadDiff]);
 
   // ── Temps réel : recharger les fichiers ouverts et les diffs quand modifiés dans le sandbox ──
@@ -132,11 +132,11 @@ export function useFileSystem() {
       }
     };
 
-    window.addEventListener('jarvis-sandbox-file-changed', handleFileChanged);
-    window.addEventListener('jarvis-sandbox-file-deleted', handleFileDeleted);
+    window.addEventListener('Leanna-sandbox-file-changed', handleFileChanged);
+    window.addEventListener('Leanna-sandbox-file-deleted', handleFileDeleted);
     return () => {
-      window.removeEventListener('jarvis-sandbox-file-changed', handleFileChanged);
-      window.removeEventListener('jarvis-sandbox-file-deleted', handleFileDeleted);
+      window.removeEventListener('Leanna-sandbox-file-changed', handleFileChanged);
+      window.removeEventListener('Leanna-sandbox-file-deleted', handleFileDeleted);
     };
   }, [openFiles, activePath]);
   // Open a file

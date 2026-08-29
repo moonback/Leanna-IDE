@@ -19,7 +19,7 @@ test('crypto: decrypt supports legacy AES-256-CBC format for backwards compatibi
   const plainText = 'legacy-secret-api-key-12345';
 
   // Create a legacy CBC encrypted string using the same master key derivation
-  const envKey = process.env.JARVIS_MASTER_KEY || '';
+  const envKey = process.env.Leanna_MASTER_KEY || '';
   let userInfo = '';
   try { userInfo = os.userInfo().username; } catch { userInfo = 'default-user'; }
   const rawSecret = envKey + `${os.hostname()}-${os.platform()}-${userInfo}`;

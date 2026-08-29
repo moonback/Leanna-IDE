@@ -190,8 +190,8 @@ async function streamWithOpenRouter(options: GenerateTextStreamOptions): Promise
       headers: {
         'Authorization': `Bearer ${orKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': process.env.OPENROUTER_REFERER || 'https://jarvis-os.local',
-        'X-Title': process.env.OPENROUTER_TITLE || 'Jarvis-OS',
+        'HTTP-Referer': process.env.OPENROUTER_REFERER || 'https://Leanna.local',
+        'X-Title': process.env.OPENROUTER_TITLE || 'Leanna',
       },
       body: JSON.stringify({
         model,
@@ -349,8 +349,8 @@ async function generateWithOpenRouter(options: GenerateTextOptions): Promise<Gen
       headers: {
         'Authorization': `Bearer ${orKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': process.env.OPENROUTER_REFERER || 'https://jarvis-os.local',
-        'X-Title': process.env.OPENROUTER_TITLE || 'Jarvis-OS',
+        'HTTP-Referer': process.env.OPENROUTER_REFERER || 'https://Leanna.local',
+        'X-Title': process.env.OPENROUTER_TITLE || 'Leanna',
       },
       body: JSON.stringify({
         model,

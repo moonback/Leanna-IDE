@@ -1,0 +1,26 @@
+{
+  "aiName": "Leanna",
+  "aiVoice": "Aoede",
+  "userName": "Maysson",
+  "userRole": "createur jarvis",
+  "language": "fr",
+  "responseStyle": "concise",
+  "temperature": 0.3,
+  "topP": 0.8,
+  "textProvider": "openrouter",
+  "openrouterModel": "openai/gpt-5.6-luna",
+  "agents": {
+    "enabled": true,
+    "allowedRoles": [
+      "designer"
+    ]
+  },
+  "hotkeys": {
+    "focusLastModifiedFile": "ctrl+alt+j"
+  },
+  "gitEnabled": false,
+  "customSystemPrompt": "",
+  "reasoningEnabled": false,
+  "openrouterImageModel": "google/gemini-2.5-flash-image",
+  "reasoningVoiceEnabled": false
+}

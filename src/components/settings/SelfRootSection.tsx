@@ -99,8 +99,8 @@ export function SelfRootSection() {
         // Invalide les caches IDE pour forcer un rechargement depuis le nouveau repo
         ideApi.invalidateCache();
         // Reload file tree in IDE + notify workspace change
-        window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
-        window.dispatchEvent(new CustomEvent('jarvis-workspace-changed', { detail: { workspace: data.newRoot } }));
+        window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+        window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: data.newRoot } }));
         setTimeout(() => fetchStatus(), 1000);
       } else {
         setFeedback({ type: 'error', msg: data.error || 'Erreur' });

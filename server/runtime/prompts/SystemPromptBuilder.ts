@@ -59,7 +59,7 @@ export class SystemPromptBuilder {
     }
 
     const variables: Record<string, string> = {
-      aiName: config.aiName ?? "Jarvis",
+      aiName: config.aiName ?? "Leanna",
       userName: config.userName ?? "",
       userRole: config.userRole ?? "",
     };
@@ -173,7 +173,7 @@ export class SystemPromptBuilder {
     const lines: string[] = [];
     lines.push("# Système Multi-Agents");
     lines.push("");
-    lines.push("Tu fais partie du système multi-agents Jarvis-OS, couvrant l'ingénierie de code et la rédaction.");
+    lines.push("Tu fais partie du système multi-agents Leanna, couvrant l'ingénierie de code et la rédaction.");
     lines.push(`**Agents activés :** ${allowedRoles.join(", ")}`);
     lines.push("");
 

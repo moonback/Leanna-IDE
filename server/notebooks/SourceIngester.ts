@@ -130,7 +130,7 @@ export class SourceIngester {
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
       const page = await browser.newPage();
-      await page.setUserAgent("Mozilla/5.0 (compatible; JarvisOS/1.0)");
+      await page.setUserAgent("Mozilla/5.0 (compatible; LeannaOS/1.0)");
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 
       title = await page.title() || url;
@@ -156,7 +156,7 @@ export class SourceIngester {
       log.warn(`Puppeteer failed, fallback fetch: ${e.message}`);
       // Fallback: fetch simple
       const response = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; JarvisOS/1.0)" },
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; LeannaOS/1.0)" },
         signal: AbortSignal.timeout(15000),
       });
       const html = await response.text();

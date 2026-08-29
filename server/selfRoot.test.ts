@@ -1,6 +1,6 @@
 /**
  * Tests de sécurité pour le module selfRoot.ts
- * Vérifie le verrouillage du workspace sur le propre repo de Jarvis-OS.
+ * Vérifie le verrouillage du workspace sur le propre repo de Leanna.
  */
 
 import path from 'path';
@@ -143,14 +143,14 @@ test('isCriticalFile does NOT flag skill files', () => {
   assert.equal(isCriticalFile(abs), false);
 });
 
-// ── Vérification que JARVIS_DEFAULT_WORKSPACE ne peut pas contaminer le root
+// ── Vérification que Leanna_DEFAULT_WORKSPACE ne peut pas contaminer le root
 
-test('SELF_ROOT does not change based on JARVIS_DEFAULT_WORKSPACE env var', () => {
+test('SELF_ROOT does not change based on Leanna_DEFAULT_WORKSPACE env var', () => {
   // Even if someone sets this env var, SELF_ROOT is computed once at module load
-  // and ignores JARVIS_DEFAULT_WORKSPACE entirely.
+  // and ignores Leanna_DEFAULT_WORKSPACE entirely.
   const originalRoot = SELF_ROOT;
-  process.env.JARVIS_DEFAULT_WORKSPACE = '/tmp/malicious';
+  process.env.Leanna_DEFAULT_WORKSPACE = '/tmp/malicious';
   // SELF_ROOT is a const — it cannot be reassigned
   assert.equal(SELF_ROOT, originalRoot);
-  delete process.env.JARVIS_DEFAULT_WORKSPACE;
+  delete process.env.Leanna_DEFAULT_WORKSPACE;
 });

@@ -225,7 +225,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                         fontFamily: 'var(--font-sans)',
                       }}
                     >
-                      JARVIS OS
+                      Leanna OS
                     </p>
                     <p
                       style={{
@@ -478,7 +478,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                     textTransform: 'uppercase',
                   }}
                 >
-                  v0.4.0 · JARVIS OS
+                  v0.4.0 · Leanna OS
                 </span>
               </div>
             </motion.div>

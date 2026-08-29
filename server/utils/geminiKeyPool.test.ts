@@ -5,10 +5,10 @@ import * as path from 'path';
 import * as os from 'os';
 import { SELF_ROOT } from './selfRoot';
 
-const tmpConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-keys-test-'));
-process.env.JARVIS_CONFIG_PATH = tmpConfigDir;
+const tmpConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), 'Leanna-keys-test-'));
+process.env.Leanna_CONFIG_PATH = tmpConfigDir;
 
-// Import dynamique après avoir configuré JARVIS_CONFIG_PATH
+// Import dynamique après avoir configuré Leanna_CONFIG_PATH
 const {
   addGeminiKey,
   removeGeminiKey,

@@ -82,7 +82,7 @@ export interface UserProfile {
   customSystemPrompt: string;  // Prompt système personnalisé (ajouté au prompt de base)
 }
 
-const STORAGE_KEY = 'jarvis_user_profile';
+const STORAGE_KEY = 'Leanna_user_profile';
 
 const DEFAULT_PROFILE: UserProfile = {
   userName:      '',

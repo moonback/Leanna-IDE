@@ -319,7 +319,7 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
               Aucun workflow configuré
             </p>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
-              Demande à Jarvis d'en créer un via le chat.<br/>
+              Demande à Leanna d'en créer un via le chat.<br/>
               Les workflows automatisent des séquences d'actions.
             </p>
           </div>

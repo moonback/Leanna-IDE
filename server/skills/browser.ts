@@ -968,7 +968,7 @@ export const browserSkill: Skill = {
 
     // ── browser_read_content ──────────────────────────────────────────────────
     // Canal retour : le skill envoie un browser-read-request via emitIdeAction
-    // → useLiveAPI dispatche jarvis-browser-read-request
+    // → useLiveAPI dispatche Leanna-browser-read-request
     // → BrowserPanel exécute executeJavaScript et POST /api/browser/content-result
     // → la promesse ici est résolue avec le texte extrait
     if (name === "browser_read_content") {

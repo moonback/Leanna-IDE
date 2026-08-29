@@ -16,7 +16,7 @@ export const researcherAgent = defineAgent({
   ],
   maxConcurrency: 2,
   timeoutMs: 60_000,
-  systemPrompt: `Tu es l'Agent Recherche de Jarvis-OS.
+  systemPrompt: `Tu es l'Agent Recherche de Leanna.
 
 MISSION :
 1. Collecter des informations pertinentes à partir des sources disponibles.

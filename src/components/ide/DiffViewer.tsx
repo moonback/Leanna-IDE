@@ -18,8 +18,8 @@ interface DiffViewerProps {
 // ── Auth helpers ───────────────────────────────────────────────────────────
 
 function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('jarvis_api_token');
-  return token ? { 'x-jarvis-token': token } : {};
+  const token = localStorage.getItem('Leanna_api_token');
+  return token ? { 'x-Leanna-token': token } : {};
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -127,7 +127,7 @@ export function DiffViewer({ filePath, currentContent, theme = 'vs-dark', onClos
               <button
                 onClick={() => {
                   // Revert to saved — dispatch event to reload
-                  window.dispatchEvent(new CustomEvent('jarvis-ide-file-changed', { detail: { path: filePath } }));
+                  window.dispatchEvent(new CustomEvent('Leanna-ide-file-changed', { detail: { path: filePath } }));
                   onClose();
                 }}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition hover:opacity-90"

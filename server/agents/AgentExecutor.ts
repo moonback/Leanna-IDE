@@ -1143,7 +1143,7 @@ ${truncated}
     ];
     const preferredRank = new Map(preferredFiles.map((file, index) => [file.replace(/\\/g, "/"), index]));
     const normalizedFiles = [...new Set(files.map((file) => file.replace(/\\/g, "/"))) ]
-      .filter((file) => !file.startsWith(".git/") && !file.startsWith(".jarvis/") && !file.includes("/node_modules/"));
+      .filter((file) => !file.startsWith(".git/") && !file.startsWith(".Leanna/") && !file.includes("/node_modules/"));
 
     return normalizedFiles
       .sort((left, right) => {

@@ -53,7 +53,7 @@ export function TemplateSelectorModal({
 
   // Default values for variables based on profile
   const defaultVarValues = useMemo(() => {
-    return getDefaultVariableValues(profile.userName || 'Mayss', 'Jarvis-OS');
+    return getDefaultVariableValues(profile.userName || 'Mayss', 'Leanna');
   }, [profile.userName]);
 
   const [variableValues, setVariableValues] = useState<Record<string, string>>(defaultVarValues);

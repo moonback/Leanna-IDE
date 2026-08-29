@@ -55,7 +55,7 @@ export function useTranscript() {
   }, []);
 
   // ── Listener: résumé automatique du contexte ─────────────────────────────
-  // Quand useLiveAPI déclenche 'jarvis-summarize-context', on remplace le
+  // Quand useLiveAPI déclenche 'Leanna-summarize-context', on remplace le
   // transcript par le résumé + les tours conservés.
   useEffect(() => {
     const handler = (e: CustomEvent) => {
@@ -73,8 +73,8 @@ export function useTranscript() {
       console.log('[useTranscript] Résumé appliqué:', { summarizedTurns, retainedCount: retained.length, summaryLength: summary.length });
       setTranscript([summaryEntry, ...retained]);
     };
-    window.addEventListener('jarvis-summarize-context', handler as EventListener);
-    return () => window.removeEventListener('jarvis-summarize-context', handler as EventListener);
+    window.addEventListener('Leanna-summarize-context', handler as EventListener);
+    return () => window.removeEventListener('Leanna-summarize-context', handler as EventListener);
   }, []);
 
   return {

@@ -191,7 +191,7 @@ export function AgentBuilderPanel({ inline, onClose }: AgentBuilderPanelProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'jarvis-custom-agents.json';
+    a.download = 'Leanna-custom-agents.json';
     a.click();
     URL.revokeObjectURL(url);
   }, []);
@@ -207,7 +207,7 @@ export function AgentBuilderPanel({ inline, onClose }: AgentBuilderPanelProps) {
       reader.onload = async () => {
         const count = await importCustomAgents(reader.result as string);
         if (count > 0) {
-          window.dispatchEvent(new CustomEvent('jarvis-toast', {
+          window.dispatchEvent(new CustomEvent('Leanna-toast', {
             detail: { message: `${count} agent(s) importé(s)`, type: 'success' },
           }));
         }

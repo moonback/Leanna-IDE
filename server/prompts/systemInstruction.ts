@@ -60,4 +60,4 @@ export function buildSystemInstructionV2(config: SystemPromptConfig = {}): strin
   return builder.build(config);
 }
 
-export const JARVIS_SYSTEM_INSTRUCTION = buildSystemInstruction();
+export const Leanna_SYSTEM_INSTRUCTION = buildSystemInstruction();

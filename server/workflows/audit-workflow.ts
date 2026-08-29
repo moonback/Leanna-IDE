@@ -84,7 +84,7 @@ export const AUDIT_WORKFLOW_DEFINITION = {
       action: "save_memory",
       args: {
         content:
-          "📋 Audit périodique Jarvis-OS — " +
+          "📋 Audit périodique Leanna — " +
           "Git: {{steps.git-check.status}} (branche: {{steps.git-check.result.branch}}, {{steps.git-check.result.summary}}) | " +
           "Codebase.md: {{steps.generate-codebase.status}} | " +
           "TypeCheck: {{steps.typecheck.status}} ({{steps.typecheck.result.message}}) | " +

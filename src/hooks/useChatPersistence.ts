@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TranscriptEntry } from './useTranscript';
 
-const STORAGE_PREFIX = 'jarvis_chat_transcript';
+const STORAGE_PREFIX = 'Leanna_chat_transcript';
 const MAX_PERSISTED_MESSAGES = 200;
 
 type PersistedTranscriptEntry = Omit<TranscriptEntry, 'timestamp'> & {

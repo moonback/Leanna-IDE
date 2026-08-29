@@ -25,8 +25,8 @@ interface Window {
 }
 
 interface CustomEventMap {
-  'jarvis-sandbox-changed': CustomEvent<{ path?: string }>;
-  'jarvis-sandbox-file-changed': CustomEvent<{ path: string }>;
-  'jarvis-sandbox-file-deleted': CustomEvent<{ path: string }>;
-  'jarvis-realtime-file-event': CustomEvent<any>;
+  'Leanna-sandbox-changed': CustomEvent<{ path?: string }>;
+  'Leanna-sandbox-file-changed': CustomEvent<{ path: string }>;
+  'Leanna-sandbox-file-deleted': CustomEvent<{ path: string }>;
+  'Leanna-realtime-file-event': CustomEvent<any>;
 }

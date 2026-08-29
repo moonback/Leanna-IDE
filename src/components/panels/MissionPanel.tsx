@@ -250,8 +250,8 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
       });
     };
 
-    window.addEventListener('jarvis-mission-event', handler);
-    return () => window.removeEventListener('jarvis-mission-event', handler);
+    window.addEventListener('Leanna-mission-event', handler);
+    return () => window.removeEventListener('Leanna-mission-event', handler);
   }, []);
 
   // Auto-expand first active mission

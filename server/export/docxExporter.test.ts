@@ -6,7 +6,7 @@ test('docxExporter: converts markdown into a Word-compatible binary buffer', () 
   const md = '# Spécification Technique\n\nIntroduction du document.\n\n| Colonne 1 | Colonne 2 |\n|---|---|\n| Valeur A | Valeur B |\n';
   const buffer = exportToDocx(md, {
     title: 'Spécification Technique',
-    author: 'Equipe Jarvis',
+    author: 'Equipe Leanna',
   });
 
   assert.ok(Buffer.isBuffer(buffer));

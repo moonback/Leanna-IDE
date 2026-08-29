@@ -18,8 +18,8 @@ interface SandboxStatus {
 }
 
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('jarvis_api_token');
-  return token ? { 'x-jarvis-token': token } : {};
+  const token = localStorage.getItem('Leanna_api_token');
+  return token ? { 'x-Leanna-token': token } : {};
 }
 
 interface SandboxPanelProps {
@@ -89,11 +89,11 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
     }, [fetchStatus]),
     onTreeChanged: useCallback(() => {
       fetchStatus();
-      window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+      window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
     }, [fetchStatus]),
     onFileDeleted: useCallback((_rp: string) => {
       fetchStatus();
-      window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+      window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
     }, [fetchStatus]),
   });
 
@@ -109,7 +109,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
       const data = await res.json();
       if (data.status === 'success') {
         setFeedback({ type: 'success', msg: actionMessages[action] || 'OK' });
-        window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+        window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
         setShowCodeInput(false);
         setSecurityCode('');
       } else if (data.status === 'validation_failed') {

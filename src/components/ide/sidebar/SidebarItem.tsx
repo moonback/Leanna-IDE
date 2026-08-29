@@ -216,7 +216,7 @@ export function SidebarStatusIndicator({
       <motion.button
         whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.9 }}
-        className="jarvis-ai-status flex items-center justify-center w-[42px] h-[42px] rounded-md relative overflow-hidden"
+        className="Leanna-ai-status flex items-center justify-center w-[42px] h-[42px] rounded-md relative overflow-hidden"
         style={{
           backgroundColor: 'var(--nav-active-bg)',
           border: '1px solid var(--accent-primary)',
@@ -282,7 +282,7 @@ export function SidebarStatusIndicator({
     <motion.button
       whileHover={{ scale: 1.12 }}
       whileTap={{ scale: 0.88 }}
-      className="jarvis-ai-status flex items-center justify-center w-[42px] h-[42px] rounded-md relative overflow-hidden"
+      className="Leanna-ai-status flex items-center justify-center w-[42px] h-[42px] rounded-md relative overflow-hidden"
       style={{
         background: hovered
           ? 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 22%, transparent) 0%, color-mix(in srgb, var(--color-accent-alt) 18%, transparent) 50%, color-mix(in srgb, var(--accent-primary) 22%, transparent) 100%)'

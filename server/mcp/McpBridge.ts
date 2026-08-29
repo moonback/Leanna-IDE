@@ -2,7 +2,7 @@
  * MCP Bridge — Orchestrateur de serveurs MCP
  * 
  * Gère plusieurs connexions McpClient et expose leurs outils comme une Skill
- * unifiée dans le SkillManager de Jarvis-OS.
+ * unifiée dans le SkillManager de Leanna.
  * 
  * Fonctionnalités:
  * - Connexion/déconnexion de serveurs MCP à la volée
@@ -360,7 +360,7 @@ export class McpBridge extends EventEmitter {
       if (!resolved) {
         throw new Error(
           `[MCP Security] L'argument "${key}" contient un chemin hors du périmètre autorisé: "${value}". ` +
-          `Les outils MCP ne peuvent accéder qu'aux fichiers du repo Jarvis-OS.`
+          `Les outils MCP ne peuvent accéder qu'aux fichiers du repo Leanna.`
         );
       }
       // Replace with the normalized absolute path for safety
@@ -540,7 +540,7 @@ export class McpBridge extends EventEmitter {
   // ─── Skill Adapter ──────────────────────────────────────────────────────────
 
   /**
-   * Génère une Skill Jarvis qui expose tous les outils MCP au système IA.
+   * Génère une Skill Leanna qui expose tous les outils MCP au système IA.
    * 
    * Convertit les définitions MCP (JSON Schema) en format Gemini Function Declaration.
    */

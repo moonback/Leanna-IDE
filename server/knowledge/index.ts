@@ -1,7 +1,7 @@
 /**
  * Knowledge System — Compréhension avancée du projet
  *
- * Ce module ajoute à Jarvis une capacité de compréhension profonde du projet :
+ * Ce module ajoute à Leanna une capacité de compréhension profonde du projet :
  * - ProjectIndexer : scanne tous les fichiers et extrait les entités de code
  * - KnowledgeGraph : graphe permanent des connaissances du projet (persisté)
  * - DependencyGraph : graphe orienté des dépendances entre fichiers

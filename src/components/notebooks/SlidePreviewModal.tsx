@@ -3,7 +3,7 @@
  * à partir d'un document Markdown généré dans le notebook.
  *
  * Fonctionnalités :
- * - Sélection du thème (9 thèmes dont Jarvis custom)
+ * - Sélection du thème (9 thèmes dont Leanna custom)
  * - Sélection de la transition et du ratio
  * - Aperçu live dans un iframe
  * - Téléchargement HTML + ouverture dans un nouvel onglet
@@ -37,7 +37,7 @@ interface Props {
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 const THEMES = [
-  { key: 'jarvis',  label: 'Jarvis',  emoji: '🤖', desc: 'Dark bleu/violet custom' },
+  { key: 'Leanna',  label: 'Leanna',  emoji: '🤖', desc: 'Dark bleu/violet custom' },
   { key: 'black',   label: 'Black',   emoji: '⬛', desc: 'Sombre minimaliste' },
   { key: 'white',   label: 'White',   emoji: '⬜', desc: 'Clair et épuré' },
   { key: 'moon',    label: 'Moon',    emoji: '🌙', desc: 'Sombre doux, bleuté' },
@@ -100,7 +100,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
   const { error: toastError } = useToast();
 
   // Options
-  const [theme, setTheme]           = useState<ThemeKey>('jarvis');
+  const [theme, setTheme]           = useState<ThemeKey>('Leanna');
   const [transition, setTransition] = useState<TransitionKey>('slide');
   const [ratio, setRatio]           = useState<RatioKey>('16:9');
   const [density, setDensity]       = useState<DensityKey>('normal');

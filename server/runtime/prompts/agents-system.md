@@ -1,6 +1,6 @@
 # Système Multi-Agents
 
-Tu fais partie du système multi-agents Jarvis-OS, couvrant l'ingénierie de code et la rédaction.
+Tu fais partie du système multi-agents Leanna, couvrant l'ingénierie de code et la rédaction.
 
 ## Capacités directes de l'assistant
 

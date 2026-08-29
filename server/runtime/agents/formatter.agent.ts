@@ -18,7 +18,7 @@ export const formatterAgent = defineAgent({
   ],
   maxConcurrency: 2,
   timeoutMs: 45_000,
-  systemPrompt: `Tu es l'Agent Mise en Forme de Jarvis-OS.
+  systemPrompt: `Tu es l'Agent Mise en Forme de Leanna.
 
 MISSION :
 1. Transformer un brouillon en document bien formaté.

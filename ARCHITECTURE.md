@@ -1,4 +1,4 @@
-# Architecture Jarvis OS
+# Architecture Leanna OS
 
 ## Sommaire
 
@@ -14,7 +14,7 @@
 
 ## Vue d'ensemble
 
-Jarvis OS est une **application desktop monolithique** basee sur Electron, avec une architecture client-serveur interne :
+Leanna OS est une **application desktop monolithique** basee sur Electron, avec une architecture client-serveur interne :
 
 - **Frontend** : Application React 19 rendue dans un navigateur Electron
 - **Backend** : Serveur Express + WebSocket incluant Vite en middleware (dev)
@@ -294,7 +294,7 @@ export interface Agent {
 
 ### Supabase PostgreSQL
 
-Jarvis OS utilise **Supabase** comme base de donnees principale pour :
+Leanna OS utilise **Supabase** comme base de donnees principale pour :
 
 1. **Persistance des agents** (`agent_tasks`, `agent_orchestrations`, `agent_messages`)
 2. **Memories long terme** (`memories`)
@@ -307,10 +307,10 @@ Jarvis OS utilise **Supabase** comme base de donnees principale pour :
 ### Stockage local
 
 - **Configuration** : `.env`, `.env.local`, `.gemini-keys.json` (chiffre)
-- **Projet** : `.jarvis-profile.json`, `.jarvis/lastProject.json`
+- **Projet** : `.Leanna-profile.json`, `.Leanna/lastProject.json`
 - **Knowledge** : `ProjectKnowledge.json`, `ProjectMemory.json`
-- **Sandbox** : `.jarvis/sandbox/` (fichiers temporaires)
-- **Backup** : `.jarvis/notebooks/backups/` (sauvegardes incrementales)
+- **Sandbox** : `.Leanna/sandbox/` (fichiers temporaires)
+- **Backup** : `.Leanna/notebooks/backups/` (sauvegardes incrementales)
 
 ### Schemas principaux
 
@@ -355,7 +355,7 @@ sequenceDiagram
 
 ### Securite des acces
 
-- **Sandbox isolation** : Toutes les modifications passent par `.jarvis/sandbox/`
+- **Sandbox isolation** : Toutes les modifications passent par `.Leanna/sandbox/`
 - **Validation** : Vérification TypeScript avant merge
 - **Checkpoints** : Git commit automatique avant modification
 - **Confirmation** : Dialogue de confirmation pour les fichiers critiques
@@ -405,7 +405,7 @@ interface ServerMessage {
 
 #### REST API (HTTP)
 - **Base URL** : `/api/`
-- **Authentification** : Header `x-jarvis-token` ou cookie `jarvis_token`
+- **Authentification** : Header `x-Leanna-token` ou cookie `Leanna_token`
 - **Rate Limiting** : Limiteurs dedies par type doperation
 - **Format** : JSON pour les requetes et reponses
 
@@ -436,15 +436,15 @@ interface ServerMessage {
 ### Backend <-> Filesystem
 
 #### Sandbox Mode
-- **Root** : `.jarvis/sandbox/`
+- **Root** : `.Leanna/sandbox/`
 - **Activation** : Automatique quand un projet est selectionne
 - **Sync** : Manual via confirmation utilisateur
 - **Cleanup** : Nettoyage automatique des fichiers temporaires
 
 #### Self-Root
-- **Definition** : Racine du projet que Jarvis peut modifier
-- **Default** : Configure via `JARVIS_DEFAULT_WORKSPACE`
-- **Persistence** : Stocke dans `.jarvis/lastProject.json`
+- **Definition** : Racine du projet que Leanna peut modifier
+- **Default** : Configure via `Leanna_DEFAULT_WORKSPACE`
+- **Persistence** : Stocke dans `.Leanna/lastProject.json`
 
 ---
 

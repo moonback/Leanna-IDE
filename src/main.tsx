@@ -74,7 +74,7 @@ import './index.css';
     return new Response(body, {
       status: 503,
       statusText: 'Service Unavailable',
-      headers: { 'Content-Type': 'application/json', 'X-Jarvis-CB': '1' },
+      headers: { 'Content-Type': 'application/json', 'X-Leanna-CB': '1' },
     });
   }
 
@@ -105,11 +105,11 @@ import './index.css';
 
     let resolvedInit = init;
     if (isApi) {
-      const token = localStorage.getItem('jarvis_api_token');
+      const token = localStorage.getItem('Leanna_api_token');
       if (token) {
         const headers = new Headers(init?.headers);
-        if (!headers.has('x-jarvis-token')) {
-          headers.set('x-jarvis-token', token);
+        if (!headers.has('x-Leanna-token')) {
+          headers.set('x-Leanna-token', token);
         }
         resolvedInit = { ...init, headers };
       }
@@ -147,7 +147,7 @@ import './index.css';
 }
 
 // ── Apply saved profile before first paint (no flash) ──────────────────────
-const PROFILE_KEY = 'jarvis_user_profile';
+const PROFILE_KEY = 'Leanna_user_profile';
 try {
   const raw = localStorage.getItem(PROFILE_KEY);
   if (raw) {
@@ -165,12 +165,12 @@ try {
   const raw = localStorage.getItem(PROFILE_KEY);
   if (raw) {
     const p = JSON.parse(raw);
-    const _token = localStorage.getItem('jarvis_api_token');
+    const _token = localStorage.getItem('Leanna_api_token');
     fetch('/api/profile', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(_token ? { 'x-jarvis-token': _token } : {}),
+        ...(_token ? { 'x-Leanna-token': _token } : {}),
       },
       body: JSON.stringify({
         aiName:        p.aiName        || 'Leanna',
@@ -194,7 +194,7 @@ function IdeNavigationBridge() {
 
     const handleNavClick = () => { ignoreUntil = Date.now() + 1000; };
     // Listen to user-initiated navigation (popstate or link clicks)
-    window.addEventListener('jarvis-user-nav', handleNavClick);
+    window.addEventListener('Leanna-user-nav', handleNavClick);
 
     const handleAction = (event: Event) => {
       const detail = (event as CustomEvent).detail;
@@ -215,13 +215,13 @@ function IdeNavigationBridge() {
           navigate('/ide');
         }
         if (typeof detail.path === 'string') {
-          sessionStorage.setItem('jarvis-ide-pending-file', JSON.stringify({
+          sessionStorage.setItem('Leanna-ide-pending-file', JSON.stringify({
             path: detail.path,
             line: detail.line,
             column: detail.column,
           }));
           setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('jarvis-ide-open-file', {
+            window.dispatchEvent(new CustomEvent('Leanna-ide-open-file', {
               detail: { path: detail.path, line: detail.line, column: detail.column },
             }));
           }, 300);
@@ -234,17 +234,17 @@ function IdeNavigationBridge() {
           navigate('/ide');
         }
         setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('jarvis-ide-file-changed', {
+          window.dispatchEvent(new CustomEvent('Leanna-ide-file-changed', {
             detail: { path: detail.path },
           }));
         }, 300);
       }
     };
 
-    window.addEventListener('jarvis-ide-action', handleAction as EventListener);
+    window.addEventListener('Leanna-ide-action', handleAction as EventListener);
     return () => {
-      window.removeEventListener('jarvis-ide-action', handleAction as EventListener);
-      window.removeEventListener('jarvis-user-nav', handleNavClick);
+      window.removeEventListener('Leanna-ide-action', handleAction as EventListener);
+      window.removeEventListener('Leanna-user-nav', handleNavClick);
     };
   }, [navigate, location.pathname]);
 
@@ -257,13 +257,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem('jarvis_api_token') || '';
+    const stored = localStorage.getItem('Leanna_api_token') || '';
     setToken(stored);
     setReady(true);
   }, []);
 
   const isAuthenticated = useMemo(() => {
-    const configuredToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_JARVIS_API_TOKEN;
+    const configuredToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_Leanna_API_TOKEN;
     if (!configuredToken) return true;
     return token === configuredToken;
   }, [token]);
@@ -284,7 +284,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           onChange={e => {
             const next = e.target.value;
             setToken(next);
-            localStorage.setItem('jarvis_api_token', next);
+            localStorage.setItem('Leanna_api_token', next);
           }}
           className="mt-4 w-full rounded-xl border px-3 py-2 text-sm"
           style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}

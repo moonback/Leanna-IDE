@@ -203,7 +203,7 @@ export const MemoryPanel = React.memo(function MemoryPanel({
               <p className="text-sm leading-relaxed max-w-[200px]" style={{ color: 'var(--text-muted)' }}>
                 {query
                   ? 'Essayez un autre terme.'
-                  : 'Jarvis retient automatiquement les informations importantes.'}
+                  : 'Leanna retient automatiquement les informations importantes.'}
               </p>
             </div>
           </motion.div>

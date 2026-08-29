@@ -159,7 +159,7 @@ export class McpClient extends EventEmitter {
           // On ne supporte pas sampling/resources côté client pour le moment
         },
         clientInfo: {
-          name: 'jarvis-os',
+          name: 'Leanna',
           version: '1.0.0',
         },
       });

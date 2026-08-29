@@ -6,7 +6,7 @@ import path from 'node:path';
 import { appendAuditEvent, readAuditEntries, analyzeAuditLog } from './audit';
 
 test('appendAuditEvent writes and reads audit entries', async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-audit-'));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'Leanna-audit-'));
   const logPath = path.join(tempDir, 'audit.log');
 
   await appendAuditEvent({ action: 'write_file', target: 'src/App.tsx', details: 'saved', logPath });
@@ -19,7 +19,7 @@ test('appendAuditEvent writes and reads audit entries', async () => {
 });
 
 test('analyzeAuditLog calculates correctly', async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-audit-'));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'Leanna-audit-'));
   const logPath = path.join(tempDir, 'audit_analyze.log');
 
   await appendAuditEvent({ action: 'write_file', target: 'src/App.tsx', logPath });

@@ -41,7 +41,7 @@ export async function exportToPdf(markdown: string, options: PdfExportOptions = 
         right: '20mm',
       },
       displayHeaderFooter: true,
-      headerTemplate: `<div style="font-size: 8px; color: #94a3b8; width: 100%; text-align: right; padding-right: 20mm;">${options.title || 'Jarvis-OS'}</div>`,
+      headerTemplate: `<div style="font-size: 8px; color: #94a3b8; width: 100%; text-align: right; padding-right: 20mm;">${options.title || 'Leanna'}</div>`,
       footerTemplate: '<div style="font-size: 8px; color: #94a3b8; width: 100%; text-align: center;"><span class="pageNumber"></span> / <span class="totalPages"></span></div>',
     });
 

@@ -1,5 +1,5 @@
 {
-  "name": "Jarvis OS",
+  "name": "Leanna OS",
   "description": "An ambitious real-time multimodal AI operating system using Gemini Live, featuring voice interaction, computer vision, function calling, and an immersive UI.",
   "requestFramePermissions": ["camera", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

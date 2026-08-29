@@ -1,10 +1,10 @@
-# JARVIS-OS Design System Tokens
+# Leanna Design System Tokens
 
 **Version:** 1.0.0  
 **Date:** 28 août 2026  
 **Périmètre:** Tous les composants React dans `src/components/`  
 
-Ce document définit le design system cible pour la modernisation UI/UX de JARVIS-OS. Tous les nouveaux composants doivent s'y référer.
+Ce document définit le design system cible pour la modernisation UI/UX de Leanna. Tous les nouveaux composants doivent s'y référer.
 
 ---
 

@@ -111,7 +111,7 @@ export function useTerminal(initialCols = 80, initialRows = 24): [TerminalState,
 
   // Obtenir le token d'authentification
   const getAuthToken = useCallback((): string | null => {
-    return localStorage.getItem('jarvis_api_token');
+    return localStorage.getItem('Leanna_api_token');
   }, []);
 
   // Ajouter du texte à la sortie
@@ -151,7 +151,7 @@ export function useTerminal(initialCols = 80, initialRows = 24): [TerminalState,
             case 'output':
               // Filtrer les messages de bienvenue dupliqués
               const messageText = message.data || '';
-              if (messageText.includes('=== Jarvis-OS Terminal ===') || messageText.includes('Jarvis-OS Terminal')) {
+              if (messageText.includes('=== Leanna Terminal ===') || messageText.includes('Leanna Terminal')) {
                 if (!welcomeShownRef.current) {
                   welcomeShownRef.current = true;
                   appendOutput(messageText);

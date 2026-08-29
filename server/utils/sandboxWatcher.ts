@@ -2,7 +2,7 @@
  * sandboxWatcher.ts — Surveillance en temps réel des fichiers du sandbox.
  *
  * Utilise fs.watch (récursif sur Windows) pour détecter les changements dans
- * .jarvis/sandbox/ et broadcaster les événements aux clients WebSocket connectés.
+ * .Leanna/sandbox/ et broadcaster les événements aux clients WebSocket connectés.
  */
 
 import fs from "fs";

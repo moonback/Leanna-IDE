@@ -29,8 +29,8 @@ export type DiffMode = 'side-by-side' | 'unified';
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('jarvis_api_token');
-  return token ? { 'x-jarvis-token': token } : {};
+  const token = localStorage.getItem('Leanna_api_token');
+  return token ? { 'x-Leanna-token': token } : {};
 }
 
 function computeDiff(original: string, modified: string): DiffLine[] {
@@ -409,7 +409,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
           setFiles((prev) => prev.filter((f) => f.path !== filePath));
           const remaining = files.filter((f) => f.path !== filePath);
           setSelectedFile(remaining.length > 0 ? remaining[0].path : null);
-          window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+          window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
         } else {
           setFeedback({ type: 'error', msg: 'Fichier introuvable dans le sandbox' });
         }
@@ -438,7 +438,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
           setFiles((prev) => prev.filter((f) => f.path !== filePath));
           const remaining = files.filter((f) => f.path !== filePath);
           setSelectedFile(remaining.length > 0 ? remaining[0].path : null);
-          window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+          window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
         } else {
           setFeedback({ type: 'error', msg: 'Fichier introuvable' });
         }
@@ -466,7 +466,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
         setFeedback({ type: 'success', msg: `${files.length} fichier(s) appliqué(s)` });
         setFiles([]);
         setSelectedFile(null);
-        window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+        window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
       } else if (data.status === 'validation_failed') {
         const errCount = data.errorCount || 0;
         const warnCount = data.warningCount || 0;
@@ -494,7 +494,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
         setFeedback({ type: 'success', msg: 'Toutes les modifications rejetées' });
         setFiles([]);
         setSelectedFile(null);
-        window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+        window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
       }
     } catch {
       setFeedback({ type: 'error', msg: 'Erreur réseau' });

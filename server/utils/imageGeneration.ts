@@ -74,8 +74,8 @@ export async function generateImage(
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": process.env.OPENROUTER_REFERER || "https://jarvis-os.local",
-        "X-Title": process.env.OPENROUTER_TITLE || "Jarvis-OS",
+        "HTTP-Referer": process.env.OPENROUTER_REFERER || "https://Leanna.local",
+        "X-Title": process.env.OPENROUTER_TITLE || "Leanna",
       },
       body: JSON.stringify({
         model,

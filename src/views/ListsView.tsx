@@ -143,7 +143,7 @@ export default function ListsView() {
         icon={Code}
         title="Snippets"
         badge="Bibliothèque"
-        description="Tes blocs de code réutilisables, centralisés dans Jarvis"
+        description="Tes blocs de code réutilisables, centralisés dans Leanna"
         actions={
           <>
             <div className="hidden items-center gap-1.5 rounded-lg border px-3 py-2 sm:flex" style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)' }}>

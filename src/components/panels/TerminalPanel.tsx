@@ -949,12 +949,12 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
     const handleSandboxChange = () => {
       fetchSandboxPath();
     };
-    window.addEventListener('jarvis-sandbox-changed', handleSandboxChange);
-    window.addEventListener('jarvis-sandbox-file-changed', handleSandboxChange);
+    window.addEventListener('Leanna-sandbox-changed', handleSandboxChange);
+    window.addEventListener('Leanna-sandbox-file-changed', handleSandboxChange);
     
     return () => {
-      window.removeEventListener('jarvis-sandbox-changed', handleSandboxChange);
-      window.removeEventListener('jarvis-sandbox-file-changed', handleSandboxChange);
+      window.removeEventListener('Leanna-sandbox-changed', handleSandboxChange);
+      window.removeEventListener('Leanna-sandbox-file-changed', handleSandboxChange);
     };
   }, []);
 

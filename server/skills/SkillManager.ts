@@ -170,7 +170,7 @@ function resolveSelfHealingSandboxTarget(skillPath: string): SelfHealingSandboxT
   }
 }
 
-const AUDIT_LOG_PATH = path.resolve(SELF_ROOT, '.jarvis-audit.log');
+const AUDIT_LOG_PATH = path.resolve(SELF_ROOT, '.Leanna-audit.log');
 const MAX_AUDIT_SIZE = 500_000; // 500 KB
 
 async function writeAuditLog(entry: HealAttempt): Promise<void> {

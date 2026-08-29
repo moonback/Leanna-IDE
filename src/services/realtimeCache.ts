@@ -147,7 +147,7 @@ function emitFileEvent(event: FileEvent): void {
   
   // Also dispatch as CustomEvent for backward compatibility
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('jarvis-realtime-file-event', { detail: event }));
+    window.dispatchEvent(new CustomEvent('Leanna-realtime-file-event', { detail: event }));
   }
 }
 
@@ -487,7 +487,7 @@ export const realtimeWs = {
     }
     
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const token = localStorage.getItem('jarvis_api_token');
+    const token = localStorage.getItem('Leanna_api_token');
     const params = token ? `?token=${encodeURIComponent(token)}` : '';
     const ws = new WebSocket(`${protocol}//${window.location.host}/sandbox-watch${params}`);
     
@@ -591,18 +591,18 @@ realtimeCache.handleWsMessage = (data: FileEvent): void => {
 
 // Listen for legacy events and forward to unified system
 if (typeof window !== 'undefined') {
-  window.addEventListener('jarvis-sandbox-changed', () => {
+  window.addEventListener('Leanna-sandbox-changed', () => {
     realtimeCache.invalidateAll();
   });
   
-  window.addEventListener('jarvis-sandbox-file-changed', (e: Event) => {
+  window.addEventListener('Leanna-sandbox-file-changed', (e: Event) => {
     const detail = (e as CustomEvent).detail;
     if (detail?.path) {
       realtimeCache.invalidateForFileChange(detail.path);
     }
   });
   
-  window.addEventListener('jarvis-sandbox-file-deleted', (e: Event) => {
+  window.addEventListener('Leanna-sandbox-file-deleted', (e: Event) => {
     const detail = (e as CustomEvent).detail;
     if (detail?.path) {
       realtimeCache.invalidateForFileDelete(detail.path);

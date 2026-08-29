@@ -109,7 +109,7 @@ export function useOrbState(): OrbState {
     if (isConnected) disconnect();
     else if (!isConnecting) {
       const savedMode = (typeof localStorage !== 'undefined' 
-        ? localStorage.getItem('jarvis_mode') as 'full' | 'ask' 
+        ? localStorage.getItem('Leanna_mode') as 'full' | 'ask' 
         : null) || 'full';
       connect([], savedMode);
     }

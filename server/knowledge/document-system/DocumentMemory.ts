@@ -9,7 +9,7 @@
  *   • Statistiques et métriques
  *   • Auto-pruning (rotation si > MAX_DOCUMENTS)
  *
- * Persisté dans : .jarvis/DocumentKnowledge.json
+ * Persisté dans : .Leanna/DocumentKnowledge.json
  */
 
 import fs from "fs";
@@ -38,7 +38,7 @@ const MAX_FACTS = 1000;
 const STORE_FILE = "DocumentKnowledge.json";
 
 function getStorePath(): string {
-  return path.join(SELF_ROOT, ".jarvis", STORE_FILE);
+  return path.join(SELF_ROOT, ".Leanna", STORE_FILE);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

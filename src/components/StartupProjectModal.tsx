@@ -50,8 +50,8 @@ export function StartupProjectModal() {
 
   const activate = useCallback(async (newRoot: string) => {
     ideApi.invalidateCache();
-    window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
-    window.dispatchEvent(new CustomEvent('jarvis-workspace-changed', { detail: { workspace: newRoot } }));
+    window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+    window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: newRoot } }));
     setIsOpen(false);
   }, []);
 

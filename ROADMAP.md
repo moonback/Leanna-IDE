@@ -1,4 +1,4 @@
-# Roadmap Jarvis OS
+# Roadmap Leanna OS
 
 ## Sommaire
 
@@ -156,7 +156,7 @@ Phase 5: Production (v1.0+) 📋 Planifiee
 - Historique des modifications par utilisateur
 
 ### V2.5 - Cloud & Collaboration
-- Version SaaS (Jarvis OS Cloud)
+- Version SaaS (Leanna OS Cloud)
 - Synchronisation multi-appareils
 - Espace de travail partagé
 - Integration avec les outils DevOps

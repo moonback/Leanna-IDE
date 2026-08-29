@@ -232,7 +232,7 @@ function useRecentFiles(): [
   // Chargement initial
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('jarvis_recent_files');
+      const stored = localStorage.getItem('Leanna_recent_files');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (isValidRecentFiles(parsed)) {
@@ -247,18 +247,18 @@ function useRecentFiles(): [
   const updateFiles = useCallback((newFiles: RecentFile[]) => {
     const sliced = newFiles.slice(0, MAX_RECENT_FILES);
     setFiles(sliced);
-    localStorage.setItem('jarvis_recent_files', JSON.stringify(sliced));
+    localStorage.setItem('Leanna_recent_files', JSON.stringify(sliced));
   }, []);
 
   const clearFiles = useCallback(() => {
     setFiles([]);
-    localStorage.removeItem('jarvis_recent_files');
+    localStorage.removeItem('Leanna_recent_files');
   }, []);
 
   const removeFile = useCallback((path: string) => {
     setFiles((prev) => {
       const updated = prev.filter((f) => f.path !== path);
-      localStorage.setItem('jarvis_recent_files', JSON.stringify(updated));
+      localStorage.setItem('Leanna_recent_files', JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -392,8 +392,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
       if (loadingFile) return; // Évite les doubles clics
       setLoadingFile(filePath);
       try {
-        const token = localStorage.getItem('jarvis_api_token');
-        const headers: Record<string, string> = token ? { 'x-jarvis-token': token } : {};
+        const token = localStorage.getItem('Leanna_api_token');
+        const headers: Record<string, string> = token ? { 'x-Leanna-token': token } : {};
         const response = await fetch(
           `/api/ide/file?${new URLSearchParams({ path: filePath })}`,
           { headers }

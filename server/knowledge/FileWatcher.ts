@@ -38,7 +38,7 @@ const WATCHABLE_EXTENSIONS = new Set([
 
 /** Dossiers ignorés */
 const IGNORED_DIRS = new Set([
-  "node_modules", ".git", ".jarvis", "dist", "build", "out",
+  "node_modules", ".git", ".Leanna", "dist", "build", "out",
   "release", "coverage", ".vscode", ".idea", "assets", "public",
 ]);
 

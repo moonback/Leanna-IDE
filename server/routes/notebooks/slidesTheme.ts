@@ -1,4 +1,4 @@
-const JARVIS_THEME_CSS = `
+const Leanna_THEME_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
   :root {
@@ -559,15 +559,15 @@ export function buildRevealPresentation(
   opts: { theme: string; transition: string; ratio: string; density?: string }
 ): string {
   const { theme, transition, ratio, density = "normal" } = opts;
-  const isJarvisTheme = theme === "jarvis";
+  const isLeannaTheme = theme === "Leanna";
 
   const [rw, rh] = ratio === "4:3" ? [960, 720] : [1280, 720];
 
-  const themeLink = isJarvisTheme
+  const themeLink = isLeannaTheme
     ? `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/black.css">`
     : `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/${theme}.css">`;
 
-  const customStyle = isJarvisTheme ? `<style>${JARVIS_THEME_CSS}</style>` : "";
+  const customStyle = isLeannaTheme ? `<style>${Leanna_THEME_CSS}</style>` : "";
 
   const densityLevel = (density === "compact" || density === "detailed") ? density : "normal";
   const slides = parseMarkdownToSlides(markdown, title, densityLevel);
@@ -585,7 +585,7 @@ export function buildRevealPresentation(
         ? `<p class="title-subtitle">${escapeHtml(firstSentence)}.</p>`
         : "";
       return `    <section class="title-slide" data-transition="zoom-in fade-out">
-      <div class="tag">Jarvis OS&nbsp;&nbsp;·&nbsp;&nbsp;Notebook</div>
+      <div class="tag">Leanna OS&nbsp;&nbsp;·&nbsp;&nbsp;Notebook</div>
       <h1>${processInlineTitle(s.title)}</h1>
       <div class="accent-bar"></div>
       ${subtitle}
@@ -598,13 +598,13 @@ export function buildRevealPresentation(
     }
 
     sectionCounter++;
-    const numBadge = isJarvisTheme
+    const numBadge = isLeannaTheme
       ? `<div class="section-num">${sectionCounter}</div>`
       : "";
 
     let heading = "";
     if (s.title) {
-      if (isJarvisTheme) {
+      if (isLeannaTheme) {
         heading = `<div class="slide-header">
         ${numBadge}
         <div class="slide-header-text">
@@ -625,9 +625,9 @@ export function buildRevealPresentation(
     </section>`;
   }).join("\n\n");
 
-  const closingSlide = isJarvisTheme
+  const closingSlide = isLeannaTheme
     ? `    <section class="title-slide closing-slide" data-transition="fade">
-      <div class="tag">Jarvis OS&nbsp;&nbsp;·&nbsp;&nbsp;Notebook</div>
+      <div class="tag">Leanna OS&nbsp;&nbsp;·&nbsp;&nbsp;Notebook</div>
       <h2>Merci</h2>
       <div class="accent-bar"></div>
       <p class="title-subtitle">Questions &amp; discussion</p>

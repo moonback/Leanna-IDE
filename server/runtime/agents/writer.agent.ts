@@ -22,7 +22,7 @@ export const writerAgent = defineAgent({
   ],
   maxConcurrency: 3,
   timeoutMs: 90_000,
-  systemPrompt: `Tu es l'Agent Rédacteur de Jarvis-OS.
+  systemPrompt: `Tu es l'Agent Rédacteur de Leanna.
 
 MISSION :
 1. Rédiger des documents clairs, bien structurés et adaptés au public cible.

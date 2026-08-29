@@ -18,7 +18,7 @@ export function FloatingOrb() {
   const constraintRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState(() => {
     try {
-      const saved = localStorage.getItem('jarvis_orb_position');
+      const saved = localStorage.getItem('Leanna_orb_position');
       if (saved) return JSON.parse(saved);
     } catch { /* ignore */ }
     return { x: 0, y: 0 };
@@ -30,7 +30,7 @@ export function FloatingOrb() {
   const handleDragEnd = useCallback((_: any, info: any) => {
     const newPos = { x: info.offset.x + position.x, y: info.offset.y + position.y };
     setPosition(newPos);
-    localStorage.setItem('jarvis_orb_position', JSON.stringify(newPos));
+    localStorage.setItem('Leanna_orb_position', JSON.stringify(newPos));
   }, [position]);
 
   return (
@@ -44,7 +44,7 @@ export function FloatingOrb() {
 
       {/* Floating orb */}
       <motion.div
-        layoutId="jarvis-orb"
+        layoutId="Leanna-orb"
         drag
         dragMomentum={false}
         dragElastic={0.05}
@@ -58,9 +58,9 @@ export function FloatingOrb() {
           right: 24,
           cursor: isConnecting ? 'wait' : 'grab',
         }}
-        title={`Jarvis — ${statusLabel}. Cliquer pour ${isConnected ? 'déconnecter' : 'connecter'}. Glisser pour déplacer.`}
+        title={`Leanna — ${statusLabel}. Cliquer pour ${isConnected ? 'déconnecter' : 'connecter'}. Glisser pour déplacer.`}
         role="button"
-        aria-label={`Jarvis ${statusLabel}`}
+        aria-label={`Leanna ${statusLabel}`}
         tabIndex={0}
       >
         {/* <OrbCore orb={orb} size="sm" /> */}

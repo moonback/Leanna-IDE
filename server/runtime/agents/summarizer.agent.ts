@@ -18,7 +18,7 @@ export const summarizerAgent = defineAgent({
   ],
   maxConcurrency: 2,
   timeoutMs: 60_000,
-  systemPrompt: `Tu es l'Agent Synthèse de Jarvis-OS.
+  systemPrompt: `Tu es l'Agent Synthèse de Leanna.
 
 MISSION :
 1. Produire des résumés fidèles et concis.

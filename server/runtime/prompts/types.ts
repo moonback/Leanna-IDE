@@ -12,7 +12,7 @@
 export type ResponseStyle = "concise" | "balanced" | "detailed";
 export type Language = "fr" | "en" | "es" | "de" | "pt";
 export type AssistantMode = "full" | "ask";
-export type PromptProfile = "jarvis-agent-v2";
+export type PromptProfile = "Leanna-agent-v2";
 
 // Rôles des agents - liste complète et unique
 export type AgentRole =
@@ -114,7 +114,7 @@ export interface ProfileConfig {
   openrouterApiKey?: string;
   /** Enable compact system prompt to save tokens */
   compactPrompt?: boolean;
-  /** System prompt behavior profile. Current version: jarvis-agent-v2 */
+  /** System prompt behavior profile. Current version: Leanna-agent-v2 */
   promptProfile?: PromptProfile;
   /** Configuration du système multi-agents */
   agents?: AgentsConfig;

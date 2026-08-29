@@ -1,7 +1,7 @@
 /**
  * sandbox.ts — Workspace sandbox isolé pour l'auto-modification.
  *
- * Le sandbox est une copie du code source dans `.jarvis/sandbox/` sur laquelle
+ * Le sandbox est une copie du code source dans `.Leanna/sandbox/` sur laquelle
  * l'assistant travaille sans provoquer de redémarrage du serveur principal.
  * Les modifications sont validées (tsc + tests) dans le sandbox AVANT d'être
  * synchronisées vers le repo principal.
@@ -29,7 +29,7 @@ const SANDBOX_DIR_NAME = "sandbox";
  * d'après le SELF_ROOT (projet actif courant).
  */
 export function getSandboxRoot(): string {
-  return path.join(SELF_ROOT, ".jarvis", SANDBOX_DIR_NAME);
+  return path.join(SELF_ROOT, ".Leanna", SANDBOX_DIR_NAME);
 }
 
 // Dossiers/fichiers à exclure de la copie (trop volumineux ou inutiles dans le sandbox)
@@ -39,8 +39,8 @@ const EXCLUDE_PATTERNS = [
   "dist",
   "build",
   "release",
-  ".jarvis/sandbox",  // éviter la récursion
-  ".jarvis-audit.log",
+  ".Leanna/sandbox",  // éviter la récursion
+  ".Leanna-audit.log",
 ];
 
 // ── State ────────────────────────────────────────────────────────────────────

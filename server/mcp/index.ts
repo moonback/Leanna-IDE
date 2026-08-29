@@ -1,7 +1,7 @@
 /**
  * MCP (Model Context Protocol) — Module d'intégration
  * 
- * Permet à Jarvis-OS de se connecter à n'importe quel serveur d'outils MCP
+ * Permet à Leanna de se connecter à n'importe quel serveur d'outils MCP
  * et d'exposer leurs outils à l'IA de manière transparente.
  * 
  * Usage:

@@ -213,7 +213,7 @@ export const codebaseSkill: Skill = {
     },
     {
       name: "delete_project_folder",
-      description: "Supprime un dossier et tout son contenu (récursivement) du workspace. Utiliser pour supprimer un dossier entier avec tous ses fichiers et sous-dossiers. Une confirmation est demandée si le dossier n'est pas vide. Les dossiers protégés (.git, node_modules, .jarvis, electron) ne peuvent pas être supprimés.",
+      description: "Supprime un dossier et tout son contenu (récursivement) du workspace. Utiliser pour supprimer un dossier entier avec tous ses fichiers et sous-dossiers. Une confirmation est demandée si le dossier n'est pas vide. Les dossiers protégés (.git, node_modules, .Leanna, electron) ne peuvent pas être supprimés.",
       parameters: {
         type: "OBJECT",
         properties: {

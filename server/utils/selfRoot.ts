@@ -1,7 +1,7 @@
 /**
  * selfRoot.ts — Source unique de vérité pour le répertoire racine du projet actif.
  *
- * Jarvis-OS est un IDE universel multi-projets : l'utilisateur choisit un projet
+ * Leanna est un IDE universel multi-projets : l'utilisateur choisit un projet
  * externe via la modal de sélection, l'IA travaille dessus, et peut en changer
  * à tout moment. Ce module centralise la résolution du root (SELF_ROOT) et
  * fournit les garde-fous de chemin utilisés par tous les skills et routes.
@@ -36,34 +36,34 @@ function resolveModuleDir(): string {
 
 const __moduleDir = resolveModuleDir();
 
-// ── Jarvis app root (le dossier de Jarvis lui-même, immuable) ─────────────────
+// ── Leanna app root (le dossier de Leanna lui-même, immuable) ─────────────────
 
 /**
- * Résout le dossier de l'app Jarvis (là où tourne server.ts).
- * Utilisé uniquement pour trouver les fichiers de config internes à Jarvis
+ * Résout le dossier de l'app Leanna (là où tourne server.ts).
+ * Utilisé uniquement pour trouver les fichiers de config internes à Leanna
  * (ex : persistedProject.json). Ne doit PAS être utilisé comme workspace projet.
  */
-function resolveJarvisAppRoot(): string {
-  // Remonter de server/utils/ → root de l'app Jarvis
+function resolveLeannaAppRoot(): string {
+  // Remonter de server/utils/ → root de l'app Leanna
   const fromModule = path.resolve(__moduleDir, "..", "..");
   const pkg = path.join(fromModule, "package.json");
   if (fs.existsSync(pkg)) return fromModule;
   return process.cwd();
 }
 
-const JARVIS_APP_ROOT = resolveJarvisAppRoot();
-export { JARVIS_APP_ROOT };
+const Leanna_APP_ROOT = resolveLeannaAppRoot();
+export { Leanna_APP_ROOT };
 
 // ── Persistance du projet sélectionné ────────────────────────────────────────
 
 /**
- * Fichier de config interne (dans le dossier Jarvis) qui mémorise
+ * Fichier de config interne (dans le dossier Leanna) qui mémorise
  * le dernier projet sélectionné par l'utilisateur.
- * IMPORTANT : situé dans le .jarvis/ du repo Jarvis lui-même,
+ * IMPORTANT : situé dans le .Leanna/ du repo Leanna lui-même,
  * pas dans le workspace projet.
  */
 function getPersistedProjectPath(): string {
-  return path.join(JARVIS_APP_ROOT, ".jarvis", "lastProject.json");
+  return path.join(Leanna_APP_ROOT, ".Leanna", "lastProject.json");
 }
 
 interface PersistedProjectData {
@@ -143,8 +143,8 @@ export function hasProject(): boolean {
  */
 export function initSelfRoot(): void {
   // Override explicite (tests/CI uniquement)
-  if (process.env.JARVIS_SELF_ROOT_OVERRIDE?.trim()) {
-    const override = process.env.JARVIS_SELF_ROOT_OVERRIDE.trim();
+  if (process.env.Leanna_SELF_ROOT_OVERRIDE?.trim()) {
+    const override = process.env.Leanna_SELF_ROOT_OVERRIDE.trim();
     if (fs.existsSync(override) && fs.statSync(override).isDirectory()) {
       SELF_ROOT = path.resolve(override);
       console.log(`[SelfRoot] Override actif: ${SELF_ROOT}`);
@@ -188,7 +188,7 @@ export function setSelfRoot(newPath: string, siteUrl?: string): string {
     WORKSPACE_SITE_URL = siteUrl.trim();
   }
   persistProject(resolved, WORKSPACE_SITE_URL || undefined);
-  console.log(`[SelfRoot] Jarvis-OS root verrouillé: ${SELF_ROOT}`);
+  console.log(`[SelfRoot] Leanna root verrouillé: ${SELF_ROOT}`);
   if (WORKSPACE_SITE_URL) {
     console.log(`[SelfRoot] URL site persistée: ${WORKSPACE_SITE_URL}`);
   }

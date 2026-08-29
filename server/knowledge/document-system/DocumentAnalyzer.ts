@@ -8,7 +8,7 @@
  *   • Répondre à des questions sur les documents
  *   • Créer des synthèses multi-documents
  *
- * S'appuie sur Google Gemini (comme le reste de Jarvis).
+ * S'appuie sur Google Gemini (comme le reste de Leanna).
  */
 
 import { createLogger } from "../../utils/logger";

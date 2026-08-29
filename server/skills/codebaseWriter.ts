@@ -632,7 +632,7 @@ export async function handleDeleteProjectFolder(args: any, toolContext: any) {
   if (!stats.isDirectory()) return { error: "Le chemin doit pointer vers un dossier. Pour supprimer un fichier, utilise delete_project_file." };
 
   // Garde : refuser la suppression de la racine du workspace ou de dossiers critiques de premier niveau
-  const PROTECTED_DIRS = new Set(['.git', '.jarvis', 'node_modules', 'electron', '.env', '.husky']);
+  const PROTECTED_DIRS = new Set(['.git', '.Leanna', 'node_modules', 'electron', '.env', '.husky']);
   const topLevel = requestedPath.replace(/\\/g, '/').split('/')[0];
   if (!topLevel || topLevel === '.' || PROTECTED_DIRS.has(topLevel)) {
     return { error: `Suppression interdite sur le dossier protégé ou racine: ${requestedPath}` };

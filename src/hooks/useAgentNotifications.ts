@@ -133,9 +133,9 @@ export function useAgentNotifications(options: NotificationOptions = {}) {
       }
     };
 
-    window.addEventListener('jarvis-agent-event', handleAgentEvent);
+    window.addEventListener('Leanna-agent-event', handleAgentEvent);
     return () => {
-      window.removeEventListener('jarvis-agent-event', handleAgentEvent);
+      window.removeEventListener('Leanna-agent-event', handleAgentEvent);
     };
   }, [
     notifyOnComplete,

@@ -33,7 +33,7 @@ test('github routes: GET /repos delegates to skillManager', async () => {
   const mockSkillManager: any = {
     handleToolCall: async (name: string) => {
       calledTool = name;
-      return { repos: [{ name: 'jarvis-os' }] };
+      return { repos: [{ name: 'Leanna' }] };
     },
   };
 
@@ -51,7 +51,7 @@ test('github routes: GET /repos delegates to skillManager', async () => {
     assert.equal(res.status, 200);
     const body = await res.json() as any;
     assert.equal(calledTool, 'list_github_repos');
-    assert.equal(body.repos[0].name, 'jarvis-os');
+    assert.equal(body.repos[0].name, 'Leanna');
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }

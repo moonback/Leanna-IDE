@@ -21,7 +21,7 @@ export function AiSection() {
           <TextInput
             value={profile.aiName}
             onChange={v => setField('aiName', v)}
-            placeholder="Ex : Jarvis"
+            placeholder="Ex : Leanna"
             style={{ paddingLeft: '2rem' }}
           />
         </div>

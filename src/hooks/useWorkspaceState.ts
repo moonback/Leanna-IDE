@@ -8,7 +8,7 @@ export interface WorkspaceData {
 
 /**
  * Hook simplifié pour l'IDE .
- * Le workspace est verrouillé sur le propre code source de Jarvis-OS.
+ * Le workspace est verrouillé sur le propre code source de Leanna.
  * Plus de changement de workspace possible.
  */
 export function useWorkspaceState() {
@@ -19,9 +19,9 @@ export function useWorkspaceState() {
   const fetchWorkspace = useCallback(async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('jarvis_api_token');
+      const token = localStorage.getItem('Leanna_api_token');
       const res = await fetch('/api/workspace', {
-        headers: token ? { 'x-jarvis-token': token } : {},
+        headers: token ? { 'x-Leanna-token': token } : {},
       });
       if (!res.ok) return;
       const data = await res.json();

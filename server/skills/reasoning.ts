@@ -559,7 +559,7 @@ export const reasoningSkill: Skill = {
           strategy: {
             type: "STRING",
             description:
-              "La stratégie de pensée à utiliser : 'chain_of_thought', 'decomposition', 'analogical', 'self_critique', 'first_principles', 'tree_of_thought', 'document_analysis', 'comparative_analysis', ou 'auto' pour laisser Jarvis choisir. Défaut: 'auto'. Utilisez 'document_analysis' pour synthèse/extraction/relecture de documents, 'comparative_analysis' pour croiser des sources, 'tree_of_thought' pour les tâches critiques.",
+              "La stratégie de pensée à utiliser : 'chain_of_thought', 'decomposition', 'analogical', 'self_critique', 'first_principles', 'tree_of_thought', 'document_analysis', 'comparative_analysis', ou 'auto' pour laisser Leanna choisir. Défaut: 'auto'. Utilisez 'document_analysis' pour synthèse/extraction/relecture de documents, 'comparative_analysis' pour croiser des sources, 'tree_of_thought' pour les tâches critiques.",
           },
         },
         required: ["prompt"],

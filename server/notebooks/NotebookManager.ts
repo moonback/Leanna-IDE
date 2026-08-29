@@ -18,8 +18,8 @@ const log = createLogger("NotebookManager");
 // ─── Persistence ─────────────────────────────────────────────────────────────
 
 const DATA_DIR = path.join(
-  process.env.JARVIS_CONFIG_PATH || process.env.ELECTRON_APP_PATH || SELF_ROOT || process.cwd(),
-  ".jarvis",
+  process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || SELF_ROOT || process.cwd(),
+  ".Leanna",
   "notebooks"
 );
 

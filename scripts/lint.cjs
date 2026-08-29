@@ -1,5 +1,5 @@
 /**
- * Linter statique intégré pour Jarvis-OS.
+ * Linter statique intégré pour Leanna.
  * Vérifie le code source sans dépendance externe (ESLint non installé).
  * Usage : node scripts/lint.cjs [--fix] [chemin...]
  */
@@ -13,7 +13,7 @@ const IGNORE_DIRS = new Set([
   "node_modules",
   "dist",
   ".git",
-  ".jarvis",
+  ".Leanna",
   "release",
   "assets",
   "electron",

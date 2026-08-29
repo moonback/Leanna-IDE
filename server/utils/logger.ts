@@ -1,5 +1,5 @@
 /**
- * Logger structuré pour Jarvis-OS
+ * Logger structuré pour Leanna
  *
  * Remplace les console.log éparpillés par un système centralisé avec :
  * - Niveaux configurables (debug, info, warn, error)

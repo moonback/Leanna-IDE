@@ -34,7 +34,7 @@ const log = createLogger("KnowledgeGraph");
 
 /** Chemin du fichier de persistance calculé dynamiquement depuis SELF_ROOT */
 function getStorePath(): string {
-  return path.join(SELF_ROOT, ".jarvis", "ProjectKnowledge.json");
+  return path.join(SELF_ROOT, ".Leanna", "ProjectKnowledge.json");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
