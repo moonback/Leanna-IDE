@@ -107,15 +107,15 @@ const DEFAULT_PROFILE: UserProfile = {
   compactPrompt: true,
   // Agents
   agents: {
-    enabled: true,
+    enabled: false,
     allowedRoles: [
       'coder', 'refactor', 'debugger', 'reviewer', 'tester', 'security', 'architect',
       'writer', 'formatter', 'researcher', 'proofreader', 'translator', 'summarizer', 'planner',
     ],
   },
   // Reasoning
-  reasoningEnabled: true,
-  reasoningVoiceEnabled: true,
+  reasoningEnabled: false,
+  reasoningVoiceEnabled: false,
   // Custom system prompt
   customSystemPrompt: '',
 };
