@@ -11,18 +11,18 @@
  * 7. Notification de progression (via ProgressNotifier)
  */
 import { randomUUID, createHash } from "crypto";
-import type { AgentTask } from "./types";
-import { getAgentDefinition, getAgentDefinitionOrThrow, hasAgent } from "./roles";
-import { PromptBuilder } from "./PromptBuilder";
-import { GeneratedFileWriter } from "./GeneratedFileWriter";
-import { ResultParser } from "./ResultParser";
-import { DelegationParser, type ParsedDelegation } from "./DelegationParser";
-import { ProgressNotifier } from "./ProgressNotifier";
-import { agentMessageBus } from "./AgentMessageBus";
-import type { TaskRequestPayload } from "./AgentCommunication";
-import { createLogger } from "../utils/logger";
-import { WorkspaceState, type VerificationRecord } from "./WorkspaceState";
-import { AgentRepairLoop } from "./AgentRepairLoop";
+import type { AgentTask } from "./types.js";
+import { getAgentDefinition, getAgentDefinitionOrThrow, hasAgent } from "./roles.js";
+import { PromptBuilder } from "./PromptBuilder.js";
+import { GeneratedFileWriter } from "./GeneratedFileWriter.js";
+import { ResultParser } from "./ResultParser.js";
+import { DelegationParser, type ParsedDelegation } from "./DelegationParser.js";
+import { ProgressNotifier } from "./ProgressNotifier.js";
+import { agentMessageBus } from "./AgentMessageBus.js";
+import type { TaskRequestPayload } from "./AgentCommunication.js";
+import { createLogger } from "../utils/logger.js";
+import { WorkspaceState, type VerificationRecord, type VerificationIssue } from "./WorkspaceState.js";
+import { AgentRepairLoop } from "./AgentRepairLoop.js";
 // import { promptCache } from "../utils/promptCache"; // Prêt pour intégration future
 
 const log = createLogger("AgentExecutor");
@@ -362,7 +362,7 @@ export class AgentExecutor {
       touchedFiles: new Set(),
       repairLoops: new Map(),
       blockedFiles: new Set(),
-      workspace: new WorkspaceState(async (path) => {
+      workspace: new WorkspaceState(async (path: string) => {
         const result = await this.callToolWithTimeout("read_project_file", { path, full: true });
         if (result?.error || result?.status === "failed" || typeof result?.content !== "string") {
           throw new Error(this.formatToolFailure(result));
@@ -695,7 +695,7 @@ ${truncated}
 
   private repairInstruction(state: ToolExecutionState, path: string, issues: unknown, patch?: string): string {
     const normalized = Array.isArray(issues) && issues.length > 0
-      ? issues as import("./WorkspaceState").VerificationIssue[]
+      ? issues as VerificationIssue[]
       : [{ type: "execution", file: path, line: null, column: null, severity: "error" as const, rule: "tool-result", message: "Écriture ou vérification non confirmée." }];
     const key = path.replace(/\\/g, "/").replace(/^\.\//, "");
     const loop = state.repairLoops.get(key) ?? new AgentRepairLoop();
@@ -1018,7 +1018,7 @@ ${truncated}
     const nextDepth = depth + 1;
 
     // Lancer toutes les délégations en parallèle (fire-and-forget)
-    const dispatches = delegations.map((delegation) =>
+    const dispatches = delegations.map((delegation: ParsedDelegation) =>
       this.sendDelegation(parentTask, delegation, nextDepth).then((taskId) => {
         if (taskId) subTaskIds.push(taskId);
       })
@@ -1175,23 +1175,23 @@ ${truncated}
    */
   private async resolveContextFiles(task: AgentTask, capabilities: string[]): Promise<string[]> {
     const mentionedFiles = this.extractMentionedFiles(task);
-    const hardExplicitFiles = [...new Set(task.context.files)].filter(Boolean);
+    const hardExplicitFiles: string[] = [...new Set(task.context.files)].filter(Boolean) as string[];
 
     // Si des fichiers explicites sont fournis par l'appelant (pas extraits), les utiliser directement
     if (hardExplicitFiles.length > 0 && !capabilities.includes("list_project_files")) {
-      return hardExplicitFiles.slice(0, 10);
+      return hardExplicitFiles.slice(0, 10) as string[];
     }
 
     // Toujours découvrir l'inventaire pour résoudre les noms partiels/fuzzy
     if (!capabilities.includes("list_project_files")) {
-      return hardExplicitFiles.slice(0, 10);
+      return hardExplicitFiles.slice(0, 10) as string[];
     }
 
     try {
       const inventory = await this.callToolWithTimeout("list_project_files", { path: ".", recursive: true });
       if (inventory?.status !== "success" || !Array.isArray(inventory.files)) {
         log.warn(`[${task.id.slice(0, 8)}] Découverte de contexte indisponible: ${inventory?.error ?? inventory?.message ?? "réponse invalide"}`);
-        return hardExplicitFiles.slice(0, 10);
+        return hardExplicitFiles.slice(0, 10) as string[];
       }
 
       const allFiles: string[] = inventory.files;
@@ -1205,7 +1205,7 @@ ${truncated}
       const priorityFiles = [...new Set([...hardExplicitFiles, ...resolvedMentioned])];
 
       if (priorityFiles.length >= 10) {
-        const selected = priorityFiles.slice(0, 10);
+        const selected: string[] = priorityFiles.slice(0, 10);
         task.context.files = selected;
         log.info(`[${task.id.slice(0, 8)}] Contexte explicite résolu: ${selected.length} fichier(s)`);
         return selected;
@@ -1219,10 +1219,10 @@ ${truncated}
         projectFileCount: inventory.count,
       };
       log.info(`[${task.id.slice(0, 8)}] Contexte projet découvert: ${selectedFiles.length}/${inventory.count} fichier(s) sélectionné(s)`);
-      return selectedFiles;
+      return selectedFiles as string[];
     } catch (error) {
       log.warn(`[${task.id.slice(0, 8)}] Échec de découverte du contexte: ${(error as Error).message}`);
-      return hardExplicitFiles.slice(0, 10);
+      return hardExplicitFiles.slice(0, 10) as string[];
     }
   }
 
