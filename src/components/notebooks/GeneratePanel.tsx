@@ -22,6 +22,8 @@ import { SlidePreviewModal } from './SlidePreviewModal';
 import { useToast } from '../ui/Toast';
 import { useProfile } from '../../context/UserProfileContext';
 import { MermaidDiagram } from './MermaidDiagram';
+// Styles premium NotebookLM
+import '../../styles/notebooklm.css';
 
 interface SourceItem {
   id: string;
@@ -93,78 +95,269 @@ const REPORT_TYPES = [
   { key: 'report-project', label: 'Rapport de projet', icon: Clock, desc: 'Avancement, livrables, jalons, blocages', color: 'var(--color-accent-alt)' },
 ];
 
-/** Render markdown-like content with Mermaid diagram support */
+// ============================================
+// 🎨 RENDU PREMIUM - Style NotebookLM
+// ============================================
+
+/** Thèmes disponibles pour le code */
+const CODE_THEMES: Record<string, { bg: string; text: string; border: string }> = {
+  default: { bg: 'var(--bg-base)', text: 'var(--text-primary)', border: 'var(--border-base)' },
+};
+
+/**
+ * Rendu premium du contenu généré
+ * Supports: markdown complet + blocs de code enrichis + images + liens + tableaux
+ */
 function renderGeneratedContent(content: string): JSX.Element {
   const parts = content.split(/(```[\s\S]*?```)/g);
 
   return (
-    <div className="space-y-2">
+    <div className="notebooklm-prose max-w-none space-y-5">
       {parts.map((part, i) => {
+        // --- BLOC DE CODE ---
         if (part.startsWith('```')) {
           const lines = part.slice(3, -3).split('\n');
           const lang = lines[0]?.trim().toLowerCase() || '';
-          const code = (lang ? lines.slice(1) : lines).join('\n').trim();
+          const codeContent = (lang ? lines.slice(1) : lines).join('\n').trim();
+          const theme = CODE_THEMES.default;
 
+          // Mermaid
           if (lang === 'mermaid') {
-            return <MermaidDiagram key={i} code={code} id={`gen-${i}`} />;
+            return (
+              <div key={i} className="notebooklm-mermaid my-6">
+                <MermaidDiagram code={codeContent} id={`gen-mermaid-${i}`} />
+              </div>
+            );
           }
 
+          // Blocs de code premium
           return (
-            <pre
+            <div
               key={i}
-              className="px-4 py-3 rounded-xl text-xs overflow-x-auto font-mono"
-              style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+              className="notebooklm-code rounded-xl overflow-hidden shadow-sm border group/code relative"
+              style={{ borderColor: theme.border, backgroundColor: theme.bg }}
             >
-              <code>{code}</code>
-            </pre>
+              {lang && (
+                <div
+                  className="flex items-center gap-2 px-4 py-2.5 border-b"
+                  style={{
+                    borderColor: theme.border,
+                    backgroundColor: `color-mix(in srgb, ${theme.bg} 95%, black)`,
+                  }}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: 'var(--accent-primary)' }}
+                  />
+                  <span className="text-xs font-medium text-[var(--text-dimmed)]">
+                    {lang}
+                  </span>
+                </div>
+              )}
+
+              <pre
+                className={`p-4 overflow-x-auto font-mono text-sm leading-relaxed ${
+                  lang ? '' : 'rounded-xl'
+                }`}
+                style={{ color: theme.text }}
+              >
+                <code>{codeContent}</code>
+              </pre>
+
+              <button
+                onClick={() => navigator.clipboard.writeText(codeContent)}
+                className="absolute top-2 right-2 p-2 rounded-lg opacity-0 group-hover/code:opacity-100 transition-opacity hover:bg-white/10"
+                style={{ color: 'var(--text-muted)' }}
+                title="Copier"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+            </div>
           );
         }
 
+        // --- CONTENU TEXTUEL ---
         const lines = part.split('\n');
         return (
-          <div key={i} className="space-y-1.5">
+          <div key={i} className="space-y-4">
             {lines.map((line, j) => {
-              if (!line.trim()) return <div key={j} className="h-1.5" />;
-              // Image markdown (inline base64 ou URL)
+              if (!line.trim()) return <div key={j} className="h-2" />;
+
+              // ========== IMAGES ==========
               const imgMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
               if (imgMatch) {
                 return (
-                  <div key={j} className="my-3 rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border-base)' }}>
-                    <img src={imgMatch[2]} alt={imgMatch[1] || 'Image générée'} className="w-full h-auto max-h-[600px] object-contain" style={{ backgroundColor: 'var(--bg-base)' }} />
-                    {imgMatch[1] && <p className="text-xs text-center py-1.5 opacity-60">{imgMatch[1]}</p>}
-                  </div>
+                  <figure key={j} className="notebooklm-figure my-6">
+                    <div
+                      className="rounded-2xl overflow-hidden border shadow-lg"
+                      style={{
+                        borderColor: 'var(--border-base)',
+                        backgroundColor: 'var(--bg-base)',
+                      }}
+                    >
+                      <img
+                        src={imgMatch[2]}
+                        alt={imgMatch[1] || 'Image'}
+                        className="w-full h-auto"
+                        style={{ maxHeight: '700px', objectFit: 'contain' }}
+                      />
+                    </div>
+                    {imgMatch[1] && (
+                      <figcaption
+                        className="mt-3 text-center text-xs"
+                        style={{ color: 'var(--text-dimmed)' }}
+                      >
+                        {imgMatch[1]}
+                      </figcaption>
+                    )}
+                  </figure>
                 );
               }
-              if (line.startsWith('#### ')) return <h5 key={j} className="text-xs font-bold mt-3 mb-0.5" style={{ color: 'var(--text-primary)' }}>{line.slice(5)}</h5>;
-              if (line.startsWith('### ')) return <h4 key={j} className="text-xs font-bold mt-4 mb-1" style={{ color: 'var(--text-primary)' }}>{line.slice(4)}</h4>;
-              if (line.startsWith('## ')) return <h3 key={j} className="text-sm font-bold mt-5 mb-1.5" style={{ color: 'var(--text-primary)' }}>{line.slice(3)}</h3>;
-              if (line.startsWith('# ')) return <h2 key={j} className="text-base font-bold mt-6 mb-2" style={{ color: 'var(--text-primary)' }}>{line.slice(2)}</h2>;
-              if (line.match(/^---+$/)) return <hr key={j} className="my-4" style={{ borderColor: 'var(--border-base)' }} />;
-              if (line.startsWith('> ')) {
+
+              // ========== TITRES ==========
+              if (line.startsWith('# '))
                 return (
-                  <blockquote key={j} className="pl-3 py-1 text-xs leading-relaxed italic border-l-2" style={{ borderColor: 'var(--accent-primary)', color: 'var(--text-muted)' }}>
-                    {line.slice(2)}
+                  <h1 key={j} className="notebooklm-h1 text-3xl md:text-4xl font-bold mt-8 mb-4">
+                    {renderInlineMarkdown(line.slice(2).trim())}
+                  </h1>
+                );
+              if (line.startsWith('## '))
+                return (
+                  <h2 key={j} className="notebooklm-h2 text-2xl md:text-3xl font-bold mt-7 mb-3">
+                    {renderInlineMarkdown(line.slice(3).trim())}
+                  </h2>
+                );
+              if (line.startsWith('### '))
+                return (
+                  <h3 key={j} className="notebooklm-h3 text-xl md:text-2xl font-semibold mt-6 mb-2">
+                    {renderInlineMarkdown(line.slice(4).trim())}
+                  </h3>
+                );
+              if (line.startsWith('#### '))
+                return (
+                  <h4 key={j} className="notebooklm-h4 text-lg md:text-xl font-semibold mt-5 mb-2">
+                    {renderInlineMarkdown(line.slice(5).trim())}
+                  </h4>
+                );
+              if (line.startsWith('##### '))
+                return (
+                  <h5 key={j} className="notebooklm-h5 text-base font-medium mt-4 mb-1.5">
+                    {renderInlineMarkdown(line.slice(6).trim())}
+                  </h5>
+                );
+              if (line.startsWith('###### '))
+                return (
+                  <h6 key={j} className="notebooklm-h6 text-sm font-medium mt-3 mb-1 opacity-80">
+                    {renderInlineMarkdown(line.slice(7).trim())}
+                  </h6>
+                );
+
+              // ========== SÉPARATEURS ==========
+              if (line.match(/^---+$/) || line.match(/^___+$/) || line.match(/^\*\*\*+$/))
+                return (
+                  <hr
+                    key={j}
+                    className="my-6 border-0 h-px"
+                    style={{
+                      background: 'linear-gradient(to right, transparent, var(--border-base), transparent)',
+                    }}
+                  />
+                );
+
+              // ========== CITATIONS ==========
+              if (line.startsWith('> '))
+                return (
+                  <blockquote
+                    key={j}
+                    className="notebooklm-blockquote pl-5 pr-4 py-3 rounded-xl my-4"
+                    style={{
+                      borderLeft: '3px solid var(--accent-primary)',
+                      backgroundColor: 'color-mix(in srgb, var(--accent-primary) 5%, transparent)',
+                    }}
+                  >
+                    <p className="text-sm italic leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                      {renderInlineMarkdown(line.slice(2).trim())}
+                    </p>
                   </blockquote>
                 );
-              }
-              if (line.match(/^[\-\*]\s/)) {
+
+              // ========== LISTES À PUCES ==========
+              if (line.match(/^[\-\*\+]\s/)) {
+                const bullet = line.match(/^([\-\*\+])\s/)![1];
                 return (
-                  <div key={j} className="flex gap-2 pl-2">
-                    <span className="text-xs mt-0.5 opacity-50">•</span>
-                    <span className="text-xs leading-relaxed flex-1" style={{ color: 'var(--text-primary)' }}>{renderBoldItalic(line.slice(2))}</span>
+                  <div key={j} className="flex gap-3 py-1.5 notebooklm-list-item">
+                    <span
+                      className="mt-1.5 flex-shrink-0"
+                      style={{ color: 'var(--accent-primary)', opacity: 0.7 }}
+                    >
+                      {bullet === '*' ? '•' : bullet === '+' ? '›' : '○'}
+                    </span>
+                    <div className="text-sm leading-relaxed flex-1">
+                      {renderInlineMarkdown(line.slice(2).trim())}
+                    </div>
                   </div>
                 );
               }
+
+              // ========== LISTES NUMÉROTÉES ==========
               if (line.match(/^\d+\.\s/)) {
-                const num = line.match(/^(\d+)\./)?.[1];
+                const numMatch = line.match(/^(\d+)\.\s(.*)$/);
+                if (numMatch)
+                  return (
+                    <div key={j} className="flex gap-3 py-1.5 notebooklm-list-item">
+                      <span
+                        className="mt-1.5 flex-shrink-0 w-6 text-right font-semibold"
+                        style={{ color: 'var(--accent-primary)' }}
+                      >
+                        {numMatch[1]}.
+                      </span>
+                      <div className="text-sm leading-relaxed flex-1">
+                        {renderInlineMarkdown(numMatch[2])}
+                      </div>
+                    </div>
+                  );
+              }
+
+              // ========== LISTES DE TÂCHES ==========
+              const taskMatch = line.match(/^[\-\*]\s\[([xX\s])\]\s(.*)$/);
+              if (taskMatch)
                 return (
-                  <div key={j} className="flex gap-2 pl-2">
-                    <span className="text-xs mt-0.5 opacity-60 font-semibold min-w-[16px]" style={{ color: 'var(--accent-primary)' }}>{num}.</span>
-                    <span className="text-xs leading-relaxed flex-1" style={{ color: 'var(--text-primary)' }}>{renderBoldItalic(line.replace(/^\d+\.\s/, ''))}</span>
+                  <div key={j} className="flex items-start gap-3 py-1.5 notebooklm-task">
+                    <input
+                      type="checkbox"
+                      checked={taskMatch[1].toLowerCase() === 'x'}
+                      readOnly
+                      className="mt-1.5 w-4 h-4 rounded border-2 accent-[var(--accent-primary)]"
+                    />
+                    <span className="text-sm leading-relaxed pt-0.5">
+                      {renderInlineMarkdown(taskMatch[2])}
+                    </span>
                   </div>
                 );
-              }
-              return <p key={j} className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>{renderBoldItalic(line)}</p>;
+
+              // ========== LIENS STANDALONE ==========
+              const bareLinkMatch = line.match(/^https?:\/\/[^\s]+$/);
+              if (bareLinkMatch)
+                return (
+                  <p key={j} className="text-sm">
+                    <a
+                      href={line}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="notebooklm-link inline-flex items-center gap-1 font-medium"
+                    >
+                      {line}
+                      <span className="opacity-50">↗</span>
+                    </a>
+                  </p>
+                );
+
+              // ========== PARAGRAPHES ==========
+              return (
+                <p key={j} className="text-sm leading-7 notebooklm-paragraph">
+                  {renderInlineMarkdown(line)}
+                </p>
+              );
             })}
           </div>
         );
@@ -175,7 +368,6 @@ function renderGeneratedContent(content: string): JSX.Element {
 
 /** Render infographic content — affiche l'image PNG directement */
 function renderInfographicContent(content: string): JSX.Element {
-  // Le contenu est soit du JSON (nouveau format), soit du markdown (ancien format)
   let imageSrc = '';
   let prompt = '';
   let model = '';
@@ -192,17 +384,25 @@ function renderInfographicContent(content: string): JSX.Element {
       sizeKB = data.sizeKB || 0;
     }
   } catch {
-    // Fallback : ancien format markdown
     const imgMatch = content.match(/!\[[^\]]*\]\((data:image\/[^;]+;base64,[^)]+)\)/);
     if (imgMatch) imageSrc = imgMatch[1];
-    const promptMatch = content.match(/\*\*Prompt\*\*\s*:\s*(.+)/);
-    if (promptMatch) prompt = promptMatch[1];
-    const modelMatch = content.match(/\*\*Modèle utilisé\*\*\s*:\s*(.+)/);
-    if (modelMatch) model = modelMatch[1];
   }
 
   if (!imageSrc) {
-    return <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Aucune image trouvée dans le contenu.</p>;
+    return (
+      <div
+        className="flex flex-col items-center gap-4 p-8 rounded-2xl"
+        style={{
+          backgroundColor: 'var(--bg-panel)',
+          border: '1px dashed var(--border-base)',
+        }}
+      >
+        <Lightbulb className="w-8 h-8 opacity-50" style={{ color: 'var(--color-warning)' }} />
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          Aucune image trouvée
+        </p>
+      </div>
+    );
   }
 
   const handleDownload = () => {
@@ -215,56 +415,92 @@ function renderInfographicContent(content: string): JSX.Element {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Image affichée en plein */}
+    <div className="notebooklm-infographic space-y-6">
       <div
-        className="rounded-2xl overflow-hidden border shadow-sm"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+        className="rounded-3xl overflow-hidden shadow-2xl border"
+        style={{
+          borderColor: 'var(--border-base)',
+          backgroundColor: 'var(--bg-base)',
+        }}
       >
         <img
           src={imageSrc}
           alt="Infographie générée"
           className="w-full h-auto"
-          style={{ maxHeight: '800px', objectFit: 'contain' }}
+          style={{ maxHeight: '850px', objectFit: 'contain' }}
         />
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap">
         <button
           onClick={handleDownload}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:shadow-md active:scale-[0.98]"
           style={{
             backgroundColor: 'color-mix(in srgb, var(--color-warning) 12%, transparent)',
             color: 'var(--color-warning)',
             border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)',
           }}
         >
-          📥 Télécharger PNG
+          <Download className="w-4 h-4" />
+          Télécharger PNG
         </button>
+
         {filePath && (
-          <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
-            📁 {filePath}
+          <span
+            className="text-xs px-3 py-1.5 rounded-xl"
+            style={{
+              backgroundColor: 'var(--bg-base)',
+              color: 'var(--text-dimmed)',
+            }}
+          >
+            📁 {filePath.split('/').pop()}
           </span>
         )}
         {sizeKB > 0 && (
-          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+          <span
+            className="text-xs px-2 py-1 rounded-full"
+            style={{
+              backgroundColor: 'var(--bg-panel)',
+              color: 'var(--text-dimmed)',
+            }}
+          >
             {sizeKB} KB
           </span>
         )}
       </div>
 
-      {/* Metadata */}
       {(prompt || model) && (
-        <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: 'var(--border-base)' }}>
+        <div
+          className="p-4 rounded-xl border space-y-3"
+          style={{
+            borderColor: 'var(--border-base)',
+            backgroundColor: 'var(--bg-panel)',
+          }}
+        >
           {model && (
-            <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
-              <span className="font-semibold">Modèle :</span> {model}
+            <p className="text-sm flex items-center gap-2">
+              <Brain
+                className="w-4 h-4"
+                style={{ color: 'var(--accent-primary)', opacity: 0.7 }}
+              />
+              <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                Modèle:
+              </span>
+              <span style={{ color: 'var(--text-dimmed)' }}> {model}</span>
             </p>
           )}
           {prompt && (
-            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
-              <span className="font-semibold">Prompt :</span> {prompt.slice(0, 200)}{prompt.length > 200 ? '...' : ''}
+            <p className="text-sm">
+              <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                Prompt:
+              </span>
+              <span
+                className="ml-2 leading-relaxed"
+                style={{ color: 'var(--text-dimmed)' }}
+              >
+                {prompt.slice(0, 250)}
+                {prompt.length > 250 ? '...' : ''}
+              </span>
             </p>
           )}
         </div>
@@ -273,21 +509,110 @@ function renderInfographicContent(content: string): JSX.Element {
   );
 }
 
-/** Render bold and italic inline */
+/**
+ * Rendu du markdown INLINE (gras, italique, code, liens, barré)
+ * Optimisé avec parsing récursif
+ */
+function renderInlineMarkdown(text: string): JSX.Element {
+  const parseMarkdown = (text: string, depth = 0): (string | JSX.Element)[] => {
+    if (depth > 10) return [text];
+
+    const result: (string | JSX.Element)[] = [];
+    let lastIndex = 0;
+    let hasMatch = false;
+
+    const patterns: Array<{
+      regex: RegExp;
+      render: (content: string, fullMatch: string) => JSX.Element;
+    }> = [
+      {
+        regex: /`([^`]+)`/g,
+        render: (content) => (
+          <code
+            key={`${content}-code-${depth}`}
+            className="notebooklm-inline-code px-1.5 py-0.5 rounded text-sm font-mono"
+            style={{ backgroundColor: 'var(--bg-base)', color: 'var(--accent-primary)' }}
+          >
+            {content}
+          </code>
+        ),
+      },
+      {
+        regex: /\[([^\]]+)\]\(([^)]+)\)/g,
+        render: (content, fullMatch) => {
+          const matchResult = fullMatch.match(/\[([^\]]+)\]\(([^)]+)\)/);
+          const linkText = matchResult ? matchResult[1] : content;
+          const url = matchResult ? matchResult[2] : content;
+          return (
+            <a
+              key={`${url}-link-${depth}`}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="notebooklm-link inline-flex items-center gap-1 font-medium"
+              style={{ color: 'var(--accent-primary)' }}
+            >
+              {parseMarkdown(linkText, depth + 1)}
+              <span className="opacity-50">↗</span>
+            </a>
+          );
+        },
+      },
+      {
+        regex: /\*\*([^*]+)\*\*/g,
+        render: (content) => (
+          <strong key={`${content}-bold-${depth}`} className="font-bold">
+            {parseMarkdown(content, depth + 1)}
+          </strong>
+        ),
+      },
+      {
+        regex: /\*([^*]+)\*/g,
+        render: (content) => (
+          <em key={`${content}-italic-${depth}`} className="italic opacity-80">
+            {parseMarkdown(content, depth + 1)}
+          </em>
+        ),
+      },
+      {
+        regex: /~~([^~]+)~~/g,
+        render: (content) => (
+          <s key={`${content}-strike-${depth}`} className="line-through opacity-50">
+            {parseMarkdown(content, depth + 1)}
+          </s>
+        ),
+      },
+    ];
+
+    for (const pattern of patterns) {
+      pattern.regex.lastIndex = 0;
+      let match;
+      while ((match = pattern.regex.exec(text)) !== null) {
+        hasMatch = true;
+        if (match.index > lastIndex) {
+          result.push(text.slice(lastIndex, match.index));
+        }
+        result.push(pattern.render(match[1], match[0]));
+        lastIndex = match.index + match[0].length;
+      }
+    }
+
+    if (hasMatch) {
+      if (lastIndex < text.length) {
+        result.push(...parseMarkdown(text.slice(lastIndex), depth + 1));
+      }
+      return result;
+    }
+
+    return [text];
+  };
+
+  return <>{parseMarkdown(text)}</>;
+}
+
+// Ancienne fonction conservée pour compatibilité (à supprimer plus tard)
 function renderBoldItalic(text: string): (string | JSX.Element)[] {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
-    }
-    if (part.startsWith('*') && part.endsWith('*')) {
-      return <em key={i} className="italic opacity-80">{part.slice(1, -1)}</em>;
-    }
-    if (part.startsWith('`') && part.endsWith('`')) {
-      return <code key={i} className="px-1 py-0.5 rounded text-xs font-mono" style={{ backgroundColor: 'var(--bg-base)' }}>{part.slice(1, -1)}</code>;
-    }
-    return part;
-  });
+  return [renderInlineMarkdown(text)];
 }
 
 /** Détecte prefers-reduced-transparency pour durcir les scrims de modal */
@@ -1167,7 +1492,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
       {/* Document viewer — shown in fullView mode */}
       {fullView && (
-      <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-1" style={{ borderColor: 'var(--notebook-border)' }}>
+      <div ref={contentRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-8 notebooklm-viewer" style={{ borderColor: 'var(--notebook-border)' }}>
         {/* Streaming view */}
         {Object.keys(streamingTexts).length > 0 && !selectedDoc && (
           <div className="space-y-5 max-w-3xl">
@@ -1203,7 +1528,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
         {selectedDoc && Object.keys(streamingTexts).length === 0 ? (
           <div className={`space-y-5 ${selectedDoc.type === 'mindmap' ? 'max-w-none' : 'max-w-6xl mx-auto'}`}>
             {/* Document header — sticky */}
-            <div className="flex items-start gap-3 pb-4 border-b sticky top-0 z-10 pt-1" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-canvas, var(--bg-base))' }}>
+            <div className="flex items-start gap-3 pb-6 border-b sticky top-0 z-10 pt-2 notebooklm-doc-header" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-canvas, var(--bg-base))', backdropFilter: 'blur(12px)' }}>
               {onClose && (
                 <button onClick={onClose} className="notebook-icon-button flex-shrink-0 mt-0.5" title="Retour">
                   <ArrowLeft className="h-4 w-4" />
