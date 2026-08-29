@@ -9,7 +9,6 @@ import type { TreeEntry } from '../../types/ide';
 import Tree from 'react-window-tree';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 
-
 type SortMode = 'name-asc' | 'name-desc' | 'type';
 
 export type DiffInfo = {
@@ -203,7 +202,6 @@ function getDiffInfo(
     const keySegments = normKey.split('/').filter(Boolean);
     const keyName = keySegments[keySegments.length - 1];
     if (keyName && targetName && keyName === targetName) {
-      // Si les noms de fichiers sont identiques et qu'un des chemins est inclus dans l'autre
       if (normalizedTarget.includes(normKey) || normKey.includes(normalizedTarget) || keySegments.length === 1 || targetSegments.length === 1) {
         return val;
       }
@@ -212,6 +210,7 @@ function getDiffInfo(
   return undefined;
 }
 
+// Version améliorée de toDataNode avec un rendu plus soigné
 function toDataNode(
   entry: TreeEntry,
   depth: number,
@@ -238,7 +237,6 @@ function toDataNode(
   const additions = diffInfo?.additions ?? 0;
   const deletions = diffInfo?.deletions ?? 0;
 
-  // Diff color coding & background highlight
   const diffColor = diffStatus === 'added'
     ? 'var(--color-success)'
     : diffStatus === 'modified'
@@ -248,13 +246,13 @@ function toDataNode(
         : undefined;
 
   const rowBg = isDragTarget
-    ? 'color-mix(in srgb, var(--accent-primary) 15%, transparent)'
+    ? 'color-mix(in srgb, var(--accent-primary) 20%, transparent)'
     : diffStatus === 'modified'
-      ? 'color-mix(in srgb, var(--color-warning) 8%, transparent)'
+      ? 'color-mix(in srgb, var(--color-warning) 10%, transparent)'
       : diffStatus === 'added'
-        ? 'color-mix(in srgb, var(--color-success) 8%, transparent)'
+        ? 'color-mix(in srgb, var(--color-success) 10%, transparent)'
         : diffStatus === 'deleted'
-          ? 'color-mix(in srgb, var(--color-error) 8%, transparent)'
+          ? 'color-mix(in srgb, var(--color-error) 10%, transparent)'
           : 'transparent';
 
   const activateRow = () => {
@@ -267,15 +265,16 @@ function toDataNode(
       role="treeitem"
       tabIndex={0}
       aria-expanded={entry.type === 'directory' ? isExpanded : undefined}
-      className="flex items-center gap-1.5 py-1 px-2 text-sm cursor-pointer select-none relative group transition-colors duration-150 rounded-md"
+      className="flex items-center gap-1.5 py-1 px-2 text-sm cursor-pointer select-none relative group transition-all duration-150 rounded-md hover:bg-[var(--bg-panel)]"
       style={{
-        paddingLeft: `${8 + depth * 14}px`,
+        paddingLeft: `${12 + depth * 16}px`,
         color: diffColor || 'var(--text-primary)',
         backgroundColor: rowBg,
-        outline: isDragTarget ? '1.5px solid var(--accent-primary)' : 'none',
+        outline: isDragTarget ? '2px solid var(--accent-primary)' : 'none',
         outlineOffset: '-1px',
         borderRadius: '6px',
-        transition: 'background 0.15s, outline 0.15s',
+        transition: 'background 0.15s, outline 0.15s, transform 0.1s',
+        transform: isDragTarget ? 'scale(1.01)' : 'scale(1)',
       }}
       onClick={activateRow}
       onKeyDown={(e) => {
@@ -293,41 +292,41 @@ function toDataNode(
       onDrop={(e) => handleDrop(e, entry)}
     >
       {/* Drag handle indicator */}
-      <span className="opacity-0 group-hover:opacity-30 transition-opacity absolute" style={{ left: `${depth * 14 + 2}px` }}>
-        <GripVertical size={10} />
+      <span className="opacity-0 group-hover:opacity-40 transition-opacity absolute" style={{ left: `${depth * 16 + 4}px` }}>
+        <GripVertical size={12} />
       </span>
 
       {/* Arrow indicator for directories */}
       {entry.type === 'directory' ? (
-        <span className="opacity-60 group-hover:opacity-100 mr-0.5">
-          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <span className="opacity-60 group-hover:opacity-100 mr-0.5 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+          <ChevronRight size={14} />
         </span>
       ) : (
         <span className="w-4" />
       )}
 
       <div className="flex items-center gap-1.5 flex-1 min-w-0">
-        {/* Status dot for modified files */}
+        {/* Status dot */}
         {diffStatus && (
           <span
-            className="w-1.5 h-1.5 rounded-full shrink-0"
+            className="w-2 h-2 rounded-full shrink-0 shadow-sm"
             style={{ backgroundColor: diffColor }}
           />
         )}
 
         {entry.type === 'directory' ? (
           isDragTarget || isExpanded ? (
-            <FolderOpen size={14} style={{ color: diffColor || 'var(--accent-primary)' }} />
+            <FolderOpen size={16} style={{ color: diffColor || 'var(--accent-primary)' }} />
           ) : (
-            <Folder size={14} style={{ color: diffColor || 'var(--accent-primary)' }} />
+            <Folder size={16} style={{ color: diffColor || 'var(--accent-primary)' }} />
           )
         ) : (
-          <FileIcon filePath={entry.path} size={14} />
+          <FileIcon filePath={entry.path} size={16} />
         )}
         <span
-          className={`truncate ${diffStatus ? 'font-medium' : 'font-normal opacity-90 group-hover:opacity-100'}`}
+          className={`truncate ${diffStatus ? 'font-medium' : 'font-normal'}`}
           title={entry.name}
-          style={{ color: diffColor }}
+          style={{ color: diffColor || 'var(--text-primary)' }}
         >
           {searchQuery ? (
             <HighlightMatch text={entry.name} query={searchQuery} />
@@ -336,16 +335,16 @@ function toDataNode(
           )}
         </span>
 
-        {/* Diff stats indicators (+lines / -lines / badge) */}
+        {/* Diff stats améliorés */}
         {diffStatus && (
-          <div className="ml-auto flex items-center gap-1 text-sm font-mono shrink-0 pl-1">
+          <div className="ml-auto flex items-center gap-1 text-xs font-mono shrink-0 pl-2">
             {additions > 0 && (
               <span
-                className="font-bold px-1.5 py-0.5 rounded text-sm"
+                className="font-bold px-1.5 py-0.5 rounded"
                 style={{
                   color: 'var(--color-success)',
-                  backgroundColor: 'rgba(34, 197, 94, 0.18)',
-                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--color-success) 25%, transparent)',
                 }}
                 title={`${additions} ligne(s) ajoutée(s)`}
               >
@@ -354,11 +353,11 @@ function toDataNode(
             )}
             {deletions > 0 && (
               <span
-                className="font-bold px-1.5 py-0.5 rounded text-sm"
+                className="font-bold px-1.5 py-0.5 rounded"
                 style={{
                   color: 'var(--color-error)',
-                  backgroundColor: 'rgba(239, 68, 68, 0.18)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  backgroundColor: 'color-mix(in srgb, var(--color-error) 15%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--color-error) 25%, transparent)',
                 }}
                 title={`${deletions} ligne(s) retirée(s)`}
               >
@@ -415,7 +414,7 @@ function toDataNode(
   };
 }
 
-// Main Component 
+// ── Composant principal amélioré ────────────────────────────────────────────
 
 const FileExplorer = memo(function FileExplorer({
   tree,
@@ -477,7 +476,6 @@ const FileExplorer = memo(function FileExplorer({
       debounceTimer = setTimeout(() => checkSandbox(true), 150);
     };
 
-    // Polling léger toutes les 3s pour garder les compteurs synchronisés
     const interval = setInterval(() => {
       checkSandbox(true);
     }, 3000);
@@ -493,13 +491,11 @@ const FileExplorer = memo(function FileExplorer({
     };
   }, []);
 
-  // Effective diff map
   const effectiveDiffPaths = useMemo(() => {
     if (liveDiffPaths.size > 0) return liveDiffPaths;
     return diffPaths;
   }, [liveDiffPaths, diffPaths]);
 
-  // Search, Sort, Hidden files
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
@@ -507,13 +503,11 @@ const FileExplorer = memo(function FileExplorer({
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Debounce manuel
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 200);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Keyboard shortcut: Ctrl/Cmd+Shift+F to focus search
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'F') {
@@ -540,7 +534,6 @@ const FileExplorer = memo(function FileExplorer({
     });
   }, []);
 
-  // Process tree: filter, hidden, sort
   const processedTree = useMemo(() => {
     const filtered = filterTree(tree, debouncedSearch, showHidden);
     const applySort = (entries: TreeEntry[]): TreeEntry[] =>
@@ -552,7 +545,6 @@ const FileExplorer = memo(function FileExplorer({
     return applySort(filtered);
   }, [tree, debouncedSearch, sortMode, showHidden]);
 
-  // Drag & Drop
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
 
@@ -593,7 +585,6 @@ const FileExplorer = memo(function FileExplorer({
     setDragOverPath(null);
   }, []);
 
-  // Convert to rc-tree format (sandbox/active tree)
   const treeData = useMemo(() => {
     return processedTree.map(entry =>
       toDataNode(
@@ -633,10 +624,8 @@ const FileExplorer = memo(function FileExplorer({
     effectiveDiffPaths,
   ]);
 
-  // Workspace tree section (read-only, shows ONLY modified files)
   const [wsExpandedDirs, setWsExpandedDirs] = useState<Set<string>>(new Set());
   const [showWorkspace, setShowWorkspace] = useState(true);
-  // One-shot: polling regenerates processedWorkspaceTree every 3s — never re-collapse after user opens it
   const hasAutoCollapsed = useRef(false);
 
   const wsToggleDir = useCallback((dirPath: string) => {
@@ -650,7 +639,6 @@ const FileExplorer = memo(function FileExplorer({
 
   const processedWorkspaceTree = useMemo(() => {
     if (!workspaceTree || workspaceTree.length === 0) return [];
-    // Si des fichiers sont modifiés dans le sandbox, on affiche ces fichiers en priorité
     const entriesToFilter = (effectiveDiffPaths && effectiveDiffPaths.size > 0)
       ? filterTreeOnlyDiffs(workspaceTree, effectiveDiffPaths, debouncedSearch, showHidden)
       : filterTree(workspaceTree, debouncedSearch, showHidden);
@@ -664,7 +652,6 @@ const FileExplorer = memo(function FileExplorer({
     return applySort(entriesToFilter);
   }, [workspaceTree, effectiveDiffPaths, debouncedSearch, sortMode, showHidden]);
 
-  // Auto-expand dirs + collapse Workspace section once — background refresh must not undo user choice
   useEffect(() => {
     if (processedWorkspaceTree.length === 0) {
       hasAutoCollapsed.current = false;
@@ -682,7 +669,6 @@ const FileExplorer = memo(function FileExplorer({
   const noopDragLeave = useCallback((_e: React.DragEvent) => {}, []);
 
   const wsTreeData = useMemo(() => {
-    // For Workspace files: use onOpenFileDiff to open the diff view instead of the raw editor
     const openWsFile = onOpenFileDiff ?? onOpenFile;
     return processedWorkspaceTree.map(entry =>
       toDataNode(
@@ -719,20 +705,18 @@ const FileExplorer = memo(function FileExplorer({
   ]);
 
   const wsExpandedKeys = useMemo(() => Array.from(wsExpandedDirs), [wsExpandedDirs]);
-
   const handleWsTreeExpand = useCallback((keys: React.Key[]) => {
     keys.forEach(key => wsToggleDir(String(key)));
   }, [wsToggleDir]);
 
-  // Sync expansion with rc-tree
   const expandedKeys = useMemo(() => Array.from(expandedDirs), [expandedDirs]);
-
   const handleTreeExpand = useCallback((keys: React.Key[]) => {
     keys.forEach(key => onToggleDirectory(String(key)));
   }, [onToggleDirectory]);
 
-  // Count files
   const fileCount = useMemo(() => countEntries(processedTree), [processedTree]);
+
+  // ── Rendu amélioré ─────────────────────────────────────────────────────────
 
   return (
     <div
@@ -743,10 +727,10 @@ const FileExplorer = memo(function FileExplorer({
         backgroundColor: 'var(--bg-sidebar)',
       }}
     >
-      {/* Explorer Header (with integrated "Changer de projet") */}
+      {/* Header amélioré */}
       <div
-        className="flex items-center justify-between border-b px-3"
-        style={{ height: '36px', borderColor: 'var(--border-base)' }}
+        className="flex items-center justify-between border-b px-3 py-1.5"
+        style={{ borderColor: 'var(--border-base)', minHeight: '44px' }}
       >
         <div className="flex items-center gap-2 min-w-0">
           <button
@@ -756,83 +740,103 @@ const FileExplorer = memo(function FileExplorer({
               } catch { /* best-effort */ }
               window.location.reload();
             }}
-            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-[var(--bg-panel)]"
+            className="flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors hover:bg-[var(--bg-panel)]"
             style={{ color: 'var(--accent-primary)' }}
             title="Changer de projet racine"
           >
-            <FolderInput size={12} />
+            <FolderInput size={14} />
           </button>
           <div className="min-w-0">
-            <span className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>
-              📁 Explorer
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+              Explorer
             </span>
-            <div className="text-xs truncate" style={{ color: 'var(--text-muted)' }} title={currentDir ? currentDir : 'Racine'}>
-              {currentDir === '.' ? 'Racine' : currentDir}
+            <div
+              className="text-xs truncate font-mono"
+              style={{ color: 'var(--text-muted)' }}
+              title={currentDir || 'Racine'}
+            >
+              {currentDir === '.' ? '~/projet' : currentDir}
             </div>
           </div>
           {!loading && (
-            <span className="text-xs px-1.5 rounded-md" style={{ color: 'var(--text-dimmed)', background: 'var(--bg-input)' }}>
+            <span
+              className="text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{ color: 'var(--text-dimmed)', background: 'var(--bg-input)' }}
+            >
               {fileCount}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           {currentDir && currentDir !== '.' && (
             <button
               onClick={() => onNavigate(currentDir.split('/').slice(0, -1).join('/') || '.')}
-              className="flex items-center rounded-md px-2 py-0.5 text-xs font-semibold transition-colors hover:bg-[var(--bg-panel)]"
+              className="flex items-center rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--bg-panel)]"
               style={{ color: 'var(--accent-primary)' }}
               title="Remonter d'un niveau"
             >
-              <ChevronUp size={12} />
-              <span className="hidden sm:inline">Parent</span>
+              <ChevronUp size={14} />
+              <span className="hidden sm:inline ml-0.5">Parent</span>
             </button>
           )}
           <div className="flex items-center gap-1">
             {sandboxActive ? (
               <span
-                className="text-xs px-1.5 py-0.5 rounded-md font-bold flex items-center gap-0.5 shadow-sm border border-success-subtle bg-success-subtle text-success"
+                className="text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-sm"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
+                  color: 'var(--color-success)',
+                  border: '1px solid color-mix(in srgb, var(--color-success) 30%, transparent)',
+                }}
                 title="Mode Sandbox actif"
               >
-                <Shield size={8} />
+                <Shield size={10} />
                 SBX
               </span>
             ) : (
               <span
-                className="text-xs px-1.5 py-0.5 rounded-md font-bold flex items-center gap-0.5 border border-[rgba(156,163,175,0.15)] bg-[rgba(156,163,175,0.08)] text-[var(--text-muted)]"
+                className="text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
+                style={{
+                  backgroundColor: 'var(--bg-panel)',
+                  color: 'var(--text-dimmed)',
+                  border: '1px solid var(--border-base)',
+                }}
                 title="Mode Sandbox inactif"
               >
-                <Shield size={8} />
+                <Shield size={10} />
                 SBX
               </span>
             )}
           </div>
         </div>
       </div>
-      {/* Toolbar */}
+
+      {/* Toolbar améliorée */}
       <div
         className="flex items-center gap-0.5 px-2 border-b"
-        style={{ height: '32px', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+        style={{ height: '36px', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
       >
         <button
           onClick={toggleSearch}
-          className={`rounded-md p-1.5 transition-colors hover:bg-[var(--bg-panel)] ${showSearch ? 'bg-[var(--bg-panel)]' : ''}`}
+          className={`rounded-md p-1.5 transition-all duration-200 hover:bg-[var(--bg-panel)] hover:scale-105 ${
+            showSearch ? 'bg-[var(--bg-panel)]' : ''
+          }`}
           title="Rechercher (Ctrl/Cmd+Shift+F)"
           style={{ color: showSearch ? 'var(--accent-primary)' : 'var(--text-muted)' }}
         >
-          <Search size={13} />
+          <Search size={14} />
         </button>
         <button
           onClick={() => setShowHidden(!showHidden)}
-          className="rounded-md p-1.5 transition-colors hover:bg-[var(--bg-panel)]"
+          className="rounded-md p-1.5 transition-all duration-200 hover:bg-[var(--bg-panel)] hover:scale-105"
           title={showHidden ? 'Masquer fichiers cachés' : 'Afficher fichiers cachés'}
           style={{ color: showHidden ? 'var(--accent-primary)' : 'var(--text-muted)' }}
         >
-          {showHidden ? <Eye size={13} /> : <EyeOff size={13} />}
+          {showHidden ? <Eye size={14} /> : <EyeOff size={14} />}
         </button>
         <button
           onClick={() => setSortMode(nextSort)}
-          className="rounded-md p-1.5 transition-colors hover:bg-[var(--bg-panel)]"
+          className="rounded-md p-1.5 transition-all duration-200 hover:bg-[var(--bg-panel)] hover:scale-105"
           title={sortLabel(sortMode)}
           style={{ color: sortMode !== 'name-asc' ? 'var(--accent-primary)' : 'var(--text-muted)' }}
         >
@@ -841,81 +845,87 @@ const FileExplorer = memo(function FileExplorer({
         <div className="flex-1" />
         <button
           onClick={onCreateFile}
-          className="rounded-md p-1.5 transition-colors hover:bg-[var(--bg-panel)]"
+          className="rounded-md p-1.5 transition-all duration-200 hover:bg-[var(--bg-panel)] hover:scale-105"
           title="Nouveau fichier"
         >
-          <Plus size={13} style={{ color: 'var(--text-muted)' }} />
+          <Plus size={14} style={{ color: 'var(--text-muted)' }} />
         </button>
         <button
           onClick={onRefresh}
-          className="rounded-md p-1.5 transition-colors hover:bg-[var(--bg-panel)]"
+          className="rounded-md p-1.5 transition-all duration-200 hover:bg-[var(--bg-panel)] hover:scale-105 hover:rotate-90"
           title="Actualiser"
         >
-          <RefreshCcw size={13} style={{ color: 'var(--text-muted)' }} />
+          <RefreshCcw size={14} style={{ color: 'var(--text-muted)' }} />
         </button>
       </div>
 
-      {/* Search input (expandable) */}
+      {/* Search input amélioré */}
       <AnimatePresence>
         {showSearch && (
           <motion.div
             initial={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
             animate={reduceMotion ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
             exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={{ duration: reduceMotion ? 0.01 : 0.15 }}
+            transition={{ duration: reduceMotion ? 0.01 : 0.2 }}
             className="overflow-hidden"
           >
             <div
-              className="flex items-center gap-1.5 border-b px-3 py-1.5"
+              className="flex items-center gap-2 border-b px-3 py-2"
               style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
             >
-              <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              <Search size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Filtrer les fichiers…"
-                className="flex-1 bg-transparent text-sm outline-none placeholder:opacity-40"
+                className="flex-1 bg-transparent text-sm outline-none placeholder:opacity-50"
                 style={{ color: 'var(--text-primary)' }}
+                autoFocus
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="opacity-50 hover:opacity-100 transition"
+                  className="rounded-full p-1 hover:bg-[var(--bg-panel)] transition"
                   title="Effacer"
                 >
-                  <X size={11} style={{ color: 'var(--text-muted)' }} />
+                  <X size={12} style={{ color: 'var(--text-muted)' }} />
                 </button>
               )}
               <button
                 onClick={toggleSearch}
-                className="opacity-50 hover:opacity-100 transition"
+                className="rounded-full p-1 hover:bg-[var(--bg-panel)] transition"
                 title="Fermer la recherche"
               >
-                <X size={11} style={{ color: 'var(--text-muted)' }} />
+                <X size={12} style={{ color: 'var(--text-muted)' }} />
               </button>
             </div>
             {searchQuery && (
               <div
-                className="px-3 py-0.5 text-xs border-b"
+                className="px-3 py-1 text-xs border-b flex items-center gap-2"
                 style={{
                   borderColor: 'var(--border-base)',
                   color: 'var(--text-dimmed)',
-                  backgroundColor: 'color-mix(in srgb, var(--accent-primary) 5%, transparent)',
+                  backgroundColor: 'color-mix(in srgb, var(--accent-primary) 6%, transparent)',
                 }}
               >
-                {fileCount} résultat{fileCount !== 1 ? 's' : ''} pour «{searchQuery}»
+                <span className="font-medium">{fileCount}</span>
+                <span>résultat{fileCount !== 1 ? 's' : ''}</span>
+                <span className="opacity-50">pour</span>
+                <span className="font-mono font-medium" style={{ color: 'var(--accent-primary)' }}>
+                  «{searchQuery}»
+                </span>
               </div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Sort indicator (non-default) */}
+      {/* Sort indicator amélioré */}
       {sortMode !== 'name-asc' && !searchQuery && !showSearch && (
         <div
-          className="flex items-center gap-1 px-3 py-0.5 text-xs border-b"
+          className="flex items-center gap-2 px-3 py-1 text-xs border-b"
           style={{
             borderColor: 'var(--border-base)',
             backgroundColor: 'color-mix(in srgb, var(--accent-primary) 8%, transparent)',
@@ -923,83 +933,90 @@ const FileExplorer = memo(function FileExplorer({
           }}
         >
           <SortIcon mode={sortMode} />
-          <span>{sortLabel(sortMode)}</span>
+          <span className="font-medium">{sortLabel(sortMode)}</span>
           <button
-            className="ml-auto opacity-60 hover:opacity-100 transition"
+            className="ml-auto rounded-full p-0.5 hover:bg-[var(--bg-panel)] transition"
             onClick={() => setSortMode('name-asc')}
             title="Réinitialiser le tri"
           >
-            <X size={9} />
+            <X size={10} />
           </button>
         </div>
       )}
 
-      {/* Tree View Container - Virtualized */}
+      {/* Tree View Container - avec meilleur padding */}
       <div className="flex-1 overflow-y-auto py-1 custom-scrollbar" style={{ height: '100%' }}>
         {loading ? (
-          <div className="space-y-1.5 px-3 py-2">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-2" style={{ paddingLeft: `${8 + (i % 4) * 14}px` }}>
-                <div className="skeleton w-4 h-4 rounded flex-shrink-0 opacity-40" />
-                <div className="skeleton h-2.5 rounded flex-1 opacity-30" style={{ maxWidth: `${60 + Math.random() * 80}px` }} />
+          <div className="space-y-2 px-3 py-3">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 animate-pulse"
+                style={{ paddingLeft: `${8 + (i % 5) * 14}px` }}
+              >
+                <div className="skeleton w-4 h-4 rounded-md flex-shrink-0" style={{ background: 'var(--bg-input)' }} />
+                <div
+                  className="skeleton h-2.5 rounded-md flex-1"
+                  style={{ background: 'var(--bg-input)', maxWidth: `${50 + Math.random() * 100}px` }}
+                />
               </div>
             ))}
           </div>
         ) : processedTree.length === 0 && !searchQuery ? (
-          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
             <div
-              className="w-10 h-10 rounded flex items-center justify-center mb-3"
-              style={{ backgroundColor: 'var(--accent-subtle)' }}
+              className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)' }}
             >
-              <Folder size={20} style={{ color: 'var(--accent-primary)' }} />
+              <Folder size={28} style={{ color: 'var(--accent-primary)' }} />
             </div>
-            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
               Dossier vide
             </p>
-            <p className="text-sm mb-4 leading-normal opacity-60" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-sm mb-5 leading-relaxed opacity-60" style={{ color: 'var(--text-muted)' }}>
               Créez un fichier ou ouvrez un projet.
             </p>
             <button
               onClick={onCreateFile}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold transition hover:opacity-95"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition hover:shadow-lg hover:scale-105"
               style={{
                 backgroundColor: 'var(--accent-primary)',
                 color: 'white',
-                borderRadius: 'var(--radius-sm)',
               }}
             >
-              <Plus size={12} />
+              <Plus size={16} />
               Nouveau fichier
             </button>
           </div>
         ) : processedTree.length === 0 && searchQuery ? (
-          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-            <Search size={24} className="mb-3 opacity-30" style={{ color: 'var(--text-muted)' }} />
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+            <Search size={32} className="mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
             <p className="text-sm opacity-60" style={{ color: 'var(--text-muted)' }}>
-              Aucun fichier ne correspond à «{searchQuery}»
+              Aucun fichier ne correspond à <span className="font-mono font-medium" style={{ color: 'var(--accent-primary)' }}>«{searchQuery}»</span>
             </p>
           </div>
         ) : (
           <>
-            {/* Section: Sandbox (active tree) */}
+            {/* Section Sandbox améliorée */}
             {sandboxActive && (
               <div
-                className="flex items-center gap-1.5 px-3 py-1 border-b sticky top-0 z-10"
+                className="flex items-center gap-2 px-3 py-1.5 border-b sticky top-0 z-10 backdrop-blur-sm"
                 style={{
                   borderColor: 'var(--border-base)',
-                  backgroundColor: 'color-mix(in srgb, var(--color-success, var(--color-success)) 6%, var(--bg-sidebar))',
+                  backgroundColor: 'color-mix(in srgb, var(--color-success) 8%, var(--bg-sidebar))',
                 }}
               >
-                <Shield size={10} style={{ color: 'var(--color-success, var(--color-success))' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--color-success, var(--color-success))' }}>
+                <Shield size={12} style={{ color: 'var(--color-success)' }} />
+                <span className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>
                   Sandbox
                 </span>
                 {effectiveDiffPaths && effectiveDiffPaths.size > 0 && (
                   <span
-                    className="text-xs px-1.5 rounded-full ml-auto"
+                    className="text-xs px-2 py-0.5 rounded-full font-medium ml-auto"
                     style={{
-                      backgroundColor: 'color-mix(in srgb, var(--color-warning, var(--color-warning)) 15%, transparent)',
-                      color: 'var(--color-warning, var(--color-warning))',
+                      backgroundColor: 'color-mix(in srgb, var(--color-warning) 18%, transparent)',
+                      color: 'var(--color-warning)',
+                      border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)',
                     }}
                   >
                     {effectiveDiffPaths.size} diff{effectiveDiffPaths.size > 1 ? 's' : ''}
@@ -1010,7 +1027,7 @@ const FileExplorer = memo(function FileExplorer({
             <Tree
               treeData={treeData}
               height={sandboxActive && showWorkspace ? 320 : 600}
-              itemHeight={26}
+              itemHeight={28}
               virtual
               showLine
               expandedKeys={expandedKeys}
@@ -1019,33 +1036,31 @@ const FileExplorer = memo(function FileExplorer({
               defaultExpandParent
             />
 
-            {/* Section: Workspace (fichiers réels) — Toujours accessible lorsque sandbox actif */}
+            {/* Section Workspace améliorée */}
             {sandboxActive && processedWorkspaceTree.length > 0 && (
               <>
                 <div
-                  className="flex items-center gap-1.5 px-3 py-1 border-t border-b cursor-pointer select-none"
+                  className="flex items-center gap-2 px-3 py-1.5 border-t border-b cursor-pointer select-none transition-colors hover:bg-[var(--bg-panel)]"
                   style={{
                     borderColor: 'var(--border-base)',
                     backgroundColor: 'color-mix(in srgb, var(--accent-primary) 6%, var(--bg-sidebar))',
                   }}
                   onClick={() => setShowWorkspace(prev => !prev)}
                 >
-                  <span className="opacity-60">
-                    {showWorkspace ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                  <span className="opacity-60 transition-transform duration-200" style={{ transform: showWorkspace ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
+                    <ChevronDown size={12} />
                   </span>
-                  <FolderInput size={10} style={{ color: 'var(--accent-primary)' }} />
-                  <span className="text-sm font-semibold" style={{ color: 'var(--accent-primary)' }}>
+                  <FolderInput size={12} style={{ color: 'var(--accent-primary)' }} />
+                  <span className="text-sm font-bold" style={{ color: 'var(--accent-primary)' }}>
                     Dossiers Réels
                   </span>
-                  {/* <span className="text-xs opacity-50 ml-1" style={{ color: 'var(--text-muted)' }}>
-                    (fichiers réels)
-                  </span> */}
                   {sandboxModifiedCount > 0 ? (
                     <span
-                      className="ml-auto text-xs px-1.5 py-0.5 rounded font-medium flex items-center gap-1"
+                      className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1"
                       style={{
-                        backgroundColor: 'color-mix(in srgb, var(--color-warning, var(--color-warning)) 15%, transparent)',
-                        color: 'var(--color-warning, var(--color-warning))',
+                        backgroundColor: 'color-mix(in srgb, var(--color-warning) 18%, transparent)',
+                        color: 'var(--color-warning)',
+                        border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)',
                       }}
                       title="Cliquez sur un fichier pour examiner et valider les modifications"
                     >
@@ -1054,14 +1069,15 @@ const FileExplorer = memo(function FileExplorer({
                     </span>
                   ) : (
                     <span
-                      className="ml-auto text-xs px-1.5 py-0.5 rounded font-medium flex items-center gap-1"
+                      className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1"
                       style={{
-                        backgroundColor: 'color-mix(in srgb, var(--color-success, var(--color-success)) 15%, transparent)',
-                        color: 'var(--color-success, var(--color-success))',
+                        backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
+                        color: 'var(--color-success)',
+                        border: '1px solid color-mix(in srgb, var(--color-success) 30%, transparent)',
                       }}
                       title="Tous les fichiers sont validés et synchronisés sur le workspace réel"
                     >
-                      <span>✓ Validé (à jour)</span>
+                      <span>✓ Validé</span>
                     </span>
                   )}
                 </div>
@@ -1069,7 +1085,7 @@ const FileExplorer = memo(function FileExplorer({
                   <Tree
                     treeData={wsTreeData}
                     height={280}
-                    itemHeight={26}
+                    itemHeight={28}
                     virtual
                     showLine
                     expandedKeys={wsExpandedKeys}
