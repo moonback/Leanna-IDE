@@ -5,7 +5,7 @@ import { setupGracefulShutdown } from "./server/lifecycle";
 // vite est importé dynamiquement en dev uniquement (voir plus bas)
 import { WebSocketServer, WebSocket } from "ws";
 import { GoogleGenAI } from "@google/genai";
-import { SkillManager } from "./server/skills/SkillManager";
+import { bootstrapRuntime } from "./server/runtime/bootstrap";
 import { agentOrchestrator } from "./server/agents";
 import { mcpBridge } from "./server/mcp";
 import { type ProfileConfig } from "./server/prompts/systemInstruction";
@@ -230,53 +230,94 @@ function getGeminiAI(): GoogleGenAI {
   }
   return client;
 }
-const skillManager = new SkillManager();
-
-// ─── Nouveau Runtime v2 — Pont actif vers le ToolRegistry ───────────────────
-// Le runtime V2 est maintenant connecté au SkillManager existant.
-// Toutes les skills sont mirrorées dans le ToolRegistry pour les métriques
-// et les nouvelles routes /api/v2/*.
-import { createRuntime } from "./server/runtime";
+// ─── Initialisation Unifiée : SkillManagerV2 + Runtime ────────────────
+// Utilisation de bootstrapRuntime pour une initialisation centralisée.
+// Toutes les skills sont enregistrées une seule fois dans le ToolRegistry.
 import { Observability } from "./server/runtime/Observability";
 
-const runtimeV2 = createRuntime({ enableMetrics: true, logLevel: "info" });
-const observability = new Observability();
-observability.attach(runtimeV2.events);
+// Importer toutes les skills pour l'initialisation
+import { automationSkill } from "./server/skills/automation";
+import { browserSkill } from "./server/skills/browser";
+import { codebaseSkill } from "./server/skills/codebase";
+import { githubSkill } from "./server/skills/github";
+import { guidelinesSkill } from "./server/skills/guidelines";
+import { historySkill } from "./server/skills/history";
+import { knowledgeSkill } from "./server/skills/knowledge";
+import { listSkill } from "./server/skills/list";
+import { memorySkill } from "./server/skills/memory";
+import { reasoningSkill } from "./server/skills/reasoning";
+import { systemSkill } from "./server/skills/system";
+import { timeSkill } from "./server/skills/time";
+import { verifySkill } from "./server/skills/verify";
+import { weatherSkill } from "./server/skills/weather";
+import { projectSkill } from "./server/skills/project";
+import { agentsSkill } from "./server/skills/agents";
+import { missionSkill } from "./server/skills/mission";
+import { aiStudioDirectivesSkill } from "./server/skills/aiStudioDirectives";
+import { documentLinkerSkill } from "./server/skills/documentLinker";
+import { documentKnowledgeSkill } from "./server/skills/documentKnowledge";
+import { richDocumentSkill } from "./server/skills/richDocument";
 
-// Enregistrer les skills du SkillManager dans le ToolRegistry du runtime (mirror)
-  // Cela se fait après l'init async du SkillManager
-  setTimeout(() => {
-    try {
-      const declarations = skillManager.getToolDeclarations();
-      // Créer un adaptateur léger qui route vers le SkillManager
-      for (const decl of declarations) {
-        if (!runtimeV2.tools.has(decl.name)) {
-          // Convertir le schéma Zod en objet JSON Schema simple pour le runtime
-          let parameters: Record<string, unknown> = {};
-          if (decl.parameters && typeof decl.parameters === 'object') {
-            // Si c'est un schéma Zod, essayer d'en extraire la structure
-            if ('_def' in decl.parameters) {
-              // C'est un schéma Zod - on utilise un objet vide comme fallback
-              // Le vrai typage se fait côté SkillManager via validateArgs
-              parameters = {};
-            } else {
-              parameters = decl.parameters as Record<string, unknown>;
-            }
-          }
-          runtimeV2.tools.register({
-            declaration: { name: decl.name, description: decl.description || '', parameters },
-            handler: async (args) => skillManager.handleToolCall(decl.name, args),
-            category: 'legacy',
-            timeoutMs: 30_000,
-          });
-        }
+// Initialisation unifiée via bootstrapRuntime
+import type { AgentRuntime } from "./server/runtime/AgentRuntime";
+import type { SkillManagerV2 } from "./server/runtime/compat/SkillManagerV2";
+
+let runtime: AgentRuntime;
+let skillManager: SkillManagerV2;
+try {
+  ({ runtime, skillManager } = await bootstrapRuntime({
+    skills: [
+      automationSkill, browserSkill, codebaseSkill, githubSkill,
+      guidelinesSkill, historySkill, knowledgeSkill, listSkill,
+      memorySkill, reasoningSkill, systemSkill, timeSkill,
+      verifySkill, weatherSkill, projectSkill, agentsSkill,
+      missionSkill, aiStudioDirectivesSkill, documentLinkerSkill,
+      documentKnowledgeSkill, richDocumentSkill,
+    ],
+    onReady: async (r, sm) => {
+      // Charger les custom skills après l'initialisation de base
+      await sm.loadCustomSkills();
+      
+      // Initialiser le Mission System (doit être fait après que les outils soient enregistrés)
+      try {
+        const missionModule = await import("./server/mission");
+        const { Executor } = missionModule;
+        const { initMissionSystem } = await import("./server/skills/mission");
+        const executor = new Executor();
+        executor.setSkillHandler((name: string, args: any) => sm.handleToolCall(name, args));
+        const skillNames = sm.getToolDeclarations().map((d: any) => d.name);
+        initMissionSystem(executor, skillNames);
+        // Stocker le missionExecutor dans le skillManager
+        (sm as any)._missionExecutor = executor;
+        console.log(`[Bootstrap] ✓ Mission System initialisé.`);
+      } catch (error) {
+        console.warn(`[Bootstrap] ⚠️ Erreur initialisation Mission System:`, error);
       }
-      console.log(`[RuntimeV2] ✅ ${runtimeV2.tools.size} outils mirrorés depuis SkillManager`);
-    } catch (e: any) {
-      console.warn(`[RuntimeV2] Mirror partiel: ${e.message}`);
-    }
-  }, 3000); // Attendre que le SkillManager ait fini son init async
+      
+      console.log(`[Bootstrap] ✅ Initialisation complète: ${r.tools.size} outils, ${r.listAgents().length} agents`);
+    },
+  }));
+} catch (error) {
+  console.error(`[Bootstrap] ❌ Erreur critique lors de l'initialisation:`, error);
+  throw error;
+}
 
+// Alias pour compatibilité avec le code existant
+const runtimeV2 = runtime;
+const observability = new Observability();
+observability.attach(runtime.events);
+
+// Connecter l'AgentOrchestrator au nouveau skillManager (compatible avec l'ancien)
+// L'ancien SkillManager faisait cela dans son constructeur, maintenant on le fait explicitement
+agentOrchestrator.setSkillHandler((name: string, args: any) => skillManager.handleToolCall(name, args));
+
+// Connecter le Workflow Engine
+const { setWorkflowSkillHandler } = await import("./server/skills/workflow");
+setWorkflowSkillHandler((name: string, args: any) => skillManager.handleToolCall(name, args));
+
+console.log(`[Server] ✓ AgentOrchestrator et Workflow Engine connectés au nouveau SkillManagerV2.`);
+
+// Démarrer le runtime
 runtimeV2.start().then(() => {
   console.log(`[RuntimeV2] ✅ Runtime démarré — ${runtimeV2.listAgents().length} agents, EventBus actif`);
 }).catch((e: Error) => {
@@ -635,7 +676,7 @@ async function startServer() {
   const missionBroadcasterInterval = setInterval(() => {
     if (skillManager.missionExecutor) {
       clearInterval(missionBroadcasterInterval);
-      skillManager.missionExecutor.setEventEmitter((event, data) => {
+      skillManager.missionExecutor.setEventEmitter((event: string, data: any) => {
         const payload = JSON.stringify({ type: 'mission_event', event, ...data, timestamp: new Date().toISOString() });
         for (const client of wss.clients) {
           if (client.readyState === WebSocket.OPEN) {

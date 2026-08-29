@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { SkillManager } from '../skills/SkillManager';
+import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2';
 import {
   agentOrchestrator,
   agentMessageBus,
@@ -9,6 +9,9 @@ import {
   DELEGATION_MATRIX,
 } from '../agents';
 import { AgentPersistence } from '../agents/AgentPersistence';
+
+// Type compatible avec l'ancien SkillManager pour une migration progressive
+type SkillManager = SkillManagerV2;
 
 export function createAgentsRouter(skillManager: SkillManager): Router {
   const router = Router();

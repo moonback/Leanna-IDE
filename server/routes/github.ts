@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { SkillManager } from '../skills/SkillManager';
+import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2';
 import { SELF_ROOT } from '../utils/selfRoot';
+
+// Type compatible avec l'ancien SkillManager pour une migration progressive
+type SkillManager = SkillManagerV2;
 
 export function createGithubRouter(skillManager: SkillManager): Router {
   const router = Router();
