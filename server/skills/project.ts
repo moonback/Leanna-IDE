@@ -208,15 +208,15 @@ export const projectSkill: Skill = {
 
           // Activer le nouveau projet comme workspace courant
           try {
-            const { switchSandboxProject } = await import("../utils/sandbox");
+            const { switchSandboxProject } = await import("../utils/sandbox.js");
 
             const newRoot = await switchSandboxProject(projectPath);
 
             // Recharger le Knowledge System
             try {
-              const { knowledgeGraph } = await import("../knowledge/KnowledgeGraph");
-              const { projectMemory } = await import("../knowledge/ProjectMemory");
-              const { projectIndexer } = await import("../knowledge/ProjectIndexer");
+              const { knowledgeGraph } = await import("../knowledge/KnowledgeGraph.js");
+              const { projectMemory } = await import("../knowledge/ProjectMemory.js");
+              const { projectIndexer } = await import("../knowledge/ProjectIndexer.js");
               knowledgeGraph.load();
               projectMemory.load();
               projectIndexer.scanAll().catch(() => {});
