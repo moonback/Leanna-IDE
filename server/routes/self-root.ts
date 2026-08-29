@@ -181,7 +181,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         finalPath = pathModule.default.resolve(projectPath.trim());
       } else {
         // Si seulement un nom est fourni, créer dans le dossier Documents de l'utilisateur
-        const docsDir = pathModule.default.join(os.default.homedir(), 'Documents', 'Jarvis-Projects');
+        const docsDir = pathModule.default.join(os.default.homedir(), 'Documents', 'Leanna-Projects');
         finalPath = pathModule.default.join(docsDir, name!.trim().replace(/[^a-zA-Z0-9_\-. ]/g, '_'));
       }
 
@@ -200,7 +200,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         const projectName = pathModule.default.basename(finalPath);
         fsModule.default.writeFileSync(
           readmePath,
-          `# ${projectName}\n\nProjet créé avec Jarvis-OS.\n`,
+          `# ${projectName}\n\nProjet créé avec Leanna.\n`,
           'utf-8'
         );
       }
@@ -289,7 +289,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
     if (rawParent?.trim()) {
       parentDir = pathModule.default.resolve(rawParent.trim());
     } else {
-      parentDir = pathModule.default.join(osModule.default.homedir(), 'Documents', 'Jarvis-Projects');
+      parentDir = pathModule.default.join(osModule.default.homedir(), 'Documents', 'Leanna-Projects');
     }
 
     const projectPath = pathModule.default.join(parentDir, projectName);

@@ -66,7 +66,7 @@ router.get('/', async (_req: Request, res: Response) => {
 // GET /api/audit/logs
 router.get('/logs', async (_req: Request, res: Response) => {
   try {
-    const logPath = path.join(SELF_ROOT, '.jarvis-audit.log');
+    const logPath = path.join(SELF_ROOT, '.Leanna-audit.log');
     const entries = await readAuditEntries(logPath, 20);
     res.json({ status: 'ok', entries });
   } catch (e: any) {
@@ -102,7 +102,7 @@ router.get('/runtime-logs', (req: Request, res: Response) => {
 
 // GET /api/audit/analysis
 router.get('/analysis', (_req: Request, res: Response) => {
-  const logPath = path.join(SELF_ROOT, '.jarvis-audit.log');
+  const logPath = path.join(SELF_ROOT, '.Leanna-audit.log');
   const analysis = analyzeAuditLog(logPath);
   res.json({ status: 'success', analysis });
 });

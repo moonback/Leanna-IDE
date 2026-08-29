@@ -295,7 +295,7 @@ export class SkillScorer {
   }
 
   private initializeCategories(): void {
-    // Catégorisation par défaut des skills connus de Jarvis
+    // Catégorisation par défaut des skills connus de Leanna
     const defaults: Record<string, { category: SkillCategory; keywords: string[] }> = {
       read_project_file: { category: "read", keywords: ["lire", "fichier", "code", "contenu"] },
       write_project_file: { category: "write", keywords: ["écrire", "créer", "fichier", "code"] },

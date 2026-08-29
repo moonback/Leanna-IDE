@@ -1,4 +1,4 @@
-# 🔍 **ANALYSE TECHNIQUE COMPLÈTE - JARVIS OS**
+# 🔍 **ANALYSE TECHNIQUE COMPLÈTE - Leanna OS**
 ## *Partie 2 : Fonctionnalités, UI/UX, Composants et Logique Métier*
 
 ---
@@ -91,7 +91,7 @@ Fournir un environnement de développement complet avec éditeur de code, explor
 - **Activation** : `POST /api/sandbox/activate`
 - **Désactivation** : `POST /api/sandbox/deactivate`
 - **Statut** : `GET /api/sandbox/status`
-- **Modifications** : Suivies dans `.jarvis/sandbox/`
+- **Modifications** : Suivies dans `.Leanna/sandbox/`
 - **Validation** : `POST /api/sandbox/validate` avant merge
 
 #### Vérification fichiers (Skill: verify)
@@ -470,7 +470,7 @@ Fournir une compréhension profonde du projet via indexation automatique, graphe
 #### KnowledgeGraph
 - **Entités** : Représentation des éléments de code
 - **Relations** : Import, export, héritage, utilisation, etc.
-- **Persistance** : Sauvegarde dans `.jarvis/ProjectKnowledge.json`
+- **Persistance** : Sauvegarde dans `.Leanna/ProjectKnowledge.json`
 - **Visualisation** : Graphe des relations entre fichiers
 
 #### SemanticSearch
@@ -1381,14 +1381,14 @@ Tous les panneaux suivent un pattern similaire :
 ### 🔐 Sécurité
 
 #### 1. Accès API
-- Toutes les routes `/api/*` nécessitent authentification **SI** `JARVIS_API_TOKEN` est configuré
-- Authentification via header `x-jarvis-token`
+- Toutes les routes `/api/*` nécessitent authentification **SI** `Leanna_API_TOKEN` est configuré
+- Authentification via header `x-Leanna-token`
 - Token stocké dans `.env` ou `.env.local`
 - **Si pas de token configuré** : Accès libre (développement)
 
 #### 2. Port Binding
 - Par défaut : `127.0.0.1` (localhost uniquement)
-- Si `JARVIS_LISTEN_HOST=0.0.0.0`, **réquiert obligatoirement** `JARVIS_API_TOKEN`
+- Si `Leanna_LISTEN_HOST=0.0.0.0`, **réquiert obligatoirement** `Leanna_API_TOKEN`
 - Sinon, **refus de démarrage** avec message d'erreur
 
 #### 3. Fichiers Critiques
@@ -1410,7 +1410,7 @@ Tous les panneaux suivent un pattern similaire :
 - **Timeout** : Configurable
 
 #### 6. Sandbox Isolation
-- **Dossier** : `.jarvis/sandbox/`
+- **Dossier** : `.Leanna/sandbox/`
 - **Activation** : Si un projet est sélectionné
 - **Fonctionnement** :
   - Toutes les modifications IA vont dans le sandbox
@@ -1426,10 +1426,10 @@ Tous les panneaux suivent un pattern similaire :
 
 #### 8. Chiffrement des Clés
 - **Algorithme** : AES-256-GCM
-- **Clé dérivée** : `JARVIS_MASTER_KEY` + hardware seed
+- **Clé dérivée** : `Leanna_MASTER_KEY` + hardware seed
 - **Clés chiffrées** : `GEMINI_API_KEY`, `SUPABASE_*`, `OPENROUTER_API_KEY`, `GITHUB_TOKEN`
 - **Rétrocompatibilité** : Support du format AES-256-CBC historique
 
 ---
 
-*Fin de la Partie 2. Voir JARVIS-OS-ANALYSE-TECHNIQUE-PARTIE-3.md pour la suite avec Base de Données, API, Sécurité, Performance, Design System, Flux Utilisateur et Diagrammes.*
+*Fin de la Partie 2. Voir Leanna-ANALYSE-TECHNIQUE-PARTIE-3.md pour la suite avec Base de Données, API, Sécurité, Performance, Design System, Flux Utilisateur et Diagrammes.*

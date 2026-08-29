@@ -19,7 +19,7 @@ test('authenticateRequest allows requests when no token is configured', () => {
 });
 
 test('authenticateRequest rejects mismatched API tokens', () => {
-  const req = { headers: { 'x-jarvis-token': 'wrong' } } as any;
+  const req = { headers: { 'x-Leanna-token': 'wrong' } } as any;
   const result = authenticateRequest(req, { apiToken: 'secret' });
 
   assert.equal(result.ok, false);
@@ -28,7 +28,7 @@ test('authenticateRequest rejects mismatched API tokens', () => {
 });
 
 test('authenticateRequest accepts a matching token', () => {
-  const req = { headers: { 'x-jarvis-token': 'secret' } } as any;
+  const req = { headers: { 'x-Leanna-token': 'secret' } } as any;
   assert.deepEqual(authenticateRequest(req, { apiToken: 'secret' }), { ok: true });
 });
 

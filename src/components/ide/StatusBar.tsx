@@ -79,8 +79,8 @@ export const StatusBar = memo(function StatusBar({
     let cancelled = false;
     const fetchMcp = async () => {
       try {
-        const token = localStorage.getItem('jarvis_api_token');
-        const headers: Record<string, string> = token ? { 'x-jarvis-token': token } : {};
+        const token = localStorage.getItem('Leanna_api_token');
+        const headers: Record<string, string> = token ? { 'x-Leanna-token': token } : {};
         const res = await fetch('/api/mcp/status', { headers });
         const data = await res.json();
         if (!cancelled) {
@@ -107,8 +107,8 @@ export const StatusBar = memo(function StatusBar({
     let cancelled = false;
     const fetchSandbox = async () => {
       try {
-        const token = localStorage.getItem('jarvis_api_token');
-        const headers: Record<string, string> = token ? { 'x-jarvis-token': token } : {};
+        const token = localStorage.getItem('Leanna_api_token');
+        const headers: Record<string, string> = token ? { 'x-Leanna-token': token } : {};
         const res = await fetch('/api/sandbox/status', { headers });
         const data = await res.json();
         if (!cancelled && data.status === 'success') {
@@ -128,10 +128,10 @@ export const StatusBar = memo(function StatusBar({
 
   const handleConfirmReset = useCallback(async () => {
     try {
-      const token = localStorage.getItem('jarvis_api_token');
+      const token = localStorage.getItem('Leanna_api_token');
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        ...(token ? { 'x-jarvis-token': token } : {}),
+        ...(token ? { 'x-Leanna-token': token } : {}),
       };
       const res = await fetch('/api/sandbox/reset', {
         method: 'POST',
@@ -142,7 +142,7 @@ export const StatusBar = memo(function StatusBar({
       if (data.status === 'success') {
         setShowResetConfirm(false);
         setResetCode('');
-        window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+        window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
       }
     } catch {
       /* silent */

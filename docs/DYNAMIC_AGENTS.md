@@ -1,4 +1,4 @@
-# Système d'Agents Dynamiques pour Jarvis-OS
+# Système d'Agents Dynamiques pour Leanna
 
 ## Problème Résolu
 
@@ -223,7 +223,7 @@ after (agent créé dans le fichier JSON) {
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        Système d'Agents Jarvis-OS                      │
+│                        Système d'Agents Leanna                      │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                       │
 │  ┌──────────────────┐     ┌──────────────────┐                      │
@@ -263,7 +263,7 @@ after (agent créé dans le fichier JSON) {
 Flow de création via Agent Builder :
 ┌─────────────────────────────────────────────────────────────────────┐
 │  1. UI → POST /api/custom-agents (AgentBuilderPanel)                  │
-│  2. handleCreateAgent enregistre dans .jarvis/custom-agents.json      │
+│  2. handleCreateAgent enregistre dans .Leanna/custom-agents.json      │
 │  3. handleCreateAgent → dynamicAgentRegistry.registerAgent()        │
 │  4. Si AgentRegistry.isReady → registerAndStartDynamicAgent()       │
 │  5. Agent est maintenant disponible pour délégation/exécution        │
@@ -343,7 +343,7 @@ Dans votre code ou via un agent :
 ## Persistance
 
 Les agents personnalisés sont persistance dans :
-- `.jarvis/custom-agents.json` (configuration)
+- `.Leanna/custom-agents.json` (configuration)
 - `DynamicAgentRegistry` (en mémoire, rechargé au démarrage)
 
 ## Sécurité

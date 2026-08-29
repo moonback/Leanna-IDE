@@ -21,7 +21,7 @@ async function testCodebaseSkill() {
   console.log('\n📝 Test 2: Création de fichier');
   const writeResult = await codebaseSkill.handleToolCall('write_project_file', {
     path: 'test-output/sample/hello.txt',
-    content: 'Hello from Jarvis!\nThis is a test file.'
+    content: 'Hello from Leanna!\nThis is a test file.'
   });
   console.log('Résultat:', writeResult);
 
@@ -36,8 +36,8 @@ async function testCodebaseSkill() {
   console.log('\n✏️ Test 4: Modification du fichier');
   const modifyResult = await codebaseSkill.handleToolCall('modify_project_file', {
     path: 'test-output/sample/hello.txt',
-    searchText: 'Hello from Jarvis!',
-    replaceText: 'Bonjour from Jarvis! 🤖'
+    searchText: 'Hello from Leanna!',
+    replaceText: 'Bonjour from Leanna! 🤖'
   });
   console.log('Résultat:', modifyResult);
 

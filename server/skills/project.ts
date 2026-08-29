@@ -94,7 +94,7 @@ export const projectSkill: Skill = {
           parent_path: {
             type: "STRING",
             description:
-              "Chemin absolu du dossier parent dans lequel créer le projet. Si absent, utilise ~/Documents/Jarvis-Projects/.",
+              "Chemin absolu du dossier parent dans lequel créer le projet. Si absent, utilise ~/Documents/Leanna-Projects/.",
           },
         },
         required: ["name"],
@@ -140,7 +140,7 @@ export const projectSkill: Skill = {
           if (typeof args.parent_path === "string" && args.parent_path.trim()) {
             parentDir = path.resolve(args.parent_path.trim());
           } else {
-            parentDir = path.join(os.homedir(), "Documents", "Jarvis-Projects");
+            parentDir = path.join(os.homedir(), "Documents", "Leanna-Projects");
           }
 
           // Créer le dossier parent si nécessaire

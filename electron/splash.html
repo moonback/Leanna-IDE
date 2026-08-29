@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="color-scheme" content="dark light" />
-<title>Jarvis OS · Boot</title>
+<title>Leanna OS · Boot</title>
 
 <script>
 (function() {
@@ -330,7 +330,7 @@ svg.progress-ring{position:absolute;inset:0;transform:rotate(-90deg)}
     <div class="coord tl" id="coordTL">SYS.X 042.71</div>
     <div class="coord tr" id="coordTR">SYS.Y 118.36</div>
     <div class="coord bl" id="coordBL">NODE #A7-C3</div>
-    <div class="coord br" id="coordBR">JARVIS::CORE</div>
+    <div class="coord br" id="coordBR">Leanna::CORE</div>
   </div>
 
   <div class="panel" id="splash">
@@ -338,7 +338,7 @@ svg.progress-ring{position:absolute;inset:0;transform:rotate(-90deg)}
     <div class="header">
       <div class="brand">
         <div class="emblem">
-          <img id="brandLogo" class="emblem-img" src="../assets/images/icon-sombre.png" alt="Jarvis OS" />
+          <img id="brandLogo" class="emblem-img" src="../assets/images/icon-sombre.png" alt="Leanna OS" />
           <svg class="emblem-fallback" viewBox="0 0 24 24">
             <polygon points="12,2 21,7 21,17 12,22 3,17 3,7"/>
             <circle cx="12" cy="12" r="2.4"/>
@@ -346,9 +346,9 @@ svg.progress-ring{position:absolute;inset:0;transform:rotate(-90deg)}
         </div>
         <div class="brand-info">
           <div class="brand-name" id="brandName">
-            JARVIS OS
-            <span class="glitch-layer g1">JARVIS OS</span>
-            <span class="glitch-layer g2">JARVIS OS</span>
+            Leanna OS
+            <span class="glitch-layer g1">Leanna OS</span>
+            <span class="glitch-layer g2">Leanna OS</span>
           </div>
           <div class="brand-sub">Intelligence Core</div>
         </div>
@@ -584,7 +584,7 @@ svg.progress-ring{position:absolute;inset:0;transform:rotate(-90deg)}
     function finish() {
       if (splash.classList.contains("leaving")) return;
       splash.classList.add("leaving");
-      window.dispatchEvent(new CustomEvent("jarvis:boot-complete"));
+      window.dispatchEvent(new CustomEvent("Leanna:boot-complete"));
       setTimeout(() => {
         if (typeof window.onSplashFinished === "function") window.onSplashFinished();
       }, 480);

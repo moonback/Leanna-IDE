@@ -480,14 +480,14 @@ const FileExplorer = memo(function FileExplorer({
       checkSandbox(true);
     }, 3000);
 
-    window.addEventListener('jarvis-sandbox-changed', handleChange);
-    window.addEventListener('jarvis-sandbox-file-changed', handleChange);
+    window.addEventListener('Leanna-sandbox-changed', handleChange);
+    window.addEventListener('Leanna-sandbox-file-changed', handleChange);
     return () => {
       mounted = false;
       clearInterval(interval);
       if (debounceTimer) clearTimeout(debounceTimer);
-      window.removeEventListener('jarvis-sandbox-changed', handleChange);
-      window.removeEventListener('jarvis-sandbox-file-changed', handleChange);
+      window.removeEventListener('Leanna-sandbox-changed', handleChange);
+      window.removeEventListener('Leanna-sandbox-file-changed', handleChange);
     };
   }, []);
 

@@ -1,4 +1,4 @@
-JARVIS-OS
+Leanna
 Plan d'action — Modernisation UI/UX
 Refonte de l'apparence et de la disposition des composants pour un rendu professionnel et moderne
 Périmètre : dossier components/ (124 fichiers)

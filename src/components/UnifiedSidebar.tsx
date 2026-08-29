@@ -120,7 +120,7 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
       )}
 
       <motion.nav
-        className={`jarvis-sidebar flex flex-col items-center select-none relative ${mobileOpen ? 'mobile-open' : ''}`}
+        className={`Leanna-sidebar flex flex-col items-center select-none relative ${mobileOpen ? 'mobile-open' : ''}`}
         initial={false}
         animate={{ x: 0 }}
         transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
@@ -224,7 +224,7 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
                 icon={Power}
                 active={false}
                 onClick={() => setShowQuitConfirm(true)}
-                title="Quitter Jarvis OS"
+                title="Quitter Leanna OS"
               />
             </motion.div>
             <QuitConfirmDialog
@@ -257,14 +257,14 @@ function BrandLogo({ theme, onNavigate }: { theme: string; onNavigate: () => voi
           border: '1px solid var(--ide-shell-border)',
         }}
         onClick={onNavigate}
-        title="Jarvis OS"
+        title="Leanna OS"
         aria-label="Retourner à l'éditeur"
         whileHover={{ scale: 1.05, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
         whileTap={{ scale: 0.95 }}
       >
         <img
           src={theme === 'dark' ? logoDark : logoLight}
-          alt="Jarvis OS"
+          alt="Leanna OS"
           className="w-full h-full object-contain"
         />
       </motion.button>

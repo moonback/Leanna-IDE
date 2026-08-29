@@ -131,7 +131,7 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
         const timeoutId = setTimeout(() => controller.abort(), 60_000);
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
-          headers: { Authorization: `Bearer ${orKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://jarvis-os.local', 'X-Title': 'Jarvis-OS' },
+          headers: { Authorization: `Bearer ${orKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://Leanna.local', 'X-Title': 'Leanna' },
           body: JSON.stringify({ model: orModel, messages, temperature: 0.3, max_tokens: 1024 }),
           signal: controller.signal,
         });

@@ -435,11 +435,11 @@ export function KnowledgeHealthDashboard() {
               </h3>
               <div className="space-y-2 text-xs" style={{ color: 'var(--text-muted)' }}>
                 <div className="flex justify-between p-2 rounded-lg" style={{ backgroundColor: 'var(--bg-base)' }}>
-                  <span>Fichier de Graphe (.jarvis) :</span>
+                  <span>Fichier de Graphe (.Leanna) :</span>
                   <code className="font-mono text-emerald-400">ProjectKnowledge.json</code>
                 </div>
                 <div className="flex justify-between p-2 rounded-lg" style={{ backgroundColor: 'var(--bg-base)' }}>
-                  <span>Mémoire Métier (.jarvis) :</span>
+                  <span>Mémoire Métier (.Leanna) :</span>
                   <code className="font-mono text-purple-400">ProjectMemory.json</code>
                 </div>
                 <div className="flex justify-between p-2 rounded-lg" style={{ backgroundColor: 'var(--bg-base)' }}>

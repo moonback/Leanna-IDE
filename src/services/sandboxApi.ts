@@ -5,7 +5,7 @@
  * - fetchWithRetry (backoff exponentiel sur 429/5xx, Retry-After)
  * - Cache TTL pour endpoints fréquemment pollés (/status, /diff)
  * - In-flight deduplication (évite appels parallèles identiques)
- * - Écoute de jarvis-sandbox-changed avec debounce pour invalider le cache
+ * - Écoute de Leanna-sandbox-changed avec debounce pour invalider le cache
  */
 
 type CacheEntry<T> = { value: T; ts: number };
@@ -24,10 +24,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms));
 }
 
-/** Lis / écris le token jarvis depuis localStorage */
+/** Lis / écris le token Leanna depuis localStorage */
 function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('jarvis_api_token');
-  return token ? { 'x-jarvis-token': token } : {};
+  const token = localStorage.getItem('Leanna_api_token');
+  return token ? { 'x-Leanna-token': token } : {};
 }
 
 async function fetchWithRetry(
@@ -112,18 +112,18 @@ function invalidateAll() {
   invalidateTimers.clear();
 }
 
-/* ── Écoute globale de jarvis-sandbox-changed ────────────────────────────────
+/* ── Écoute globale de Leanna-sandbox-changed ────────────────────────────────
  * Quand ce CustomEvent est émis, on invalide les caches de façon debouncée
  * pour éviter une rafale d'appels si l'événement est émis 30x/s.
  */
 (function installSandboxListener() {
   if (typeof window === 'undefined') return;
   let debounce: ReturnType<typeof setTimeout> | null = null;
-  window.addEventListener('jarvis-sandbox-changed', () => {
+  window.addEventListener('Leanna-sandbox-changed', () => {
     if (debounce) clearTimeout(debounce);
     debounce = setTimeout(() => invalidateAll(), 200);
   });
-  window.addEventListener('jarvis-sandbox-file-changed', () => {
+  window.addEventListener('Leanna-sandbox-file-changed', () => {
     if (debounce) clearTimeout(debounce);
     debounce = setTimeout(() => invalidateAll(), 200);
   });

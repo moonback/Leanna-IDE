@@ -2,7 +2,7 @@
  * DocumentStore — Stockage persistant des documents analysés
  *
  * Persiste les résumés, textes extraits et métadonnées des documents uploadés
- * dans .jarvis/documents.json pour permettre le croisement inter-documents.
+ * dans .Leanna/documents.json pour permettre le croisement inter-documents.
  *
  * Fonctionnalités :
  *   • Stockage persistant (JSON sur disque)
@@ -82,12 +82,12 @@ export class DocumentStore {
 
   constructor(projectRoot?: string) {
     const root = projectRoot || process.cwd();
-    const jarvisDir = path.join(root, ".jarvis");
-    this.filePath = path.join(jarvisDir, "documents.json");
+    const LeannaDir = path.join(root, ".Leanna");
+    this.filePath = path.join(LeannaDir, "documents.json");
 
-    // Créer le répertoire .jarvis si nécessaire
-    if (!fs.existsSync(jarvisDir)) {
-      fs.mkdirSync(jarvisDir, { recursive: true });
+    // Créer le répertoire .Leanna si nécessaire
+    if (!fs.existsSync(LeannaDir)) {
+      fs.mkdirSync(LeannaDir, { recursive: true });
     }
 
     this.data = this.load();

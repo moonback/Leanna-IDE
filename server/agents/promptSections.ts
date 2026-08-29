@@ -293,7 +293,7 @@ export function buildOptimizedAgentPrompt(
   const isWritingAgent = ['writer', 'formatter', 'researcher', 'proofreader', 'translator', 'summarizer', 'planner'].includes(role);
   
   // Ajouter les sections d'identité et de mission (spécifiques à l'agent)
-  parts.push(`\nIDENTITÉ : Agent ${options.name} de Jarvis-OS – ${options.specificity}.`);
+  parts.push(`\nIDENTITÉ : Agent ${options.name} de Leanna – ${options.specificity}.`);
   parts.push(`\nMISSION (par ordre de priorité) :\n${options.missions.map((m, i) => `${i + 1}. ${m}`).join('\n')}`);
   
   // Ajouter le processus

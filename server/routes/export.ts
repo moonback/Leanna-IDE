@@ -15,7 +15,7 @@ export function createExportRouter(): Router {
         return res.status(400).json({ error: 'markdown est requis.' });
       }
 
-      const pdfBuffer = await exportToPdf(markdown, { title: title || 'Document Jarvis-OS' });
+      const pdfBuffer = await exportToPdf(markdown, { title: title || 'Document Leanna' });
       const safeFilename = encodeURIComponent((filename || title || 'document').replace(/[^a-zA-Z0-9_-]/g, '_') + '.pdf');
 
       res.setHeader('Content-Type', 'application/pdf');
@@ -36,7 +36,7 @@ export function createExportRouter(): Router {
         return res.status(400).json({ error: 'markdown est requis.' });
       }
 
-      const docxBuffer = exportToDocx(markdown, { title: title || 'Document Jarvis-OS' });
+      const docxBuffer = exportToDocx(markdown, { title: title || 'Document Leanna' });
       const safeFilename = encodeURIComponent((filename || title || 'document').replace(/[^a-zA-Z0-9_-]/g, '_') + '.doc');
 
       res.setHeader('Content-Type', 'application/msword');
@@ -57,7 +57,7 @@ export function createExportRouter(): Router {
         return res.status(400).json({ error: 'markdown est requis.' });
       }
 
-      const html = exportToStandaloneHtml(markdown, { title: title || 'Document Jarvis-OS', theme: theme || 'modern' });
+      const html = exportToStandaloneHtml(markdown, { title: title || 'Document Leanna', theme: theme || 'modern' });
       const safeFilename = encodeURIComponent((filename || title || 'document').replace(/[^a-zA-Z0-9_-]/g, '_') + '.html');
 
       res.setHeader('Content-Type', 'text/html; charset=utf-8');

@@ -1,4 +1,4 @@
-# JARVIS-OS - ANALYSE TECHNIQUE COMPLÈTE - PARTIE 3A
+# Leanna - ANALYSE TECHNIQUE COMPLÈTE - PARTIE 3A
 
 **Date** : 28 août 2026  
 **Version** : 1.0.0  
@@ -29,14 +29,14 @@ supabase/
 ```
 
 #### 7.1.2. Local (JSON Filesystem)
-- Stockage dans `.jarvis/` à la racine du projet
+- Stockage dans `.Leanna/` à la racine du projet
 - Format JSON avec UUIDv4 comme identifiants
 - Backup automatique avec versioning
 
 **Structure** :
 ```
-.jarvis/
-├── .jarvis-profile.json          # Profil utilisateur
+.Leanna/
+├── .Leanna-profile.json          # Profil utilisateur
 ├── lastProject.json             # Dernier projet
 ├── ProjectKnowledge.json        # Connaissances indexées
 ├── ProjectMemory.json           # Mémoire du projet
@@ -181,7 +181,7 @@ supabase/
 ### 7.4. Persistance locale JSON
 
 #### Notebooks
-**Fichier** : `.jarvis/notebooks/<uuid>.json`
+**Fichier** : `.Leanna/notebooks/<uuid>.json`
 ```json
 {
   "id": "uuid",
@@ -197,7 +197,7 @@ supabase/
 ```
 
 #### Embeddings
-**Fichier** : `.jarvis/notebooks/embeddings/<uuid>.json`
+**Fichier** : `.Leanna/notebooks/embeddings/<uuid>.json`
 ```json
 {
   "notebookId": "uuid",
@@ -242,7 +242,7 @@ supabase/
 - Extraction des entités (classes, fonctions, variables)
 - Construction d'un graphe de dépendances
 
-**Fichier** : `.jarvis/ProjectKnowledge.json`
+**Fichier** : `.Leanna/ProjectKnowledge.json`
 ```json
 {
   "projectRoot": "/path/to/project",
@@ -270,7 +270,7 @@ supabase/
 **Génération clé** :
 ```typescript
 function getMasterKey(): Buffer {
-  const envKey = process.env.JARVIS_MASTER_KEY || '';
+  const envKey = process.env.Leanna_MASTER_KEY || '';
   const machineSeed = `${os.hostname()}-${os.platform()}-${os.userInfo().username}`;
   return crypto.createHash('sha256').update(envKey + machineSeed).digest();
 }
@@ -278,7 +278,7 @@ function getMasterKey(): Buffer {
 
 **Variables chiffrées dans .env** :
 ```
-JARVIS_API_TOKEN, GEMINI_API_KEY, SUPABASE_URL, 
+Leanna_API_TOKEN, GEMINI_API_KEY, SUPABASE_URL, 
 SUPABASE_SERVICE_ROLE_KEY, OPENROUTER_API_KEY, GITHUB_TOKEN
 ```
 
@@ -307,10 +307,10 @@ function resolveWorkspacePath(requestedPath: string, workspaceRoot: string) {
 | Lists | Cloud | Supabase | PostgreSQL | Variable |
 | Workflows | Cloud | Supabase | PostgreSQL | Variable |
 | Skills | Cloud | Supabase | PostgreSQL | Variable |
-| Notebooks | Local | `.jarvis/notebooks/` | JSON | 1-10MB/nb |
-| Embeddings | Local | `.jarvis/embeddings/` | JSON | 10-100MB/nb |
-| Knowledge | Local | `.jarvis/` | JSON | 1-5MB |
-| Profil | Local | `.jarvis-profile.json` | JSON | ~1KB |
+| Notebooks | Local | `.Leanna/notebooks/` | JSON | 1-10MB/nb |
+| Embeddings | Local | `.Leanna/embeddings/` | JSON | 10-100MB/nb |
+| Knowledge | Local | `.Leanna/` | JSON | 1-5MB |
+| Profil | Local | `.Leanna-profile.json` | JSON | ~1KB |
 
 ---
 
@@ -321,7 +321,7 @@ function resolveWorkspacePath(requestedPath: string, workspaceRoot: string) {
 - **Type** : REST API + WebSocket
 - **Base URL** : `/api`
 - **Format** : JSON
-- **Authentification** : Token API (`JARVIS_API_TOKEN`)
+- **Authentification** : Token API (`Leanna_API_TOKEN`)
 - **CORS** : Désactivé (accès local uniquement)
 - **Rate Limiting** : `server/config/rateLimits.ts`
 
@@ -334,10 +334,10 @@ function resolveWorkspacePath(requestedPath: string, workspaceRoot: string) {
 function authenticateRequest(req: { headers?: Record<string, string> }, 
   options: AuthOptions): AuthResult
 ```
-- Header requis : `x-jarvis-token`
-- Cookie alternative : `jarvis_token`
+- Header requis : `x-Leanna-token`
+- Cookie alternative : `Leanna_token`
 - Token query param : `token` (pour WebSocket)
-- Si `JARVIS_API_TOKEN` non configuré → accès autorisé
+- Si `Leanna_API_TOKEN` non configuré → accès autorisé
 - Sinon → vérification du token
 
 **Application** :

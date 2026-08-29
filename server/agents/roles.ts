@@ -2,11 +2,11 @@ import type { AgentDefinition, AgentRole } from "./types";
 import { dynamicAgentRegistry } from "./DynamicAgentRegistry";
 
 // ═══════════════════════════════════════════════════════════════════════════
-// BASE COMMUNE – Règles fondamentales pour agents Jarvis-OS
+// BASE COMMUNE – Règles fondamentales pour agents Leanna
 // ═══════════════════════════════════════════════════════════════════════════
 
 const BASE_SYSTEM_PROMPT = `
-Tu fais partie du système multi-agents Jarvis-OS, spécialisé dans l'ingénierie logicielle et la rédaction de documents.
+Tu fais partie du système multi-agents Leanna, spécialisé dans l'ingénierie logicielle et la rédaction de documents.
 
 PRINCIPES :
 - Agis exclusivement dans ton domaine de compétence.
@@ -73,7 +73,7 @@ ${SECTION_DELEGATION}
 `;
 
 const SECTION_IDENTITY = (roleName: string, specificity: string) => `
-IDENTITÉ : Agent ${roleName} de Jarvis-OS – ${specificity}.
+IDENTITÉ : Agent ${roleName} de Leanna – ${specificity}.
 `;
 
 const SECTION_MISSION = (missions: string[]) => `

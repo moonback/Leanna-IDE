@@ -1,4 +1,4 @@
-# API Documentation - Jarvis OS
+# API Documentation - Leanna OS
 
 ## Sommaire
 
@@ -39,14 +39,14 @@
 
 ## Apercu general
 
-L'API de Jarvis OS est composee de **32+ groupes de routes REST** exposees sous le prefixe `/api/`.
+L'API de Leanna OS est composee de **32+ groupes de routes REST** exposees sous le prefixe `/api/`.
 
 - **Base URL** : `http://localhost:5000/api/` (dev) ou selon `VITE_SERVER_PORT`
 - **Format** : JSON pour les requetes et reponses
-- **Authentification** : Header `x-jarvis-token` ou cookie `jarvis_token`
+- **Authentification** : Header `x-Leanna-token` ou cookie `Leanna_token`
 - **CORS** : Configure pour permettre les requetes depuis `http://localhost:*`
 
-Toutes les routes **sauf `/api/health`** requierent une authentification quand `JARVIS_API_TOKEN` est configure.
+Toutes les routes **sauf `/api/health`** requierent une authentification quand `Leanna_API_TOKEN` est configure.
 
 ---
 
@@ -55,23 +55,23 @@ Toutes les routes **sauf `/api/health`** requierent une authentification quand `
 ### Header HTTP
 ```bash
 curl -X GET http://localhost:5000/api/ide/tree \
-  -H 'x-jarvis-token: votre_token'
+  -H 'x-Leanna-token: votre_token'
 ```
 
 ### Cookie
 ```bash
 curl -X GET http://localhost:5000/api/ide/tree \
-  -H 'Cookie: jarvis_token=votre_token'
+  -H 'Cookie: Leanna_token=votre_token'
 ```
 
 ### Configuration du token
 Le token est configure dans `.env` :
 ```
-JARVIS_API_TOKEN=votre_token_secret
-VITE_JARVIS_API_TOKEN=votre_token_secret  # Pour le frontend
+Leanna_API_TOKEN=votre_token_secret
+VITE_Leanna_API_TOKEN=votre_token_secret  # Pour le frontend
 ```
 
-> **Securite** : Si `JARVIS_LISTEN_HOST=0.0.0.0`, un token est **obligatoire**.
+> **Securite** : Si `Leanna_LISTEN_HOST=0.0.0.0`, un token est **obligatoire**.
 
 ---
 
@@ -677,7 +677,7 @@ const socket = new WebSocket('ws://localhost:5000/live?token=votre_token');
 
 ## Rate Limiting
 
-Jarvis OS implemente un **rate limiting multi-couche** pour proteger contre les abus.
+Leanna OS implemente un **rate limiting multi-couche** pour proteger contre les abus.
 
 ### Limiteurs globaux
 
@@ -725,7 +725,7 @@ Voir `server/config/rateLimits.ts` pour les details de configuration.
 
 ```bash
 curl -X GET "http://localhost:5000/api/ide/file?path=src/main.tsx" \
-  -H 'x-jarvis-token: votre_token'
+  -H 'x-Leanna-token: votre_token'
 ```
 
 ### CURL - Envoyer un message au chat
@@ -733,7 +733,7 @@ curl -X GET "http://localhost:5000/api/ide/file?path=src/main.tsx" \
 ```bash
 curl -X POST "http://localhost:5000/api/notebooks/abc123/chat" \
   -H 'Content-Type: application/json' \
-  -H 'x-jarvis-token: votre_token' \
+  -H 'x-Leanna-token: votre_token' \
   -d '{"message": "Resumer ce document"}'
 ```
 

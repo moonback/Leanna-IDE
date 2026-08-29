@@ -18,7 +18,7 @@ const DATA_FILE_BASENAMES = new Set([
   "ProjectKnowledge.json",
   "ProjectMemory.json",
 ]);
-const DATA_DIR_PREFIXES = [".jarvis/", "node_modules/"];
+const DATA_DIR_PREFIXES = [".Leanna/", "node_modules/"];
 
 function isRunnableServerCode(relative: string): boolean {
   const normalized = relative.replace(/\\/g, "/");

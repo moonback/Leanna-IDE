@@ -1,7 +1,7 @@
 @echo off
-title Jarvis OS
+title Leanna OS
 echo.
-echo   [44m[97m        Jarvis OS        [0m
+echo   [44m[97m        Leanna OS        [0m
 echo   [90mInitializing System...[0m
 echo.
 
@@ -26,7 +26,7 @@ if not exist "node_modules\" (
 )
 
 :: Lancer l'application desktop (serveur + Electron)
-echo   [92m[START][0m Launching Jarvis OS...
+echo   [92m[START][0m Launching Leanna OS...
 echo.
 call npm run desktop
 

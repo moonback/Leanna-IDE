@@ -30,7 +30,7 @@ export function AIConnectionBanner({
   connecting = false,
   working = false,
   muted = false,
-  aiName = 'Jarvis',
+  aiName = 'Leanna',
   onConnect,
   onDisconnect,
   onSettings,

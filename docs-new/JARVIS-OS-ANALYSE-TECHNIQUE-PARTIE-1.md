@@ -1,4 +1,4 @@
-# 🔍 **ANALYSE TECHNIQUE COMPLÈTE - JARVIS OS**
+# 🔍 **ANALYSE TECHNIQUE COMPLÈTE - Leanna OS**
 ## *Partie 1 : Vue Générale et Architecture Technique*
 
 ---
@@ -37,7 +37,7 @@
 
 ### 🎯 Objectif de l'application
 
-Jarvis OS est un **environnement de développement IA tout-en-un** conçu comme un système d'exploitation desktop intelligent qui combine :
+Leanna OS est un **environnement de développement IA tout-en-un** conçu comme un système d'exploitation desktop intelligent qui combine :
 
 1. **IDE Complet** - Éditeur de code avancé avec gestion de fichiers, recherche, navigation
 2. **Assistant IA Multimodal** - Interaction par voix, webcam, partage d'écran, chat textuel
@@ -127,7 +127,7 @@ Jarvis OS est un **environnement de développement IA tout-en-un** conçu comme 
 ### 🏛️ Architecture générale
 
 ```
-Jarvis OS
+Leanna OS
 ├── Electron (Process Main)
 │   ├── main.cjs - Point d'entrée Electron
 │   ├── preload.cjs - Bridge entre main et renderer
@@ -404,11 +404,11 @@ Jarvis OS
 ### 📁 Organisation des dossiers
 
 ```
-Jarvis-OS/
+Leanna/
 ├── .aionrs/ - Configuration Aion
 ├── .github/ - Configuration GitHub
 ├── .husky/ - Git Hooks
-├── .jarvis/ - Données persistance (créé à l'exécution)
+├── .Leanna/ - Données persistance (créé à l'exécution)
 │   ├── notebooks/ - Données notebooks
 │   │   ├── backups/ - Sauvegardes
 │   │   ├── embeddings/ - Embeddings
@@ -625,11 +625,11 @@ Jarvis-OS/
 
 Persistance Locale
 ├── localStorage
-│   ├── jarvis_api_token - Token d'authentification
-│   ├── jarvis_user_profile - Profil utilisateur
-│   └── jarvis_mode - Mode (full/ask)
+│   ├── Leanna_api_token - Token d'authentification
+│   ├── Leanna_user_profile - Profil utilisateur
+│   └── Leanna_mode - Mode (full/ask)
 └── sessionStorage
-    └── jarvis-ide-pending-file - Fichier en attente d'ouverture
+    └── Leanna-ide-pending-file - Fichier en attente d'ouverture
 ```
 
 **Pattern de gestion d'état** :
@@ -677,7 +677,7 @@ Persistance Locale
 **Intercepteur Fetch Global** :
 - **Circuit breaker** : 12 échecs consécutifs → blocage 8 secondes
 - **Deduplication** : Une seule requête GET par URL en vol
-- **Injection token** : Ajout automatique de `x-jarvis-token` header
+- **Injection token** : Ajout automatique de `x-Leanna-token` header
 - **Error tracking** : Suivi des erreurs réseau
 
 **Exemple de code** :
@@ -718,10 +718,10 @@ window.fetch = function (input, init) {
   
   // Token injection
   if (isApi) {
-    const token = localStorage.getItem('jarvis_api_token');
+    const token = localStorage.getItem('Leanna_api_token');
     if (token) {
       const headers = new Headers(init?.headers);
-      headers.set('x-jarvis-token', token);
+      headers.set('x-Leanna-token', token);
       init = { ...init, headers };
     }
   }
@@ -844,7 +844,7 @@ const server = app.listen(PORT, listenHost, () => {
 - **Paths** :
   - `/live` - Communication temps réel pour Gemini Live
   - `/sandbox-watch` - Surveillance des fichiers sandbox
-- **Authentication** : Via cookie `jarvis_token` ou query string `token`
+- **Authentication** : Via cookie `Leanna_token` ou query string `token`
 
 **Handler** : `server/live/LiveSocketHandler.ts`
 
@@ -867,7 +867,7 @@ server.on('upgrade', (request, socket, head) => {
   
   // Authentification
   if (pathname === '/live' || pathname === '/sandbox-watch') {
-    const token = cookies['jarvis_token'] || url.searchParams.get('token');
+    const token = cookies['Leanna_token'] || url.searchParams.get('token');
     const authResult = authenticateToken(token, apiToken);
     if (!authResult.ok) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -974,7 +974,7 @@ AgentOrchestrator (Façade)
 ```
 NotebookManager (CRUD)
 ├── Persistence (JSON files)
-│   └── .jarvis/notebooks/<id>.json
+│   └── .Leanna/notebooks/<id>.json
 ├── Source Management
 │   ├── SourceIngester - Extraction de texte
 │   │   └── Support: PDF, DOCX, MD, HTML, images, CSV, JSON, YAML
@@ -1001,7 +1001,7 @@ NotebookManager (CRUD)
   - Gestion des documents générés
   - Gestion des audio overviews
   - Gestion de l'historique de chat
-- **Persistance** : Fichiers JSON dans `.jarvis/notebooks/`
+- **Persistance** : Fichiers JSON dans `.Leanna/notebooks/`
 - **Rotation des couleurs** : 8 couleurs disponibles
 - **Rotation des icônes** : 8 icônes disponibles
 
@@ -1112,7 +1112,7 @@ ProjectMemory
 - **Fonctionnalités** :
   - Stockage des entités (classes, fonctions, etc.)
   - Gestion des relations entre entités
-  - Persistance dans `.jarvis/ProjectKnowledge.json`
+  - Persistance dans `.Leanna/ProjectKnowledge.json`
   - Recherche sémantique
 
 **DependencyGraph** (`server/knowledge/DependencyGraph.ts`) :
@@ -1296,7 +1296,7 @@ function authenticateRequest(req, options = {}) {
   const configuredToken = options.apiToken;
   if (!configuredToken) return { ok: true }; // Pas de token = accès libre
   
-  const headerValue = req.headers?.['x-jarvis-token'];
+  const headerValue = req.headers?.['x-Leanna-token'];
   const token = Array.isArray(headerValue) ? headerValue[0] : headerValue;
   
   if (token === configuredToken) return { ok: true };
@@ -1341,7 +1341,7 @@ function getDefaultWorkspaceRoot() {
 ```
 
 **Sandbox** (`server/utils/sandbox.ts`) :
-- **Dossier** : `.jarvis/sandbox/`
+- **Dossier** : `.Leanna/sandbox/`
 - **Activation** : Via `activateSandbox()`
 - **Désactivation** : Via `deactivateSandbox()`
 - **Validation** : `assertSandboxReady(path)` vérifie que le fichier est dans le sandbox
@@ -1402,7 +1402,7 @@ function isWriteForbidden(path) {
 
 **Chiffrement** (`server/utils/crypto.ts`) :
 - **Algorithme** : AES-256-GCM
-- **Clé** : Dérivée de `JARVIS_MASTER_KEY` + hardware seed
+- **Clé** : Dérivée de `Leanna_MASTER_KEY` + hardware seed
 - **Fonctions** :
   - `encrypt(plaintext)` : Chiffrement
   - `decrypt(ciphertext)` : Déchiffrement
@@ -1433,4 +1433,4 @@ function setupGracefulShutdown(deps) {
 
 ---
 
-*Fin de la Partie 1. Voir JARVIS-OS-ANALYSE-TECHNIQUE-PARTIE-2.md pour la suite.*
+*Fin de la Partie 1. Voir Leanna-ANALYSE-TECHNIQUE-PARTIE-2.md pour la suite.*

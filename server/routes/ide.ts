@@ -42,7 +42,7 @@ router.get('/tree-workspace', async (req: Request, res: Response) => {
     const walk = (current: string): any[] => {
       const entries = fs.readdirSync(current, { withFileTypes: true });
       return entries
-        .filter(entry => !['node_modules', '.git', 'dist', 'build', 'out', '.jarvis'].includes(entry.name))
+        .filter(entry => !['node_modules', '.git', 'dist', 'build', 'out', '.Leanna'].includes(entry.name))
         .sort((a, b) => {
           if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
           return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });

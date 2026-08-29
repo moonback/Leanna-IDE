@@ -1,4 +1,4 @@
-# Contributing to Jarvis OS
+# Contributing to Leanna OS
 
 ## Sommaire
 
@@ -54,8 +54,8 @@ Voir [Demander une fonctionnalite](#-demander-une-fonctionnalite) ci-dessous.
 
 ```bash
 # Cloner le depot
-git clone https://github.com/moonback/Jarvis-OS.git
-cd Jarvis-OS
+git clone https://github.com/moonback/Leanna.git
+cd Leanna
 
 # Installer les dependances
 npm install
@@ -77,7 +77,7 @@ Pour le developpement, configurez ces variables dans `.env` :
 GEMINI_API_KEY=votre_cle_api_gemini
 
 # Recommande
-JARVIS_API_TOKEN=token_secret_pour_dev
+Leanna_API_TOKEN=token_secret_pour_dev
 
 # Optionnel mais utile
 SUPABASE_URL=votre_url_supabase
@@ -296,7 +296,7 @@ src/
 
 ### Journalisation
 
-Utiliser le systeme de logging de Jarvis :
+Utiliser le systeme de logging de Leanna :
 
 ```typescript
 import { createLogger } from './utils/logger';
@@ -329,9 +329,9 @@ Avant de commencer a coder, verifiez s'il existe deja une issue pour votre contr
 3. Ajoutez le depot upstream comme remote
 
 ```bash
-git clone https://github.com/votre-username/Jarvis-OS.git
-cd Jarvis-OS
-git remote add upstream https://github.com/moonback/Jarvis-OS.git
+git clone https://github.com/votre-username/Leanna.git
+cd Leanna
+git remote add upstream https://github.com/moonback/Leanna.git
 ```
 
 ### 3. Creer une branche
@@ -555,7 +555,7 @@ Creez une nouvelle issue sur GitHub avec :
    - Systeme d'exploitation
    - Version de Node.js
    - Navigateur (si UI)
-   - Version de Jarvis OS
+   - Version de Leanna OS
 
 4. **Logs** : Si applicable, ajoutez les logs d'erreur
 
@@ -620,4 +620,4 @@ Si vous avez des questions sur la contribution, ouvrez une issue avec le label `
 
 ---
 
-Merci de contribuer a Jarvis OS ! 
+Merci de contribuer a Leanna OS ! 

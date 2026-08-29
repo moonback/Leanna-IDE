@@ -1,12 +1,12 @@
-# Jarvis-OS — IDE 
+# Leanna — IDE 
 
-> Jarvis-OS ne lit, n'écrit et n'exécute **que sur son propre code source**. Ce document décrit l'architecture self-referential et explique comment étendre les skills en respectant le périmètre verrouillé.
+> Leanna ne lit, n'écrit et n'exécute **que sur son propre code source**. Ce document décrit l'architecture self-referential et explique comment étendre les skills en respectant le périmètre verrouillé.
 
 ---
 
 ## 1. Principe
 
-Jarvis-OS n'est pas un IDE généraliste multi-projets. C'est un IDE **auto-hébergé** : l'application ne peut modifier que le repo qui la fait tourner. Il n'existe aucun moyen d'ouvrir un workspace externe ou de cloner un autre dépôt.
+Leanna n'est pas un IDE généraliste multi-projets. C'est un IDE **auto-hébergé** : l'application ne peut modifier que le repo qui la fait tourner. Il n'existe aucun moyen d'ouvrir un workspace externe ou de cloner un autre dépôt.
 
 Cette contrainte est **structurelle**, pas cosmétique :
 - La racine du projet (`SELF_ROOT`) est résolue une seule fois au démarrage et ne change jamais.
@@ -24,7 +24,7 @@ Cette contrainte est **structurelle**, pas cosmétique :
 
 | Export | Type | Rôle |
 |--------|------|------|
-| `SELF_ROOT` | `string` | Racine absolue et immuable du repo Jarvis-OS |
+| `SELF_ROOT` | `string` | Racine absolue et immuable du repo Leanna |
 | `normalizeSelfPath(target)` | `(string) => string \| null` | Résout un chemin relatif et vérifie qu'il reste dans `SELF_ROOT`. Retourne `null` si sortie du périmètre |
 | `isWriteForbidden(absPath)` | `(string) => boolean` | `true` si le chemin est totalement interdit en écriture (`.git/config`, `node_modules`…) |
 | `isCriticalFile(absPath)` | `(string) => boolean` | `true` si le fichier nécessite une confirmation utilisateur (`server.ts`, `.env`…) |
@@ -79,8 +79,8 @@ const root = process.cwd();
 // JAMAIS : accès direct sans normalisation (path traversal)
 fs.readFileSync(path.join(root, userInput));
 
-// JAMAIS : lire JARVIS_DEFAULT_WORKSPACE (supprimé du produit)
-const ws = process.env.JARVIS_DEFAULT_WORKSPACE;
+// JAMAIS : lire Leanna_DEFAULT_WORKSPACE (supprimé du produit)
+const ws = process.env.Leanna_DEFAULT_WORKSPACE;
 ```
 
 ---
@@ -144,7 +144,7 @@ En développement uniquement, vous pouvez surcharger le root pour les tests :
 
 ```bash
 # NODE_ENV=development requis
-JARVIS_SELF_ROOT_OVERRIDE="/chemin/vers/repo/test" npm run dev
+Leanna_SELF_ROOT_OVERRIDE="/chemin/vers/repo/test" npm run dev
 ```
 
 Cette variable est **ignorée en production** et absente du `.env.example` public.

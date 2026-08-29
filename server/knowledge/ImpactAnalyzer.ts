@@ -536,7 +536,7 @@ export class ImpactAnalyzer {
       return 0.95;
     }
 
-    // Fichiers sources cœurs du système Jarvis
+    // Fichiers sources cœurs du système Leanna
     if (/server\/(knowledge|mission|agents|skills|orchestration|tools)\//.test(lower)) {
       return 0.8;
     }

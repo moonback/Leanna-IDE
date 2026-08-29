@@ -39,7 +39,7 @@ function invalidateCache(configPath: string) {
 
 // GET /api/safeguards/config
 router.get('/config', (_req: Request, res: Response) => {
-  const configPath = path.join(SELF_ROOT, '.jarvis', 'safeguards.json');
+  const configPath = path.join(SELF_ROOT, '.Leanna', 'safeguards.json');
   const defaultConfig = {
     autoCheckpoint: true,
     postEditValidation: true,
@@ -53,7 +53,7 @@ router.get('/config', (_req: Request, res: Response) => {
 
 // POST /api/safeguards/config
 router.post('/config', (req: Request, res: Response) => {
-  const configDir = path.join(SELF_ROOT, '.jarvis');
+  const configDir = path.join(SELF_ROOT, '.Leanna');
   const configPath = path.join(configDir, 'safeguards.json');
   try {
     if (!fs.existsSync(configDir)) {

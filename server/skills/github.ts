@@ -6,7 +6,7 @@ const TIMEOUT_MS = 10_000;
 function getHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     "Accept": "application/vnd.github+json",
-    "User-Agent": "Jarvis-OS",
+    "User-Agent": "Leanna",
     "X-GitHub-Api-Version": "2022-11-28",
   };
   const token = process.env.GITHUB_TOKEN?.trim();

@@ -57,7 +57,7 @@ const EXCLUDED_DIRS = new Set([
   "coverage",
   ".vscode",
   ".idea",
-  ".jarvis",
+  ".Leanna",
   ".husky",
 ]);
 

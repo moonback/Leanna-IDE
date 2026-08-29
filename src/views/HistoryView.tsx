@@ -109,7 +109,7 @@ export default function HistoryView() {
         icon={History}
         title="Historique"
         badge="Persistant"
-        description="Toutes vos conversations passées avec Jarvis"
+        description="Toutes vos conversations passées avec Leanna"
         actions={
           <>
             <span className="hidden text-[10px] sm:inline" style={{ color: 'var(--text-muted)' }}>{conversations.length} conversation{conversations.length !== 1 ? 's' : ''}</span>
@@ -393,7 +393,7 @@ function MessageList({ messages, loadingMessages }: { messages: ConversationMess
                 {/* Role label on first message of group */}
                 {!isConsecutiveSameRole && (
                   <span className="text-[9px] font-semibold uppercase tracking-wider px-1 mb-0.5" style={{ color: 'var(--text-dimmed)' }}>
-                    {isAssistant ? 'Jarvis' : 'Vous'}
+                    {isAssistant ? 'Leanna' : 'Vous'}
                   </span>
                 )}
 

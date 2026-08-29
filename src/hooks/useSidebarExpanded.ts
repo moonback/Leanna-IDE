@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 
-const STORAGE_KEY = 'jarvis_sidebar_expanded';
+const STORAGE_KEY = 'Leanna_sidebar_expanded';
 
 export function useSidebarExpanded(defaultExpanded = false) {
   const [expanded, setExpanded] = useState(() => {

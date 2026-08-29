@@ -1,4 +1,4 @@
-# Database Schema - Jarvis OS
+# Database Schema - Leanna OS
 
 ## Sommaire
 
@@ -26,7 +26,7 @@
 
 ## Apercu general
 
-Jarvis OS utilise **Supabase (PostgreSQL)** comme base de donnees principale pour la persistance des donnees utilisateur et systeme.
+Leanna OS utilise **Supabase (PostgreSQL)** comme base de donnees principale pour la persistance des donnees utilisateur et systeme.
 
 ### Configuration
 
@@ -429,13 +429,13 @@ FOR ALL
 USING (auth.uid() = user_id);
 ```
 
-> **Note** : Dans Jarvis OS, l'authentification utilisateur n'est pas encore completement implementee, donc la plupart des politiques permettent l'acces complet aux utilisateurs authentifies.
+> **Note** : Dans Leanna OS, l'authentification utilisateur n'est pas encore completement implementee, donc la plupart des politiques permettent l'acces complet aux utilisateurs authentifies.
 
 ---
 
 ## Stockage local
 
-En plus de Supabase, Jarvis OS utilise le stockage local pour :
+En plus de Supabase, Leanna OS utilise le stockage local pour :
 
 ### Fichiers de configuration
 
@@ -444,8 +444,8 @@ En plus de Supabase, Jarvis OS utilise le stockage local pour :
 | `.env` | Variables d'environnement | Key=Value |
 | `.env.local` | Variables locales (override) | Key=Value |
 | `.gemini-keys.json` | Pool de cles API Gemini (chiffre) | JSON |
-| `.jarvis-profile.json` | Profil utilisateur | JSON |
-| `.jarvis/lastProject.json` | Dernier projet selectionne | JSON |
+| `.Leanna-profile.json` | Profil utilisateur | JSON |
+| `.Leanna/lastProject.json` | Dernier projet selectionne | JSON |
 
 ### Donnees de connaissance
 
@@ -458,17 +458,17 @@ En plus de Supabase, Jarvis OS utilise le stockage local pour :
 
 | Dossier | Description |
 |---------|-------------|
-| `.jarvis/sandbox/` | Environnement isole pour les modifications | Filesystem |
-| `.jarvis/sandbox/.env` | Configuration sandbox | Key=Value |
-| `.jarvis/sandbox/.jarvis-profile.json` | Profil sandbox | JSON |
+| `.Leanna/sandbox/` | Environnement isole pour les modifications | Filesystem |
+| `.Leanna/sandbox/.env` | Configuration sandbox | Key=Value |
+| `.Leanna/sandbox/.Leanna-profile.json` | Profil sandbox | JSON |
 
 ### Backups
 
 | Dossier | Description |
 |---------|-------------|
-| `.jarvis/notebooks/backups/` | Sauvegardes des notebooks | JSON + binaires |
-| `.jarvis/notebooks/backups/backup-{timestamp}/` | Sauvegarde incrementale | - |
-| `.jarvis/notebooks/embeddings/` | Embeddings caches | JSON |
+| `.Leanna/notebooks/backups/` | Sauvegardes des notebooks | JSON + binaires |
+| `.Leanna/notebooks/backups/backup-{timestamp}/` | Sauvegarde incrementale | - |
+| `.Leanna/notebooks/embeddings/` | Embeddings caches | JSON |
 
 ---
 
@@ -833,10 +833,10 @@ supabase db reset --db-url postgresql://... -f backup.sql
 
 ## Notes
 
-1. **Pas d'authentification utilisateur** : Actuellement, Jarvis OS utilise principalement le systeme de fichiers local et Supabase avec la Service Role Key. L'authentification multi-utilisateurs n'est pas encore completement implementee.
+1. **Pas d'authentification utilisateur** : Actuellement, Leanna OS utilise principalement le systeme de fichiers local et Supabase avec la Service Role Key. L'authentification multi-utilisateurs n'est pas encore completement implementee.
 
 2. **Chiffrement des donnes sensibles** : Les cles API sont stockees chiffrees dans `.gemini-keys.json` et `.env.local` avec AES-256-GCM.
 
-3. **Stockage des embeddings** : Les embeddings sont stockes dans la table `notebook_sources` sous forme de JSONB, mais peuvent aussi etre caches localement dans `.jarvis/notebooks/embeddings/`.
+3. **Stockage des embeddings** : Les embeddings sont stockes dans la table `notebook_sources` sous forme de JSONB, mais peuvent aussi etre caches localement dans `.Leanna/notebooks/embeddings/`.
 
 4. **Performance** : Pour les gros volumes de donnees (beaucoup de notebooks/sources), considerer l'ajout d'indexes supplementaires ou le partitionnement des tables.

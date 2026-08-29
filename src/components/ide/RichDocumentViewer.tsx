@@ -1359,8 +1359,8 @@ export const RichDocumentViewer = memo(function RichDocumentViewer({ document, o
         setSaveError(detail.error ?? 'Erreur inconnue');
       }
     };
-    window.addEventListener('jarvis-save-rich-document-result', handler);
-    return () => window.removeEventListener('jarvis-save-rich-document-result', handler);
+    window.addEventListener('Leanna-save-rich-document-result', handler);
+    return () => window.removeEventListener('Leanna-save-rich-document-result', handler);
   }, []);
 
   const handleOpenSaveModal = () => {

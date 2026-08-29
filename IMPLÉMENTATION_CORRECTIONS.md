@@ -1,7 +1,7 @@
-# Implémentation des Corrections - Audit Jarvis-OS
+# Implémentation des Corrections - Audit Leanna
 
 *Date : 28 Août 2026*
-*Basé sur : Audit_Agents_Jarvis-OS.md*
+*Basé sur : Audit_Agents_Leanna.md*
 
 ## Résumé des Corrections Implémentées
 
@@ -343,4 +343,4 @@ const rules = [...COMMON_CODE_RULES, 'Règle spécifique'];
 ---
 
 *Document généré par Mistral Vibe*
-*Basé sur l'audit complet du système multi-agents Jarvis-OS*
+*Basé sur l'audit complet du système multi-agents Leanna*

@@ -84,7 +84,7 @@ export const WorkspacePanel = React.memo(function WorkspacePanel() {
         setInput(data.workspace);
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
-        window.dispatchEvent(new CustomEvent('jarvis-workspace-changed', {
+        window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', {
           detail: { workspace: data.workspace },
         }));
       }

@@ -293,7 +293,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
 
       const excludedDirsSet = new Set([
         ...EXCLUDED_DIRS,
-        ".jarvis", ".aionrs", ".kiro", ".github", ".husky", ".vscode",
+        ".Leanna", ".aionrs", ".kiro", ".github", ".husky", ".vscode",
         "coverage", ".nyc_output", "tmp", "temp", ".cache",
         ...excludeDirs.map((d: string) => d.toLowerCase()),
       ]);

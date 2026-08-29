@@ -169,7 +169,7 @@ export function setupTerminalWebSocket(wss: WebSocketServer, apiToken: string | 
     // Message initial - envoyé une seule fois par connexion
     if (ws.readyState === WebSocket.OPEN && !welcomeSent) {
       welcomeSent = true;
-      const welcomeMessage = `\n=== Jarvis-OS Terminal ===\n` +
+      const welcomeMessage = `\n=== Leanna Terminal ===\n` +
         `Working directory: ${SELF_ROOT}\n` +
         `Shell: ${shell}\n` +
         `Platform: ${os.platform()}\n` +

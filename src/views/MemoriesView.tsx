@@ -63,7 +63,7 @@ export default function MemoriesView() {
         icon={BrainCircuit}
         title="Mémoire"
         badge="Mémoire active"
-        description="Les informations importantes retenues par Jarvis"
+        description="Les informations importantes retenues par Leanna"
         actions={
           <>
             <span className="hidden text-[10px] sm:inline" style={{ color: 'var(--text-muted)' }}>{memories.length} {memories.length === 1 ? 'entrée' : 'entrées'}</span>
@@ -117,7 +117,7 @@ export default function MemoriesView() {
             <p className="text-sm text-center max-w-xs" style={{ color: 'var(--text-dimmed)' }}>
               {query
                 ? 'Essayez un autre terme de recherche.'
-                : 'Parlez à Jarvis — il se souviendra automatiquement des informations importantes vous concernant.'}
+                : 'Parlez à Leanna — il se souviendra automatiquement des informations importantes vous concernant.'}
             </p>
           </div>
         ) : (

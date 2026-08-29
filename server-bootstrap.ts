@@ -2,12 +2,12 @@ import path from "path";
 import dotenv from "dotenv";
 import { decrypt } from "./server/utils/crypto";
 
-const configRoot = process.env.JARVIS_CONFIG_PATH || process.env.ELECTRON_APP_PATH || process.cwd();
+const configRoot = process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || process.cwd();
 dotenv.config({ path: path.join(configRoot, ".env") });
 dotenv.config({ path: path.join(configRoot, ".env.local"), override: true });
 
 for (const key of [
-  "JARVIS_API_TOKEN",
+  "Leanna_API_TOKEN",
   "GEMINI_API_KEY",
   "SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",

@@ -38,8 +38,8 @@ export function CriticalEditConfirm({ sendMessage }: Props) {
       setTimeLeft(Math.ceil(e.detail.timeoutMs / 1000));
     }
 
-    window.addEventListener('jarvis-confirm-critical-edit', handleConfirmEvent as EventListener);
-    return () => window.removeEventListener('jarvis-confirm-critical-edit', handleConfirmEvent as EventListener);
+    window.addEventListener('Leanna-confirm-critical-edit', handleConfirmEvent as EventListener);
+    return () => window.removeEventListener('Leanna-confirm-critical-edit', handleConfirmEvent as EventListener);
   }, []);
 
   // Countdown timer

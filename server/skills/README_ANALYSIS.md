@@ -1,6 +1,6 @@
-# Analyse des Skills du Serveur Jarvis-OS
+# Analyse des Skills du Serveur Leanna
 
-Ce document présente une vue d'ensemble des compétences (skills) actuellement implémentées dans le serveur de Jarvis-OS.
+Ce document présente une vue d'ensemble des compétences (skills) actuellement implémentées dans le serveur de Leanna.
 
 ## Fondations
 

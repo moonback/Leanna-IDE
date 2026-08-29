@@ -1,4 +1,4 @@
-# Audit du système multi-agents — Jarvis-OS
+# Audit du système multi-agents — Leanna
 
 *Analyse basée sur l'export complet du dossier `server/` (263 fichiers, ~76 500 lignes).*
 

@@ -8,8 +8,8 @@
  */
 
 function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('jarvis_api_token');
-  return token ? { 'x-jarvis-token': token } : {};
+  const token = localStorage.getItem('Leanna_api_token');
+  return token ? { 'x-Leanna-token': token } : {};
 }
 
 /** Attend N ms */

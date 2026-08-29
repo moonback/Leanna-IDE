@@ -35,7 +35,7 @@ export function SystemModal({ onClose, connected, profile, gitInfo, workspace }:
             </div>
             <div>
               <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Statut système</h2>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>État des services Jarvis</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>État des services Leanna</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition" style={{ color: 'var(--text-muted)' }}>

@@ -47,11 +47,11 @@ export class BackupService {
   private isRunning = false;
 
   constructor(config?: Partial<BackupConfig>) {
-    const baseDir = process.env.JARVIS_CONFIG_PATH || process.env.ELECTRON_APP_PATH || SELF_ROOT || process.cwd();
+    const baseDir = process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || SELF_ROOT || process.cwd();
     this.config = {
       intervalMs: config?.intervalMs ?? 30 * 60 * 1000, // 30 minutes
       maxBackups: config?.maxBackups ?? 10,
-      backupDir: config?.backupDir ?? path.join(baseDir, ".jarvis", "notebooks", "backups"),
+      backupDir: config?.backupDir ?? path.join(baseDir, ".Leanna", "notebooks", "backups"),
       enabled: config?.enabled ?? true,
     };
   }
@@ -288,8 +288,8 @@ export class BackupService {
   // ─── Utilitaires ───────────────────────────────────────────────────────────
 
   private getNotebooksDir(): string {
-    const baseDir = process.env.JARVIS_CONFIG_PATH || process.env.ELECTRON_APP_PATH || SELF_ROOT || process.cwd();
-    return path.join(baseDir, ".jarvis", "notebooks");
+    const baseDir = process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || SELF_ROOT || process.cwd();
+    return path.join(baseDir, ".Leanna", "notebooks");
   }
 
   private ensureBackupDir(): void {

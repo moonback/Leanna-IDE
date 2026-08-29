@@ -749,12 +749,12 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
     const filePath = `docs/generated/${filename}.md`;
 
     try {
-      const token = localStorage.getItem('jarvis_api_token');
+      const token = localStorage.getItem('Leanna_api_token');
       const res = await fetch('/api/ide/file', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'x-jarvis-token': token } : {}),
+          ...(token ? { 'x-Leanna-token': token } : {}),
         },
         body: JSON.stringify({ path: filePath, content: doc.content }),
       });

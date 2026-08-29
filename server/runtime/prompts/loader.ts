@@ -75,7 +75,7 @@ export function buildSystemPrompt(
   profile: { aiName?: string; userName?: string; userRole?: string; compact?: boolean } = {}
 ): string {
   const variables: Record<string, string> = {
-    aiName: profile.aiName ?? "Jarvis",
+    aiName: profile.aiName ?? "Leanna",
     userName: profile.userName ?? "",
     userRole: profile.userRole ?? "",
   };

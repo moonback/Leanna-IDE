@@ -13,7 +13,7 @@ import { loadScheduledTasks, stopAllScheduledTasks } from "./server/skills/autom
 import { loadWorkflows, stopAllWorkflowTimers } from "./server/skills/workflow";
 import fs from "fs";
 import { authenticateRequest, authenticateToken } from "./server/security";
-import { SELF_ROOT, JARVIS_APP_ROOT, initSelfRoot, hasProject } from "./server/utils/selfRoot";
+import { SELF_ROOT, Leanna_APP_ROOT, initSelfRoot, hasProject } from "./server/utils/selfRoot";
 import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox";
 
 import { knowledgeGraph, projectIndexer, projectMemory } from "./server/knowledge";
@@ -184,14 +184,14 @@ process.on('uncaughtException', (error) => {
  * Preserves all existing comments and other keys.
  */
 function updateEnvFile(key: string, value: string): void {
-  const configBase = process.env.JARVIS_CONFIG_PATH || process.env.ELECTRON_APP_PATH || process.cwd();
+  const configBase = process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || process.cwd();
   const envPath = path.join(configBase, ".env");
   const envLocalPath = path.join(configBase, ".env.local");
   // Prefer .env.local if it exists, else fall back to .env
   const targetPath = fs.existsSync(envLocalPath) ? envLocalPath : envPath;
 
   const SENSITIVE_ENV_KEYS = [
-    'JARVIS_API_TOKEN',
+    'Leanna_API_TOKEN',
     'GEMINI_API_KEY',
     'SUPABASE_URL',
     'SUPABASE_SERVICE_ROLE_KEY',
@@ -301,7 +301,7 @@ const browserActionPending = new Map<string, {
   reject: (err: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 }>();
-const apiToken = process.env.JARVIS_API_TOKEN;
+const apiToken = process.env.Leanna_API_TOKEN;
 
 function getDefaultWorkspaceRoot(): string {
   return SELF_ROOT;
@@ -309,8 +309,8 @@ function getDefaultWorkspaceRoot(): string {
 
 // In-memory profile store (persisted to a local JSON file in production)
 function getProfilePath(): string {
-  // Le profil est toujours dans le dossier de l'app Jarvis, pas le projet actif
-  return path.join(JARVIS_APP_ROOT, ".jarvis-profile.json");
+  // Le profil est toujours dans le dossier de l'app Leanna, pas le projet actif
+  return path.join(Leanna_APP_ROOT, ".Leanna-profile.json");
 }
 
 function loadProfile(): ProfileConfig {
@@ -397,7 +397,7 @@ async function startServer() {
       return;
     }
     if (apiToken) {
-      res.cookie('jarvis_token', apiToken, {
+      res.cookie('Leanna_token', apiToken, {
         httpOnly: true,
         sameSite: 'strict',
         secure: process.env.NODE_ENV === 'production',
@@ -415,7 +415,7 @@ async function startServer() {
 
   // autres routes (gestion des clés Gemini, tokens, workspace, git, github,
   // workflows, mémoires, conversations...) étaient accessibles sans aucune
-  // authentification même lorsque JARVIS_API_TOKEN est configuré, en
+  // authentification même lorsque Leanna_API_TOKEN est configuré, en
   // contradiction avec API_DOCS.md. On applique désormais l'authentification
   // à toutes les routes /api/* (sauf /api/health, déjà traitée ci-dessus).
   app.use("/api", requireAuth);
@@ -508,18 +508,18 @@ async function startServer() {
   // BUGFIX : écouter sur 0.0.0.0 exposait le serveur (et donc le terminal
   // shell, les outils fichiers/git/system, les clés API) à tout le réseau
   // local par défaut. On se limite désormais à la boucle locale, sauf si
-  // l'utilisateur exporte explicitement JARVIS_LISTEN_HOST (ex: pour un accès
-  // LAN volontaire, à combiner impérativement avec JARVIS_API_TOKEN).
-  const listenHost = process.env.JARVIS_LISTEN_HOST?.trim() || "127.0.0.1";
+  // l'utilisateur exporte explicitement Leanna_LISTEN_HOST (ex: pour un accès
+  // LAN volontaire, à combiner impérativement avec Leanna_API_TOKEN).
+  const listenHost = process.env.Leanna_LISTEN_HOST?.trim() || "127.0.0.1";
   if (!apiToken) {
     console.warn(
-      "\n[Security] ⚠️  AVERTISSEMENT SÉCURITÉ : Aucun JARVIS_API_TOKEN n'est configuré dans .env.\n" +
+      "\n[Security] ⚠️  AVERTISSEMENT SÉCURITÉ : Aucun Leanna_API_TOKEN n'est configuré dans .env.\n" +
       "          Les endpoints API (/api/*) et WebSocket (/live, /sandbox-watch) ne sont pas protégés par jeton.\n" +
-      "          Pour restreindre l'accès, définissez JARVIS_API_TOKEN=<votre_jeton_secret> dans votre .env.\n"
+      "          Pour restreindre l'accès, définissez Leanna_API_TOKEN=<votre_jeton_secret> dans votre .env.\n"
     );
   }
   if (listenHost === "0.0.0.0" && !apiToken) {
-    console.error("[Security] ❌ REFUS DE DÉMARRAGE — JARVIS_LISTEN_HOST=0.0.0.0 exposé sans JARVIS_API_TOKEN. Définissez JARVIS_API_TOKEN dans .env pour sécuriser l'accès.");
+    console.error("[Security] ❌ REFUS DE DÉMARRAGE — Leanna_LISTEN_HOST=0.0.0.0 exposé sans Leanna_API_TOKEN. Définissez Leanna_API_TOKEN dans .env pour sécuriser l'accès.");
     process.exit(1);
   }
 
@@ -669,7 +669,7 @@ async function startServer() {
         }
       });
 
-      const token = cookies['jarvis_token'] || url.searchParams.get('token');
+      const token = cookies['Leanna_token'] || url.searchParams.get('token');
       const authResult = authenticateToken(token, apiToken);
       if (!authResult.ok) {
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');

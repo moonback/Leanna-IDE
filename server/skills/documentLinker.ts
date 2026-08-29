@@ -592,8 +592,8 @@ async function callLLMForAnalysis(prompt: string, context?: any): Promise<string
       headers: {
         Authorization: `Bearer ${orKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://jarvis-os.local",
-        "X-Title": "Jarvis-OS DocumentLinker",
+        "HTTP-Referer": "https://Leanna.local",
+        "X-Title": "Leanna DocumentLinker",
       },
       body: JSON.stringify({
         model: orModel,

@@ -11,7 +11,7 @@ function getWindowIcon() {
 }
 
 // --- Logging vers fichier, visible même sans terminal ---
-const logPath = path.join(app.getPath('userData'), 'jarvis-debug.log');
+const logPath = path.join(app.getPath('userData'), 'Leanna-debug.log');
 function log(...args) {
   const line = `[${new Date().toISOString()}] ${args.join(' ')}`;
   console.log(line);
@@ -20,7 +20,7 @@ function log(...args) {
 
 process.on('uncaughtException', (err) => {
   log('UNCAUGHT EXCEPTION:', err.stack || err.message);
-  dialog.showErrorBox('Erreur Jarvis OS', String(err.stack || err));
+  dialog.showErrorBox('Erreur Leanna OS', String(err.stack || err));
 });
 
 process.on('unhandledRejection', (err) => {
@@ -35,7 +35,7 @@ function startBackendServer() {
     process.env.ELECTRON_APP_PATH = app.getAppPath();
     // Dossier persistant pour les fichiers de config (.env, .gemini-keys.json, etc.)
     const configDir = app.getPath('userData');
-    process.env.JARVIS_CONFIG_PATH = configDir;
+    process.env.Leanna_CONFIG_PATH = configDir;
     log('Config directory:', configDir);
 
     // Initialiser le fichier .env utilisateur dans userData à partir du template .env.example si absent
@@ -240,7 +240,7 @@ app.whenReady().then(() => {
   });
 
   if (Notification.isSupported()) {
-    new Notification({ title: 'Jarvis OS', body: 'Système local connecté et prêt.' }).show();
+    new Notification({ title: 'Leanna OS', body: 'Système local connecté et prêt.' }).show();
   }
 });
 
@@ -252,7 +252,7 @@ app.on('window-all-closed', function () {
 
 // ── Graceful shutdown ────────────────────────────────────────────────────────
 // Le serveur Express est chargé dans le même process (require(serverPath)).
-// On utilise process.__jarvisShutdown (exposé par server.ts) pour déclencher
+// On utilise process.__LeannaShutdown (exposé par server.ts) pour déclencher
 // l'arrêt propre des timers, sessions Gemini et WebSocket avant de quitter.
 // Cela évite les MaxListenersExceededWarning et sessions zombies après
 // plusieurs redémarrages en développement.
@@ -261,7 +261,7 @@ let isShuttingDown = false;
 
 app.on('before-quit', function (event) {
   if (isShuttingDown) return; // Éviter les appels multiples
-  const shutdown = process.__jarvisShutdown;
+  const shutdown = process.__LeannaShutdown;
   if (typeof shutdown !== 'function') return; // dev mode : server.ts non chargé ici
 
   isShuttingDown = true;

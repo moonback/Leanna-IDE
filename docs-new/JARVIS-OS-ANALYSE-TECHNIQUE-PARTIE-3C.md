@@ -1,4 +1,4 @@
-# JARVIS-OS - ANALYSE TECHNIQUE COMPLÈTE - PARTIE 3C
+# Leanna - ANALYSE TECHNIQUE COMPLÈTE - PARTIE 3C
 
 **Date** : 28 août 2026  
 **Version** : 1.0.0  

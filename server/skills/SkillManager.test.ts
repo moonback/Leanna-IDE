@@ -582,7 +582,7 @@ test("SkillManager — handleToolCall déclenche selfHealSkill sur erreur et pro
   const manager = new SkillManager();
 
   // Créer un vrai fichier temporaire pour que selfHealSkill puisse le lire
-  const tmpDir = path.join(SELF_ROOT, '.jarvis', 'tasks');
+  const tmpDir = path.join(SELF_ROOT, '.Leanna', 'tasks');
   if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
   const tmpPath = path.join(tmpDir, `heal-trigger-${Date.now()}.ts`);
   fs.writeFileSync(tmpPath, 'export const x: number = "oops";', 'utf-8');

@@ -37,8 +37,8 @@ export default defineConfig(({ mode }) => {
       hmr: process.env.DISABLE_HMR === 'true' ? false : true,
       watch: process.env.DISABLE_HMR === 'true' ? null : {
         ignored: [
-          '**/.jarvis-profile.json',
-          '**/.jarvis/sandbox/**',
+          '**/.Leanna-profile.json',
+          '**/.Leanna/sandbox/**',
           '**/ProjectMemory.json',
           '**/ProjectKnowledge.json',
         ],

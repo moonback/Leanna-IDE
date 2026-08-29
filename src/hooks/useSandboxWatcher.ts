@@ -91,7 +91,7 @@ export function useSandboxWatcher({
     lastConnectStartTs.current = Date.now();
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const token = localStorage.getItem('jarvis_api_token');
+    const token = localStorage.getItem('Leanna_api_token');
     const params = token ? `?token=${encodeURIComponent(token)}` : '';
 
     let host = window.location.host;

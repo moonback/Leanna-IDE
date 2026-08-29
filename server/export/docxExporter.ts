@@ -12,7 +12,7 @@ export interface DocxExportOptions {
  * immédiate avec Microsoft Word, Google Docs et LibreOffice sans dépendances binaires lourdes.
  */
 export function exportToDocx(markdown: string, options: DocxExportOptions = {}): Buffer {
-  const { title = 'Document Jarvis-OS', author = 'Jarvis-OS' } = options;
+  const { title = 'Document Leanna', author = 'Leanna' } = options;
   const contentHtml = marked.parse(markdown || '', { async: false }) as string;
 
   const wordDocument = `

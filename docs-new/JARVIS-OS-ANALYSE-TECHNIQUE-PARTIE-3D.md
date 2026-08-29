@@ -1,4 +1,4 @@
-# JARVIS-OS - ANALYSE TECHNIQUE COMPLÈTE - PARTIE 3D
+# Leanna - ANALYSE TECHNIQUE COMPLÈTE - PARTIE 3D
 
 **Date** : 28 août 2026  
 **Version** : 1.0.0  
@@ -55,7 +55,7 @@ POST /api/notebooks
 [Serveur]
   ├── Validation du nom
   ├── Génération UUID v4
-  └── Création .jarvis/notebooks/<uuid>.json
+  └── Création .Leanna/notebooks/<uuid>.json
   ↓
 [Réponse: { id: "uuid", name: "...", createdAt: "..." }]
   ↓
@@ -269,7 +269,7 @@ Utilisateur → SettingsView
 [Section Apparence]
   │
   └── Sélection thème (dark/light/cyberpunk/sepia/high-contrast)
-      └── Persistance dans .jarvis-profile.json
+      └── Persistance dans .Leanna-profile.json
 ```
 
 ---
@@ -283,11 +283,11 @@ POST /api/sandbox/activate
   │
   ├── Vérification projet sélectionné
   └── Initialisation sandbox
-      └── Copie projet vers .jarvis/sandbox/
+      └── Copie projet vers .Leanna/sandbox/
   ↓
 Mode sandbox actif
   │
-  ├── Toutes opérations limitées à .jarvis/sandbox/
+  ├── Toutes opérations limitées à .Leanna/sandbox/
   ├── Badge "SANDBOX" dans barre de statut
   └── POST /api/sandbox/deactivate → sortie
 ```
@@ -330,15 +330,15 @@ GET /api/workflows → liste
 ```
 Client → Connexion ws://localhost:5000/live
   │
-  ├── Token URL: ?token=<JARVIS_API_TOKEN>
-  └── Ou Cookie: jarvis_token=<JARVIS_API_TOKEN>
+  ├── Token URL: ?token=<Leanna_API_TOKEN>
+  └── Ou Cookie: Leanna_token=<Leanna_API_TOKEN>
   ↓
 Serveur (server.ts:648-671)
   │
   ├── Parsing cookies
   ├── Extraction token
   ├── Vérification via authenticateToken()
-  │   └── Comparaison avec JARVIS_API_TOKEN
+  │   └── Comparaison avec Leanna_API_TOKEN
   ├── Si invalide
   │   └── socket.write('HTTP/1.1 401...') + socket.destroy()
   └── Si valide
@@ -384,7 +384,7 @@ Client
 ```
 [401 Unauthorized]
   │
-  ├── Pas de token → "Configurez JARVIS_API_TOKEN"
+  ├── Pas de token → "Configurez Leanna_API_TOKEN"
   └── Token invalide → "Token invalide"
 
 [403 Forbidden]
@@ -471,7 +471,7 @@ Client
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         ARCHITECTURE JARVIS-OS                                │
+│                         ARCHITECTURE Leanna                                │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                                 │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
@@ -521,7 +521,7 @@ Client
 │  │                     PERSISTANCE                                          │   │
 │  │  ┌──────────────────────┐     ┌──────────────────┐                   │   │
 │  │  │   SUPABASE (Cloud)    │     │   LOCAL (JSON)   │                   │   │
-│  │  │  PostgreSQL 15+       │     │  .jarvis/        │                   │   │
+│  │  │  PostgreSQL 15+       │     │  .Leanna/        │                   │   │
 │  │  │  - pgvector           │     │  - notebooks/    │                   │   │
 │  │  │  - pg_trgm            │     │  - embeddings/   │                   │   │
 │  │  │  - 6 tables           │     │  - backups/     │                   │   │
@@ -652,7 +652,7 @@ Client
 │  │                                                                       │   │
 │  │  CACHE: chatResponseCache, ragSearchCache (TTL: 1h)                   │   │
 │  │                                                                       │   │
-│  │  PERSISTANCE: .jarvis/notebooks/<uuid>.json + embeddings/            │   │
+│  │  PERSISTANCE: .Leanna/notebooks/<uuid>.json + embeddings/            │   │
 │  │  BACKUP: BackupService → backup-<timestamp>/ (automatique)            │   │
 │  │                                                                       │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
@@ -766,4 +766,4 @@ Client
 
 **Statut** : ✅ **RAPPORT COMPLET**
 
-*Fin du rapport technique JARVIS-OS - Toutes les sections sont maintenant disponibles.*
+*Fin du rapport technique Leanna - Toutes les sections sont maintenant disponibles.*

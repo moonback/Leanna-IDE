@@ -31,7 +31,7 @@ Pour supprimer un dossier et tous ses fichiers/sous-dossiers :
 ```
 delete_project_folder({ path: "src/old-feature" })
 ```
-⚠️ Une confirmation est demandée si le dossier contient des fichiers. Les dossiers protégés (`.git`, `node_modules`, `.jarvis`, `electron`) ne peuvent pas être supprimés.
+⚠️ Une confirmation est demandée si le dossier contient des fichiers. Les dossiers protégés (`.git`, `node_modules`, `.Leanna`, `electron`) ne peuvent pas être supprimés.
 
 ### Déplacer un fichier dans un dossier
 Pour déplacer un fichier, utilise `rename_project_file` avec le nouveau chemin complet :

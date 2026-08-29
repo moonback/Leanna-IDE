@@ -1,4 +1,4 @@
-# JARVIS-OS - ANALYSE TECHNIQUE COMPLÈTE - PARTIE 3B
+# Leanna - ANALYSE TECHNIQUE COMPLÈTE - PARTIE 3B
 
 **Date** : 28 août 2026  
 **Version** : 1.0.0  
@@ -13,9 +13,9 @@
 #### 9.1.1. Mécanisme d'authentification
 
 **Type** : Token API statique (Bearer-like)  
-**Header** : `x-jarvis-token`  
-**Cookie** : `jarvis_token` (HttpOnly, Secure, SameSite=strict)  
-**Environnement** : `JARVIS_API_TOKEN` dans `.env`
+**Header** : `x-Leanna-token`  
+**Cookie** : `Leanna_token` (HttpOnly, Secure, SameSite=strict)  
+**Environnement** : `Leanna_API_TOKEN` dans `.env`
 
 **Fichier** : `server/security.ts`
 
@@ -30,7 +30,7 @@ export function authenticateRequest(
     return { ok: true };  // Accès autorisé si pas de token configuré
   }
   
-  const headerValue = req.headers?.['x-jarvis-token'];
+  const headerValue = req.headers?.['x-Leanna-token'];
   const token = Array.isArray(headerValue) ? headerValue[0] : headerValue;
   
   if (token === configuredToken) {
@@ -48,7 +48,7 @@ app.use("/api/health", healthRouter); // /api/health est avant requireAuth = pas
 ```
 
 **Comportement** :
-- Si `JARVIS_API_TOKEN` **non configuré** → **accès autorisé sans token** (mode développement)
+- Si `Leanna_API_TOKEN` **non configuré** → **accès autorisé sans token** (mode développement)
 - Si token valide → accès autorisé
 - Sinon → 401 Unauthorized
 - Le token est automatiquement ajouté au cookie de réponse
@@ -76,7 +76,7 @@ server.on('upgrade', (request, socket, head) => {
       }
     });
     
-    const token = cookies['jarvis_token'] || url.searchParams.get('token');
+    const token = cookies['Leanna_token'] || url.searchParams.get('token');
     const authResult = authenticateToken(token, apiToken);
     if (!authResult.ok) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -89,8 +89,8 @@ server.on('upgrade', (request, socket, head) => {
 ```
 
 **Points d'accès** :
-- Token dans l'URL : `ws://localhost:5000/live?token=<JARVIS_API_TOKEN>`
-- Cookie : `jarvis_token=<JARVIS_API_TOKEN>`
+- Token dans l'URL : `ws://localhost:5000/live?token=<Leanna_API_TOKEN>`
+- Cookie : `Leanna_token=<Leanna_API_TOKEN>`
 
 ---
 
@@ -186,7 +186,7 @@ export function decrypt(encryptedText: string): string {
 **Code** :
 ```typescript
 function getMasterKey(): Buffer {
-  const envKey = process.env.JARVIS_MASTER_KEY || '';
+  const envKey = process.env.Leanna_MASTER_KEY || '';
   // Combine hostname, platform, and username for a stable machine-specific seed
   let userInfo = '';
   try {
@@ -203,7 +203,7 @@ function getMasterKey(): Buffer {
 
 **Caractéristiques** :
 - La clé dépend de la **machine** (hostname, platform, username)
-- Une **clé maîtresse optionnelle** peut être ajoutée via `JARVIS_MASTER_KEY`
+- Une **clé maîtresse optionnelle** peut être ajoutée via `Leanna_MASTER_KEY`
 - La clé est dérivée via **SHA-256** (32 bytes)
 - Sans clé maîtresse : clé spécifique à la machine
 - Avec clé maîtresse : clé portable entre machines
@@ -217,7 +217,7 @@ function getMasterKey(): Buffer {
 **Variables concernées** :
 ```typescript
 const SENSITIVE_ENV_KEYS = [
-  'JARVIS_API_TOKEN',
+  'Leanna_API_TOKEN',
   'GEMINI_API_KEY',
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
@@ -239,7 +239,7 @@ function updateEnvFile(key: string, value: string): void {
 
 **Format dans .env** :
 ```
-JARVIS_API_TOKEN=gcm:6a1b2c3d4e5f:90a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5:9d8e7f6a5b4c3...
+Leanna_API_TOKEN=gcm:6a1b2c3d4e5f:90a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5:9d8e7f6a5b4c3...
 GEMINI_API_KEY=gcm:1a2b3c4d5e6f:...:...
 ```
 
@@ -251,29 +251,29 @@ GEMINI_API_KEY=gcm:1a2b3c4d5e6f:...:...
 
 **Code** :
 ```typescript
-const listenHost = process.env.JARVIS_LISTEN_HOST?.trim() || "127.0.0.1";
+const listenHost = process.env.Leanna_LISTEN_HOST?.trim() || "127.0.0.1";
 
 if (!apiToken) {
   console.warn(
-    "\n[Security] ⚠️ AVERTISSEMENT SÉCURITÉ : Aucun JARVIS_API_TOKEN n'est configuré.
+    "\n[Security] ⚠️ AVERTISSEMENT SÉCURITÉ : Aucun Leanna_API_TOKEN n'est configuré.
 " +
     "Les endpoints API (/api/*) et WebSocket (/live, /sandbox-watch) ne sont pas protégés.
 " +
-    "Pour restreindre l'accès, définissez JARVIS_API_TOKEN dans votre .env.\n"
+    "Pour restreindre l'accès, définissez Leanna_API_TOKEN dans votre .env.\n"
   );
 }
 
 if (listenHost === "0.0.0.0" && !apiToken) {
   console.error(
-    "[Security] ❌ REFUS DE DÉMARRAGE — JARVIS_LISTEN_HOST=0.0.0.0 exposé sans JARVIS_API_TOKEN. " +
-    "Définissez JARVIS_API_TOKEN dans .env pour sécuriser l'accès."
+    "[Security] ❌ REFUS DE DÉMARRAGE — Leanna_LISTEN_HOST=0.0.0.0 exposé sans Leanna_API_TOKEN. " +
+    "Définissez Leanna_API_TOKEN dans .env pour sécuriser l'accès."
   );
   process.exit(1);
 }
 ```
 
 **Comportement** :
-| `JARVIS_LISTEN_HOST` | `JARVIS_API_TOKEN` | Résultat |
+| `Leanna_LISTEN_HOST` | `Leanna_API_TOKEN` | Résultat |
 |---------------------|--------------------|---------|
 | non défini | non défini | ⚠️ Écoute sur 127.0.0.1 + avertissement |
 | non défini | défini | ✅ Écoute sur 127.0.0.1 |
@@ -293,7 +293,7 @@ if (listenHost === "0.0.0.0" && !apiToken) {
 - `server/utils/sandboxWatcher.ts`
 
 **Fonctionnalités** :
-- Création d'un environnement isolé dans `.jarvis/sandbox/`
+- Création d'un environnement isolé dans `.Leanna/sandbox/`
 - Copie du projet actif vers le sandbox
 - Surveillance des modifications en temps réel (`chokidar`)
 - Validation des chemins pour rester dans le sandbox
@@ -301,8 +301,8 @@ if (listenHost === "0.0.0.0" && !apiToken) {
 
 **Structure** :
 ```
-.jarvis/sandbox/
-├── .jarvis/                 # Même structure que la racine
+.Leanna/sandbox/
+├── .Leanna/                 # Même structure que la racine
 │   ├── notebooks/
 │   ├── ProjectKnowledge.json
 │   └── ...
@@ -979,7 +979,7 @@ res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 heure
 **Stratégie** :
 - Cache des embeddings déjà calculés
 - Clé : hash SHA-256 du texte
-- Persistance sur disque dans `.jarvis/notebooks/embeddings/`
+- Persistance sur disque dans `.Leanna/notebooks/embeddings/`
 - Invalidation lors de la mise à jour du modèle
 
 ---

@@ -17,7 +17,7 @@ export const translatorAgent = defineAgent({
   ],
   maxConcurrency: 2,
   timeoutMs: 90_000,
-  systemPrompt: `Tu es l'Agent Traducteur de Jarvis-OS.
+  systemPrompt: `Tu es l'Agent Traducteur de Leanna.
 
 MISSION :
 1. Traduire fidèlement le contenu dans la langue cible.

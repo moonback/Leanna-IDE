@@ -43,7 +43,7 @@ function findExportingFile(symbolName: string, dir: string, depth = 0): string |
   try {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist' || entry.name === '.jarvis') continue;
+      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist' || entry.name === '.Leanna') continue;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         const found = findExportingFile(symbolName, fullPath, depth + 1);

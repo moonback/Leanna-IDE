@@ -1,5 +1,5 @@
 /**
- * Routes API pour la persistance des agents personnalisés dans .jarvis/custom-agents.json
+ * Routes API pour la persistance des agents personnalisés dans .Leanna/custom-agents.json
  * et leur enregistrement dans le DynamicAgentRegistry pour exécution.
  */
 
@@ -15,11 +15,11 @@ import { createLogger } from "../utils/logger";
 const log = createLogger("CustomAgentsAPI");
 
 function getAgentsFilePath(): string {
-  return path.join(SELF_ROOT, ".jarvis", "custom-agents.json");
+  return path.join(SELF_ROOT, ".Leanna", "custom-agents.json");
 }
 
 function ensureDir() {
-  const dir = path.join(SELF_ROOT, ".jarvis");
+  const dir = path.join(SELF_ROOT, ".Leanna");
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }

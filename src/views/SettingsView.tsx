@@ -39,7 +39,7 @@ const NAV_GROUPS = [
   {
     label: 'IA & Modèles',
     items: [
-      { id: 'ai-settings', icon: Cpu, label: 'Assistant IA', keywords: 'voix nom ia leanna jarvis identité' },
+      { id: 'ai-settings', icon: Cpu, label: 'Assistant IA', keywords: 'voix nom ia leanna Leanna identité' },
       { id: 'systemprompt-settings', icon: Settings2, label: 'Prompt Système', keywords: 'prompt systeme instruction personnaliser comportement custom system' },
       { id: 'agents-settings', icon: Bot, label: 'Agents', keywords: 'agent multi-agents coder test docs refactor security review architect délégation solo' },
       { id: 'custom-skills-settings', icon: Code2, label: 'Skills custom', keywords: 'skill personnalisé custom outil tool instruction prompt automatisation' },
@@ -271,7 +271,7 @@ export default function SettingsView() {
           <div className="rounded-lg p-2.5"
             style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 5%, transparent)' }}>
             <p className="text-[9px] leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
-              💡 Jarvis ne modifie que son propre code source. Toute écriture crée un checkpoint automatique.
+              💡 Leanna ne modifie que son propre code source. Toute écriture crée un checkpoint automatique.
             </p>
           </div>
         </div>

@@ -1,9 +1,9 @@
 
 <!-- <p align="center">
-  <img src="assets/images/header.png" alt="Jarvis OS" width="100%" />
+  <img src="assets/images/header.png" alt="Leanna OS" width="100%" />
 </p> -->
 
-<h1 align="center">Jarvis OS</h1>
+<h1 align="center">Leanna OS</h1>
 
 <p align="center">
   <strong>L'IDE intelligent pour développeurs, assisté par l'IA Leanna et ses agents spécialisés</strong>
@@ -22,7 +22,7 @@
 
 ## 📌 Table des matières
 
-- [Pourquoi Jarvis OS ?](#-pourquoi-jarvis-os)
+- [Pourquoi Leanna OS ?](#-pourquoi-Leanna)
 - [Présentation](#-présentation)
 - [Stack technique](#-stack-technique)
 - [Fonctionnalités principales](#-fonctionnalités-principales)
@@ -43,9 +43,9 @@
 
 ---
 
-## 🌟 Pourquoi Jarvis OS ?
+## 🌟 Pourquoi Leanna OS ?
 
-Jarvis OS est **l'IDE du futur** : un environnement de développement **intelligent** où **l'IA Leanna et ses 14 agents spécialisés** collaborent avec toi pour :
+Leanna OS est **l'IDE du futur** : un environnement de développement **intelligent** où **l'IA Leanna et ses 14 agents spécialisés** collaborent avec toi pour :
 
 - **Créer et modifier du code** de manière sécurisée et assistée.
 - **Comprendre et optimiser** ton projet grâce à une **indexation sémantique** du workspace.
@@ -62,9 +62,9 @@ Jarvis OS est **l'IDE du futur** : un environnement de développement **intellig
 
 ## 📖 Présentation
 
-**Jarvis OS est un IDE ** : un environnement de développement **intelligent** où l'assistant IA intégré (**Leanna par défaut**) peut **lire, comprendre et modifier le code source de votre application**.
+**Leanna OS est un IDE ** : un environnement de développement **intelligent** où l'assistant IA intégré (**Leanna par défaut**) peut **lire, comprendre et modifier le code source de votre application**.
 
-Conçu comme un **système d'exploitation desktop**, Jarvis OS combine :
+Conçu comme un **système d'exploitation desktop**, Leanna OS combine :
 
 - ✅ Un **IDE complet** avec éditeur Monaco, explorateur de fichiers et recherche globale.
 - 🤖 Un **assistant IA multimodal** (voix, webcam, partage d'écran via Gemini Live).
@@ -96,7 +96,7 @@ Conçu comme un **système d'exploitation desktop**, Jarvis OS combine :
 - **Éditeur Monaco** : Syntaxe, autocomplétion, multi-fichiers, multi-onglets.
 - **Explorateur de fichiers** : Arbre interactif avec filtres et recherche globale (`Ctrl+Shift+F`).
 - **Terminal intégré** : Terminal multi-onglets avec commandes favorites, historique, recherche et exécutions rapides via raccourcis clavier. **Sélecteur Workspace/Sandbox** pour choisir le contexte d'exécution des commandes.
-- **Mode Sandbox** : Environnement isolé (`.jarvis/sandbox/`) pour les modifications IA.
+- **Mode Sandbox** : Environnement isolé (`.Leanna/sandbox/`) pour les modifications IA.
 - **Checkpoints Git** : Snapshot automatique avant modification avec possibilité de rollback.
 - **Validation stricte** : TypeScript, lint, analyse de sécurité avant merge.
 
@@ -222,8 +222,8 @@ Accès direct au code source de votre app via **20+ outils** pour une assistance
 ### 1. Cloner le dépôt
 
 ```bash
-git clone https://github.com/moonback/Jarvis-OS.git
-cd Jarvis-OS
+git clone https://github.com/moonback/Leanna.git
+cd Leanna
 ```
 
 ### 2. Installer les dépendances
@@ -242,7 +242,7 @@ npm install
 2. Éditer `.env` et configurer au minimum :
    ```env
    GEMINI_API_KEY=votre_clé_api_gemini
-   JARVIS_API_TOKEN=votre_token_sécurité  # Recommandé
+   Leanna_API_TOKEN=votre_token_sécurité  # Recommandé
    SUPABASE_URL=votre_url_supabase          # Optionnel
    SUPABASE_SERVICE_ROLE_KEY=votre_clé    # Optionnel
    ```
@@ -260,7 +260,7 @@ Voir `.env.example` pour la liste complète. Voici les principales :
 | Variable | Description | Obligatoire |
 |----------|-------------|:-----------:|
 | `GEMINI_API_KEY` | Clé API Google Gemini | ✅ |
-| `JARVIS_API_TOKEN` | Token de sécurité des endpoints | ❌ (Recommandé) |
+| `Leanna_API_TOKEN` | Token de sécurité des endpoints | ❌ (Recommandé) |
 | `SUPABASE_URL` | URL de l'instance Supabase | ❌ |
 | `SUPABASE_SERVICE_ROLE_KEY` | Clé service Supabase | ❌ |
 | `OPENROUTER_API_KEY` | Clé OpenRouter | ❌ |
@@ -268,11 +268,11 @@ Voir `.env.example` pour la liste complète. Voici les principales :
 | `ENABLE_CHAIN_OF_THOUGHT` | Afficher le raisonnement IA (`true`/`false`) | ❌ |
 | `SANDBOX_EXIT_CODE` | Code de sécurité pour sortir du sandbox | ❌ |
 | `VITE_SERVER_PORT` | Port du serveur backend (défaut: 4000) | ❌ |
-| `JARVIS_DEFAULT_WORKSPACE` | Chemin du workspace par défaut | ❌ |
+| `Leanna_DEFAULT_WORKSPACE` | Chemin du workspace par défaut | ❌ |
 
 ### Pool de clés Gemini
 
-Jarvis OS supporte un **pool de clés API** avec rotation automatique (round-robin + retry sur `429`). Les clés sont stockées chiffrées dans `.gemini-keys.json`. Gestion possible via l'UI **Paramètres > Clés API**.
+Leanna OS supporte un **pool de clés API** avec rotation automatique (round-robin + retry sur `429`). Les clés sont stockées chiffrées dans `.gemini-keys.json`. Gestion possible via l'UI **Paramètres > Clés API**.
 
 ---
 
@@ -330,7 +330,7 @@ npm run dist:win
 ## 📁 Structure du projet
 
 ```
-Jarvis-OS/
+Leanna/
 ├── assets/                          # Images, icônes, splash screen
 ├── electron/                        # Process principal Electron
 │   ├── main.cjs                    # Point d'entrée Electron
@@ -454,5 +454,5 @@ Distribué sous licence **MIT**. Voir [LICENSE](LICENSE) pour plus de détails.
 ---
 
 <p align="center">
-  Built with passion and a lot of Gemini by Jarvis OS team
+  Built with passion and a lot of Gemini by Leanna OS team
 </p>

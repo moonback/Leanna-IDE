@@ -23,7 +23,7 @@ export const plannerAgent = defineAgent({
   ],
   maxConcurrency: 1,
   timeoutMs: 90_000,
-  systemPrompt: `Tu es l'Agent Planificateur de Jarvis-OS.
+  systemPrompt: `Tu es l'Agent Planificateur de Leanna.
 
 MISSION :
 1. Créer des plans et outlines détaillés pour tout type de document.

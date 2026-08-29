@@ -17,7 +17,7 @@ export function getProjectRoot(): string {
 }
 
 export interface SandboxWriteTarget {
-  /** Cible canonique sous `.jarvis/sandbox`, obtenue uniquement via le garde. */
+  /** Cible canonique sous `.Leanna/sandbox`, obtenue uniquement via le garde. */
   sandboxPath: string;
   /** Chemin relatif canonique partagé par sandbox et projet principal. */
   relativePath: string;

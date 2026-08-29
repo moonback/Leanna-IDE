@@ -23,11 +23,11 @@ export function getDefaultVariableValues(userName?: string, projectName?: string
   });
 
   return {
-    nom_projet: projectName || 'Jarvis-OS App',
+    nom_projet: projectName || 'Leanna App',
     date: formattedDate,
-    auteur: userName || 'Équipe Jarvis-OS',
+    auteur: userName || 'Équipe Leanna',
     version: '1.0.0',
-    entreprise: 'Jarvis Inc.',
+    entreprise: 'Leanna Inc.',
     description: 'Description synthétique de la fonctionnalité ou du projet.',
     stack: 'TypeScript, React, Node.js, Gemini API',
     cible: 'Utilisateurs finaux & développeurs',

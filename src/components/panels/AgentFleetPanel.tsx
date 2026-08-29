@@ -96,8 +96,8 @@ const TYPE_COLOR: Record<string, string> = {
 };
 
 function apiHeaders(): Record<string, string> {
-  const token = localStorage.getItem('jarvis_api_token');
-  return token ? { 'x-jarvis-token': token } : {};
+  const token = localStorage.getItem('Leanna_api_token');
+  return token ? { 'x-Leanna-token': token } : {};
 }
 
 async function fetchJSON<T>(url: string): Promise<T> {
@@ -238,8 +238,8 @@ export function AgentFleetPanel({ inline = false, onClose }: AgentFleetPanelProp
       }, 400);
     };
 
-    window.addEventListener('jarvis-agent-event', handleAgentEvent);
-    return () => window.removeEventListener('jarvis-agent-event', handleAgentEvent);
+    window.addEventListener('Leanna-agent-event', handleAgentEvent);
+    return () => window.removeEventListener('Leanna-agent-event', handleAgentEvent);
   }, []);
 
   // ── Polling ─────────────────────────────────────────────────────────────────

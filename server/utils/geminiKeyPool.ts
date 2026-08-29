@@ -9,7 +9,7 @@ import { SELF_ROOT } from "./selfRoot";
  * When a key hits rate limits (429), it automatically rotates to the next key.
  */
 
-const KEYS_FILE = path.join(process.env.JARVIS_CONFIG_PATH || process.env.ELECTRON_APP_PATH || SELF_ROOT, ".gemini-keys.json");
+const KEYS_FILE = path.join(process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || SELF_ROOT, ".gemini-keys.json");
 
 interface KeyEntry {
   key: string;

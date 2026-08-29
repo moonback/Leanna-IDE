@@ -3,7 +3,7 @@ import os from 'os';
 
 // Derive a key from machine info + optional env master key
 function getMasterKey(): Buffer {
-  const envKey = process.env.JARVIS_MASTER_KEY || '';
+  const envKey = process.env.Leanna_MASTER_KEY || '';
   // Combine hostname, platform, and username for a stable machine-specific seed
   let userInfo = '';
   try {

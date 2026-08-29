@@ -13,7 +13,7 @@ export interface AuditEvent {
 }
 
 export async function appendAuditEvent(event: Omit<AuditEvent, 'timestamp'> & { logPath?: string }) {
-  const logPath = event.logPath || path.join(SELF_ROOT, '.jarvis-audit.log');
+  const logPath = event.logPath || path.join(SELF_ROOT, '.Leanna-audit.log');
   const safeEvent: AuditEvent = {
     timestamp: new Date().toISOString(),
     action: event.action,

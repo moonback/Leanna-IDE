@@ -49,7 +49,7 @@ test('ide routes: GET /file returns file content for valid path', async () => {
     assert.equal(res.status, 200);
     const body = await res.json() as any;
     assert.equal(body.path, 'package.json');
-    assert.ok(body.content.includes('Jarvis-OS'));
+    assert.ok(body.content.includes('Leanna'));
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }

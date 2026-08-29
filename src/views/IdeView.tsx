@@ -84,13 +84,13 @@ export default function IdeView() {
 
     // Initialize mode from localStorage on mount
     useEffect(() => {
-      const stored = localStorage.getItem('jarvis_mode') as 'full' | 'ask' | null;
+      const stored = localStorage.getItem('Leanna_mode') as 'full' | 'ask' | null;
       if (stored && stored !== ('vie' as any)) setMode(stored);
     }, []);
 
     // Persist mode to localStorage
     useEffect(() => {
-      localStorage.setItem('jarvis_mode', mode);
+      localStorage.setItem('Leanna_mode', mode);
     }, [mode]);
 
     // Reconnect after mode change: wait until status is idle then reconnect
@@ -115,16 +115,16 @@ export default function IdeView() {
   useSandboxWatcher({
     enabled: true,
     onFileChanged: useCallback((relativePath: string) => {
-      window.dispatchEvent(new CustomEvent('jarvis-sandbox-file-changed', { detail: { path: relativePath } }));
+      window.dispatchEvent(new CustomEvent('Leanna-sandbox-file-changed', { detail: { path: relativePath } }));
       // Également rafraîchir l'arbre pour refléter les changements
-      window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+      window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
     }, []),
     onTreeChanged: useCallback(() => {
-      window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+      window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
     }, []),
     onFileDeleted: useCallback((relativePath: string) => {
-      window.dispatchEvent(new CustomEvent('jarvis-sandbox-file-deleted', { detail: { path: relativePath } }));
-      window.dispatchEvent(new CustomEvent('jarvis-sandbox-changed'));
+      window.dispatchEvent(new CustomEvent('Leanna-sandbox-file-deleted', { detail: { path: relativePath } }));
+      window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
     }, []),
   });
 
@@ -247,9 +247,9 @@ export default function IdeView() {
   // ── Handle AI-triggered file open ──────────────────────────────────────────
 
   useEffect(() => {
-    const pending = sessionStorage.getItem('jarvis-ide-pending-file');
+    const pending = sessionStorage.getItem('Leanna-ide-pending-file');
     if (pending) {
-      sessionStorage.removeItem('jarvis-ide-pending-file');
+      sessionStorage.removeItem('Leanna-ide-pending-file');
       try {
         const { path, line, column } = JSON.parse(pending);
         if (typeof path === 'string') {
@@ -285,24 +285,24 @@ export default function IdeView() {
       fileSystem.loadTree();
     };
 
-    window.addEventListener('jarvis-ide-open-file', handleOpenFile);
-    window.addEventListener('jarvis-ide-file-changed', handleFileChanged);
-    window.addEventListener('jarvis-workspace-changed', handleWorkspaceChanged);
+    window.addEventListener('Leanna-ide-open-file', handleOpenFile);
+    window.addEventListener('Leanna-ide-file-changed', handleFileChanged);
+    window.addEventListener('Leanna-workspace-changed', handleWorkspaceChanged);
     return () => {
-      window.removeEventListener('jarvis-ide-open-file', handleOpenFile);
-      window.removeEventListener('jarvis-ide-file-changed', handleFileChanged);
-      window.removeEventListener('jarvis-workspace-changed', handleWorkspaceChanged);
+      window.removeEventListener('Leanna-ide-open-file', handleOpenFile);
+      window.removeEventListener('Leanna-ide-file-changed', handleFileChanged);
+      window.removeEventListener('Leanna-workspace-changed', handleWorkspaceChanged);
     };
   }, [openFileAt, fileSystem]);
 
   // ── Open Sandbox Diff from StatusBar click ─────────────────────────────────
   useEffect(() => {
     const handleOpenSandboxDiff = () => openSandboxDiff();
-    window.addEventListener('jarvis-open-sandbox-diff', handleOpenSandboxDiff);
-    return () => window.removeEventListener('jarvis-open-sandbox-diff', handleOpenSandboxDiff);
+    window.addEventListener('Leanna-open-sandbox-diff', handleOpenSandboxDiff);
+    return () => window.removeEventListener('Leanna-open-sandbox-diff', handleOpenSandboxDiff);
   }, [openSandboxDiff]);
 
-  // ── Actions navigateur pilotées par Leanna via jarvis-ide-action ───────────
+  // ── Actions navigateur pilotées par Leanna via Leanna-ide-action ───────────
   useEffect(() => {
     const handle = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -322,11 +322,11 @@ export default function IdeView() {
       // browser-scroll, browser-back, browser-forward, browser-reload, browser-read-request
       // sont dispatché directement comme CustomEvents dédiés par useLiveAPI / BrowserPanel
     };
-    window.addEventListener('jarvis-ide-action', handle as EventListener);
-    return () => window.removeEventListener('jarvis-ide-action', handle as EventListener);
+    window.addEventListener('Leanna-ide-action', handle as EventListener);
+    return () => window.removeEventListener('Leanna-ide-action', handle as EventListener);
   }, []);
 
-  // ── Documents riches pilotés par Leanna via jarvis-open-rich-document ──────
+  // ── Documents riches pilotés par Leanna via Leanna-open-rich-document ──────
   useEffect(() => {
     const handle = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -338,17 +338,17 @@ export default function IdeView() {
       setShowKnowledge(false);
       setShowNotebooks(false);
     };
-    window.addEventListener('jarvis-open-rich-document', handle as EventListener);
-    return () => window.removeEventListener('jarvis-open-rich-document', handle as EventListener);
+    window.addEventListener('Leanna-open-rich-document', handle as EventListener);
+    return () => window.removeEventListener('Leanna-open-rich-document', handle as EventListener);
   }, []);
 
   // Open Agents panel only on explicit user action (button click, overlay)
   useEffect(() => {
     const handleOpenAgents = () => setShowAgents(true);
-    window.addEventListener('jarvis-open-agents-panel', handleOpenAgents);
+    window.addEventListener('Leanna-open-agents-panel', handleOpenAgents);
 
     return () => {
-      window.removeEventListener('jarvis-open-agents-panel', handleOpenAgents);
+      window.removeEventListener('Leanna-open-agents-panel', handleOpenAgents);
     };
   }, []);
 
@@ -595,7 +595,7 @@ export default function IdeView() {
     updateCursor();
 
     editor.addAction({
-      id: 'jarvis-send-selection-to-ai',
+      id: 'Leanna-send-selection-to-ai',
       label: "Envoyer à l'IA",
       keybindings: [monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Enter],
       precondition: 'editorHasSelection',
@@ -657,7 +657,7 @@ export default function IdeView() {
     const active = fileSystem.openFiles.find(f => f.path === fileSystem.activePath);
     if (!active) return;
     try {
-      const STORAGE_KEY = 'jarvis_recent_files';
+      const STORAGE_KEY = 'Leanna_recent_files';
       const stored = localStorage.getItem(STORAGE_KEY);
       const recent: { path: string; language: string; openedAt: number }[] = stored ? JSON.parse(stored) : [];
       const filtered = recent.filter(r => r.path !== active.path);
@@ -669,7 +669,7 @@ export default function IdeView() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="jarvis-ide-shell flex h-full" style={{ backgroundColor: 'var(--ide-shell-bg)', color: 'var(--text-primary)', width: showChat && chatDocked ? 'calc(100% - 420px)' : '100%', transition: 'width 0.25s ease' }}>
+    <div className="Leanna-ide-shell flex h-full" style={{ backgroundColor: 'var(--ide-shell-bg)', color: 'var(--text-primary)', width: showChat && chatDocked ? 'calc(100% - 420px)' : '100%', transition: 'width 0.25s ease' }}>
 
       {/* Sidebar Unifiée */}
       <UnifiedSidebar
@@ -789,7 +789,7 @@ export default function IdeView() {
       )}
 
       {/* Editor Area */}
-      <div className="jarvis-ide-workspace flex flex-1 flex-col min-w-0 min-h-0 relative">
+      <div className="Leanna-ide-workspace flex flex-1 flex-col min-w-0 min-h-0 relative">
         {/* Tab Bar — masqué quand un panneau plein-écran est actif */}
         {!showSandbox && !showHistory && !showAutomation && !showMemory && !showKnowledge && !showNotebooks && !(showBrowser && !fileSystem.activePath) && (
           <EditorTabs

@@ -1629,12 +1629,12 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
     const filePath = `docs/generated/${filename}.md`;
 
     try {
-      const token = localStorage.getItem('jarvis_api_token');
+      const token = localStorage.getItem('Leanna_api_token');
       const res = await fetch('/api/ide/file', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'x-jarvis-token': token } : {}),
+          ...(token ? { 'x-Leanna-token': token } : {}),
         },
         body: JSON.stringify({ path: filePath, content: doc.content }),
       });
@@ -7388,7 +7388,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
  * à partir d'un document Markdown généré dans le notebook.
  *
  * Fonctionnalités :
- * - Sélection du thème (9 thèmes dont Jarvis custom)
+ * - Sélection du thème (9 thèmes dont Leanna custom)
  * - Sélection de la transition et du ratio
  * - Aperçu live dans un iframe
  * - Téléchargement HTML + ouverture dans un nouvel onglet
@@ -7422,7 +7422,7 @@ interface Props {
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 const THEMES = [
-  { key: 'jarvis',  label: 'Jarvis',  emoji: '🤖', desc: 'Dark bleu/violet custom' },
+  { key: 'Leanna',  label: 'Leanna',  emoji: '🤖', desc: 'Dark bleu/violet custom' },
   { key: 'black',   label: 'Black',   emoji: '⬛', desc: 'Sombre minimaliste' },
   { key: 'white',   label: 'White',   emoji: '⬜', desc: 'Clair et épuré' },
   { key: 'moon',    label: 'Moon',    emoji: '🌙', desc: 'Sombre doux, bleuté' },
@@ -7485,7 +7485,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
   const { error: toastError } = useToast();
 
   // Options
-  const [theme, setTheme]           = useState<ThemeKey>('jarvis');
+  const [theme, setTheme]           = useState<ThemeKey>('Leanna');
   const [transition, setTransition] = useState<TransitionKey>('slide');
   const [ratio, setRatio]           = useState<RatioKey>('16:9');
   const [density, setDensity]       = useState<DensityKey>('normal');

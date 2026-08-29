@@ -122,7 +122,7 @@ export function AppearanceSection() {
           value={profile.floatingOrb}
           onChange={v => setField('floatingOrb', v)}
           label="Orb flottant"
-          hint="Bouton déplaçable pour contrôler Jarvis depuis n'importe quelle page"
+          hint="Bouton déplaçable pour contrôler Leanna depuis n'importe quelle page"
         />
       </div>
     </Section>

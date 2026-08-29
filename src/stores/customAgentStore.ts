@@ -1,6 +1,6 @@
 /**
  * Store pour les agents personnalisés créés via l'Agent Builder.
- * Persiste côté serveur dans .jarvis/custom-agents.json via l'API REST.
+ * Persiste côté serveur dans .Leanna/custom-agents.json via l'API REST.
  * Expose un pattern subscribe pour useSyncExternalStore.
  */
 

@@ -1,6 +1,6 @@
 # Codebase Skill - Documentation
 
-Le skill `codebase` permet à l'assistant Jarvis d'explorer, lire, créer, modifier, déplacer et
+Le skill `codebase` permet à l'assistant Leanna d'explorer, lire, créer, modifier, déplacer et
 supprimer des fichiers dans le workspace du projet.
 
 ## Stratégie de lecture/édition recommandée
@@ -137,7 +137,7 @@ Supprime un **fichier** individuel du projet.
 Supprime un **dossier entier** et tout son contenu de façon récursive.
 - `path` (string, requis) : chemin relatif du dossier (ex: `src/old-feature`, `dist/legacy`)
 
-⚠️ Une confirmation interactive est demandée si le dossier contient des fichiers. Dossiers protégés non supprimables : `.git`, `node_modules`, `.jarvis`, `electron`, `.husky`.
+⚠️ Une confirmation interactive est demandée si le dossier contient des fichiers. Dossiers protégés non supprimables : `.git`, `node_modules`, `.Leanna`, `electron`, `.husky`.
 
 ## Sécurité
 

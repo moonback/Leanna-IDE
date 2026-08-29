@@ -106,7 +106,7 @@ export function McpPanel() {
   const fetchServers = useCallback(async () => {
     try {
       const res = await fetch(`${apiBase}/servers`, {
-        headers: { 'X-Jarvis-Token': localStorage.getItem('jarvis_api_token') || '' }
+        headers: { 'X-Leanna-Token': localStorage.getItem('Leanna_api_token') || '' }
       });
       const data = await res.json();
       if (data.status === 'success') {
@@ -131,7 +131,7 @@ export function McpPanel() {
   const fetchMetrics = useCallback(async () => {
     try {
       const res = await fetch(`${apiBase}/metrics`, {
-        headers: { 'X-Jarvis-Token': localStorage.getItem('jarvis_api_token') || '' }
+        headers: { 'X-Leanna-Token': localStorage.getItem('Leanna_api_token') || '' }
       });
       const data = await res.json();
       if (data.status === 'success') {
@@ -164,7 +164,7 @@ export function McpPanel() {
   const handleToggle = async (id: string, currentlyDisabled: boolean) => {
     await fetch(`${apiBase}/servers/${id}/toggle`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Jarvis-Token': localStorage.getItem('jarvis_api_token') || '' },
+      headers: { 'Content-Type': 'application/json', 'X-Leanna-Token': localStorage.getItem('Leanna_api_token') || '' },
       body: JSON.stringify({ enabled: currentlyDisabled }),
     });
     fetchServers();
@@ -173,7 +173,7 @@ export function McpPanel() {
   const handleReconnect = async (id: string) => {
     await fetch(`${apiBase}/servers/${id}/reconnect`, {
       method: 'POST',
-      headers: { 'X-Jarvis-Token': localStorage.getItem('jarvis_api_token') || '' },
+      headers: { 'X-Leanna-Token': localStorage.getItem('Leanna_api_token') || '' },
     });
     fetchServers();
   };
@@ -182,7 +182,7 @@ export function McpPanel() {
     if (!confirm(`Supprimer le serveur MCP "${id}" ?`)) return;
     await fetch(`${apiBase}/servers/${id}`, {
       method: 'DELETE',
-      headers: { 'X-Jarvis-Token': localStorage.getItem('jarvis_api_token') || '' },
+      headers: { 'X-Leanna-Token': localStorage.getItem('Leanna_api_token') || '' },
     });
     fetchServers();
   };
@@ -230,7 +230,7 @@ export function McpPanel() {
 
       const res = await fetch(`${apiBase}/servers`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Jarvis-Token': localStorage.getItem('jarvis_api_token') || '' },
+        headers: { 'Content-Type': 'application/json', 'X-Leanna-Token': localStorage.getItem('Leanna_api_token') || '' },
         body: JSON.stringify(body),
       });
       const data = await res.json();
@@ -328,7 +328,7 @@ export function McpPanel() {
       try {
         const res = await fetch(`${apiBase}/servers`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Jarvis-Token': localStorage.getItem('jarvis_api_token') || '' },
+          headers: { 'Content-Type': 'application/json', 'X-Leanna-Token': localStorage.getItem('Leanna_api_token') || '' },
           body: JSON.stringify(body),
         });
         const data = await res.json();

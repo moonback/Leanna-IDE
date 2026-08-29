@@ -2,7 +2,7 @@
  * MCP Server Configuration Management
  * 
  * Gère la configuration persistante des serveurs MCP (Model Context Protocol).
- * Les configurations sont stockées dans .jarvis/mcp.json à la racine du workspace.
+ * Les configurations sont stockées dans .Leanna/mcp.json à la racine du workspace.
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -50,12 +50,12 @@ export interface McpConfigFile {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function getConfigPath(): string {
-  const configRoot = process.env.JARVIS_CONFIG_PATH || process.env.ELECTRON_APP_PATH || SELF_ROOT;
-  return path.join(configRoot, '.jarvis', 'mcp.json');
+  const configRoot = process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || SELF_ROOT;
+  return path.join(configRoot, '.Leanna', 'mcp.json');
 }
 
 /**
- * Charge la configuration MCP depuis le fichier .jarvis/mcp.json
+ * Charge la configuration MCP depuis le fichier .Leanna/mcp.json
  */
 export function loadMcpConfig(): McpConfigFile {
   const configPath = getConfigPath();
@@ -87,13 +87,13 @@ export function loadMcpConfig(): McpConfigFile {
 }
 
 /**
- * Sauvegarde la configuration MCP dans .jarvis/mcp.json
+ * Sauvegarde la configuration MCP dans .Leanna/mcp.json
  */
 export function saveMcpConfig(config: McpConfigFile): void {
   const configPath = getConfigPath();
   const dir = path.dirname(configPath);
   
-  // Créer le dossier .jarvis si nécessaire
+  // Créer le dossier .Leanna si nécessaire
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }

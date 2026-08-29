@@ -55,7 +55,7 @@ async function validateToken(key: string, value: string): Promise<boolean> {
         return r.ok;
       }
       case 'GITHUB_TOKEN': {
-        const r = await fetch('https://api.github.com/user', { headers: { Authorization: `Bearer ${value}`, 'User-Agent': 'Jarvis-OS' }, signal: controller.signal });
+        const r = await fetch('https://api.github.com/user', { headers: { Authorization: `Bearer ${value}`, 'User-Agent': 'Leanna' }, signal: controller.signal });
         return r.ok;
       }
       default:

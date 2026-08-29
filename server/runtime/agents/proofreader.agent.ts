@@ -17,7 +17,7 @@ export const proofreaderAgent = defineAgent({
   ],
   maxConcurrency: 2,
   timeoutMs: 45_000,
-  systemPrompt: `Tu es l'Agent Correcteur de Jarvis-OS.
+  systemPrompt: `Tu es l'Agent Correcteur de Leanna.
 
 MISSION :
 1. Corriger toute erreur d'orthographe et de grammaire.

@@ -70,7 +70,7 @@ export function setupGracefulShutdown(deps: GracefulShutdownDeps): GracefulShutd
   process.once('beforeExit', () => void gracefulShutdown('beforeExit'));
 
   // Exposer le shutdown sur le process pour que electron/main.cjs puisse l'appeler
-  (process as any).__jarvisShutdown = gracefulShutdown;
+  (process as any).__LeannaShutdown = gracefulShutdown;
 
   return gracefulShutdown;
 }

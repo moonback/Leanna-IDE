@@ -13,8 +13,8 @@ export interface HtmlExportOptions {
  */
 export function exportToStandaloneHtml(markdown: string, options: HtmlExportOptions = {}): string {
   const {
-    title = 'Document Jarvis-OS',
-    author = 'Jarvis-OS',
+    title = 'Document Leanna',
+    author = 'Leanna',
     theme = 'modern',
     includeToc = true,
     headerDate = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' }),
@@ -205,7 +205,7 @@ export function exportToStandaloneHtml(markdown: string, options: HtmlExportOpti
   </main>
 
   <footer>
-    Document généré automatiquement par Jarvis-OS — ${escapeHtml(headerDate)}
+    Document généré automatiquement par Leanna — ${escapeHtml(headerDate)}
   </footer>
 </body>
 </html>`;

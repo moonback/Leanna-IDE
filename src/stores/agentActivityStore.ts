@@ -164,9 +164,9 @@ function cleanup() {
 export function initActivityStore() {
   if (initialized) return;
   initialized = true;
-  window.addEventListener('jarvis-tool-start', handleToolStart);
-  window.addEventListener('jarvis-tool-done', handleToolDone);
-  window.addEventListener('jarvis-agent-event', handleAgentEvent);
+  window.addEventListener('Leanna-tool-start', handleToolStart);
+  window.addEventListener('Leanna-tool-done', handleToolDone);
+  window.addEventListener('Leanna-agent-event', handleAgentEvent);
   // Cleanup every 3s
   setInterval(cleanup, 3000);
 }

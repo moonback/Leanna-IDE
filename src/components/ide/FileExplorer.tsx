@@ -161,11 +161,11 @@ const FileExplorer = memo(function FileExplorer({
       debounceTimer = setTimeout(() => checkSandbox(true), 150);
     };
 
-    window.addEventListener('jarvis-sandbox-changed', handleChange);
+    window.addEventListener('Leanna-sandbox-changed', handleChange);
     return () => {
       mounted = false;
       if (debounceTimer) clearTimeout(debounceTimer);
-      window.removeEventListener('jarvis-sandbox-changed', handleChange);
+      window.removeEventListener('Leanna-sandbox-changed', handleChange);
     };
   }, []);
 

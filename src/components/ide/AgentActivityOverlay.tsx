@@ -131,11 +131,11 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions }: AgentActi
       });
     };
 
-    window.addEventListener('jarvis-agent-event', handler);
-    window.addEventListener('jarvis-mission-event', missionHandler);
+    window.addEventListener('Leanna-agent-event', handler);
+    window.addEventListener('Leanna-mission-event', missionHandler);
     return () => {
-      window.removeEventListener('jarvis-agent-event', handler);
-      window.removeEventListener('jarvis-mission-event', missionHandler);
+      window.removeEventListener('Leanna-agent-event', handler);
+      window.removeEventListener('Leanna-mission-event', missionHandler);
     };
   }, []);
 

@@ -144,8 +144,8 @@ export function MultiAgentIndicator({ steps }: MultiAgentIndicatorProps) {
       }
     };
 
-    window.addEventListener('jarvis-agent-event', handler);
-    return () => window.removeEventListener('jarvis-agent-event', handler);
+    window.addEventListener('Leanna-agent-event', handler);
+    return () => window.removeEventListener('Leanna-agent-event', handler);
   }, []);
 
   // ── Listen for mission events ────────────────────────────────────────────
@@ -171,8 +171,8 @@ export function MultiAgentIndicator({ steps }: MultiAgentIndicatorProps) {
       }
     };
 
-    window.addEventListener('jarvis-mission-event', handler);
-    return () => window.removeEventListener('jarvis-mission-event', handler);
+    window.addEventListener('Leanna-mission-event', handler);
+    return () => window.removeEventListener('Leanna-mission-event', handler);
   }, []);
 
   // ── Compute visible badges ───────────────────────────────────────────────

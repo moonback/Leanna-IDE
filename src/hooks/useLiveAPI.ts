@@ -119,84 +119,84 @@ export function useLiveAPI() {
     }
     if (msg.type === 'ide-action' && msg.action) {
       const a = msg.action;
-      window.dispatchEvent(new CustomEvent('jarvis-ide-action', { detail: a }));
+      window.dispatchEvent(new CustomEvent('Leanna-ide-action', { detail: a }));
       switch (a.type) {
         case 'browser-scroll':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-scroll', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-scroll', { detail: a }));
           break;
         case 'browser-back':
         case 'browser-forward':
         case 'browser-reload':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-control', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-control', { detail: a }));
           break;
         case 'browser-read-request':
           if (a.requestId) {
-            window.dispatchEvent(new CustomEvent('jarvis-browser-read-request', {
+            window.dispatchEvent(new CustomEvent('Leanna-browser-read-request', {
               detail: { requestId: a.requestId, selector: a.selector ?? null },
             }));
           }
           break;
         case 'browser-click':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-click', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-click', { detail: a }));
           break;
         case 'browser-type':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-type', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-type', { detail: a }));
           break;
         case 'browser-snapshot':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-snapshot', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-snapshot', { detail: a }));
           break;
         case 'browser-inspect':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-inspect', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-inspect', { detail: a }));
           break;
         case 'browser-get-links':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-get-links', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-get-links', { detail: a }));
           break;
         case 'browser-mouse-move':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-mouse-move', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-mouse-move', { detail: a }));
           break;
         // Sprint 1 — J1 : Accessibilité
         case 'browser-accessibility-snapshot':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-accessibility-snapshot', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-accessibility-snapshot', { detail: a }));
           break;
         case 'browser-click-by-role':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-click-by-role', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-click-by-role', { detail: a }));
           break;
         case 'browser-type-by-label':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-type-by-label', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-type-by-label', { detail: a }));
           break;
         // Sprint 1 — J2 : Robustesse
         case 'browser-wait-for':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-wait-for', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-wait-for', { detail: a }));
           break;
         // Sprint 1 — J3 : Actions primitives
         case 'browser-get-element-text':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-get-element-text', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-get-element-text', { detail: a }));
           break;
         case 'browser-get-element-attribute':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-get-element-attribute', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-get-element-attribute', { detail: a }));
           break;
         case 'browser-fill-form':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-fill-form', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-fill-form', { detail: a }));
           break;
         case 'browser-select-option':
-          window.dispatchEvent(new CustomEvent('jarvis-browser-select-option', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-browser-select-option', { detail: a }));
           break;
         case 'open-rich-document':
-          window.dispatchEvent(new CustomEvent('jarvis-open-rich-document', { detail: a }));
+          window.dispatchEvent(new CustomEvent('Leanna-open-rich-document', { detail: a }));
           break;
       }
     }
     if (msg.type === 'save-rich-document-result') {
-      window.dispatchEvent(new CustomEvent('jarvis-save-rich-document-result', { detail: msg }));
+      window.dispatchEvent(new CustomEvent('Leanna-save-rich-document-result', { detail: msg }));
     }
     if (msg.type === 'browser-read-request' && msg.requestId) {
-      window.dispatchEvent(new CustomEvent('jarvis-browser-read-request', {
+      window.dispatchEvent(new CustomEvent('Leanna-browser-read-request', {
         detail: { requestId: msg.requestId, selector: msg.selector ?? null },
       }));
     }
     // ── Confirmation interactive (fichiers critiques) ──────────────────
     if (msg.type === 'confirm-critical-edit' && msg.requestId) {
-      window.dispatchEvent(new CustomEvent('jarvis-confirm-critical-edit', { detail: msg }));
+      window.dispatchEvent(new CustomEvent('Leanna-confirm-critical-edit', { detail: msg }));
     }
     if (msg.tool_start) {
       // Auto-open IDE when a codebase tool is used
@@ -205,17 +205,17 @@ export function useLiveAPI() {
         'create_project_directory', 'rename_project_file', 'delete_project_file', 'delete_project_folder',
         'analyze_project_file', 'get_workspace_info', 'generate_codebase_markdown'];
       if (IDE_TOOLS.includes(msg.tool_start)) {
-        window.dispatchEvent(new CustomEvent('jarvis-ide-action', { detail: { type: 'open-ide' } }));
+        window.dispatchEvent(new CustomEvent('Leanna-ide-action', { detail: { type: 'open-ide' } }));
       }
       startActivity(msg.tool_start, msg.args);
       // Dispatch for AgentPanel real-time tool tracking
-      window.dispatchEvent(new CustomEvent('jarvis-tool-start', { detail: { tool: msg.tool_start, args: msg.args } }));
+      window.dispatchEvent(new CustomEvent('Leanna-tool-start', { detail: { tool: msg.tool_start, args: msg.args } }));
     }
     if (msg.tool_used) {
       addLog(`${msg.tool_used} — ${msg.info}`, 'action');
       completeActivity(msg.tool_used);
       // Dispatch for AgentPanel real-time tool tracking
-      window.dispatchEvent(new CustomEvent('jarvis-tool-done', { detail: { tool: msg.tool_used, info: msg.info } }));
+      window.dispatchEvent(new CustomEvent('Leanna-tool-done', { detail: { tool: msg.tool_used, info: msg.info } }));
     }
     if (msg.error) {
       addLog(msg.error, 'error');
@@ -238,10 +238,10 @@ export function useLiveAPI() {
       addLog(`${emoji} Agent ${msg.agentName}: ${msg.detail || msg.title}${duration}`,
         msg.event === 'task_failed' ? 'error' : 'action');
       // Dispatch pour composants qui écoutent les événements agents
-      window.dispatchEvent(new CustomEvent('jarvis-agent-event', { detail: msg }));
+      window.dispatchEvent(new CustomEvent('Leanna-agent-event', { detail: msg }));
     }
     if (msg.type === 'build-status') {
-      window.dispatchEvent(new CustomEvent('jarvis-build-status', { detail: msg }));
+      window.dispatchEvent(new CustomEvent('Leanna-build-status', { detail: msg }));
     }
     if (msg.type === 'mission_event') {
       const emoji = msg.event === 'mission_started' ? '🎯'
@@ -253,7 +253,7 @@ export function useLiveAPI() {
       addLog(`${emoji} Mission: ${msg.title || msg.goalTitle || msg.skill || msg.event}`,
         msg.event.includes('fail') || msg.event.includes('escalat') ? 'error' : 'action');
       // Dispatch pour composants qui écoutent les événements missions
-      window.dispatchEvent(new CustomEvent('jarvis-mission-event', { detail: msg }));
+      window.dispatchEvent(new CustomEvent('Leanna-mission-event', { detail: msg }));
     }
     if (msg.text) {
       addTranscript('assistant', msg.text);
@@ -280,7 +280,7 @@ export function useLiveAPI() {
 
       // Remplacer le transcript par le résumé + indication de redémarrage
       if (summary) {
-        window.dispatchEvent(new CustomEvent('jarvis-summarize-context', {
+        window.dispatchEvent(new CustomEvent('Leanna-summarize-context', {
           detail: {
             summary: `[Redémarrage automatique — ${messagesSummarized} messages de la conversation précédente résumés]\n\n${summary}`,
             summarizedTurns: messagesSummarized,
@@ -367,7 +367,7 @@ export function useLiveAPI() {
       const { summary, retainedTurns, summarizedTurns, method, tokensSaved } = data;
 
       // Dispatch pour useTranscript: remplacer le transcript par résumé + tours conservés
-      window.dispatchEvent(new CustomEvent('jarvis-summarize-context', {
+      window.dispatchEvent(new CustomEvent('Leanna-summarize-context', {
         detail: {
           summary,
           summarizedTurns,

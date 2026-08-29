@@ -48,7 +48,7 @@ export function handleSandboxWatchUpgrade(
     }
   });
 
-  const token = cookies['jarvis_token'] || url.searchParams.get('token');
+  const token = cookies['Leanna_token'] || url.searchParams.get('token');
   const authResult = authenticateToken(token, apiToken);
   if (!authResult.ok) {
     socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');

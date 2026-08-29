@@ -8,13 +8,13 @@ coverage/
 !.env.example
 .gemini-keys.json
 release/
-.jarvis/
+.Leanna/
 .kiro/
 .vscode/
-.jarvis-audit.log
-.jarvis-profile.json
+.Leanna-audit.log
+.Leanna-profile.json
 # task.md
-jarvis-prompt.md 
+Leanna-prompt.md 
 
 # Fichiers de persistance Knowledge System (générés automatiquement au démarrage)
 # Ne jamais commiter ces fichiers — ils sont recréés par l'indexeur

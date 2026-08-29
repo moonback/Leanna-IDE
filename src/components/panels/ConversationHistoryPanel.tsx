@@ -286,7 +286,7 @@ export const ConversationHistoryPanel = React.memo(function ConversationHistoryP
               <div className={`flex flex-col gap-0.5 max-w-[80%] ${isAssistant ? 'items-start' : 'items-end'}`}>
                 {!isConsecutive && (
                   <span className="text-xs font-semibold uppercase tracking-wider px-0.5 mb-0.5" style={{ color: 'var(--text-dimmed)' }}>
-                    {isAssistant ? 'Jarvis' : 'Vous'}
+                    {isAssistant ? 'Leanna' : 'Vous'}
                   </span>
                 )}
                 <div

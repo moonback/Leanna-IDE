@@ -1,4 +1,4 @@
-# JARVIS-OS Design System Migration Progress
+# Leanna Design System Migration Progress
 
 **Dernière mise à jour:** 28 août 2026  
 **Statut:** Complété à 95%+ (Toutes les phases terminées)  
