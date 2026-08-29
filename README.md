@@ -1,7 +1,5 @@
 
-<p align="center">
-  <img src="assets/images/header.png" alt="Leanna OS" width="100%" />
-</p>
+
 
 <h1 align="center">Leanna OS</h1>
 
@@ -17,7 +15,9 @@
   <img src="https://img.shields.io/badge/AI-Gemini%202.x-orange" alt="Gemini" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
-
+<p align="center">
+  <img src="assets/images/header.png" alt="Leanna OS" width="100%" />
+</p>
 ---
 
 ## 📌 Table des matières
