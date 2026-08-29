@@ -15,9 +15,9 @@
   <img src="https://img.shields.io/badge/AI-Gemini%202.x-orange" alt="Gemini" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
-<p align="center">
+<!-- <p align="center">
   <img src="assets/images/header.png" alt="Leanna " width="100%" />
-</p>
+</p> -->
 
 
 ## 📌 Table des matières
