@@ -104,7 +104,15 @@
   --bg-sidebar:    rgba(10, 22, 40, 0.98);
   --bg-input:      rgba(0, 194, 255, 0.10);
   --bg-elevated:   #0e2a47;
-
+/* Dans la section :root[data-theme="dark"] */
+  /* Contrôles */
+  --ctrl-icon:       #6a8aaa;
+  --ctrl-icon-hover: #f0f4ff;
+  --ctrl-hover:      rgba(0, 194, 255, 0.08);
+  --btn-active-bg:   rgba(0, 194, 255, 0.18);
+  --btn-active-text: #00c2ff;
+  --scroll-thumb: rgba(0, 194, 255, 0.3);
+  --scroll-thumb-hover: rgba(0, 194, 255, 0.5);
   /* Bordures – cyan et orange */
   --border-base:   rgba(0, 194, 255, 0.30);
   --border-strong: rgba(255, 140, 0, 0.60);
