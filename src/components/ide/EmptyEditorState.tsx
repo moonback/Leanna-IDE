@@ -1,12 +1,10 @@
 import React, {
-  useState, useEffect, useMemo, useRef, useCallback,
+  useState, useEffect, useMemo, useCallback,
 } from 'react';
 import {
-  Plus, X, FolderOpen, FileText,
-  MessageSquare, FolderPlus,
-  Code2, GitBranch, BrainCircuit,
-  Search, ChevronRight, Trash2,
-  Command, BookOpen, Sparkles, Zap,
+  Plus, FolderOpen, FileText,
+  MessageSquare, Search, ChevronRight,
+  Trash2, BookOpen,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState';
@@ -33,20 +31,133 @@ interface GitInfo {
   summary: string;
 }
 
-// ─── Utilitaires ─────────────────────────────────────────────────────────
+// ─── Constantes ──────────────────────────────────────────────────────────
 
 const MOD = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
   ? '⌘'
   : 'Ctrl';
 
-// Spring de base (critically damped — pas de rebond) pour toute animation
-// d'apparition non pilotée par un geste. Voir §4 apple-design.
+const MAX_RECENT_FILES = 5;
 const ENTRANCE_SPRING = { type: 'spring' as const, bounce: 0, duration: 0.4 };
 
-// ─── Feedback interactif partagé (press + focus-visible) ─────────────────
-// Centralise les états :hover / :active / :focus-visible en CSS plutôt que
-// de dupliquer la logique dans des handlers onMouseEnter/onMouseLeave — une
-// seule source de vérité, et ça couvre aussi le clavier et le tactile.
+// ─── Validation des fichiers récents ────────────────────────────────────
+
+function isValidRecentFiles(data: unknown): data is RecentFile[] {
+  if (!Array.isArray(data)) return false;
+  return data.every(
+    (item) =>
+      typeof item === 'object' &&
+      item !== null &&
+      typeof (item as RecentFile).path === 'string' &&
+      typeof (item as RecentFile).language === 'string' &&
+      typeof (item as RecentFile).openedAt === 'number'
+  );
+}
+
+// ─── Sous‑composants (extraits et memoïsés) ────────────────────────────
+
+const Kbd = React.memo(function Kbd({
+  children,
+  tone = 'default',
+}: {
+  children: React.ReactNode;
+  tone?: 'default' | 'invert';
+}) {
+  if (tone === 'invert') {
+    return (
+      <span className="inline-flex items-center justify-center h-[19px] min-w-[19px] px-1.5 rounded text-xs font-mono font-semibold tracking-wide bg-white/15 text-white/85">
+        {children}
+      </span>
+    );
+  }
+  return (
+    <kbd
+      className="inline-flex items-center justify-center h-[19px] min-w-[19px] px-1.5 text-xs font-mono font-semibold tracking-wide"
+      style={{
+        color: 'var(--text-dimmed)',
+        backgroundColor: 'var(--bg-input)',
+        border: '1px solid var(--border-base)',
+        borderRadius: '4px',
+      }}
+    >
+      {children}
+    </kbd>
+  );
+});
+
+const ActionCard = React.memo(function ActionCard({
+  icon: Icon,
+  title,
+  description,
+  shortcut,
+  onClick,
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
+  title: string;
+  description: string;
+  shortcut?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="ai-interactive ai-card group relative flex items-start gap-3 p-4 text-left rounded-xl"
+      style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}
+      aria-describedby={`action-desc-${title.replace(/\s/g, '')}`}
+    >
+      <div
+        className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
+        style={{ backgroundColor: 'var(--accent-subtle)' }}
+      >
+        <Icon size={15} style={{ color: 'var(--accent-primary)' }} />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+          {title}
+        </div>
+        <div
+          id={`action-desc-${title.replace(/\s/g, '')}`}
+          className="text-sm mt-0.5 leading-snug"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          {description}
+        </div>
+      </div>
+
+      {shortcut && (
+        <div className="flex-shrink-0 mt-0.5">
+          <Kbd>{shortcut}</Kbd>
+        </div>
+      )}
+    </button>
+  );
+});
+
+const QuickLink = React.memo(function QuickLink({
+  label,
+  onClick,
+  shortcut,
+}: {
+  label: string;
+  onClick: () => void;
+  shortcut?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="ai-interactive ai-quicklink flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium"
+      style={{ color: 'var(--text-dimmed)' }}
+    >
+      {label}
+      {shortcut && <Kbd>{shortcut}</Kbd>}
+    </button>
+  );
+});
+
+// ─── Styles interactifs partagés ───────────────────────────────────────
 
 function InteractiveFeedbackStyles() {
   return (
@@ -57,7 +168,7 @@ function InteractiveFeedbackStyles() {
         outline: none;
       }
       .ai-interactive:active {
-        transform: scale(0.97);
+        transform: scale(0.985);
         transition-duration: 60ms;
       }
       .ai-interactive:focus-visible {
@@ -65,14 +176,14 @@ function InteractiveFeedbackStyles() {
         outline-offset: 2px;
       }
 
-      .ai-card:not(.ai-card-primary):hover {
+      .ai-card:hover {
         border-color: var(--border-strong);
         box-shadow: var(--shadow-sm);
       }
-      .ai-card-primary:hover {
-        filter: brightness(1.08);
+      .ai-hero:hover {
+        filter: brightness(1.06);
       }
-      .ai-card-primary:active {
+      .ai-hero:active {
         filter: brightness(1.02);
       }
 
@@ -82,9 +193,6 @@ function InteractiveFeedbackStyles() {
       .ai-recent-row:hover .ai-recent-chevron,
       .ai-recent-row:hover .ai-recent-lang {
         opacity: 1;
-      }
-      .ai-recent-row:active {
-        transform: scale(0.99);
       }
 
       .ai-quicklink:hover {
@@ -98,49 +206,42 @@ function InteractiveFeedbackStyles() {
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .ai-interactive:active { transform: none; }
+        .ai-interactive:active,
         .ai-recent-row:active { transform: none; }
       }
     `}</style>
   );
 }
 
-// ─── Composant Kbd ──────────────────────────────────────────────────────
+// ─── Hook personnalisé pour les fichiers récents ───────────────────────
 
-function Kbd({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd
-      className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 text-xs font-mono font-semibold tracking-wide"
-      style={{
-        color: 'var(--text-dimmed)',
-        backgroundColor: 'var(--bg-input)',
-        border: '1px solid var(--border-base)',
-        borderRadius: '4px',
-      }}
-    >
-      {children}
-    </kbd>
-  );
-}
-
-// ─── Hooks personnalisés ────────────────────────────────────────────────
-
-function useRecentFiles(): [RecentFile[], (files: RecentFile[]) => void, () => void] {
+function useRecentFiles(): [
+  RecentFile[],
+  (files: RecentFile[]) => void,
+  () => void,
+  (path: string) => void
+] {
   const [files, setFiles] = useState<RecentFile[]>([]);
 
+  // Chargement initial
   useEffect(() => {
     try {
       const stored = localStorage.getItem('jarvis_recent_files');
       if (stored) {
-        const parsed = JSON.parse(stored) as RecentFile[];
-        setFiles(parsed.slice(0, 5));
+        const parsed = JSON.parse(stored);
+        if (isValidRecentFiles(parsed)) {
+          setFiles(parsed.slice(0, MAX_RECENT_FILES));
+        }
       }
-    } catch { /* ignore */ }
+    } catch {
+      // Données invalides, on ignore
+    }
   }, []);
 
   const updateFiles = useCallback((newFiles: RecentFile[]) => {
-    setFiles(newFiles.slice(0, 5));
-    localStorage.setItem('jarvis_recent_files', JSON.stringify(newFiles));
+    const sliced = newFiles.slice(0, MAX_RECENT_FILES);
+    setFiles(sliced);
+    localStorage.setItem('jarvis_recent_files', JSON.stringify(sliced));
   }, []);
 
   const clearFiles = useCallback(() => {
@@ -148,11 +249,48 @@ function useRecentFiles(): [RecentFile[], (files: RecentFile[]) => void, () => v
     localStorage.removeItem('jarvis_recent_files');
   }, []);
 
-  return [files, updateFiles, clearFiles];
+  const removeFile = useCallback((path: string) => {
+    setFiles((prev) => {
+      const updated = prev.filter((f) => f.path !== path);
+      localStorage.setItem('jarvis_recent_files', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  return [files, updateFiles, clearFiles, removeFile];
 }
 
 function useGitInfo() {
-  return null;
+  return null; // À remplacer par une vraie implémentation
+}
+
+// ─── Hook de piège de focus (pour les modales) ─────────────────────────
+
+function useFocusTrap(isActive: boolean) {
+  useEffect(() => {
+    if (!isActive) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        const focusable = document.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const first = focusable[0] as HTMLElement;
+        const last = focusable[focusable.length - 1] as HTMLElement;
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isActive]);
 }
 
 // ─── Composant principal ────────────────────────────────────────────────
@@ -180,14 +318,19 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const { connected, isBusy, connect } = useLiveAPIContext();
   const { profile } = useProfile();
   const { theme } = useTheme();
-  const disconnectedBg = theme === 'dark' ? disconnectedBgDark : disconnectedBgLight;
   const prefersReducedMotion = useReducedMotion();
 
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSystem, setShowSystem] = useState(false);
+  const [loadingFile, setLoadingFile] = useState<string | null>(null);
 
-  const [recentFiles, setRecentFiles, clearRecentFiles] = useRecentFiles();
+  const [recentFiles, setRecentFiles, clearRecentFiles, removeRecentFile] = useRecentFiles();
   const gitInfo = useGitInfo();
+
+  // Piège de focus pour les modales
+  useFocusTrap(showShortcuts || showSystem);
+
+  const aiName = profile.aiName || 'Leanna';
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -197,10 +340,15 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     return 'Bonsoir';
   }, []);
 
-  // Transition d'entrée : spring critically-damped, ou simple fondu si
-  // l'utilisateur a demandé une motion réduite (§14 apple-design).
+  // Fond selon le thème (memoïsation)
+  const disconnectedBg = useMemo(
+    () => (theme === 'dark' ? disconnectedBgDark : disconnectedBgLight),
+    [theme]
+  );
+
+  // Props d’entrée avec spring ou fondu selon la motion réduite
   const makeEntranceProps = useCallback(
-    (delay = 0) => (
+    (delay = 0) =>
       prefersReducedMotion
         ? {
             initial: { opacity: 0 },
@@ -208,28 +356,36 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             transition: { duration: 0.15, delay },
           }
         : {
-            initial: { opacity: 0, y: 12 },
+            initial: { opacity: 0, y: 10 },
             animate: { opacity: 1, y: 0 },
             transition: { ...ENTRANCE_SPRING, delay },
-          }
-    ),
+          },
     [prefersReducedMotion]
   );
 
-  // Keyboard shortcuts
+  // Raccourcis clavier (stabilisés)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
-      if (e.key.toLowerCase() === 'n') { e.preventDefault(); onCreateFile(); }
-      if (e.key === ',') { e.preventDefault(); onShowSettings(); }
+      if (e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        onCreateFile();
+      }
+      if (e.key === ',') {
+        e.preventDefault();
+        onShowSettings();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onCreateFile, onShowSettings]);
 
+  // Ouverture d’un fichier récent avec gestion d’erreur et chargement
   const handleOpenRecent = useCallback(
     async (filePath: string) => {
+      if (loadingFile) return; // Évite les doubles clics
+      setLoadingFile(filePath);
       try {
         const token = localStorage.getItem('jarvis_api_token');
         const headers: Record<string, string> = token ? { 'x-jarvis-token': token } : {};
@@ -238,16 +394,23 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
           { headers }
         );
         if (!response.ok) {
-          const updated = recentFiles.filter((f) => f.path !== filePath);
-          setRecentFiles(updated);
+          // Fichier introuvable ou erreur, on le retire de la liste
+          removeRecentFile(filePath);
+          // On pourrait notifier l’utilisateur ici
+          console.warn(`Fichier ${filePath} introuvable (${response.status})`);
           return;
         }
         onOpenFile(filePath);
-      } catch {
+      } catch (error) {
+        // Erreur réseau, on garde le fichier mais on affiche une notification
+        console.error('Erreur lors de l’ouverture du fichier :', error);
+        // On peut aussi tenter l’ouverture locale
         onOpenFile(filePath);
+      } finally {
+        setLoadingFile(null);
       }
     },
-    [recentFiles, setRecentFiles, onOpenFile]
+    [loadingFile, removeRecentFile, onOpenFile]
   );
 
   const handleConnect = useCallback(() => {
@@ -276,48 +439,68 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: theme === 'dark'
-            ? 'radial-gradient(ellipse 100% 100% at 20% 0%, transparent 0%, var(--bg-base) 100%)'
-            : 'radial-gradient(ellipse 100% 100% at 20% 0%, transparent 0%, var(--bg-base) 100%)',
+          background: 'radial-gradient(ellipse 100% 100% at 20% 0%, transparent 0%, var(--bg-base) 100%)',
         }}
       />
 
       {/* ── Contenu ── */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-[940px]">
-
-          {/* ── Header : Salutation ── */}
-          <motion.div className="mb-10" {...makeEntranceProps(0)}>
+          {/* ── Header : Salutation + statut ── */}
+          <motion.div className="mb-9 flex items-center justify-between gap-4" {...makeEntranceProps(0)}>
             <h1
-              className="text-xl sm:text-3xl font-semibold tracking-[-0.025em] leading-tight"
+              className="text-2xl sm:text-[28px] font-semibold tracking-[-0.025em] leading-tight"
               style={{ color: 'var(--text-primary)' }}
             >
               {profile.userName ? `${greeting}, ${profile.userName}` : greeting}
             </h1>
-            <p className="mt-2 text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              {connected
-                ? <><span style={{ color: 'var(--color-success)' }}>●</span> {profile.aiName || 'Leanna'} est connectée et prête.</>
-                : <><span style={{ color: 'var(--text-dimmed)' }}>○</span> {profile.aiName || 'Leanna'} est en attente de connexion.</>
-              }
-            </p>
+
+            <span
+              className="hidden sm:inline-flex items-center gap-2 flex-shrink-0 rounded-full pl-2 pr-3 py-1 text-xs font-medium"
+              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-secondary)' }}
+              aria-live="polite"
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: connected ? 'var(--color-success)' : 'var(--text-dimmed)' }}
+              />
+              {aiName} {connected ? 'connectée' : isBusy ? 'en cours de connexion' : 'en attente'}
+            </span>
           </motion.div>
 
-          {/* ── Actions principales — grille 2×2 ── */}
-          <motion.div
-            className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-10"
-            {...makeEntranceProps(0.08)}
+          {/* ── CTA principal : Chat IA ── */}
+          <motion.button
+            type="button"
+            onClick={handleConnect}
+            className="ai-interactive ai-hero group w-full flex items-center gap-4 p-5 mb-3 text-left rounded-2xl"
+            style={{ backgroundColor: 'var(--accent-primary)', border: 'none' }}
+            {...makeEntranceProps(0.06)}
+            aria-label={connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`}
           >
-            {/* Chat IA */}
-            <ActionCard
-              icon={MessageSquare}
-              title={connected ? 'Ouvrir le chat' : 'Connecter ' +  (profile.aiName || 'l\'agent')}
-              description={connected ? 'Session vocale et texte' : 'Démarrer une session avec ' + (profile.aiName || 'l\'agent')}
-              shortcut={`${MOD}+L`}
-              onClick={handleConnect}
-              // primary
-            />
+            <div
+              className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ backgroundColor: 'rgba(255,255,255,0.16)' }}
+            >
+              <MessageSquare size={19} style={{ color: '#fff' }} />
+            </div>
 
-            {/* Nouveau fichier */}
+            <div className="flex-1 min-w-0">
+              <div className="text-[15px] font-semibold leading-tight" style={{ color: '#fff' }}>
+                {connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`}
+              </div>
+              <div className="text-sm mt-0.5 leading-snug" style={{ color: 'rgba(255,255,255,0.72)' }}>
+                {connected ? 'Session vocale et texte en cours' : 'Session vocale et texte, prête en un instant'}
+              </div>
+            </div>
+
+            <Kbd tone="invert">{MOD}+L</Kbd>
+          </motion.button>
+
+          {/* ── Actions secondaires ── */}
+          <motion.div
+            className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-10"
+            {...makeEntranceProps(0.11)}
+          >
             <ActionCard
               icon={Plus}
               title="Nouveau fichier"
@@ -325,8 +508,6 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               shortcut={`${MOD}+N`}
               onClick={onCreateFile}
             />
-
-            {/* Recherche */}
             <ActionCard
               icon={Search}
               title="Rechercher"
@@ -334,8 +515,6 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               shortcut={`${MOD}+P`}
               onClick={onOpenSearch}
             />
-
-            {/* Notebooks */}
             <ActionCard
               icon={BookOpen}
               title="Notebooks"
@@ -346,7 +525,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
           {/* ── Fichiers récents ── */}
           {recentFiles.length > 0 && (
-            <motion.div {...makeEntranceProps(0.16)}>
+            <motion.div {...makeEntranceProps(0.17)}>
               <div className="flex items-center justify-between mb-3">
                 <h2
                   className="text-xs font-semibold uppercase tracking-[0.08em]"
@@ -358,8 +537,9 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                   onClick={clearRecentFiles}
                   className="ai-interactive ai-clear-btn flex items-center gap-1 text-sm px-2 py-1 rounded-md"
                   style={{ color: 'var(--text-dimmed)' }}
+                  aria-label="Effacer la liste des fichiers récents"
                 >
-                  <Trash2 size={9} />
+                  <Trash2 size={12} />
                   Effacer
                 </button>
               </div>
@@ -367,18 +547,24 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               <div
                 className="rounded-xl overflow-hidden"
                 style={{ border: '1px solid var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
+                role="list"
               >
                 {recentFiles.map(({ path, language }, index) => {
                   const fileName = path.split(/[/\\]/).pop() || path;
                   const dirPath = path.split(/[/\\]/).slice(-3, -1).join('/');
+                  const isDisabled = loadingFile === path;
                   return (
                     <button
                       key={path}
                       onClick={() => handleOpenRecent(path)}
+                      disabled={isDisabled}
                       className="ai-interactive ai-recent-row w-full flex items-center gap-3 px-4 py-2.5 text-left group"
                       style={{
                         borderTop: index > 0 ? '1px solid var(--border-base)' : undefined,
+                        opacity: isDisabled ? 0.6 : 1,
                       }}
+                      role="listitem"
+                      aria-label={`Ouvrir ${fileName} (${path})`}
                     >
                       <FileText size={13} style={{ color: 'var(--text-dimmed)' }} className="flex-shrink-0" />
                       <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
@@ -412,21 +598,22 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
           {/* ── Barre d'info bas ── */}
           <motion.div
-            className="flex items-center justify-between mt-10 pt-6"
+            className="flex items-center justify-between mt-11 pt-5"
             style={{ borderTop: '1px solid var(--border-base)' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: prefersReducedMotion ? 0.15 : 0.4 }}
           >
             {/* Workspace info */}
-            <div className="flex items-center gap-3 text-sm font-mono" style={{ color: 'var(--text-dimmed)' }}>
-              {ws.workspace && (
-                <span className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 text-sm font-mono" style={{ color: 'var(--text-dimmed)' }}>
+              {ws.workspace ? (
+                <>
                   <FolderOpen size={11} />
                   {ws.workspace.path.split(/[/\\]/).pop()}
-                </span>
+                </>
+              ) : (
+                <span>Aucun espace de travail ouvert</span>
               )}
-              
             </div>
 
             {/* Quick links */}
@@ -436,7 +623,6 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               <QuickLink label="Réglages" onClick={onShowSettings} shortcut={`${MOD}+,`} />
             </div>
           </motion.div>
-
         </div>
       </div>
 
@@ -456,83 +642,3 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     </div>
   );
 });
-
-// ─── ActionCard ─────────────────────────────────────────────────────────
-
-interface ActionCardProps {
-  icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
-  title: string;
-  description: string;
-  shortcut?: string;
-  onClick?: () => void;
-  primary?: boolean;
-}
-
-function ActionCard({ icon: Icon, title, description, shortcut, onClick, primary }: ActionCardProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`ai-interactive ai-card${primary ? ' ai-card-primary' : ''} group relative flex items-start gap-3.5 p-4 text-left rounded-xl`}
-      style={{
-        backgroundColor: primary ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-        border: primary ? 'none' : '1px solid var(--border-base)',
-      }}
-    >
-      <div
-        className="w-9 h-9 flex items-center justify-center rounded-lg flex-shrink-0"
-        style={{
-          backgroundColor: primary ? 'rgba(255,255,255,0.15)' : 'var(--accent-subtle)',
-        }}
-      >
-        <Icon
-          size={16}
-          style={{ color: primary ? 'whitefff' : 'var(--accent-primary)' }}
-        />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div
-          className="text-sm font-semibold leading-tight"
-          style={{ color: primary ? 'whitefff' : 'var(--text-primary)' }}
-        >
-          {title}
-        </div>
-        <div
-          className="text-sm mt-0.5 leading-snug"
-          style={{ color: primary ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }}
-        >
-          {description}
-        </div>
-      </div>
-
-      {shortcut && (
-        <div className="flex-shrink-0 mt-0.5">
-          {primary ? (
-            <span className="text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-white/15 text-white/80">
-              {shortcut}
-            </span>
-          ) : (
-            <Kbd>{shortcut}</Kbd>
-          )}
-        </div>
-      )}
-    </button>
-  );
-}
-
-// ─── QuickLink ──────────────────────────────────────────────────────────
-
-function QuickLink({ label, onClick, shortcut }: { label: string; onClick: () => void; shortcut?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="ai-interactive ai-quicklink flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium"
-      style={{ color: 'var(--text-dimmed)' }}
-    >
-      {label}
-      {shortcut && <Kbd>{shortcut}</Kbd>}
-    </button>
-  );
-}
