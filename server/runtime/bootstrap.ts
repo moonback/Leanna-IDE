@@ -70,6 +70,13 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   // 1. Créer le runtime
   const runtime = new AgentRuntime(config.runtime);
 
+  // 1.5. Configurer l'AgentOrchestrator pour utiliser le ToolRegistry du runtime (timeout corrigé)
+  // Import dynamique pour éviter la dépendance circulaire
+  const { agentOrchestrator } = await import("../agents/AgentOrchestrator");
+  agentOrchestrator.setSkillHandler((name: string, args: any) => 
+    runtime.tools.call(name, args)
+  );
+
   // 2. Créer le SkillManagerV2 qui partage le ToolRegistry du runtime
   const skillManager = new SkillManagerV2({
     eventBus: runtime.events,

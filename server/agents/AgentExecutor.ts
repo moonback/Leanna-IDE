@@ -86,6 +86,7 @@ const EXECUTABLE_AGENT_TOOLS = new Set([
   "knowledge_status",
   "knowledge_reindex",
   "reasoning_think",
+  "agent_execute",
 ]);
 
 export class AgentExecutor {
@@ -105,6 +106,52 @@ export class AgentExecutor {
   private static readonly MAX_DELEGATION_DEPTH = 4;
   
   /**
+   * Timeouts par outil (ms) - optimisé pour éviter les timeouts prématurés
+   * Les outils LLM et d'analyse nécessitent plus de temps
+   */
+  private static readonly TOOL_TIMEOUTS: Record<string, number> = {
+    // Outils de lecture rapide (10-15s)
+    'list_project_files': 15_000,
+    'read_project_file': 20_000,
+    'read_file_outline': 15_000,
+    
+    // Outils de recherche (30-45s)
+    'search_in_files': 45_000,
+    'knowledge_semantic_search': 45_000,
+    'knowledge_search_entities': 30_000,
+    'knowledge_memory_search': 30_000,
+    'knowledge_memory_add': 30_000,
+    
+    // Outils d'analyse complexe (60-90s)
+    'analyze_project_file': 90_000,
+    'knowledge_build_context': 90_000,
+    'knowledge_impact_analyze': 90_000,
+    'knowledge_graph_query': 60_000,
+    
+    // Outils de vérification (45-60s)
+    'verify_file': 60_000,
+    'verify_typecheck': 120_000,
+    'verify_lint': 120_000,
+    'verify_full': 180_000,
+    
+    // Outils d'écriture (30-60s)
+    'write_project_file': 60_000,
+    'apply_patch': 60_000,
+    'patch_project_file': 60_000,
+    'modify_project_file': 60_000,
+    'create_project_directory': 30_000,
+    'rename_project_file': 30_000,
+    'delete_project_file': 30_000,
+    
+    // Outils de raisonnement LLM (90-180s)
+    'reasoning_think': 180_000,
+    'agent_execute': 180_000,
+    
+    // Timeout par défaut pour les outils inconnus
+    'default': 120_000,
+  };
+  
+  /**
    * Map pour suivre les chaînes de délégation actives et détecter les cycles
    * Clé: parentTaskId, Valeur: Set des rôles déjà rencontrés dans cette chaîne
    */
@@ -113,6 +160,38 @@ export class AgentExecutor {
   constructor(notifier: ProgressNotifier) {
     this.notifier = notifier;
     this.fileWriter = new GeneratedFileWriter(null);
+  }
+
+  /**
+   * Appelle un outil avec un timeout spécifique basé sur le type d'outil.
+   * Gère automatiquement les timeouts et les erreurs.
+   */
+  private async callToolWithTimeout(
+    toolName: string,
+    args: Record<string, unknown>
+  ): Promise<any> {
+    const timeoutMs = AgentExecutor.TOOL_TIMEOUTS[toolName] ?? 
+                     AgentExecutor.TOOL_TIMEOUTS['default'];
+    
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Outil timeout après ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+
+    try {
+      const handler = this.skillHandler!;
+      const toolPromise = handler(toolName, args);
+      
+      // Course entre le tool et le timeout
+      return await Promise.race([toolPromise, timeoutPromise]);
+    } catch (error) {
+      // Si l'erreur vient du timeout, ajouter des infos contextuelles
+      if ((error as Error).message.includes('timeout')) {
+        throw new Error(`[${toolName}] ${(error as Error).message}`);
+      }
+      throw error;
+    }
   }
 
   setSkillHandler(handler: SkillHandler): void {
@@ -186,7 +265,7 @@ export class AgentExecutor {
 
       // ── Étape 3: Exécution directe par l'agent ──
       log.debug(`[${agent.name}] Exécution via agent_execute...`);
-      const thinkResult = await this.skillHandler("agent_execute", {
+      const thinkResult = await this.callToolWithTimeout("agent_execute", {
         prompt: executionPrompt,
       });
 
@@ -284,7 +363,7 @@ export class AgentExecutor {
       repairLoops: new Map(),
       blockedFiles: new Set(),
       workspace: new WorkspaceState(async (path) => {
-        const result = await this.skillHandler!("read_project_file", { path, full: true });
+        const result = await this.callToolWithTimeout("read_project_file", { path, full: true });
         if (result?.error || result?.status === "failed" || typeof result?.content !== "string") {
           throw new Error(this.formatToolFailure(result));
         }
@@ -364,7 +443,7 @@ export class AgentExecutor {
         "",
         synthesisInstruction,
       ].join("\n");
-      const followUp = await this.skillHandler!("agent_execute", {
+      const followUp = await this.callToolWithTimeout("agent_execute", {
         prompt: followUpPrompt,
       });
       state.resultText = this.resultParser.normalizeResult(followUp);
@@ -601,7 +680,7 @@ ${truncated}
     for (const filePath of [...new Set(paths)]) {
       state.touchedFiles.add(filePath);
       if (!await this.refreshFileSnapshot(filePath, state, "après la génération", true)) { errors.push({ path: filePath, error: "Relecture post-écriture impossible." }); continue; }
-      const verification = await this.skillHandler!("verify_file", { path: filePath });
+      const verification = await this.callToolWithTimeout("verify_file", { path: filePath });
       state.toolsExecuted.push("verify_file");
       const record = verification?.verificationRecord;
       if (this.isVerificationRecord(record)) state.workspace.recordVerification(filePath, record);
@@ -674,6 +753,55 @@ ${truncated}
       const isWriteCall = requestedPath && ["write_project_file", "apply_patch", "patch_project_file"].includes(call.name);
       const pathKey = requestedPath?.replace(/\\/g, "/").replace(/^\.\//, "");
 
+      // ── Validations préventives pour éviter les erreurs courantes ──────────────────
+      
+      // 1. Vérifier que search_in_files a un chemin valide
+      if (call.name === "search_in_files" && requestedPath) {
+        // Vérification simple : le chemin ne doit pas contenir de caractères problématiques
+        // et ne doit pas être visiblement invalide
+        const invalidPaths = ["node_modules", ".git", ".Leanna/sandbox/components", ".Leanna/sandbox/src"];
+        if (invalidPaths.some(p => requestedPath.includes(p))) {
+          state.observations.push(`- search_in_files: Le chemin "${requestedPath}" pointe vers un répertoire invalide ou inexistant. Essaye un chemin valide comme "server/" ou "src/".`);
+          log.warn(`[${agent.name}] search_in_files ignoré: chemin invalide "${requestedPath}"`);
+          continue;
+        }
+        
+        // Vérifier que le chemin n'est pas vide ou juste des espaces
+        if (!requestedPath.trim() || requestedPath === ".") {
+          // C'est OK, recherche à la racine
+        } else if (!/^[a-zA-Z0-9_\\\/\-\.]+$/.test(requestedPath.replace(/\\/g, "/"))) {
+          state.observations.push(`- search_in_files: Le chemin "${requestedPath}" contient des caractères invalides.`);
+          log.warn(`[${agent.name}] search_in_files ignoré: caractères invalides dans "${requestedPath}"`);
+          continue;
+        }
+      }
+      
+      // 2. Vérifier que read_file_outline pointe vers un fichier (pas un répertoire)
+      if (call.name === "read_file_outline" && requestedPath) {
+        // Un fichier doit avoir une extension
+        const fileExtensions = [".ts", ".tsx", ".js", ".jsx", ".json", ".md", ".css", ".scss", ".html", ".vue", ".py", ".rs", ".go", ".yaml", ".yml"];
+        const hasExtension = fileExtensions.some(ext => requestedPath.endsWith(ext));
+        
+        if (!hasExtension) {
+          // Cela ressemble à un répertoire
+          state.observations.push(`- read_file_outline: "${requestedPath}" semble être un répertoire. Utilise list_project_files pour lister son contenu, ou read_project_file pour lire un fichier spécifique.`);
+          log.warn(`[${agent.name}] read_file_outline ignoré: "${requestedPath}" semble être un répertoire (pas d'extension)`);
+          continue;
+        }
+      }
+      
+      // 3. Vérifier que modify_project_file a un chemin valide
+      if (call.name === "modify_project_file" && requestedPath) {
+        const fileExtensions = [".ts", ".tsx", ".js", ".jsx", ".json", ".md", ".css", ".scss", ".html", ".vue", ".py", ".rs", ".go", ".yaml", ".yml", ".txt", ".tsv", ".csv"];
+        const hasExtension = fileExtensions.some(ext => requestedPath.endsWith(ext));
+        
+        if (!hasExtension) {
+          state.observations.push(`- modify_project_file: "${requestedPath}" semble être un répertoire. Utilise un chemin de fichier valide avec une extension.`);
+          log.warn(`[${agent.name}] modify_project_file ignoré: "${requestedPath}" semble être un répertoire`);
+          continue;
+        }
+      }
+
       // Tous les patches d'une réponse sont produits à partir du même état. Après une
       // écriture, tout second patch du même fichier serait nécessairement obsolète.
       if (isWriteCall && pathKey && writePathsHandled.has(pathKey)) {
@@ -688,7 +816,7 @@ ${truncated}
 
       try {
         log.info(`[${agent.name}] Exécution outil structuré: ${call.name} args=${JSON.stringify(call.parameters).slice(0, 200)}`);
-        const result = await this.skillHandler!(call.name, call.parameters);
+        const result = await this.callToolWithTimeout(call.name, call.parameters);
         state.toolsExecuted.push(call.name);
         if (isWriteCall && requestedPath) state.touchedFiles.add(requestedPath);
         if (result?.error || result?.status === "failed") {
@@ -718,7 +846,7 @@ ${truncated}
             continue;
           }
 
-          const verification = await this.skillHandler!("verify_file", { path: requestedPath });
+          const verification = await this.callToolWithTimeout("verify_file", { path: requestedPath });
           state.toolsExecuted.push("verify_file");
           const record = verification?.verificationRecord;
           if (!this.isVerificationRecord(record)) state.workspace.markError(requestedPath, "verify_file n'a pas retourné de preuve hashée structurée.");
@@ -767,10 +895,11 @@ ${truncated}
     ])];
     const findings = this.extractFindings(resultText);
     const completion = toolExecution.workspace.completionReport(toolExecution.touchedFiles);
-    const writeRequired = ["writer", "formatter", "proofreader", "translator", "summarizer"].includes(task.role)
+    const writeRequired = ["writer", "formatter", "proofreader", "translator"].includes(task.role)
       // Une sous-tâche explicitement orientée lecture/analyse n'exige pas d'écriture.
       // On détecte cela par l'absence totale de mot-clé d'écriture dans le titre/description
       // ET par la présence de mots-clés d'analyse.
+      // Note: summarizer est exclu car il produit des résumés, pas des fichiers modificateurs
       && !this.isAnalysisOnlyTask(task);
     const readEvidenceRequired = ["researcher", "planner"].includes(task.role);
     const planningOnly = this.isPlanningOnly(resultText);
@@ -1059,7 +1188,7 @@ ${truncated}
     }
 
     try {
-      const inventory = await this.skillHandler!("list_project_files", { path: ".", recursive: true });
+      const inventory = await this.callToolWithTimeout("list_project_files", { path: ".", recursive: true });
       if (inventory?.status !== "success" || !Array.isArray(inventory.files)) {
         log.warn(`[${task.id.slice(0, 8)}] Découverte de contexte indisponible: ${inventory?.error ?? inventory?.message ?? "réponse invalide"}`);
         return hardExplicitFiles.slice(0, 10);
@@ -1160,7 +1289,7 @@ ${truncated}
         // Le premier fichier est le fichier principal résolu par la tâche :
         // injecter son contenu complet évite que le modèle travaille sur une
         // simple fenêtre startLine/endLine ou sur les 50 premières lignes.
-        const content = await this.skillHandler!("read_project_file", {
+        const content = await this.callToolWithTimeout("read_project_file", {
           path: file,
           ...(index === 0 ? { full: true } : {}),
         });

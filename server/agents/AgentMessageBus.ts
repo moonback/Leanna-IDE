@@ -194,7 +194,7 @@ export class AgentMessageBus extends EventEmitter {
    */
   async request(
     message: AgentMessage,
-    timeoutMs: number = 30_000
+    timeoutMs: number = 120_000
   ): Promise<AgentMessage> {
     const correlationId = randomUUID();
     message.correlationId = correlationId;
