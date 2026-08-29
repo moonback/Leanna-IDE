@@ -14,7 +14,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   History,
   Zap,
-  HelpCircle,
   Power,
   Settings,
   BrainCircuit,
@@ -210,8 +209,6 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
           context={context}
           currentPath={location.pathname}
           navigate={navigate}
-          showHelp={props.showHelp ?? false}
-          onToggleHelp={props.onToggleHelp ?? noop}
         />
 
         {/* Quit App (Electron) */}
@@ -430,17 +427,13 @@ function FooterSection({
   context,
   currentPath,
   navigate,
-  showHelp,
-  onToggleHelp,
 }: {
   context: SidebarContext;
   currentPath: string;
   navigate: (path: string) => void;
-  showHelp: boolean;
-  onToggleHelp: () => void;
 }) {
   return (
-    <div className="w-full flex flex-col items-center gap-0.5" role="navigation" aria-label="Aide et paramètres">
+    <div className="w-full flex flex-col items-center gap-0.5" role="navigation" aria-label="Paramètres">
       <motion.div
         whileHover={{ scale: 1.02 }}
         transition={{ duration: 0.15 }}
@@ -450,17 +443,6 @@ function FooterSection({
           active={currentPath === '/settings'}
           onClick={() => navigate('/settings')}
           title="Paramètres"
-        />
-      </motion.div>
-      <motion.div
-        whileHover={{ scale: 1.02 }}
-        transition={{ duration: 0.15 }}
-      >
-        <SidebarItem
-          icon={HelpCircle}
-          active={context === 'ide' ? showHelp : currentPath === '/help'}
-          onClick={context === 'ide' ? onToggleHelp : () => navigate('/help')}
-          title="Aide"
         />
       </motion.div>
     </div>

@@ -145,8 +145,6 @@ export interface UnifiedSidebarProps {
   onDisconnectAssistant?: () => void;
   onConnectAssistant?: () => void;
   onMuteToggle?: () => void;
-  onToggleHelp?: () => void;
-  showHelp?: boolean;
   onToggleHistory?: () => void;
   showHistory?: boolean;
   onToggleAutomation?: () => void;

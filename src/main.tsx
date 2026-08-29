@@ -19,7 +19,6 @@ const MemoriesView = lazy(() => import('./views/MemoriesView'));
 const SettingsView = lazy(() => import('./views/SettingsView'));
 const ListsView = lazy(() => import('./views/ListsView'));
 const IdeView = lazy(() => import('./views/IdeView'));
-const HelpView = lazy(() => import('./views/HelpView'));
 const AutomationView = lazy(() => import('./views/AutomationView'));
 const HistoryView = lazy(() => import('./views/HistoryView'));
 const GitHubView = lazy(() => import('./views/GitHubView'));
@@ -458,7 +457,6 @@ function AnimatedRoutes() {
         <Route path="/automation" element={wrap(<AutomationView />)} />
         <Route path="/documents"  element={wrap(<DocumentsView />)} />
         <Route path="/notebooks"  element={wrap(<NotebooksView />)} />
-        <Route path="/help"       element={wrap(<HelpView />)} />
       </Routes>
     </AnimatePresence>
   );
