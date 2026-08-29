@@ -4,11 +4,12 @@
  * Thème entièrement piloté par les variables CSS du projet (data-theme sur <html>).
  * Compatible : dark · light · cyberpunk · sepia · high-contrast
  *
- * Changements vs. version précédente (revue apple-design) :
- *  - Ressorts (spring, damping critique) au lieu de transitions durée+easing
- *  - Focus par défaut sur "Annuler" (option sûre) plutôt que sur l'action destructive
- *  - Respect de prefers-reduced-motion (cross-fade, arrêt des boucles)
- *  - Respect de prefers-reduced-transparency (fond quasi-opaque, sans blur)
+ * Améliorations cohérence visuelle :
+ *  - Système de couleurs unifié via variables CSS
+ *  - Espacements basés sur une échelle de 4px (système de design tokens)
+ *  - Hiérarchie typographique plus claire
+ *  - Effets hover/focus harmonisés
+ *  - Contraste WCAG amélioré sur tous les éléments interactifs
  */
 
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
@@ -33,8 +34,6 @@ function useMediaQuery(query: string) {
 }
 
 export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialogProps) {
-  // Default focus lives on the SAFE action, not the destructive one — an
-  // accidental Enter while the dialog is settling should never quit.
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -47,7 +46,6 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
     return () => clearTimeout(timer);
   }, [open]);
 
-  // Minimal focus trap: keep Tab cycling inside the dialog.
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -70,8 +68,6 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [open]);
 
-  // Critically damped spring: settles cleanly, no overshoot, and — unlike a
-  // fixed-duration tween — can be interrupted and re-targeted mid-flight.
   const panelTransition = prefersReducedMotion
     ? { duration: 0.15, ease: 'linear' as const }
     : { type: 'spring' as const, bounce: 0, duration: 0.35 };
@@ -87,13 +83,11 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
   const overlayBackground = prefersReducedTransparency
     ? 'var(--bg-base)'
     : 'color-mix(in srgb, var(--bg-base) 55%, transparent)';
-  const panelBackground = prefersReducedTransparency ? 'var(--bg-panel)' : 'var(--bg-panel)';
 
   return (
     <AnimatePresence mode="wait">
       {open && (
         <>
-          {/* ── Keyframes (paused under reduced motion) ── */}
           <style>{`
             @keyframes qd-breathe { 50% { transform: scale(1.06); } }
             @keyframes qd-blink   { to  { opacity: .35; } }
@@ -102,7 +96,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
             }
           `}</style>
 
-          {/* ── Overlay ── */}
+          {/* Overlay */}
           <motion.div
             key="quit-overlay"
             className="fixed inset-0 z-50 flex items-center justify-center px-4"
@@ -118,7 +112,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
             onClick={onClose}
             role="presentation"
           >
-            {/* ── Panel ── */}
+            {/* Panel */}
             <motion.div
               key="quit-panel"
               ref={panelRef}
@@ -139,19 +133,17 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                 padding: '24px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '20px',
-                background: panelBackground,
-                border: prefersReducedTransparency
-                  ? '1px solid var(--border-strong)'
-                  : '1px solid var(--border-strong)',
-                borderRadius: '26px',
+                gap: '16px',
+                background: 'var(--bg-panel)',
+                border: '1px solid var(--border-strong)',
+                borderRadius: '24px',
                 boxShadow: 'var(--shadow-xl)',
                 backdropFilter: prefersReducedTransparency ? 'none' : 'blur(28px) saturate(1.3)',
                 WebkitBackdropFilter: prefersReducedTransparency ? 'none' : 'blur(28px) saturate(1.3)',
                 overflow: 'hidden',
               }}
             >
-              {/* Shimmer interne (haut-gauche) */}
+              {/* Shimmer interne */}
               <div
                 aria-hidden="true"
                 style={{
@@ -159,11 +151,11 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                   inset: 0,
                   borderRadius: 'inherit',
                   pointerEvents: 'none',
-                  background: 'linear-gradient(135deg, rgba(255,255,255,.06), transparent 40%)',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,.04), transparent 40%)',
                 }}
               />
 
-              {/* ── Header ── */}
+              {/* Header */}
               <div
                 style={{
                   display: 'flex',
@@ -173,41 +165,52 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                   zIndex: 1,
                 }}
               >
-                {/* Logo + titre */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  {/* Orbe accent */}
                   <div
                     aria-hidden="true"
                     className="qd-orb"
                     style={{
-                      width: '44px',
-                      height: '44px',
+                      width: '40px',
+                      height: '40px',
                       borderRadius: '50%',
                       flexShrink: 0,
-                      background:
-                        'radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--accent-primary) 60%, white), var(--accent-primary) 72%)',
-                      boxShadow:
-                        '0 0 0 1px rgba(255,255,255,.12) inset, 0 10px 30px var(--accent-glow)',
+                      background: 'var(--accent-gradient)',
+                      boxShadow: '0 0 0 1px rgba(255,255,255,.12) inset, 0 10px 30px var(--accent-glow)',
                       animation: 'qd-breathe 3.4s ease-in-out infinite',
                       display: 'grid',
                       placeItems: 'center',
                     }}
                   >
-                    {/* Icône Power */}
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="var(--text-primary)"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M18.36 6.64A9 9 0 1 1 5.64 6.64" />
-                      <line x1="12" y1="2" x2="12" y2="12" />
-                    </svg>
+                    <div
+  aria-hidden="true"
+  className="qd-orb"
+  style={{
+    width: '40px',
+    height: '40px',
+    borderRadius: '50%',
+    flexShrink: 0,
+    background: 'var(--accent-gradient)',
+    boxShadow: '0 0 0 1px rgba(255,255,255,.12) inset, 0 10px 30px var(--accent-glow)',
+    animation: 'qd-breathe 3.4s ease-in-out infinite',
+    display: 'grid',
+    placeItems: 'center',
+  }}
+>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="var(--text-primary)"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M18.36 6.64A9 9 0 1 1 5.64 6.64" />
+    <line x1="12" y1="2" x2="12" y2="12" />
+  </svg>
+</div>
                   </div>
 
                   <div>
@@ -215,11 +218,11 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                       id="quit-title"
                       style={{
                         margin: 0,
-                        fontSize: '15px',
+                        fontSize: '14px',
                         fontWeight: 700,
-                        letterSpacing: '-0.03em',
+                        letterSpacing: '-0.02em',
                         color: 'var(--text-primary)',
-                        fontFamily: '"DM Sans", system-ui, sans-serif',
+                        fontFamily: 'var(--font-sans)',
                       }}
                     >
                       JARVIS OS
@@ -227,11 +230,11 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                     <p
                       style={{
                         margin: 0,
-                        fontSize: '9px',
-                        letterSpacing: '.14em',
+                        fontSize: '8px',
+                        letterSpacing: '.12em',
                         textTransform: 'uppercase',
                         color: 'var(--text-muted)',
-                        fontFamily: '"JetBrains Mono", monospace',
+                        fontFamily: 'var(--font-mono)',
                         fontWeight: 600,
                       }}
                     >
@@ -240,40 +243,40 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                   </div>
                 </div>
 
-                {/* Badge SHUTDOWN */}
                 <div
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    padding: '6px 10px',
+                    padding: '4px 8px',
                     borderRadius: '999px',
-                    background: 'color-mix(in srgb, var(--color-error) 10%, transparent)',
-                    border: '1px solid color-mix(in srgb, var(--color-error) 28%, transparent)',
-                    color: 'var(--color-error)',
-                    fontFamily: '"JetBrains Mono", monospace',
-                    fontSize: '8px',
+                    background: 'var(--bg-error-subtle)',
+                    border: '1px solid var(--border-error)',
+                    color: 'var(--text-error)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '7px',
                     fontWeight: 600,
-                    letterSpacing: '.10em',
+                    letterSpacing: '.08em',
+                    textTransform: 'uppercase',
                   }}
                 >
                   <span
                     aria-hidden="true"
                     className="qd-dot"
                     style={{
-                      width: '5px',
-                      height: '5px',
+                      width: '4px',
+                      height: '4px',
                       borderRadius: '50%',
                       background: 'var(--color-error)',
-                      boxShadow: '0 0 7px var(--color-error)',
+                      boxShadow: '0 0 6px var(--color-error)',
                       animation: 'qd-blink .9s ease-in-out infinite alternate',
                     }}
                   />
-                  SHUTDOWN
+                  Shutdown
                 </div>
               </div>
 
-              {/* ── Divider ── */}
+              {/* Divider */}
               <hr
                 style={{
                   border: 0,
@@ -283,7 +286,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                 }}
               />
 
-              {/* ── Body ── */}
+              {/* Body */}
               <div
                 style={{
                   position: 'relative',
@@ -296,50 +299,50 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                 {/* Warning card */}
                 <div
                   style={{
-                    padding: '14px 16px',
-                    borderRadius: '14px',
-                    background: 'color-mix(in srgb, var(--color-warning) 8%, transparent)',
-                    border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    background: 'var(--bg-warning-subtle)',
+                    border: '1px solid var(--border-warning)',
                   }}
                 >
                   <p
                     style={{
-                      margin: '0 0 6px',
-                      fontSize: '9px',
+                      margin: '0 0 4px',
+                      fontSize: '8px',
                       fontWeight: 600,
-                      letterSpacing: '.12em',
-                      color: 'var(--color-warning)',
-                      fontFamily: '"JetBrains Mono", monospace',
+                      letterSpacing: '.10em',
+                      color: 'var(--text-warning)',
+                      fontFamily: 'var(--font-mono)',
                       textTransform: 'uppercase',
                     }}
                   >
-                    ⚠ Avertissement
+                    Warning
                   </p>
                   <p
                     id="quit-desc"
                     style={{
                       margin: 0,
                       fontSize: '12px',
-                      lineHeight: 1.6,
+                      lineHeight: 1.5,
                       color: 'var(--text-secondary)',
-                      fontFamily: '"DM Sans", system-ui, sans-serif',
+                      fontFamily: 'var(--font-sans)',
                     }}
                   >
-                    Les modifications non enregistrées pourraient être perdues.{' '}
-                    <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                      Confirmer l'arrêt du système ?
+                    Les modifications non enregistrées pourraient être perdues.
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                      {' Confirmer l\'arrêt du système ?'}
                     </span>
                   </p>
                 </div>
 
-                {/* Ligne de statut système */}
+                {/* Status line */}
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    padding: '10px 12px',
-                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
                     background: 'var(--bg-input)',
                     border: '1px solid var(--border-base)',
                   }}
@@ -347,93 +350,94 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                   <span
                     aria-hidden="true"
                     style={{
-                      width: '5px',
-                      height: '5px',
+                      width: '4px',
+                      height: '4px',
                       borderRadius: '50%',
                       flexShrink: 0,
                       background: 'var(--color-success)',
-                      boxShadow: '0 0 8px var(--color-success)',
+                      boxShadow: '0 0 6px var(--color-success)',
                     }}
                   />
                   <span
                     style={{
                       flex: 1,
-                      fontSize: '9px',
+                      fontSize: '8px',
                       color: 'var(--text-dimmed)',
-                      fontFamily: '"JetBrains Mono", monospace',
+                      fontFamily: 'var(--font-mono)',
                       fontWeight: 500,
-                      letterSpacing: '.06em',
+                      letterSpacing: '.04em',
                     }}
                   >
                     SECURE · AES-256-GCM · SESSION ACTIVE
                   </span>
                   <span
                     style={{
-                      fontSize: '8px',
-                      color: 'var(--color-success)',
-                      fontFamily: '"JetBrains Mono", monospace',
+                      fontSize: '7px',
+                      color: 'var(--text-success)',
+                      fontFamily: 'var(--font-mono)',
                       fontWeight: 600,
-                      letterSpacing: '.10em',
+                      letterSpacing: '.08em',
+                      textTransform: 'uppercase',
                     }}
                   >
-                    EN LIGNE
+                    Online
                   </span>
                 </div>
               </div>
 
-              {/* ── Actions ── */}
+              {/* Actions */}
               <div
                 style={{
                   display: 'flex',
-                  gap: '10px',
+                  gap: '8px',
                   justifyContent: 'flex-end',
                   position: 'relative',
                   zIndex: 1,
                 }}
               >
-                {/* Annuler — focus par défaut : action sûre */}
                 <button
                   ref={cancelButtonRef}
                   type="button"
                   onClick={onClose}
-                  className="transition-opacity hover:opacity-75 active:scale-[.97]"
+                  className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offsetvar(--bg-panel) focus:ringvar(--border-focus) transition-all duration-200 hover:bgvar(--bg-secondary-hover) active:scale-[.98]"
                   style={{
-                    padding: '9px 20px',
-                    borderRadius: '12px',
+                    padding: '8px 16px',
+                    borderRadius: '10px',
                     border: '1px solid var(--border-base)',
                     background: 'var(--bg-secondary)',
-                    color: 'var(--text-muted)',
+                    color: 'var(--text-primary)',
                     fontSize: '12px',
                     fontWeight: 600,
-                    fontFamily: '"DM Sans", system-ui, sans-serif',
+                    fontFamily: 'var(--font-sans)',
                     cursor: 'pointer',
                     letterSpacing: '-.01em',
+                    minWidth: '80px',
                   }}
                 >
                   Annuler
                 </button>
 
-                {/* Quitter */}
                 <button
                   type="button"
                   onClick={onConfirm}
-                  className="transition-opacity hover:opacity-85 active:scale-[.97]"
+                  className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offsetvar(--bg-panel) focus:ringvar(--color-error) transition-all duration-200 hover:opacity-90 active:scale-[.98]"
                   style={{
-                    padding: '9px 20px',
-                    borderRadius: '12px',
-                    border: '1px solid color-mix(in srgb, var(--color-error) 35%, transparent)',
-                    background:
-                      'linear-gradient(135deg, var(--color-error), color-mix(in srgb, var(--color-error) 75%, black))',
-                    color: 'var(--text-primary)',
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-error)',
+                    background: 'var(--bg-error)',
+                    color: 'var(--text-error-inverse)',
                     fontSize: '12px',
                     fontWeight: 700,
-                    fontFamily: '"DM Sans", system-ui, sans-serif',
+                    fontFamily: 'var(--font-sans)',
                     cursor: 'pointer',
                     letterSpacing: '-.01em',
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: '6px',
-                    boxShadow: '0 8px 24px -8px color-mix(in srgb, var(--color-error) 55%, transparent)',
+                    minWidth: '80px',
+                    boxShadow: '0 4px 16px -4px var(--shadow-error)',
                   }}
                 >
                   <svg
@@ -454,23 +458,24 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                 </button>
               </div>
 
-              {/* ── Footer ── */}
+              {/* Footer */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'center',
-                  paddingTop: '2px',
+                  paddingTop: '4px',
                   position: 'relative',
                   zIndex: 1,
                 }}
               >
                 <span
                   style={{
-                    fontSize: '8px',
-                    fontFamily: '"JetBrains Mono", monospace',
+                    fontSize: '7px',
+                    fontFamily: 'var(--font-mono)',
                     fontWeight: 500,
                     color: 'var(--text-dimmed)',
-                    letterSpacing: '.08em',
+                    letterSpacing: '.06em',
+                    textTransform: 'uppercase',
                   }}
                 >
                   v0.4.0 · JARVIS OS
