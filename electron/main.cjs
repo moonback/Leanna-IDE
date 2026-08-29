@@ -64,8 +64,8 @@ function startBackendServer() {
 
 function createSplashWindow() {
   const splash = new BrowserWindow({
-    width: 480,
-    // height: 420,
+    width: 736,
+    height: 400,
     frame: false,
     transparent: true,
     resizable: false,
