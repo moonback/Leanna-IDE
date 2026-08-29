@@ -70,6 +70,19 @@
   }
 }
 
+/* New design variables for EmptyEditorState - Default fallback */
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-soft: #f1f3f7;
+  --text: #111827;
+  --text-secondary: #667085;
+  --text-muted: #98a2b3;
+  --primary: #159fe3;
+  --primary-dark: #087fbd;
+  --border: rgba(15, 23, 42, 0.08);
+}
+
 /* ═══════════════════════════════════════════════
    THEME TOKEN GROUPS — IMPORTANT
    This file defines FIVE selectable themes: dark, light,
@@ -176,6 +189,17 @@
   --glass-bg:        rgba(24, 24, 27, 0.72);
   --glass-border:    rgba(255, 255, 255, 0.07);
   --glass-blur:      20px;
+
+  /* New design variables for EmptyEditorState - Dark mode */
+  --bg: #09090b;
+  --surface: #18181b;
+  --surface-soft: #111113;
+  --text: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --primary: #159fe3;
+  --primary-dark: #087fbd;
+  --border: rgba(63, 63, 70, 0.55);
 }
 
 :root[data-theme="light"] {
@@ -272,6 +296,17 @@
   --glass-bg:        rgba(255, 255, 255, 0.8);
   --glass-border:    rgba(99, 102, 241, 0.08);
   --glass-blur:      12px;
+
+  /* New design variables for EmptyEditorState - Apple x Linear x Raycast x AI assistant */
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-soft: #f1f3f7;
+  --text: #111827;
+  --text-secondary: #667085;
+  --text-muted: #98a2b3;
+  --primary: #159fe3;
+  --primary-dark: #087fbd;
+  --border: rgba(15, 23, 42, 0.08);
 }
 
 /* ═══════════════════════════════════════════════

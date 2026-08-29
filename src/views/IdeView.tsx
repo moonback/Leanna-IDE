@@ -19,7 +19,6 @@ import { GlobalSearch } from '../components/ide/GlobalSearch';
 import { StatusBar } from '../components/ide/StatusBar';
 
 import { EditorTabs } from '../components/ide/EditorTabs';
-import { SettingsPanel } from '../components/ide/SettingsPanel';
 import { HelpPanel } from '../components/ide/HelpPanel';
 import { HistoryPanel } from '../components/ide/HistoryPanel';
 import { AutomationPanel } from '../components/ide/AutomationPanel';
@@ -127,7 +126,6 @@ export default function IdeView() {
 
   // UI State
   const [showExplorer, setShowExplorer] = useState(true);
-  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [showDiffViewer, setShowDiffViewer] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState<'files' | 'commands' | null>(null);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
@@ -235,7 +233,6 @@ export default function IdeView() {
     setShowHelp(false);
     setShowHistory(false);
     setShowAutomation(false);
-    setShowSettingsPanel(false);
     setShowMemory(false);
     setRichDocument(null);
 
@@ -677,7 +674,6 @@ export default function IdeView() {
         context="ide"
         showExplorer={showExplorer}
         showGlobalSearch={showGlobalSearch}
-        showSettings={showSettingsPanel}
         showRunMenu={showRunMenu}
         showSandbox={showSandbox}
         showWorkflow={showWorkflow}
@@ -701,10 +697,6 @@ export default function IdeView() {
         mode={mode}
         onToggleExplorer={() => setShowExplorer(v => !v)}
         onToggleSearch={() => setShowGlobalSearch(v => !v)}
-        onToggleSettings={() => {
-          setShowSettingsPanel(v => !v);
-          if (!showSettingsPanel) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); setShowNotebooks(false); setShowMemory(false); }
-        }}
         onToggleRunMenu={() => setShowRunMenu(v => !v)}
         onToggleSandbox={toggleSandbox}
         onToggleWorkflow={() => setShowWorkflow(v => !v)}
@@ -716,14 +708,14 @@ export default function IdeView() {
         onToggleMissions={() => setShowMissions(v => !v)}
         onToggleKnowledge={() => {
           setShowKnowledge(v => !v);
-          if (!showKnowledge) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowNotebooks(false); setShowMemory(false); }
+          if (!showKnowledge) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowNotebooks(false); setShowMemory(false); }
         }}
         onToggleNotebooks={() => {
           setShowNotebooks(v => {
             if (!v) {
               // Ouverture des notebooks → fermer l'explorer automatiquement
               setShowExplorer(false);
-              setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowMemory(false);
+              setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); setShowMemory(false);
             } else {
               // Fermeture des notebooks → réouvrir l'explorer
               setShowExplorer(true);
@@ -751,22 +743,22 @@ export default function IdeView() {
         showHelp={showHelp}
         onToggleHelp={() => {
           setShowHelp(v => !v);
-          if (!showHelp) { setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowNotebooks(false); setShowMemory(false); }
+          if (!showHelp) { setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); setShowNotebooks(false); setShowMemory(false); }
         }}
         showHistory={showHistory}
         onToggleHistory={() => {
           setShowHistory(v => !v);
-          if (!showHistory) { setShowHelp(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowNotebooks(false); setShowMemory(false); }
+          if (!showHistory) { setShowHelp(false); setShowAutomation(false); setShowKnowledge(false); setShowNotebooks(false); setShowMemory(false); }
         }}
         showAutomation={showAutomation}
         onToggleAutomation={() => {
           setShowAutomation(v => !v);
-          if (!showAutomation) { setShowHelp(false); setShowHistory(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowNotebooks(false); setShowMemory(false); }
+          if (!showAutomation) { setShowHelp(false); setShowHistory(false); setShowKnowledge(false); setShowNotebooks(false); setShowMemory(false); }
         }}
         showMemory={showMemory}
         onToggleMemory={() => {
           setShowMemory(v => !v);
-          if (!showMemory) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false); setShowNotebooks(false); }
+          if (!showMemory) { setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); setShowNotebooks(false); }
         }}
         showTerminal={showTerminal}
         onToggleTerminal={() => setShowTerminal(v => !v)}
@@ -802,7 +794,7 @@ export default function IdeView() {
       {/* Editor Area */}
       <div className="jarvis-ide-workspace flex flex-1 flex-col min-w-0 min-h-0 relative">
         {/* Tab Bar — masqué quand un panneau plein-écran est actif */}
-        {!showSandbox && !showHistory && !showAutomation && !showMemory && !showHelp && !showSettingsPanel && !showKnowledge && !showNotebooks && !(showBrowser && !fileSystem.activePath) && (
+        {!showSandbox && !showHistory && !showAutomation && !showMemory && !showHelp && !showKnowledge && !showNotebooks && !(showBrowser && !fileSystem.activePath) && (
           <EditorTabs
             openFiles={fileSystem.openFiles}
             activePath={fileSystem.activePath}
@@ -939,12 +931,6 @@ export default function IdeView() {
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement…</div></div>}>
                           <DocumentPanel />
                         </Suspense>
-                      ) : showSettingsPanel ? (
-                        <SettingsPanel
-                          settings={ideSettings}
-                          onUpdateSetting={updateSetting}
-                          onClose={() => setShowSettingsPanel(false)}
-                        />
                       ) : showHelp ? (
                         <HelpPanel onClose={() => setShowHelp(false)} />
                       ) : showHistory ? (
@@ -983,13 +969,12 @@ export default function IdeView() {
                                                   onOpenFile={openFileAt}
                                                   onCreateFile={() => setModalState({ type: 'create-file', dir: fileSystem.currentDir })}
                                                   onCreateFolder={() => setModalState({ type: 'create-folder', dir: fileSystem.currentDir })}
-                                                  onShowSettings={() => setShowSettingsPanel(true)}
                                                   onOpenSearch={() => setShowGlobalSearch(true)}
                                                   onOpenChat={() => setShowChat(true)}
                                                   onOpenNotebooks={() => {
                                                     setShowNotebooks(true);
                                                     setShowExplorer(false);
-                                                    setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowSettingsPanel(false); setShowKnowledge(false);
+                                                    setShowHelp(false); setShowHistory(false); setShowAutomation(false); setShowKnowledge(false);
                                                   }}
                                                 />
                       )}
@@ -1131,7 +1116,6 @@ export default function IdeView() {
           onFormat={formatDocument}
           onToggleMinimap={() => updateSetting('showMinimap', !ideSettings.showMinimap)}
           onToggleWordWrap={() => updateSetting('wordWrap', !ideSettings.wordWrap)}
-          onToggleSettings={() => setShowSettingsPanel(!showSettingsPanel)}
           onShowDiff={() => setShowDiffViewer(true)}
         />
       )}

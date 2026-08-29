@@ -4,7 +4,7 @@ import React, {
 import {
   Plus, FolderOpen, FileText,
   MessageSquare, Search, ChevronRight,
-  Trash2, BookOpen,
+  Trash2, BookOpen, Sparkles,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState';
@@ -13,10 +13,6 @@ import { useProfile } from '../../context/UserProfileContext';
 import { ShortcutsModal } from './ShortcutsModal';
 import { SystemModal } from './SystemModal';
 import { useTheme } from '../../context/ThemeContext';
-// @ts-ignore — Vite handles image imports
-import disconnectedBgDark from '../../../assets/images/disconnected-bg-dark.png';
-// @ts-ignore
-import disconnectedBgLight from '../../../assets/images/disconnected-bg-light.png';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -26,18 +22,13 @@ interface RecentFile {
   openedAt: number;
 }
 
-interface GitInfo {
-  branch: string;
-  summary: string;
-}
-
 // ─── Constantes ──────────────────────────────────────────────────────────
 
 const MOD = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
   ? '⌘'
   : 'Ctrl';
 
-const MAX_RECENT_FILES = 5;
+const MAX_RECENT_FILES = 3;
 const ENTRANCE_SPRING = { type: 'spring' as const, bounce: 0, duration: 0.4 };
 
 // ─── Validation des fichiers récents ────────────────────────────────────
@@ -65,18 +56,18 @@ const Kbd = React.memo(function Kbd({
 }) {
   if (tone === 'invert') {
     return (
-      <span className="inline-flex items-center justify-center h-[19px] min-w-[19px] px-1.5 rounded text-xs font-mono font-semibold tracking-wide bg-white/15 text-white/85">
+      <span className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 rounded text-xs font-mono font-semibold tracking-wide bg-white/15 text-white/85">
         {children}
       </span>
     );
   }
   return (
     <kbd
-      className="inline-flex items-center justify-center h-[19px] min-w-[19px] px-1.5 text-xs font-mono font-semibold tracking-wide"
+      className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 text-xs font-mono font-semibold tracking-wide"
       style={{
-        color: 'var(--text-dimmed)',
-        backgroundColor: 'var(--bg-input)',
-        border: '1px solid var(--border-base)',
+        color: 'var(--text-muted)',
+        backgroundColor: 'var(--surface-soft)',
+        border: '1px solid var(--border)',
         borderRadius: '4px',
       }}
     >
@@ -85,7 +76,7 @@ const Kbd = React.memo(function Kbd({
   );
 });
 
-const ActionCard = React.memo(function ActionCard({
+const CompactActionCard = React.memo(function CompactActionCard({
   icon: Icon,
   title,
   description,
@@ -102,24 +93,28 @@ const ActionCard = React.memo(function ActionCard({
     <button
       type="button"
       onClick={onClick}
-      className="ai-interactive ai-card group relative flex items-start gap-3 p-4 text-left rounded-xl"
-      style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}
+      className="ai-interactive ai-compact-card group relative flex flex-col items-center gap-2 p-4 text-center rounded-xl"
+      style={{
+        backgroundColor: 'var(--surface)',
+        border: '1px solid var(--border)',
+        minHeight: '80px',
+      }}
       aria-describedby={`action-desc-${title.replace(/\s/g, '')}`}
     >
       <div
-        className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
-        style={{ backgroundColor: 'var(--accent-subtle)' }}
+        className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
+        style={{ backgroundColor: 'var(--surface-soft)' }}
       >
-        <Icon size={15} style={{ color: 'var(--accent-primary)' }} />
+        <Icon size={14} style={{ color: 'var(--primary)' }} />
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+      <div className="flex flex-col items-center gap-0.5">
+        <div className="text-sm font-semibold leading-tight" style={{ color: 'var(--text)' }}>
           {title}
         </div>
         <div
           id={`action-desc-${title.replace(/\s/g, '')}`}
-          className="text-sm mt-0.5 leading-snug"
+          className="text-xs leading-snug"
           style={{ color: 'var(--text-muted)' }}
         >
           {description}
@@ -127,7 +122,7 @@ const ActionCard = React.memo(function ActionCard({
       </div>
 
       {shortcut && (
-        <div className="flex-shrink-0 mt-0.5">
+        <div className="flex-shrink-0 mt-1">
           <Kbd>{shortcut}</Kbd>
         </div>
       )}
@@ -138,33 +133,29 @@ const ActionCard = React.memo(function ActionCard({
 const QuickLink = React.memo(function QuickLink({
   label,
   onClick,
-  shortcut,
 }: {
   label: string;
   onClick: () => void;
-  shortcut?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="ai-interactive ai-quicklink flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium"
-      style={{ color: 'var(--text-dimmed)' }}
+      className="ai-interactive ai-quicklink flex items-center gap-1 px-2 py-1 rounded text-sm font-medium"
+      style={{ color: 'var(--text-muted)' }}
     >
       {label}
-      {shortcut && <Kbd>{shortcut}</Kbd>}
     </button>
   );
 });
 
 // ─── Styles interactifs partagés ───────────────────────────────────────
 
-function InteractiveFeedbackStyles() {
+function GlobalStyles() {
   return (
     <style>{`
       .ai-interactive {
-        transition: transform 100ms ease-out, border-color 150ms ease-out,
-          box-shadow 150ms ease-out, background-color 150ms ease-out, color 150ms ease-out;
+        transition: all 150ms ease-out;
         outline: none;
       }
       .ai-interactive:active {
@@ -172,42 +163,57 @@ function InteractiveFeedbackStyles() {
         transition-duration: 60ms;
       }
       .ai-interactive:focus-visible {
-        outline: 2px solid var(--accent-primary);
+        outline: 2px solid var(--primary);
         outline-offset: 2px;
       }
 
-      .ai-card:hover {
-        border-color: var(--border-strong);
-        box-shadow: var(--shadow-sm);
+      .ai-compact-card:hover {
+        border-color: var(--primary);
+        box-shadow: 0 4px 12px rgba(21, 159, 227, 0.1);
+        transform: translateY(-1px);
       }
+
       .ai-hero:hover {
-        filter: brightness(1.06);
+        box-shadow: 0 8px 24px rgba(21, 159, 227, 0.15);
+        transform: translateY(-1px);
       }
+
       .ai-hero:active {
-        filter: brightness(1.02);
+        transform: translateY(0);
       }
 
       .ai-recent-row:hover {
-        background-color: var(--ctrl-hover);
+        background-color: var(--surface-soft);
       }
+
       .ai-recent-row:hover .ai-recent-chevron,
       .ai-recent-row:hover .ai-recent-lang {
         opacity: 1;
       }
 
       .ai-quicklink:hover {
-        color: var(--accent-primary);
-        background-color: var(--ctrl-hover);
+        color: var(--primary);
+        background-color: var(--surface-soft);
       }
 
       .ai-clear-btn:hover {
         color: var(--text-muted);
-        background-color: var(--ctrl-hover);
+        background-color: var(--surface-soft);
+      }
+
+      .ai-status-dot {
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
       }
 
       @media (prefers-reduced-motion: reduce) {
         .ai-interactive:active,
         .ai-recent-row:active { transform: none; }
+        .ai-status-dot { animation: none; }
       }
     `}</style>
   );
@@ -331,6 +337,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   useFocusTrap(showShortcuts || showSystem);
 
   const aiName = profile.aiName || 'Leanna';
+  const userName = profile.userName || 'Utilisateur';
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -340,13 +347,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     return 'Bonsoir';
   }, []);
 
-  // Fond selon le thème (memoïsation)
-  const disconnectedBg = useMemo(
-    () => (theme === 'dark' ? disconnectedBgDark : disconnectedBgLight),
-    [theme]
-  );
-
-  // Props d’entrée avec spring ou fondu selon la motion réduite
+  // Props d'entrée avec spring ou fondu selon la motion réduite
   const makeEntranceProps = useCallback(
     (delay = 0) =>
       prefersReducedMotion
@@ -376,12 +377,16 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
         e.preventDefault();
         onShowSettings();
       }
+      if (e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        handleConnect();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onCreateFile, onShowSettings]);
 
-  // Ouverture d’un fichier récent avec gestion d’erreur et chargement
+  // Ouverture d'un fichier récent avec gestion d'erreur et chargement
   const handleOpenRecent = useCallback(
     async (filePath: string) => {
       if (loadingFile) return; // Évite les doubles clics
@@ -396,15 +401,12 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
         if (!response.ok) {
           // Fichier introuvable ou erreur, on le retire de la liste
           removeRecentFile(filePath);
-          // On pourrait notifier l’utilisateur ici
           console.warn(`Fichier ${filePath} introuvable (${response.status})`);
           return;
         }
         onOpenFile(filePath);
       } catch (error) {
-        // Erreur réseau, on garde le fichier mais on affiche une notification
-        console.error('Erreur lors de l’ouverture du fichier :', error);
-        // On peut aussi tenter l’ouverture locale
+        console.error('Erreur lors de l\'ouverture du fichier :', error);
         onOpenFile(filePath);
       } finally {
         setLoadingFile(null);
@@ -421,122 +423,152 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   return (
     <div
       className="flex flex-1 flex-col overflow-y-auto relative"
-      style={{ backgroundColor: 'var(--bg-base)' }}
+      style={{ backgroundColor: 'var(--bg)' }}
     >
-      <InteractiveFeedbackStyles />
+      <GlobalStyles />
 
-      {/* ── Fond subtil ── */}
+      {/* ── Fond subtil : dégradé bleu très léger en haut seulement ── */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          backgroundImage: `url(${disconnectedBg})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          opacity: 0.8,
+          background: 'linear-gradient(to bottom, var(--primary) 0%, var(--primary) 12%, transparent 30%)',
+          opacity: 0.03,
         }}
       />
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse 100% 100% at 20% 0%, transparent 0%, var(--bg-base) 100%)',
+          background: 'radial-gradient(ellipse 100% 100% at 50% 0%, var(--primary) 0%, transparent 40%)',
+          opacity: 0.05,
         }}
       />
 
       {/* ── Contenu ── */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <div className="w-full max-w-[940px]">
-          {/* ── Header : Salutation + statut ── */}
-          <motion.div className="mb-9 flex items-center justify-between gap-4" {...makeEntranceProps(0)}>
-            <h1
-              className="text-2xl sm:text-[28px] font-semibold tracking-[-0.025em] leading-tight"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {profile.userName ? `${greeting}, ${profile.userName}` : greeting}
-            </h1>
+        <div className="w-full max-w-[1000px]">
+          {/* ── NIVEAU 1 : Header avec salutation premium ── */}
+          <motion.div 
+            className="mb-2 flex items-baseline gap-4"
+            {...makeEntranceProps(0)}
+          >
+            <div className="flex flex-col gap-0">
+              <span 
+                className="text-sm font-normal"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                {greeting}
+              </span>
+              <h1
+                className="text-4xl sm:text-5xl font-semibold tracking-[-0.02em] leading-tight"
+                style={{ color: 'var(--text)' }}
+              >
+                {userName}
+              </h1>
+            </div>
 
-            <span
-              className="hidden sm:inline-flex items-center gap-2 flex-shrink-0 rounded-full pl-2 pr-3 py-1 text-xs font-medium"
-              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-secondary)' }}
-              aria-live="polite"
-            >
-              <span
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: connected ? 'var(--color-success)' : 'var(--text-dimmed)' }}
+            {/* ── NIVEAU 1 : Statut Leanna discret ── */}
+            <div className="flex-1" />
+            <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+              <span 
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0 ai-status-dot"
+                style={{
+                  backgroundColor: connected ? 'var(--primary)' : 'var(--text-muted)',
+                }}
               />
-              {aiName} {connected ? 'connectée' : isBusy ? 'en cours de connexion' : 'en attente'}
-            </span>
+              <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>
+                {aiName}
+              </span>
+              <span>
+                {connected ? 'Prête' : isBusy ? 'Connexion...' : 'En attente'}
+              </span>
+            </div>
           </motion.div>
 
-          {/* ── CTA principal : Chat IA ── */}
+          {/* ── NIVEAU 2 : Sous-titre principal ── */}
+          <motion.div 
+            className="mb-8"
+            {...makeEntranceProps(0.04)}
+          >
+            <h2 
+              className="text-lg sm:text-xl font-normal"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Que souhaitez-vous faire aujourd'hui ?
+            </h2>
+          </motion.div>
+
+          {/* ── NIVEAU 3 : CTA principal compact premium ── */}
           <motion.button
             type="button"
             onClick={handleConnect}
-            className="ai-interactive ai-hero group w-full flex items-center gap-4 p-5 mb-3 text-left rounded-2xl"
-            style={{ backgroundColor: 'var(--accent-primary)', border: 'none' }}
-            {...makeEntranceProps(0.06)}
+            className="ai-interactive ai-hero group w-full flex items-center gap-4 p-5 mb-10 text-left rounded-[20px]"
+            style={{
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              height: '96px',
+              minHeight: '96px',
+            }}
+            {...makeEntranceProps(0.08)}
             aria-label={connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`}
           >
             <div
-              className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ backgroundColor: 'rgba(255,255,255,0.16)' }}
+              className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ backgroundColor: 'var(--surface-soft)' }}
             >
-              <MessageSquare size={19} style={{ color: '#fff' }} />
+              <Sparkles size={18} style={{ color: 'var(--primary)' }} />
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="text-[15px] font-semibold leading-tight" style={{ color: '#fff' }}>
+              <div className="text-[15px] font-semibold leading-tight" style={{ color: 'var(--text)' }}>
                 {connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`}
               </div>
-              <div className="text-sm mt-0.5 leading-snug" style={{ color: 'rgba(255,255,255,0.72)' }}>
-                {connected ? 'Session vocale et texte en cours' : 'Session vocale et texte, prête en un instant'}
+              <div className="text-sm mt-0.5 leading-snug" style={{ color: 'var(--text-muted)' }}>
+                {connected ? 'Session vocale et texte en cours' : 'Parlez, écrivez ou demandez quelque chose à Leanna'}
               </div>
             </div>
 
-            <Kbd tone="invert">{MOD}+L</Kbd>
+            <Kbd>{MOD}+L</Kbd>
           </motion.button>
 
-          {/* ── Actions secondaires ── */}
+          {/* ── NIVEAU 4 : Actions secondaires compactes ── */}
           <motion.div
-            className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-10"
-            {...makeEntranceProps(0.11)}
+            className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-12"
+            {...makeEntranceProps(0.12)}
           >
-            <ActionCard
+            <CompactActionCard
               icon={Plus}
               title="Nouveau fichier"
-              description="Créer dans le projet actif"
-              shortcut={`${MOD}+N`}
+              description="Ctrl+N"
               onClick={onCreateFile}
             />
-            <ActionCard
+            <CompactActionCard
               icon={Search}
               title="Rechercher"
-              description="Fichiers, symboles, texte"
-              shortcut={`${MOD}+P`}
+              description="Ctrl+P"
               onClick={onOpenSearch}
             />
-            <ActionCard
+            <CompactActionCard
               icon={BookOpen}
               title="Notebooks"
-              description="Sources, résumés, podcasts"
+              description="Sources et résumés"
               onClick={onOpenNotebooks}
             />
           </motion.div>
 
-          {/* ── Fichiers récents ── */}
+          {/* ── Fichiers récents (NIVEAU 4-5) ── */}
           {recentFiles.length > 0 && (
-            <motion.div {...makeEntranceProps(0.17)}>
-              <div className="flex items-center justify-between mb-3">
+            <motion.div {...makeEntranceProps(0.16)}>
+              <div className="flex items-center justify-between mb-4">
                 <h2
                   className="text-xs font-semibold uppercase tracking-[0.08em]"
-                  style={{ color: 'var(--text-dimmed)' }}
+                  style={{ color: 'var(--text-muted)' }}
                 >
                   Fichiers récents
                 </h2>
                 <button
                   onClick={clearRecentFiles}
                   className="ai-interactive ai-clear-btn flex items-center gap-1 text-sm px-2 py-1 rounded-md"
-                  style={{ color: 'var(--text-dimmed)' }}
+                  style={{ color: 'var(--text-muted)' }}
                   aria-label="Effacer la liste des fichiers récents"
                 >
                   <Trash2 size={12} />
@@ -546,7 +578,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
               <div
                 className="rounded-xl overflow-hidden"
-                style={{ border: '1px solid var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
+                style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)' }}
                 role="list"
               >
                 {recentFiles.map(({ path, language }, index) => {
@@ -560,24 +592,24 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                       disabled={isDisabled}
                       className="ai-interactive ai-recent-row w-full flex items-center gap-3 px-4 py-2.5 text-left group"
                       style={{
-                        borderTop: index > 0 ? '1px solid var(--border-base)' : undefined,
+                        borderTop: index > 0 ? '1px solid var(--border)' : undefined,
                         opacity: isDisabled ? 0.6 : 1,
                       }}
                       role="listitem"
                       aria-label={`Ouvrir ${fileName} (${path})`}
                     >
-                      <FileText size={13} style={{ color: 'var(--text-dimmed)' }} className="flex-shrink-0" />
-                      <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                      <FileText size={13} style={{ color: 'var(--text-muted)' }} className="flex-shrink-0" />
+                      <span className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
                         {fileName}
                       </span>
-                      <span className="text-sm font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>
+                      <span className="text-sm font-mono truncate" style={{ color: 'var(--text-muted)' }}>
                         {dirPath}
                       </span>
                       {language && (
                         <span
                           className="ai-recent-lang ml-auto text-xs font-mono px-1.5 py-0.5 rounded opacity-0 transition-opacity flex-shrink-0"
                           style={{
-                            backgroundColor: 'var(--bg-input)',
+                            backgroundColor: 'var(--surface-soft)',
                             color: 'var(--text-muted)',
                           }}
                         >
@@ -587,7 +619,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                       <ChevronRight
                         size={12}
                         className="ai-recent-chevron flex-shrink-0 opacity-0 transition-opacity"
-                        style={{ color: 'var(--text-dimmed)' }}
+                        style={{ color: 'var(--text-muted)' }}
                       />
                     </button>
                   );
@@ -596,16 +628,16 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             </motion.div>
           )}
 
-          {/* ── Barre d'info bas ── */}
+          {/* ── NIVEAU 5 : Barre d'info bas ── */}
           <motion.div
-            className="flex items-center justify-between mt-11 pt-5"
-            style={{ borderTop: '1px solid var(--border-base)' }}
+            className="flex items-center justify-between mt-8 pt-6"
+            style={{ borderTop: '1px solid var(--border)' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: prefersReducedMotion ? 0.15 : 0.4 }}
           >
             {/* Workspace info */}
-            <div className="flex items-center gap-1.5 text-sm font-mono" style={{ color: 'var(--text-dimmed)' }}>
+            <div className="flex items-center gap-1.5 text-sm font-mono" style={{ color: 'var(--text-muted)' }}>
               {ws.workspace ? (
                 <>
                   <FolderOpen size={11} />
@@ -619,8 +651,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             {/* Quick links */}
             <div className="flex items-center gap-1">
               <QuickLink label="Raccourcis" onClick={() => setShowShortcuts(true)} />
+              <span style={{ color: 'var(--text-muted)' }}>·</span>
               <QuickLink label="Système" onClick={() => setShowSystem(true)} />
-              <QuickLink label="Réglages" onClick={onShowSettings} shortcut={`${MOD}+,`} />
             </div>
           </motion.div>
         </div>
