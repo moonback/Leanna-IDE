@@ -7,6 +7,11 @@ import {
   agentPersistence,
   COLLABORATION_PATTERNS,
   DELEGATION_MATRIX,
+  STATIC_AGENT_REGISTRY,
+  initializeToolAgentMapper,
+  getPrimaryAgentForTool,
+  getAllToolCategories,
+  getToolsForAgent,
 } from '../agents';
 import { AgentPersistence } from '../agents/AgentPersistence';
 
@@ -133,7 +138,7 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
       }
 
       const plan = await agentOrchestrator.collaborateByPattern({ patternName, context });
-      res.status(202).json({
+      return res.status(202).json({
         orchestrationId: plan.id,
         pattern: patternName,
         status: plan.status,
@@ -141,7 +146,7 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
         message: `Collaboration "${patternName}" démarrée`,
       });
     } catch (e: any) {
-      res.status(400).json({ error: e.message });
+      return res.status(400).json({ error: e.message });
     }
   });
 
@@ -153,14 +158,14 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
   router.post('/delegate-autonomous', async (req: Request, res: Response) => {
     try {
       const task = await agentOrchestrator.delegateAutonomously(req.body);
-      res.status(202).json({
+      return res.status(202).json({
         taskId: task.id,
         role: task.role,
         status: task.status,
         message: `Tâche déléguée à l'agent autonome "${task.role}"`,
       });
     } catch (e: any) {
-      res.status(400).json({ error: e.message });
+      return res.status(400).json({ error: e.message });
     }
   });
 
@@ -174,9 +179,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
         return res.status(503).json({ error: 'Registry non initialisé' });
       }
       const agent = agentRegistry.getAgent(req.params.role as any);
-      res.json(agent.getStats());
+      return res.json(agent.getStats());
     } catch (e: any) {
-      res.status(404).json({ error: e.message });
+      return res.status(404).json({ error: e.message });
     }
   });
 
@@ -250,9 +255,126 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
         return res.status(503).json({ error: 'Supabase non configuré' });
       }
       const result = await agentOrchestrator.restoreFromPersistence();
-      res.json({ success: true, ...result });
+      return res.json({ success: true, ...result });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ─── Tool-Agent Mapping (Spécialisation des compétences) ──────────────────
+
+  /**
+   * GET /api/agents/tool-mapping
+   * Retourne le mapping complet outil → agent.
+   * Utilisé par le frontend pour l'affichage des activités par agent.
+   */
+  router.get('/tool-mapping', (_req: Request, res: Response) => {
+    try {
+      // Initialiser le mapper si ce n'est pas déjà fait
+      initializeToolAgentMapper();
+      
+      // Construire le mapping complet
+      const toolMapping: Record<string, string> = {};
+      const allTools = new Set<string>();
+      
+      // Obtenir tous les agents et leurs outils
+      const allAgents = Object.keys(STATIC_AGENT_REGISTRY);
+      for (const role of allAgents) {
+        const tools = getToolsForAgent(role);
+        for (const tool of tools) {
+          if (!allTools.has(tool)) {
+            allTools.add(tool);
+            toolMapping[tool] = role;
+          }
+        }
+      }
+      
+      return res.json({
+        success: true,
+        mapping: toolMapping,
+        totalTools: Object.keys(toolMapping).length,
+        totalAgents: allAgents.length,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * GET /api/agents/tool-mapping/primary
+   * Retourne uniquement le mapping outil → agent principal (premier agent trouvé).
+   * Format optimisé pour le frontend.
+   */
+  router.get('/tool-mapping/primary', (_req: Request, res: Response) => {
+    try {
+      initializeToolAgentMapper();
+      
+      // Obtenir le mapping principal
+      const mapping: Record<string, string> = {};
+      const allTools = new Set<string>();
+      
+      const allAgents = Object.keys(STATIC_AGENT_REGISTRY);
+      for (const role of allAgents) {
+        const tools = getToolsForAgent(role);
+        for (const tool of tools) {
+          if (!allTools.has(tool)) {
+            allTools.add(tool);
+            mapping[tool] = getPrimaryAgentForTool(tool);
+          }
+        }
+      }
+      
+      return res.json({
+        success: true,
+        mapping,
+        totalTools: Object.keys(mapping).length,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * GET /api/agents/tool-categories
+   * Retourne les catégories d'outils avec leurs rôles recommandés.
+   */
+  router.get('/tool-categories', (_req: Request, res: Response) => {
+    try {
+      const categories = getAllToolCategories();
+      return res.json({
+        success: true,
+        categories,
+        totalCategories: Object.keys(categories).length,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * GET /api/agents/:role/tools
+   * Retourne tous les outils disponibles pour un rôle d'agent donné.
+   */
+  router.get('/:role/tools', (req: Request, res: Response) => {
+    try {
+      const role = req.params.role;
+      const tools = getToolsForAgent(role);
+      
+      if (tools.length === 0) {
+        return res.status(404).json({
+          error: `Aucun outil trouvé pour le rôle "${role}"`,
+          availableRoles: Object.keys(STATIC_AGENT_REGISTRY),
+        });
+      }
+      
+      return res.json({
+        success: true,
+        role,
+        tools,
+        count: tools.length,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
     }
   });
 

@@ -59,6 +59,19 @@ export type {
   OrchestrationPlan,
   AgentDefinition,
 } from "./types";
+
+// Tool-Agent Mapper (spécialisation des compétences)
+export {
+  TOOL_CATEGORIES,
+  initializeToolAgentMapper,
+  getAgentsForTool,
+  getPrimaryAgentForTool,
+  canAgentUseTool,
+  getToolCategory,
+  getAllToolCategories,
+  getToolsForAgent,
+  getRecommendedRolesForCategory,
+} from "./toolAgentMapper";
 export {
   agentRoleSchema,
   taskPrioritySchema,

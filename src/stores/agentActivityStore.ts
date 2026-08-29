@@ -38,6 +38,61 @@ let agentTasks: AgentTaskEntry[] = [];
 let listeners: Listener[] = [];
 let initialized = false;
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Tool-Agent Mapping
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Mapping dynamique outil → agent basé sur les capabilities des rôles d'agents.
+ * Ce mapping est généré à partir des définitions centralisées dans server/agents/roles.ts
+ * et est mis à jour automatiquement lors de l'initialisation.
+ * 
+ * Pour les outils non trouvés dans le mapping dynamique, un fallback statique est utilisé.
+ */
+let toolToAgentCache: Map<string, string> | null = null;
+
+/**
+ * Mapping statique de fallback pour les outils non couverts par le mapping dynamique.
+ * Ce mapping est progressivement remplacé par le système dynamique basé sur les capabilities.
+ */
+const FALLBACK_TOOL_TO_AGENT: Record<string, string> = {
+  read_project_file: 'writer', write_project_file: 'writer', modify_project_file: 'writer',
+  patch_project_file: 'writer', analyze_project_file: 'researcher', search_in_files: 'researcher',
+  read_file_outline: 'planner', open_project_file: 'writer',
+  list_project_files: 'researcher', create_project_directory: 'writer',
+  rename_project_file: 'writer', delete_project_file: 'writer', delete_project_folder: 'writer', get_workspace_info: 'researcher',
+  git_status: 'writer', git_diff: 'writer', git_stage: 'writer', git_unstage: 'writer',
+  git_commit: 'writer', git_push: 'writer', git_pull: 'writer', git_branches: 'writer',
+  git_switch_branch: 'writer', git_log: 'writer',
+  system_execute_command: 'writer', system_open: 'writer', system_notify: 'writer',
+  automation_navigate: 'researcher', automation_click: 'researcher', automation_type: 'researcher',
+  automation_extract: 'researcher', automation_search: 'researcher', automation_snapshot: 'researcher',
+  save_memory: 'planner', search_memory: 'researcher', search_history: 'researcher',
+  get_conversation_context: 'researcher',
+  reasoning_delegate_task: 'planner', reasoning_think: 'planner',
+  reasoning_list_strategies: 'planner',
+  mission_create: 'planner', mission_status: 'planner', mission_list: 'planner',
+  agent_delegate: 'planner', agent_orchestrate: 'planner',
+};
+
+/**
+ * Initialise le mapping dynamique outil → agent.
+ * Charge le mapping depuis le serveur si disponible (via window), 
+ * sinon utilise le fallback statique.
+ */
+function initializeToolAgentMapping(): void {
+  // Essayer de récupérer le mapping depuis le backend
+  if (typeof window !== 'undefined' && window.LeannaToolAgentMapping) {
+    toolToAgentCache = new Map(Object.entries(window.LeannaToolAgentMapping));
+    console.log(`[agentActivityStore] Mapping outil→agent chargé depuis le backend (${toolToAgentCache.size} outils)`);
+    return;
+  }
+  
+  // Fallback : créer un mapping à partir du fallback statique
+  toolToAgentCache = new Map(Object.entries(FALLBACK_TOOL_TO_AGENT));
+  console.log(`[agentActivityStore] Mapping outil→agent initialisé avec fallback statique (${toolToAgentCache.size} outils)`);
+}
+
 function notify() {
   for (const fn of listeners) fn();
 }
@@ -45,26 +100,21 @@ function notify() {
 // ─── Tool Activity ───────────────────────────────────────────────────────────
 
 function getAgentForTool(tool: string): string {
-  const TOOL_TO_AGENT: Record<string, string> = {
-    read_project_file: 'writer', write_project_file: 'writer', modify_project_file: 'writer',
-    patch_project_file: 'writer', analyze_project_file: 'researcher', search_in_files: 'researcher',
-    read_file_outline: 'planner', open_project_file: 'writer',
-    list_project_files: 'researcher', create_project_directory: 'writer',
-    rename_project_file: 'writer', delete_project_file: 'writer', delete_project_folder: 'writer', get_workspace_info: 'researcher',
-    git_status: 'writer', git_diff: 'writer', git_stage: 'writer', git_unstage: 'writer',
-    git_commit: 'writer', git_push: 'writer', git_pull: 'writer', git_branches: 'writer',
-    git_switch_branch: 'writer', git_log: 'writer',
-    system_execute_command: 'writer', system_open: 'writer', system_notify: 'writer',
-    automation_navigate: 'researcher', automation_click: 'researcher', automation_type: 'researcher',
-    automation_extract: 'researcher', automation_search: 'researcher', automation_snapshot: 'researcher',
-    save_memory: 'planner', search_memory: 'researcher', search_history: 'researcher',
-    get_conversation_context: 'researcher',
-    reasoning_delegate_task: 'planner', reasoning_think: 'planner',
-    reasoning_list_strategies: 'planner',
-    mission_create: 'planner', mission_status: 'planner', mission_list: 'planner',
-    agent_delegate: 'planner', agent_orchestrate: 'planner',
-  };
-  return TOOL_TO_AGENT[tool] ?? 'writer';
+  // Vérifier si le cache est initialisé
+  if (!toolToAgentCache) {
+    initializeToolAgentMapping();
+  }
+  
+  // Chercher dans le cache dynamique
+  if (toolToAgentCache) {
+    const agent = toolToAgentCache.get(tool);
+    if (agent) {
+      return agent;
+    }
+  }
+  
+  // Fallback vers le mapping statique
+  return FALLBACK_TOOL_TO_AGENT[tool] ?? 'writer';
 }
 
 function formatToolLabel(tool: string): string {
@@ -164,6 +214,10 @@ function cleanup() {
 export function initActivityStore() {
   if (initialized) return;
   initialized = true;
+  
+  // Initialiser le mapping outil → agent
+  initializeToolAgentMapping();
+  
   window.addEventListener('Leanna-tool-start', handleToolStart);
   window.addEventListener('Leanna-tool-done', handleToolDone);
   window.addEventListener('Leanna-agent-event', handleAgentEvent);
