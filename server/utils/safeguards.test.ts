@@ -14,10 +14,10 @@ import assert from "node:assert/strict";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { requestConfirmation, handleConfirmationResponse, getPendingCount, cancelAllPending } from "./confirmationBridge";
-import { requiresRestart } from "./serverRestart";
-import { generateDiffSummary } from "../audit";
-import { normalizeSelfPath, SELF_ROOT, setSelfRoot } from "./selfRoot";
+import { requestConfirmation, handleConfirmationResponse, getPendingCount, cancelAllPending } from "./confirmationBridge.js";
+import { requiresRestart } from "./serverRestart.js";
+import { generateDiffSummary } from "../audit.js";
+import { normalizeSelfPath, SELF_ROOT, setSelfRoot } from "./selfRoot.js";
 
 // Ensure SELF_ROOT is set before any test assertions — walk up from server/utils/
 {

@@ -2,7 +2,7 @@
  * Agent Traducteur — Traduction et localisation multilingue
  */
 
-import { defineAgent } from "./plugin";
+import { defineAgent } from "./plugin.js";
 
 export const translatorAgent = defineAgent({
   id: "translator",

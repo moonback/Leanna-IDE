@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import type { Server } from 'http';
-import { createSandboxRouter } from './sandbox';
+import { createSandboxRouter } from './sandbox.js';
 
 test('sandbox routes: GET /status returns sandbox status', async () => {
   const app = express();

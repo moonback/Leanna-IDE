@@ -4,8 +4,8 @@
  */
 
 import { useMemo } from 'react';
-import type { UnifiedSidebarProps } from './types';
-import type { IDEPanelState, IDEPanelActions } from './types';
+import type { UnifiedSidebarProps } from './types.js';
+import type { IDEPanelState, IDEPanelActions } from './types.js';
 
 const noop = () => {};
 

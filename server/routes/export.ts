@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { exportToPdf } from '../export/pdfExporter';
-import { exportToDocx } from '../export/docxExporter';
-import { exportToStandaloneHtml } from '../export/htmlExporter';
-import { notebookManager } from '../notebooks';
+import { exportToPdf } from '../export/pdfExporter.js';
+import { exportToDocx } from '../export/docxExporter.js';
+import { exportToStandaloneHtml } from '../export/htmlExporter.js';
+import { notebookManager } from '../notebooks/index.js';
 
 export function createExportRouter(): Router {
   const router = Router();

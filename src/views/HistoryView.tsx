@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { History, Search, Trash2, RefreshCw, MessageSquare, User, Cpu } from 'lucide-react';
-import { useToast } from '../components/ui/Toast';
-import { ViewHeader } from '../components/ui/ViewHeader';
+import { useToast } from '../components/ui/Toast.js';
+import { ViewHeader } from '../components/ui/ViewHeader.js';
 
 interface Conversation {
   id: string;

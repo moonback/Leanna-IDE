@@ -1,10 +1,10 @@
-import { Skill, SkillContext, validateArgs, SkillResult, createSuccessResult, createErrorResult } from "./base";
+import { Skill, SkillContext, validateArgs, SkillResult, createSuccessResult, createErrorResult } from "./base.js";
 import { z } from "zod";
 import {
   createWorkflow, executeWorkflow, deleteWorkflow, toggleWorkflow,
   listWorkflows, getWorkflow,
   createWorkflowSchema, runWorkflowSchema, deleteWorkflowSchema, toggleWorkflowSchema
-} from "./workflow";
+} from "./workflow.js";
 
 import {
   handleNavigate, handleClick, handleType, handleExtract,
@@ -13,7 +13,7 @@ import {
   handleScreenshot, handleAnalyzeScreenshot,
   handleDownloadFile,
   handleSaveSession, handleRestoreSession, handleListSessions, handleDeleteSession
-} from "./automationBrowser";
+} from "./automationBrowser.js";
 
 import {
   ScheduledTaskDefinition,
@@ -21,7 +21,7 @@ import {
   pauseScheduledTask, resumeScheduledTask, runScheduledTaskNow,
   cancelScheduledTask, stopAllScheduledTasks, setSchedulerSkillHandler,
   handleScheduleTask, handleListScheduledTasks, handleCancelScheduledTask
-} from "./automationScheduler";
+} from "./automationScheduler.js";
 
 // Re-exports publics pour garantir la compatibilité avec server.ts et les tests
 export type { ScheduledTaskDefinition };
@@ -30,7 +30,7 @@ export {
   pauseScheduledTask, resumeScheduledTask, runScheduledTaskNow,
   cancelScheduledTask, stopAllScheduledTasks
 };
-export { getWorkflowsSnapshot, loadWorkflows as loadWorkflowsFromDb } from "./workflow";
+export { getWorkflowsSnapshot, loadWorkflows as loadWorkflowsFromDb } from "./workflow.js";
 
 const selectorSchema = z.string().min(1, "Sélecteur requis").trim();
 

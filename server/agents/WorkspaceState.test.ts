@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AgentRepairLoop } from "./AgentRepairLoop";
-import { WorkspaceState } from "./WorkspaceState";
+import { AgentRepairLoop } from "./AgentRepairLoop.js";
+import { WorkspaceState } from "./WorkspaceState.js";
 
 const issue = (message = "broken") => ({ type: "typecheck", file: "server/example.ts", line: 1, column: 1, severity: "error" as const, rule: "TS1000", message });
 

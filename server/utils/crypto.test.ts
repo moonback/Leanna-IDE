@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import os from 'node:os';
-import { encrypt, decrypt } from './crypto';
+import { encrypt, decrypt } from './crypto.js';
 
 test('crypto: GCM encrypt and decrypt returns original text', () => {
   const plainText = 'sk-or-v1-abcdef1234567890';

@@ -1,18 +1,18 @@
 import fs from "fs";
 import path from "path";
-import { isWriteForbidden, isCriticalFile } from "../utils/selfRoot";
-import { requestConfirmation, type ConfirmationRequest } from "../utils/confirmationBridge";
-import { triggerRestartIfNeeded } from "../utils/serverRestart";
-import { scheduleValidation } from "../utils/postEditValidator";
-import { appendAuditEvent, generateDiffSummary } from "../audit";
-import { isSandboxActive, markFileModified } from "../utils/sandbox";
-import { createLogger } from "../utils/logger";
+import { isWriteForbidden, isCriticalFile } from "../utils/selfRoot.js";
+import { requestConfirmation, type ConfirmationRequest } from "../utils/confirmationBridge.js";
+import { triggerRestartIfNeeded } from "../utils/serverRestart.js";
+import { scheduleValidation } from "../utils/postEditValidator.js";
+import { appendAuditEvent, generateDiffSummary } from "../audit.js";
+import { isSandboxActive, markFileModified } from "../utils/sandbox.js";
+import { createLogger } from "../utils/logger.js";
 import {
   getProjectRoot,
   resolveWritePath,
   resolveSandboxWriteTarget,
   checkWorkspace
-} from "./codebaseHelpers";
+} from "./codebaseHelpers.js";
 
 const log = createLogger("CodebaseWriter");
 

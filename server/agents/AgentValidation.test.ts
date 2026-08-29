@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AgentValidation } from "./AgentValidation";
+import { AgentValidation } from "./AgentValidation.js";
 
 test("AgentValidation accepts a stable baseline with pre-existing failures", () => {
   const baseline = AgentValidation.snapshot({ typecheck: { errorCount: 10 }, lint: { summary: { errors: 2 } }, security: { summary: { critical: 0, high: 1 } } });

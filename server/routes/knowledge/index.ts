@@ -1,13 +1,13 @@
-export { default as knowledgeRouter } from "./knowledgeRouter";
-export { default as memoryRouter } from "./memoryRouter";
-export { default as impactRouter } from "./impactRouter";
-export { default as understandingRouter } from "./understandingRouter";
+export { default as knowledgeRouter } from "./knowledgeRouter.js";
+export { default as memoryRouter } from "./memoryRouter.js";
+export { default as impactRouter } from "./impactRouter.js";
+export { default as understandingRouter } from "./understandingRouter.js";
 
 import type { Router } from "express";
-import knowledgeRouter_ from "./knowledgeRouter";
-import memoryRouter_ from "./memoryRouter";
-import impactRouter_ from "./impactRouter";
-import understandingRouter_ from "./understandingRouter";
+import knowledgeRouter_ from "./knowledgeRouter.js";
+import memoryRouter_ from "./memoryRouter.js";
+import impactRouter_ from "./impactRouter.js";
+import understandingRouter_ from "./understandingRouter.js";
 
 export function createKnowledgeRoutes(): Router[] {
   return [knowledgeRouter_, memoryRouter_, impactRouter_, understandingRouter_];

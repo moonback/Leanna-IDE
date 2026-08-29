@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAnalysisPrompt } from './codebase';
+import { buildAnalysisPrompt } from './codebase.js';
 
 test('buildAnalysisPrompt creates a concise analysis prompt for the codebase markdown', () => {
   const codebaseMarkdown = '# Codebase\n\n## Structure\n- src/\n';

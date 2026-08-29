@@ -25,11 +25,11 @@
  *   Retour à l'Executor (décision: continuer/corriger/escalade)
  */
 
-export { Mission } from "./Mission";
-export { Planner, type SubGoalPlan, type DecomposeFunction } from "./Planner";
-export { Executor, type SkillHandlerFn, type ExecutorEventEmitter } from "./Executor";
-export { ReflectionEngine, reflectionEngine, type ReflectionInput, type ReflectFunction, type ReflectionMode, type LoopDetectionResult, type ConfidenceAnalysis, type ReflectionLesson, type ReflectionSummary } from "./Reflection";
-export { SkillScorer, type ScoringContext, type SkillCategory } from "./SkillScorer";
+export { Mission } from "./Mission.js";
+export { Planner, type SubGoalPlan, type DecomposeFunction } from "./Planner.js";
+export { Executor, type SkillHandlerFn, type ExecutorEventEmitter } from "./Executor.js";
+export { ReflectionEngine, reflectionEngine, type ReflectionInput, type ReflectFunction, type ReflectionMode, type LoopDetectionResult, type ConfidenceAnalysis, type ReflectionLesson, type ReflectionSummary } from "./Reflection.js";
+export { SkillScorer, type ScoringContext, type SkillCategory } from "./SkillScorer.js";
 export type {
   MissionState,
   MissionConfig,
@@ -43,5 +43,5 @@ export type {
   ReflectionResult,
   SkillScore,
   Confidence,
-} from "./types";
-export { DEFAULT_MISSION_CONFIG, createMissionSchema, addGoalSchema } from "./types";
+} from "./types.js";
+export { DEFAULT_MISSION_CONFIG, createMissionSchema, addGoalSchema } from "./types.js";

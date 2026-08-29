@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
-import { projectMemory } from "../knowledge/ProjectMemory";
-import { createLogger } from "../utils/logger";
-import type { Confidence, ReflectionResult, MissionState, Goal } from "./types";
+import { projectMemory } from "../knowledge/ProjectMemory.js";
+import { createLogger } from "../utils/logger.js";
+import type { Confidence, ReflectionResult, MissionState, Goal } from "./types.js";
 
 const log = createLogger("ReflectionEngine");
 

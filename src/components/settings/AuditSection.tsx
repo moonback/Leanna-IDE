@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Database } from 'lucide-react';
-import { Section, Field } from './SettingsPrimitives';
-import type { AuditEntry } from './constants';
+import { Section, Field } from './SettingsPrimitives.js';
+import type { AuditEntry } from './constants.js';
 
 export function AuditSection() {
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);

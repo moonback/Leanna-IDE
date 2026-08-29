@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { z } from 'zod';
-import { requestConfirmation } from '../utils/confirmationBridge';
+import { requestConfirmation } from '../utils/confirmationBridge.js';
 
 export function createSelfRootRouter(getWss: () => WebSocketServer | null): Router {
   const router = Router();

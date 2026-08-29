@@ -10,7 +10,7 @@ import {
   resolveRealPathWithinSelf,
   auditSymlinks,
   setSelfRoot,
-} from './selfRoot';
+} from './selfRoot.js';
 
 // Ensure SELF_ROOT is initialised — needed in test environments where no
 // project has been persisted yet. Walk up from server/utils/ to project root.

@@ -23,13 +23,13 @@
  */
 
 import { randomUUID } from "crypto";
-import { createLogger } from "../utils/logger";
-import { projectMemory } from "./ProjectMemory";
-import { knowledgeGraph } from "./KnowledgeGraph";
-import { dependencyGraph } from "./DependencyGraph";
-import { impactAnalyzer } from "./ImpactAnalyzer";
-import type { Lesson, LearningResult, ProjectKnowledgeCategory, ProjectFact } from "./types";
-import type { RiskLevel } from "./ImpactAnalyzer";
+import { createLogger } from "../utils/logger.js";
+import { projectMemory } from "./ProjectMemory.js";
+import { knowledgeGraph } from "./KnowledgeGraph.js";
+import { dependencyGraph } from "./DependencyGraph.js";
+import { impactAnalyzer } from "./ImpactAnalyzer.js";
+import type { Lesson, LearningResult, ProjectKnowledgeCategory, ProjectFact } from "./types.js";
+import type { RiskLevel } from "./ImpactAnalyzer.js";
 
 const log = createLogger("LearningEngine");
 

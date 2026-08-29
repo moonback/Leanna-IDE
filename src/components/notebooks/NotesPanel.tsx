@@ -10,9 +10,9 @@ import {
   Plus, Pin, Trash2, Edit3, Save, X, StickyNote, Clock, Search, ArrowUpDown,
   Download, FileText, Layout, ListChecks, BookOpen, Grid3X3, List, Link2,
 } from 'lucide-react';
-import { useToast } from '../ui/Toast';
-import { NotesCanvas } from './NotesCanvas';
-import { TemplateSelectorModal } from '../templates/TemplateSelectorModal';
+import { useToast } from '../ui/Toast.js';
+import { NotesCanvas } from './NotesCanvas.js';
+import { TemplateSelectorModal } from '../templates/TemplateSelectorModal.js';
 import { Sparkles } from 'lucide-react';
 
 interface NoteItem {

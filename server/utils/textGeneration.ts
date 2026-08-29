@@ -4,13 +4,13 @@
  * based on the user's profile setting (textProvider).
  *
  * Usage:
- *   import { generateText, generateTextStream, setTextGenerationProfile } from './utils/textGeneration';
+ *   import { generateText, generateTextStream, setTextGenerationProfile } from './utils/textGeneration.js';
  *   const result = await generateText({ prompt: "...", systemPrompt: "..." });
  *   const stream = generateTextStream({ prompt: "...", onChunk: (text) => ... });
  */
 
-import { withGeminiRetry } from "./geminiKeyPool";
-import { getNextGeminiKey } from "./geminiKeyPool";
+import { withGeminiRetry } from "./geminiKeyPool.js";
+import { getNextGeminiKey } from "./geminiKeyPool.js";
 import { GoogleGenAI } from "@google/genai";
 
 // ── Profile interface (minimal subset needed here) ──────────────────────────

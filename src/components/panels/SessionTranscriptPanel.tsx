@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, Trash2, User, Cpu } from 'lucide-react';
-import { Panel } from '../ui/Panel';
-import { IconButton } from '../ui/IconButton';
-import type { TranscriptEntry } from '../../hooks/useLiveAPI';
-import { useProfile } from '../../context/UserProfileContext';
+import { Panel } from '../ui/Panel.js';
+import { IconButton } from '../ui/IconButton.js';
+import type { TranscriptEntry } from '../../hooks/useLiveAPI.js';
+import { useProfile } from '../../context/UserProfileContext.js';
 
 interface SessionTranscriptPanelProps {
   transcript: TranscriptEntry[];

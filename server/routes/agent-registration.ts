@@ -6,11 +6,11 @@
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { dynamicAgentRegistry } from '../agents/DynamicAgentRegistry';
-import { agentRegistry } from '../agents/AgentRegistry';
-import { getAgentDefinition, STATIC_AGENT_REGISTRY, listAgentDefinitions } from '../agents/roles';
-import type { AgentRole } from '../agents/types';
-import { createLogger } from '../utils/logger';
+import { dynamicAgentRegistry } from '../agents/DynamicAgentRegistry.js';
+import { agentRegistry } from '../agents/AgentRegistry.js';
+import { getAgentDefinition, STATIC_AGENT_REGISTRY, listAgentDefinitions } from '../agents/roles.js';
+import type { AgentRole } from '../agents/types.js';
+import { createLogger } from '../utils/logger.js';
 
 const log = createLogger("AgentRegistrationAPI");
 

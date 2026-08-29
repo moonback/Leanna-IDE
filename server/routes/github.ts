@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2';
-import { SELF_ROOT } from '../utils/selfRoot';
+import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2.js';
+import { SELF_ROOT } from '../utils/selfRoot.js';
 
 // Type compatible avec l'ancien SkillManager pour une migration progressive
 type SkillManager = SkillManagerV2;

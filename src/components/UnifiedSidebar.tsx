@@ -24,24 +24,24 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-import { useTheme } from '../context/ThemeContext';
-import { useProfile } from '../context/UserProfileContext';
-import { SidebarSection, SidebarSeparator } from './ide/sidebar/SidebarSection';
-import { SidebarItem } from './ide/sidebar/SidebarItem';
-import { sidebarSections } from '../config/ideSidebarConfig';
+import { useTheme } from '../context/ThemeContext.js';
+import { useProfile } from '../context/UserProfileContext.js';
+import { SidebarSection, SidebarSeparator } from './ide/sidebar/SidebarSection.js';
+import { SidebarItem } from './ide/sidebar/SidebarItem.js';
+import { sidebarSections } from '../config/ideSidebarConfig.js';
 // @ts-ignore - Assets handled by bundler
 import logoDark from '../../assets/images/icon-sombre.png';
 // @ts-ignore - Assets handled by bundler
 import logoLight from '../../assets/images/icon-light.png';
 
-import { QuitConfirmDialog } from './sidebar/QuitConfirmDialog';
-import { AgentStatusBlock } from './sidebar/AgentStatusBlock';
-import { buildAIMenuItems } from './sidebar/buildAIMenuItems';
-import { useIDEState } from './sidebar/useIDEState';
-import type { UnifiedSidebarProps, SidebarContext } from './sidebar/types';
+import { QuitConfirmDialog } from './sidebar/QuitConfirmDialog.js';
+import { AgentStatusBlock } from './sidebar/AgentStatusBlock.js';
+import { buildAIMenuItems } from './sidebar/buildAIMenuItems.js';
+import { useIDEState } from './sidebar/useIDEState.js';
+import type { UnifiedSidebarProps, SidebarContext } from './sidebar/types.js';
 
 // Re-export types for consumers
-export type { UnifiedSidebarProps } from './sidebar/types';
+export type { UnifiedSidebarProps } from './sidebar/types.js';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 

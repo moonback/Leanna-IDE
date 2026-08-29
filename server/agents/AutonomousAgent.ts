@@ -19,19 +19,19 @@
  *           Other AutonomousAgents (parallel)
  */
 import { randomUUID } from "crypto";
-import type { AgentRole, AgentTask, TaskResult, TaskPriority } from "./types";
+import type { AgentRole, AgentTask, TaskResult, TaskPriority } from "./types.js";
 import type {
   AgentMessage,
   TaskRequestPayload,
   CollaborationRequestPayload,
   StatusResponsePayload,
-} from "./AgentCommunication";
-import { DELEGATION_MATRIX, isDelegationAllowed } from "./AgentCommunication";
-import { AgentMessageBus } from "./AgentMessageBus";
-import { AgentExecutor } from "./AgentExecutor";
-import { AutonomousLoop, type LoopConfig } from "./AutonomousLoop";
-import { getAgentDefinition } from "./roles";
-import { createLogger } from "../utils/logger";
+} from "./AgentCommunication.js";
+import { DELEGATION_MATRIX, isDelegationAllowed } from "./AgentCommunication.js";
+import { AgentMessageBus } from "./AgentMessageBus.js";
+import { AgentExecutor } from "./AgentExecutor.js";
+import { AutonomousLoop, type LoopConfig } from "./AutonomousLoop.js";
+import { getAgentDefinition } from "./roles.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("AutonomousAgent");
 

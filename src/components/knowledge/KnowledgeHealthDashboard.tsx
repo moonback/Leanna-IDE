@@ -18,7 +18,7 @@ import {
   Cpu,
   Info,
 } from 'lucide-react';
-import { useToast } from '../ui/Toast';
+import { useToast } from '../ui/Toast.js';
 
 interface HealthData {
   status: string;

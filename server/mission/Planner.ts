@@ -5,9 +5,9 @@ import type {
   PlannedAction,
   MissionState,
   SkillScore,
-} from "./types";
-import { Mission } from "./Mission";
-import { SkillScorer } from "./SkillScorer";
+} from "./types.js";
+import { Mission } from "./Mission.js";
+import { SkillScorer } from "./SkillScorer.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Planner — Décomposition hiérarchique des objectifs

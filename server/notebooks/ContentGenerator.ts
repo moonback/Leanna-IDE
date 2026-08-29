@@ -10,10 +10,10 @@
  */
 
 import { randomUUID } from "crypto";
-import { createLogger } from "../utils/logger";
-import { generateText } from "../utils/textGeneration";
-import { notebookManager } from "./NotebookManager";
-import type { GeneratedDocument, GeneratedDocType, AudioOverview, ReportSuggestion } from "./types";
+import { createLogger } from "../utils/logger.js";
+import { generateText } from "../utils/textGeneration.js";
+import { notebookManager } from "./NotebookManager.js";
+import type { GeneratedDocument, GeneratedDocType, AudioOverview, ReportSuggestion } from "./types.js";
 
 const log = createLogger("ContentGenerator");
 

@@ -1,7 +1,7 @@
 import express from "express";
 import { rateLimit } from "express-rate-limit";
 import compression from "compression";
-import { resolveWorkspacePath } from "../security";
+import { resolveWorkspacePath } from "../security.js";
 import * as path from "path";
 
 export interface RateLimitDeps {

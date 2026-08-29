@@ -1,4 +1,4 @@
-import { Skill } from "./base";
+import { Skill } from "./base.js";
 
 export const timeSkill: Skill = {
   name: "time",

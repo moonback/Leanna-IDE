@@ -5,7 +5,7 @@
  * pour permettre aux agents de communiquer de manière autonome.
  */
 import { z } from "zod";
-import type { AgentRole, TaskResult } from "./types";
+import type { AgentRole, TaskResult } from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types de messages inter-agents
@@ -153,9 +153,9 @@ export interface DelegationCapability {
   reason: string;
 }
 
-import { STATIC_AGENT_ROLES } from "./types";
-import { listAgentRoles } from "./roles";
-import { getAgentDefinition } from "./roles";
+import { STATIC_AGENT_ROLES } from "./types.js";
+import { listAgentRoles } from "./roles.js";
+import { getAgentDefinition } from "./roles.js";
 
 /** Matrice de délégation : quels agents peuvent déléguer à qui */
 export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {

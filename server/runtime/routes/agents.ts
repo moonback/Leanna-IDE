@@ -6,7 +6,7 @@
  */
 
 import { Router, Request, Response } from "express";
-import type { AgentRuntime } from "../AgentRuntime";
+import type { AgentRuntime } from "../AgentRuntime.js";
 
 export function createAgentsRouterV2(runtime: AgentRuntime): Router {
   const router = Router();

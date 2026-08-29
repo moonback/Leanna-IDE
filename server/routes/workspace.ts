@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { existsSync } from 'node:fs';
-import { isSandboxActive } from '../utils/sandbox';
-import { SELF_ROOT } from '../utils/selfRoot';
+import { isSandboxActive } from '../utils/sandbox.js';
+import { SELF_ROOT } from '../utils/selfRoot.js';
 
 export function createWorkspaceRouter(getWorkspaceRoot: () => string): Router {
   const router = Router();

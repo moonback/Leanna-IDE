@@ -1,8 +1,8 @@
 import { useRef, useState, useEffect } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { SidebarItem } from './SidebarItem';
-import { FlyoutMenu, FlyoutHeader, FlyoutItem } from './FlyoutMenu';
-import type { SidebarSectionConfig } from '../../../config/ideSidebarConfig';
+import { SidebarItem } from './SidebarItem.js';
+import { FlyoutMenu, FlyoutHeader, FlyoutItem } from './FlyoutMenu.js';
+import type { SidebarSectionConfig } from '../../../config/ideSidebarConfig.js';
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

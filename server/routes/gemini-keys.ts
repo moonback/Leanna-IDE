@@ -10,7 +10,7 @@ import {
   removeGeminiKey,
   toggleGeminiKey,
   updateGeminiKeyLabel,
-} from '../utils/geminiKeyPool';
+} from '../utils/geminiKeyPool.js';
 
 export function createGeminiKeysRouter(): Router {
   const router = Router();

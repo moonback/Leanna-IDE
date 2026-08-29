@@ -12,7 +12,7 @@
  * Gain attendu : Réduction de ~30-40% de la taille des system prompts
  */
 
-import type { AgentRole } from "./types";
+import type { AgentRole } from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SECTIONS COMMUNES À TOUS LES AGENTS

@@ -11,8 +11,8 @@
  * with deduplication, TTL caching, and event-driven invalidation.
  */
 
-import { ideApi, type TreeEntry } from './ideApi';
-import { sandboxApi, type SandboxStatus, type SandboxDiff } from './sandboxApi';
+import { ideApi, type TreeEntry } from './ideApi.js';
+import { sandboxApi, type SandboxStatus, type SandboxDiff } from './sandboxApi.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 

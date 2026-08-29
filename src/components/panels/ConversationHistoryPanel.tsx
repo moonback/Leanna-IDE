@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { History, Search, Trash2, MessageSquare, ChevronLeft, RefreshCw, User, Cpu } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Panel } from '../ui/Panel';
-import { IconButton } from '../ui/IconButton';
+import { Panel } from '../ui/Panel.js';
+import { IconButton } from '../ui/IconButton.js';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { SELF_ROOT } from './selfRoot';
+import { SELF_ROOT } from './selfRoot.js';
 
 const tmpConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), 'Leanna-keys-test-'));
 process.env.Leanna_CONFIG_PATH = tmpConfigDir;

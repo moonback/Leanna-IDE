@@ -8,7 +8,7 @@
  */
 
 import { Router, Request, Response } from "express";
-import { generateSpeech, generateSpeechStreaming, getTTSStats, clearTTSCache } from "../utils/geminiTTS";
+import { generateSpeech, generateSpeechStreaming, getTTSStats, clearTTSCache } from "../utils/geminiTTS.js";
 
 export function createTTSRouter(): Router {
   const router = Router();

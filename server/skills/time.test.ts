@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { timeSkill } from './time';
+import { timeSkill } from './time.js';
 
 test('timeSkill: get_current_time returns time and date', async () => {
   assert.equal(timeSkill.name, 'time');

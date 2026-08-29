@@ -11,13 +11,13 @@
  *   7. Fallback en cascade : OpenRouter Kokoro → OpenRouter Fish → Gemini TTS
  *
  * Usage :
- *   import { generateSpeech, generateSpeechStreaming } from './utils/geminiTTS';
+ *   import { generateSpeech, generateSpeechStreaming } from './utils/geminiTTS.js';
  *   const base64Audio = await generateSpeech("Bonjour !", { voiceName: "ff_siwis" });
  *   // Ou en streaming pour les textes longs :
  *   for await (const chunk of generateSpeechStreaming(longText, opts)) { ... }
  */
 
-import { createLogger } from "./logger";
+import { createLogger } from "./logger.js";
 
 const log = createLogger("TTS");
 

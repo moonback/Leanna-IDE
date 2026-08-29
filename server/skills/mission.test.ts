@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { missionSkill, updateMissionSkills } from './mission';
+import { missionSkill, updateMissionSkills } from './mission.js';
 
 test('missionSkill: metadata and skills update', () => {
   assert.equal(missionSkill.name, 'mission');

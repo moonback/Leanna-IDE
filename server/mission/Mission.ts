@@ -10,8 +10,8 @@ import type {
   MissionMetrics,
   MissionConfig,
   ReflectionResult,
-} from "./types";
-import { DEFAULT_MISSION_CONFIG } from "./types";
+} from "./types.js";
+import { DEFAULT_MISSION_CONFIG } from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Mission — État persistant et Goal Stack

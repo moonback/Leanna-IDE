@@ -9,7 +9,7 @@
  */
 
 import path from "path";
-import { SELF_ROOT } from "./selfRoot";
+import { SELF_ROOT } from "./selfRoot.js";
 
 const SERVER_CODE_EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".cjs", ".mjs"]);
 const SERVER_DIRS = ["server/", "electron/"];

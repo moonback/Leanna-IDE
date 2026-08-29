@@ -1,6 +1,6 @@
 import { User, AtSign, Briefcase } from 'lucide-react';
-import { useProfile } from '../../context/UserProfileContext';
-import { Section, Field, TextInput } from './SettingsPrimitives';
+import { useProfile } from '../../context/UserProfileContext.js';
+import { Section, Field, TextInput } from './SettingsPrimitives.js';
 
 export function ProfileSection() {
   const { profile, setField } = useProfile();

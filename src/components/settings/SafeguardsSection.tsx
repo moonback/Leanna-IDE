@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShieldCheck, History, FileWarning, RotateCcw, Play, CheckCircle2, XCircle, Clock } from 'lucide-react';
-import { Section, Field, ToggleSwitch } from './SettingsPrimitives';
+import { Section, Field, ToggleSwitch } from './SettingsPrimitives.js';
 
 interface Checkpoint {
   hash: string;

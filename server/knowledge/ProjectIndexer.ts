@@ -20,16 +20,16 @@
 
 import fs from "fs";
 import path from "path";
-import { SELF_ROOT } from "../utils/selfRoot";
-import { createLogger } from "../utils/logger";
-import { knowledgeGraph } from "./KnowledgeGraph";
-import type { CodeEntity, FileNode } from "./types";
-import { extractFileOutline } from "../skills/codebaseHelpers";
-import type { OutlineEntry } from "../skills/codebaseHelpers";
-import { isSandboxActive, getSandboxRoot } from "../utils/sandbox";
-import { fileWatcher } from "./FileWatcher";
-import type { FileChangeEvent } from "./FileWatcher";
-import { relationExtractor } from "./RelationExtractor";
+import { SELF_ROOT } from "../utils/selfRoot.js";
+import { createLogger } from "../utils/logger.js";
+import { knowledgeGraph } from "./KnowledgeGraph.js";
+import type { CodeEntity, FileNode } from "./types.js";
+import { extractFileOutline } from "../skills/codebaseHelpers.js";
+import type { OutlineEntry } from "../skills/codebaseHelpers.js";
+import { isSandboxActive, getSandboxRoot } from "../utils/sandbox.js";
+import { fileWatcher } from "./FileWatcher.js";
+import type { FileChangeEvent } from "./FileWatcher.js";
+import { relationExtractor } from "./RelationExtractor.js";
 
 const log = createLogger("ProjectIndexer");
 
@@ -376,7 +376,7 @@ export class ProjectIndexer {
         imports.push(staticImport[1]);
       }
 
-      // Imports sans binding : import "./polyfill"
+      // Imports sans binding : import "./polyfill.js"
       const sideEffectImport = line.match(/^import\s+['"]([^'"]+)['"]/);
       if (sideEffectImport) {
         imports.push(sideEffectImport[1]);

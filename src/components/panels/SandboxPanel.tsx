@@ -6,7 +6,7 @@ import {
   GitCompareArrows, FileCode2,
   ChevronDown, RotateCcw, X,
 } from 'lucide-react';
-import { useSandboxWatcher } from '../../hooks/useSandboxWatcher';
+import { useSandboxWatcher } from '../../hooks/useSandboxWatcher.js';
 
 interface SandboxStatus {
   active: boolean;

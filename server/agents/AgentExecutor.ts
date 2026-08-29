@@ -23,7 +23,7 @@ import type { TaskRequestPayload } from "./AgentCommunication.js";
 import { createLogger } from "../utils/logger.js";
 import { WorkspaceState, type VerificationRecord, type VerificationIssue } from "./WorkspaceState.js";
 import { AgentRepairLoop } from "./AgentRepairLoop.js";
-// import { promptCache } from "../utils/promptCache"; // Prêt pour intégration future
+// import { promptCache } from "../utils/promptCache.js"; // Prêt pour intégration future
 
 const log = createLogger("AgentExecutor");
 

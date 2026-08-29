@@ -1,7 +1,7 @@
 import React from 'react';
 import { Camera } from 'lucide-react';
-import { Panel } from '../ui/Panel';
-import { WebcamCapture } from '../WebcamCapture';
+import { Panel } from '../ui/Panel.js';
+import { WebcamCapture } from '../WebcamCapture.js';
 
 interface VisionPanelProps {
   connected: boolean;

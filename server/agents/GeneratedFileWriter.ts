@@ -9,10 +9,10 @@
  * 2. ## Fichier: path/to/file.ts\n```lang\n...content...\n```
  * 3. JSON structuré { "files": [{ "path": "...", "content": "..." }] }
  */
-import type { AgentTask } from "./types";
-import { getAgentDefinition } from "./roles";
-import { createLogger } from "../utils/logger";
-import { checkBracketBalance, checkTypeScriptSyntax } from "../skills/verify";
+import type { AgentTask } from "./types.js";
+import { getAgentDefinition } from "./roles.js";
+import { createLogger } from "../utils/logger.js";
+import { checkBracketBalance, checkTypeScriptSyntax } from "../skills/verify.js";
 
 const log = createLogger("FileWriter");
 

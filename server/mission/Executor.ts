@@ -1,16 +1,16 @@
 import { randomUUID } from "crypto";
-import { Mission } from "./Mission";
-import { Planner, type SubGoalPlan } from "./Planner";
-import { ReflectionEngine, type ReflectionInput } from "./Reflection";
-import { SkillScorer } from "./SkillScorer";
+import { Mission } from "./Mission.js";
+import { Planner, type SubGoalPlan } from "./Planner.js";
+import { ReflectionEngine, type ReflectionInput } from "./Reflection.js";
+import { SkillScorer } from "./SkillScorer.js";
 import type {
   GoalStatus,
   PlannedAction,
   GoalResult,
   ReflectionResult,
   MissionConfig,
-} from "./types";
-import { DEFAULT_MISSION_CONFIG } from "./types";
+} from "./types.js";
+import { DEFAULT_MISSION_CONFIG } from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Executor — Boucle plan → agir → vérifier → corriger

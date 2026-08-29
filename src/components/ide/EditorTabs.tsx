@@ -1,9 +1,9 @@
 import React, { memo } from 'react';
 import { motion } from 'motion/react';
 import { X, Save, Map, WrapText, AlignJustify, Eye, Code, Sparkles, Globe } from 'lucide-react';
-import { FileIcon } from './FileIcon';
-import { fileName } from '../../utils/fileUtils';
-import type { OpenFile } from '../../types/ide';
+import { FileIcon } from './FileIcon.js';
+import { fileName } from '../../utils/fileUtils.js';
+import type { OpenFile } from '../../types/ide.js';
 
 type EditorTabsProps = {
   openFiles: OpenFile[];

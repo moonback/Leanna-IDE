@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { summarizeWithLLM, estimateTokens, type ChatMessage } from '../utils/tokenOptimizer';
+import { summarizeWithLLM, estimateTokens, type ChatMessage } from '../utils/tokenOptimizer.js';
 
 const MAX_SUMMARIZE_INPUT_TOKENS = 120_000;
 const MAX_KEEP_TURNS = 30;

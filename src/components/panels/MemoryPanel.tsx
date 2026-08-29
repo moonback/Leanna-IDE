@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrainCircuit, RefreshCw, Search, Trash2, X } from 'lucide-react';
-import { Panel } from '../ui/Panel';
-import { useToast } from '../ui/Toast';
+import { Panel } from '../ui/Panel.js';
+import { useToast } from '../ui/Toast.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

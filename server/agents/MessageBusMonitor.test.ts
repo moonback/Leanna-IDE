@@ -15,8 +15,8 @@ import {
   messageBusMonitor,
   type MonitorAlert,
   type HealthStatus
-} from "./MessageBusMonitor";
-import { agentMessageBus } from "./AgentMessageBus";
+} from "./MessageBusMonitor.js";
+import { agentMessageBus } from "./AgentMessageBus.js";
 
 // Mock du logger
 vi.mock("../utils/logger", () => ({

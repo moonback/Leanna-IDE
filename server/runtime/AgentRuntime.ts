@@ -21,10 +21,10 @@
  */
 
 import { randomUUID } from "crypto";
-import { EventBus } from "./EventBus";
-import { StateMachine } from "./StateMachine";
-import { ToolRegistry } from "./ToolRegistry";
-import { Memory } from "./Memory";
+import { EventBus } from "./EventBus.js";
+import { StateMachine } from "./StateMachine.js";
+import { ToolRegistry } from "./ToolRegistry.js";
+import { Memory } from "./Memory.js";
 import type {
   Task,
   TaskResult,
@@ -33,8 +33,8 @@ import type {
   AgentPriority,
   RuntimeConfig,
   TaskState,
-} from "./types";
-import { DEFAULT_RUNTIME_CONFIG } from "./types";
+} from "./types.js";
+import { DEFAULT_RUNTIME_CONFIG } from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Agent Plugin Interface

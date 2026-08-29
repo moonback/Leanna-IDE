@@ -10,7 +10,7 @@ import {
   normalizeProjectPath,
   resolveWritePath,
   checkWorkspace
-} from './codebaseHelpers';
+} from './codebaseHelpers.js';
 
 test('codebaseHelpers: buildTreeMarkdown', () => {
   const files = [

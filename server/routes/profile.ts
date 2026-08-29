@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { ProfileConfig } from '../prompts/systemInstruction';
+import { ProfileConfig } from '../prompts/systemInstruction.js';
 
 export function createProfileRouter(
   getProfile: () => ProfileConfig,

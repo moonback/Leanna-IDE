@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { appendAuditEvent, readAuditEntries, analyzeAuditLog } from './audit';
+import { appendAuditEvent, readAuditEntries, analyzeAuditLog } from './audit.js';
 
 test('appendAuditEvent writes and reads audit entries', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'Leanna-audit-'));

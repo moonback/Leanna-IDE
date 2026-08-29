@@ -6,8 +6,8 @@
  */
 
 import React from 'react';
-import { ImportToNotebookButton, importToNotebookAction } from './ImportToNotebookButton';
-import { useNotebookId } from '../../hooks';
+import { ImportToNotebookButton, importToNotebookAction } from './ImportToNotebookButton.js';
+import { useNotebookId } from '../../hooks/index.js';
 
 // Exemple 1: Bouton simple avec création automatique
 function SimpleImportButtonExample() {

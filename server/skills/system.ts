@@ -1,11 +1,11 @@
-import { Skill } from "./base";
+import { Skill } from "./base.js";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { SELF_ROOT, normalizeSelfPath, resolveRealPathWithinSelf } from "../utils/selfRoot";
-import { requestConfirmation } from "../utils/confirmationBridge";
+import { SELF_ROOT, normalizeSelfPath, resolveRealPathWithinSelf } from "../utils/selfRoot.js";
+import { requestConfirmation } from "../utils/confirmationBridge.js";
 
 const execFileAsync = promisify(execFile);
 

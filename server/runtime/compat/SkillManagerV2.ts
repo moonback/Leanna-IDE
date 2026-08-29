@@ -15,12 +15,12 @@
  *   - Plus de 5 systèmes d'initialisation chaînés
  */
 
-import { ToolRegistry } from "../ToolRegistry";
-import { EventBus } from "../EventBus";
-import { adaptSkill, adaptAllSkills, createToolCallProxy } from "./SkillAdapter";
-import type { LegacySkill } from "./SkillAdapter";
-import type { ToolCallMetrics } from "../types";
-import type { Skill } from "../../skills/base";
+import { ToolRegistry } from "../ToolRegistry.js";
+import { EventBus } from "../EventBus.js";
+import { adaptSkill, adaptAllSkills, createToolCallProxy } from "./SkillAdapter.js";
+import type { LegacySkill } from "./SkillAdapter.js";
+import type { ToolCallMetrics } from "../types.js";
+import type { Skill } from "../../skills/base.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SkillManagerV2

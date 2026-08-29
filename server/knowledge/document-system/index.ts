@@ -10,7 +10,7 @@
  *   DocumentAnalyzer  → analyse intelligente (résumés, faits, relations)
  *
  * Usage :
- *   import { documentAnalyzer, documentMemory, documentSearchEngine } from "./document-system";
+ *   import { documentAnalyzer, documentMemory, documentSearchEngine } from "./document-system.js";
  *   
  *   // Ingérer un document
  *   const doc = await documentAnalyzer.ingestFromBuffer(buffer, "rapport.pdf", "application/pdf");
@@ -42,16 +42,16 @@ export type {
   ExtractionOptions,
   DocumentKnowledgeStore,
   DocumentKnowledgeStats,
-} from "./types";
+} from "./types.js";
 
 // DocumentExtractor
-export { DocumentExtractor, documentExtractor } from "./DocumentExtractor";
+export { DocumentExtractor, documentExtractor } from "./DocumentExtractor.js";
 
 // DocumentMemory
-export { DocumentMemory, documentMemory } from "./DocumentMemory";
+export { DocumentMemory, documentMemory } from "./DocumentMemory.js";
 
 // DocumentSearchEngine
-export { DocumentSearchEngine, documentSearchEngine } from "./DocumentSearchEngine";
+export { DocumentSearchEngine, documentSearchEngine } from "./DocumentSearchEngine.js";
 
 // DocumentAnalyzer
-export { DocumentAnalyzer, documentAnalyzer } from "./DocumentAnalyzer";
+export { DocumentAnalyzer, documentAnalyzer } from "./DocumentAnalyzer.js";

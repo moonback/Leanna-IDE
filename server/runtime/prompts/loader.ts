@@ -16,7 +16,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { PromptRegistry } from "../PromptRegistry";
+import { PromptRegistry } from "../PromptRegistry.js";
 
 const __dirname_compat = typeof __dirname !== 'undefined'
   ? __dirname

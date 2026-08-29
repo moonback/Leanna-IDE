@@ -5,7 +5,7 @@ import {
   Zap, CheckCircle2, ChevronDown, Loader2,
   Search, Globe, Database, Brain,
 } from 'lucide-react';
-import type { ActivityStep } from '../../hooks/useLiveAPI';
+import type { ActivityStep } from '../../hooks/useLiveAPI.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

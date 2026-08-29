@@ -4,10 +4,10 @@ import {
   Shield, Search, X, ArrowDownAZ, ArrowUpZA, Layers, GripVertical,
   Eye, EyeOff, FolderInput,
 } from 'lucide-react';
-import { FileIcon } from './FileIcon';
-import { Breadcrumb } from './Breadcrumb';
-import type { TreeEntry } from '../../types/ide';
-import { sandboxApi } from '../../services/sandboxApi';
+import { FileIcon } from './FileIcon.js';
+import { Breadcrumb } from './Breadcrumb.js';
+import type { TreeEntry } from '../../types/ide.js';
+import { sandboxApi } from '../../services/sandboxApi.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

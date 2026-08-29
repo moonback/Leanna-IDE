@@ -5,7 +5,7 @@ import {
   subscribeToRestart,
   triggerRestartIfNeeded,
   getRestartStatus
-} from './serverRestart';
+} from './serverRestart.js';
 
 test('serverRestart: requiresRestart logic', () => {
   // Server critical files/folders should return true

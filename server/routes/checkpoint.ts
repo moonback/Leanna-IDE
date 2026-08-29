@@ -9,7 +9,7 @@ import {
   rollbackToCheckpoint,
   listCheckpoints,
   validateBuild,
-} from '../utils/checkpoint';
+} from '../utils/checkpoint.js';
 
 export function createCheckpointRouter(): Router {
   const router = Router();

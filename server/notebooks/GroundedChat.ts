@@ -12,11 +12,11 @@
  */
 
 import { randomUUID } from "crypto";
-import { createLogger } from "../utils/logger";
-import { generateText, generateTextStream } from "../utils/textGeneration";
-import { ragEngine } from "./RAGEngine";
-import { notebookManager } from "./NotebookManager";
-import type { ChatMessage, Citation } from "./types";
+import { createLogger } from "../utils/logger.js";
+import { generateText, generateTextStream } from "../utils/textGeneration.js";
+import { ragEngine } from "./RAGEngine.js";
+import { notebookManager } from "./NotebookManager.js";
+import type { ChatMessage, Citation } from "./types.js";
 
 const log = createLogger("GroundedChat");
 

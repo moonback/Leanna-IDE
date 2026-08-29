@@ -12,8 +12,8 @@
  * - Extensible sans modification du builder
  */
 
-import { PromptRegistry } from "../PromptRegistry";
-import { loadPromptTemplates } from "./loader";
+import { PromptRegistry } from "../PromptRegistry.js";
+import { loadPromptTemplates } from "./loader.js";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import {
@@ -22,7 +22,7 @@ import {
   AGENT_ROLES_INFO,
   LANG_INSTRUCTIONS_FR,
   STYLE_INSTRUCTIONS_FR,
-} from "./types";
+} from "./types.js";
 
 const __dirname_compat = typeof __dirname !== 'undefined'
   ? __dirname

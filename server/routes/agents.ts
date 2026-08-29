@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2';
+import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2.js';
 import {
   agentOrchestrator,
   agentMessageBus,
@@ -12,8 +12,8 @@ import {
   getPrimaryAgentForTool,
   getAllToolCategories,
   getToolsForAgent,
-} from '../agents';
-import { AgentPersistence } from '../agents/AgentPersistence';
+} from '../agents/index.js';
+import { AgentPersistence } from '../agents/AgentPersistence.js';
 
 // Type compatible avec l'ancien SkillManager pour une migration progressive
 type SkillManager = SkillManagerV2;

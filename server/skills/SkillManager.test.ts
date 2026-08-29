@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { SkillManager } from "./SkillManager";
-import { Skill } from "./base";
-import { SELF_ROOT } from "../utils/selfRoot";
-import { initSandbox } from "../utils/sandbox";
+import { SkillManager } from "./SkillManager.js";
+import { Skill } from "./base.js";
+import { SELF_ROOT } from "../utils/selfRoot.js";
+import { initSandbox } from "../utils/sandbox.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const __test_dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -523,7 +523,7 @@ test("Pattern: implicit-any — ajoute le type explicite", async () => {
 
 test("Pattern: deprecated-api — annote la ligne", async () => {
   const content = [
-    'import { oldMethod } from "./lib";',
+    'import { oldMethod } from "./lib.js";',
     'const result = oldMethod();',
     'export default result;',
   ].join('\n');

@@ -2,7 +2,7 @@
  * Agent Mise en Forme — Formatage et structuration de documents
  */
 
-import { defineAgent } from "./plugin";
+import { defineAgent } from "./plugin.js";
 
 export const formatterAgent = defineAgent({
   id: "formatter",

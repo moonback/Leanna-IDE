@@ -4,8 +4,8 @@ import express from 'express';
 import type { Server } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import ideRouter from './ide';
-import { setSelfRoot } from '../utils/selfRoot';
+import ideRouter from './ide.js';
+import { setSelfRoot } from '../utils/selfRoot.js';
 
 {
   const __filename_local = fileURLToPath(import.meta.url);

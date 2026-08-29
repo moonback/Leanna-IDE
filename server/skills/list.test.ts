@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { listSkill } from './list';
+import { listSkill } from './list.js';
 
 test('listSkill: metadata', () => {
   assert.equal(listSkill.name, 'list');

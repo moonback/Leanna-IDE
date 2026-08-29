@@ -12,7 +12,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import type { AgentRuntime, AgentPlugin } from "./AgentRuntime";
+import type { AgentRuntime, AgentPlugin } from "./AgentRuntime.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AgentLoader

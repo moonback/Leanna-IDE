@@ -21,7 +21,7 @@
  * Voir le commentaire "CLIENT REQUIS" plus bas pour le contrat exact attendu.
  */
 
-import { Skill, validateArgs } from "./base";
+import { Skill, validateArgs } from "./base.js";
 import { z } from "zod";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

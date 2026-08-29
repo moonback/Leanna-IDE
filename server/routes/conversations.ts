@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { listConversations, getConversationMessages, searchHistory, deleteConversation, clearAllConversations, updateConversationTitle } from '../skills/history';
+import { listConversations, getConversationMessages, searchHistory, deleteConversation, clearAllConversations, updateConversationTitle } from '../skills/history.js';
 
 const router = Router();
 

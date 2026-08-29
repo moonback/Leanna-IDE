@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import { setSelfRoot } from './selfRoot';
+import { setSelfRoot } from './selfRoot.js';
 import {
   getSandboxRoot,
   isSandboxActive,
@@ -12,7 +12,7 @@ import {
   activateSandbox,
   deactivateSandbox,
   getSandboxStatus,
-} from './sandbox';
+} from './sandbox.js';
 
 // Ensure SELF_ROOT is set before sandbox functions are exercised.
 // sandbox.ts reads SELF_ROOT dynamically at call-time, so setting it here

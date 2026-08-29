@@ -13,8 +13,8 @@ import {
   Search, Eye, RefreshCw, Tag, ClipboardPaste, BarChart3, X, FolderCode,
   CheckSquare, Square, Plus, Sparkles,
 } from 'lucide-react';
-import { useToast } from '../ui/Toast';
-import { SourcesSummaryCard } from './SourcesSummaryCard';
+import { useToast } from '../ui/Toast.js';
+import { SourcesSummaryCard } from './SourcesSummaryCard.js';
 
 interface SourceItem {
   id: string;

@@ -14,10 +14,10 @@
  */
 
 import { EventEmitter } from "events";
-import { agentMessageBus } from "./AgentMessageBus";
-import type { AgentRole, MessagePriority } from "./types";
-import type { AgentMessage, RoutingStrategy } from "./AgentCommunication";
-import { createLogger } from "../utils/logger";
+import { agentMessageBus } from "./AgentMessageBus.js";
+import type { AgentRole, MessagePriority } from "./types.js";
+import type { AgentMessage, RoutingStrategy } from "./AgentCommunication.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("MessageBusMonitor");
 

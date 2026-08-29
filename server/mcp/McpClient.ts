@@ -9,7 +9,7 @@
  */
 import { spawn, ChildProcess, execSync } from 'child_process';
 import { EventEmitter } from 'events';
-import type { McpServerConfig } from './mcpConfig';
+import type { McpServerConfig } from './mcpConfig.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types MCP Protocol

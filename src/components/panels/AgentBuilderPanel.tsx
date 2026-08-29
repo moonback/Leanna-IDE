@@ -11,7 +11,7 @@ import {
   deleteCustomAgent, duplicateCustomAgent, exportCustomAgents,
   importCustomAgents, subscribe, initCustomAgentStore,
   type CustomAgentConfig, type CustomAgentDraft,
-} from '../../stores/customAgentStore';
+} from '../../stores/customAgentStore.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Constants

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import type { Server } from 'http';
-import { createGithubRouter } from './github';
+import { createGithubRouter } from './github.js';
 
 test('github routes: GET /issues validates missing params', async () => {
   const mockSkillManager: any = {

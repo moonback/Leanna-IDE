@@ -5,7 +5,7 @@
  * Ce fichier existe uniquement pour que AgentExecutor.ts continue à fonctionner.
  */
 
-import type { AgentDefinition, AgentTask } from "./types";
+import type { AgentDefinition, AgentTask } from "./types.js";
 
 export class PromptBuilder {
   build(agent: AgentDefinition, task: AgentTask, fileContents: string[]): string {

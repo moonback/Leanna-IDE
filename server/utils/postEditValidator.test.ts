@@ -4,7 +4,7 @@ import {
   subscribeToValidation,
   getLastValidationResult,
   scheduleValidation,
-} from './postEditValidator';
+} from './postEditValidator.js';
 
 test('postEditValidator: subscribe and unsubscribe', () => {
   let called = false;

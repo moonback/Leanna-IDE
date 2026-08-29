@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Skill, validateArgs } from "./base";
+import { Skill, validateArgs } from "./base.js";
 import {
   agentOrchestrator,
   agentMessageBus,
@@ -9,9 +9,9 @@ import {
   delegateTaskSchema,
   orchestrateSchema,
   listAgentTasksSchema,
-} from "../agents";
-import type { AgentRole } from "../agents";
-import { createLogger, getLogEntries } from "../utils/logger";
+} from "../agents/index.js";
+import type { AgentRole } from "../agents/index.js";
+import { createLogger, getLogEntries } from "../utils/logger.js";
 
 const log = createLogger("Assistant");
 

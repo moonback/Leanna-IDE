@@ -6,7 +6,7 @@
  * Permet de détecter rapidement si une modification a cassé le build.
  */
 
-import { validateBuild } from "./checkpoint";
+import { validateBuild } from "./checkpoint.js";
 
 // ── State ───────────────────────────────────────────────────────────────────
 

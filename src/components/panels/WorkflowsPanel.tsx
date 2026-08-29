@@ -4,11 +4,11 @@ import {
   AlertTriangle, Clock, ChevronDown, ChevronRight, RotateCw,
   Loader2, Activity, Zap, Timer, Hash, Sparkles, MessageSquarePlus, Plus,
 } from 'lucide-react';
-import { Panel } from '../ui/Panel';
-import { IconButton } from '../ui/IconButton';
+import { Panel } from '../ui/Panel.js';
+import { IconButton } from '../ui/IconButton.js';
 import { motion, AnimatePresence } from 'motion/react';
-import { useLiveAPIContext } from '../../context/LiveAPIContext';
-import { VisualWorkflowBuilder } from '../workflows/VisualWorkflowBuilder';
+import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
+import { VisualWorkflowBuilder } from '../workflows/VisualWorkflowBuilder.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

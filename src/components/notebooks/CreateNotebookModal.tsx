@@ -8,7 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { BookOpen, Plus, X, Loader2, Sparkles } from 'lucide-react';
-import { useToast } from '../ui/Toast';
+import { useToast } from '../ui/Toast.js';
 
 interface CreateNotebookModalProps {
   onClose: () => void;

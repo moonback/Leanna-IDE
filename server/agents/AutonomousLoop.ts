@@ -22,10 +22,10 @@
  *   - Deux itérations consécutives produisent le même résultat (détection de boucle)
  */
 import { randomUUID } from "crypto";
-import type { AgentTask, TaskResult } from "./types";
-import { AgentExecutor } from "./AgentExecutor";
-import { getAgentDefinition } from "./roles";
-import { createLogger } from "../utils/logger";
+import type { AgentTask, TaskResult } from "./types.js";
+import { AgentExecutor } from "./AgentExecutor.js";
+import { getAgentDefinition } from "./roles.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("AutonomousLoop");
 

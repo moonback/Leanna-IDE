@@ -5,16 +5,16 @@ import {
   Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2,
 } from 'lucide-react';
 import { marked } from 'marked';
-import { useLiveAPIContext } from '../../context/LiveAPIContext';
-import { useProfile, type UserProfile } from '../../context/UserProfileContext';
-import { ActivityFeed } from './ActivityFeed';
-import { MultiAgentIndicator } from './MultiAgentIndicator';
-import { MentionDropdown } from './MentionDropdown';
-import { SlashCommandDropdown } from './SlashCommandDropdown';
-import { useFileMention } from '../../hooks/useFileMention';
-import { useSlashCommand } from '../../hooks/useSlashCommand';
-import { DocumentUpload, DropZoneOverlay, useDocumentDrop, type DocumentResult } from './DocumentUpload';
-import type { TranscriptEntry } from '../../hooks/useLiveAPI';
+import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
+import { useProfile, type UserProfile } from '../../context/UserProfileContext.js';
+import { ActivityFeed } from './ActivityFeed.js';
+import { MultiAgentIndicator } from './MultiAgentIndicator.js';
+import { MentionDropdown } from './MentionDropdown.js';
+import { SlashCommandDropdown } from './SlashCommandDropdown.js';
+import { useFileMention } from '../../hooks/useFileMention.js';
+import { useSlashCommand } from '../../hooks/useSlashCommand.js';
+import { DocumentUpload, DropZoneOverlay, useDocumentDrop, type DocumentResult } from './DocumentUpload.js';
+import type { TranscriptEntry } from '../../hooks/useLiveAPI.js';
 
 // --- Styles Globaux améliorés ---
 const COLORS = {

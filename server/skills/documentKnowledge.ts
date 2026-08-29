@@ -11,13 +11,13 @@
  *   • Créer des synthèses multi-documents
  */
 
-import { Skill } from "./base";
+import { Skill } from "./base.js";
 import {
   documentMemory,
   documentSearchEngine,
   documentAnalyzer,
-} from "../knowledge/document-system";
-import type { MemoryCategory, DocumentType, SearchOptions } from "../knowledge/document-system";
+} from "../knowledge/document-system/index.js";
+import type { MemoryCategory, DocumentType, SearchOptions } from "../knowledge/document-system/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Valeurs autorisées

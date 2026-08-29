@@ -19,8 +19,8 @@ import type {
   ToolHandler,
   ToolPermission,
   ToolCallMetrics,
-} from "./types";
-import type { EventBus } from "./EventBus";
+} from "./types.js";
+import type { EventBus } from "./EventBus.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types

@@ -1,14 +1,14 @@
-import { Skill, validateArgs } from "./base";
+import { Skill, validateArgs } from "./base.js";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import * as fs from "fs";
 import * as path from "path";
 import { z } from "zod";
-import { SELF_ROOT, normalizeSelfPath } from "../utils/selfRoot";
+import { SELF_ROOT, normalizeSelfPath } from "../utils/selfRoot.js";
 import * as ts from "typescript";
 import { createHash } from "crypto";
-import type { VerificationIssue, VerificationRecord } from "../agents/WorkspaceState";
-export type { VerificationIssue, VerificationRecord } from "../agents/WorkspaceState";
+import type { VerificationIssue, VerificationRecord } from "../agents/WorkspaceState.js";
+export type { VerificationIssue, VerificationRecord } from "../agents/WorkspaceState.js";
 
 const execFileAsync = promisify(execFile);
 

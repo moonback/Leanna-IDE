@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import path from "path";
 import fs from "fs";
-import { notebookManager, groundedChat } from "../../notebooks";
-import { getSandboxRoot } from "../../utils/sandbox";
+import { notebookManager, groundedChat } from "../../notebooks/index.js";
+import { getSandboxRoot } from "../../utils/sandbox.js";
 
 export function createChatRouter(): Router {
   const router = Router();

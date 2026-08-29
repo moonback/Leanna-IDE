@@ -3,8 +3,8 @@ import {
   FolderOpen, CheckCircle2, AlertCircle, Loader2,
   RefreshCw, Save, FolderSearch, Upload, HardDrive,
 } from 'lucide-react';
-import { Panel } from '../ui/Panel';
-import { IconButton } from '../ui/IconButton';
+import { Panel } from '../ui/Panel.js';
+import { IconButton } from '../ui/IconButton.js';
 import { motion, AnimatePresence } from 'motion/react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────

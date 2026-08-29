@@ -7,8 +7,8 @@
  * 3. Intégration avec le handleToolCall existant
  */
 
-export { Supervisor, supervisor } from "./Supervisor";
-export type { SupervisorConfig, MissionObjective, SessionInjector } from "./Supervisor";
+export { Supervisor, supervisor } from "./Supervisor.js";
+export type { SupervisorConfig, MissionObjective, SessionInjector } from "./Supervisor.js";
 
-export { createSmartSkills } from "./SmartSkills";
-export type { SkillHandler } from "./SmartSkills";
+export { createSmartSkills } from "./SmartSkills.js";
+export type { SkillHandler } from "./SmartSkills.js";

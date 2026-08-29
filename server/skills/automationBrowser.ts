@@ -1,5 +1,5 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
-import { assertSafeUrl, addAllowedDomain } from "./automationHelpers";
+import { assertSafeUrl, addAllowedDomain } from "./automationHelpers.js";
 
 addAllowedDomain('duckduckgo.com');
 addAllowedDomain('html.duckduckgo.com');

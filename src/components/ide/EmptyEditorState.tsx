@@ -7,12 +7,12 @@ import {
   Trash2, BookOpen, Sparkles,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { useWorkspaceState } from '../../hooks/useWorkspaceState';
-import { useLiveAPIContext } from '../../context/LiveAPIContext';
-import { useProfile } from '../../context/UserProfileContext';
-import { ShortcutsModal } from './ShortcutsModal';
-import { SystemModal } from './SystemModal';
-import { useTheme } from '../../context/ThemeContext';
+import { useWorkspaceState } from '../../hooks/useWorkspaceState.js';
+import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
+import { useProfile } from '../../context/UserProfileContext.js';
+import { ShortcutsModal } from './ShortcutsModal.js';
+import { SystemModal } from './SystemModal.js';
+import { useTheme } from '../../context/ThemeContext.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 

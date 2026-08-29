@@ -8,10 +8,10 @@
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
-import { createLogger } from "../utils/logger";
-import { SELF_ROOT } from "../utils/selfRoot";
-import { embeddingStore } from "./EmbeddingStore";
-import type { Notebook, NotebookNote, Source, ChatMessage, GeneratedDocument, AudioOverview } from "./types";
+import { createLogger } from "../utils/logger.js";
+import { SELF_ROOT } from "../utils/selfRoot.js";
+import { embeddingStore } from "./EmbeddingStore.js";
+import type { Notebook, NotebookNote, Source, ChatMessage, GeneratedDocument, AudioOverview } from "./types.js";
 
 const log = createLogger("NotebookManager");
 

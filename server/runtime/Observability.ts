@@ -13,8 +13,8 @@
  * - Latence des workflows
  */
 
-import type { EventBus } from "./EventBus";
-import type { RuntimeEvent } from "./types";
+import type { EventBus } from "./EventBus.js";
+import type { RuntimeEvent } from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types

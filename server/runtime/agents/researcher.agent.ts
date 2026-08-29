@@ -2,7 +2,7 @@
  * Agent Recherche — Collecte et synthèse d'informations
  */
 
-import { defineAgent } from "./plugin";
+import { defineAgent } from "./plugin.js";
 
 export const researcherAgent = defineAgent({
   id: "researcher",

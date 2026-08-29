@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useCallback, useState, memo, forwardRef, useImperativeHandle } from 'react';
 import { X, Terminal, Maximize, Minimize, Plus, ChevronDown, ChevronLeft, ChevronRight, Search, Trash2, Pencil, Copy, Check, AlertCircle, Server, Command, Folder, Box } from 'lucide-react';
-import { useTerminal } from '../../hooks/useTerminal';
+import { useTerminal } from '../../hooks/useTerminal.js';
 import { motion, AnimatePresence } from 'motion/react';
-import { ideApi } from '../../services/ideApi';
-import { sandboxApi } from '../../services/sandboxApi';
+import { ideApi } from '../../services/ideApi.js';
+import { sandboxApi } from '../../services/sandboxApi.js';
 
 type ExecutionMode = 'workspace' | 'sandbox';
 

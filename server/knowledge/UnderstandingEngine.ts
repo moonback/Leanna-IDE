@@ -18,11 +18,11 @@
  *   → UnderstandingScore + ContextBatch + Prompt d'injection
  */
 
-import { createLogger } from "../utils/logger";
-import { knowledgeGraph } from "./KnowledgeGraph";
-import { dependencyGraph } from "./DependencyGraph";
-import { projectMemory } from "./ProjectMemory";
-import { semanticSearch } from "./SemanticSearch";
+import { createLogger } from "../utils/logger.js";
+import { knowledgeGraph } from "./KnowledgeGraph.js";
+import { dependencyGraph } from "./DependencyGraph.js";
+import { projectMemory } from "./ProjectMemory.js";
+import { semanticSearch } from "./SemanticSearch.js";
 import type {
   UnderstandingScore,
   ContextBatch,
@@ -30,9 +30,9 @@ import type {
   RelevantFile,
   KnowledgeStats,
   DependencyCycle,
-} from "./types";
-import type { ImpactMode } from "./ImpactAnalyzer";
-import { impactAnalyzer } from "./ImpactAnalyzer";
+} from "./types.js";
+import type { ImpactMode } from "./ImpactAnalyzer.js";
+import { impactAnalyzer } from "./ImpactAnalyzer.js";
 
 const log = createLogger("UnderstandingEngine");
 

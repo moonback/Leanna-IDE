@@ -11,8 +11,8 @@
 
 import fs from "fs";
 import path from "path";
-import { createLogger } from "../utils/logger";
-import { SELF_ROOT } from "../utils/selfRoot";
+import { createLogger } from "../utils/logger.js";
+import { SELF_ROOT } from "../utils/selfRoot.js";
 
 const log = createLogger("NotebookBackup");
 

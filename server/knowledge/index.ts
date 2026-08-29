@@ -18,14 +18,14 @@
  */
 
 // Sprint 1 — ProjectIndexer + KnowledgeGraph
-export { ProjectIndexer, projectIndexer } from "./ProjectIndexer";
-export { KnowledgeGraph, knowledgeGraph } from "./KnowledgeGraph";
+export { ProjectIndexer, projectIndexer } from "./ProjectIndexer.js";
+export { KnowledgeGraph, knowledgeGraph } from "./KnowledgeGraph.js";
 
 // File Watcher — Indexation incrémentale
-export { FileWatcher, fileWatcher, type FileChangeEvent, type FileChangeType, type FileChangeHandler } from "./FileWatcher";
+export { FileWatcher, fileWatcher, type FileChangeEvent, type FileChangeType, type FileChangeHandler } from "./FileWatcher.js";
 
 // Relation Extractor — Relations sémantiques entre entités
-export { RelationExtractor, relationExtractor } from "./RelationExtractor";
+export { RelationExtractor, relationExtractor } from "./RelationExtractor.js";
 
 // Types
 export type {
@@ -51,19 +51,19 @@ export type {
   PipelineContext,
   EntityRelation,
   EntityRelationType,
-} from "./types";
+} from "./types.js";
 
 // Sprint 2 — DependencyGraph
-export { DependencyGraph, dependencyGraph } from "./DependencyGraph";
+export { DependencyGraph, dependencyGraph } from "./DependencyGraph.js";
 
 // Sprint 3 — ProjectMemory
-export { ProjectMemory, projectMemory } from "./ProjectMemory";
+export { ProjectMemory, projectMemory } from "./ProjectMemory.js";
 
 // Sprint 4 — SemanticSearch
-export { SemanticSearch, semanticSearch } from "./SemanticSearch";
+export { SemanticSearch, semanticSearch } from "./SemanticSearch.js";
 
 // Sprint 5 — ReasoningPipeline
-export { ReasoningPipeline, reasoningPipeline } from "./ReasoningPipeline";
+export { ReasoningPipeline, reasoningPipeline } from "./ReasoningPipeline.js";
 
 // Sprint 7 — ImpactAnalyzer
 export {
@@ -75,7 +75,7 @@ export {
   type TestRecommendation,
   type ExtendedImpactReport,
   type ImpactAnalysisOptions,
-} from "./ImpactAnalyzer";
+} from "./ImpactAnalyzer.js";
 
 // Sprint 8 — PlanningEngine
 export {
@@ -87,7 +87,7 @@ export {
   type ParallelWave,
   type StructuredPlan,
   type PlanningOptions,
-} from "./PlanningEngine";
+} from "./PlanningEngine.js";
 
 // Sprint 9 — UnderstandingEngine
 export {
@@ -100,7 +100,7 @@ export {
   type KnowledgeHealth,
   type UnderstandingContext,
   type BuildContextOptions,
-} from "./UnderstandingEngine";
+} from "./UnderstandingEngine.js";
 
 // Sprint 10 — LearningEngine
 export {
@@ -111,7 +111,7 @@ export {
   type AutoImprovement,
   type LearningOptions,
   type MissionLearningInput,
-} from "./LearningEngine";
+} from "./LearningEngine.js";
 
 // Sprint 11 — DocumentStore (analyse inter-documents)
 export {
@@ -120,7 +120,7 @@ export {
   type StoredDocument,
   type DocumentLink,
   type DocumentStoreData,
-} from "./DocumentStore";
+} from "./DocumentStore.js";
 
 // Sprint 12 — DocumentExtractor (extraction automatique des documents du workspace)
 export {
@@ -130,5 +130,5 @@ export {
   type DocumentSection,
   type DocumentMetadata,
   type ExtractionStats,
-} from "./DocumentExtractor";
+} from "./DocumentExtractor.js";
 

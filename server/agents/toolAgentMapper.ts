@@ -8,8 +8,8 @@
  * par une approche basée sur les définitions centralisées dans roles.ts.
  */
 
-import { getAgentDefinition, listAgentDefinitions } from './roles';
-import type { AgentRole } from './types';
+import { getAgentDefinition, listAgentDefinitions } from './roles.js';
+import type { AgentRole } from './types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Cache pour le mapping outil → rôle(s)

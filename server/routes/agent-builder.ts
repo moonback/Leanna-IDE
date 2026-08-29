@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { handleGenerateAgent } from './generate-agent';
+import { handleGenerateAgent } from './generate-agent.js';
 
 export function createAgentBuilderRouter(): Router {
   const router = Router();

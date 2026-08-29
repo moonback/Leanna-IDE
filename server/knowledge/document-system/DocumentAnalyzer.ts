@@ -11,10 +11,10 @@
  * S'appuie sur Google Gemini (comme le reste de Leanna).
  */
 
-import { createLogger } from "../../utils/logger";
-import { documentMemory } from "./DocumentMemory";
-import { documentExtractor } from "./DocumentExtractor";
-import { documentSearchEngine } from "./DocumentSearchEngine";
+import { createLogger } from "../../utils/logger.js";
+import { documentMemory } from "./DocumentMemory.js";
+import { documentExtractor } from "./DocumentExtractor.js";
+import { documentSearchEngine } from "./DocumentSearchEngine.js";
 import type {
   KnowledgeDocument,
   DocumentRelation,
@@ -23,7 +23,7 @@ import type {
   MemoryFact,
   ExtractionOptions,
   DocumentContext,
-} from "./types";
+} from "./types.js";
 
 const log = createLogger("DocumentAnalyzer");
 

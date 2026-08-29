@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import type { Server } from 'http';
-import { createExportRouter } from './export';
+import { createExportRouter } from './export.js';
 
 test('export routes: POST /html returns standalone HTML', async () => {
   const app = express();

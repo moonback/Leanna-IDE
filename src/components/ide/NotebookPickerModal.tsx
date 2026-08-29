@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, BookOpen, Loader2, CheckCircle2, AlertCircle, FileCheck, Plus } from 'lucide-react';
-import { useToast } from '../ui/Toast';
+import { useToast } from '../ui/Toast.js';
 
 interface NotebookLight {
   id: string;

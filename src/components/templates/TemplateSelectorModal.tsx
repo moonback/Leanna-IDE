@@ -8,14 +8,14 @@ import {
   X, Search, Sparkles, Copy, Download, FileText, Layout, Check,
   Rocket, Cpu, ClipboardList, Code2, Calendar, Edit3, Eye
 } from 'lucide-react';
-import { DOCUMENT_TEMPLATES, DocumentTemplate } from '../../config/documentTemplates';
+import { DOCUMENT_TEMPLATES, DocumentTemplate } from '../../config/documentTemplates.js';
 import {
   extractVariables,
   renderTemplate,
   getDefaultVariableValues
-} from '../../utils/templateVariables';
-import { useToast } from '../ui/Toast';
-import { useProfile } from '../../context/UserProfileContext';
+} from '../../utils/templateVariables.js';
+import { useToast } from '../ui/Toast.js';
+import { useProfile } from '../../context/UserProfileContext.js';
 
 interface Props {
   isOpen: boolean;

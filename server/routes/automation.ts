@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getScheduledTasksSnapshot, pauseScheduledTask, resumeScheduledTask, runScheduledTaskNow, cancelScheduledTask, getScheduledTask } from '../skills/automation';
+import { getScheduledTasksSnapshot, pauseScheduledTask, resumeScheduledTask, runScheduledTaskNow, cancelScheduledTask, getScheduledTask } from '../skills/automation.js';
 
 const router = Router();
 

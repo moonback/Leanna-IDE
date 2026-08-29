@@ -5,7 +5,7 @@
  * Utilisée par ContentGenerator pour générer des infographies.
  */
 
-import { createLogger } from "./logger";
+import { createLogger } from "./logger.js";
 
 const log = createLogger("imageGeneration");
 

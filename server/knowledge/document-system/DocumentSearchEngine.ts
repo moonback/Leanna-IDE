@@ -10,7 +10,7 @@
  *   • Suggestions de documents similaires
  */
 
-import { documentMemory } from "./DocumentMemory";
+import { documentMemory } from "./DocumentMemory.js";
 import type {
   SearchResult,
   SearchOptions,
@@ -18,7 +18,7 @@ import type {
   KnowledgeDocument,
   MemoryFact,
   DocumentRelation,
-} from "./types";
+} from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Constantes

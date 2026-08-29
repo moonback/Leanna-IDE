@@ -6,7 +6,7 @@
  *   card, list, text, code, progress, timeline, stat_grid
  */
 
-import { Skill } from "./base";
+import { Skill } from "./base.js";
 
 // ─── Types (miroir de RichDocumentViewer.tsx) ─────────────────────────────────
 

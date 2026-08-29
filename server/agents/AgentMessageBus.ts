@@ -16,7 +16,7 @@
  */
 import { randomUUID } from "crypto";
 import { EventEmitter } from "events";
-import type { AgentRole } from "./types";
+import type { AgentRole } from "./types.js";
 import type {
   AgentMessage,
   MessageHandler,
@@ -24,9 +24,9 @@ import type {
   PublishOptions,
   RoutingStrategy,
   StatusResponsePayload,
-} from "./AgentCommunication";
-import { agentPersistence } from "./AgentPersistence";
-import { createLogger } from "../utils/logger";
+} from "./AgentCommunication.js";
+import { agentPersistence } from "./AgentPersistence.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("AgentMessageBus");
 

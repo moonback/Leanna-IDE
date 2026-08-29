@@ -1,7 +1,7 @@
-import { Skill, validateArgs } from "./base";
+import { Skill, validateArgs } from "./base.js";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { createGeminiClient } from "../utils/geminiKeyPool";
+import { createGeminiClient } from "../utils/geminiKeyPool.js";
 
 // Cache simple en mémoire pour les embeddings et les résultats de recherche
 const memoryCache = new Map<string, { data: any; timestamp: number }>();

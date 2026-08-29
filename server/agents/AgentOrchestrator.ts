@@ -1,27 +1,27 @@
 import { randomUUID } from "crypto";
-import { getAgentDefinition, getAgentDefinitionOrThrow } from "./roles";
+import { getAgentDefinition, getAgentDefinitionOrThrow } from "./roles.js";
 import type {
   AgentRole,
   AgentTask,
   TaskStatus,
   TaskPriority,
   OrchestrationPlan,
-} from "./types";
-import { AgentExecutor, SkillHandler } from "./AgentExecutor";
-import { TaskScheduler } from "./TaskScheduler";
-import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier";
-import { AgentRegistry, agentRegistry } from "./AgentRegistry";
-import { agentMessageBus } from "./AgentMessageBus";
-import { COLLABORATION_PATTERNS } from "./AgentCommunication";
-import { agentPersistence } from "./AgentPersistence";
-import { createLogger } from "../utils/logger";
-import { initCustomAgents } from "../routes/custom-agents";
+} from "./types.js";
+import { AgentExecutor, SkillHandler } from "./AgentExecutor.js";
+import { TaskScheduler } from "./TaskScheduler.js";
+import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier.js";
+import { AgentRegistry, agentRegistry } from "./AgentRegistry.js";
+import { agentMessageBus } from "./AgentMessageBus.js";
+import { COLLABORATION_PATTERNS } from "./AgentCommunication.js";
+import { agentPersistence } from "./AgentPersistence.js";
+import { createLogger } from "../utils/logger.js";
+import { initCustomAgents } from "../routes/custom-agents.js";
 
 // Ré-exporter pour compatibilité et usage externe
-export type { AgentEvent } from "./ProgressNotifier";
-export { agentMessageBus } from "./AgentMessageBus";
-export { agentRegistry } from "./AgentRegistry";
-export { COLLABORATION_PATTERNS, DELEGATION_MATRIX } from "./AgentCommunication";
+export type { AgentEvent } from "./ProgressNotifier.js";
+export { agentMessageBus } from "./AgentMessageBus.js";
+export { agentRegistry } from "./AgentRegistry.js";
+export { COLLABORATION_PATTERNS, DELEGATION_MATRIX } from "./AgentCommunication.js";
 
 const log = createLogger("Orchestrator");
 

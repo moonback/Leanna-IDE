@@ -1,4 +1,4 @@
-import { Skill, validateArgs } from "./base";
+import { Skill, validateArgs } from "./base.js";
 import { z } from "zod";
 
 export const weatherSkill: Skill = {

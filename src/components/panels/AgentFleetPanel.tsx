@@ -13,7 +13,7 @@ import {
   AlertTriangle, ArrowRight, Zap, FlaskConical, FileText,
   Shield, Eye, Building2, Mail, Inbox, Bell, BellOff, Clock,
 } from 'lucide-react';
-import { useAgentNotifications } from '../../hooks/useAgentNotifications';
+import { useAgentNotifications } from '../../hooks/useAgentNotifications.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

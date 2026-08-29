@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { notebookManager, embeddingStore } from "../../notebooks";
+import { notebookManager, embeddingStore } from "../../notebooks/index.js";
 
 export function createEmbeddingsRouter(): Router {
   const router = Router();

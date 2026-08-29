@@ -1,6 +1,6 @@
 import React from 'react';
 import { Clock3, CheckCircle2, Circle } from 'lucide-react';
-import { Panel } from '../ui/Panel';
+import { Panel } from '../ui/Panel.js';
 
 export interface ScheduledTaskViewModel {
   id: string;

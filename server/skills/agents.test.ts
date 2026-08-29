@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { agentsSkill } from "./agents";
+import { agentsSkill } from "./agents.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers — Mocks simples pour agentOrchestrator
@@ -12,7 +12,7 @@ import { agentsSkill } from "./agents";
  * de validation (avant qu'elle n'appelle l'orchestrator).
  * Pour les cas de succès, on mock via test.mock.method sur l'orchestrator importé.
  */
-import { agentOrchestrator, listAgentDefinitions } from "../agents";
+import { agentOrchestrator, listAgentDefinitions } from "../agents/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Tests : Structure et déclarations de la skill

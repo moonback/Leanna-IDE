@@ -14,10 +14,10 @@
  * - Couverture étendue (l'expansion de requête capture les angles multiples)
  */
 
-import { createLogger } from "../utils/logger";
-import { generateText } from "../utils/textGeneration";
-import { embeddingStore } from "./EmbeddingStore";
-import type { Source, SourceChunk, RAGSearchOptions, RAGSearchResult } from "./types";
+import { createLogger } from "../utils/logger.js";
+import { generateText } from "../utils/textGeneration.js";
+import { embeddingStore } from "./EmbeddingStore.js";
+import type { Source, SourceChunk, RAGSearchOptions, RAGSearchResult } from "./types.js";
 
 const log = createLogger("RAGEngine");
 

@@ -13,7 +13,7 @@ import {
   isWriteForbidden,
   isCriticalFile,
   setSelfRoot,
-} from './utils/selfRoot';
+} from './utils/selfRoot.js';
 
 // Bootstrap: set SELF_ROOT to the project root before any test runs.
 // server/selfRoot.test.ts lives in server/ → one level up is the project root.

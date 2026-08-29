@@ -20,26 +20,26 @@ export {
   isWriteForbidden,
   isCriticalFile,
   resolveRealPathWithinSelf,
-} from "./selfRoot";
+} from "./selfRoot.js";
 
 export {
   resolveWorkspacePath,
   getDefaultWorkspaceRoot,
-} from "../security";
+} from "../security.js";
 
 export {
   isSandboxActive,
   getSandboxRoot,
   assertSandboxReady,
   resolveSandboxPath,
-} from "./sandbox";
+} from "./sandbox.js";
 
 export {
   normalizeProjectPath,
   getProjectRoot,
   resolveWritePath,
   resolveSandboxWriteTarget,
-} from "../skills/codebaseHelpers";
+} from "../skills/codebaseHelpers.js";
 
 // ── Utilitaires additionnels ─────────────────────────────────────────────────
 

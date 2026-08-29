@@ -5,16 +5,16 @@
 import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
 
-import { AgentRuntime } from "./AgentRuntime";
-import { EventBus } from "./EventBus";
-import { StateMachine } from "./StateMachine";
-import { ToolRegistry } from "./ToolRegistry";
-import { Memory } from "./Memory";
-import { PromptRegistry } from "./PromptRegistry";
-import { WorkflowEngine } from "./WorkflowEngine";
-import { SkillManagerV2 } from "./compat/SkillManagerV2";
-import { defineAgent } from "./agents/plugin";
-import { createRuntime } from "./index";
+import { AgentRuntime } from "./AgentRuntime.js";
+import { EventBus } from "./EventBus.js";
+import { StateMachine } from "./StateMachine.js";
+import { ToolRegistry } from "./ToolRegistry.js";
+import { Memory } from "./Memory.js";
+import { PromptRegistry } from "./PromptRegistry.js";
+import { WorkflowEngine } from "./WorkflowEngine.js";
+import { SkillManagerV2 } from "./compat/SkillManagerV2.js";
+import { defineAgent } from "./agents/plugin.js";
+import { createRuntime } from "./index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // EventBus

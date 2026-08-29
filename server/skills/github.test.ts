@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { githubSkill } from './github';
+import { githubSkill } from './github.js';
 
 test('githubSkill: metadata', () => {
   assert.equal(githubSkill.name, 'github');

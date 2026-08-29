@@ -16,15 +16,15 @@ import {
   Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose,
   Save,
 } from 'lucide-react';
-import { useToast } from '../ui/Toast';
-import { SourcePanel } from './SourcePanel';
-import { SourceViewer } from './SourceViewer';
-import { NotebookChat } from './NotebookChat';
-import { NotesPanel, type NoteEditorData } from './NotesPanel';
-import { GeneratePanel } from './GeneratePanel';
-import { HistoryPanel } from './HistoryPanel';
-import { AudioOverviewPanel } from './AudioOverviewPanel';
-import { SourcesPanelSkeleton } from '../ui/Skeleton';
+import { useToast } from '../ui/Toast.js';
+import { SourcePanel } from './SourcePanel.js';
+import { SourceViewer } from './SourceViewer.js';
+import { NotebookChat } from './NotebookChat.js';
+import { NotesPanel, type NoteEditorData } from './NotesPanel.js';
+import { GeneratePanel } from './GeneratePanel.js';
+import { HistoryPanel } from './HistoryPanel.js';
+import { AudioOverviewPanel } from './AudioOverviewPanel.js';
+import { SourcesPanelSkeleton } from '../ui/Skeleton.js';
 
 interface NotebookData {
   id: string;

@@ -1,6 +1,6 @@
-import { Skill } from "./base";
+import { Skill } from "./base.js";
 import fs from "fs";
-import { normalizeProjectPath } from "./codebaseHelpers";
+import { normalizeProjectPath } from "./codebaseHelpers.js";
 
 import {
   handleGenerateCodebaseMarkdown,
@@ -10,7 +10,7 @@ import {
   handleSearchInFiles,
   handleAnalyzeProjectFile,
   handleGetWorkspaceInfo
-} from "./codebaseReader";
+} from "./codebaseReader.js";
 
 import {
   handleWriteProjectFile,
@@ -21,7 +21,7 @@ import {
   handleDeleteProjectFile,
   handleDeleteProjectFolder,
   handleCreateProjectDirectory
-} from "./codebaseWriter";
+} from "./codebaseWriter.js";
 
 export const codebaseSkill: Skill = {
   name: "codebase",
@@ -315,4 +315,4 @@ export const codebaseSkill: Skill = {
   },
 };
 
-export { buildAnalysisPrompt } from "./codebaseHelpers";
+export { buildAnalysisPrompt } from "./codebaseHelpers.js";

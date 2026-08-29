@@ -15,7 +15,7 @@
  *   PromptRegistry.render("agent:architect", { userName: "Bob" })
  */
 
-import type { PromptTemplate } from "./types";
+import type { PromptTemplate } from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types

@@ -18,13 +18,13 @@
 
 import fs from "fs";
 import path from "path";
-import { createLogger } from "../utils/logger";
-import { SELF_ROOT } from "../utils/selfRoot";
-import { getDocumentStore } from "./DocumentStore";
-import type { StoredDocument } from "./DocumentStore";
-import { isSandboxActive, getSandboxRoot } from "../utils/sandbox";
-import { fileWatcher } from "./FileWatcher";
-import type { FileChangeEvent } from "./FileWatcher";
+import { createLogger } from "../utils/logger.js";
+import { SELF_ROOT } from "../utils/selfRoot.js";
+import { getDocumentStore } from "./DocumentStore.js";
+import type { StoredDocument } from "./DocumentStore.js";
+import { isSandboxActive, getSandboxRoot } from "../utils/sandbox.js";
+import { fileWatcher } from "./FileWatcher.js";
+import type { FileChangeEvent } from "./FileWatcher.js";
 
 const log = createLogger("DocumentExtractor");
 

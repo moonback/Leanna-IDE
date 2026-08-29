@@ -15,7 +15,7 @@ import {
   X, Presentation, Download, ExternalLink,
   Loader2, Monitor, Maximize2, ChevronRight,
 } from 'lucide-react';
-import { useToast } from '../ui/Toast';
+import { useToast } from '../ui/Toast.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

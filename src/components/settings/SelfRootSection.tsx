@@ -4,8 +4,8 @@ import {
   Shield, GitBranch, CheckCircle2, AlertTriangle, RefreshCw,
   FolderOpen, Save, Loader2, Upload, ShieldAlert, X, Check,
 } from 'lucide-react';
-import { Section, Field, InfoRow } from './SettingsPrimitives';
-import { ideApi } from '../../services/ideApi';
+import { Section, Field, InfoRow } from './SettingsPrimitives.js';
+import { ideApi } from '../../services/ideApi.js';
 
 interface SelfRootStatus {
   rootPath: string;

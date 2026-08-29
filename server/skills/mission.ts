@@ -1,6 +1,6 @@
-import { Skill, validateArgs } from "./base";
+import { Skill, validateArgs } from "./base.js";
 import { z } from "zod";
-import { Executor, reflectionEngine } from "../mission";
+import { Executor, reflectionEngine } from "../mission/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Skill Mission — Interface IA ↔ Mission System

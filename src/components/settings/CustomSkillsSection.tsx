@@ -5,8 +5,8 @@ import {
   X, ChevronDown, ChevronUp, Zap, Globe, Database as DbIcon,
   Briefcase, Code2, AlertCircle, ClipboardPaste, FileCode
 } from 'lucide-react';
-import { Section, TextInput } from './SettingsPrimitives';
-import { useToast } from '../ui/Toast';
+import { Section, TextInput } from './SettingsPrimitives.js';
+import { useToast } from '../ui/Toast.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

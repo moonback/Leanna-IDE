@@ -14,8 +14,8 @@ import {
   Filter, X, MessageSquarePlus, ChevronDown, FolderOpen, Folder, FileDown,
   ExternalLink,
 } from 'lucide-react';
-import { useToast } from '../ui/Toast';
-import { MermaidDiagram } from './MermaidDiagram';
+import { useToast } from '../ui/Toast.js';
+import { MermaidDiagram } from './MermaidDiagram.js';
 
 interface Citation {
   sourceId: string;

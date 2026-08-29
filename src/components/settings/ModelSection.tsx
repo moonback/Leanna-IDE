@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import { SlidersHorizontal, Zap, Scale, Lightbulb } from 'lucide-react';
-import { useProfile } from '../../context/UserProfileContext';
-import { Section, Field, SectionDivider } from './SettingsPrimitives';
+import { useProfile } from '../../context/UserProfileContext.js';
+import { Section, Field, SectionDivider } from './SettingsPrimitives.js';
 
 interface SliderProps {
   value: number;

@@ -4,7 +4,7 @@
  */
 
 import type { Request, Response } from "express";
-import { generateText } from "../utils/textGeneration";
+import { generateText } from "../utils/textGeneration.js";
 
 const AGENT_GENERATION_PROMPT = `Tu es un expert en conception d'agents IA. L'utilisateur va te décrire l'agent qu'il souhaite créer.
 Tu dois générer une configuration JSON complète pour cet agent.

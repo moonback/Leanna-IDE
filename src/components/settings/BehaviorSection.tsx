@@ -1,7 +1,7 @@
 import { Languages, GitBranch } from 'lucide-react';
-import { useProfile } from '../../context/UserProfileContext';
-import { Section, SectionDivider, Field, ChipGroup, ToggleSwitch, TextInput } from './SettingsPrimitives';
-import { LANGUAGES, RESPONSE_STYLES } from './constants';
+import { useProfile } from '../../context/UserProfileContext.js';
+import { Section, SectionDivider, Field, ChipGroup, ToggleSwitch, TextInput } from './SettingsPrimitives.js';
+import { LANGUAGES, RESPONSE_STYLES } from './constants.js';
 
 export function BehaviorSection() {
   const { profile, setField } = useProfile();

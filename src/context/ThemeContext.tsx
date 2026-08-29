@@ -4,7 +4,7 @@
  * This file re-exports a useTheme hook that reads/writes through UserProfileContext
  * so legacy consumers (ThemeToggle, etc.) keep working without changes.
  */
-import { useProfile } from './UserProfileContext';
+import { useProfile } from './UserProfileContext.js';
 
 export type Theme = 'dark' | 'light' | 'cyberpunk' | 'sepia' | 'high-contrast';
 

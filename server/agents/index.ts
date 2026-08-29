@@ -1,18 +1,18 @@
-export { AgentOrchestrator, agentOrchestrator } from "./AgentOrchestrator";
-export type { AgentEvent } from "./AgentOrchestrator";
-export { agentMessageBus } from "./AgentOrchestrator";
-export { agentRegistry } from "./AgentOrchestrator";
-export { COLLABORATION_PATTERNS, DELEGATION_MATRIX } from "./AgentOrchestrator";
+export { AgentOrchestrator, agentOrchestrator } from "./AgentOrchestrator.js";
+export type { AgentEvent } from "./AgentOrchestrator.js";
+export { agentMessageBus } from "./AgentOrchestrator.js";
+export { agentRegistry } from "./AgentOrchestrator.js";
+export { COLLABORATION_PATTERNS, DELEGATION_MATRIX } from "./AgentOrchestrator.js";
 
 // Exports directs des nouveaux modules autonomes
-export { AutonomousAgent } from "./AutonomousAgent";
-export { AgentRegistry } from "./AgentRegistry";
-export { AgentMessageBus } from "./AgentMessageBus";
-export { DelegationParser, delegationParser } from "./DelegationParser";
-export { AutonomousLoop } from "./AutonomousLoop";
-export type { LoopConfig, LoopResult, IterationRecord, LoopDecision } from "./AutonomousLoop";
-export type { ParsedDelegation, DelegationParseResult } from "./DelegationParser";
-export { AgentPersistence, agentPersistence } from "./AgentPersistence";
+export { AutonomousAgent } from "./AutonomousAgent.js";
+export { AgentRegistry } from "./AgentRegistry.js";
+export { AgentMessageBus } from "./AgentMessageBus.js";
+export { DelegationParser, delegationParser } from "./DelegationParser.js";
+export { AutonomousLoop } from "./AutonomousLoop.js";
+export type { LoopConfig, LoopResult, IterationRecord, LoopDecision } from "./AutonomousLoop.js";
+export type { ParsedDelegation, DelegationParseResult } from "./DelegationParser.js";
+export { AgentPersistence, agentPersistence } from "./AgentPersistence.js";
 export type {
   AgentMessage,
   AgentMessageType,
@@ -27,14 +27,14 @@ export type {
   StatusResponsePayload,
   EventPayload,
   BroadcastPayload,
-} from "./AgentCommunication";
+} from "./AgentCommunication.js";
 
-export { WorkspaceState } from "./WorkspaceState";
-export type { WorkspaceFileState, WorkspaceCompletionReport, WorkspaceRead, VerificationIssue, VerificationRecord, VerificationSeverity } from "./WorkspaceState";
-export { AgentValidation } from "./AgentValidation";
-export type { ValidationSnapshot, RegressionReport } from "./AgentValidation";
-export { AgentRepairLoop } from "./AgentRepairLoop";
-export type { RepairAction, RepairDirective } from "./AgentRepairLoop";
+export { WorkspaceState } from "./WorkspaceState.js";
+export type { WorkspaceFileState, WorkspaceCompletionReport, WorkspaceRead, VerificationIssue, VerificationRecord, VerificationSeverity } from "./WorkspaceState.js";
+export { AgentValidation } from "./AgentValidation.js";
+export type { ValidationSnapshot, RegressionReport } from "./AgentValidation.js";
+export { AgentRepairLoop } from "./AgentRepairLoop.js";
+export type { RepairAction, RepairDirective } from "./AgentRepairLoop.js";
 
 // Exports existants (inchangés)
 export { 
@@ -44,11 +44,11 @@ export {
   listAgentDefinitions, 
   listAgentRoles,
   hasAgent
-} from "./roles";
-export { isDelegationAllowed } from "./AgentCommunication";
+} from "./roles.js";
+export { isDelegationAllowed } from "./AgentCommunication.js";
 
 // Dynamic Agent Registry
-export { DynamicAgentRegistry, dynamicAgentRegistry } from "./DynamicAgentRegistry";
+export { DynamicAgentRegistry, dynamicAgentRegistry } from "./DynamicAgentRegistry.js";
 export type {
   AgentRole,
   AgentTask,
@@ -58,7 +58,7 @@ export type {
   TaskPriority,
   OrchestrationPlan,
   AgentDefinition,
-} from "./types";
+} from "./types.js";
 
 // Tool-Agent Mapper (spécialisation des compétences)
 export {
@@ -71,31 +71,31 @@ export {
   getAllToolCategories,
   getToolsForAgent,
   getRecommendedRolesForCategory,
-} from "./toolAgentMapper";
+} from "./toolAgentMapper.js";
 export {
   agentRoleSchema,
   taskPrioritySchema,
   delegateTaskSchema,
   orchestrateSchema,
   listAgentTasksSchema,
-} from "./types";
+} from "./types.js";
 
 // === NOUVEAUX EXPORTS POUR LES AMÉLIORATIONS ===
 
 // Délégation structurée (remplace le parsing Markdown)
-export { DelegationManager, delegationManager } from "./DelegationManager";
+export { DelegationManager, delegationManager } from "./DelegationManager.js";
 export type { 
   StructuredDelegation, 
   BatchDelegation, 
   DelegationResult, 
   DelegationEvent 
-} from "./DelegationManager";
+} from "./DelegationManager.js";
 
 // Routage avancé
-export type { RoutingStrategy } from "./AgentCommunication";
+export type { RoutingStrategy } from "./AgentCommunication.js";
 
 // Surveillance et traçage du MessageBus
-export { MessageBusMonitor, messageBusMonitor } from "./MessageBusMonitor";
+export { MessageBusMonitor, messageBusMonitor } from "./MessageBusMonitor.js";
 export type { 
   AlertSeverity, 
   MonitorAlert, 
@@ -104,4 +104,4 @@ export type {
   MessageFlowNode,
   MessageFlowEdge,
   MessageFlowGraph
-} from "./MessageBusMonitor";
+} from "./MessageBusMonitor.js";

@@ -1,4 +1,4 @@
-import { Skill } from "./base";
+import { Skill } from "./base.js";
 
 const GITHUB_API = "https://api.github.com";
 const TIMEOUT_MS = 10_000;

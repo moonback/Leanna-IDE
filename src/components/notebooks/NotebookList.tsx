@@ -17,8 +17,8 @@ import {
   Search, SortAsc, SortDesc, Sparkles, X, Upload, Globe, Mic,
   ArrowRight, Layers,
 } from 'lucide-react';
-import { useToast } from '../ui/Toast';
-import { CreateNotebookModal } from './CreateNotebookModal';
+import { useToast } from '../ui/Toast.js';
+import { CreateNotebookModal } from './CreateNotebookModal.js';
 
 interface NotebookSummary {
   id: string;

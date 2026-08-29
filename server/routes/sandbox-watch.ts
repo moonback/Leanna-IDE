@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { addWatchClient, startWatching, stopWatching, getWatchClientCount } from '../utils/sandboxWatcher';
-import { authenticateToken } from '../security';
-import { isSandboxActive } from '../utils/sandbox';
+import { addWatchClient, startWatching, stopWatching, getWatchClientCount } from '../utils/sandboxWatcher.js';
+import { authenticateToken } from '../security.js';
+import { isSandboxActive } from '../utils/sandbox.js';
 
 let sandboxWss: WebSocketServer | null = null;
 

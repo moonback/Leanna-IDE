@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrainCircuit, Search, Trash2, RefreshCw } from 'lucide-react';
-import { useToast } from '../components/ui/Toast';
-import { ViewHeader } from '../components/ui/ViewHeader';
+import { useToast } from '../components/ui/Toast.js';
+import { ViewHeader } from '../components/ui/ViewHeader.js';
 
 interface Memory { id: string; content: string; created_at: string; }
 

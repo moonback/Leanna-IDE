@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { createList, getListByName, listAll, addItemToList, removeItemFromList, deleteList } from '../skills/list';
+import { createList, getListByName, listAll, addItemToList, removeItemFromList, deleteList } from '../skills/list.js';
 
 const router = Router();
 

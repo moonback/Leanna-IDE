@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { type IdeSettings, DEFAULT_IDE_SETTINGS } from '../types/ide';
+import { type IdeSettings, DEFAULT_IDE_SETTINGS } from '../types/ide.js';
 
 /**
  * Hook for managing IDE settings with persistence

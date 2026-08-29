@@ -16,7 +16,7 @@ import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { SELF_ROOT, isWriteForbidden } from "./selfRoot";
+import { SELF_ROOT, isWriteForbidden } from "./selfRoot.js";
 
 const execFileAsync = promisify(execFile);
 

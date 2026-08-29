@@ -11,8 +11,8 @@
  * L'API est unifiée : get/set/search avec un paramètre `level`.
  */
 
-import type { MemoryLevel, MemoryEntry } from "./types";
-import type { EventBus } from "./EventBus";
+import type { MemoryLevel, MemoryEntry } from "./types.js";
+import type { EventBus } from "./EventBus.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types

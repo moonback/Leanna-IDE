@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { SELF_ROOT } from "../utils/selfRoot";
+import { SELF_ROOT } from "../utils/selfRoot.js";
 
 export interface HealAttempt {
   skillPath: string;
