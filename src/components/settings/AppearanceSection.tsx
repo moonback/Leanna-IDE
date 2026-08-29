@@ -80,7 +80,7 @@ export function AppearanceSection() {
           {EXTENDED_ACCENTS.map(a => {
             const isActive = profile.accentColor === a.value;
             return (
-              <div key={a.value} className="relative flex flex-col items-center gap-1">
+              <div key={`${a.label}-${a.value}`} className="relative flex flex-col items-center gap-1">
                 <motion.button
                   type="button"
                   onClick={() => applyAccent(a.value)}
