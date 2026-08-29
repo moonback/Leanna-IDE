@@ -96,47 +96,35 @@
 ═══════════════════════════════════════════════ */
 
 :root[data-theme="dark"] {
-  /* Fond — deeper, richer blacks with subtle blue undertone */
-  --bg-base:       #09090b;
-  --bg-secondary:  #111113;
-  --bg-panel:      rgba(17, 17, 20, 0.94);
-  --bg-ctrl:       rgba(24, 24, 27, 0.96);
-  --bg-sidebar:    rgba(12, 12, 15, 0.98);
-  --bg-input:      rgba(39, 39, 42, 0.62);
-  --bg-elevated:   #18181b;
+  --bg-base: #09090b;
+  --bg-secondary: #111113;
+  --bg-panel: rgba(17, 17, 20, 0.94);
+  --bg-ctrl: rgba(24, 24, 27, 0.96);
+  --bg-sidebar: rgba(12, 12, 15, 0.98);
+  --bg-input: rgba(39, 39, 42, 0.62);
+  --bg-elevated: #0e2a47;               /* bleu foncé du logo */
 
-  /* Ombres — stronger depth, colored shadow for dimension */
-  --shadow-xs:  0 1px 2px rgba(0,0,0,0.3);
-  --shadow-sm:  0 2px 4px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.25);
-  --shadow-md:  0 4px 16px rgba(0,0,0,0.4), 0 2px 6px rgba(2,6,23,0.3);
-  --shadow-lg:  0 12px 40px rgba(0,0,0,0.5), 0 4px 16px rgba(2,6,23,0.3);
-  --shadow-xl:  0 24px 56px rgba(0,0,0,0.55), 0 8px 24px rgba(2,6,23,0.35);
-  --shadow-glow: 0 0 18px rgba(124,58,237,0.08);
+  --border-base: rgba(0, 194, 255, 0.2);
+  --border-strong: rgba(0, 194, 255, 0.35);
+  --border-focus: rgba(0, 194, 255, 0.72);
+  --border-glow: rgba(0, 194, 255, 0.18);
 
-  /* Bordures — subtle with slight color tint */
-  --border-base:   rgba(63, 63, 70, 0.55);
-  --border-strong: rgba(82, 82, 91, 0.78);
-  --border-focus:  rgba(124, 58, 237, 0.72);
-  --border-glow:   rgba(124, 58, 237, 0.18);
-
-  /* Textes — better contrast hierarchy */
-  --text-primary:   #f4f4f5;
+  --text-primary: #f4f4f5;
   --text-secondary: #a1a1aa;
-  --text-muted:     #71717a;
-  --text-dimmed:    #52525b;
+  --text-muted: #71717a;
+  --text-dimmed: #52525b;
 
-  /* Accent — indigo-to-cyan gradient feel */
-  --accent-primary:  #7c3aed;
-  --accent-hover:    #8b5cf6;
-  --accent-subtle:   rgba(124, 58, 237, 0.12);
-  --accent-glow:     rgba(124, 58, 237, 0.18);
-  --accent-secondary: #3b82f6;
+  --accent-primary: #00c2ff;
+  --accent-hover: #33ccff;
+  --accent-subtle: rgba(0, 194, 255, 0.12);
+  --accent-glow: rgba(0, 194, 255, 0.18);
+  --accent-secondary: #ff8c00;
 
-  /* Semantic colours — softer, more balanced */
-  --color-success:  #22c55e;
-  --color-warning:  #f59e0b;
-  --color-error:    #ef4444;
-  --color-info:     #38bdf8;
+  --color-success: #00ff9d; /* gardez ou adaptez */
+  --color-warning: #ffb703;
+  --color-error: #ff0055;
+  --color-info: #00c2ff;
+
 
   /* Semantic colours — subtle variants (12% opacity backgrounds) */
   --color-success-subtle: color-mix(in srgb, var(--color-success) 12%, transparent);
