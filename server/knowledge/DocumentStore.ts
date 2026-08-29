@@ -79,6 +79,7 @@ const STORE_VERSION = 1;
 export class DocumentStore {
   private data: DocumentStoreData;
   private filePath: string;
+  private linksDetected: boolean = false;
 
   constructor(projectRoot?: string) {
     const root = projectRoot || process.cwd();
@@ -91,6 +92,9 @@ export class DocumentStore {
     }
 
     this.data = this.load();
+    
+    // Vérifier si des liens existent déjà
+    this.linksDetected = this.data.links.length > 0;
   }
 
   // ─── Persistence ──────────────────────────────────────────────────────────
@@ -137,6 +141,9 @@ export class DocumentStore {
     };
 
     this.data.documents.push(stored);
+
+    // Détecter automatiquement des liens avec les documents existants
+    this.detectAndAddLinksForDocument(id);
 
     // Rotation FIFO si trop de documents
     while (this.data.documents.length > MAX_DOCUMENTS) {
@@ -247,7 +254,75 @@ export class DocumentStore {
    * Récupère tous les liens.
    */
   public getAllLinks(): DocumentLink[] {
+    // Détecter les liens automatiquement si ce n'est pas déjà fait
+    // et qu'il y a des documents sans liens
+    if (!this.linksDetected && this.data.documents.length > 1) {
+      this.detectAllLinks();
+      this.linksDetected = true;
+    }
     return [...this.data.links];
+  }
+
+  /**
+   * Détecte automatiquement des liens entre un document et les documents existants
+   * basé sur la similarité des mots-clés.
+   */
+  private detectAndAddLinksForDocument(newDocId: string, minSimilarity = 0.2): void {
+    const newDoc = this.getDocument(newDocId);
+    if (!newDoc) return;
+
+    const existingDocs = this.data.documents.filter((d) => d.id !== newDocId);
+    const newLinks: Omit<DocumentLink, "createdAt">[] = [];
+    
+    for (const existingDoc of existingDocs) {
+      // Calculer la similarité basée sur les mots-clés communs
+      const commonKeywords = newDoc.keywords.filter((k) => existingDoc.keywords.includes(k));
+      const keywordSimilarity = commonKeywords.length / Math.max(newDoc.keywords.length, 1);
+
+      if (keywordSimilarity > minSimilarity) {
+        // Éviter les doublons
+        const linkExists = this.data.links.some(
+          (l) =>
+            (l.docA === newDocId && l.docB === existingDoc.id) ||
+            (l.docA === existingDoc.id && l.docB === newDocId)
+        );
+
+        if (!linkExists) {
+          const linkType: DocumentLink["linkType"] = keywordSimilarity > 0.6 ? "thematic" : "complementary";
+          newLinks.push({
+            docA: newDocId,
+            docB: existingDoc.id,
+            linkType,
+            description: `Mots-clés communs: ${commonKeywords.slice(0, 5).join(", ")}`,
+            confidence: Math.min(keywordSimilarity, 0.9),
+          });
+        }
+      }
+    }
+    
+    // Ajouter tous les nouveaux liens en une seule fois
+    if (newLinks.length > 0) {
+      for (const link of newLinks) {
+        // Ajouter directement sans sauvegarder à chaque fois
+        const docA = this.getDocument(link.docA);
+        const docB = this.getDocument(link.docB);
+        if (docA && docB) {
+          // Éviter les doublons une dernière fois
+          const exists = this.data.links.some(
+            (l) =>
+              (l.docA === link.docA && l.docB === link.docB) ||
+              (l.docA === link.docB && l.docB === link.docA)
+          );
+          if (!exists) {
+            this.data.links.push({
+              ...link,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        }
+      }
+      this.save();
+    }
   }
 
   // ─── Analyse de similarité ────────────────────────────────────────────────
@@ -329,6 +404,24 @@ export class DocumentStore {
       totalTextSize: this.data.documents.reduce((sum, d) => sum + d.extractedText.length, 0),
       lastUpdated: this.data.lastUpdated,
     };
+  }
+
+  /**
+   * Détecte des liens entre tous les documents existants.
+   * À appeler après le chargement initial ou une ré-extraction complète.
+   */
+  public detectAllLinks(minSimilarity = 0.2): number {
+    const docIds = this.data.documents.map((d) => d.id);
+    
+    // Vider les liens existants pour recalculer proprement
+    this.data.links = [];
+
+    for (const docId of docIds) {
+      this.detectAndAddLinksForDocument(docId, minSimilarity);
+    }
+
+    log.info(`🔗 Liens détectés entre ${docIds.length} documents`);
+    return this.data.links.length;
   }
 
   // ─── Utilitaires privés ───────────────────────────────────────────────────

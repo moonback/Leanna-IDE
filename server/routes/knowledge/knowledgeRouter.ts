@@ -355,8 +355,38 @@ router.get('/documents', async (_req: Request, res: Response) => {
 router.post('/documents/reextract', async (_req: Request, res: Response) => {
   try {
     const { documentExtractor } = await import('../../knowledge/DocumentExtractor');
+    const { getDocumentStore } = await import('../../knowledge/DocumentStore');
+    
     const stats = await documentExtractor.extractAll();
-    res.json({ status: 'success', stats });
+    
+    // Détecter les liens entre documents après extraction
+    const store = getDocumentStore();
+    const linksCount = store.detectAllLinks();
+    
+    res.json({ 
+      status: 'success', 
+      stats, 
+      linksDetected: linksCount 
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/knowledge/documents/detect-links — Détecte les liens entre documents existants
+router.post('/documents/detect-links', async (_req: Request, res: Response) => {
+  try {
+    const { getDocumentStore } = await import('../../knowledge/DocumentStore');
+    const store = getDocumentStore();
+    const minSimilarity = typeof req.body.minSimilarity === 'number' ? req.body.minSimilarity : 0.2;
+    
+    const linksCount = store.detectAllLinks(minSimilarity);
+    
+    res.json({ 
+      status: 'success', 
+      linksDetected: linksCount,
+      totalLinks: store.getAllLinks().length
+    });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
