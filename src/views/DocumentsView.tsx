@@ -1085,7 +1085,7 @@ function StatsTab() {
         <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           Statistiques du Knowledge System
         </h2>
-        {workspaceStats?.documentCount > 0 && (
+        {workspaceStats?.documentCount && workspaceStats.documentCount > 0 && (
           <span className="text-xs px-2 py-0.5 rounded-full" style={{
             backgroundColor: 'var(--bg-base)',
             color: 'var(--text-muted)'
@@ -1093,7 +1093,7 @@ function StatsTab() {
             {workspaceStats.documentCount} docs auto-extraits
           </span>
         )}
-        {projectMemoryStats?.totalFacts > 0 && (
+        {projectMemoryStats?.totalFacts && projectMemoryStats.totalFacts > 0 && (
           <span className="text-xs px-2 py-0.5 rounded-full" style={{
             backgroundColor: 'var(--bg-base)',
             color: 'var(--text-muted)'
@@ -1101,7 +1101,7 @@ function StatsTab() {
             {projectMemoryStats.totalFacts} faits projet
           </span>
         )}
-        {kgStats?.totalRelations > 0 && (
+        {kgStats?.totalRelations && kgStats.totalRelations > 0 && (
           <span className="text-xs px-2 py-0.5 rounded-full" style={{
             backgroundColor: 'var(--bg-base)',
             color: 'var(--text-muted)'
