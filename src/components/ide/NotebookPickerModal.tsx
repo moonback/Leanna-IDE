@@ -257,29 +257,65 @@ export function NotebookPickerModal({
           <div className="flex items-center justify-center py-8">
             <Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
           </div>
-        ) : notebooks.length === 0 ? (
-          <div className="py-4 text-center">
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Aucun notebook disponible.</p>
-            
-            {!showCreateForm ? (
-              <button
-                onClick={() => {
-                  setShowCreateForm(true);
-                  setNewNotebookTitle(defaultNotebookTitle);
-                }}
-                disabled={creatingNotebook}
-                className="mt-3 flex items-center justify-center gap-2 mx-auto rounded-lg px-4 py-2 text-sm font-medium transition hover:bg-white/10 disabled:opacity-60"
-                style={{
-                  backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
-                  color: 'var(--accent-primary)',
-                  border: '1px solid var(--border-base)'
-                }}
-              >
-                <Plus size={14} />
-                Créer un notebook
-              </button>
+        ) : (
+          <>
+            {/* Liste des notebooks existants ou message si vide */}
+            {notebooks.length === 0 ? (
+              <div className="py-4 text-center">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Aucun notebook disponible.</p>
+              </div>
             ) : (
-              <div className="mt-4 space-y-3">
+              <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
+                {notebooks.map(nb => {
+                  const isPresent = alreadyIn.has(nb.id);
+                  return (
+                    <button
+                      key={nb.id}
+                      onClick={() => !isPresent && handleImport(nb.id)}
+                      disabled={importing !== null || isPresent}
+                      className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/10 disabled:opacity-60 disabled:cursor-default"
+                      style={{ borderColor: 'var(--border-base)' }}
+                      title={isPresent ? 'Ce fichier est déjà présent dans ce notebook' : `Importer dans ${nb.title}`}
+                    >
+                      <span
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-base flex-shrink-0"
+                        style={{ backgroundColor: `${nb.color}22`, color: nb.color || 'var(--accent-primary)' }}
+                      >
+                        {nb.icon || '📓'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                          {nb.title}
+                        </div>
+                        <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                          {nb.sourcesCount} source{nb.sourcesCount !== 1 ? 's' : ''}
+                          {nb.description ? ` · ${nb.description}` : ''}
+                        </div>
+                      </div>
+                      {isPresent && (
+                        <span
+                          className="flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded-md flex-shrink-0"
+                          style={{
+                            backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
+                            color: 'var(--accent-primary)',
+                          }}
+                        >
+                          <FileCheck size={11} />
+                          Déjà présent
+                        </span>
+                      )}
+                      {importing === nb.id && (
+                        <Loader2 size={14} className="animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Formulaire de création de notebook (affiché si showCreateForm) */}
+            {showCreateForm && (
+              <div className="mt-4 pt-4 border-t border-[var(--border-base)] space-y-3">
                 <input
                   type="text"
                   value={newNotebookTitle}
@@ -302,6 +338,10 @@ export function NotebookPickerModal({
                         setShowCreateForm(false);
                         setNewNotebookTitle('');
                       }
+                    }
+                    if (e.key === 'Escape') {
+                      setShowCreateForm(false);
+                      setNewNotebookTitle('');
                     }
                   }}
                 />
@@ -341,58 +381,29 @@ export function NotebookPickerModal({
                 </div>
               </div>
             )}
-          </div>
-        ) : (
-          <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1">
-            {notebooks.map(nb => {
-              const isPresent = alreadyIn.has(nb.id);
-              return (
-                <button
-                  key={nb.id}
-                  onClick={() => !isPresent && handleImport(nb.id)}
-                  disabled={importing !== null || isPresent}
-                  className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/10 disabled:opacity-60 disabled:cursor-default"
-                  style={{ borderColor: 'var(--border-base)' }}
-                  title={isPresent ? 'Ce fichier est déjà présent dans ce notebook' : `Importer dans ${nb.title}`}
-                >
-                  <span
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-base flex-shrink-0"
-                    style={{ backgroundColor: `${nb.color}22`, color: nb.color || 'var(--accent-primary)' }}
-                  >
-                    {nb.icon || '📓'}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                      {nb.title}
-                    </div>
-                    <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                      {nb.sourcesCount} source{nb.sourcesCount !== 1 ? 's' : ''}
-                      {nb.description ? ` · ${nb.description}` : ''}
-                    </div>
-                  </div>
-                  {isPresent && (
-                    <span
-                      className="flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded-md flex-shrink-0"
-                      style={{
-                        backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
-                        color: 'var(--accent-primary)',
-                      }}
-                    >
-                      <FileCheck size={11} />
-                      Déjà présent
-                    </span>
-                  )}
-                  {importing === nb.id && (
-                    <Loader2 size={14} className="animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          </>
         )}
 
-        {/* Footer */}
-        <div className="mt-4 flex justify-end">
+        {/* Footer avec bouton "Créer un nouveau" */}
+        <div className="mt-4 flex justify-between items-center">
+          {!showCreateForm && (
+            <button
+              onClick={() => {
+                setShowCreateForm(true);
+                setNewNotebookTitle(defaultNotebookTitle);
+              }}
+              disabled={creatingNotebook}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition hover:bg-white/10 disabled:opacity-60"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
+                color: 'var(--accent-primary)',
+                border: '1px solid var(--border-base)'
+              }}
+            >
+              <Plus size={14} />
+              Créer un nouveau
+            </button>
+          )}
           <button
             onClick={onClose}
             className="rounded-lg border px-3 py-1.5 text-sm transition hover:bg-white/10"
