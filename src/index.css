@@ -96,98 +96,100 @@
 ═══════════════════════════════════════════════ */
 
 :root[data-theme="dark"] {
-  --bg-base: #09090b;
-  --bg-secondary: #111113;
-  --bg-panel: rgba(17, 17, 20, 0.94);
-  --bg-ctrl: rgba(24, 24, 27, 0.96);
-  --bg-sidebar: rgba(12, 12, 15, 0.98);
-  --bg-input: rgba(39, 39, 42, 0.62);
-  --bg-elevated: #0e2a47;               /* bleu foncé du logo */
+  /* Base – foncé mais avec une teinte bleutée */
+  --bg-base:       #0a1628;
+  --bg-secondary:  #0e2a47;
+  --bg-panel:      rgba(14, 42, 71, 0.92);
+  --bg-ctrl:       rgba(14, 42, 71, 0.96);
+  --bg-sidebar:    rgba(10, 22, 40, 0.98);
+  --bg-input:      rgba(0, 194, 255, 0.10);
+  --bg-elevated:   #0e2a47;
 
-  --border-base: rgba(0, 194, 255, 0.2);
-  --border-strong: rgba(0, 194, 255, 0.35);
-  --border-focus: rgba(0, 194, 255, 0.72);
-  --border-glow: rgba(0, 194, 255, 0.18);
+  /* Bordures – cyan et orange */
+  --border-base:   rgba(0, 194, 255, 0.30);
+  --border-strong: rgba(255, 140, 0, 0.60);
+  --border-focus:  #00c2ff;
+  --border-glow:   rgba(0, 194, 255, 0.35);
 
-  --text-primary: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-  --text-dimmed: #52525b;
+  /* Textes */
+  --text-primary:   #f0f4ff;
+  --text-secondary: #b0c8e0;
+  --text-muted:     #6a8aaa;
+  --text-dimmed:    #3a5a7a;
 
-  --accent-primary: #00c2ff;
-  --accent-hover: #33ccff;
-  --accent-subtle: rgba(0, 194, 255, 0.12);
-  --accent-glow: rgba(0, 194, 255, 0.18);
+  /* Accents – vos couleurs */
+  --accent-primary:  #00c2ff;
+  --accent-hover:    #33ccff;
+  --accent-subtle:   rgba(0, 194, 255, 0.12);
+  --accent-glow:     rgba(0, 194, 255, 0.25);
   --accent-secondary: #ff8c00;
 
-  --color-success: #00ff9d; /* gardez ou adaptez */
-  --color-warning: #ffb703;
-  --color-error: #ff0055;
-  --color-info: #00c2ff;
+  /* Couleurs sémantiques adaptées */
+  --color-success:  #00ff9d;
+  --color-warning:  #ffb703;
+  --color-error:    #ff4d6d;
+  --color-info:     #00c2ff;
 
-
-  /* Semantic colours — subtle variants (12% opacity backgrounds) */
+  /* Déclinaisons subtiles */
   --color-success-subtle: color-mix(in srgb, var(--color-success) 12%, transparent);
   --color-warning-subtle: color-mix(in srgb, var(--color-warning) 12%, transparent);
   --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
   --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
 
-  /* Accent alternative — secondary highlight color */
-  --color-accent-alt: #8b5cf6;
-  --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
+  /* Orb – avec le bleu foncé en halo */
+  --orb-glow-active: rgba(0, 194, 255, 0.50);
+  --gradient-from:   rgba(0, 194, 255, 0.10);
+  --orb-idle:      #00c2ff;
+  --orb-online:    #33ccff;
+  --orb-listening: #00bfff;
+  --orb-speaking:  #ff8c00;
+  --orb-busy:      #ffa500;
+  --orb-thinking:  #0e2a47;
 
-  /* Orb — vibrant multi-state glow */
-  --orb-glow-active: rgba(124, 58, 237, 0.34);
-  --gradient-from:   rgba(124, 58, 237, 0.14);
-  /* Orb state accents */
-  --orb-idle:      #7c3aed;
-  --orb-online:    #8b5cf6;
-  --orb-listening: #38bdf8;
-  --orb-speaking:  #a78bfa;
-  --orb-busy:      #f59e0b;
-  --orb-thinking:  #8b5cf6;
+  /* Contrôles */
+  --ctrl-icon:       #6a8aaa;
+  --ctrl-icon-hover: #f0f4ff;
+  --ctrl-hover:      rgba(0, 194, 255, 0.08);
+  --btn-active-bg:   rgba(0, 194, 255, 0.18);
+  --btn-active-text: #00c2ff;
 
-  /* Controls */
-  --ctrl-icon:       #71717a;
-  --ctrl-icon-hover: #f4f4f5;
-  --ctrl-hover:      rgba(39, 39, 42, 0.82);
-  --btn-active-bg:   rgba(124, 58, 237, 0.14);
-  --btn-active-text: #a78bfa;
+  /* Navigation */
+  --nav-active-bg:  rgba(0, 194, 255, 0.12);
+  --nav-active-bar: #00c2ff;
 
-  /* Misc */
-  --drag-overlay:   rgba(49, 46, 129, 0.2);
-  --scroll-thumb:   #27272a;
-  --scroll-thumb-hover: #3f3f46;
+  /* Verre */
+  --glass-bg:        rgba(14, 42, 71, 0.80);
+  --glass-border:    rgba(0, 194, 255, 0.20);
+  --glass-blur:      18px;
 
-  /* Sidebar nav */
-  --nav-active-bg:  rgba(124, 58, 237, 0.12);
-  --nav-active-bar: #7c3aed;
+  /* Variables spécifiques pour le notebook */
+  --notebook-bg: #0e2a47;
+  --notebook-canvas: #0a1628;
+  --notebook-surface: rgba(14, 42, 71, 0.90);
+  --notebook-accent: #00c2ff;
+  --notebook-accent-text: #0a1628;
+  --notebook-accent-surface: rgba(0, 194, 255, 0.08);
+  --notebook-accent-hover: rgba(0, 194, 255, 0.14);
+  --notebook-border: rgba(0, 194, 255, 0.20);
+  --notebook-card-bg: rgba(10, 22, 40, 0.90);
+  --notebook-chat-user: rgba(0, 194, 255, 0.10);
 
-  /* Self-edit / Checkpoint system */
-  --self-edit-bg:     rgba(192, 132, 252, 0.05);
-  --self-edit-border: rgba(192, 132, 252, 0.25);
-  --self-edit-text:   #c084fc;
-  --checkpoint-bg:    rgba(74, 222, 128, 0.06);
-  --checkpoint-text:  #4ade80;
-  --critical-bg:      rgba(251, 113, 133, 0.06);
-  --critical-border:  rgba(251, 113, 133, 0.3);
-  --critical-text:    #fb7185;
+  /* IDE shell */
+  --ide-shell-bg: #0a1628;
+  --ide-panel-bg: rgba(14, 42, 71, 0.94);
+  --ide-sidebar-bg: rgba(10, 22, 40, 0.98);
+  --ide-shell-border: rgba(0, 194, 255, 0.15);
 
-  /* Glass effect tokens */
-  --glass-bg:        rgba(24, 24, 27, 0.72);
-  --glass-border:    rgba(255, 255, 255, 0.07);
-  --glass-blur:      20px;
-
-  /* New design variables for EmptyEditorState - Dark mode */
-  --bg: #09090b;
-  --surface: #18181b;
-  --surface-soft: #111113;
-  --text: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-  --primary: #159fe3;
-  --primary-dark: #087fbd;
-  --border: rgba(63, 63, 70, 0.55);
+  /* New design variables for EmptyEditorState - Dark theme */
+  --bg: #0a1628;
+  --surface: #0e2a47;
+  --surface-soft: #1a3a5c;
+  --text: #f0f4ff;
+  --text-secondary: #b0c8e0;
+  --text-muted: #6a8aaa;
+  --primary: #00c2ff;
+  --primary-dark: #0099cc;
+  --border: rgba(0, 194, 255, 0.15);
 }
 
 :root[data-theme="light"] {
@@ -370,6 +372,17 @@
   --glass-bg:        rgba(15, 23, 42, 0.85);
   --glass-border:    rgba(0, 240, 255, 0.2);
   --glass-blur:      16px;
+
+  /* New design variables for EmptyEditorState - Cyberpunk theme */
+  --bg: #060814;
+  --surface: #0d1127;
+  --surface-soft: #121833;
+  --text: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --primary: #00f0ff;
+  --primary-dark: #00bfff;
+  --border: rgba(0, 240, 255, 0.2);
 }
 
 /* ═══════════════════════════════════════════════
@@ -445,6 +458,17 @@
   --glass-bg:        rgba(253, 246, 227, 0.85);
   --glass-border:    rgba(181, 137, 0, 0.15);
   --glass-blur:      12px;
+
+  /* New design variables for EmptyEditorState - Sepia theme */
+  --bg: #fbf0d9;
+  --surface: #fdf6e3;
+  --surface-soft: #f7edd4;
+  --text: #433422;
+  --text-secondary: #5c4731;
+  --text-muted: #85694b;
+  --primary: #b58900;
+  --primary-dark: #997300;
+  --border: rgba(181, 137, 0, 0.15);
 }
 
 /* ═══════════════════════════════════════════════
@@ -520,6 +544,17 @@
   --glass-bg:        #000000;
   --glass-border:    #ffffff;
   --glass-blur:      0px;
+
+  /* New design variables for EmptyEditorState - High Contrast theme */
+  --bg: #000000;
+  --surface: #121212;
+  --surface-soft: #1a1a1a;
+  --text: #ffffff;
+  --text-secondary: #e0e0e0;
+  --text-muted: #cccccc;
+  --primary: #ffff00;
+  --primary-dark: #cccc00;
+  --border: #ffffff;
 }
 
 /* ═══════════════════════════════════════════════
