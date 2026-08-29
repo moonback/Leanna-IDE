@@ -1653,10 +1653,10 @@ body {
 ═══════════════════════════════════════════════ */
 :root[data-theme="dark"] {
   --notebook-bg: #1b1b1f;
-  --notebook-canvas: #1f1f23;
-  --notebook-surface: rgba(40, 40, 48, 0.92);
+  --notebook-canvas: #0a1628;
+  --notebook-surface: #0a1628;
   --notebook-surface-muted: rgba(255, 255, 255, 0.06);
-  --notebook-surface-elevated: rgba(48, 48, 56, 0.96);
+  --notebook-surface-elevated: #0a1628;
   --notebook-border: rgba(255, 255, 255, 0.08);
   --notebook-card-bg: rgba(44, 44, 52, 0.9);
   --notebook-card-hover: rgba(52, 52, 62, 0.95);
@@ -1664,7 +1664,7 @@ body {
   --notebook-accent-text: #1b1b1f;
   --notebook-accent-surface: rgba(168, 199, 250, 0.08);
   --notebook-accent-hover: rgba(168, 199, 250, 0.14);
-  --notebook-studio-bg: rgba(36, 36, 44, 0.94);
+  --notebook-studio-bg: #0a1628;
   --notebook-chat-user: rgba(168, 199, 250, 0.12);
   --notebook-chat-ai: transparent;
 }
