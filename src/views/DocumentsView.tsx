@@ -966,15 +966,71 @@ function RelationsTab() {
 function StatsTab() {
   const { error: toastError } = useToast();
   const [stats, setStats] = useState<StatsData | null>(null);
+  const [workspaceStats, setWorkspaceStats] = useState<{
+    documentCount: number;
+    totalWords: number;
+    documentsByType: Record<string, number>;
+  } | null>(null);
+  const [projectMemoryStats, setProjectMemoryStats] = useState<{
+    totalFacts: number;
+    factsByCategory: Record<string, number>;
+    structuralFacts: number;
+  } | null>(null);
+  const [kgStats, setKgStats] = useState<{
+    totalRelations: number;
+    cycleCount: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/documents/stats');
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        setStats(data.stats);
+        const [docsStatsRes, wsDocsRes, kgHealthRes, kgDashboardRes] = await Promise.all([
+          fetch('/api/documents/stats'),
+          fetch('/api/knowledge/documents'),
+          fetch('/api/knowledge/health'),
+          fetch('/api/knowledge/dashboard'),
+        ]);
+
+        if (docsStatsRes.ok) {
+          const docsData = await docsStatsRes.json();
+          setStats(docsData.stats);
+        }
+
+        if (wsDocsRes.ok) {
+          const wsData = await wsDocsRes.json();
+          const totalWords = wsData.documents.reduce((sum: number, d: any) =>
+            sum + (d.textLength || 0), 0);
+
+          const docsByType: Record<string, number> = {};
+          wsData.documents.forEach((d: any) => {
+            const type = d.mimeType || 'auto_extracted';
+            docsByType[type] = (docsByType[type] || 0) + 1;
+          });
+
+          setWorkspaceStats({
+            documentCount: wsData.documentCount,
+            totalWords,
+            documentsByType: docsByType,
+          });
+        }
+
+        if (kgHealthRes.ok) {
+          const kgData = await kgHealthRes.json();
+          setProjectMemoryStats({
+            totalFacts: kgData.projectMemory?.totalFacts || 0,
+            factsByCategory: kgData.projectMemory?.categoryBreakdown || {},
+            structuralFacts: kgData.projectMemory?.structuralFacts || 0,
+          });
+        }
+
+        if (kgDashboardRes.ok) {
+          const kgDbData = await kgDashboardRes.json();
+          setKgStats({
+            totalRelations: kgDbData.graph?.relations?.total || 0,
+            cycleCount: kgDbData.graph?.cycleCount || 0,
+          });
+        }
       } catch {
         toastError('Impossible de charger les statistiques');
       } finally {
@@ -991,70 +1047,127 @@ function StatsTab() {
     );
   }
 
-  if (!stats) {
+  if (!stats && !workspaceStats && !projectMemoryStats && !kgStats) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         <AlertCircle className="w-8 h-8" style={{ color: 'var(--text-dimmed)' }} />
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Données indisponibles</p>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          Aucun document trouvé
+        </p>
       </div>
     );
   }
 
+  const totalDocuments = (stats?.totalDocuments || 0) + (workspaceStats?.documentCount || 0);
+  const totalWords = (stats?.totalWords || 0) + (workspaceStats?.totalWords || 0);
+  const totalFacts = (stats?.totalFacts || 0) + (projectMemoryStats?.totalFacts || 0);
+  const totalRelations = (stats?.totalRelations || 0) + (kgStats?.totalRelations || 0);
+  const totalSections = stats?.totalSections || 0;
+  const totalEntities = stats?.totalEntities || 0;
+  const averageDocumentSize = totalDocuments > 0
+    ? Math.round((totalWords / totalDocuments) * 100) / 100
+    : 0;
+
+  const allDocumentsByType = {
+    ...workspaceStats?.documentsByType,
+    ...stats?.documentsByType,
+  };
+
+  const allFactsByCategory = {
+    ...stats?.factsByCategory,
+    ...projectMemoryStats?.factsByCategory,
+  };
+
   return (
     <div className="p-5 lg:p-7 space-y-6">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Documents" value={stats.totalDocuments} icon={FileText} color="#818cf8" />
-        <StatCard label="Faits" value={stats.totalFacts} icon={Brain} color="#34d399" />
-        <StatCard label="Relations" value={stats.totalRelations} icon={Link2} color="#f472b6" />
-        <StatCard label="Mots total" value={stats.totalWords.toLocaleString()} icon={FileType} color="#fbbf24" />
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <BarChart3 className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
+        <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          Statistiques du Knowledge System
+        </h2>
+        {workspaceStats?.documentCount > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded-full" style={{
+            backgroundColor: 'var(--bg-base)',
+            color: 'var(--text-muted)'
+          }}>
+            {workspaceStats.documentCount} docs auto-extraits
+          </span>
+        )}
+        {projectMemoryStats?.totalFacts > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded-full" style={{
+            backgroundColor: 'var(--bg-base)',
+            color: 'var(--text-muted)'
+          }}>
+            {projectMemoryStats.totalFacts} faits projet
+          </span>
+        )}
+        {kgStats?.totalRelations > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded-full" style={{
+            backgroundColor: 'var(--bg-base)',
+            color: 'var(--text-muted)'
+          }}>
+            {kgStats.totalRelations} relations code
+          </span>
+        )}
       </div>
 
-      {/* Breakdowns */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard label="Documents" value={totalDocuments} icon={FileText} color="#818cf8" />
+        <StatCard label="Faits" value={totalFacts} icon={Brain} color="#34d399" />
+        <StatCard label="Relations" value={totalRelations} icon={Link2} color="#f472b6" />
+        <StatCard
+          label="Mots total"
+          value={totalWords.toLocaleString()}
+          icon={FileType}
+          color="#fbbf24"
+        />
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Documents by type */}
-        {Object.keys(stats.documentsByType).length > 0 && (
+        {Object.keys(allDocumentsByType).length > 0 && (
           <div className="p-4 rounded-2xl border space-y-3"
             style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
             <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
               Documents par type
             </h3>
             <div className="space-y-2">
-              {Object.entries(stats.documentsByType).map(([type, count]) => (
-                <div key={type} className="flex items-center justify-between">
-                  <span className="text-xs flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                    {TYPE_ICONS[type] || '📎'} {type}
-                  </span>
-                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{count}</span>
-                </div>
-              ))}
+              {Object.entries(allDocumentsByType)
+                .sort((a, b) => b[1] - a[1])
+                .map(([type, count]) => (
+                  <div key={type} className="flex items-center justify-between">
+                    <span className="text-xs flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+                      {TYPE_ICONS[type.split('/')[1] || type] || '📎'} {type}
+                    </span>
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{count}</span>
+                  </div>
+                ))}
             </div>
           </div>
         )}
 
-        {/* Facts by category */}
-        {Object.keys(stats.factsByCategory).length > 0 && (
+        {Object.keys(allFactsByCategory).length > 0 && (
           <div className="p-4 rounded-2xl border space-y-3"
             style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
             <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
               Faits par catégorie
             </h3>
             <div className="space-y-2">
-              {Object.entries(stats.factsByCategory).map(([cat, count]) => (
-                <div key={cat} className="flex items-center justify-between">
-                  <span className="text-xs flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] || '#6b7280' }} />
-                    {cat}
-                  </span>
-                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{count}</span>
-                </div>
-              ))}
+              {Object.entries(allFactsByCategory)
+                .sort((a, b) => b[1] - a[1])
+                .map(([cat, count]) => (
+                  <div key={cat} className="flex items-center justify-between">
+                    <span className="text-xs flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] || '#6b7280' }} />
+                      {cat}
+                    </span>
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{count}</span>
+                  </div>
+                ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* Extra metrics */}
       <div className="p-4 rounded-2xl border space-y-2"
         style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
         <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
@@ -1063,22 +1176,35 @@ function StatsTab() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
           <div>
             <span style={{ color: 'var(--text-dimmed)' }}>Sections :</span>{' '}
-            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{stats.totalSections}</span>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{totalSections}</span>
           </div>
           <div>
             <span style={{ color: 'var(--text-dimmed)' }}>Entités :</span>{' '}
-            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{stats.totalEntities}</span>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{totalEntities}</span>
           </div>
           <div>
             <span style={{ color: 'var(--text-dimmed)' }}>Taille moy. :</span>{' '}
-            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{(stats.averageDocumentSize / 1024).toFixed(1)} KB</span>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+              {averageDocumentSize.toLocaleString()} mots
+            </span>
           </div>
           <div>
             <span style={{ color: 'var(--text-dimmed)' }}>Dernière activité :</span>{' '}
-            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{timeAgo(stats.lastActivity)}</span>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+              {timeAgo(stats?.lastActivity || new Date().toISOString())}
+            </span>
           </div>
         </div>
       </div>
+
+      {totalDocuments === 0 && totalFacts === 0 && (
+        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center">
+          <p className="text-sm text-blue-200">
+            💡 <strong>Astuce</strong> : Upload des documents via l'onglet <strong>Documents</strong> pour les voir apparaître ici.<br />
+            Les documents du workspace sont auto-extraits et les agents ajoutent des faits projet automatiquement.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
