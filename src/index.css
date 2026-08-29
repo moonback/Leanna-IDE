@@ -99,7 +99,7 @@
   /* Base – foncé mais avec une teinte bleutée */
   --bg-base:       #0a1628;
   --bg-secondary:  #0e2a47;
-  --bg-panel:      rgba(14, 42, 71, 0.92);
+  --bg-panel:      #0a1628;
   --bg-ctrl:       rgba(14, 42, 71, 0.96);
   --bg-sidebar:    rgba(10, 22, 40, 0.98);
   --bg-input:      rgba(0, 194, 255, 0.10);
