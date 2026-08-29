@@ -40,6 +40,8 @@ export interface SkillContext {
   };
   /** Données arbitraires pour extensions */
   custom?: Record<string, any>;
+  /** Callback pour émettre des données en temps réel vers le client */
+  emitToClient?: (data: any) => void;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { Skill } from "./base.js";
+import { Skill, SkillContext } from "./base.js";
 import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
@@ -347,7 +347,7 @@ export const systemSkill: Skill = {
         }
     ],
 
-    handleToolCall: async (name, args: Record<string, unknown>, toolContext?: { emitToClient?: (data: any) => void }) => {
+    handleToolCall: async (name, args: Record<string, unknown>, toolContext?: SkillContext) => {
         try {
             switch (name) {
                 case "run_project_command": {
