@@ -1,7 +1,7 @@
 
-<!-- <p align="center">
+<p align="center">
   <img src="assets/images/header.png" alt="Leanna OS" width="100%" />
-</p> -->
+</p>
 
 <h1 align="center">Leanna OS</h1>
 
