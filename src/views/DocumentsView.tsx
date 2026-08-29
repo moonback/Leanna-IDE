@@ -169,7 +169,7 @@ export default function DocumentsView() {
       {/* Tabs */}
       <div
         className="flex items-center gap-1 px-5 py-2 flex-shrink-0 border-b lg:px-7"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
       >
         {([
           { key: 'documents' as Tab, icon: FileText, label: 'Documents' },
@@ -183,7 +183,7 @@ export default function DocumentsView() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
             style={{
               backgroundColor: activeTab === key ? 'var(--accent-subtle)' : 'transparent',
-              color: activeTab === key ? 'var(--accent-primary)' : 'var(--text-muted)',
+              color: activeTab === key ? 'var(--accent-secondary)' : 'var(--text-muted)',
             }}
           >
             <Icon className="w-3.5 h-3.5" />
