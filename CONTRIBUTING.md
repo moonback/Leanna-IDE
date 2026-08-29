@@ -1,4 +1,4 @@
-# Contributing to Leanna OS
+# Contributing to Leanna 
 
 ## Sommaire
 
@@ -555,7 +555,7 @@ Creez une nouvelle issue sur GitHub avec :
    - Systeme d'exploitation
    - Version de Node.js
    - Navigateur (si UI)
-   - Version de Leanna OS
+   - Version de Leanna 
 
 4. **Logs** : Si applicable, ajoutez les logs d'erreur
 
@@ -620,4 +620,4 @@ Si vous avez des questions sur la contribution, ouvrez une issue avec le label `
 
 ---
 
-Merci de contribuer a Leanna OS ! 
+Merci de contribuer a Leanna  ! 

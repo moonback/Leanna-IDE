@@ -20,7 +20,7 @@ function log(...args) {
 
 process.on('uncaughtException', (err) => {
   log('UNCAUGHT EXCEPTION:', err.stack || err.message);
-  dialog.showErrorBox('Erreur Leanna OS', String(err.stack || err));
+  dialog.showErrorBox('Erreur Leanna ', String(err.stack || err));
 });
 
 process.on('unhandledRejection', (err) => {
@@ -240,7 +240,7 @@ app.whenReady().then(() => {
   });
 
   if (Notification.isSupported()) {
-    new Notification({ title: 'Leanna OS', body: 'Système local connecté et prêt.' }).show();
+    new Notification({ title: 'Leanna ', body: 'Système local connecté et prêt.' }).show();
   }
 });
 

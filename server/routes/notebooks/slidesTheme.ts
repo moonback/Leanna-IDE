@@ -585,7 +585,7 @@ export function buildRevealPresentation(
         ? `<p class="title-subtitle">${escapeHtml(firstSentence)}.</p>`
         : "";
       return `    <section class="title-slide" data-transition="zoom-in fade-out">
-      <div class="tag">Leanna OS&nbsp;&nbsp;·&nbsp;&nbsp;Notebook</div>
+      <div class="tag">Leanna &nbsp;&nbsp;·&nbsp;&nbsp;Notebook</div>
       <h1>${processInlineTitle(s.title)}</h1>
       <div class="accent-bar"></div>
       ${subtitle}
@@ -627,7 +627,7 @@ export function buildRevealPresentation(
 
   const closingSlide = isLeannaTheme
     ? `    <section class="title-slide closing-slide" data-transition="fade">
-      <div class="tag">Leanna OS&nbsp;&nbsp;·&nbsp;&nbsp;Notebook</div>
+      <div class="tag">Leanna &nbsp;&nbsp;·&nbsp;&nbsp;Notebook</div>
       <h2>Merci</h2>
       <div class="accent-bar"></div>
       <p class="title-subtitle">Questions &amp; discussion</p>

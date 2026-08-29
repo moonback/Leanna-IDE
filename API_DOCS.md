@@ -1,4 +1,4 @@
-# API Documentation - Leanna OS
+# API Documentation - Leanna 
 
 ## Sommaire
 
@@ -39,7 +39,7 @@
 
 ## Apercu general
 
-L'API de Leanna OS est composee de **32+ groupes de routes REST** exposees sous le prefixe `/api/`.
+L'API de Leanna  est composee de **32+ groupes de routes REST** exposees sous le prefixe `/api/`.
 
 - **Base URL** : `http://localhost:5000/api/` (dev) ou selon `VITE_SERVER_PORT`
 - **Format** : JSON pour les requetes et reponses
@@ -677,7 +677,7 @@ const socket = new WebSocket('ws://localhost:5000/live?token=votre_token');
 
 ## Rate Limiting
 
-Leanna OS implemente un **rate limiting multi-couche** pour proteger contre les abus.
+Leanna  implemente un **rate limiting multi-couche** pour proteger contre les abus.
 
 ### Limiteurs globaux
 

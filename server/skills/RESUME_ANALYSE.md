@@ -1,7 +1,7 @@
 # Résumé de l'analyse et Implémentation de l'Auto-Guérison
 
 ## Contexte
-Maysson a demandé une analyse des compétences ("skills") du projet Leanna OS, avec pour objectif de permettre à l'IA de les mettre à jour ou d'en créer de nouvelles suite à la résolution de problèmes.
+Maysson a demandé une analyse des compétences ("skills") du projet Leanna , avec pour objectif de permettre à l'IA de les mettre à jour ou d'en créer de nouvelles suite à la résolution de problèmes.
 
 ## Structure actuelle
 L'analyse a commencé par l'exploration des dossiers :

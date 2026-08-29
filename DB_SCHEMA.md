@@ -1,4 +1,4 @@
-# Database Schema - Leanna OS
+# Database Schema - Leanna 
 
 ## Sommaire
 
@@ -26,7 +26,7 @@
 
 ## Apercu general
 
-Leanna OS utilise **Supabase (PostgreSQL)** comme base de donnees principale pour la persistance des donnees utilisateur et systeme.
+Leanna  utilise **Supabase (PostgreSQL)** comme base de donnees principale pour la persistance des donnees utilisateur et systeme.
 
 ### Configuration
 
@@ -429,13 +429,13 @@ FOR ALL
 USING (auth.uid() = user_id);
 ```
 
-> **Note** : Dans Leanna OS, l'authentification utilisateur n'est pas encore completement implementee, donc la plupart des politiques permettent l'acces complet aux utilisateurs authentifies.
+> **Note** : Dans Leanna , l'authentification utilisateur n'est pas encore completement implementee, donc la plupart des politiques permettent l'acces complet aux utilisateurs authentifies.
 
 ---
 
 ## Stockage local
 
-En plus de Supabase, Leanna OS utilise le stockage local pour :
+En plus de Supabase, Leanna  utilise le stockage local pour :
 
 ### Fichiers de configuration
 
@@ -833,7 +833,7 @@ supabase db reset --db-url postgresql://... -f backup.sql
 
 ## Notes
 
-1. **Pas d'authentification utilisateur** : Actuellement, Leanna OS utilise principalement le systeme de fichiers local et Supabase avec la Service Role Key. L'authentification multi-utilisateurs n'est pas encore completement implementee.
+1. **Pas d'authentification utilisateur** : Actuellement, Leanna  utilise principalement le systeme de fichiers local et Supabase avec la Service Role Key. L'authentification multi-utilisateurs n'est pas encore completement implementee.
 
 2. **Chiffrement des donnes sensibles** : Les cles API sont stockees chiffrees dans `.gemini-keys.json` et `.env.local` avec AES-256-GCM.
 

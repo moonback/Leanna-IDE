@@ -1,4 +1,4 @@
-# Architecture Leanna OS
+# Architecture Leanna 
 
 ## Sommaire
 
@@ -14,7 +14,7 @@
 
 ## Vue d'ensemble
 
-Leanna OS est une **application desktop monolithique** basee sur Electron, avec une architecture client-serveur interne :
+Leanna  est une **application desktop monolithique** basee sur Electron, avec une architecture client-serveur interne :
 
 - **Frontend** : Application React 19 rendue dans un navigateur Electron
 - **Backend** : Serveur Express + WebSocket incluant Vite en middleware (dev)
@@ -294,7 +294,7 @@ export interface Agent {
 
 ### Supabase PostgreSQL
 
-Leanna OS utilise **Supabase** comme base de donnees principale pour :
+Leanna  utilise **Supabase** comme base de donnees principale pour :
 
 1. **Persistance des agents** (`agent_tasks`, `agent_orchestrations`, `agent_messages`)
 2. **Memories long terme** (`memories`)

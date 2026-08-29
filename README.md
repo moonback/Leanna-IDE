@@ -1,7 +1,7 @@
 
 
 
-<h1 align="center">Leanna OS</h1>
+<h1 align="center">Leanna </h1>
 
 <p align="center">
   <strong>L'IDE intelligent pour développeurs, assisté par l'IA Leanna et ses agents spécialisés</strong>
@@ -16,13 +16,13 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
 <p align="center">
-  <img src="assets/images/header.png" alt="Leanna OS" width="100%" />
+  <img src="assets/images/header.png" alt="Leanna " width="100%" />
 </p>
 
 
 ## 📌 Table des matières
 
-- [Pourquoi Leanna OS ?](#-pourquoi-Leanna)
+- [Pourquoi Leanna  ?](#-pourquoi-Leanna)
 - [Présentation](#-présentation)
 - [Stack technique](#-stack-technique)
 - [Fonctionnalités principales](#-fonctionnalités-principales)
@@ -43,9 +43,9 @@
 
 ---
 
-## 🌟 Pourquoi Leanna OS ?
+## 🌟 Pourquoi Leanna  ?
 
-Leanna OS est **l'IDE du futur** : un environnement de développement **intelligent** où **l'IA Leanna et ses 14 agents spécialisés** collaborent avec toi pour :
+Leanna  est **l'IDE du futur** : un environnement de développement **intelligent** où **l'IA Leanna et ses 14 agents spécialisés** collaborent avec toi pour :
 
 - **Créer et modifier du code** de manière sécurisée et assistée.
 - **Comprendre et optimiser** ton projet grâce à une **indexation sémantique** du workspace.
@@ -62,9 +62,9 @@ Leanna OS est **l'IDE du futur** : un environnement de développement **intellig
 
 ## 📖 Présentation
 
-**Leanna OS est un IDE ** : un environnement de développement **intelligent** où l'assistant IA intégré (**Leanna par défaut**) peut **lire, comprendre et modifier le code source de votre application**.
+**Leanna  est un IDE ** : un environnement de développement **intelligent** où l'assistant IA intégré (**Leanna par défaut**) peut **lire, comprendre et modifier le code source de votre application**.
 
-Conçu comme un **système d'exploitation desktop**, Leanna OS combine :
+Conçu comme un **système d'exploitation desktop**, Leanna  combine :
 
 - ✅ Un **IDE complet** avec éditeur Monaco, explorateur de fichiers et recherche globale.
 - 🤖 Un **assistant IA multimodal** (voix, webcam, partage d'écran via Gemini Live).
@@ -272,7 +272,7 @@ Voir `.env.example` pour la liste complète. Voici les principales :
 
 ### Pool de clés Gemini
 
-Leanna OS supporte un **pool de clés API** avec rotation automatique (round-robin + retry sur `429`). Les clés sont stockées chiffrées dans `.gemini-keys.json`. Gestion possible via l'UI **Paramètres > Clés API**.
+Leanna  supporte un **pool de clés API** avec rotation automatique (round-robin + retry sur `429`). Les clés sont stockées chiffrées dans `.gemini-keys.json`. Gestion possible via l'UI **Paramètres > Clés API**.
 
 ---
 
@@ -454,5 +454,5 @@ Distribué sous licence **MIT**. Voir [LICENSE](LICENSE) pour plus de détails.
 ---
 
 <p align="center">
-  Built with passion and a lot of Gemini by Leanna OS team
+  Built with passion and a lot of Gemini by Leanna  team
 </p>

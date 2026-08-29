@@ -19,7 +19,7 @@
   },
   "build": {
     "appId": "com.Leanna.os",
-    "productName": "Leanna OS",
+    "productName": "Leanna ",
     "directories": {
       "output": "release"
     },
@@ -49,7 +49,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Leanna OS"
+      "shortcutName": "Leanna "
     }
   },
   "dependencies": {
