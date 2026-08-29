@@ -79,3 +79,29 @@ export {
   orchestrateSchema,
   listAgentTasksSchema,
 } from "./types";
+
+// === NOUVEAUX EXPORTS POUR LES AMÉLIORATIONS ===
+
+// Délégation structurée (remplace le parsing Markdown)
+export { DelegationManager, delegationManager } from "./DelegationManager";
+export type { 
+  StructuredDelegation, 
+  BatchDelegation, 
+  DelegationResult, 
+  DelegationEvent 
+} from "./DelegationManager";
+
+// Routage avancé
+export type { RoutingStrategy } from "./AgentCommunication";
+
+// Surveillance et traçage du MessageBus
+export { MessageBusMonitor, messageBusMonitor } from "./MessageBusMonitor";
+export type { 
+  AlertSeverity, 
+  MonitorAlert, 
+  AggregatedMetrics, 
+  HealthStatus,
+  MessageFlowNode,
+  MessageFlowEdge,
+  MessageFlowGraph
+} from "./MessageBusMonitor";

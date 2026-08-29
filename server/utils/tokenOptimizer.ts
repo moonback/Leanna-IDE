@@ -1,5 +1,3 @@
-import { createRequire } from 'node:module';
-
 /**
  * Token Optimizer — Gestion intelligente du contexte pour réduire la consommation de tokens.
  * 
@@ -15,34 +13,77 @@ import { createRequire } from 'node:module';
 type TiktokenLike = { encode(text: string): ArrayLike<number> };
 let _tiktokenEncoding: TiktokenLike | null | undefined = undefined;
 let _tiktokenLoadAttempted = false;
+let _tiktokenLoadPromise: Promise<TiktokenLike | null> | null = null;
 const LOG_PREFIX = '[TokenOptimizer]';
 
-// createRequire a besoin d'un chemin de fichier valide (jamais une chaîne vide).
-// En ESM (dev via tsx) on utilise import.meta.url ; dans le bundle CJS (prod Electron)
-// esbuild expose __filename natif et transforme import.meta.url en "". On privilégie
-// __filename (CJS) et on évite import.meta.url en fallback pour ne jamais passer ""
-// à createRequire (sinon ERR_INVALID_ARG_VALUE au chargement du module).
-const _requireBase: string =
-  (typeof __filename !== 'undefined' && __filename) ? __filename : process.cwd();
+/** Charge tiktoken de manière asynchrone */
+async function loadTiktokenAsync(): Promise<TiktokenLike | null> {
+  if (_tiktokenLoadPromise) {
+    return _tiktokenLoadPromise;
+  }
+  
+  _tiktokenLoadPromise = (async () => {
+    if (_tiktokenLoadAttempted) {
+      return _tiktokenEncoding ?? null;
+    }
+    _tiktokenLoadAttempted = true;
+    
+    try {
+      // Import dynamique - fonctionne en ESM et CommonJS (Node.js gère l'interop)
+      const mod = await import('tiktoken');
+      const enc: TiktokenLike | null =
+        (typeof (mod as any).encodingForModel === "function" && (mod as any).encodingForModel("gpt-4o")) ||
+        (typeof (mod as any).getEncoding === "function" && (mod as any).getEncoding("cl100k_base")) ||
+        null;
+      
+      if (enc && typeof enc.encode === "function") {
+        _tiktokenEncoding = enc;
+        console.log(LOG_PREFIX + " ✅ tiktoken chargé (cl100k_base) — estimations précises.");
+        return enc;
+      }
+    } catch {
+      // tiktoken non disponible — ignorer
+    }
+    return null;
+  })();
+  
+  return _tiktokenLoadPromise;
+}
 
-const _require = createRequire(_requireBase);
-
-function loadTiktoken(): TiktokenLike | null {
-  if (_tiktokenLoadAttempted) return _tiktokenEncoding ?? null;
+/** Charge tiktoken de manière synchrone (pour compatibilité) */
+function tryLoadTiktokenSync(): TiktokenLike | null {
+  if (_tiktokenLoadAttempted) {
+    return _tiktokenEncoding ?? null;
+  }
   _tiktokenLoadAttempted = true;
+  
   try {
-    const mod = _require("tiktoken");
-    const enc: TiktokenLike =
-      (typeof mod.encodingForModel === "function" && mod.encodingForModel("gpt-4o")) ||
-      (typeof mod.getEncoding === "function" && mod.getEncoding("cl100k_base"));
-    if (enc && typeof enc.encode === "function") {
-      _tiktokenEncoding = enc;
-      console.log(LOG_PREFIX + " ✅ tiktoken chargé (cl100k_base) — estimations précises.");
-      return enc;
+    // Essayer require pour les environnements CommonJS
+    // Note: En ESM pur, require n'existe pas, donc on saute
+    if (typeof require !== 'undefined') {
+      const mod = require('tiktoken');
+      const enc: TiktokenLike | null =
+        (typeof (mod as any).encodingForModel === "function" && (mod as any).encodingForModel("gpt-4o")) ||
+        (typeof (mod as any).getEncoding === "function" && (mod as any).getEncoding("cl100k_base")) ||
+        null;
+      
+      if (enc && typeof enc.encode === "function") {
+        _tiktokenEncoding = enc;
+        console.log(LOG_PREFIX + " ✅ tiktoken chargé (cl100k_base) — estimations précises.");
+        return enc;
+      }
     }
   } catch {
+    // tiktoken non disponible
   }
   return null;
+}
+
+/**
+ * Charge tiktoken — essaie d'abord la version synchrone, puis asynchrone si nécessaire
+ */
+function loadTiktoken(): TiktokenLike | null {
+  return tryLoadTiktokenSync();
 }
 
 /**

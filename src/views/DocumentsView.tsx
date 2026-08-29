@@ -48,6 +48,41 @@ interface FactItem {
   relatedConcepts: string[];
 }
 
+// Fait de la mémoire projet (knowledge_memory_add)
+interface ProjectFactItem {
+  id: string;
+  content: string;
+  category: string;
+  tags: string[];
+  sourceFile?: string;
+  confidence: number;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+  isStructural?: boolean;
+}
+
+// Fait unifié pour affichage
+interface UnifiedFact {
+  id: string;
+  content: string;
+  category: string;
+  tags: string[];
+  confidence: number;
+  createdAt: string;
+  source: 'document' | 'project';
+  // Champs spécifiques aux documents
+  sourceDocuments?: string[];
+  importance?: number;
+  verified?: boolean;
+  relatedConcepts?: string[];
+  // Champs spécifiques au projet
+  sourceFile?: string;
+  usageCount?: number;
+  updatedAt?: string;
+  isStructural?: boolean;
+}
+
 interface RelationItem {
   id: string;
   sourceId: string;
@@ -104,10 +139,16 @@ const TYPE_ICONS: Record<string, string> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
+  // Catégories documents
   definition: '#60a5fa', fact: '#34d399', insight: '#fbbf24',
   procedure: '#a78bfa', decision: '#f87171', reference: '#06b6d4',
   quote: '#f472b6', summary: '#818cf8', question: '#fb923c',
   contradiction: '#ef4444', timeline: '#84cc16', relationship: '#e879f9',
+  // Catégories mémoire projet
+  architecture: '#06b6d4', convention: '#818cf8', pattern: '#fbbf24',
+  'known-bug': '#ef4444', api: '#34d399', module: '#a78bfa',
+  workflow: '#f87171', security: '#f472b6', stack: '#60a5fa',
+  refactoring: '#fb923c', todo: '#84cc16',
 };
 
 // ─── Composant Principal ─────────────────────────────────────────────────────
@@ -128,7 +169,7 @@ export default function DocumentsView() {
       {/* Tabs */}
       <div
         className="flex items-center gap-1 px-5 py-2 flex-shrink-0 border-b lg:px-7"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
       >
         {([
           { key: 'documents' as Tab, icon: FileText, label: 'Documents' },
@@ -142,7 +183,7 @@ export default function DocumentsView() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
             style={{
               backgroundColor: activeTab === key ? 'var(--accent-subtle)' : 'transparent',
-              color: activeTab === key ? 'var(--accent-primary)' : 'var(--text-muted)',
+              color: activeTab === key ? 'var(--accent-secondary)' : 'var(--text-muted)',
             }}
           >
             <Icon className="w-3.5 h-3.5" />
@@ -565,7 +606,7 @@ function DocumentsTab() {
 
 function MemoryTab() {
   const { success, error: toastError } = useToast();
-  const [facts, setFacts] = useState<FactItem[]>([]);
+  const [facts, setFacts] = useState<UnifiedFact[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -574,11 +615,41 @@ function MemoryTab() {
   const loadFacts = useCallback(async () => {
     setLoading(true);
     try {
-      const params = filterCategory ? `?category=${filterCategory}` : '';
-      const res = await fetch(`/api/documents/facts/list${params}`);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setFacts(data.facts || []);
+      // Charger TOUS les faits des documents (sans filtre)
+      const docRes = await fetch('/api/documents/facts/list');
+      const docData = docRes.ok ? await docRes.json() : { facts: [] };
+      
+      // Charger TOUS les faits de la mémoire projet (sans filtre)
+      const projRes = await fetch('/api/knowledge/memory');
+      const projData = projRes.ok ? await projRes.json() : { facts: [] };
+      
+      // Convertir les faits documents en UnifiedFact
+      const documentFacts: UnifiedFact[] = (docData.facts || []).map((f: FactItem) => ({
+        ...f,
+        source: 'document' as const,
+      }));
+      
+      // Convertir les faits projet en UnifiedFact
+      const projectFacts: UnifiedFact[] = (projData.facts || []).map((f: ProjectFactItem) => ({
+        ...f,
+        source: 'project' as const,
+        // Mapper les champs communs
+        tags: f.tags || [],
+        importance: undefined,
+        verified: undefined,
+        relatedConcepts: undefined,
+      }));
+      
+      // Fusionner et trier par date de création (plus récent d'abord)
+      let allFacts = [...documentFacts, ...projectFacts]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      // Appliquer le filtre de catégorie côté client
+      if (filterCategory) {
+        allFacts = allFacts.filter(f => f.category === filterCategory);
+      }
+      
+      setFacts(allFacts);
     } catch {
       toastError('Impossible de charger les faits');
     } finally {
@@ -616,8 +687,14 @@ function MemoryTab() {
     }
   }, [success, toastError]);
 
-  const categories = ['definition', 'fact', 'insight', 'procedure', 'decision',
-    'reference', 'quote', 'summary', 'question', 'contradiction', 'timeline', 'relationship'];
+  // Catégories pour les documents + catégories pour la mémoire projet
+  const categories = [
+    // Catégories documents
+    'definition', 'fact', 'insight', 'procedure', 'decision',
+    'reference', 'quote', 'summary', 'question', 'contradiction', 'timeline', 'relationship',
+    // Catégories mémoire projet (knowledge_memory_add)
+    'architecture', 'convention', 'pattern', 'known-bug', 'api', 'module', 'workflow', 'security', 'stack', 'refactoring', 'todo',
+  ];
 
   return (
     <div className="p-5 lg:p-7 space-y-4">
@@ -636,7 +713,7 @@ function MemoryTab() {
           value={filterCategory}
           onChange={e => setFilterCategory(e.target.value)}
           className="px-3 py-2 rounded-xl text-xs border outline-none"
-          style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+          style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
         >
           <option value="">Toutes catégories</option>
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -708,8 +785,8 @@ function MemoryTab() {
         </div>
       ) : facts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <Brain className="w-10 h-10" style={{ color: 'var(--text-dimmed)' }} />
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Aucun fait mémorisé</p>
+          <Brain className="w-10 h-10" style={{ color: 'var(--text-dimmed, #888)' }} />
+          <p className="text-sm" style={{ color: 'var(--text-muted, #888)' }}>Aucun fait mémorisé</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -717,14 +794,21 @@ function MemoryTab() {
             <div
               key={fact.id}
               className="group p-3 rounded-xl border flex items-start gap-3 transition hover:border-[var(--border-focus)]"
-              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+              style={{ 
+                backgroundColor: 'var(--bg-panel, #1a1a2e)', 
+                borderColor: 'var(--border-base)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }}
             >
               <div
                 className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
                 style={{ backgroundColor: CATEGORY_COLORS[fact.category] || '#6b7280' }}
               />
               <div className="flex-1 min-w-0">
-                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                <p className="text-xs leading-relaxed" style={{ 
+                  color: 'var(--text-primary)',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                }}>
                   {fact.content}
                 </p>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -732,25 +816,46 @@ function MemoryTab() {
                     style={{ backgroundColor: `${CATEGORY_COLORS[fact.category] || '#6b7280'}20`, color: CATEGORY_COLORS[fact.category] || '#6b7280' }}>
                     {fact.category}
                   </span>
+                  {/* Indicateur de source */}
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full"
+                    style={{ backgroundColor: fact.source === 'project' ? 'var(--bg-base)' : 'transparent', color: 'var(--text-dimmed)' }}>
+                    {fact.source === 'project' ? '📦 Projet' : '📄 Document'}
+                  </span>
+                  {/* Badge "vérifié" pour les faits documents */}
                   {fact.verified && (
                     <span className="text-[9px] flex items-center gap-0.5 text-emerald-400">
                       <CheckCircle2 className="w-2.5 h-2.5" /> vérifié
                     </span>
                   )}
+                  {/* Badge "structural" pour les faits projet */}
+                  {fact.isStructural && (
+                    <span className="text-[9px] flex items-center gap-0.5 text-purple-400">
+                      <CheckCircle2 className="w-2.5 h-2.5" /> structurel
+                    </span>
+                  )}
                   <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
                     confiance: {(fact.confidence * 100).toFixed(0)}%
                   </span>
+                  {/* Afficher usageCount pour les faits projet */}
+                  {fact.source === 'project' && fact.usageCount !== undefined && fact.usageCount > 0 && (
+                    <span className="text-[9px] flex items-center gap-0.5" style={{ color: 'var(--text-dimmed)' }}>
+                      👁️ {fact.usageCount}
+                    </span>
+                  )}
                   <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
                     {timeAgo(fact.createdAt)}
                   </span>
                 </div>
               </div>
-              <button
-                onClick={() => handleDeleteFact(fact.id)}
-                className="p-1 rounded opacity-0 group-hover:opacity-100 transition hover:bg-red-500/10"
-              >
-                <Trash2 className="w-3 h-3" style={{ color: 'var(--color-error)' }} />
-              </button>
+              {/* Bouton de suppression - seulement pour les faits documents */}
+              {fact.source === 'document' && (
+                <button
+                  onClick={() => handleDeleteFact(fact.id)}
+                  className="p-1 rounded opacity-0 group-hover:opacity-100 transition hover:bg-red-500/10"
+                >
+                  <Trash2 className="w-3 h-3" style={{ color: 'var(--color-error)' }} />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -861,15 +966,71 @@ function RelationsTab() {
 function StatsTab() {
   const { error: toastError } = useToast();
   const [stats, setStats] = useState<StatsData | null>(null);
+  const [workspaceStats, setWorkspaceStats] = useState<{
+    documentCount: number;
+    totalWords: number;
+    documentsByType: Record<string, number>;
+  } | null>(null);
+  const [projectMemoryStats, setProjectMemoryStats] = useState<{
+    totalFacts: number;
+    factsByCategory: Record<string, number>;
+    structuralFacts: number;
+  } | null>(null);
+  const [kgStats, setKgStats] = useState<{
+    totalRelations: number;
+    cycleCount: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/documents/stats');
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        setStats(data.stats);
+        const [docsStatsRes, wsDocsRes, kgHealthRes, kgDashboardRes] = await Promise.all([
+          fetch('/api/documents/stats'),
+          fetch('/api/knowledge/documents'),
+          fetch('/api/knowledge/health'),
+          fetch('/api/knowledge/dashboard'),
+        ]);
+
+        if (docsStatsRes.ok) {
+          const docsData = await docsStatsRes.json();
+          setStats(docsData.stats);
+        }
+
+        if (wsDocsRes.ok) {
+          const wsData = await wsDocsRes.json();
+          const totalWords = wsData.documents.reduce((sum: number, d: any) =>
+            sum + (d.textLength || 0), 0);
+
+          const docsByType: Record<string, number> = {};
+          wsData.documents.forEach((d: any) => {
+            const type = d.mimeType || 'auto_extracted';
+            docsByType[type] = (docsByType[type] || 0) + 1;
+          });
+
+          setWorkspaceStats({
+            documentCount: wsData.documentCount,
+            totalWords,
+            documentsByType: docsByType,
+          });
+        }
+
+        if (kgHealthRes.ok) {
+          const kgData = await kgHealthRes.json();
+          setProjectMemoryStats({
+            totalFacts: kgData.projectMemory?.totalFacts || 0,
+            factsByCategory: kgData.projectMemory?.categoryBreakdown || {},
+            structuralFacts: kgData.projectMemory?.structuralFacts || 0,
+          });
+        }
+
+        if (kgDashboardRes.ok) {
+          const kgDbData = await kgDashboardRes.json();
+          setKgStats({
+            totalRelations: kgDbData.graph?.relations?.total || 0,
+            cycleCount: kgDbData.graph?.cycleCount || 0,
+          });
+        }
       } catch {
         toastError('Impossible de charger les statistiques');
       } finally {
@@ -886,70 +1047,127 @@ function StatsTab() {
     );
   }
 
-  if (!stats) {
+  if (!stats && !workspaceStats && !projectMemoryStats && !kgStats) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         <AlertCircle className="w-8 h-8" style={{ color: 'var(--text-dimmed)' }} />
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Données indisponibles</p>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          Aucun document trouvé
+        </p>
       </div>
     );
   }
 
+  const totalDocuments = (stats?.totalDocuments || 0) + (workspaceStats?.documentCount || 0);
+  const totalWords = (stats?.totalWords || 0) + (workspaceStats?.totalWords || 0);
+  const totalFacts = (stats?.totalFacts || 0) + (projectMemoryStats?.totalFacts || 0);
+  const totalRelations = (stats?.totalRelations || 0) + (kgStats?.totalRelations || 0);
+  const totalSections = stats?.totalSections || 0;
+  const totalEntities = stats?.totalEntities || 0;
+  const averageDocumentSize = totalDocuments > 0
+    ? Math.round((totalWords / totalDocuments) * 100) / 100
+    : 0;
+
+  const allDocumentsByType = {
+    ...workspaceStats?.documentsByType,
+    ...stats?.documentsByType,
+  };
+
+  const allFactsByCategory = {
+    ...stats?.factsByCategory,
+    ...projectMemoryStats?.factsByCategory,
+  };
+
   return (
     <div className="p-5 lg:p-7 space-y-6">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Documents" value={stats.totalDocuments} icon={FileText} color="#818cf8" />
-        <StatCard label="Faits" value={stats.totalFacts} icon={Brain} color="#34d399" />
-        <StatCard label="Relations" value={stats.totalRelations} icon={Link2} color="#f472b6" />
-        <StatCard label="Mots total" value={stats.totalWords.toLocaleString()} icon={FileType} color="#fbbf24" />
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <BarChart3 className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
+        <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          Statistiques du Knowledge System
+        </h2>
+        {workspaceStats?.documentCount && workspaceStats.documentCount > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded-full" style={{
+            backgroundColor: 'var(--bg-base)',
+            color: 'var(--text-muted)'
+          }}>
+            {workspaceStats.documentCount} docs auto-extraits
+          </span>
+        )}
+        {projectMemoryStats?.totalFacts && projectMemoryStats.totalFacts > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded-full" style={{
+            backgroundColor: 'var(--bg-base)',
+            color: 'var(--text-muted)'
+          }}>
+            {projectMemoryStats.totalFacts} faits projet
+          </span>
+        )}
+        {kgStats?.totalRelations && kgStats.totalRelations > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded-full" style={{
+            backgroundColor: 'var(--bg-base)',
+            color: 'var(--text-muted)'
+          }}>
+            {kgStats.totalRelations} relations code
+          </span>
+        )}
       </div>
 
-      {/* Breakdowns */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard label="Documents" value={totalDocuments} icon={FileText} color="#818cf8" />
+        <StatCard label="Faits" value={totalFacts} icon={Brain} color="#34d399" />
+        <StatCard label="Relations" value={totalRelations} icon={Link2} color="#f472b6" />
+        <StatCard
+          label="Mots total"
+          value={totalWords.toLocaleString()}
+          icon={FileType}
+          color="#fbbf24"
+        />
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Documents by type */}
-        {Object.keys(stats.documentsByType).length > 0 && (
+        {Object.keys(allDocumentsByType).length > 0 && (
           <div className="p-4 rounded-2xl border space-y-3"
             style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
             <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
               Documents par type
             </h3>
             <div className="space-y-2">
-              {Object.entries(stats.documentsByType).map(([type, count]) => (
-                <div key={type} className="flex items-center justify-between">
-                  <span className="text-xs flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                    {TYPE_ICONS[type] || '📎'} {type}
-                  </span>
-                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{count}</span>
-                </div>
-              ))}
+              {Object.entries(allDocumentsByType)
+                .sort((a, b) => b[1] - a[1])
+                .map(([type, count]) => (
+                  <div key={type} className="flex items-center justify-between">
+                    <span className="text-xs flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+                      {TYPE_ICONS[type.split('/')[1] || type] || '📎'} {type}
+                    </span>
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{count}</span>
+                  </div>
+                ))}
             </div>
           </div>
         )}
 
-        {/* Facts by category */}
-        {Object.keys(stats.factsByCategory).length > 0 && (
+        {Object.keys(allFactsByCategory).length > 0 && (
           <div className="p-4 rounded-2xl border space-y-3"
             style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
             <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
               Faits par catégorie
             </h3>
             <div className="space-y-2">
-              {Object.entries(stats.factsByCategory).map(([cat, count]) => (
-                <div key={cat} className="flex items-center justify-between">
-                  <span className="text-xs flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] || '#6b7280' }} />
-                    {cat}
-                  </span>
-                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{count}</span>
-                </div>
-              ))}
+              {Object.entries(allFactsByCategory)
+                .sort((a, b) => b[1] - a[1])
+                .map(([cat, count]) => (
+                  <div key={cat} className="flex items-center justify-between">
+                    <span className="text-xs flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] || '#6b7280' }} />
+                      {cat}
+                    </span>
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{count}</span>
+                  </div>
+                ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* Extra metrics */}
       <div className="p-4 rounded-2xl border space-y-2"
         style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
         <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
@@ -958,22 +1176,35 @@ function StatsTab() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
           <div>
             <span style={{ color: 'var(--text-dimmed)' }}>Sections :</span>{' '}
-            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{stats.totalSections}</span>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{totalSections}</span>
           </div>
           <div>
             <span style={{ color: 'var(--text-dimmed)' }}>Entités :</span>{' '}
-            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{stats.totalEntities}</span>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{totalEntities}</span>
           </div>
           <div>
             <span style={{ color: 'var(--text-dimmed)' }}>Taille moy. :</span>{' '}
-            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{(stats.averageDocumentSize / 1024).toFixed(1)} KB</span>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+              {averageDocumentSize.toLocaleString()} mots
+            </span>
           </div>
           <div>
             <span style={{ color: 'var(--text-dimmed)' }}>Dernière activité :</span>{' '}
-            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{timeAgo(stats.lastActivity)}</span>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+              {timeAgo(stats?.lastActivity || new Date().toISOString())}
+            </span>
           </div>
         </div>
       </div>
+
+      {totalDocuments === 0 && totalFacts === 0 && (
+        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center">
+          <p className="text-sm text-blue-200">
+            💡 <strong>Astuce</strong> : Upload des documents via l'onglet <strong>Documents</strong> pour les voir apparaître ici.<br />
+            Les documents du workspace sont auto-extraits et les agents ajoutent des faits projet automatiquement.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

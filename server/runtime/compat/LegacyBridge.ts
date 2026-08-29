@@ -30,7 +30,7 @@ export function convertLegacySkill(skill: LegacySkill): ToolDefinition[] {
       return skill.handleToolCall(decl.name, args);
     },
     category: skill.name,
-    timeoutMs: 30_000,
+    timeoutMs: 120_000, // Augmenté de 30s à 2 minutes pour les tâches complexes
   }));
 }
 

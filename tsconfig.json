@@ -3,7 +3,7 @@
     "target": "ES2022",
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
-    "module": "ESNext",
+    "module": "NodeNext",
     "lib": [
       "ES2022",
       "DOM",
@@ -11,7 +11,7 @@
     ],
     "types": ["node"],
     "skipLibCheck": true,
-    "moduleResolution": "bundler",
+    "moduleResolution": "NodeNext",
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,

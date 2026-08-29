@@ -38,7 +38,7 @@ export class SkillManagerV2 {
     this.registry = config?.registry ?? new ToolRegistry({
       enableMetrics: true,
       eventBus: this.eventBus,
-      defaultTimeoutMs: 30_000,
+      defaultTimeoutMs: 120_000, // Augmenté de 30s à 2 minutes
     });
   }
 

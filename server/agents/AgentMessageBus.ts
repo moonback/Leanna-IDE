@@ -11,6 +11,8 @@
  * - Queue de messages avec priorité
  * - Retry avec backoff exponentiel
  * - Métriques et historique des messages
+ * - Routage avancé (round-robin, load-balancing)
+ * - Surveillance et traçage des messages
  */
 import { randomUUID } from "crypto";
 import { EventEmitter } from "events";
@@ -18,9 +20,9 @@ import type { AgentRole } from "./types";
 import type {
   AgentMessage,
   MessageHandler,
-  MessagePriority,
   MessageSubscription,
   PublishOptions,
+  RoutingStrategy,
   StatusResponsePayload,
 } from "./AgentCommunication";
 import { agentPersistence } from "./AgentPersistence";
@@ -44,13 +46,31 @@ interface MessageMetric {
   timestamp: number;
   processingMs?: number;
   success: boolean;
+  strategy?: RoutingStrategy;
+  agentLoad?: Record<AgentRole, number>;
 }
 
-// Capacité max de la file de messages par priorité
-const QUEUE_CAPACITY = 100;
-// Délai max avant délivrance forcée (ms)
-const MAX_DELIVERY_DELAY_MS = 30_000;
-// TTL de la dead-letter queue (ms) — messages non délivrés expirés après ce délai
+// Métriques de routage pour le load-balancing
+interface RoutingMetrics {
+  /** Nombre de messages traités par agent */
+  agentMessageCount: Map<AgentRole, number>;
+  /** Nombre de messages en cours par agent */
+  agentActiveMessages: Map<AgentRole, number>;
+  /** Temps moyen de traitement par agent (ms) */
+  agentAvgProcessingTime: Map<AgentRole, number>;
+  /** Dernier temps de traitement par agent */
+  agentLastProcessingTime: Map<AgentRole, number>;
+}
+
+// État pour le round-robin par rôle cible
+interface RoundRobinState {
+  /** Index courant pour chaque rôle cible */
+  index: Map<AgentRole, number>;
+  /** Liste des abonnés pour chaque rôle */
+  subscribers: Map<AgentRole, string[]>;
+}
+
+// TTL de la dead-letter queue (ms) — messages non livrés expirés après ce délai
 const DEAD_LETTER_TTL_MS = 60_000;
 
 interface DeadLetterEntry {
@@ -68,10 +88,32 @@ export class AgentMessageBus extends EventEmitter {
   private pendingRequests: Map<string, PendingRequest> = new Map();
   private messageHistory: AgentMessage[] = [];
   private metrics: MessageMetric[] = [];
-  private processingQueue = false;
-  private queue: Array<{ message: AgentMessage; options: PublishOptions }> = [];
   /** Dead-letter queue : messages non délivrés car l'agent cible n'était pas abonné */
   private deadLetterQueue: Map<AgentRole, DeadLetterEntry[]> = new Map();
+
+  // ─── Routage avancé ───────────────────────────────────────────────────────────
+  
+  /** Métriques de routage pour le load-balancing */
+  private routingMetrics: RoutingMetrics = {
+    agentMessageCount: new Map(),
+    agentActiveMessages: new Map(),
+    agentAvgProcessingTime: new Map(),
+    agentLastProcessingTime: new Map(),
+  };
+
+  /** État pour le round-robin */
+  private roundRobinState: RoundRobinState = {
+    index: new Map(),
+    subscribers: new Map(),
+  };
+
+
+
+  // ─── Traçage et surveillance ──────────────────────────────────────────────────
+  
+  /** ID de trace pour corrélation des messages */
+  private traceEnabled = true;
+  private traceIdCounter = 0;
 
   constructor(private readonly maxHistorySize = 100) {
     super();
@@ -152,7 +194,7 @@ export class AgentMessageBus extends EventEmitter {
    */
   async request(
     message: AgentMessage,
-    timeoutMs: number = 30_000
+    timeoutMs: number = 120_000
   ): Promise<AgentMessage> {
     const correlationId = randomUUID();
     message.correlationId = correlationId;
@@ -267,6 +309,181 @@ export class AgentMessageBus extends EventEmitter {
     return this.messageHistory.slice(-limit);
   }
 
+  // ─── Traçage et Surveillance ────────────────────────────────────────────────
+
+  /**
+   * Active ou désactive le traçage des messages
+   */
+  enableTracing(enabled: boolean = true): void {
+    this.traceEnabled = enabled;
+    log.info(`Traçage des messages : ${enabled ? "ACTIVÉ" : "DÉSACTIVÉ"}`);
+  }
+
+  /**
+   * Retourne si le traçage est activé
+   */
+  isTracingEnabled(): boolean {
+    return this.traceEnabled;
+  }
+
+  /**
+   * Génère un ID de trace pour une séquence de messages
+   */
+  generateTraceId(): string {
+    return `trace-${++this.traceIdCounter}`;
+  }
+
+  /**
+   * Retourne les métriques de routage détaillées
+   */
+  getRoutingMetrics(): {
+    agentMessageCount: Record<string, number>;
+    agentActiveMessages: Record<string, number>;
+    agentAvgProcessingTime: Record<string, number>;
+    agentLastProcessingTime: Record<string, number>;
+  } {
+    return {
+      agentMessageCount: Object.fromEntries(this.routingMetrics.agentMessageCount),
+      agentActiveMessages: Object.fromEntries(this.routingMetrics.agentActiveMessages),
+      agentAvgProcessingTime: Object.fromEntries(this.routingMetrics.agentAvgProcessingTime),
+      agentLastProcessingTime: Object.fromEntries(this.routingMetrics.agentLastProcessingTime),
+    };
+  }
+
+  /**
+   * Retourne les statistiques de charge par agent
+   */
+  getAgentLoad(): Record<AgentRole, {
+    messageCount: number;
+    activeMessages: number;
+    avgProcessingTime: number;
+    loadScore: number;
+  }> {
+    const load: Record<AgentRole, {
+      messageCount: number;
+      activeMessages: number;
+      avgProcessingTime: number;
+      loadScore: number;
+    }> = {};
+
+    // Collecter tous les rôles
+    const allRoles = new Set<AgentRole>();
+    for (const sub of this.subscriptions.values()) {
+      allRoles.add(sub.agentRole);
+    }
+
+    for (const role of allRoles) {
+      const messageCount = this.routingMetrics.agentMessageCount.get(role) ?? 0;
+      const activeMessages = this.routingMetrics.agentActiveMessages.get(role) ?? 0;
+      const avgProcessingTime = this.routingMetrics.agentAvgProcessingTime.get(role) ?? 0;
+      
+      // Score de charge = messages actifs * temps moyen
+      const loadScore = activeMessages * (avgProcessingTime > 0 ? avgProcessingTime : 100);
+
+      load[role] = {
+        messageCount,
+        activeMessages,
+        avgProcessingTime,
+        loadScore
+      };
+    }
+
+    return load;
+  }
+
+  /**
+   * Retourne l'état actuel du round-robin
+   */
+  getRoundRobinState(): Record<AgentRole, {
+    currentIndex: number;
+    subscriberCount: number;
+  }> {
+    const state: Record<AgentRole, { currentIndex: number; subscriberCount: number }> = {};
+
+    for (const [role, subIds] of this.roundRobinState.subscribers) {
+      state[role] = {
+        currentIndex: this.roundRobinState.index.get(role) ?? 0,
+        subscriberCount: subIds.length
+      };
+    }
+
+    return state;
+  }
+
+  /**
+   * Réinitialise les métriques de routage
+   */
+  resetRoutingMetrics(): void {
+    this.routingMetrics.agentMessageCount.clear();
+    this.routingMetrics.agentActiveMessages.clear();
+    this.routingMetrics.agentAvgProcessingTime.clear();
+    this.routingMetrics.agentLastProcessingTime.clear();
+    log.info("✅ Métriques de routage réinitialisées");
+  }
+
+  /**
+   * Retourne un rapport complet de surveillance
+   */
+  getMonitoringReport(): {
+    bus: {
+      totalMessages: number;
+      successRate: number;
+      byMessageType: Record<string, number>;
+      pendingRequests: number;
+      activeSubscriptions: number;
+      deadLetterQueue: Record<string, number>;
+    };
+    routing: {
+      strategyUsage: Record<RoutingStrategy, number>;
+      agentLoad: Record<AgentRole, {
+        messageCount: number;
+        activeMessages: number;
+        avgProcessingTime: number;
+        loadScore: number;
+      }>;
+      roundRobinState: Record<AgentRole, { currentIndex: number; subscriberCount: number }>;
+    };
+    traceEnabled: boolean;
+    timestamp: string;
+  } {
+    const metrics = this.getMetrics();
+    const load = this.getAgentLoad();
+    const rrState = this.getRoundRobinState();
+
+    // Compter l'utilisation des stratégies
+    const strategyUsage: Record<RoutingStrategy, number> = {
+      direct: 0,
+      broadcast: 0,
+      "round-robin": 0,
+      "load-balanced": 0
+    };
+    for (const m of this.metrics) {
+      if (m.strategy) {
+        strategyUsage[m.strategy] = (strategyUsage[m.strategy] ?? 0) + 1;
+      } else {
+        strategyUsage.direct++;
+      }
+    }
+
+    return {
+      bus: {
+        totalMessages: metrics.totalMessages,
+        successRate: metrics.successRate,
+        byMessageType: metrics.byMessageType,
+        pendingRequests: metrics.pendingRequests,
+        activeSubscriptions: metrics.activeSubscriptions,
+        deadLetterQueue: metrics.deadLetterQueue,
+      },
+      routing: {
+        strategyUsage,
+        agentLoad: load,
+        roundRobinState: rrState,
+      },
+      traceEnabled: this.traceEnabled,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   /** Retourne les métriques d'utilisation du bus */
   getMetrics(): {
     totalMessages: number;
@@ -304,50 +521,194 @@ export class AgentMessageBus extends EventEmitter {
     };
   }
 
+  // ─── Routage avancé ──────────────────────────────────────────────────────
+
+  /**
+   * Détermine la stratégie de routage à utiliser.
+   * L'ordre de priorité est : options.routing > message.metadata.routing > "direct"
+   */
+  private determineRoutingStrategy(options: PublishOptions): RoutingStrategy {
+    return options.routing ?? "direct";
+  }
+
+  /**
+   * Met à jour l'état des abonnements pour le round-robin
+   */
+  private updateRoundRobinState(): void {
+    this.roundRobinState.subscribers.clear();
+    this.roundRobinState.index.clear();
+
+    for (const sub of this.subscriptions.values()) {
+      if (!this.roundRobinState.subscribers.has(sub.agentRole)) {
+        this.roundRobinState.subscribers.set(sub.agentRole, []);
+      }
+      this.roundRobinState.subscribers.get(sub.agentRole)!.push(sub.id);
+    }
+  }
+
+  /**
+   * Sélectionne le prochain abonné pour un rôle donné (round-robin)
+   */
+  private getNextRoundRobinSubscriber(role: AgentRole): string | null {
+    const subscriberIds = this.roundRobinState.subscribers.get(role);
+    if (!subscriberIds || subscriberIds.length === 0) {
+      return null;
+    }
+
+    const currentIndex = this.roundRobinState.index.get(role) ?? 0;
+    const nextIndex = (currentIndex + 1) % subscriberIds.length;
+    this.roundRobinState.index.set(role, nextIndex);
+
+    return subscriberIds[currentIndex];
+  }
+
+  /**
+   * Met à jour les métriques de routage après traitement d'un message
+   */
+  private updateRoutingMetrics(
+    agentRole: AgentRole,
+    processingTime: number
+  ): void {
+    // Mettre à jour le compteur de messages
+    const messageCount = this.routingMetrics.agentMessageCount.get(agentRole) ?? 0;
+    this.routingMetrics.agentMessageCount.set(agentRole, messageCount + 1);
+
+    // Mettre à jour le temps de traitement
+    this.routingMetrics.agentLastProcessingTime.set(agentRole, processingTime);
+
+    // Mettre à jour la moyenne (moyenne mobile)
+    const avgTime = this.routingMetrics.agentAvgProcessingTime.get(agentRole) ?? 0;
+    const newAvg = avgTime === 0 
+      ? processingTime 
+      : (avgTime * 0.7) + (processingTime * 0.3); // Moyenne exponentielle
+    this.routingMetrics.agentAvgProcessingTime.set(agentRole, newAvg);
+  }
+
+  /**
+   * Sélectionne le meilleur agent pour le load-balancing
+   * Utilise l'algorithme "least connections" avec pondération par temps de réponse
+   */
+  private selectAgentForLoadBalancing(targetRole: AgentRole): string | null {
+    const availableHandlers: Array<{ subId: string; load: number; avgTime: number }> = [];
+
+    for (const sub of this.subscriptions.values()) {
+      if (sub.agentRole !== targetRole) continue;
+
+      const subId = sub.id;
+      const load = this.routingMetrics.agentActiveMessages.get(sub.agentRole) ?? 0;
+      const avgTime = this.routingMetrics.agentAvgProcessingTime.get(sub.agentRole) ?? 100;
+
+      availableHandlers.push({ subId, load, avgTime });
+    }
+
+    if (availableHandlers.length === 0) {
+      return null;
+    }
+
+    // Score = load * avgTime (plus le score est bas, meilleur c'est)
+    const scored = availableHandlers.map(h => ({
+      ...h,
+      score: h.load * h.avgTime
+    }));
+
+    // Trier par score ascendant
+    scored.sort((a, b) => a.score - b.score);
+
+    return scored[0].subId;
+  }
+
+  /**
+   * Incrémente le compteur de messages actifs pour un agent
+   */
+  private incrementActiveMessages(agentRole: AgentRole): void {
+    const count = this.routingMetrics.agentActiveMessages.get(agentRole) ?? 0;
+    this.routingMetrics.agentActiveMessages.set(agentRole, count + 1);
+  }
+
+  /**
+   * Décrémente le compteur de messages actifs pour un agent
+   */
+  private decrementActiveMessages(agentRole: AgentRole): void {
+    const count = this.routingMetrics.agentActiveMessages.get(agentRole) ?? 1;
+    this.routingMetrics.agentActiveMessages.set(agentRole, Math.max(0, count - 1));
+  }
+
   // ─── Interne ──────────────────────────────────────────────────────────────
 
   private async deliver(message: AgentMessage, options: PublishOptions): Promise<void> {
     const startTime = Date.now();
     let success = false;
+    const strategy = this.determineRoutingStrategy(options);
+
+    // Générer un traceId pour le traçage
+    const traceId = this.traceEnabled ? `trace-${++this.traceIdCounter}` : undefined;
+
+    // Logger avec trace
+    const traceInfo = traceId ? `[${traceId}]` : "";
+    log.debug(
+      `📤 ${traceInfo} [${message.from}] → [${message.to}] type="${message.type}" strategy="${strategy}"`
+    );
 
     try {
       if (message.to === "broadcast") {
-        await this.deliverToAll(message);
+        await this.deliverToAll(message, strategy);
       } else {
-        await this.deliverToAgent(message.to, message);
+        await this.deliverToAgent(message.to, message, options, strategy);
       }
       success = true;
     } finally {
+      const processingMs = Date.now() - startTime;
+      
+      // Mettre à jour les métriques de routage si cible est un rôle
+      if (typeof message.to === "string" && message.to !== "broadcast") {
+        this.updateRoutingMetrics(message.to, processingMs);
+      }
+
       this.metrics.push({
         messageId: message.id,
         from: message.from,
         to: message.to,
         type: message.type,
         timestamp: startTime,
-        processingMs: Date.now() - startTime,
+        processingMs,
         success,
+        strategy,
       });
+      
       // Garder les métriques sous contrôle
       if (this.metrics.length > 1000) {
         this.metrics.splice(0, 200);
+      }
+
+      // Logger le résultat avec trace
+      if (traceId) {
+        log.debug(
+          `📞 ${traceInfo} Délivraison terminée : ${success ? "✅" : "❌"} ` +
+          `(${processingMs}ms)`
+        );
       }
     }
   }
 
   private async deliverToAgent(
     targetRole: AgentRole,
-    message: AgentMessage
+    message: AgentMessage,
+    _options: PublishOptions = {},
+    strategy: RoutingStrategy = "direct"
   ): Promise<void> {
-    const handlers: MessageHandler[] = [];
+    const handlers: Array<{ handler: MessageHandler; subId: string }> = [];
 
     for (const sub of this.subscriptions.values()) {
       if (
         sub.agentRole === targetRole &&
         (sub.messageType === "*" || sub.messageType === message.type)
       ) {
-        handlers.push(sub.handler);
+        handlers.push({ handler: sub.handler, subId: sub.id });
       }
     }
+
+    // Mettre à jour l'état round-robin
+    this.updateRoundRobinState();
 
     if (handlers.length === 0) {
       // ── Dead-letter queue : l'agent n'est pas encore abonné ──────────────
@@ -374,13 +735,73 @@ export class AgentMessageBus extends EventEmitter {
       return;
     }
 
+    // Appliquer la stratégie de routage
+    const selectedHandlers = this.applyRoutingStrategy(handlers, targetRole, strategy);
+
+    // Incrémenter le compteur pour le load-balancing
+    if (strategy === "load-balanced") {
+      this.incrementActiveMessages(targetRole);
+    }
+
+    // Traiter avec les handlers sélectionnés
     await Promise.allSettled(
-      handlers.map((h) =>
-        h(message).catch((err) =>
-          log.error(`Handler [${targetRole}] erreur: ${err.message}`)
+      selectedHandlers.map(({ handler }) =>
+        handler(message).catch((err) =>
+          log.error(`Handler [${targetRole}] erreur: ${(err as Error).message}`)
         )
       )
     );
+
+    // Décrémenter après traitement
+    if (strategy === "load-balanced") {
+      this.decrementActiveMessages(targetRole);
+    }
+  }
+
+  /**
+   * Applique la stratégie de routage pour sélectionner les handlers
+   */
+  private applyRoutingStrategy(
+    handlers: Array<{ handler: MessageHandler; subId: string }>,
+    targetRole: AgentRole,
+    strategy: RoutingStrategy
+  ): Array<{ handler: MessageHandler; subId: string }> {
+    switch (strategy) {
+      case "round-robin":
+        // Sélectionner un seul handler en round-robin
+        const nextSubId = this.getNextRoundRobinSubscriber(targetRole);
+        if (nextSubId) {
+          const handler = handlers.find(h => h.subId === nextSubId);
+          if (handler) {
+            log.debug(`🔄 Round-robin : sélectionné ${nextSubId.slice(0, 8)} pour [${targetRole}]`);
+            return [handler];
+          }
+        }
+        // Fallback : retourner tous les handlers
+        return handlers;
+
+      case "load-balanced":
+        // Sélectionner le handler avec la plus faible charge
+        const selectedSubId = this.selectAgentForLoadBalancing(targetRole);
+        if (selectedSubId) {
+          const handler = handlers.find(h => h.subId === selectedSubId);
+          if (handler) {
+            log.debug(`⚖️ Load-balanced : sélectionné ${selectedSubId.slice(0, 8)} pour [${targetRole}]`);
+            return [handler];
+          }
+        }
+        // Fallback : retourner tous les handlers
+        return handlers;
+
+      case "broadcast":
+        // Envoyer à tous les handlers (comportement par défaut pour broadcast)
+        return handlers;
+
+      case "direct":
+      default:
+        // Envoyer à tous les handlers (comportement original)
+        return handlers;
+    }
   }
 
   /**
@@ -409,8 +830,8 @@ export class AgentMessageBus extends EventEmitter {
     }
   }
 
-  private async deliverToAll(message: AgentMessage): Promise<void> {
-    const handlers: MessageHandler[] = [];
+  private async deliverToAll(message: AgentMessage, _strategy: RoutingStrategy = "broadcast"): Promise<void> {
+    const handlers: Array<{ handler: MessageHandler; subId: string }> = [];
     const seen = new Set<AgentRole>();
 
     for (const sub of this.subscriptions.values()) {
@@ -421,14 +842,16 @@ export class AgentMessageBus extends EventEmitter {
 
       if (sub.messageType === "*" || sub.messageType === message.type) {
         seen.add(sub.agentRole);
-        handlers.push(sub.handler);
+        handlers.push({ handler: sub.handler, subId: sub.id });
       }
     }
 
+    // Pour le broadcast, on envoie à tous les handlers
+    // Les autres stratégies sont gérées dans deliverToAgent
     await Promise.allSettled(
-      handlers.map((h) =>
-        h(message).catch((err) =>
-          log.error(`Broadcast handler erreur: ${err.message}`)
+      handlers.map(({ handler }) =>
+        handler(message).catch((err) =>
+          log.error(`Broadcast handler erreur: ${(err as Error).message}`)
         )
       )
     );

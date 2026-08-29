@@ -90,28 +90,66 @@ const CompactActionCard = React.memo(function CompactActionCard({
   onClick?: () => void;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
-      className="ai-interactive ai-compact-card group relative flex flex-col items-center gap-2 p-4 text-center rounded-xl"
+      className="ai-interactive ai-compact-card group relative flex flex-col items-center gap-3 p-5 text-center rounded-xl"
       style={{
         backgroundColor: 'var(--surface)',
         border: '1px solid var(--border)',
-        minHeight: '80px',
+        minHeight: '96px',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
       aria-describedby={`action-desc-${title.replace(/\s/g, '')}`}
+      whileHover={{
+        y: -4,
+        scale: 1.02,
+        boxShadow: '0 8px 20px rgba(0, 194, 255, 0.1)',
+        borderColor: 'rgba(0, 194, 255, 0.3)',
+      }}
+      whileTap={{ scale: 0.95 }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
     >
+      {/* Hover glow effect */}
       <div
-        className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
-        style={{ backgroundColor: 'var(--surface-soft)' }}
-      >
-        <Icon size={14} style={{ color: 'var(--primary)' }} />
-      </div>
+        className="absolute inset-0 rounded-xl pointer-events-none opacity-0 group-hover:opacity-100"
+        style={{
+          background: 'radial-gradient(circle at center, rgba(0, 194, 255, 0.1) 0%, transparent 70%)',
+          transition: 'opacity 0.3s ease',
+        }}
+      />
 
-      <div className="flex flex-col items-center gap-0.5">
-        <div className="text-sm font-semibold leading-tight" style={{ color: 'var(--text)' }}>
+      <motion.div
+        className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 relative"
+        style={{
+          backgroundColor: 'var(--surface-soft)',
+          border: '1px solid rgba(0, 194, 255, 0.1)',
+        }}
+        whileHover={{ scale: 1.1, rotate: 5 }}
+        transition={{ duration: 0.2 }}
+      >
+        <Icon size={16} style={{ color: 'var(--primary)' }} />
+        {/* Icon glow on hover */}
+        <div
+          className="absolute inset-0 rounded-xl pointer-events-none opacity-0 group-hover:opacity-100"
+          style={{
+            boxShadow: 'inset 0 0 8px rgba(0, 194, 255, 0.2)',
+            transition: 'opacity 0.3s ease',
+          }}
+        />
+      </motion.div>
+
+      <div className="flex flex-col items-center gap-1">
+        <motion.div
+          className="text-sm font-semibold leading-tight"
+          style={{ color: 'var(--text)' }}
+          whileHover={{ color: 'var(--primary)' }}
+          transition={{ duration: 0.2 }}
+        >
           {title}
-        </div>
+        </motion.div>
         <div
           id={`action-desc-${title.replace(/\s/g, '')}`}
           className="text-xs leading-snug"
@@ -122,11 +160,16 @@ const CompactActionCard = React.memo(function CompactActionCard({
       </div>
 
       {shortcut && (
-        <div className="flex-shrink-0 mt-1">
+        <motion.div
+          className="flex-shrink-0 mt-2"
+          initial={{ opacity: 0, scale: 0.8 }}
+          whileHover={{ scale: 1.05 }}
+          transition={{ duration: 0.2 }}
+        >
           <Kbd>{shortcut}</Kbd>
-        </div>
+        </motion.div>
       )}
-    </button>
+    </motion.button>
   );
 });
 
@@ -497,37 +540,88 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             </h2>
           </motion.div>
 
-          {/* ── NIVEAU 3 : CTA principal compact premium ── */}
+          {/* ── NIVEAU 3 : CTA principal - Plus grand et centré avec identité IA ── */}
           <motion.button
             type="button"
             onClick={handleConnect}
-            className="ai-interactive ai-hero group w-full flex items-center gap-4 p-5 mb-10 text-left rounded-[20px]"
+            className="ai-interactive ai-hero group w-full mx-auto flex items-center gap-4 p-6 mb-10 text-left rounded-[22px]"
             style={{
               backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-              height: '96px',
-              minHeight: '96px',
+              border: '2px solid var(--primary)',
+              height: '112px',
+              minHeight: '112px',
+              maxWidth: '600px',
+              boxShadow: '0 8px 24px rgba(0, 194, 255, 0.12)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
             {...makeEntranceProps(0.08)}
             aria-label={connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`}
+            whileHover={{
+              scale: 1.02,
+              boxShadow: '0 12px 32px rgba(0, 194, 255, 0.18)',
+              borderColor: 'var(--accent-hover)',
+            }}
+            whileTap={{ scale: 0.98 }}
           >
+            {/* Gradient background overlay for depth */}
             <div
-              className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ backgroundColor: 'var(--surface-soft)' }}
+              className="absolute inset-0 rounded-[20px] pointer-events-none"
+              style={{
+                background: 'linear-gradient(135deg, rgba(0, 194, 255, 0.05) 0%, rgba(255, 140, 0, 0.03) 100%)',
+              }}
+            />
+
+            <div
+              className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0 relative"
+              style={{
+                backgroundColor: 'var(--surface-soft)',
+                border: '1px solid rgba(0, 194, 255, 0.15)',
+              }}
             >
-              <Sparkles size={18} style={{ color: 'var(--primary)' }} />
+              {/* Animated icon container */}
+              <motion.div
+                animate={{ rotate: [0, 10, -5, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              >
+                <Sparkles size={20} style={{ color: 'var(--primary)' }} />
+              </motion.div>
+              {/* Subtle glow effect */}
+              <div
+                className="absolute inset-0 rounded-xl pointer-events-none"
+                style={{
+                  boxShadow: 'inset 0 0 12px rgba(0, 194, 255, 0.1)',
+                }}
+              />
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="text-[15px] font-semibold leading-tight" style={{ color: 'var(--text)' }}>
+              <motion.div
+                className="text-[17px] font-bold leading-tight"
+                style={{ color: 'var(--text)' }}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1, duration: 0.3 }}
+              >
                 {connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`}
-              </div>
-              <div className="text-sm mt-0.5 leading-snug" style={{ color: 'var(--text-muted)' }}>
-                {connected ? 'Session vocale et texte en cours' : 'Parlez, écrivez ou demandez quelque chose à Leanna'}
-              </div>
+              </motion.div>
+              <motion.div
+                className="text-sm mt-1 leading-snug"
+                style={{ color: 'var(--text-muted)' }}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.15, duration: 0.3 }}
+              >
+                {connected ? 'Session vocale et texte en cours' : 'Parlez, écrivez ou demandez quelque chose à votre assistant IA'}
+              </motion.div>
             </div>
 
-            <Kbd>{MOD}+L</Kbd>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2, type: 'spring', stiffness: 500, damping: 25 }}
+            >
+              <Kbd>{MOD}+L</Kbd>
+            </motion.div>
           </motion.button>
 
           {/* ── NIVEAU 4 : Actions secondaires compactes ── */}
@@ -565,63 +659,109 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                 >
                   Fichiers récents
                 </h2>
-                <button
+                <motion.button
                   onClick={clearRecentFiles}
                   className="ai-interactive ai-clear-btn flex items-center gap-1 text-sm px-2 py-1 rounded-md"
                   style={{ color: 'var(--text-muted)' }}
                   aria-label="Effacer la liste des fichiers récents"
+                  whileHover={{ scale: 1.05, color: 'var(--primary)' }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
                 >
                   <Trash2 size={12} />
                   Effacer
-                </button>
+                </motion.button>
               </div>
 
               <div
                 className="rounded-xl overflow-hidden"
-                style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)' }}
+                style={{
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'var(--surface)',
+                  boxShadow: '0 2px 8px rgba(0, 194, 255, 0.03)',
+                }}
                 role="list"
               >
                 {recentFiles.map(({ path, language }, index) => {
                   const fileName = path.split(/[/\\]/).pop() || path;
                   const dirPath = path.split(/[/\\]/).slice(-3, -1).join('/');
                   const isDisabled = loadingFile === path;
+                  const fileExtension = fileName.split('.').pop()?.toLowerCase();
+                  
+                  // Map common extensions to specific icons (simplified for now)
+                  const getFileIconColor = () => {
+                    if (['js', 'ts', 'jsx', 'tsx'].includes(fileExtension || '')) return '#f7df1e';
+                    if (['html', 'xml'].includes(fileExtension || '')) return '#e34f26';
+                    if (['css', 'scss'].includes(fileExtension || '')) return '#1572b6';
+                    if (['py'].includes(fileExtension || '')) return '#3572a5';
+                    if (['json'].includes(fileExtension || '')) return '#2b91af';
+                    if (['md'].includes(fileExtension || '')) return '#087fbd';
+                    return 'var(--text-muted)';
+                  };
+
                   return (
-                    <button
+                    <motion.button
                       key={path}
                       onClick={() => handleOpenRecent(path)}
                       disabled={isDisabled}
-                      className="ai-interactive ai-recent-row w-full flex items-center gap-3 px-4 py-2.5 text-left group"
+                      className="ai-interactive ai-recent-row w-full flex items-center gap-3 px-5 py-3 text-left group"
                       style={{
                         borderTop: index > 0 ? '1px solid var(--border)' : undefined,
                         opacity: isDisabled ? 0.6 : 1,
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
                       role="listitem"
                       aria-label={`Ouvrir ${fileName} (${path})`}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05, duration: 0.3 }}
+                      whileHover={{
+                        x: 4,
+                        backgroundColor: 'rgba(0, 194, 255, 0.02)',
+                      }}
                     >
-                      <FileText size={13} style={{ color: 'var(--text-muted)' }} className="flex-shrink-0" />
-                      <span className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
-                        {fileName}
-                      </span>
-                      <span className="text-sm font-mono truncate" style={{ color: 'var(--text-muted)' }}>
-                        {dirPath}
-                      </span>
+                      <motion.div
+                        className="w-6 h-6 flex items-center justify-center rounded-md flex-shrink-0"
+                        style={{
+                          backgroundColor: 'var(--surface-soft)',
+                          border: '1px solid rgba(0, 194, 255, 0.1)',
+                        }}
+                        whileHover={{ scale: 1.1 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <FileText size={14} style={{ color: getFileIconColor() }} />
+                      </motion.div>
+                      
+                      <div className="flex-1 min-w-0 flex flex-col">
+                        <span className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
+                          {fileName}
+                        </span>
+                        <span className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>
+                          {dirPath}
+                        </span>
+                      </div>
+                      
                       {language && (
                         <span
-                          className="ai-recent-lang ml-auto text-xs font-mono px-1.5 py-0.5 rounded opacity-0 transition-opacity flex-shrink-0"
+                          className="ai-recent-lang ml-auto text-xs font-mono px-2 py-0.5 rounded-full opacity-0 transition-opacity flex-shrink-0"
                           style={{
                             backgroundColor: 'var(--surface-soft)',
-                            color: 'var(--text-muted)',
+                            color: 'var(--primary)',
+                            border: '1px solid rgba(0, 194, 255, 0.15)',
                           }}
                         >
                           {language}
                         </span>
                       )}
-                      <ChevronRight
-                        size={12}
-                        className="ai-recent-chevron flex-shrink-0 opacity-0 transition-opacity"
+                      
+                      <motion.div
+                        className="flex-shrink-0 opacity-0 transition-opacity"
                         style={{ color: 'var(--text-muted)' }}
-                      />
-                    </button>
+                        whileHover={{ opacity: 1, x: 4 }}
+                      >
+                        <ChevronRight size={12} />
+                      </motion.div>
+                    </motion.button>
                   );
                 })}
               </div>

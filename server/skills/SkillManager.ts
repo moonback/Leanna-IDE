@@ -8,6 +8,7 @@ import { pathToFileURL } from 'url';
 import { mcpBridge } from "../mcp";
 import { SELF_ROOT, isCriticalFile, isWriteForbidden } from "../utils/selfRoot";
 import { assertSandboxReady, markFileModified } from "../utils/sandbox";
+import { importModule } from "../utils/ModuleLoader";
 
 // ─── Dynamic Tool Relevance Classifier (Optimisation Leanna #1) ───────────────
 const TOOL_KEYWORDS: Record<string, string[]> = {
@@ -526,7 +527,7 @@ export class SkillManager {
     } catch (e) {
       // Fallback statique
       try {
-        const { createSmartSkills } = require('../autonomy/SmartSkills');
+        const { createSmartSkills } = await importModule<{ createSmartSkills: any }>('../autonomy/SmartSkills');
         const smartSkill = createSmartSkills((name: string, args: any) => this.handleToolCall(name, args));
         this.registerDynSkill(smartSkill, 'autonomy:smart');
         console.log(`[SkillManager] ✓ Smart Skills enregistrés (fallback statique).`);

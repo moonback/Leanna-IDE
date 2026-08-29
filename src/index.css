@@ -99,7 +99,7 @@
   /* Base – foncé mais avec une teinte bleutée */
   --bg-base:       #0a1628;
   --bg-secondary:  #0e2a47;
-  --bg-panel:      rgba(14, 42, 71, 0.92);
+  --bg-panel:      #0a1628;
   --bg-ctrl:       rgba(14, 42, 71, 0.96);
   --bg-sidebar:    rgba(10, 22, 40, 0.98);
   --bg-input:      rgba(0, 194, 255, 0.10);
@@ -111,10 +111,10 @@
   --ctrl-hover:      rgba(0, 194, 255, 0.08);
   --btn-active-bg:   rgba(0, 194, 255, 0.18);
   --btn-active-text: #00c2ff;
-  --scroll-thumb: rgba(0, 194, 255, 0.3);
-  --scroll-thumb-hover: rgba(0, 194, 255, 0.5);
+  --scroll-thumb: rgba(255, 140, 0, 0.60);
+  --scroll-thumb-hover: rgba(255, 140, 0, 0.60);
   /* Bordures – cyan et orange */
-  --border-base:   rgba(0, 194, 255, 0.30);
+  --border-base:   rgba(0, 194, 255, 0.20);
   --border-strong: rgba(255, 140, 0, 0.60);
   --border-focus:  #00c2ff;
   --border-glow:   rgba(0, 194, 255, 0.35);
@@ -197,17 +197,17 @@
   --text-muted: #6a8aaa;
   --primary: #00c2ff;
   --primary-dark: #0099cc;
-  --border: rgba(0, 194, 255, 0.15);
+  --border: rgba(255, 140, 0, 0.15);
 }
 
 :root[data-theme="light"] {
-  /* Elevation (shadows) — subtle warm tones */
-  --shadow-xs:  0 1px 2px rgba(0,0,0,0.04);
-  --shadow-sm:  0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:  0 4px 16px rgba(99,102,241,0.06), 0 2px 6px rgba(0,0,0,0.06);
-  --shadow-lg:  0 12px 36px rgba(99,102,241,0.08), 0 4px 12px rgba(0,0,0,0.06);
-  --shadow-xl:  0 24px 52px rgba(99,102,241,0.1), 0 8px 20px rgba(0,0,0,0.06);
-  --shadow-glow: 0 0 16px rgba(99,102,241,0.08), 0 0 48px rgba(99,102,241,0.03);
+  /* Elevation (shadows) — Maysson brand colors */
+  --shadow-xs:  0 1px 2px rgba(0, 194, 255, 0.04);
+  --shadow-sm:  0 2px 4px rgba(0, 194, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md:  0 4px 16px rgba(0, 194, 255, 0.06), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-lg:  0 12px 36px rgba(0, 194, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-xl:  0 24px 52px rgba(0, 194, 255, 0.1), 0 8px 20px rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 16px rgba(0, 194, 255, 0.08), 0 0 48px rgba(0, 194, 255, 0.03);
 
   /* Surfaces — clean whites with warmth */
   --bg-base:       #ffffff;
@@ -221,8 +221,8 @@
   /* Borders — softer, more refined */
   --border-base:   rgba(180, 185, 210, 0.45);
   --border-strong: rgba(150, 155, 185, 0.6);
-  --border-focus:  rgba(99, 102, 241, 0.5);
-  --border-glow:   rgba(99, 102, 241, 0.2);
+  --border-focus:  rgba(0, 194, 255, 0.5);
+  --border-glow:   rgba(0, 194, 255, 0.2);
 
   /* Text — strong hierarchy */
   --text-primary:   #111827;
@@ -230,12 +230,12 @@
   --text-muted:     #6b7280;
   --text-dimmed:    #9ca3af;
 
-  /* Accent — indigo primary */
-  --accent-primary:  #4f46e5;
-  --accent-hover:    #4338ca;
-  --accent-subtle:   rgba(79, 70, 229, 0.08);
-  --accent-glow:     rgba(79, 70, 229, 0.2);
-  --accent-secondary: #0891b2;
+  /* Accent — Maysson brand colors (#00c2ff and #ff8c00) */
+  --accent-primary:  #00c2ff;
+  --accent-hover:    #33ccff;
+  --accent-subtle:   rgba(0, 194, 255, 0.08);
+  --accent-glow:     rgba(0, 194, 255, 0.2);
+  --accent-secondary: #ff8c00;
 
   /* Semantic colours — vibrant but readable */
   --color-success:  #059669;
@@ -249,41 +249,41 @@
   --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
   --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
 
-  /* Accent alternative — secondary highlight color */
-  --color-accent-alt: #6366f1;
+  /* Accent alternative — Maysson orange (#ff8c00) */
+  --color-accent-alt: #ff8c00;
   --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
 
   /* Orb */
-  --orb-glow-active: rgba(79, 70, 229, 0.35);
-  --gradient-from:   rgba(79, 70, 229, 0.08);
+  --orb-glow-active: rgba(0, 194, 255, 0.35);
+  --gradient-from:   rgba(0, 194, 255, 0.08);
   /* Orb state accents */
-  --orb-idle:      #4f46e5;
-  --orb-online:    #6366f1;
-  --orb-listening: #0891b2;
-  --orb-speaking:  #7c3aed;
-  --orb-busy:      #d97706;
-  --orb-thinking:  #8b5cf6;
+  --orb-idle:      #00c2ff;
+  --orb-online:    #33ccff;
+  --orb-listening: #00bfff;
+  --orb-speaking:  #ff8c00;
+  --orb-busy:      #ffa500;
+  --orb-thinking:  #00c2ff;
 
   /* Controls */
   --ctrl-icon:       #6b7280;
   --ctrl-icon-hover: #111827;
-  --ctrl-hover:      rgba(99, 102, 241, 0.06);
-  --btn-active-bg:   rgba(79, 70, 229, 0.1);
-  --btn-active-text: #4f46e5;
+  --ctrl-hover:      rgba(0, 194, 255, 0.06);
+  --btn-active-bg:   rgba(0, 194, 255, 0.1);
+  --btn-active-text: #00c2ff;
 
   /* Misc */
-  --drag-overlay:   rgba(199, 210, 254, 0.4);
-  --scroll-thumb:   #c7d2fe;
-  --scroll-thumb-hover: #a5b4fc;
+  --drag-overlay:   rgba(0, 194, 255, 0.15);
+  --scroll-thumb:   rgba(0, 194, 255, 0.3);
+  --scroll-thumb-hover: rgba(0, 194, 255, 0.5);
 
   /* Sidebar nav */
-  --nav-active-bg:  rgba(79, 70, 229, 0.08);
-  --nav-active-bar: #4f46e5;
+  --nav-active-bg:  rgba(0, 194, 255, 0.08);
+  --nav-active-bar: #00c2ff;
 
   /* Self-edit / Checkpoint system */
-  --self-edit-bg:     rgba(124, 58, 237, 0.05);
-  --self-edit-border: rgba(124, 58, 237, 0.2);
-  --self-edit-text:   #6d28d9;
+  --self-edit-bg:     rgba(0, 194, 255, 0.05);
+  --self-edit-border: rgba(0, 194, 255, 0.2);
+  --self-edit-text:   #00c2ff;
   --checkpoint-bg:    rgba(5, 150, 105, 0.06);
   --checkpoint-text:  #047857;
   --critical-bg:      rgba(220, 38, 38, 0.05);
@@ -292,19 +292,19 @@
 
   /* Glass effect tokens */
   --glass-bg:        rgba(255, 255, 255, 0.8);
-  --glass-border:    rgba(99, 102, 241, 0.08);
+  --glass-border:    rgba(0, 194, 255, 0.08);
   --glass-blur:      12px;
 
-  /* New design variables for EmptyEditorState - Apple x Linear x Raycast x AI assistant */
+  /* New design variables for EmptyEditorState - Maysson brand colors */
   --bg: #f7f8fa;
   --surface: #ffffff;
   --surface-soft: #f1f3f7;
   --text: #111827;
   --text-secondary: #667085;
   --text-muted: #98a2b3;
-  --primary: #159fe3;
-  --primary-dark: #087fbd;
-  --border: rgba(15, 23, 42, 0.08);
+  --primary: #00c2ff;
+  --primary-dark: #0099cc;
+  --border: rgba(0, 194, 255, 0.08);
 }
 
 /* ═══════════════════════════════════════════════
@@ -594,11 +594,117 @@
     background-color 0.25s ease,
     border-color 0.25s ease,
     color 0.2s ease,
-    box-shadow 0.25s ease;
+    box-shadow 0.25s ease,
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 /* Never transition animations or transforms (breaks motion) */
 [class*="animate-"], [data-motion], canvas, video {
   transition: none !important;
+}
+
+/* Subtle animations for enhanced UX */
+@keyframes subtle-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes gentle-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 194, 255, 0.2); }
+  50% { box-shadow: 0 0 8px 4px rgba(0, 194, 255, 0.15); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes slide-in-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth hover effects for interactive elements */
+button,
+[role="button"],
+a[href] {
+  cursor: pointer;
+}
+
+/* Focus states for accessibility */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Animation utility classes */
+.animate-subtle-pulse {
+  animation: subtle-pulse 2s ease-in-out infinite;
+}
+
+.animate-gentle-glow {
+  animation: gentle-glow 3s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-slide-in-fade {
+  animation: slide-in-fade 0.5s ease-out forwards;
+}
+
+/* Delay variants */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+
+/* Duration variants */
+.duration-150 { animation-duration: 150ms; transition-duration: 150ms; }
+.duration-200 { animation-duration: 200ms; transition-duration: 200ms; }
+.duration-250 { animation-duration: 250ms; transition-duration: 250ms; }
+.duration-300 { animation-duration: 300ms; transition-duration: 300ms; }
+.duration-400 { animation-duration: 400ms; transition-duration: 400ms; }
+.duration-500 { animation-duration: 500ms; transition-duration: 500ms; }
+
+/* Easing variants */
+.ease-spring {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ease-bounce {
+  transition-timing-function: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Hover effects for cards and panels */
+.hover-lift {
+  transition: transform 0.2s ease-spring, box-shadow 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 194, 255, 0.1);
+}
+
+.hover-glow {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.hover-glow:hover {
+  box-shadow: 0 0 12px rgba(0, 194, 255, 0.15);
+  border-color: rgba(0, 194, 255, 0.3);
+}
+
+.hover-scale {
+  transition: transform 0.2s ease;
+}
+.hover-scale:hover {
+  transform: scale(1.02);
 }
 
 body {
@@ -2018,7 +2124,7 @@ body {
   --ide-panel-bg: rgba(17, 17, 20, 0.96);
   --ide-sidebar-bg: rgba(12, 12, 15, 0.98);
   --ide-sidebar-hover: rgba(255, 255, 255, 0.045);
-  --ide-sidebar-active: rgba(124, 58, 237, 0.11);
+  --ide-sidebar-active: rgba(0, 194, 255, 0.11);
   --ide-sidebar-item-bg: rgba(255, 255, 255, 0.025);
   --ide-shell-border: rgba(255, 255, 255, 0.07);
 }
@@ -2027,7 +2133,7 @@ body {
   --ide-panel-bg: rgba(255, 255, 255, 0.96);
   --ide-sidebar-bg: rgba(250, 248, 244, 0.98);
   --ide-sidebar-hover: rgba(17, 24, 39, 0.055);
-  --ide-sidebar-active: rgba(79, 70, 229, 0.10);
+  --ide-sidebar-active: rgba(0, 194, 255, 0.10);
   --ide-sidebar-item-bg: rgba(17, 24, 39, 0.035);
   --ide-shell-border: rgba(86, 82, 74, 0.12);
 }

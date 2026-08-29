@@ -200,12 +200,50 @@ export function createDocumentsRouter(_getProfile: () => ProfileConfig): Router 
   });
 
   // GET /api/documents/relations/list
-  router.get("/relations/list", (req: Request, res: Response) => {
+  router.get("/relations/list", async (req: Request, res: Response) => {
     try {
       const docId = typeof req.query.documentId === "string" ? req.query.documentId : undefined;
-      const relations = docId ? documentMemory.getRelationsForDocument(docId) : documentMemory.getAllRelations();
-      res.json({ status: "success", count: relations.length, relations });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+      
+      // Récupérer les relations de DocumentMemory (documents uploadés)
+      const memoryRelations = docId 
+        ? documentMemory.getRelationsForDocument(docId) 
+        : documentMemory.getAllRelations();
+      
+      // Récupérer les liens de DocumentStore (documents workspace)
+      let storeLinks: any[] = [];
+      try {
+        const { getDocumentStore } = await import('../knowledge/DocumentStore');
+        const store = getDocumentStore();
+        const links = docId ? store.getLinksForDocument(docId) : store.getAllLinks();
+        
+        // Convertir DocumentLink en format DocumentRelation pour uniformité
+        storeLinks = links.map((link: any) => ({
+          id: `link_${link.docA}_${link.docB}`,
+          sourceId: link.docA,
+          targetId: link.docB,
+          type: link.linkType,
+          description: link.description || '',
+          confidence: link.confidence || 0.7,
+          evidence: undefined,
+          createdAt: link.createdAt || new Date().toISOString(),
+          autoDetected: true,
+        }));
+      } catch (e) {
+        // Si DocumentStore n'est pas disponible, ignorer
+        // console.debug('DocumentStore non disponible pour les relations:', e);
+      }
+      
+      // Fusionner les relations des deux sources
+      const allRelations = [...memoryRelations, ...storeLinks];
+      
+      res.json({ 
+        status: "success", 
+        count: allRelations.length, 
+        relations: allRelations 
+      });
+    } catch (e: any) { 
+      res.status(500).json({ error: e.message }); 
+    }
   });
 
   // POST /api/documents/relations

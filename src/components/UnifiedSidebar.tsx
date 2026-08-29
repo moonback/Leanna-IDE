@@ -129,10 +129,11 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
           borderRight: '1px solid var(--ide-shell-border)',
           backgroundColor: 'var(--ide-sidebar-bg)',
           height: '100%',
-          paddingBottom: '8px',
+          paddingBottom: '12px',
           boxShadow: 'none',
           borderTopLeftRadius: 'var(--radius-base)',
           borderBottomLeftRadius: 'var(--radius-base)',
+          gap: '4px',
         }}
         aria-label="Navigation principale"
       >
@@ -245,12 +246,12 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
 function BrandLogo({ theme, onNavigate }: { theme: string; onNavigate: () => void }) {
   return (
     <div
-      className="w-full h-[64px] flex items-center justify-center flex-shrink-0"
+      className="w-full h-[72px] flex items-center justify-center flex-shrink-0"
       style={{ borderBottom: '1px solid var(--ide-shell-border)' }}
     >
       <motion.button
         type="button"
-        className="w-[38px] h-[38px] rounded-md overflow-hidden flex items-center justify-center cursor-pointer transition-all duration-200"
+        className="w-[44px] h-[44px] rounded-xl overflow-hidden flex items-center justify-center cursor-pointer transition-all duration-300 relative"
         style={{
           background: 'var(--ide-sidebar-item-bg)',
           boxShadow: 'none',
@@ -259,13 +260,46 @@ function BrandLogo({ theme, onNavigate }: { theme: string; onNavigate: () => voi
         onClick={onNavigate}
         title="Leanna "
         aria-label="Retourner à l'éditeur"
-        whileHover={{ scale: 1.05, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{
+          scale: 1.1,
+          boxShadow: '0 0 16px rgba(0, 194, 255, 0.25), 0 4px 12px rgba(0,0,0,0.2)',
+          borderColor: 'rgba(0, 194, 255, 0.5)',
+        }}
+        whileTap={{ scale: 0.92 }}
       >
-        <img
+        {/* Subtle glow effect on hover */}
+        <motion.div
+          className="absolute inset-0 rounded-xl pointer-events-none"
+          initial={{ opacity: 0 }}
+          whileHover={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          style={{
+            background: 'radial-gradient(circle at center, rgba(0, 194, 255, 0.15) 0%, transparent 70%)',
+          }}
+        />
+        
+        {/* Animated border ring */}
+        <motion.div
+          className="absolute inset-[-2px] rounded-xl pointer-events-none"
+          style={{
+            border: '1px solid rgba(0, 194, 255, 0.2)',
+          }}
+          animate={{ 
+            scale: [1, 1.05, 1], 
+            opacity: [0.3, 0.7, 0.3] 
+          }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        
+        <motion.img
           src={theme === 'dark' ? logoDark : logoLight}
           alt="Leanna "
-          className="w-full h-full object-contain"
+          className="w-[32px] h-[32px] object-contain"
+          whileHover={{ 
+            scale: 1.15, 
+            rotate: [0, -5, 5, 0] 
+          }}
+          transition={{ duration: 0.4, ease: 'easeInOut' }}
         />
       </motion.button>
     </div>
