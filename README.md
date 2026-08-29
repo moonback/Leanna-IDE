@@ -30,6 +30,11 @@
     - [Raccourcis clavier du Terminal](#-raccourcis-clavier-du-terminal)
   - [Assistant Code (Leanna)](#assistant-code-leanna)
   - [Système Multi-Agents](#système-multi-agents)
+    - [Système de Délégation Structurée](#-système-de-délégation-structurée)
+  - [Routage Avancé du MessageBus](#-routage-avancé-du-messagebus)
+  - [Surveillance et Monitoring](#-surveillance-et-monitoring)
+  - [Spécialisation des Compétences](#-spécialisation-des-compétences)
+  - [Tableau de Bord Santé](#-tableau-de-bord-santé)
   - [Notebooks RAG](#notebooks-rag)
   - [Assistant Multimodal](#assistant-multimodal)
   - [Moteur de Connaissances](#moteur-de-connaissances)
@@ -150,6 +155,148 @@ Accès direct au code source de votre app via **20+ outils** pour une assistance
 ---
 
 ### 👥 Système Multi-Agents (14 agents)
+---
+
+### 🔄 Système de Délégation Structurée
+
+**Remplacement du parsing Markdown par une approche JSON typée et validée.**
+
+#### Avantages
+- ✅ **Format machine-readable** - Pas de parsing fragile
+- ✅ **Validation stricte** avec Zod
+- ✅ **Support des délégations imbriquées** et conditionnelles
+- ✅ **Intégration facile** avec APIs et outils externes
+- ✅ **Meilleure traçabilité** et audit
+
+#### Formats Supportés
+
+**Délégation simple:**
+```json
+{
+  "targetRole": "coder",
+  "title": "Implémenter une fonction utilitaire",
+  "description": "Créer une fonction de manipulation de chaînes en TypeScript",
+  "priority": "high",
+  "files": ["src/utils/string.ts"],
+  "instructions": "Utiliser TypeScript et ajouter des tests unitaires",
+  "context": { "project": "utils-library" },
+  "timeoutMs": 60000,
+  "condition": { "type": "always" }
+}
+```
+
+**Délégation batch (orchestration):**
+```json
+{
+  "batchId": "550e8400-e29b-41d4-a716-446655440000",
+  "strategy": "sequential",
+  "delegations": [
+    {
+      "targetRole": "coder",
+      "title": "Implémenter le module",
+      "description": "Créer le module principal"
+    },
+    {
+      "targetRole": "tester",
+      "title": "Écrire les tests",
+      "description": "Créer les tests unitaires et d'intégration",
+      "condition": { "type": "on_success" }
+    }
+  ],
+  "conditions": { "allSucceed": true },
+  "onComplete": {
+    "agentRole": "reviewer",
+    "instructions": "Revoir l'implémentation complète"
+  }
+}
+```
+
+#### Stratégies d'Orchestration
+| Stratégie | Description | Cas d'usage |
+|-----------|-------------|-------------|
+| `parallel` | Exécute toutes les délégations simultanément | Tâches indépendantes |
+| `sequential` | Exécute les délégations une par une | Tâches dépendantes |
+| `conditional` | Exécute selon des conditions (`on_success`, `on_failure`, `on_complete`) | Workflows complexes |
+
+#### Fonctionnalités Clés
+- **Validation stricte** avec Zod pour éviter les erreurs de format
+- **Vérification automatique** contre la matrice de délégation autorisée
+- **Enrichissement** avec des valeurs par défaut
+- **Génération de templates** pour faciliter le développement
+- **Historique complet** des délégations avec filtrage
+- **Statistiques détaillées** (par rôle, priorité, statut, etc.)
+- **Nettoyage automatique** des données anciennes (configurable)
+
+#### Utilisation
+```typescript
+// Parsing depuis JSON
+const delegations = delegationManager.parseFromJSON(jsonString, "planner");
+
+// Exécution d'une délégation simple
+const result = await delegationManager.executeDelegation(delegation, "planner");
+
+// Exécution d'un batch
+const results = await delegationManager.executeBatch(batchDelegation, "planner");
+
+// Récupérer les statistiques
+const stats = delegationManager.getStatistics();
+```
+
+> **⚡ Migration**: Le `DelegationParser` (Markdown) reste disponible pour la rétrocompatibilité. Utilisez `DelegationManager` pour les nouveaux développements.
+
+
+---
+
+### 🚦 Routage Avancé du MessageBus
+
+**Optimisation de la distribution des messages entre agents avec 4 stratégies.**
+
+#### Stratégies de Routage
+
+| Stratégie | Description | Avantages | Inconvénients |
+|-----------|-------------|-----------|---------------|
+| `direct` | Envoi à tous les agents abonnés (comportement original) | Simple, fiable | Pas d'équilibrage |
+| `round-robin` | Distribution équilibrée entre les abonnés | Équilibre la charge | Ne tient pas compte de la charge actuelle |
+| `load-balanced` | Sélection de l'agent avec la plus faible charge | Optimise les ressources | Légèrement plus complexe |
+| `broadcast` | Diffusion à tous les agents (sauf l'émetteur) | Tous informés | Pas ciblé |
+
+#### Métriques de Routage
+```typescript
+// Charge par agent
+const load = agentMessageBus.getAgentLoad();
+// {
+//   coder: { messageCount: 10, activeMessages: 2, avgProcessingTime: 50, loadScore: 100 },
+//   tester: { messageCount: 5, activeMessages: 0, avgProcessingTime: 30, loadScore: 0 }
+// }
+
+// Métriques détaillées
+const metrics = agentMessageBus.getRoutingMetrics();
+
+// État round-robin
+const rrState = agentMessageBus.getRoundRobinState();
+```
+
+#### Traçage des Messages
+```typescript
+// Activer le traçage
+agentMessageBus.enableTracing(true);
+
+// Générer un ID de trace
+const traceId = agentMessageBus.generateTraceId();
+
+// Les logs incluront l'ID de trace
+// [trace-abc123] [planner] → [coder] type="task_request" strategy="load-balanced"
+```
+
+#### Exemple d'Utilisation
+```typescript
+await agentMessageBus.publish(message, {
+  routing: "load-balanced" // L'agent le moins chargé sera sélectionné
+});
+```
+
+> **💡 Bonnes pratiques**: Utilisez `load-balanced` pour les tâches gourmandes en ressources, `round-robin` pour un équilibrage simple, et `direct` pour les communications 1:1.
+
 
 #### 💻 Pôle Code & Ingénierie Logicielle
 
