@@ -713,7 +713,7 @@ function MemoryTab() {
           value={filterCategory}
           onChange={e => setFilterCategory(e.target.value)}
           className="px-3 py-2 rounded-xl text-xs border outline-none"
-          style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+          style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
         >
           <option value="">Toutes catégories</option>
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -785,8 +785,8 @@ function MemoryTab() {
         </div>
       ) : facts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <Brain className="w-10 h-10" style={{ color: 'var(--text-dimmed)' }} />
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Aucun fait mémorisé</p>
+          <Brain className="w-10 h-10" style={{ color: 'var(--text-dimmed, #888)' }} />
+          <p className="text-sm" style={{ color: 'var(--text-muted, #888)' }}>Aucun fait mémorisé</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -794,14 +794,21 @@ function MemoryTab() {
             <div
               key={fact.id}
               className="group p-3 rounded-xl border flex items-start gap-3 transition hover:border-[var(--border-focus)]"
-              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+              style={{ 
+                backgroundColor: 'var(--bg-panel, #1a1a2e)', 
+                borderColor: 'var(--border-base)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }}
             >
               <div
                 className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
                 style={{ backgroundColor: CATEGORY_COLORS[fact.category] || '#6b7280' }}
               />
               <div className="flex-1 min-w-0">
-                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                <p className="text-xs leading-relaxed" style={{ 
+                  color: 'var(--text-primary)',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                }}>
                   {fact.content}
                 </p>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
