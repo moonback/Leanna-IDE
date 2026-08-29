@@ -48,6 +48,41 @@ interface FactItem {
   relatedConcepts: string[];
 }
 
+// Fait de la mémoire projet (knowledge_memory_add)
+interface ProjectFactItem {
+  id: string;
+  content: string;
+  category: string;
+  tags: string[];
+  sourceFile?: string;
+  confidence: number;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+  isStructural?: boolean;
+}
+
+// Fait unifié pour affichage
+interface UnifiedFact {
+  id: string;
+  content: string;
+  category: string;
+  tags: string[];
+  confidence: number;
+  createdAt: string;
+  source: 'document' | 'project';
+  // Champs spécifiques aux documents
+  sourceDocuments?: string[];
+  importance?: number;
+  verified?: boolean;
+  relatedConcepts?: string[];
+  // Champs spécifiques au projet
+  sourceFile?: string;
+  usageCount?: number;
+  updatedAt?: string;
+  isStructural?: boolean;
+}
+
 interface RelationItem {
   id: string;
   sourceId: string;
@@ -104,10 +139,16 @@ const TYPE_ICONS: Record<string, string> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
+  // Catégories documents
   definition: '#60a5fa', fact: '#34d399', insight: '#fbbf24',
   procedure: '#a78bfa', decision: '#f87171', reference: '#06b6d4',
   quote: '#f472b6', summary: '#818cf8', question: '#fb923c',
   contradiction: '#ef4444', timeline: '#84cc16', relationship: '#e879f9',
+  // Catégories mémoire projet
+  architecture: '#06b6d4', convention: '#818cf8', pattern: '#fbbf24',
+  'known-bug': '#ef4444', api: '#34d399', module: '#a78bfa',
+  workflow: '#f87171', security: '#f472b6', stack: '#60a5fa',
+  refactoring: '#fb923c', todo: '#84cc16',
 };
 
 // ─── Composant Principal ─────────────────────────────────────────────────────
@@ -565,7 +606,7 @@ function DocumentsTab() {
 
 function MemoryTab() {
   const { success, error: toastError } = useToast();
-  const [facts, setFacts] = useState<FactItem[]>([]);
+  const [facts, setFacts] = useState<UnifiedFact[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -574,11 +615,41 @@ function MemoryTab() {
   const loadFacts = useCallback(async () => {
     setLoading(true);
     try {
-      const params = filterCategory ? `?category=${filterCategory}` : '';
-      const res = await fetch(`/api/documents/facts/list${params}`);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setFacts(data.facts || []);
+      // Charger TOUS les faits des documents (sans filtre)
+      const docRes = await fetch('/api/documents/facts/list');
+      const docData = docRes.ok ? await docRes.json() : { facts: [] };
+      
+      // Charger TOUS les faits de la mémoire projet (sans filtre)
+      const projRes = await fetch('/api/knowledge/memory');
+      const projData = projRes.ok ? await projRes.json() : { facts: [] };
+      
+      // Convertir les faits documents en UnifiedFact
+      const documentFacts: UnifiedFact[] = (docData.facts || []).map((f: FactItem) => ({
+        ...f,
+        source: 'document' as const,
+      }));
+      
+      // Convertir les faits projet en UnifiedFact
+      const projectFacts: UnifiedFact[] = (projData.facts || []).map((f: ProjectFactItem) => ({
+        ...f,
+        source: 'project' as const,
+        // Mapper les champs communs
+        tags: f.tags || [],
+        importance: undefined,
+        verified: undefined,
+        relatedConcepts: undefined,
+      }));
+      
+      // Fusionner et trier par date de création (plus récent d'abord)
+      let allFacts = [...documentFacts, ...projectFacts]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      // Appliquer le filtre de catégorie côté client
+      if (filterCategory) {
+        allFacts = allFacts.filter(f => f.category === filterCategory);
+      }
+      
+      setFacts(allFacts);
     } catch {
       toastError('Impossible de charger les faits');
     } finally {
@@ -616,8 +687,14 @@ function MemoryTab() {
     }
   }, [success, toastError]);
 
-  const categories = ['definition', 'fact', 'insight', 'procedure', 'decision',
-    'reference', 'quote', 'summary', 'question', 'contradiction', 'timeline', 'relationship'];
+  // Catégories pour les documents + catégories pour la mémoire projet
+  const categories = [
+    // Catégories documents
+    'definition', 'fact', 'insight', 'procedure', 'decision',
+    'reference', 'quote', 'summary', 'question', 'contradiction', 'timeline', 'relationship',
+    // Catégories mémoire projet (knowledge_memory_add)
+    'architecture', 'convention', 'pattern', 'known-bug', 'api', 'module', 'workflow', 'security', 'stack', 'refactoring', 'todo',
+  ];
 
   return (
     <div className="p-5 lg:p-7 space-y-4">
@@ -732,25 +809,46 @@ function MemoryTab() {
                     style={{ backgroundColor: `${CATEGORY_COLORS[fact.category] || '#6b7280'}20`, color: CATEGORY_COLORS[fact.category] || '#6b7280' }}>
                     {fact.category}
                   </span>
+                  {/* Indicateur de source */}
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full"
+                    style={{ backgroundColor: fact.source === 'project' ? 'var(--bg-base)' : 'transparent', color: 'var(--text-dimmed)' }}>
+                    {fact.source === 'project' ? '📦 Projet' : '📄 Document'}
+                  </span>
+                  {/* Badge "vérifié" pour les faits documents */}
                   {fact.verified && (
                     <span className="text-[9px] flex items-center gap-0.5 text-emerald-400">
                       <CheckCircle2 className="w-2.5 h-2.5" /> vérifié
                     </span>
                   )}
+                  {/* Badge "structural" pour les faits projet */}
+                  {fact.isStructural && (
+                    <span className="text-[9px] flex items-center gap-0.5 text-purple-400">
+                      <CheckCircle2 className="w-2.5 h-2.5" /> structurel
+                    </span>
+                  )}
                   <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
                     confiance: {(fact.confidence * 100).toFixed(0)}%
                   </span>
+                  {/* Afficher usageCount pour les faits projet */}
+                  {fact.source === 'project' && fact.usageCount !== undefined && fact.usageCount > 0 && (
+                    <span className="text-[9px] flex items-center gap-0.5" style={{ color: 'var(--text-dimmed)' }}>
+                      👁️ {fact.usageCount}
+                    </span>
+                  )}
                   <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
                     {timeAgo(fact.createdAt)}
                   </span>
                 </div>
               </div>
-              <button
-                onClick={() => handleDeleteFact(fact.id)}
-                className="p-1 rounded opacity-0 group-hover:opacity-100 transition hover:bg-red-500/10"
-              >
-                <Trash2 className="w-3 h-3" style={{ color: 'var(--color-error)' }} />
-              </button>
+              {/* Bouton de suppression - seulement pour les faits documents */}
+              {fact.source === 'document' && (
+                <button
+                  onClick={() => handleDeleteFact(fact.id)}
+                  className="p-1 rounded opacity-0 group-hover:opacity-100 transition hover:bg-red-500/10"
+                >
+                  <Trash2 className="w-3 h-3" style={{ color: 'var(--color-error)' }} />
+                </button>
+              )}
             </div>
           ))}
         </div>

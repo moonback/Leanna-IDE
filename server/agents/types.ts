@@ -209,6 +209,13 @@ export interface TaskResult {
   durationMs: number;
   /** IDs des sous-tâches déléguées de manière autonome (fire-and-forget) */
   delegatedSubTasks?: string[];
+  /** Opérations de mémoire projet (knowledge_memory_add) effectuées */
+  knowledgeMemoryOperations?: Array<{
+    tool: string;
+    fact_id: string;
+    message: string;
+    timestamp: string;
+  }>;
   /** Preuves collectées par l'exécuteur, distinctes de la narration du modèle. */
   evidence?: TaskEvidence;
 }

@@ -286,8 +286,11 @@ export class AgentExecutor {
       const incompleteReason = this.getIncompleteReason(task, resultText, evidence);
       const success = incompleteReason === null;
 
+      // Extraire les opérations de mémoire projet des observations
+      const memoryOperations = this.extractMemoryOperations(toolExecution.observations);
+
       // Un texte non exceptionnel ne suffit jamais : completed nécessite des preuves
-      // observables collectées par l'exécuteur, pas seulement déclarées par le modèle.
+      // observables collectées par l'exécuteur, pas seulement déclarée par le modèle.
       task.status = success ? "completed" : "failed";
       task.completedAt = new Date().toISOString();
       task.result = {
@@ -300,6 +303,7 @@ export class AgentExecutor {
         error: incompleteReason ?? undefined,
         durationMs,
         evidence,
+        ...(memoryOperations.length > 0 && { knowledgeMemoryOperations: memoryOperations }),
       };
 
       if (!success) {
@@ -954,6 +958,36 @@ ${truncated}
       .filter((line) => line.length >= 12)
       .filter((line) => !/^(?:je vais|je dois|il faut|je commencerai|i will|i need to)/i.test(line))
       .slice(0, 20);
+  }
+
+  /**
+   * Extrait les opérations knowledge_memory_add des observations d'outils.
+   * Retourne un tableau d'opérations réussies avec leur fact_id et détails.
+   */
+  private extractMemoryOperations(observations: string[]): Array<{
+    tool: string;
+    fact_id: string;
+    message: string;
+    timestamp: string;
+  }> {
+    const operations: Array<{ tool: string; fact_id: string; message: string; timestamp: string }> = [];
+    
+    // Pattern plus robuste qui gère les variations d'espaces et d'ordre des clés
+    const memoryAddPattern = /- knowledge_memory_add: succès — \{[^}]*"status"\s*:\s*"success"[^}]*"fact_id"\s*:\s*"([^"]+)"[^}]*"message"\s*:\s*"([^"]+)"[^}]*\}/g;
+    
+    for (const obs of observations) {
+      let match: RegExpExecArray | null;
+      while ((match = memoryAddPattern.exec(obs)) !== null) {
+        operations.push({
+          tool: "knowledge_memory_add",
+          fact_id: match[1],
+          message: match[2],
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+    
+    return operations;
   }
 
   /**
