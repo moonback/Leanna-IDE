@@ -1,41 +1,17 @@
-// Agent Core
 export { AgentOrchestrator, agentOrchestrator } from "./AgentOrchestrator";
 export type { AgentEvent } from "./AgentOrchestrator";
-export { COLLABORATION_PATTERNS, DELEGATION_MATRIX } from "./AgentCommunication";
+export { agentMessageBus } from "./AgentOrchestrator";
+export { agentRegistry } from "./AgentOrchestrator";
+export { COLLABORATION_PATTERNS, DELEGATION_MATRIX } from "./AgentOrchestrator";
 
-// Message Bus et Communication
-export { AgentMessageBus } from "./AgentMessageBus";
-export { agentMessageBus } from "./AgentMessageBus";
-export type { RoutingStrategy } from "./AgentCommunication";
-
-// Délégation
-export { DelegationParser, delegationParser } from "./DelegationParser";
-export { DelegationManager, delegationManager } from "./DelegationManager";
-export type { 
-  StructuredDelegation, 
-  BatchDelegation, 
-  DelegationResult, 
-  DelegationEvent 
-} from "./DelegationManager";
-export type { ParsedDelegation, DelegationParseResult } from "./DelegationParser";
-
-// Surveillance
-export { MessageBusMonitor, messageBusMonitor } from "./MessageBusMonitor";
-export type { 
-  AlertSeverity, 
-  MonitorAlert, 
-  AggregatedMetrics, 
-  HealthStatus,
-  MessageFlowNode,
-  MessageFlowEdge,
-  MessageFlowGraph
-} from "./MessageBusMonitor";
-
-// Autonomous
+// Exports directs des nouveaux modules autonomes
 export { AutonomousAgent } from "./AutonomousAgent";
 export { AgentRegistry } from "./AgentRegistry";
+export { AgentMessageBus } from "./AgentMessageBus";
+export { DelegationParser, delegationParser } from "./DelegationParser";
 export { AutonomousLoop } from "./AutonomousLoop";
 export type { LoopConfig, LoopResult, IterationRecord, LoopDecision } from "./AutonomousLoop";
+export type { ParsedDelegation, DelegationParseResult } from "./DelegationParser";
 export { AgentPersistence, agentPersistence } from "./AgentPersistence";
 export type {
   AgentMessage,
@@ -103,3 +79,29 @@ export {
   orchestrateSchema,
   listAgentTasksSchema,
 } from "./types";
+
+// === NOUVEAUX EXPORTS POUR LES AMÉLIORATIONS ===
+
+// Délégation structurée (remplace le parsing Markdown)
+export { DelegationManager, delegationManager } from "./DelegationManager";
+export type { 
+  StructuredDelegation, 
+  BatchDelegation, 
+  DelegationResult, 
+  DelegationEvent 
+} from "./DelegationManager";
+
+// Routage avancé
+export type { RoutingStrategy } from "./AgentCommunication";
+
+// Surveillance et traçage du MessageBus
+export { MessageBusMonitor, messageBusMonitor } from "./MessageBusMonitor";
+export type { 
+  AlertSeverity, 
+  MonitorAlert, 
+  AggregatedMetrics, 
+  HealthStatus,
+  MessageFlowNode,
+  MessageFlowEdge,
+  MessageFlowGraph
+} from "./MessageBusMonitor";

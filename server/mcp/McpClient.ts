@@ -7,7 +7,7 @@
  * 
  * Implémente le protocole JSON-RPC 2.0 utilisé par MCP.
  */
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess, execSync } from 'child_process';
 import { EventEmitter } from 'events';
 import type { McpServerConfig } from './mcpConfig';
 
@@ -535,7 +535,6 @@ export class McpClient extends EventEmitter {
           const pid = this.process.pid;
           if (pid) {
             try {
-              const { execSync } = require('child_process');
               execSync(`taskkill /PID ${pid} /T /F`, { stdio: 'ignore', windowsHide: true });
             } catch { /* ignore — process déjà mort */ }
           }

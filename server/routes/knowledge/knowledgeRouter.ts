@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { knowledgeGraph, projectIndexer, projectMemory, understandingEngine, dependencyGraph, learningEngine, fileWatcher } from '../../knowledge';
 import { SELF_ROOT } from '../../utils/selfRoot';
 import { isSandboxActive, getSandboxRoot } from '../../utils/sandbox';
+import { importModule } from '../../utils/ModuleLoader';
 
 const router = Router();
 
@@ -362,7 +363,7 @@ router.post('/documents/reextract', async (_req: Request, res: Response) => {
 });
 
 // GET /api/knowledge/documents/search — Recherche dans les documents
-router.get('/documents/search', (req: Request, res: Response): void => {
+router.get('/documents/search', async (req: Request, res: Response): Promise<void> => {
   try {
     const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
     if (!query) {
@@ -370,7 +371,7 @@ router.get('/documents/search', (req: Request, res: Response): void => {
       return;
     }
     const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
-    const { getDocumentStore } = require('../knowledge/DocumentStore');
+    const { getDocumentStore } = await importModule<{ getDocumentStore: any }>('../knowledge/DocumentStore');
     const store = getDocumentStore(root);
     const results = store.searchDocuments(query, 20);
     res.json({

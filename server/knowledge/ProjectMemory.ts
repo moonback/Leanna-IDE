@@ -665,8 +665,8 @@ export class ProjectMemory {
       if (!/\.(ts|tsx|js|jsx)$/.test(p)) continue;
       try {
         const absPath = path.join(ROOT, p);
-        if (!require("fs").existsSync(absPath)) continue;
-        const content: string = require("fs").readFileSync(absPath, "utf-8");
+        if (!fs.existsSync(absPath)) continue;
+        const content: string = fs.readFileSync(absPath, "utf-8");
 
         for (const match of content.matchAll(/\/\/\s*DECISION:\s*(.*)/gi)) {
           const text = match[1].trim();

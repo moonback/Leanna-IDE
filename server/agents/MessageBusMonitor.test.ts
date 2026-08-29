@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, beforeAll, afterAll } from "vitest";
+import { EventEmitter } from "events";
 import {
   MessageBusMonitor,
   messageBusMonitor,
@@ -29,7 +30,6 @@ vi.mock("../utils/logger", () => ({
 
 // Mock de l'agentMessageBus
 vi.mock("./AgentMessageBus", () => {
-  const EventEmitter = require("events");
   
   class MockAgentMessageBus extends EventEmitter {
     private messages: any[] = [];

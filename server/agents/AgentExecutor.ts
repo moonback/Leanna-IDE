@@ -10,7 +10,7 @@
  * 6. **Parse et déclenchement des délégations autonomes (via DelegationParser)**
  * 7. Notification de progression (via ProgressNotifier)
  */
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import type { AgentTask } from "./types";
 import { getAgentDefinition, getAgentDefinitionOrThrow, hasAgent } from "./roles";
 import { PromptBuilder } from "./PromptBuilder";
@@ -514,7 +514,6 @@ ${truncated}
    * Calcul un hash simple pour le contenu (pour référence)
    */
   private computeContentHash(content: string): string {
-    const { createHash } = require('crypto');
     return createHash('sha256').update(content).digest('hex');
   }
 
