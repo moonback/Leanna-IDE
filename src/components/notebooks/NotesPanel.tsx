@@ -295,8 +295,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
     <div className={`h-full ${viewMode === 'canvas' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto custom-scrollbar'} p-5 lg:p-7 space-y-5`}>
       {/* Header with stats */}
       <div className="space-y-2">
-        {/* First line: Nouvelle note + Templates */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => {
               if (onOpenNoteEditor) {
@@ -307,9 +306,18 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
             }}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95 shadow-sm"
             style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
+            title="Nouvelle note"
           >
             <Plus className="w-3.5 h-3.5" />
-            Nouvelle note
+          </button>
+
+          <button
+            onClick={() => setShowSearchModal(true)}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
+            style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+            title="Rechercher"
+          >
+            <Search className="w-3.5 h-3.5" />
           </button>
 
           {/* Templates dropdown */}
@@ -318,9 +326,9 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
               onClick={() => setShowTemplates(!showTemplates)}
               className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
               style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+              title="Modèles"
             >
               <Layout className="w-3.5 h-3.5" />
-              Templates
             </button>
             <AnimatePresence>
               {showTemplates && (
@@ -346,25 +354,13 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                     onClick={() => { setShowTemplates(false); setShowTemplateModal(true); }}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--accent-subtle)]"
                   >
-                    <Sparkles className="w-3.5 h-3.5 flex-shrink-0 text-[var(--accent-primary)]" />
+                    <Sparkles className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
                     <span>Bibliothèque complète...</span>
                   </button>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-        </div>
-
-        {/* Second line: Search button + Controls */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setShowSearchModal(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
-            style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
-          >
-            <Search className="w-3.5 h-3.5" />
-            Rechercher
-          </button>
 
           <button
             onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : prev === 'oldest' ? 'alpha' : 'newest')}
@@ -412,7 +408,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
             </button>
           </div>
 
-          <span className="text-xs ml-2" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
             {notes.length} note{notes.length !== 1 ? 's' : ''}
           </span>
         </div>
