@@ -1148,7 +1148,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
           >
           {/* Barre de progression pour la génération en cours */}
           {activeGenerationIds.size > 0 ? (
-            <div className="space-y-2">
+            <div className="notebooklm-prose max-w-none space-y-5">
               {[...activeGenerationIds].map(taskId => {
                 const task = generationQueue.find(t => t.id === taskId);
                 if (!task) return null;
@@ -1927,7 +1927,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
               <div className="px-6 py-5 space-y-5 max-h-[65vh] overflow-y-auto custom-scrollbar">
 
                 {/* Orientation */}
-                <div className="space-y-2">
+                <div className="notebooklm-prose max-w-none space-y-5">
                   <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Choisissez une orientation</p>
                   <div className="flex gap-2">
                     {([
@@ -1953,7 +1953,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 </div>
 
                 {/* Langue */}
-                <div className="space-y-2">
+                <div className="notebooklm-prose max-w-none space-y-5">
                   <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Langue</p>
                   <div className="flex gap-1.5 flex-wrap">
                     {([
@@ -1985,7 +1985,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 </div>
 
                 {/* Style visuel */}
-                <div className="space-y-2">
+                <div className="notebooklm-prose max-w-none space-y-5">
                   <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Choisissez un style visuel</p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {([
@@ -2019,7 +2019,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 </div>
 
                 {/* Niveau de détail */}
-                <div className="space-y-2">
+                <div className="notebooklm-prose max-w-none space-y-5">
                   <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Niveau de détail</p>
                   <div className="flex gap-2">
                     {([
@@ -2046,7 +2046,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
                 {/* Sources */}
                 {sources.length > 1 && (
-                  <div className="space-y-2">
+                  <div className="notebooklm-prose max-w-none space-y-5">
                     <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>
                       Sources ({selectedSourceIds.length || sources.length}/{sources.length})
                     </p>
@@ -2057,7 +2057,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
                 )}
 
                 {/* Description personnalisée */}
-                <div className="space-y-2">
+                <div className="notebooklm-prose max-w-none space-y-5">
                   <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>
                     Décrivez l'infographie que vous souhaitez créer
                   </p>
