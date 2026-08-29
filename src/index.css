@@ -111,10 +111,10 @@
   --ctrl-hover:      rgba(0, 194, 255, 0.08);
   --btn-active-bg:   rgba(0, 194, 255, 0.18);
   --btn-active-text: #00c2ff;
-  --scroll-thumb: rgba(0, 194, 255, 0.3);
-  --scroll-thumb-hover: rgba(0, 194, 255, 0.5);
+  --scroll-thumb: rgba(255, 140, 0, 0.60);
+  --scroll-thumb-hover: rgba(255, 140, 0, 0.60);
   /* Bordures – cyan et orange */
-  --border-base:   rgba(0, 194, 255, 0.30);
+  --border-base:   rgba(0, 194, 255, 0.20);
   --border-strong: rgba(255, 140, 0, 0.60);
   --border-focus:  #00c2ff;
   --border-glow:   rgba(0, 194, 255, 0.35);
@@ -197,7 +197,7 @@
   --text-muted: #6a8aaa;
   --primary: #00c2ff;
   --primary-dark: #0099cc;
-  --border: rgba(0, 194, 255, 0.15);
+  --border: rgba(255, 140, 0, 0.15);
 }
 
 :root[data-theme="light"] {
