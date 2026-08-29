@@ -2,10 +2,10 @@ import { Router, Request, Response } from 'express';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
-import { readAuditEntries, analyzeAuditLog } from '../audit';
-import { SELF_ROOT } from '../utils/selfRoot';
-import { isSandboxActive, getSandboxRoot } from '../utils/sandbox';
-import { getLogEntries, type LogLevel } from '../utils/logger';
+import { readAuditEntries, analyzeAuditLog } from '../audit.js';
+import { SELF_ROOT } from '../utils/selfRoot.js';
+import { isSandboxActive, getSandboxRoot } from '../utils/sandbox.js';
+import { getLogEntries, type LogLevel } from '../utils/logger.js';
 
 const AGENT_LOG_MODULE = /^(Agent|Orchestrator|TaskScheduler|FileWriter|DelegationParser|Autonomous)/;
 

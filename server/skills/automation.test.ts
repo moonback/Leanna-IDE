@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { automationSkill, getScheduledTasksSnapshot, stopAllScheduledTasks } from './automation';
+import { automationSkill, getScheduledTasksSnapshot, stopAllScheduledTasks } from './automation.js';
 
 test('automationSkill: metadata and tool execution', async () => {
   assert.equal(automationSkill.name, 'automation');

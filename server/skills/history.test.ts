@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { historySkill } from './history';
+import { historySkill } from './history.js';
 
 test('historySkill: metadata', () => {
   assert.equal(historySkill.name, 'history');

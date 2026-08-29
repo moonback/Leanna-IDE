@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseClient } from '../utils/supabaseClient';
+import { getSupabaseClient } from '../utils/supabaseClient.js';
 
 interface Memory {
   id: string;

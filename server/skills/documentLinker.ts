@@ -11,10 +11,10 @@
  * Utilise le DocumentStore (persistant) + appels LLM pour l'analyse sémantique.
  */
 
-import { Skill, validateArgs } from "./base";
+import { Skill, validateArgs } from "./base.js";
 import { z } from "zod";
-import { getDocumentStore } from "../knowledge/DocumentStore";
-import type { StoredDocument, DocumentLink } from "../knowledge/DocumentStore";
+import { getDocumentStore } from "../knowledge/DocumentStore.js";
+import type { StoredDocument, DocumentLink } from "../knowledge/DocumentStore.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Skill Declaration

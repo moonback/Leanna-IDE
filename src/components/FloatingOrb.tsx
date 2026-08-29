@@ -1,8 +1,8 @@
 import { useRef, useState, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { useProfile } from '../context/UserProfileContext';
-import { useOrbState } from '../hooks/useOrbState';
-// import { OrbCore } from './orb/OrbCore';
+import { useProfile } from '../context/UserProfileContext.js';
+import { useOrbState } from '../hooks/useOrbState.js';
+// import { OrbCore } from './orb/OrbCore.js';
 
 /**
  * Floating draggable orb — visible across non-hub views.

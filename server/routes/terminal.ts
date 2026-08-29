@@ -2,9 +2,9 @@ import { Router } from "express";
 import { WebSocketServer, WebSocket, RawData } from "ws";
 import { spawn, ChildProcessWithoutNullStreams, spawn as childProcessSpawn } from "child_process";
 import * as os from "os";
-import { SELF_ROOT } from "../utils/selfRoot";
-import { authenticateRequest, authenticateToken } from "../security";
-import type { AuthOptions } from "../security";
+import { SELF_ROOT } from "../utils/selfRoot.js";
+import { authenticateRequest, authenticateToken } from "../security.js";
+import type { AuthOptions } from "../security.js";
 
 // Types pour les messages WebSocket
 interface TerminalMessage {

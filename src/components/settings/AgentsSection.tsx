@@ -5,9 +5,9 @@ import {
   UserRoundCog, RefreshCw
 } from 'lucide-react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useProfile } from '../../context/UserProfileContext';
-import type { AgentRole, CustomAgentConfig } from '../../context/UserProfileContext';
-import { Section, Field, ToggleSwitch, SectionDivider } from './SettingsPrimitives';
+import { useProfile } from '../../context/UserProfileContext.js';
+import type { AgentRole, CustomAgentConfig } from '../../context/UserProfileContext.js';
+import { Section, Field, ToggleSwitch, SectionDivider } from './SettingsPrimitives.js';
 
 interface AgentRoleMeta {
   id: AgentRole;

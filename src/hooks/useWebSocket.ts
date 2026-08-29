@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import type { ConnectionStatus } from './useLiveAPI';
+import type { ConnectionStatus } from './useLiveAPI.js';
 
 export interface UseWebSocketOptions {
   onMessage: (msg: any) => void;

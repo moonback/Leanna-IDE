@@ -4,8 +4,8 @@ import {
   Blocks, Clock, CloudRain, Github, Globe, Database,
   Monitor, Code, List, Brain, Zap,
 } from 'lucide-react';
-import { Panel } from '../ui/Panel';
-import { Toggle } from '../ui/Toggle';
+import { Panel } from '../ui/Panel.js';
+import { Toggle } from '../ui/Toggle.js';
 
 const iconMap: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
   Clock, CloudRain, Github, Globe, Database,

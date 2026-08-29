@@ -8,7 +8,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Sparkles, Trash2, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List, Brain, Target, BookOpen, Lightbulb, Zap } from 'lucide-react';
-import { useToast } from '../ui/Toast';
+import { useToast } from '../ui/Toast.js';
 
 interface SourceItem {
   id: string;

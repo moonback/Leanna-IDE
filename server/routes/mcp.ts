@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { mcpBridge } from '../mcp';
+import { mcpBridge } from '../mcp/index.js';
 
 const router = Router();
 

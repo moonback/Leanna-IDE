@@ -5,10 +5,10 @@
  * le callback backend et le broadcaster temps réel vers le frontend.
  * Persiste également les mises à jour de statut dans Supabase.
  */
-import type { AgentTask, TaskStatus, AgentRole } from "./types";
-import { getAgentDefinition } from "./roles";
-import { agentPersistence } from "./AgentPersistence";
-import { createLogger } from "../utils/logger";
+import type { AgentTask, TaskStatus, AgentRole } from "./types.js";
+import { getAgentDefinition } from "./roles.js";
+import { agentPersistence } from "./AgentPersistence.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("AgentProgress");
 

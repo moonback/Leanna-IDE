@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { notebookManager } from "../../notebooks";
+import { notebookManager } from "../../notebooks/index.js";
 
 export function createNotesRouter(): Router {
   const router = Router();

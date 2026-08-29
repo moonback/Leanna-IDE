@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import { ideApi, type TreeEntry } from '../services/ideApi';
-import { type OpenFile } from '../types/ide';
-import { getLanguage } from '../utils/fileUtils';
+import { ideApi, type TreeEntry } from '../services/ideApi.js';
+import { type OpenFile } from '../types/ide.js';
+import { getLanguage } from '../utils/fileUtils.js';
 
 export type DiffInfo = {
   status: 'added' | 'modified' | 'deleted';

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Trash2 } from 'lucide-react';
-import { Section, Field } from './SettingsPrimitives';
+import { Section, Field } from './SettingsPrimitives.js';
 
 export function DataSection() {
   const [clearing, setClearing] = useState(false);

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { buildSystemInstruction, ProfileConfig } from '../prompts/systemInstruction';
+import { buildSystemInstruction, ProfileConfig } from '../prompts/systemInstruction.js';
 
 export function createTokensOptimizationRouter(getProfile: () => ProfileConfig, getWorkspaceRoot: () => string): Router {
   const router = Router();

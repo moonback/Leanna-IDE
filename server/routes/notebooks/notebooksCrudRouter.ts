@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { notebookManager, contentGenerator } from "../../notebooks";
+import { notebookManager, contentGenerator } from "../../notebooks/index.js";
 
 export function createNotebooksCrudRouter(): Router {
   const router = Router();

@@ -20,15 +20,15 @@
 
 import fs from "fs";
 import path from "path";
-import { SELF_ROOT } from "../utils/selfRoot";
-import { createLogger } from "../utils/logger";
+import { SELF_ROOT } from "../utils/selfRoot.js";
+import { createLogger } from "../utils/logger.js";
 import type {
   FileNode,
   CodeEntity,
   KnowledgeGraphState,
   KnowledgeStats,
   EntityRelation,
-} from "./types";
+} from "./types.js";
 
 const log = createLogger("KnowledgeGraph");
 

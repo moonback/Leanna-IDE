@@ -17,9 +17,9 @@ import type {
   WorkflowDefinition,
   WorkflowStep,
   WorkflowRun,
-} from "./types";
-import type { ToolRegistry } from "./ToolRegistry";
-import type { EventBus } from "./EventBus";
+} from "./types.js";
+import type { ToolRegistry } from "./ToolRegistry.js";
+import type { EventBus } from "./EventBus.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types

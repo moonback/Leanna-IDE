@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import type { Server } from 'http';
-import healthRouter from './routes/health';
-import { createSandboxRouter } from './routes/sandbox';
-import { createCheckpointRouter } from './routes/checkpoint';
-import { createGeminiKeysRouter } from './routes/gemini-keys';
+import healthRouter from './routes/health.js';
+import { createSandboxRouter } from './routes/sandbox.js';
+import { createCheckpointRouter } from './routes/checkpoint.js';
+import { createGeminiKeysRouter } from './routes/gemini-keys.js';
 
 test('server-bootstrap smoke test: health endpoint responds 200', async () => {
   const app = express();

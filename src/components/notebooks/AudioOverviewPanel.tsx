@@ -15,7 +15,7 @@ import {
   Mic, Play, Loader2, Clock, Users, Radio, Pause, Square,
   Trash2, RefreshCw, Volume2, Settings2, FileText, CheckSquare
 } from 'lucide-react';
-import { useToast } from '../ui/Toast';
+import { useToast } from '../ui/Toast.js';
 
 interface AudioOverview {
   id: string;

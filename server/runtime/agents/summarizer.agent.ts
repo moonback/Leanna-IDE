@@ -2,7 +2,7 @@
  * Agent Synthèse — Résumés et condensés
  */
 
-import { defineAgent } from "./plugin";
+import { defineAgent } from "./plugin.js";
 
 export const summarizerAgent = defineAgent({
   id: "summarizer",

@@ -18,9 +18,9 @@
  * - Chaque opération a son propre try/catch avec log
  */
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { AgentTask, TaskResult, OrchestrationPlan, TaskStatus } from "./types";
-import type { AgentMessage } from "./AgentCommunication";
-import { createLogger } from "../utils/logger";
+import type { AgentTask, TaskResult, OrchestrationPlan, TaskStatus } from "./types.js";
+import type { AgentMessage } from "./AgentCommunication.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("AgentPersistence");
 

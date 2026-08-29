@@ -5,13 +5,13 @@
  * chat grounded, résumés, génération de contenu et audio overview.
  */
 
-export { notebookManager } from "./NotebookManager";
-export { sourceIngester } from "./SourceIngester";
-export { embeddingStore } from "./EmbeddingStore";
-export { ragEngine } from "./RAGEngine";
-export { groundedChat } from "./GroundedChat";
-export { contentGenerator } from "./ContentGenerator";
-export { backupService } from "./BackupService";
-export { sourceProcessingQueue } from "./ProcessingQueue";
-export { chatResponseCache, ragSearchCache } from "./ResponseCache";
-export type * from "./types";
+export { notebookManager } from "./NotebookManager.js";
+export { sourceIngester } from "./SourceIngester.js";
+export { embeddingStore } from "./EmbeddingStore.js";
+export { ragEngine } from "./RAGEngine.js";
+export { groundedChat } from "./GroundedChat.js";
+export { contentGenerator } from "./ContentGenerator.js";
+export { backupService } from "./BackupService.js";
+export { sourceProcessingQueue } from "./ProcessingQueue.js";
+export { chatResponseCache, ragSearchCache } from "./ResponseCache.js";
+export type * from "./types.js";

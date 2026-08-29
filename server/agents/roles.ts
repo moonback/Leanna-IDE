@@ -1,5 +1,5 @@
-import type { AgentDefinition, AgentRole } from "./types";
-import { dynamicAgentRegistry } from "./DynamicAgentRegistry";
+import type { AgentDefinition, AgentRole } from "./types.js";
+import { dynamicAgentRegistry } from "./DynamicAgentRegistry.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BASE COMMUNE – Règles fondamentales pour agents Leanna

@@ -1,9 +1,9 @@
-import { Skill } from "./base";
+import { Skill } from "./base.js";
 import fs from "fs";
-import { generateText, getActiveProvider } from "../utils/textGeneration";
-import { generateSpeech } from "../utils/geminiTTS";
-import { SELF_ROOT, normalizeSelfPath } from "../utils/selfRoot";
-import { ChainOfThoughtExecutor, assessComplexity, type ComplexityLevel } from "./chainOfThought";
+import { generateText, getActiveProvider } from "../utils/textGeneration.js";
+import { generateSpeech } from "../utils/geminiTTS.js";
+import { SELF_ROOT, normalizeSelfPath } from "../utils/selfRoot.js";
+import { ChainOfThoughtExecutor, assessComplexity, type ComplexityLevel } from "./chainOfThought.js";
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 

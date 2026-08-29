@@ -3,8 +3,8 @@
  * à partir de la config sidebar, filtrée par état de connexion et agents.
  */
 
-import { sidebarSections } from '../../config/ideSidebarConfig';
-import type { AIMenuItem } from './types';
+import { sidebarSections } from '../../config/ideSidebarConfig.js';
+import type { AIMenuItem } from './types.js';
 
 /** IDs des items qui nécessitent que les agents soient activés */
 const AGENT_ITEM_IDS = new Set(['agents', 'fleet', 'skills-monitor']);

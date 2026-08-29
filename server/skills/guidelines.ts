@@ -1,5 +1,5 @@
-import { Skill } from "./base";
-import { SELF_ROOT } from "../utils/selfRoot";
+import { Skill } from "./base.js";
+import { SELF_ROOT } from "../utils/selfRoot.js";
 
 // System constants used by systemInstruction.ts
 export function getSystemGuidelines(): { priorities: string; selfModificationProtocol: string } {

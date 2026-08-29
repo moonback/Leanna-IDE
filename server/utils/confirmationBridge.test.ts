@@ -5,7 +5,7 @@ import {
   handleConfirmationResponse,
   getPendingCount,
   cancelAllPending,
-} from './confirmationBridge';
+} from './confirmationBridge.js';
 
 test('confirmationBridge: handles approved confirmation response', async () => {
   cancelAllPending();

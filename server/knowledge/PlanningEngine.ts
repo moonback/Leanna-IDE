@@ -21,10 +21,10 @@
  *   ImpactAnalyzer    — risque par fichier, recommandations de tests
  */
 
-import { createLogger } from "../utils/logger";
-import { dependencyGraph } from "./DependencyGraph";
-import { impactAnalyzer } from "./ImpactAnalyzer";
-import type { ImpactMode, ExtendedImpactReport, TestRecommendation } from "./ImpactAnalyzer";
+import { createLogger } from "../utils/logger.js";
+import { dependencyGraph } from "./DependencyGraph.js";
+import { impactAnalyzer } from "./ImpactAnalyzer.js";
+import type { ImpactMode, ExtendedImpactReport, TestRecommendation } from "./ImpactAnalyzer.js";
 
 const log = createLogger("PlanningEngine");
 

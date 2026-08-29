@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { projectMemory } from '../../knowledge';
+import { projectMemory } from '../../knowledge/index.js';
 
 const router = Router();
 

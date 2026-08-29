@@ -1,14 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { buildAuditSteps, isSystemAuditRequest, type AuditStep, type AuditReport } from '../utils/audit';
-import type { ScheduledTaskViewModel } from '../components/panels/ScheduledTasksPanel';
-import type { WorkflowViewModel } from '../components/panels/WorkflowsPanel';
+import { buildAuditSteps, isSystemAuditRequest, type AuditStep, type AuditReport } from '../utils/audit.js';
+import type { ScheduledTaskViewModel } from '../components/panels/ScheduledTasksPanel.js';
+import type { WorkflowViewModel } from '../components/panels/WorkflowsPanel.js';
 
-import { useAudio } from './useAudio';
-import { useWebSocket } from './useWebSocket';
-import { useToken, type TokenUsage, type TokenUsageSession, type PromptContextState, type ContextAlertLevel } from './useToken';
-import { useTranscript, type TranscriptRole, type TranscriptEntry } from './useTranscript';
-import { useActivity, type ActivityStep, type ModifiedFile, type ReasoningState, type ReasoningStep } from './useActivity';
-import { useProfile } from '../context/UserProfileContext';
+import { useAudio } from './useAudio.js';
+import { useWebSocket } from './useWebSocket.js';
+import { useToken, type TokenUsage, type TokenUsageSession, type PromptContextState, type ContextAlertLevel } from './useToken.js';
+import { useTranscript, type TranscriptRole, type TranscriptEntry } from './useTranscript.js';
+import { useActivity, type ActivityStep, type ModifiedFile, type ReasoningState, type ReasoningStep } from './useActivity.js';
+import { useProfile } from '../context/UserProfileContext.js';
 
 // Re-export types to keep existing component imports functional
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected';

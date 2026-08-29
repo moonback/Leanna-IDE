@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { useLiveAPI } from '../hooks/useLiveAPI';
+import type { useLiveAPI } from '../hooks/useLiveAPI.js';
 
 // Re-export the return type of the hook as the context shape
 export type LiveAPIContextValue = ReturnType<typeof useLiveAPI>;

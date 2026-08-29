@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { backupService } from "../../notebooks";
+import { backupService } from "../../notebooks/index.js";
 
 export function createBackupRouter(): Router {
   const router = Router();

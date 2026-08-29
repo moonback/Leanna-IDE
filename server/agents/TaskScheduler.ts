@@ -4,10 +4,10 @@
  * Responsabilité unique : exécuter un plan d'orchestration en respectant
  * les dépendances entre tâches et la parallélisation.
  */
-import type { AgentTask, OrchestrationPlan, TaskResult } from "./types";
-import { getAgentDefinition } from "./roles";
-import { AgentExecutor } from "./AgentExecutor";
-import { createLogger } from "../utils/logger";
+import type { AgentTask, OrchestrationPlan, TaskResult } from "./types.js";
+import { getAgentDefinition } from "./roles.js";
+import { AgentExecutor } from "./AgentExecutor.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("TaskScheduler");
 

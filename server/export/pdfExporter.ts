@@ -1,5 +1,5 @@
 import puppeteer, { Browser } from 'puppeteer';
-import { exportToStandaloneHtml, HtmlExportOptions } from './htmlExporter';
+import { exportToStandaloneHtml, HtmlExportOptions } from './htmlExporter.js';
 
 export interface PdfExportOptions extends HtmlExportOptions {
   format?: 'A4' | 'Letter';

@@ -1,4 +1,4 @@
-import { supabase } from '../services/supabase'
+import { supabase } from '../services/supabase.js'
 
 /**
  * Skill permettant à Leanna d'effectuer des modifications sur la base de données Supabase.

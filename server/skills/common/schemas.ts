@@ -2,7 +2,7 @@
  * Référentiel partagé des paramètres d'outils fréquents.
  *
  * Utilisation :
- *   import { PATH_PARAM, FILES_PARAM, PRIORITY_PARAM } from "./common/schemas";
+ *   import { PATH_PARAM, FILES_PARAM, PRIORITY_PARAM } from "./common/schemas.js";
  *
  * Avantages :
  *   - Cohérence sémantique entre tous les skills.

@@ -16,17 +16,17 @@ import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
-import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2';
-import { buildSystemInstruction, type ProfileConfig } from '../prompts/systemInstruction';
-import { startConversation, endConversation, saveMessage, getConversationMessages } from '../skills/history';
-import { isSandboxActive } from '../utils/sandbox';
-import { subscribeToValidation } from '../utils/postEditValidator';
-import { estimateTokens, summarizeWithLLM } from '../utils/tokenOptimizer';
-import { knowledgeGraph, projectMemory, understandingEngine } from '../knowledge';
-import { notebookManager } from '../notebooks';
-import { supervisor } from '../autonomy';
-import { WORKSPACE_SITE_URL } from '../utils/selfRoot';
-import type { BrowserPendingEntry, BrowserActionPendingEntry } from '../routes/browser';
+import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2.js';
+import { buildSystemInstruction, type ProfileConfig } from '../prompts/systemInstruction.js';
+import { startConversation, endConversation, saveMessage, getConversationMessages } from '../skills/history.js';
+import { isSandboxActive } from '../utils/sandbox.js';
+import { subscribeToValidation } from '../utils/postEditValidator.js';
+import { estimateTokens, summarizeWithLLM } from '../utils/tokenOptimizer.js';
+import { knowledgeGraph, projectMemory, understandingEngine } from '../knowledge/index.js';
+import { notebookManager } from '../notebooks/index.js';
+import { supervisor } from '../autonomy/index.js';
+import { WORKSPACE_SITE_URL } from '../utils/selfRoot.js';
+import type { BrowserPendingEntry, BrowserActionPendingEntry } from '../routes/browser.js';
 
 // Type compatible avec l'ancien SkillManager pour une migration progressive
 type SkillManager = SkillManagerV2;

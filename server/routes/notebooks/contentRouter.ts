@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
-import { notebookManager, contentGenerator } from "../../notebooks";
-import type { GeneratedDocType, ReportSuggestion } from "../../notebooks/types";
-import { buildRevealPresentation, countSlides } from "./slidesTheme";
+import { notebookManager, contentGenerator } from "../../notebooks/index.js";
+import type { GeneratedDocType, ReportSuggestion } from "../../notebooks/types.js";
+import { buildRevealPresentation, countSlides } from "./slidesTheme.js";
 
 export function createContentRouter(): Router {
   const router = Router();

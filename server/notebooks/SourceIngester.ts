@@ -9,10 +9,10 @@
  */
 
 import { randomUUID } from "crypto";
-import { createLogger } from "../utils/logger";
-import { generateText } from "../utils/textGeneration";
-import { embeddingStore } from "./EmbeddingStore";
-import type { Source, SourceChunk, SourceType } from "./types";
+import { createLogger } from "../utils/logger.js";
+import { generateText } from "../utils/textGeneration.js";
+import { embeddingStore } from "./EmbeddingStore.js";
+import type { Source, SourceChunk, SourceType } from "./types.js";
 
 const log = createLogger("SourceIngester");
 

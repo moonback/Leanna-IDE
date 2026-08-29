@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getWorkflowsSnapshot } from '../skills/workflow';
+import { getWorkflowsSnapshot } from '../skills/workflow.js';
 
 const router = Router();
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { TranscriptEntry } from './useTranscript';
+import type { TranscriptEntry } from './useTranscript.js';
 
 const STORAGE_PREFIX = 'Leanna_chat_transcript';
 const MAX_PERSISTED_MESSAGES = 200;

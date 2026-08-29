@@ -7,8 +7,8 @@
  * Il coexiste avec le AGENT_REGISTRY statique et est prioritaire pour les
  * rôles qui y sont enregistrés.
  */
-import type { AgentDefinition, AgentRole } from "./types";
-import { createLogger } from "../utils/logger";
+import type { AgentDefinition, AgentRole } from "./types.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("DynamicAgentRegistry");
 

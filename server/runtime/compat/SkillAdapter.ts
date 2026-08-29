@@ -13,7 +13,7 @@
  *   Nouveau runtime
  */
 
-import type { ToolDefinition, ToolDeclaration } from "../types";
+import type { ToolDefinition, ToolDeclaration } from "../types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Interface Legacy Skill (contractuelle, pas d'import depuis l'ancien code)
@@ -148,7 +148,7 @@ export function adaptAllSkills(
 // Reverse adapter (ToolRegistry → SkillManager handleToolCall interface)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import type { ToolRegistry } from "../ToolRegistry";
+import type { ToolRegistry } from "../ToolRegistry.js";
 
 /**
  * Crée une fonction handleToolCall compatible avec l'ancien SkillManager

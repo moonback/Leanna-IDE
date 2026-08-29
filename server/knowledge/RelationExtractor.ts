@@ -18,7 +18,7 @@
  */
 
 import path from "path";
-import type { EntityRelation, FileNode, CodeEntity } from "./types";
+import type { EntityRelation, FileNode, CodeEntity } from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RelationExtractor

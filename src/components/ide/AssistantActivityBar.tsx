@@ -7,7 +7,7 @@ import {
   FileMinus, FolderMinus, FileCode, Info, Database, Globe, Brain, Cpu,
   Search, Terminal, RefreshCw, BarChart2,
 } from 'lucide-react';
-import type { ActivityStep } from '../../hooks/useLiveAPI';
+import type { ActivityStep } from '../../hooks/useLiveAPI.js';
 
 interface AssistantActivityBarProps {
   steps: ActivityStep[];

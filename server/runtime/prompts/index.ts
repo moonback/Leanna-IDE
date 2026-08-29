@@ -18,7 +18,7 @@ export type {
   AgentsConfig,
   ProfileConfig,
   SystemPromptConfig,
-} from "./types";
+} from "./types.js";
 
 export {
   // Mappings
@@ -30,10 +30,10 @@ export {
   // Informations sur les agents
   AGENT_ROLES_INFO,
   ALL_AGENT_ROLES,
-} from "./types";
+} from "./types.js";
 
 // Builder
-export { SystemPromptBuilder, getSystemPromptBuilder, buildSystemInstructionV3 } from "./SystemPromptBuilder";
+export { SystemPromptBuilder, getSystemPromptBuilder, buildSystemInstructionV3 } from "./SystemPromptBuilder.js";
 
 // Loader
-export { loadPromptTemplates, buildSystemPrompt } from "./loader";
+export { loadPromptTemplates, buildSystemPrompt } from "./loader.js";

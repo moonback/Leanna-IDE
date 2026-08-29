@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { createHash } from "crypto";
-import { generateText } from "../utils/textGeneration";
-import { markFileModified } from "../utils/sandbox";
+import { generateText } from "../utils/textGeneration.js";
+import { markFileModified } from "../utils/sandbox.js";
 
 /** Calcule le hash MD5 d'un contenu string (utf-8). */
 function md5(content: string): string {
@@ -22,7 +22,7 @@ import {
   buildPackageSummary,
   extractFileOutline,
   buildAnalysisPrompt
-} from "./codebaseHelpers";
+} from "./codebaseHelpers.js";
 
 async function walkDirectory(dir: string, relativeBase: string, files: string[]) {
   const entries = await fs.promises.readdir(dir, { withFileTypes: true });

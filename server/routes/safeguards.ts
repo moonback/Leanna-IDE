@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
-import { SELF_ROOT, CRITICAL_FILES } from '../utils/selfRoot';
+import { SELF_ROOT, CRITICAL_FILES } from '../utils/selfRoot.js';
 
 const router = Router();
 

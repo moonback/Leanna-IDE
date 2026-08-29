@@ -10,12 +10,12 @@
  * Les types sont centralisés dans server/runtime/prompts/types.ts
  */
 
-import { SystemPromptBuilder } from "../runtime/prompts/SystemPromptBuilder";
-import type { ProfileConfig, SystemPromptConfig } from "../runtime/prompts/types";
+import { SystemPromptBuilder } from "../runtime/prompts/SystemPromptBuilder.js";
+import type { ProfileConfig, SystemPromptConfig } from "../runtime/prompts/types.js";
 
 // Ré-export des types pour compatibilité ascendante
 export type { ProfileConfig, SystemPromptConfig };
-export { LANG_INSTRUCTIONS, STYLE_INSTRUCTIONS, AGENT_ROLES_INFO, ALL_AGENT_ROLES } from "../runtime/prompts/types";
+export { LANG_INSTRUCTIONS, STYLE_INSTRUCTIONS, AGENT_ROLES_INFO, ALL_AGENT_ROLES } from "../runtime/prompts/types.js";
 
 // buildLifeInstruction est maintenant un no-op (le contenu est dans base.md)
 export function buildLifeInstruction(): string {

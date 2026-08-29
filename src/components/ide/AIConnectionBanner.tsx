@@ -10,7 +10,7 @@ import {
   Wifi, WifiOff, Loader2, BrainCircuit,
   Zap, AlertTriangle,
 } from 'lucide-react';
-import { StatusBadge } from '../ui/StatusBadge';
+import { StatusBadge } from '../ui/StatusBadge.js';
 
 interface AIConnectionBannerProps {
   connected: boolean;

@@ -1,9 +1,9 @@
 import { useState, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Search, Zap, Check, Globe, BrainCircuit } from 'lucide-react';
-import { useProfile } from '../../context/UserProfileContext';
-import { OPENROUTER_MODELS } from '../settings/OpenRouterSection';
-import type { AIProvider } from '../../context/UserProfileContext';
+import { useProfile } from '../../context/UserProfileContext.js';
+import { OPENROUTER_MODELS } from '../settings/OpenRouterSection.js';
+import type { AIProvider } from '../../context/UserProfileContext.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

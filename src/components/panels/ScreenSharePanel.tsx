@@ -1,7 +1,7 @@
 import React from 'react';
 import { Monitor } from 'lucide-react';
-import { Panel } from '../ui/Panel';
-import { ScreenShareCapture } from '../ScreenShareCapture';
+import { Panel } from '../ui/Panel.js';
+import { ScreenShareCapture } from '../ScreenShareCapture.js';
 
 export const ScreenSharePanel = React.memo(function ScreenSharePanel() {
   return (

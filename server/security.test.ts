@@ -2,8 +2,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { authenticateRequest, createRateLimiter, resolveWorkspacePath } from './security';
-import { SELF_ROOT, normalizeSelfPath, isWriteForbidden, isCriticalFile, setSelfRoot } from './utils/selfRoot';
+import { authenticateRequest, createRateLimiter, resolveWorkspacePath } from './security.js';
+import { SELF_ROOT, normalizeSelfPath, isWriteForbidden, isCriticalFile, setSelfRoot } from './utils/selfRoot.js';
 
 // ── SELF_ROOT bootstrap ───────────────────────────────────────────────────────
 // security.test.ts lives in server/ → one level up is the project root.

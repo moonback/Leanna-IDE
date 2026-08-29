@@ -1,5 +1,5 @@
 import path from 'path';
-import { SELF_ROOT } from './utils/selfRoot';
+import { SELF_ROOT } from './utils/selfRoot.js';
 
 export interface AuthOptions {
   apiToken?: string;

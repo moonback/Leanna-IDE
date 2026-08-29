@@ -22,10 +22,10 @@ import {
   acceptFile,
   rejectFile,
   resetSandbox,
-} from '../utils/sandbox';
-import { startWatching, stopWatching } from '../utils/sandboxWatcher';
-import { appendAuditEvent } from '../audit';
-import { SELF_ROOT } from '../utils/selfRoot';
+} from '../utils/sandbox.js';
+import { startWatching, stopWatching } from '../utils/sandboxWatcher.js';
+import { appendAuditEvent } from '../audit.js';
+import { SELF_ROOT } from '../utils/selfRoot.js';
 
 export function createSandboxRouter(): Router {
   const router = Router();

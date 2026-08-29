@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLiveAPIContext } from '../context/LiveAPIContext';
+import { useLiveAPIContext } from '../context/LiveAPIContext.js';
 
 export type OrbStatus = 'idle' | 'connecting' | 'listening' | 'speaking' | 'busy' | 'online';
 

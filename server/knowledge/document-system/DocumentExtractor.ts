@@ -18,7 +18,7 @@
 
 import fs from "fs";
 import path from "path";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger.js";
 import type {
   ExtractionResult,
   ExtractionOptions,
@@ -26,7 +26,7 @@ import type {
   DocumentEntity,
   DocumentMetadata,
   DocumentType,
-} from "./types";
+} from "./types.js";
 
 const log = createLogger("DocumentExtractor");
 

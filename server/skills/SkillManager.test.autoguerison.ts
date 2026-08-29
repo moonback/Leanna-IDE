@@ -1,4 +1,4 @@
-import { SkillManager } from './SkillManager';
+import { SkillManager } from './SkillManager.js';
 
 // Test basique pour vérifier que l'analyse des alternatives fonctionne
 async function testAutoGuerison() {

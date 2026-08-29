@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import { setSelfRoot } from '../utils/selfRoot';
-import { ERROR_PATTERNS } from './skillManagerRules';
+import { setSelfRoot } from '../utils/selfRoot.js';
+import { ERROR_PATTERNS } from './skillManagerRules.js';
 
 // Set SELF_ROOT so path resolution in ERROR_PATTERNS fixes works correctly
 {

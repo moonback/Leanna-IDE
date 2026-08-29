@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { customSkillsManagementSkill, invalidateCustomSkillsCache } from './customSkills';
+import { customSkillsManagementSkill, invalidateCustomSkillsCache } from './customSkills.js';
 
 test('customSkillsManagementSkill: metadata and cache invalidation', () => {
   assert.equal(customSkillsManagementSkill.name, 'custom_skills_management');

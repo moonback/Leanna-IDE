@@ -1,4 +1,6 @@
 const { app, BrowserWindow, systemPreferences, Notification, ipcMain, shell, dialog, desktopCapturer, nativeTheme } = require('electron');
+nativeTheme.themeSource = 'dark';
+
 const fs = require('fs');
 const path = require('path');
 

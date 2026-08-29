@@ -1,4 +1,4 @@
-import { Skill, validateArgs } from "./base";
+import { Skill, validateArgs } from "./base.js";
 import { z } from "zod";
 import path from "path";
 import {
@@ -7,10 +7,10 @@ import {
   projectMemory,
   impactAnalyzer,
   knowledgeGraph,
-} from "../knowledge";
-import type { ContextStrategy, ContextDetailLevel } from "../knowledge/UnderstandingEngine";
-import type { ImpactMode, RiskLevel } from "../knowledge/ImpactAnalyzer";
-import type { ProjectKnowledgeCategory } from "../knowledge/types";
+} from "../knowledge/index.js";
+import type { ContextStrategy, ContextDetailLevel } from "../knowledge/UnderstandingEngine.js";
+import type { ImpactMode, RiskLevel } from "../knowledge/ImpactAnalyzer.js";
+import type { ProjectKnowledgeCategory } from "../knowledge/types.js";
 
 const CATEGORY_VALUES: ProjectKnowledgeCategory[] = [
   "architecture",

@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import type { VerificationIssue, VerificationRecord } from "./WorkspaceState";
+import type { VerificationIssue, VerificationRecord } from "./WorkspaceState.js";
 
 export type RepairAction = "continue" | "change_strategy" | "stop";
 export interface RepairDirective {

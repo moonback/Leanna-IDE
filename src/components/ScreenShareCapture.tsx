@@ -1,5 +1,5 @@
 import React from 'react';
-import { useScreenShare } from '../context/ScreenShareContext';
+import { useScreenShare } from '../context/ScreenShareContext.js';
 
 /**
  * Composant d'affichage du partage d'écran.

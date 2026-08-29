@@ -1,8 +1,8 @@
 import { motion } from 'motion/react';
 import { Cpu, Volume2, Wand2 } from 'lucide-react';
-import { useProfile } from '../../context/UserProfileContext';
-import { Section, Field, TextInput } from './SettingsPrimitives';
-import { VOICES } from './constants';
+import { useProfile } from '../../context/UserProfileContext.js';
+import { Section, Field, TextInput } from './SettingsPrimitives.js';
+import { VOICES } from './constants.js';
 
 export function AiSection() {
   const { profile, setField } = useProfile();

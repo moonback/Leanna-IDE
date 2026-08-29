@@ -10,9 +10,9 @@
  * - Intégration naturelle avec l'EventBus
  */
 
-import type { TaskState, Task } from "./types";
-import { VALID_TRANSITIONS } from "./types";
-import type { EventBus } from "./EventBus";
+import type { TaskState, Task } from "./types.js";
+import { VALID_TRANSITIONS } from "./types.js";
+import type { EventBus } from "./EventBus.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types

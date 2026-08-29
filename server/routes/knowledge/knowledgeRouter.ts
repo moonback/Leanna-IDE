@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { knowledgeGraph, projectIndexer, projectMemory, understandingEngine, dependencyGraph, learningEngine, fileWatcher } from '../../knowledge';
-import { SELF_ROOT } from '../../utils/selfRoot';
-import { isSandboxActive, getSandboxRoot } from '../../utils/sandbox';
-import { importModule } from '../../utils/ModuleLoader';
+import { knowledgeGraph, projectIndexer, projectMemory, understandingEngine, dependencyGraph, learningEngine, fileWatcher } from '../../knowledge/index.js';
+import { SELF_ROOT } from '../../utils/selfRoot.js';
+import { isSandboxActive, getSandboxRoot } from '../../utils/sandbox.js';
+import { importModule } from '../../utils/ModuleLoader.js';
 
 const router = Router();
 

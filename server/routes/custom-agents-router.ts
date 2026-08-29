@@ -12,7 +12,7 @@ import {
   handleUpdateAgent,
   handleDeleteAgent,
   handleImportAgents,
-} from './custom-agents';
+} from './custom-agents.js';
 
 export function createCustomAgentsRouter(): Router {
   const router = Router();

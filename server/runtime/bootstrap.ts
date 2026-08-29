@@ -5,20 +5,20 @@
  * par une séquence claire et testable.
  * 
  * Usage dans server.ts :
- *   import { bootstrapRuntime } from "./server/runtime/bootstrap";
+ *   import { bootstrapRuntime } from "./server/runtime/bootstrap.js";
  *   const { runtime, skillManager } = await bootstrapRuntime();
  * 
  * L'ancien server.ts peut continuer à utiliser `skillManager.handleToolCall()`
  * comme avant — mais en interne ça passe par le ToolRegistry.
  */
 
-import { AgentRuntime } from "./AgentRuntime";
-import { SkillManagerV2 } from "./compat/SkillManagerV2";
-import { PromptRegistry } from "./PromptRegistry";
-import { loadPromptTemplates } from "./prompts/loader";
-import { defaultAgents } from "./agents";
-import type { RuntimeConfig } from "./types";
-import type { LegacySkill } from "./compat/SkillAdapter";
+import { AgentRuntime } from "./AgentRuntime.js";
+import { SkillManagerV2 } from "./compat/SkillManagerV2.js";
+import { PromptRegistry } from "./PromptRegistry.js";
+import { loadPromptTemplates } from "./prompts/loader.js";
+import { defaultAgents } from "./agents/index.js";
+import type { RuntimeConfig } from "./types.js";
+import type { LegacySkill } from "./compat/SkillAdapter.js";
 import * as path from "path";
 import { fileURLToPath } from "url";
 

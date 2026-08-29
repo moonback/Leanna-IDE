@@ -12,7 +12,7 @@
  * - Aucune dépendance externe
  */
 
-import type { RuntimeEvent, RuntimeEventType, RuntimeEventHandler } from "./types";
+import type { RuntimeEvent, RuntimeEventType, RuntimeEventHandler } from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types

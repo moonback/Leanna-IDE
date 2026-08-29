@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { SELF_ROOT } from './utils/selfRoot';
+import { SELF_ROOT } from './utils/selfRoot.js';
 
 export interface AuditEvent {
   timestamp: string;

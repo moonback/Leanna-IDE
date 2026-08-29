@@ -8,15 +8,15 @@ import {
   Code2, Sparkles, Bug, CheckCheck, FlaskConical, ShieldAlert, Network,
   PenTool, AlignLeft, Search, SpellCheck, Languages, ListTree,
 } from 'lucide-react';
-import { Panel } from '../ui/Panel';
-import { IconButton } from '../ui/IconButton';
-import { useProfile } from '../../context/UserProfileContext';
-import type { AgentRole } from '../../context/UserProfileContext';
+import { Panel } from '../ui/Panel.js';
+import { IconButton } from '../ui/IconButton.js';
+import { useProfile } from '../../context/UserProfileContext.js';
+import type { AgentRole } from '../../context/UserProfileContext.js';
 import {
   getToolActivities, getAgentTasks, subscribe,
   clearCompletedTools, clearCompletedTasks,
   type ToolActivityEntry, type AgentTaskEntry,
-} from '../../stores/agentActivityStore';
+} from '../../stores/agentActivityStore.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Agent Metadata

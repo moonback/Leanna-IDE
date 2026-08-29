@@ -6,12 +6,12 @@
 
 import { Router, Request, Response } from "express";
 import multer from "multer";
-import type { ProfileConfig } from "../prompts/systemInstruction";
+import type { ProfileConfig } from "../prompts/systemInstruction.js";
 import {
   documentAnalyzer,
   documentMemory,
   documentSearchEngine,
-} from "../knowledge/document-system";
+} from "../knowledge/document-system/index.js";
 
 // Configuration multer pour uploads en mémoire
 const upload = multer({

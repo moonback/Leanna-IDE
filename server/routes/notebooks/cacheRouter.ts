@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { chatResponseCache, ragSearchCache } from "../../notebooks";
+import { chatResponseCache, ragSearchCache } from "../../notebooks/index.js";
 
 export function createCacheRouter(): Router {
   const router = Router();

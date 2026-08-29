@@ -1,9 +1,9 @@
 import { Router, Request, Response } from "express";
 import path from "path";
 import fs from "fs";
-import { notebookManager, contentGenerator } from "../../notebooks";
-import { getSandboxRoot } from "../../utils/sandbox";
-import { getProjectRoot } from "../../utils/pathUtils";
+import { notebookManager, contentGenerator } from "../../notebooks/index.js";
+import { getSandboxRoot } from "../../utils/sandbox.js";
+import { getProjectRoot } from "../../utils/pathUtils.js";
 
 export function createAudioRouter(): Router {
   const router = Router();

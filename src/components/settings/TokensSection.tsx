@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Key, Plus, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
-import { Section } from './SettingsPrimitives';
+import { Section } from './SettingsPrimitives.js';
 
 interface TokenInfo {
   key: string; label: string; configured: boolean; valid: boolean | null; preview: string;

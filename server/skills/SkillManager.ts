@@ -1,14 +1,14 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { Skill } from "./base";
-import { setWorkflowSkillHandler } from "./workflow";
-import { gitSkill } from "../skills/git";
-import { verifySkill } from "../skills/verify";
+import { Skill } from "./base.js";
+import { setWorkflowSkillHandler } from "./workflow.js";
+import { gitSkill } from "../skills/git.js";
+import { verifySkill } from "../skills/verify.js";
 import { pathToFileURL } from 'url';
-import { mcpBridge } from "../mcp";
-import { SELF_ROOT, isCriticalFile, isWriteForbidden } from "../utils/selfRoot";
-import { assertSandboxReady, markFileModified } from "../utils/sandbox";
-import { importModule } from "../utils/ModuleLoader";
+import { mcpBridge } from "../mcp/index.js";
+import { SELF_ROOT, isCriticalFile, isWriteForbidden } from "../utils/selfRoot.js";
+import { assertSandboxReady, markFileModified } from "../utils/sandbox.js";
+import { importModule } from "../utils/ModuleLoader.js";
 
 // ─── Dynamic Tool Relevance Classifier (Optimisation Leanna #1) ───────────────
 const TOOL_KEYWORDS: Record<string, string[]> = {
@@ -231,28 +231,28 @@ export const TOOL_KEYWORDS_WITH_AGENTS: Record<string, {
 };
 
 // ── Imports statiques de tous les skills (fallback pour Electron/bundle) ──────
-import { automationSkill } from "./automation";
-import { browserSkill } from "./browser";
-import { codebaseSkill } from "./codebase";
-import { githubSkill } from "./github";
-import { guidelinesSkill } from "./guidelines";
-import { historySkill } from "./history";
-import { knowledgeSkill } from "./knowledge";
-import { listSkill } from "./list";
-import { memorySkill } from "./memory";
-import { reasoningSkill } from "./reasoning";
-import { systemSkill } from "./system";
-import { timeSkill } from "./time";
-import { weatherSkill } from "./weather";
-import { projectSkill } from "./project";
-import { agentsSkill } from "./agents";
-import { aiStudioDirectivesSkill } from "./aiStudioDirectives";
-import { documentLinkerSkill } from "./documentLinker";
-import { documentKnowledgeSkill } from "./documentKnowledge";
-import { richDocumentSkill } from "./richDocument";
-import { agentOrchestrator } from "../agents";
-import { missionSkill, initMissionSystem, updateMissionSkills } from "./mission";
-import { Executor } from "../mission";
+import { automationSkill } from "./automation.js";
+import { browserSkill } from "./browser.js";
+import { codebaseSkill } from "./codebase.js";
+import { githubSkill } from "./github.js";
+import { guidelinesSkill } from "./guidelines.js";
+import { historySkill } from "./history.js";
+import { knowledgeSkill } from "./knowledge.js";
+import { listSkill } from "./list.js";
+import { memorySkill } from "./memory.js";
+import { reasoningSkill } from "./reasoning.js";
+import { systemSkill } from "./system.js";
+import { timeSkill } from "./time.js";
+import { weatherSkill } from "./weather.js";
+import { projectSkill } from "./project.js";
+import { agentsSkill } from "./agents.js";
+import { aiStudioDirectivesSkill } from "./aiStudioDirectives.js";
+import { documentLinkerSkill } from "./documentLinker.js";
+import { documentKnowledgeSkill } from "./documentKnowledge.js";
+import { richDocumentSkill } from "./richDocument.js";
+import { agentOrchestrator } from "../agents/index.js";
+import { missionSkill, initMissionSystem, updateMissionSkills } from "./mission.js";
+import { Executor } from "../mission/index.js";
 
 // Map des skills statiques (fallback Electron) — utilisée par discoverAndLoad.
 const STATIC_SKILLS: Record<string, Skill> = {
@@ -288,7 +288,7 @@ const __dirname_compat = typeof __dirname !== 'undefined'
   ? __dirname
   : path.join(SELF_ROOT, 'server', 'skills');
 
-import { ERROR_PATTERNS, HealAttempt, ErrorPattern } from "./skillManagerRules";
+import { ERROR_PATTERNS, HealAttempt, ErrorPattern } from "./skillManagerRules.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Audit log

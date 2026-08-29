@@ -20,7 +20,7 @@ export type {
   AgentsConfig,
   ProfileConfig,
   SystemPromptConfig,
-} from "../runtime/prompts/types";
+} from "../runtime/prompts/types.js";
 
 // Ré-export des constantes (non-types)
 export {
@@ -33,4 +33,4 @@ export {
   // Informations sur les agents
   AGENT_ROLES_INFO,
   ALL_AGENT_ROLES,
-} from "../runtime/prompts/types";
+} from "../runtime/prompts/types.js";

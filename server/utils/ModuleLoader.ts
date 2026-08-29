@@ -6,7 +6,7 @@
  * - CommonJS (require/module.exports) → Héritage
  *
  * Utilisation :
- *   import { importModule, requireCompat } from './ModuleLoader';
+ *   import { importModule, requireCompat } from './ModuleLoader.js';
  *   const fs = await importModule('fs');
  *   const path = requireCompat('path'); // Déconseillé en ESM
  */

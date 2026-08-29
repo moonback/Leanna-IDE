@@ -9,7 +9,7 @@
  *   - Support des réponses partielles (streaming)
  */
 
-import { createLogger } from "../utils/logger";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("ResponseCache");
 

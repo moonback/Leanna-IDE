@@ -15,8 +15,8 @@
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
-import { createLogger } from "../../utils/logger";
-import { SELF_ROOT } from "../../utils/selfRoot";
+import { createLogger } from "../../utils/logger.js";
+import { SELF_ROOT } from "../../utils/selfRoot.js";
 import type {
   KnowledgeDocument,
   DocumentRelation,
@@ -24,7 +24,7 @@ import type {
   DocumentKnowledgeStore,
   DocumentKnowledgeStats,
   MemoryCategory,
-} from "./types";
+} from "./types.js";
 
 const log = createLogger("DocumentMemory");
 

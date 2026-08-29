@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
-import { createRateLimiter } from '../security';
-import { withGeminiRetry } from '../utils/geminiKeyPool';
-import { ProfileConfig } from '../prompts/systemInstruction';
-import { scanPromptInjection } from '../utils/promptInjectionGuard';
-import { createLogger } from '../utils/logger';
-import { getDocumentStore } from '../knowledge/DocumentStore';
+import { createRateLimiter } from '../security.js';
+import { withGeminiRetry } from '../utils/geminiKeyPool.js';
+import { ProfileConfig } from '../prompts/systemInstruction.js';
+import { scanPromptInjection } from '../utils/promptInjectionGuard.js';
+import { createLogger } from '../utils/logger.js';
+import { getDocumentStore } from '../knowledge/DocumentStore.js';
 
 const log = createLogger('UploadDocumentRoute');
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reasoningSkill } from './reasoning';
+import { reasoningSkill } from './reasoning.js';
 
 test('reasoningSkill: metadata', () => {
   assert.equal(reasoningSkill.name, 'reasoning');

@@ -12,10 +12,10 @@ import {
   BrainCircuit, WifiOff, ChevronDown,
 } from 'lucide-react';
 
-import { SidebarItem } from '../ide/sidebar/SidebarItem';
-import { FlyoutMenu, FlyoutHeader, FlyoutItem, FlyoutSeparator } from '../ide/sidebar/FlyoutMenu';
-import { SidebarSeparator } from '../ide/sidebar/SidebarSection';
-import type { AIMenuItem, IDEPanelState, IDEPanelActions } from './types';
+import { SidebarItem } from '../ide/sidebar/SidebarItem.js';
+import { FlyoutMenu, FlyoutHeader, FlyoutItem, FlyoutSeparator } from '../ide/sidebar/FlyoutMenu.js';
+import { SidebarSeparator } from '../ide/sidebar/SidebarSection.js';
+import type { AIMenuItem, IDEPanelState, IDEPanelActions } from './types.js';
 
 interface AgentStatusBlockProps {
   assistantConnected: boolean;

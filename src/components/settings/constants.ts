@@ -1,5 +1,5 @@
 import { User, Cpu, Languages, Palette, Key, Database, Trash2, SlidersHorizontal, Globe, Shield, ShieldCheck, Bot } from 'lucide-react';
-import type { Language, ResponseStyle } from '../../context/UserProfileContext';
+import type { Language, ResponseStyle } from '../../context/UserProfileContext.js';
 
 export const VOICES = [
   { id: 'Aoede',  label: 'Aoede',  desc: 'Douce & naturelle' },

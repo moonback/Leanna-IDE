@@ -19,9 +19,9 @@
 
 import fs from "fs";
 import path from "path";
-import { createLogger } from "../utils/logger";
-import { SELF_ROOT } from "../utils/selfRoot";
-import { isSandboxActive, getSandboxRoot } from "../utils/sandbox";
+import { createLogger } from "../utils/logger.js";
+import { SELF_ROOT } from "../utils/selfRoot.js";
+import { isSandboxActive, getSandboxRoot } from "../utils/sandbox.js";
 
 const log = createLogger("FileWatcher");
 

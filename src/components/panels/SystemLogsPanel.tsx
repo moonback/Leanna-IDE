@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Monitor, Trash2 } from 'lucide-react';
-import { Panel } from '../ui/Panel';
-import { IconButton } from '../ui/IconButton';
-import type { LogEntry } from '../../hooks/useLiveAPI';
+import { Panel } from '../ui/Panel.js';
+import { IconButton } from '../ui/IconButton.js';
+import type { LogEntry } from '../../hooks/useLiveAPI.js';
 
 // Colour per log type
 const LOG_COLORS: Record<LogEntry['type'], string> = {

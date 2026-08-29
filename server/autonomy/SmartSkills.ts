@@ -12,8 +12,8 @@
  * inclut la logique de retry/loop qui manquait au niveau prompt.
  */
 
-import { Skill } from "../skills/base";
-import { createLogger } from "../utils/logger";
+import { Skill } from "../skills/base.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("SmartSkills");
 

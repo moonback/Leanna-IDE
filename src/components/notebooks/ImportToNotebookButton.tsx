@@ -8,8 +8,8 @@
 import React, { useState, useCallback } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { Upload, Plus, Loader2, BookOpen } from 'lucide-react';
-import { useToast } from '../ui/Toast';
-import { NotebookPickerModal } from '../ide/NotebookPickerModal';
+import { useToast } from '../ui/Toast.js';
+import { NotebookPickerModal } from '../ide/NotebookPickerModal.js';
 
 interface ImportToNotebookButtonProps {
   /** Callback appelé après import réussi (optionnel) */

@@ -3,8 +3,8 @@ import {
   ShieldCheck, Circle, CheckCircle2, AlertCircle, Loader2,
   Cpu, MemoryStick, Server, Puzzle, Activity, ExternalLink, RefreshCw,
 } from 'lucide-react';
-import { Panel } from '../ui/Panel';
-import type { AuditStep, AuditReport } from '../../utils/audit';
+import { Panel } from '../ui/Panel.js';
+import type { AuditStep, AuditReport } from '../../utils/audit.js';
 
 interface AuditPanelProps {
   steps: AuditStep[];

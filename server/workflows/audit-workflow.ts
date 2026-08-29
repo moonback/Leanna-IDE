@@ -11,7 +11,7 @@
  * Il utilise le moteur workflow existant et n'est exécuté que si le serveur tourne.
  */
 
-import { createWorkflow, listWorkflows, type WorkflowDefinition } from "../skills/workflow";
+import { createWorkflow, listWorkflows, type WorkflowDefinition } from "../skills/workflow.js";
 
 const AUDIT_WORKFLOW_NAME = "audit-codebase-periodique";
 

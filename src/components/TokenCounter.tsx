@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Hash, TrendingUp, ArrowUp, ArrowDown, Clock, Sparkles, AlertTriangle, Gauge, Zap } from 'lucide-react';
-import { useLiveAPIContext } from '../context/LiveAPIContext';
-import { useProfile } from '../context/UserProfileContext';
-import type { TokenUsage } from '../hooks/useLiveAPI';
+import { useLiveAPIContext } from '../context/LiveAPIContext.js';
+import { useProfile } from '../context/UserProfileContext.js';
+import type { TokenUsage } from '../hooks/useLiveAPI.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

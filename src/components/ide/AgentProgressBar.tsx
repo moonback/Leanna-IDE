@@ -5,7 +5,7 @@ import {
   FileText, FilePen, Search, Trash2, Globe, Brain, Users,
   Database, LayoutGrid, Terminal, Info,
 } from 'lucide-react';
-import type { ActivityStep, ReasoningState } from '../../hooks/useLiveAPI';
+import type { ActivityStep, ReasoningState } from '../../hooks/useLiveAPI.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

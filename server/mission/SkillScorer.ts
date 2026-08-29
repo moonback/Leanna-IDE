@@ -1,4 +1,4 @@
-import type { SkillScore } from "./types";
+import type { SkillScore } from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SkillScorer — Sélection intelligente des outils

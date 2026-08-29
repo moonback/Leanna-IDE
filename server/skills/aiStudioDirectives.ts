@@ -1,4 +1,4 @@
-import { Skill } from "./base";
+import { Skill } from "./base.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Skill "aiStudioDirectives"

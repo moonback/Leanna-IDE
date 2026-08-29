@@ -11,8 +11,8 @@
  * Aucune modification du runtime n'est nécessaire.
  */
 
-export { defineAgent } from "./plugin";
-export type { AgentConfig } from "./plugin";
+export { defineAgent } from "./plugin.js";
+export type { AgentConfig } from "./plugin.js";
 
 export { writerAgent } from "./writer.agent";
 export { formatterAgent } from "./formatter.agent";
@@ -22,7 +22,7 @@ export { translatorAgent } from "./translator.agent";
 export { summarizerAgent } from "./summarizer.agent";
 export { plannerAgent } from "./planner.agent";
 
-import type { AgentPlugin } from "../AgentRuntime";
+import type { AgentPlugin } from "../AgentRuntime.js";
 import { writerAgent } from "./writer.agent";
 import { formatterAgent } from "./formatter.agent";
 import { researcherAgent } from "./researcher.agent";

@@ -6,8 +6,8 @@ import {
   User, Cpu, Globe, SlidersHorizontal, Languages,
   Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot
 } from 'lucide-react';
-import { useProfile } from '../context/UserProfileContext';
-import { useToast } from '../components/ui/Toast';
+import { useProfile } from '../context/UserProfileContext.js';
+import { useToast } from '../components/ui/Toast.js';
 import {
   ProfileSection,
   AiSection,
@@ -24,7 +24,7 @@ import {
   CustomSkillsSection,
   KnowledgeHealthSection,
   SystemPromptSection,
-} from '../components/settings';
+} from '../components/settings/index.js';
 
 // ─── Nav Groups (4 catégories — Phase 4c du plan) ─────────────────────────────
 

@@ -1,8 +1,8 @@
-import { Skill, validateArgs } from "./base";
+import { Skill, validateArgs } from "./base.js";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { generateText } from "../utils/textGeneration";
-import { createLogger } from "../utils/logger";
+import { generateText } from "../utils/textGeneration.js";
+import { createLogger } from "../utils/logger.js";
 
 const logger = createLogger("History");
 

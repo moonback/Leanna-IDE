@@ -2,7 +2,7 @@
  * Agent Rédacteur — Production de documents textuels
  */
 
-import { defineAgent } from "./plugin";
+import { defineAgent } from "./plugin.js";
 
 export const writerAgent = defineAgent({
   id: "writer",

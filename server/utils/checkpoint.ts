@@ -7,7 +7,7 @@
 
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { SELF_ROOT } from "./selfRoot";
+import { SELF_ROOT } from "./selfRoot.js";
 
 const execFileAsync = promisify(execFile);
 const MAX_BUFFER = 2 * 1024 * 1024;

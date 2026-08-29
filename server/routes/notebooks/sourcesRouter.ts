@@ -2,8 +2,8 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { notebookManager, sourceIngester, embeddingStore, sourceProcessingQueue } from "../../notebooks";
-import { getSandboxRoot } from "../../utils/sandbox";
+import { notebookManager, sourceIngester, embeddingStore, sourceProcessingQueue } from "../../notebooks/index.js";
+import { getSandboxRoot } from "../../utils/sandbox.js";
 
 export function createSourcesRouter(upload: multer.Multer): Router {
   const router = Router();

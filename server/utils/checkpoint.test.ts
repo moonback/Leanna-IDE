@@ -8,7 +8,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { listCheckpoints, validateBuild } from "./checkpoint";
+import { listCheckpoints, validateBuild } from "./checkpoint.js";
 
 test("listCheckpoints retourne un tableau", async () => {
   const checkpoints = await listCheckpoints(5);

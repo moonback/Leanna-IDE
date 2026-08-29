@@ -22,9 +22,9 @@ import {
   AlertCircle,
   MessageSquare,
 } from 'lucide-react';
-import { useProfile } from '../../context/UserProfileContext';
-import { useLiveAPIContext } from '../../context/LiveAPIContext';
-import { formatExactTokenCount, formatTokenCount } from '../../utils/tokenFormatting';
+import { useProfile } from '../../context/UserProfileContext.js';
+import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
+import { formatExactTokenCount, formatTokenCount } from '../../utils/tokenFormatting.js';
 
 // ===== Types =====
 interface OptimizationData {

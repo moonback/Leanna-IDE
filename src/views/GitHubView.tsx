@@ -4,7 +4,7 @@ import {
   ExternalLink, RefreshCw, Loader2, BookOpen, GitCommit,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ViewHeader } from '../components/ui/ViewHeader';
+import { ViewHeader } from '../components/ui/ViewHeader.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

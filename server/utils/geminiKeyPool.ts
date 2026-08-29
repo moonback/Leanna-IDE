@@ -1,8 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
 import path from "path";
-import { encrypt, decrypt } from "./crypto";
-import { SELF_ROOT } from "./selfRoot";
+import { encrypt, decrypt } from "./crypto.js";
+import { SELF_ROOT } from "./selfRoot.js";
 
 /**
  * GeminiKeyPool — Manages a pool of Gemini API keys with round-robin rotation.

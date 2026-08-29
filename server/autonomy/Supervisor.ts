@@ -17,7 +17,7 @@
  *     → session.sendToolResponse()
  */
 
-import { createLogger } from "../utils/logger";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("Supervisor");
 

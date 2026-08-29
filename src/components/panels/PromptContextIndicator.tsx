@@ -1,7 +1,7 @@
 import { Gauge, AlertTriangle, AlertOctagon, Sparkles } from 'lucide-react';
 import { useState } from 'react';
-import { useLiveAPIContext } from '../../context/LiveAPIContext';
-import type { PromptContextState } from '../../hooks/useToken';
+import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
+import type { PromptContextState } from '../../hooks/useToken.js';
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

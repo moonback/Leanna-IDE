@@ -13,13 +13,13 @@
  */
 
 import { z } from "zod";
-import type { AgentRole, TaskPriority, AgentTask, TaskContext } from "./types";
-import { isDelegationAllowed } from "./AgentCommunication";
-import { listAgentRoles } from "./roles";
-import { agentMessageBus } from "./AgentMessageBus";
+import type { AgentRole, TaskPriority, AgentTask, TaskContext } from "./types.js";
+import { isDelegationAllowed } from "./AgentCommunication.js";
+import { listAgentRoles } from "./roles.js";
+import { agentMessageBus } from "./AgentMessageBus.js";
 import { randomUUID } from "crypto";
-import { createLogger } from "../utils/logger";
-import type { TaskRequestPayload } from "./AgentCommunication";
+import { createLogger } from "../utils/logger.js";
+import type { TaskRequestPayload } from "./AgentCommunication.js";
 
 const log = createLogger("DelegationManager");
 

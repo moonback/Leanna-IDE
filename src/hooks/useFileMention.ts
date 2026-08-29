@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { ideApi, type TreeEntry } from '../services/ideApi';
+import { ideApi, type TreeEntry } from '../services/ideApi.js';
 
 export interface MentionSuggestion {
   name: string;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { weatherSkill } from './weather';
+import { weatherSkill } from './weather.js';
 
 test('weatherSkill: metadata', () => {
   assert.equal(weatherSkill.name, 'weather');

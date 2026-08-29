@@ -15,8 +15,8 @@ import {
   Trash2, RefreshCw, Plus, Clock,
   Loader2, X, Globe, FileType, CheckCircle2, AlertCircle,
 } from 'lucide-react';
-import { useToast } from '../components/ui/Toast';
-import { ViewHeader } from '../components/ui/ViewHeader';
+import { useToast } from '../components/ui/Toast.js';
+import { ViewHeader } from '../components/ui/ViewHeader.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

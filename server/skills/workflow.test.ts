@@ -5,7 +5,7 @@ import {
   getWorkflow,
   toggleWorkflow,
   deleteWorkflow,
-} from './workflow';
+} from './workflow.js';
 
 test('workflow: CRUD operations', async () => {
 

@@ -13,9 +13,9 @@
 
 import fs from "fs";
 import path from "path";
-import { createLogger } from "../utils/logger";
-import { withGeminiRetry } from "../utils/geminiKeyPool";
-import { SELF_ROOT } from "../utils/selfRoot";
+import { createLogger } from "../utils/logger.js";
+import { withGeminiRetry } from "../utils/geminiKeyPool.js";
+import { SELF_ROOT } from "../utils/selfRoot.js";
 
 const log = createLogger("EmbeddingStore");
 

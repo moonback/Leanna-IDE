@@ -6,11 +6,11 @@
 import type { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
-import { SELF_ROOT } from "../utils/selfRoot";
-import { dynamicAgentRegistry } from "../agents/DynamicAgentRegistry";
-import { agentRegistry } from "../agents/AgentRegistry";
-import { getAgentDefinition } from "../agents/roles";
-import { createLogger } from "../utils/logger";
+import { SELF_ROOT } from "../utils/selfRoot.js";
+import { dynamicAgentRegistry } from "../agents/DynamicAgentRegistry.js";
+import { agentRegistry } from "../agents/AgentRegistry.js";
+import { getAgentDefinition } from "../agents/roles.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("CustomAgentsAPI");
 

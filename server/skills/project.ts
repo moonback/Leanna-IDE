@@ -12,7 +12,7 @@
  *   - react-router   : npx create-react-router@latest
  */
 
-import { Skill } from "./base";
+import { Skill } from "./base.js";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import fs from "fs";

@@ -1,10 +1,10 @@
 import type { Server as HttpServer } from "http";
 import type { WebSocketServer } from "ws";
-import type { AgentRuntime } from "./runtime/AgentRuntime";
-import type { Observability } from "./runtime/Observability";
-import type { ProjectMemory } from "./knowledge/ProjectMemory";
-import type { KnowledgeGraph } from "./knowledge/KnowledgeGraph";
-import type { McpBridge } from "./mcp/McpBridge";
+import type { AgentRuntime } from "./runtime/AgentRuntime.js";
+import type { Observability } from "./runtime/Observability.js";
+import type { ProjectMemory } from "./knowledge/ProjectMemory.js";
+import type { KnowledgeGraph } from "./knowledge/KnowledgeGraph.js";
+import type { McpBridge } from "./mcp/McpBridge.js";
 
 export interface GracefulShutdownDeps {
   server: HttpServer;

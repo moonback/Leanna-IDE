@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
-import { SELF_ROOT, normalizeSelfPath } from "../utils/selfRoot";
-import { isSandboxActive, getSandboxRoot, assertSandboxReady } from "../utils/sandbox";
+import { SELF_ROOT, normalizeSelfPath } from "../utils/selfRoot.js";
+import { isSandboxActive, getSandboxRoot, assertSandboxReady } from "../utils/sandbox.js";
 
 export const EXCLUDED_DIRS = new Set(["node_modules", ".git", "dist", "build", "out"]);
 export const EXCLUDED_FILES = new Set(["codebase.md"]);

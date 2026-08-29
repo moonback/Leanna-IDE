@@ -6,7 +6,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { SELF_ROOT } from '../utils/selfRoot';
+import { SELF_ROOT } from '../utils/selfRoot.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types

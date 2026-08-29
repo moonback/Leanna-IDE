@@ -8,9 +8,9 @@
  * Ce fichier sera supprimé une fois la migration complète.
  */
 
-import type { AgentRuntime } from "../AgentRuntime";
-import type { ToolRegistry } from "../ToolRegistry";
-import type { ToolDefinition } from "../types";
+import type { AgentRuntime } from "../AgentRuntime.js";
+import type { ToolRegistry } from "../ToolRegistry.js";
+import type { ToolDefinition } from "../types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Adaptateur SkillManager → ToolRegistry

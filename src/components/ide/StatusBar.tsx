@@ -13,11 +13,11 @@ import {
   Radio,
   ScrollText,
 } from 'lucide-react';
-import { useLiveAPIContext } from '../../context/LiveAPIContext';
-import { useProfile } from '../../context/UserProfileContext';
-import { TokenDetailModal } from './TokenDetailModal';
-import { ModelPickerModal } from './ModelPickerModal';
-import { formatExactTokenCount, formatTokenCount } from '../../utils/tokenFormatting';
+import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
+import { useProfile } from '../../context/UserProfileContext.js';
+import { TokenDetailModal } from './TokenDetailModal.js';
+import { ModelPickerModal } from './ModelPickerModal.js';
+import { formatExactTokenCount, formatTokenCount } from '../../utils/tokenFormatting.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

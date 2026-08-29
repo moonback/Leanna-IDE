@@ -6,7 +6,7 @@ import {
   BookOpen, ChevronDown, ChevronUp, ChevronRight, Loader2,
   Activity, CheckCircle2, Timer, TrendingUp,
 } from 'lucide-react';
-import { useLiveAPIContext } from '../../context/LiveAPIContext';
+import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 
 // ── Tool → Skill mapping ─────────────────────────────────────────────────────
 

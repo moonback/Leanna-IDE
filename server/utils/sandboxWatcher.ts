@@ -8,7 +8,7 @@
 import fs from "fs";
 import path from "path";
 import { WebSocket } from "ws";
-import { getSandboxRoot, isSandboxActive, markFileModified } from "./sandbox";
+import { getSandboxRoot, isSandboxActive, markFileModified } from "./sandbox.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

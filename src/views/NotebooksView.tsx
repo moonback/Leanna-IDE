@@ -10,8 +10,8 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { NotebookList } from '../components/notebooks/NotebookList';
-import { NotebookDetail } from '../components/notebooks/NotebookDetail';
+import { NotebookList } from '../components/notebooks/NotebookList.js';
+import { NotebookDetail } from '../components/notebooks/NotebookDetail.js';
 
 function getNotebookIdFromHash(): string | null {
   const hash = window.location.hash;

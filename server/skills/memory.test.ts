@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { memorySkill } from './memory';
+import { memorySkill } from './memory.js';
 
 test('memorySkill: metadata', () => {
   assert.equal(memorySkill.name, 'memory');

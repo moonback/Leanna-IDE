@@ -5,8 +5,8 @@ import {
   ChevronRight, Brain, Zap, RotateCcw, Pause, Play,
   TrendingUp, TrendingDown, Minus, Clock, Layers,
 } from 'lucide-react';
-import { Panel } from '../ui/Panel';
-import { IconButton } from '../ui/IconButton';
+import { Panel } from '../ui/Panel.js';
+import { IconButton } from '../ui/IconButton.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types

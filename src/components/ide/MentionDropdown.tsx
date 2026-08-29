@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { File, Folder } from 'lucide-react';
-import type { MentionSuggestion } from '../../hooks/useFileMention';
+import type { MentionSuggestion } from '../../hooks/useFileMention.js';
 
 interface MentionDropdownProps {
   suggestions: MentionSuggestion[];

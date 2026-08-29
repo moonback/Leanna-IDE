@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Palette, Check, Moon, Sun, Zap, BookOpen, Eye } from 'lucide-react';
-import { useProfile } from '../../context/UserProfileContext';
-import { Section, Field, ToggleSwitch } from './SettingsPrimitives';
-import { ACCENTS } from './constants';
+import { useProfile } from '../../context/UserProfileContext.js';
+import { Section, Field, ToggleSwitch } from './SettingsPrimitives.js';
+import { ACCENTS } from './constants.js';
 
 // Additional accent colors with labels
 const EXTENDED_ACCENTS = [

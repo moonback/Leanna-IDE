@@ -33,11 +33,11 @@
  *           ReasoningResult
  */
 
-import { createLogger } from "../utils/logger";
-import { semanticSearch } from "./SemanticSearch";
-import { projectMemory } from "./ProjectMemory";
-import { generateText } from "../utils/textGeneration";
-import { estimateTokens } from "../utils/tokenOptimizer";
+import { createLogger } from "../utils/logger.js";
+import { semanticSearch } from "./SemanticSearch.js";
+import { projectMemory } from "./ProjectMemory.js";
+import { generateText } from "../utils/textGeneration.js";
+import { estimateTokens } from "../utils/tokenOptimizer.js";
 import type {
   ReasoningStep,
   StepResult,
@@ -46,7 +46,7 @@ import type {
   ContextBatch,
   ProjectFact,
   RelevantFile,
-} from "./types";
+} from "./types.js";
 
 // ─── Import différé pour éviter les dépendances circulaires ─────────────────
 // LearningEngine est importé dynamiquement dans les méthodes qui en ont besoin.

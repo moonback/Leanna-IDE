@@ -18,11 +18,11 @@
  *   6. sideEffectScore       — Risque d'effets de bord globaux / mutables
  */
 
-import { createLogger } from "../utils/logger";
-import { dependencyGraph } from "./DependencyGraph";
-import { projectMemory } from "./ProjectMemory";
-import { knowledgeGraph } from "./KnowledgeGraph";
-import type { ImpactReport, DependencyCycle } from "./types";
+import { createLogger } from "../utils/logger.js";
+import { dependencyGraph } from "./DependencyGraph.js";
+import { projectMemory } from "./ProjectMemory.js";
+import { knowledgeGraph } from "./KnowledgeGraph.js";
+import type { ImpactReport, DependencyCycle } from "./types.js";
 
 const log = createLogger("ImpactAnalyzer");
 

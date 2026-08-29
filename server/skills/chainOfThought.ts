@@ -9,8 +9,8 @@
  * - Gestion des erreurs granulaire (une étape échoue, les autres continuent)
  */
 
-import { generateText } from "../utils/textGeneration";
-import { createLogger } from "../utils/logger";
+import { generateText } from "../utils/textGeneration.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("ChainOfThought");
 

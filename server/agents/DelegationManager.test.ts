@@ -14,8 +14,8 @@ import {
   delegationManager,
   structuredDelegationSchema,
   batchDelegationSchema
-} from "./DelegationManager";
-import { agentMessageBus } from "./AgentMessageBus";
+} from "./DelegationManager.js";
+import { agentMessageBus } from "./AgentMessageBus.js";
 
 // Mock du logger
 vi.mock("../utils/logger", () => ({

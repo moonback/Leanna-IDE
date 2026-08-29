@@ -2,7 +2,7 @@
  * Runtime — Point d'entrée du nouveau cœur architectural
  * 
  * Usage :
- *   import { createRuntime } from "./server/runtime";
+ *   import { createRuntime } from "./server/runtime.js";
  *   const runtime = createRuntime({ enableMetrics: true });
  *   await runtime.start();
  * 
@@ -11,16 +11,16 @@
  */
 
 // Core
-export { AgentRuntime } from "./AgentRuntime";
-export type { AgentPlugin } from "./AgentRuntime";
-export { EventBus } from "./EventBus";
-export { StateMachine } from "./StateMachine";
-export { ToolRegistry, ToolNotFoundError, ToolTimeoutError, ToolPermissionError } from "./ToolRegistry";
-export { Memory } from "./Memory";
-export { WorkflowEngine } from "./WorkflowEngine";
-export { PromptRegistry } from "./PromptRegistry";
-export { AgentLoader } from "./AgentLoader";
-export { Observability } from "./Observability";
+export { AgentRuntime } from "./AgentRuntime.js";
+export type { AgentPlugin } from "./AgentRuntime.js";
+export { EventBus } from "./EventBus.js";
+export { StateMachine } from "./StateMachine.js";
+export { ToolRegistry, ToolNotFoundError, ToolTimeoutError, ToolPermissionError } from "./ToolRegistry.js";
+export { Memory } from "./Memory.js";
+export { WorkflowEngine } from "./WorkflowEngine.js";
+export { PromptRegistry } from "./PromptRegistry.js";
+export { AgentLoader } from "./AgentLoader.js";
+export { Observability } from "./Observability.js";
 
 // Types
 export type {
@@ -45,31 +45,31 @@ export type {
   WorkflowRun,
   PromptTemplate,
   RuntimeConfig,
-} from "./types";
-export { DEFAULT_RUNTIME_CONFIG, VALID_TRANSITIONS } from "./types";
+} from "./types.js";
+export { DEFAULT_RUNTIME_CONFIG, VALID_TRANSITIONS } from "./types.js";
 
 // Agents (plugins)
-export { defaultAgents, defineAgent } from "./agents";
-export type { AgentConfig } from "./agents";
+export { defaultAgents, defineAgent } from "./agents/index.js";
+export type { AgentConfig } from "./agents/index.js";
 
 // Compatibility Layer
-export { SkillManagerV2 } from "./compat/SkillManagerV2";
-export { adaptSkill, adaptAllSkills, createToolCallProxy } from "./compat/SkillAdapter";
-export type { LegacySkill, AdaptOptions } from "./compat/SkillAdapter";
+export { SkillManagerV2 } from "./compat/SkillManagerV2.js";
+export { adaptSkill, adaptAllSkills, createToolCallProxy } from "./compat/SkillAdapter.js";
+export type { LegacySkill, AdaptOptions } from "./compat/SkillAdapter.js";
 
 // Prompts
-export { loadPromptTemplates, buildSystemPrompt } from "./prompts/loader";
-export { SystemPromptBuilder, buildSystemInstructionV3 } from "./prompts/SystemPromptBuilder";
+export { loadPromptTemplates, buildSystemPrompt } from "./prompts/loader.js";
+export { SystemPromptBuilder, buildSystemInstructionV3 } from "./prompts/SystemPromptBuilder.js";
 
 // Bootstrap
-export { bootstrapRuntime, bootstrapRuntimeSync } from "./bootstrap";
-export type { BootstrapConfig, BootstrapResult } from "./bootstrap";
+export { bootstrapRuntime, bootstrapRuntimeSync } from "./bootstrap.js";
+export type { BootstrapConfig, BootstrapResult } from "./bootstrap.js";
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
-import { AgentRuntime } from "./AgentRuntime";
-import { defaultAgents } from "./agents";
-import type { RuntimeConfig } from "./types";
+import { AgentRuntime } from "./AgentRuntime.js";
+import { defaultAgents } from "./agents/index.js";
+import type { RuntimeConfig } from "./types.js";
 
 /**
  * Factory pour créer un runtime pré-configuré avec les agents par défaut.

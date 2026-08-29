@@ -24,9 +24,9 @@
  *   // → [{ files: ["a.ts", "b.ts", "c.ts"], length: 3 }]
  */
 
-import { createLogger } from "../utils/logger";
-import { knowledgeGraph, KnowledgeGraph } from "./KnowledgeGraph";
-import type { DependencyCycle } from "./types";
+import { createLogger } from "../utils/logger.js";
+import { knowledgeGraph, KnowledgeGraph } from "./KnowledgeGraph.js";
+import type { DependencyCycle } from "./types.js";
 
 const log = createLogger("DependencyGraph");
 

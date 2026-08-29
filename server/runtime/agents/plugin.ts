@@ -8,9 +8,9 @@
  * Aucune modification du runtime nécessaire.
  */
 
-import type { AgentMetadata, AgentContext, TaskResult } from "../types";
-import type { ToolRegistry } from "../ToolRegistry";
-import type { AgentPlugin } from "../AgentRuntime";
+import type { AgentMetadata, AgentContext, TaskResult } from "../types.js";
+import type { ToolRegistry } from "../ToolRegistry.js";
+import type { AgentPlugin } from "../AgentRuntime.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Factory Helper

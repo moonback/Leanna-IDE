@@ -5,7 +5,7 @@ import {
   FileText, Search, Loader2, Target, Users, FlaskConical,
   RefreshCw, Shield, Eye, Building2,
 } from 'lucide-react';
-import type { ActivityStep } from '../../hooks/useLiveAPI';
+import type { ActivityStep } from '../../hooks/useLiveAPI.js';
 
 // ── Agent Definitions (tool-based "virtual" agents) ────────────────────────
 

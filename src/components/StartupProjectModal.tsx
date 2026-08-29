@@ -4,7 +4,7 @@ import {
   FolderOpen, Upload, ShieldAlert, Loader2,
   FolderX, FolderInput, Globe, X, Plus,
 } from 'lucide-react';
-import { ideApi } from '../services/ideApi';
+import { ideApi } from '../services/ideApi.js';
 
 function getElectronAPI(): { selectFolder: () => Promise<string | null> } | null {
   const w = window as any;

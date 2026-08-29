@@ -10,7 +10,7 @@ import {
   CheckCircle2, Loader2, AlertCircle, Clock,
   FileText, X, Play, RotateCcw, Eye,
 } from 'lucide-react';
-import { StatusBadge, type StatusType } from './StatusBadge';
+import { StatusBadge, type StatusType } from './StatusBadge.js';
 
 export interface TaskStep {
   id: string;

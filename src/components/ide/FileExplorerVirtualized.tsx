@@ -4,8 +4,8 @@ import {
   Shield, Search, X, ArrowDownAZ, ArrowUpZA, Layers, GripVertical,
   Eye, EyeOff, FolderInput,
 } from 'lucide-react';
-import { FileIcon } from './FileIcon';
-import type { TreeEntry } from '../../types/ide';
+import { FileIcon } from './FileIcon.js';
+import type { TreeEntry } from '../../types/ide.js';
 import Tree from 'react-window-tree';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 

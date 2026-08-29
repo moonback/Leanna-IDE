@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import http from 'node:http';
-import { knowledgeRouter } from './routes/knowledge';
+import { knowledgeRouter } from './routes/knowledge/index.js';
 
 test('GET /api/knowledge/health returns knowledge system health structure', async () => {
   const app = express();

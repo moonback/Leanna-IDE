@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Zap } from 'lucide-react';
-import type { SlashCommandSuggestion } from '../../hooks/useSlashCommand';
+import type { SlashCommandSuggestion } from '../../hooks/useSlashCommand.js';
 
 interface SlashCommandDropdownProps {
   suggestions: SlashCommandSuggestion[];

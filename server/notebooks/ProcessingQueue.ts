@@ -10,7 +10,7 @@
  *   - Statistiques (temps moyen, erreurs, débit)
  */
 
-import { createLogger } from "../utils/logger";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("ProcessingQueue");
 

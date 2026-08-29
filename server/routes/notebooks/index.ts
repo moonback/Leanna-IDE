@@ -1,16 +1,16 @@
 import { Router } from "express";
 import multer from "multer";
 
-import { createNotebooksCrudRouter } from "./notebooksCrudRouter";
-import { createSourcesRouter } from "./sourcesRouter";
-import { createChatRouter } from "./chatRouter";
-import { createNotesRouter } from "./notesRouter";
-import { createContentRouter } from "./contentRouter";
-import { createAudioRouter } from "./audioRouter";
-import { createEmbeddingsRouter } from "./embeddingsRouter";
-import { createQueueRouter } from "./queueRouter";
-import { createCacheRouter } from "./cacheRouter";
-import { createBackupRouter } from "./backupRouter";
+import { createNotebooksCrudRouter } from "./notebooksCrudRouter.js";
+import { createSourcesRouter } from "./sourcesRouter.js";
+import { createChatRouter } from "./chatRouter.js";
+import { createNotesRouter } from "./notesRouter.js";
+import { createContentRouter } from "./contentRouter.js";
+import { createAudioRouter } from "./audioRouter.js";
+import { createEmbeddingsRouter } from "./embeddingsRouter.js";
+import { createQueueRouter } from "./queueRouter.js";
+import { createCacheRouter } from "./cacheRouter.js";
+import { createBackupRouter } from "./backupRouter.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -48,14 +48,14 @@ export function createNotebooksRouter(): Router {
   return router;
 }
 
-export { createNotebooksCrudRouter } from "./notebooksCrudRouter";
-export { createSourcesRouter } from "./sourcesRouter";
-export { createChatRouter } from "./chatRouter";
-export { createNotesRouter } from "./notesRouter";
-export { createContentRouter } from "./contentRouter";
-export { createAudioRouter } from "./audioRouter";
-export { createEmbeddingsRouter } from "./embeddingsRouter";
-export { createQueueRouter } from "./queueRouter";
-export { createCacheRouter } from "./cacheRouter";
-export { createBackupRouter } from "./backupRouter";
-export { buildRevealPresentation, countSlides } from "./slidesTheme";
+export { createNotebooksCrudRouter } from "./notebooksCrudRouter.js";
+export { createSourcesRouter } from "./sourcesRouter.js";
+export { createChatRouter } from "./chatRouter.js";
+export { createNotesRouter } from "./notesRouter.js";
+export { createContentRouter } from "./contentRouter.js";
+export { createAudioRouter } from "./audioRouter.js";
+export { createEmbeddingsRouter } from "./embeddingsRouter.js";
+export { createQueueRouter } from "./queueRouter.js";
+export { createCacheRouter } from "./cacheRouter.js";
+export { createBackupRouter } from "./backupRouter.js";
+export { buildRevealPresentation, countSlides } from "./slidesTheme.js";

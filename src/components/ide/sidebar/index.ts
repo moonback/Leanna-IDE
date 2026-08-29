@@ -1,3 +1,3 @@
-export { SidebarItem, SidebarStatusIndicator } from './SidebarItem';
-export { SidebarSection, SidebarSeparator } from './SidebarSection';
-export { FlyoutMenu, FlyoutHeader, FlyoutItem } from './FlyoutMenu';
+export { SidebarItem, SidebarStatusIndicator } from './SidebarItem.js';
+export { SidebarSection, SidebarSeparator } from './SidebarSection.js';
+export { FlyoutMenu, FlyoutHeader, FlyoutItem } from './FlyoutMenu.js';

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Globe, Zap, Check, AlertCircle, Search } from 'lucide-react';
-import { useProfile } from '../../context/UserProfileContext';
-import { Section, Field, SecretInput } from './SettingsPrimitives';
-import type { AIProvider } from '../../context/UserProfileContext';
+import { useProfile } from '../../context/UserProfileContext.js';
+import { Section, Field, SecretInput } from './SettingsPrimitives.js';
+import type { AIProvider } from '../../context/UserProfileContext.js';
 
 // ─── Tous les modèles gratuits OpenRouter ────────────────────────────────────
 // Source : openrouter.ai/api/v1/models — vérifié le 03/08/2026

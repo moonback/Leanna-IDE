@@ -22,14 +22,14 @@
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
-import { SELF_ROOT } from "../utils/selfRoot";
-import { createLogger } from "../utils/logger";
-import { knowledgeGraph } from "./KnowledgeGraph";
+import { SELF_ROOT } from "../utils/selfRoot.js";
+import { createLogger } from "../utils/logger.js";
+import { knowledgeGraph } from "./KnowledgeGraph.js";
 import type {
   ProjectFact,
   ProjectKnowledgeCategory,
   ProjectContext,
-} from "./types";
+} from "./types.js";
 
 const log = createLogger("ProjectMemory");
 

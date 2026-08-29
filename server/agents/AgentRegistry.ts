@@ -8,15 +8,15 @@
  * - Monitoring de l'état de santé de la flotte
  * - Sélection d'un agent disponible (load balancing)
  */
-import type { AgentRole } from "./types";
-import type { SkillHandler } from "./AgentExecutor";
-import { AutonomousAgent } from "./AutonomousAgent";
-import { AgentExecutor } from "./AgentExecutor";
-import { AgentMessageBus, agentMessageBus } from "./AgentMessageBus";
-import { ProgressNotifier } from "./ProgressNotifier";
-import { STATIC_AGENT_REGISTRY, listAgentRoles } from "./roles";
-import { dynamicAgentRegistry } from "./DynamicAgentRegistry";
-import { createLogger } from "../utils/logger";
+import type { AgentRole } from "./types.js";
+import type { SkillHandler } from "./AgentExecutor.js";
+import { AutonomousAgent } from "./AutonomousAgent.js";
+import { AgentExecutor } from "./AgentExecutor.js";
+import { AgentMessageBus, agentMessageBus } from "./AgentMessageBus.js";
+import { ProgressNotifier } from "./ProgressNotifier.js";
+import { STATIC_AGENT_REGISTRY, listAgentRoles } from "./roles.js";
+import { dynamicAgentRegistry } from "./DynamicAgentRegistry.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("AgentRegistry");
 

@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { isSandboxActive, getSandboxRoot, markFileModified, assertSandboxReady, SandboxGuardError } from '../utils/sandbox';
-import { resolveWorkspacePath, getDefaultWorkspaceRoot } from '../security';
-import { appendAuditEvent } from '../audit';
+import { isSandboxActive, getSandboxRoot, markFileModified, assertSandboxReady, SandboxGuardError } from '../utils/sandbox.js';
+import { resolveWorkspacePath, getDefaultWorkspaceRoot } from '../security.js';
+import { appendAuditEvent } from '../audit.js';
 
 const router = Router();
 

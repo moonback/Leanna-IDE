@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FileIcon } from './FileIcon';
+import { FileIcon } from './FileIcon.js';
 import {
   Search, X, CaseSensitive, Regex, ChevronRight,
   ChevronDown, Loader2,

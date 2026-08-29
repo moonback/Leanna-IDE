@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { logger, createLogger } from './logger';
+import { logger, createLogger } from './logger.js';
 
 test('logger: isLevelEnabled filtering', () => {
   logger.configure({ level: 'warn' });

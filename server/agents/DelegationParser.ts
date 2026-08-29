@@ -9,10 +9,10 @@
  * - Dead-letter logging pour les blocs ignorés
  */
 
-import type { AgentRole, TaskPriority } from "./types";
-import { DELEGATION_MATRIX, isDelegationAllowed } from "./AgentCommunication";
-import { listAgentRoles } from "./roles";
-import { createLogger } from "../utils/logger";
+import type { AgentRole, TaskPriority } from "./types.js";
+import { DELEGATION_MATRIX, isDelegationAllowed } from "./AgentCommunication.js";
+import { listAgentRoles } from "./roles.js";
+import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("DelegationParser");
 

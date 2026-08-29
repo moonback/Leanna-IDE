@@ -2,7 +2,7 @@
  * Agent Correcteur — Relecture, orthographe, grammaire, style
  */
 
-import { defineAgent } from "./plugin";
+import { defineAgent } from "./plugin.js";
 
 export const proofreaderAgent = defineAgent({
   id: "proofreader",

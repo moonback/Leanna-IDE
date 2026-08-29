@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertSafeUrl, parseIntervalToMs } from './automationHelpers';
+import { assertSafeUrl, parseIntervalToMs } from './automationHelpers.js';
 
 test('automationHelpers: assertSafeUrl', () => {
   // Safe URLs

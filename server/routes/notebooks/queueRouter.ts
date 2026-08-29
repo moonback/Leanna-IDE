@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { sourceProcessingQueue } from "../../notebooks";
+import { sourceProcessingQueue } from "../../notebooks/index.js";
 
 export function createQueueRouter(): Router {
   const router = Router();

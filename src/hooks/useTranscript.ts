@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useChatPersistence } from './useChatPersistence';
+import { useChatPersistence } from './useChatPersistence.js';
 
 export type TranscriptRole = 'user' | 'assistant';
 

@@ -21,20 +21,20 @@
  *   estimateQuality() → metrics de confiance
  */
 
-import { createLogger } from "../utils/logger";
-import { knowledgeGraph } from "./KnowledgeGraph";
-import { projectMemory } from "./ProjectMemory";
+import { createLogger } from "../utils/logger.js";
+import { knowledgeGraph } from "./KnowledgeGraph.js";
+import { projectMemory } from "./ProjectMemory.js";
 import fs from "fs";
 import path from "path";
-import { SELF_ROOT } from "../utils/selfRoot";
-import { isSandboxActive, getSandboxRoot } from "../utils/sandbox";
+import { SELF_ROOT } from "../utils/selfRoot.js";
+import { isSandboxActive, getSandboxRoot } from "../utils/sandbox.js";
 import type {
   RelevantFile,
   RelevantSection,
   CodeEntity,
   ContextBatch,
   ProjectFact,
-} from "./types";
+} from "./types.js";
 
 const log = createLogger("SemanticSearch");
 

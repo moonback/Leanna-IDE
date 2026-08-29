@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { exportToStandaloneHtml } from './htmlExporter';
+import { exportToStandaloneHtml } from './htmlExporter.js';
 
 test('htmlExporter: converts markdown into a full standalone HTML document', () => {
   const md = '# Titre Principal\n\nCeci est un paragraphe avec du **gras** et du *italique*.\n\n- Puce 1\n- Puce 2\n\n```typescript\nconst x = 42;\n```';

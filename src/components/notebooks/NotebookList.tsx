@@ -17,8 +17,8 @@ import {
   Search, SortAsc, SortDesc, Sparkles, X, Upload, Globe, Mic,
   ArrowRight, Layers,
 } from 'lucide-react';
-import { useToast } from '../ui/Toast';
-import { CreateNotebookModal } from './CreateNotebookModal';
+import { useToast } from '../ui/Toast.js';
+import { CreateNotebookModal } from './CreateNotebookModal.js';
 
 interface NotebookSummary {
   id: string;
@@ -132,17 +132,17 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   }, [deleteTarget, success, toastError]);
 
   return (
-    <div className="notebook-workspace h-full flex flex-col overflow-hidden">
+    <div className="notebook-workspace h-full flex flex-col overflow-hidden"style={{ backgroundColor: 'var(--bg)' }}>
       {/* ─── Header ─────────────────────────────────────────── */}
       <header className="flex-shrink-0 px-6 lg:px-10 pt-8 pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div
+            {/* <div
               className="w-11 h-11 rounded-full flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))' }}
             >
               <Layers className="h-5 w-5 text-white" />
-            </div>
+            </div> */}
             <div>
               {/* Display-size heading: tight leading, slightly negative tracking */}
               <h1

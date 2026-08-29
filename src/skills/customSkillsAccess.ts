@@ -1,4 +1,4 @@
-import { supabase } from '../services/supabase';
+import { supabase } from '../services/supabase.js';
 
 export interface CustomSkill {
   id: string;

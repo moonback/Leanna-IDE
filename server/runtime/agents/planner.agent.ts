@@ -2,7 +2,7 @@
  * Agent Planificateur — Plans et structures de documents
  */
 
-import { defineAgent } from "./plugin";
+import { defineAgent } from "./plugin.js";
 
 export const plannerAgent = defineAgent({
   id: "planner",

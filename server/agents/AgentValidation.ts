@@ -1,4 +1,4 @@
-import type { VerificationIssue } from "./WorkspaceState";
+import type { VerificationIssue } from "./WorkspaceState.js";
 
 export interface ValidationSnapshot {
   typecheckErrors: number;

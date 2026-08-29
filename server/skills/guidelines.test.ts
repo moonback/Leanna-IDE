@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { guidelinesSkill, getSystemGuidelines } from './guidelines';
+import { guidelinesSkill, getSystemGuidelines } from './guidelines.js';
 
 test('guidelinesSkill: returns system guidelines', () => {
   const system = getSystemGuidelines();
