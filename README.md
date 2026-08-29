@@ -1,6 +1,8 @@
 
 
-
+<p align="center">
+  <img src="assets\images\icon-light.png" alt="Leanna " width="20%" />
+</p>
 <h1 align="center">Leanna </h1>
 
 <p align="center">
@@ -15,9 +17,7 @@
   <img src="https://img.shields.io/badge/AI-Gemini%202.x-orange" alt="Gemini" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
-<!-- <p align="center">
-  <img src="assets/images/header.png" alt="Leanna " width="100%" />
-</p> -->
+
 
 
 ## 📌 Table des matières
