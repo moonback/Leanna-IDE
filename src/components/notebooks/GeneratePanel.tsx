@@ -14,14 +14,14 @@ import { useState, useCallback, useRef, useEffect, JSX } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Sparkles, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List,
-  Loader2, Trash2, Copy, CheckCircle2, Download, RefreshCw,
+  Loader2, Copy, CheckCircle2, Download, RefreshCw,
   Filter, PenLine, Brain, Target, BookOpen, FolderInput,
   FileBarChart, Lightbulb, Zap, X, ArrowRight, ArrowLeft, Presentation,
 } from 'lucide-react';
-import { SlidePreviewModal } from './SlidePreviewModal';
-import { useToast } from '../ui/Toast';
-import { useProfile } from '../../context/UserProfileContext';
-import { MermaidDiagram } from './MermaidDiagram';
+import { SlidePreviewModal } from './SlidePreviewModal.js';
+import { useToast } from '../ui/Toast.js';
+import { useProfile } from '../../context/UserProfileContext.js';
+import { MermaidDiagram } from './MermaidDiagram.js';
 // Styles premium NotebookLM
 import '../../styles/notebooklm.css';
 
@@ -611,7 +611,8 @@ function renderInlineMarkdown(text: string): JSX.Element {
 }
 
 // Ancienne fonction conservée pour compatibilité (à supprimer plus tard)
-function renderBoldItalic(text: string): (string | JSX.Element)[] {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _renderBoldItalic(text: string): (string | JSX.Element)[] {
   return [renderInlineMarkdown(text)];
 }
 
@@ -628,10 +629,10 @@ function useReducedTransparency(): boolean {
   return reduced;
 }
 
-export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false, onClose, onViewDoc, initialDoc }: Props) {
+export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, fullView = false, onClose, onViewDoc: _onViewDoc, initialDoc }: Props) {
   const { success, error: toastError } = useToast();
   const { profile } = useProfile();
-  const [generatedDocs, setGeneratedDocs] = useState<GeneratedDoc[]>([]);
+  const [_generatedDocs, setGeneratedDocs] = useState<GeneratedDoc[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<GeneratedDoc | null>(null);
   const [copied, setCopied] = useState(false);
   
@@ -1037,7 +1038,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
 
   // ─── Actions ────────────────────────────────────────────────────────────
 
-  const handleDelete = useCallback(async (docId: string) => {
+  const _handleDelete = useCallback(async (docId: string) => {
     try {
       await fetch(`/api/notebooks/${notebookId}/generated/${docId}`, { method: 'DELETE' });
       setGeneratedDocs(prev => prev.filter(d => d.id !== docId));
