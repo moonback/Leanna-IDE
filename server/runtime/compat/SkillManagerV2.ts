@@ -20,6 +20,7 @@ import { EventBus } from "../EventBus";
 import { adaptSkill, adaptAllSkills, createToolCallProxy } from "./SkillAdapter";
 import type { LegacySkill } from "./SkillAdapter";
 import type { ToolCallMetrics } from "../types";
+import type { Skill } from "../../skills/base";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SkillManagerV2
@@ -29,6 +30,7 @@ export class SkillManagerV2 {
   private registry: ToolRegistry;
   private eventBus: EventBus;
   private skills: LegacySkill[] = [];
+  private _missionExecutor: any = null;
   // private initialized = false;
 
   constructor(config?: { eventBus?: EventBus; registry?: ToolRegistry }) {
@@ -81,7 +83,7 @@ export class SkillManagerV2 {
    * Appelle un outil par son nom.
    * Interface identique à l'ancien SkillManager.handleToolCall().
    */
-  async handleToolCall(name: string, args: any, _context?: any): Promise<any> {
+  async handleToolCall(name: string, args: any, context?: any): Promise<any> {
     // Normalisation du nom (compatibilité Gemini qui préfixe)
     let normalizedName = name;
     if (name.includes(":")) {
@@ -100,7 +102,79 @@ export class SkillManagerV2 {
       }
     }
 
-    return this.registry.call(normalizedName, args ?? {});
+    // Si un contexte est fourni, chercher la skill correspondante et appeler son handler
+    // directement pour préserver le contexte (nécessaire pour emitIdeAction, etc.)
+    if (context) {
+      for (const skill of this.skills) {
+        const tool = skill.declarations.find(d => d.name === normalizedName);
+        if (tool) {
+          return skill.handleToolCall(normalizedName, args, context);
+        }
+      }
+    }
+
+    // Sinon, utiliser le ToolRegistry normal
+    return this.registry.call(normalizedName, args ?? {}, { context });
+  }
+
+  /**
+   * Normalise les paramètres d'outil pour supprimer les champs Zod internes.
+   * Les déclarations destinées aux providers doivent être du JSON Schema,
+   * jamais des instances Zod (qui exposent notamment `_def`).
+   */
+  private normalizeToolParameters(parameters: any): Record<string, unknown> {
+    if (!parameters || typeof parameters !== 'object') return {};
+    if (!parameters._def) return this.stripPrivateSchemaFields(parameters) as Record<string, unknown>;
+
+    const definition = parameters._def as any;
+    const shape = typeof definition.shape === 'function' ? definition.shape() : definition.shape;
+    if (!shape || typeof shape !== 'object') return { type: 'OBJECT', properties: {} };
+
+    const properties: Record<string, unknown> = {};
+    const required: string[] = [];
+    for (const [key, schema] of Object.entries(shape as Record<string, any>)) {
+      const field = schema as any;
+      const fieldDef = field?._def;
+      const typeName = fieldDef?.typeName || '';
+      const isOptional = typeName === 'ZodOptional' || typeName === 'ZodDefault' || typeName === 'ZodNullable';
+      const inner = isOptional ? fieldDef.innerType || fieldDef.type : field;
+      const innerDef = inner?._def || {};
+      const innerType = innerDef.typeName || '';
+      let type = 'STRING';
+      if (innerType === 'ZodNumber') type = 'NUMBER';
+      else if (innerType === 'ZodBoolean') type = 'BOOLEAN';
+      else if (innerType === 'ZodArray') type = 'ARRAY';
+      else if (innerType === 'ZodObject' || innerType === 'ZodRecord') type = 'OBJECT';
+      else if (innerType === 'ZodEnum' || innerType === 'ZodLiteral') type = 'STRING';
+      properties[key] = { type };
+      if (!isOptional) required.push(key);
+    }
+
+    return { type: 'OBJECT', properties, ...(required.length ? { required } : {}) };
+  }
+
+  /** Supprime toute propriété interne susceptible d'être envoyée au provider. */
+  private stripPrivateSchemaFields(value: any): any {
+    if (Array.isArray(value)) return value.map(item => this.stripPrivateSchemaFields(item));
+    if (!value || typeof value !== 'object') return value;
+    const clean: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (key === '_def' || key.startsWith('_')) continue;
+      clean[key] = this.stripPrivateSchemaFields(item);
+    }
+    return clean;
+  }
+
+  /**
+   * Normalise une déclaration d'outil pour le provider.
+   * Gemini function declarations n'acceptent que ces trois champs.
+   */
+  private normalizeDeclaration(declaration: any): any {
+    return {
+      name: String(declaration?.name || ''),
+      description: String(declaration?.description || ''),
+      parameters: this.normalizeToolParameters(declaration?.parameters),
+    };
   }
 
   /**
@@ -108,12 +182,15 @@ export class SkillManagerV2 {
    * Compatible avec l'interface de l'ancien SkillManager.
    */
   getToolDeclarations(enabledSkillIds?: string[]): any[] {
-    if (!enabledSkillIds) {
-      return this.registry.getDeclarations();
+    let declarations = this.registry.getDeclarations();
+    
+    if (enabledSkillIds) {
+      // Filtrer par catégorie (= skill name dans notre mapping)
+      declarations = enabledSkillIds.flatMap((id) => this.registry.getDeclarationsByCategory(id));
     }
-
-    // Filtrer par catégorie (= skill name dans notre mapping)
-    return enabledSkillIds.flatMap((id) => this.registry.getDeclarationsByCategory(id));
+    
+    // Normaliser toutes les déclarations pour supprimer les champs Zod
+    return declarations.map(d => this.normalizeDeclaration(d));
   }
 
   /**
@@ -199,5 +276,89 @@ export class SkillManagerV2 {
    */
   getCategories(): string[] {
     return this.registry.getCategories();
+  }
+
+  // ─── Mission System ─────────────────────────────────────────────────────────────
+
+  /**
+   * Getter pour missionExecutor (compatible avec l'ancien SkillManager).
+   * Le missionExecutor doit être initialisé explicitement via ensureMissionExecutor()
+   * ou dans le callback onReady de bootstrapRuntime.
+   */
+  get missionExecutor(): any {
+    return this._missionExecutor;
+  }
+
+  // ─── Custom Skills ────────────────────────────────────────────────────────────
+
+  /**
+   * Charge les custom skills depuis Supabase et les enregistre.
+   * Appelé au démarrage et peut être rappelé pour rafraîchir.
+   * Compatible avec l'ancien SkillManager.loadCustomSkills().
+   */
+  public async loadCustomSkills(): Promise<void> {
+    try {
+      const { getCustomSkillDeclarations, handleCustomSkillCall, customSkillsManagementSkill } = 
+        await import('../../skills/customSkills');
+
+      // Enregistrer le skill de gestion CRUD comme une skill classique
+      const managementSkill = customSkillsManagementSkill as unknown as Skill;
+      this.registerSkill({
+        name: managementSkill.name,
+        declarations: managementSkill.declarations,
+        handleToolCall: managementSkill.handleToolCall.bind(managementSkill),
+      });
+
+      // Charger les déclarations des custom skills actifs
+      const declarations = await getCustomSkillDeclarations();
+      if (declarations.length > 0) {
+        // Créer une skill proxy pour les custom skills
+        const customSkillProxy: LegacySkill = {
+          name: "custom_skills_proxy",
+          declarations: declarations as any[],
+          handleToolCall: async (name: string, args: any) => {
+            return handleCustomSkillCall(name, args);
+          },
+        };
+        this.registerSkill(customSkillProxy);
+        console.log(`[SkillManagerV2] ✓ ${declarations.length} custom skill(s) chargé(s) depuis la BDD.`);
+      }
+    } catch (err: any) {
+      // Non critique — les custom skills ne bloquent pas le démarrage
+      console.warn(`[SkillManagerV2] Custom skills non chargés:`, err.message);
+    }
+  }
+
+  // ─── Compatibilité avec l'ancien SkillManager ─────────────────────────────
+
+  /**
+   * Découverte et chargement paresseux de skills (compatibilité).
+   * Dans le nouveau système, toutes les skills sont chargées au démarrage,
+   * donc cette méthode retourne simplement les outils déjà chargés.
+   */
+  public async discoverAndLoad(category: string): Promise<{ loaded: string[]; tools: string[] }> {
+    // Toutes les skills sont déjà chargées via bootstrapRuntime
+    // Retourner les outils de la catégorie demandée
+    const allDeclarations = this.getToolDeclarations();
+    const categoryDeclarations = this.getToolDeclarations([category]);
+    
+    const loaded = categoryDeclarations.length > 0 ? [category] : [];
+    const tools = categoryDeclarations.map((d: any) => d.name);
+    
+    if (loaded.length === 0) {
+      console.warn(`[SkillManagerV2] Catégorie "${category}" non trouvée ou déjà chargée.`);
+    }
+    
+    return { loaded, tools };
+  }
+
+  /**
+   * Enregistre l'utilisation d'un outil (compatibilité avec l'ancien système).
+   * Dans le nouveau système, les métriques sont gérées automatiquement par ToolRegistry.
+   */
+  public recordToolUsage(toolName: string, success: boolean): void {
+    // Le ToolRegistry gère déjà les métriques automatiquement
+    // Cette méthode est conservée pour la compatibilité mais ne fait rien de spécial
+    console.log(`[SkillManagerV2] Utilisation de l'outil "${toolName}": ${success ? '✓' : '✗'}`);
   }
 }

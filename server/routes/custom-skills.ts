@@ -1,5 +1,8 @@
 import { Router, Request, Response } from 'express';
-import type { SkillManager } from '../skills/SkillManager';
+import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2';
+
+// Type compatible avec l'ancien SkillManager pour une migration progressive
+type SkillManager = SkillManagerV2;
 
 /**
  * Crée le router custom-skills en injectant le SkillManager.

@@ -81,6 +81,154 @@ const SKILL_NAME_TO_CATEGORY: Record<string, string> = Object.fromEntries(
   Object.entries(LAZY_CATEGORIES).map(([cat, skillName]) => [skillName, cat])
 );
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// TOOL_KEYWORDS avec associations aux rôles d'agents (Spécialisation des compétences)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Mapping étendu des mots-clés par catégorie de skill, avec association aux rôles d'agents.
+ * Chaque entrée contient :
+ * - keywords: mots-clés pour la détection sémantique
+ * - recommendedRoles: rôles d'agents recommandés pour cette catégorie
+ * - priorityRoles: rôles prioritaires (spécialisés)
+ * 
+ * Ce mapping permet une spécialisation plus fine des compétences en fonction des outils.
+ */
+export const TOOL_KEYWORDS_WITH_AGENTS: Record<string, {
+  keywords: string[];
+  recommendedRoles: string[];
+  priorityRoles: string[];
+}> = {
+  // Code & Ingénierie
+  codebase: {
+    keywords: ['fichier', 'file', 'lire', 'read', 'ecrire', 'write', 'modifier', 'modify', 'patch', 'recherche', 'search', 'codebase', 'explorateur', 'explorer', 'navigator', 'navigation', 'tree', 'listing', 'file tree', 'monaco', 'éditeur', 'editor'],
+    recommendedRoles: ['coder', 'refactor', 'debugger', 'reviewer', 'architect'],
+    priorityRoles: ['coder', 'refactor'],
+  },
+  git: {
+    keywords: ['git', 'commit', 'push', 'pull', 'branch', 'merge', 'rebase', 'diff', 'staging', 'stage', 'repository', 'repo', 'historique', 'version', 'clone', 'statut', 'status', 'modifié', 'modified', 'modification', 'changement', 'change'],
+    recommendedRoles: ['coder', 'writer'],
+    priorityRoles: ['coder'],
+  },
+  github: {
+    keywords: ['github', 'pr', 'pull request', 'issue', 'repository', 'repo', 'fork', 'star', 'notification', 'release', 'workflow', 'actions'],
+    recommendedRoles: ['coder', 'researcher'],
+    priorityRoles: ['coder'],
+  },
+  verify: {
+    keywords: ['verifier', 'verify', 'test', 'valider', 'validate', 'lint', 'typecheck', 'tsc', 'build', 'compiler', 'compile', 'syntaxe', 'syntax', 'erreur', 'error', 'warning'],
+    recommendedRoles: ['tester', 'reviewer', 'security', 'debugger'],
+    priorityRoles: ['tester', 'reviewer'],
+  },
+  
+  // Connaissance & Mémoire
+  knowledge: {
+    keywords: ['knowledge', 'connaissance', 'contexte', 'context', 'impact', 'memoire projet', 'project memory', 'reindex', 'semantic', 'entite', 'entity', 'graph', 'convention', 'architecture', 'decision', 'comprendre', 'understand', 'analyse projet', 'project analysis', 'score', 'health', 'feedback', 'learning', 'lesson', 'pattern', 'dependency', 'diagram', 'couplage', 'coupling'],
+    recommendedRoles: ['researcher', 'planner', 'architect', 'coder'],
+    priorityRoles: ['researcher', 'architect'],
+  },
+  memory: {
+    keywords: ['memoire', 'memory', 'souvenir', 'preference', 'utilisateur', 'user', 'rappeler', 'remember', 'profil', 'profile', 'user profile', 'personnalité', 'personality', 'préférence', 'preference', 'habitude', 'habit'],
+    recommendedRoles: ['planner', 'researcher', 'memory'],
+    priorityRoles: ['planner'],
+  },
+  
+  // Automatisation & Vision
+  automation: {
+    keywords: ['browser', 'navigate', 'web', 'site', 'scrape', 'click', 'screenshot', 'snapshot', 'automation', 'page', 'url', 'html', 'form', 'extract', 'inspect'],
+    recommendedRoles: ['researcher', 'vision'],
+    priorityRoles: ['vision', 'researcher'],
+  },
+  browser: {
+    keywords: ['navigateur', 'browser', 'ouvrir navigateur', 'open browser', 'browser_navigate', 'browser_search', 'browser_open', 'montrer site', 'afficher page', 'navigue vers', 'navigate to', 'recherche navigateur'],
+    recommendedRoles: ['researcher', 'vision'],
+    priorityRoles: ['researcher'],
+  },
+  
+  // Recherche & Analyse
+  reasoning: {
+    keywords: ['raisonnement', 'reasoning', 'reflechir', 'think', 'planifier', 'analyse', 'critique', 'critic', 'brainstorm', 'idee', 'stratégie', 'strategy', 'solution', 'problem solving', 'résoudre', 'solve', 'étape', 'step', 'méthode', 'method'],
+    recommendedRoles: ['planner', 'architect', 'researcher'],
+    priorityRoles: ['planner', 'architect'],
+  },
+  
+  // Mission & Orchestration
+  mission: {
+    keywords: ['mission', 'plan', 'execute', 'tache complexe', 'complex task', 'orchestrer', 'subtask', 'objectif', 'goal', 'subgoal', 'sous-objectif', 'action', 'décomposer', 'decompose', 'réfléchir', 'réflexion', 'reflection'],
+    recommendedRoles: ['planner', 'architect'],
+    priorityRoles: ['planner'],
+  },
+  agents: {
+    keywords: ['agent', 'deleguer', 'delegate', 'sous-agent', 'subagent', 'expert', 'architect', 'reviewer', 'testeur', 'rôle', 'role', 'spécialiste', 'specialist', 'parallel', 'parallèle', 'multitâche', 'multitask', 'collaborer', 'collaborate', 'collaboration', 'pattern', 'flotte', 'fleet', 'bus', 'message', 'délégation', 'autonome', 'autonomous'],
+    recommendedRoles: ['planner', 'architect'],
+    priorityRoles: ['planner'],
+  },
+  
+  // Système
+  system: {
+    keywords: ['systeme', 'system', 'fichier', 'commande', 'process', 'notifier', 'notification', 'ouvrir', 'open', 'executer', 'execute'],
+    recommendedRoles: ['coder', 'writer'],
+    priorityRoles: ['coder'],
+  },
+  
+  // Autres
+  list: {
+    keywords: ['liste', 'list', 'todo', 'tache', 'task', 'shopping', 'item', 'checklist', 'ajouter', 'supprimer'],
+    recommendedRoles: ['planner', 'writer'],
+    priorityRoles: ['planner'],
+  },
+  weather: {
+    keywords: ['meteo', 'weather', 'temperature', 'pluie', 'soleil', 'vent', 'prevision', 'forecast'],
+    recommendedRoles: ['researcher'],
+    priorityRoles: ['researcher'],
+  },
+  history: {
+    keywords: ['historique', 'history', 'conversation', 'precedent', 'derniere', 'passe', 'recherche', 'search history', 'context'],
+    recommendedRoles: ['researcher', 'memory'],
+    priorityRoles: ['researcher'],
+  },
+  time: {
+    keywords: ['heure', 'date', 'time', 'calendrier', 'calendar', 'jour', 'heure actuelle', 'today'],
+    recommendedRoles: ['planner'],
+    priorityRoles: ['planner'],
+  },
+  guidelines: {
+    keywords: ['guidelines', 'norme', 'standard', 'workflow', 'documentation', 'style', 'communication', 'convention'],
+    recommendedRoles: ['writer', 'formatter'],
+    priorityRoles: ['writer'],
+  },
+  project: {
+    keywords: ['projet', 'project', 'créer', 'create', 'nouveau projet', 'new project', 'scaffold', 'scaffolding', 'template', 'react', 'next', 'vite', 'react router', 'initialiser', 'init', 'bootstrap', 'starter', 'boilerplate'],
+    recommendedRoles: ['architect', 'planner', 'coder'],
+    priorityRoles: ['architect', 'planner'],
+  },
+  aiStudioDirectives: {
+    keywords: ['directive', 'directives', 'studio', 'ai studio', 'build', 'comportement', 'behavior', 'technique', 'technical', 'conception', 'design', 'tailwind', 'iframe', 'accessibilité', 'accessibility', 'intégration', 'integration', 'oauth', 'api key', 'port 3000', 'styling', 'enum', 'import'],
+    recommendedRoles: ['architect', 'planner'],
+    priorityRoles: ['architect'],
+  },
+  documentLinker: {
+    keywords: ['document', 'pdf', 'résumé', 'résumer', 'synthèse', 'synthétiser', 'lien', 'connexion', 'croiser', 'comparer', 'analyser document', 'upload', 'fichier uploadé', 'multimodal', 'image', 'rapport', 'briefing', 'cross-document', 'inter-document'],
+    recommendedRoles: ['researcher', 'writer', 'summarizer'],
+    priorityRoles: ['researcher', 'summarizer'],
+  },
+  richDocument: {
+    keywords: ['tableau', 'table', 'graphique', 'graph', 'chart', 'courbe', 'curve', 'camembert', 'pie', 'barres', 'bar', 'fiche', 'card', 'liste', 'list', 'visualiser', 'visualize', 'afficher', 'display', 'données', 'data', 'statistiques', 'stats', 'rapport', 'report', 'dashboard', 'kpi', 'indicateur', 'indicator', 'aire', 'area', 'document riche', 'rich document', 'présenter', 'present'],
+    recommendedRoles: ['writer', 'formatter'],
+    priorityRoles: ['writer'],
+  },
+  custom_skills_proxy: {
+    keywords: ['skill', 'custom skill', 'compétence', 'outil perso', 'custom', 'mon skill', 'mes skills', 'skill perso', 'skill personnalisé', 'outil personnalisé', 'custom tool', 'user skill', 'utilisateur'],
+    recommendedRoles: ['planner'],
+    priorityRoles: ['planner'],
+  },
+  custom_skills_management: {
+    keywords: ['créer skill', 'create skill', 'ajouter skill', 'add skill', 'supprimer skill', 'delete skill', 'modifier skill', 'update skill', 'lister skills', 'list skills', 'gérer skills', 'manage skills', 'custom skill management'],
+    recommendedRoles: ['planner'],
+    priorityRoles: ['planner'],
+  },
+};
+
 // ── Imports statiques de tous les skills (fallback pour Electron/bundle) ──────
 import { automationSkill } from "./automation";
 import { browserSkill } from "./browser";

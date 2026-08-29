@@ -16,7 +16,7 @@ import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
-import { SkillManager } from '../skills/SkillManager';
+import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2';
 import { buildSystemInstruction, type ProfileConfig } from '../prompts/systemInstruction';
 import { startConversation, endConversation, saveMessage, getConversationMessages } from '../skills/history';
 import { isSandboxActive } from '../utils/sandbox';
@@ -27,6 +27,9 @@ import { notebookManager } from '../notebooks';
 import { supervisor } from '../autonomy';
 import { WORKSPACE_SITE_URL } from '../utils/selfRoot';
 import type { BrowserPendingEntry, BrowserActionPendingEntry } from '../routes/browser';
+
+// Type compatible avec l'ancien SkillManager pour une migration progressive
+type SkillManager = SkillManagerV2;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

@@ -36,6 +36,22 @@ export interface CustomAgentConfig {
   model?: string;
   createdAt?: string;
   updatedAt?: string;
+  // Spécialisation des compétences (Skills)
+  /**
+   * Catégories d'outils associées à cet agent (ex: 'codebase', 'knowledge', 'verify')
+   * Utilisé pour le routing automatique des requêtes vers l'agent approprié
+   */
+  toolCategories?: string[];
+  /**
+   * Mots-clés spécifiques pour la détection sémantique des requêtes
+   * Ces mots-clés déclenchent la sélection de cet agent
+   */
+  toolKeywords?: string[];
+  /**
+   * Rôles d'agents prioritaires pour la délégation
+   * Quand cet agent délègue, il privilégiera ces rôles
+   */
+  priorityDelegationRoles?: string[];
 }
 
 export interface AgentsConfig {

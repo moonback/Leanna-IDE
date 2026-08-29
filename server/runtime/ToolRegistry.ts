@@ -40,6 +40,8 @@ export interface ToolCallOptions {
   retries?: number;
   /** Permissions de l'appelant */
   callerPermissions?: ToolPermission[];
+  /** Contexte à passer au handler (pour compatibilité avec les skills legacy) */
+  context?: any;
 }
 
 export interface ToolRegistryConfig {
@@ -194,7 +196,8 @@ export class ToolRegistry {
         const result = await this.executeWithTimeout(
           entry.definition.handler,
           args,
-          timeoutMs
+          timeoutMs,
+          options.context
         );
 
         const durationMs = Date.now() - startTime;
@@ -259,19 +262,26 @@ export class ToolRegistry {
   private async executeWithTimeout(
     handler: ToolHandler,
     args: Record<string, unknown>,
-    timeoutMs: number
+    timeoutMs: number,
+    context?: any
   ): Promise<unknown> {
     return new Promise<unknown>((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new ToolTimeoutError(timeoutMs));
       }, timeoutMs);
 
-      handler(args)
-        .then((result) => {
+      // Essayer d'appeler avec contexte si le handler l'accepte ( pour compatibilité legacy)
+      // Les handlers modernes prennent seulement args, mais les handlers legacy peuvent prendre context
+      const resultPromise = (handler as any).length >= 3 
+        ? (handler as any)(args, context)
+        : handler(args);
+
+      resultPromise
+        .then((result: unknown) => {
           clearTimeout(timer);
           resolve(result);
         })
-        .catch((err) => {
+        .catch((err: any) => {
           clearTimeout(timer);
           reject(err);
         });

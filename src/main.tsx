@@ -184,6 +184,30 @@ try {
   }
 } catch { /* ignore parse errors */ }
 
+// ── Load Tool-Agent Mapping on startup (Spécialisation des compétences) ─────────
+// Charge le mapping dynamique outil → agent depuis le backend
+// Cela permet au frontend de connaître quel agent utilise quel outil
+(async () => {
+  try {
+    const _token = localStorage.getItem('Leanna_api_token');
+    const response = await fetch('/api/agents/tool-mapping/primary', {
+      headers: _token ? { 'x-Leanna-token': _token } : {},
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && data.mapping) {
+        // Injecter le mapping dans window pour qu'il soit accessible partout
+        (window as any).LeannaToolAgentMapping = data.mapping;
+        console.log(`[main.tsx] Mapping outil→agent chargé: ${data.totalTools} outils mappés`);
+      }
+    }
+  } catch (error) {
+    // Le backend n'est peut-être pas encore prêt, on réessayera plus tard
+    console.warn('[main.tsx] Impossible de charger le mapping outil→agent au démarrage:', error);
+  }
+})();
+
 function IdeNavigationBridge() {
   const navigate = useNavigate();
   const location = useLocation();

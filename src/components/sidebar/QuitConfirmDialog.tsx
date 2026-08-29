@@ -478,7 +478,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
                     textTransform: 'uppercase',
                   }}
                 >
-                  v0.5.0 · Leanna 
+                  v0.6.0 · Leanna 
                 </span>
               </div>
             </motion.div>

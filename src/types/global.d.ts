@@ -22,6 +22,8 @@ declare module 'react-window-tree' {
 // Global CustomEvent types
 interface Window {
   dispatchEvent(event: CustomEvent): boolean;
+  // Spécialisation des compétences - Mapping outil → agent
+  LeannaToolAgentMapping?: Record<string, string>;
 }
 
 interface CustomEventMap {
