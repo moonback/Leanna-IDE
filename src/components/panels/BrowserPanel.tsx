@@ -66,6 +66,8 @@ interface BrowserPanelProps {
   width?: string;
   /** Callback pour ouvrir l'URL dans un nouvel onglet de l'application */
   onOpenInNewTab?: (url: string) => void;
+  /** Callback quand une URL est ouverte dans une fenêtre externe */
+  onOpenExternal?: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -91,6 +93,7 @@ function isHttps(url: string): boolean {
 export function BrowserPanel({
   onClose,
   onOpenInNewTab,
+  onOpenExternal,
   url: controlledUrl,
   defaultUrl = BROWSER_HOME_URL,
   fullWidth = false,
@@ -108,6 +111,10 @@ export function BrowserPanel({
   const [loadError, setLoadError] = useState<string | null>(null);
   /** Indicateur visuel quand Leanna pilote la navigation */
   const [assistantNavActive, setAssistantNavActive] = useState(false);
+  /** Indique si une fenêtre externe est ouverte */
+  const [isExternalWindowOpen, setIsExternalWindowOpen] = useState(false);
+  /** Référence à la fenêtre externe ouverte (pour vérifier closed) */
+  const externalWindowRef = useRef<Window | null>(null);
 
   /** true dès que le <webview> a émis dom-ready — loadURL ne peut être appelé qu'après */
   const domReadyRef = useRef(false);
@@ -162,14 +169,60 @@ export function BrowserPanel({
     webviewRef.current?.reload();
   }, []);
   const handleHome = useCallback(() => navigateTo(BROWSER_HOME_URL), [navigateTo]);
+  // Référence pour l'intervalle de vérification de la fenêtre externe
+  const externalWindowCheckRef = useRef<NodeJS.Timeout | null>(null);
+
   const handleOpenInNewWindow = useCallback(() => {
+    // Dans Electron, on utilise toujours shell.openExternal pour ouvrir dans le navigateur par défaut
+    // window.open() ne fonctionne pas correctement dans Electron pour les fenêtres externes
     try {
       const { shell } = require('electron');
       shell.openExternal(currentUrl);
+      
+      // Avec shell.openExternal, on ne peut pas détecter quand la fenêtre est fermée
+      // L'overlay reste affiché jusqu'à ce que l'utilisateur clique sur "Fermer le message"
+      externalWindowRef.current = null;
+      setIsExternalWindowOpen(true);
+      
     } catch {
-      window.open(currentUrl, '_blank', 'noopener,noreferrer');
+      // Si on n'est pas dans Electron (mode dev web), essayer window.open
+      const extWindow = window.open(currentUrl, '_blank', 'noopener,noreferrer');
+      
+      if (extWindow) {
+        externalWindowRef.current = extWindow;
+        setIsExternalWindowOpen(true);
+        
+        // Nettoyer l'intervalle précédent
+        if (externalWindowCheckRef.current) {
+          clearInterval(externalWindowCheckRef.current);
+        }
+        
+        // Vérifier périodiquement si la fenêtre est fermée
+        externalWindowCheckRef.current = setInterval(() => {
+          if (extWindow.closed) {
+            setIsExternalWindowOpen(false);
+            externalWindowRef.current = null;
+            if (externalWindowCheckRef.current) {
+              clearInterval(externalWindowCheckRef.current);
+              externalWindowCheckRef.current = null;
+            }
+          }
+        }, 500);
+      }
     }
-  }, [currentUrl]);
+    
+    onOpenExternal?.();
+  }, [currentUrl, onOpenExternal]);
+
+  // Nettoyer l'intervalle quand le composant est démonté
+  useEffect(() => {
+    return () => {
+      if (externalWindowCheckRef.current) {
+        clearInterval(externalWindowCheckRef.current);
+        externalWindowCheckRef.current = null;
+      }
+    };
+  }, []);
 
   // ── Événements webview ──────────────────────────────────────────────────────
 
@@ -364,7 +417,7 @@ export function BrowserPanel({
           },
           body: JSON.stringify({ requestId, result, error }),
         });
-      } catch {/* silent */}
+      } catch {/* silent */ }
     };
 
     // ── Curseur simulé : injection + animation dans la webview ──────────────
@@ -437,7 +490,7 @@ export function BrowserPanel({
           setTimeout(function(){ rip.remove(); }, 400);
         })()`;
         await wv.executeJavaScript(rippleScript);
-      } catch {/* ne bloque pas l'action si l'animation échoue */}
+      } catch {/* ne bloque pas l'action si l'animation échoue */ }
     };
 
     // ── Clic sur un élément
@@ -528,7 +581,7 @@ export function BrowserPanel({
                   }
                 })();
               `);
-            } catch {/* ignore */}
+            } catch {/* ignore */ }
             postActionResult(detail.requestId, { ok: true });
           }, 300);
         } else {
@@ -642,7 +695,7 @@ export function BrowserPanel({
       }
     };
 
-    // ── Inspection d'éléments spécifiques
+    // ── Inspection d'éléments spécifiques (CORRIGÉ : ajout du paramètre type)
     const handleInspect = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { requestId: string; inspectType: 'buttons' | 'inputs' | 'links' | 'all' };
       const wv = webviewRef.current;
@@ -650,7 +703,8 @@ export function BrowserPanel({
         postActionResult(detail.requestId, null, 'Webview non disponible.');
         return;
       }
-      const inspectScript = `(function(){
+      // La fonction anonyme prend désormais un paramètre `type`
+      const inspectScript = `(function(type){
         var bestSelector = function(el) {
           if (el.id) return '#' + CSS.escape(el.id);
           var testId = el.getAttribute('data-testid') || el.getAttribute('data-test-id');
@@ -674,7 +728,7 @@ export function BrowserPanel({
           results.links = Array.from(document.querySelectorAll('a[href]')).map(function(link) { return { selector: bestSelector(link), text: (link.innerText || '').trim().substring(0, 80), href: link.href || '' }; }).slice(0, 12);
         }
         return JSON.stringify(results);
-      })('${detail.inspectType || 'all'}')`;
+      })(${JSON.stringify(detail.inspectType || 'all')})`;
       try {
         const raw = await wv.executeJavaScript(inspectScript);
         const parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {};
@@ -696,7 +750,7 @@ export function BrowserPanel({
         await wv.executeJavaScript(
           `(function(x,y){ var cur=document.getElementById('__Leanna_cursor'); if(cur){cur.style.left=x+'px';cur.style.top=y+'px';} })(${lx},${ly})`
         );
-      } catch {/* silent */}
+      } catch {/* silent */ }
     };
 
     // ── Helper : attente d'une condition dans la webview (Sprint 1 — J2) ──────
@@ -726,7 +780,7 @@ export function BrowserPanel({
             ) as boolean;
           }
           if (found) return { found: true, elapsed: Date.now() - start };
-        } catch {/* page still loading */}
+        } catch {/* page still loading */ }
         await new Promise<void>((r) => setTimeout(r, interval));
       }
       return { found: false, elapsed: timeoutMs };
@@ -901,7 +955,7 @@ export function BrowserPanel({
         return JSON.stringify({ ok: true });
       })(${JSON.stringify(detail.role)}, ${JSON.stringify(detail.accessibleName)})`;
       try {
-        await moveCursorToElement(wv, `[role="${detail.role}"]`).catch(() => {/* ignore si pas trouvé */});
+        await moveCursorToElement(wv, `[role="${detail.role}"]`).catch(() => {/* ignore si pas trouvé */ });
         const raw = await wv.executeJavaScript(clickByRoleScript);
         let parsed: any = {};
         try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch {}
@@ -1131,7 +1185,7 @@ export function BrowserPanel({
       }
       try {
         await moveCursorToElement(wv, detail.selector);
-      } catch {/* ignore animation errors */}
+      } catch {/* ignore animation errors */ }
       const script = `(function(){
         var el = document.querySelector(${JSON.stringify(detail.selector)});
         if (!el) return JSON.stringify({ found: false });
@@ -1263,7 +1317,9 @@ export function BrowserPanel({
       window.removeEventListener('Leanna-browser-fill-form', handleFillForm as EventListener);
       window.removeEventListener('Leanna-browser-select-option', handleSelectOption as EventListener);
     };
-  }, [navigateTo]);  // ── Render ──────────────────────────────────────────────────────────────────
+  }, [navigateTo]);
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   const secure = isHttps(currentUrl);
 
@@ -1429,18 +1485,84 @@ export function BrowserPanel({
 
       {/* ── Webview ── */}
       <div className="flex-1 min-h-0 relative">
-        {/*
-          Les attributs Electron-spécifiques (allowpopups, webpreferences) ne sont
-          pas passés en props JSX pour éviter :
-            TS2322: Type 'string | false' not assignable to boolean | undefined
-            Warning React: Received false for a non-boolean attribute allowpopups
-          Ils sont settés via setAttribute() directement sur l'élément dans useEffect.
-        */}
         <webview
           ref={webviewRef}
           src={defaultUrl}
-          style={{ width: '100%', height: '100%', display: 'flex' }}
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            // Masquer le webview quand l'overlay est affiché
+            visibility: isExternalWindowOpen ? 'hidden' : 'visible',
+          }}
         />
+        
+        {/* Overlay message quand une fenêtre externe est ouverte */}
+        {isExternalWindowOpen && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center"
+            style={{
+              backgroundColor: 'var(--bg-panel)',
+              zIndex: 10,
+            }}
+          >
+            <div
+              className="flex flex-col items-center gap-4 p-6 rounded-lg"
+              style={{
+                backgroundColor: 'var(--bg-panel)',
+                border: '1px solid var(--border-base)',
+                maxWidth: '400px',
+              }}
+            >
+              <svg 
+                style={{ width: 64, height: 64, opacity: 0.8 }}
+                xmlns="http://www.w3.org/2000/svg" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="1.5"
+              >
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15,3 21,3 21,9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              <h2
+                className="text-lg font-semibold"
+                style={{ color: 'var(--accent-primary)' }}
+              >
+                Page ouverte dans une nouvelle fenêtre
+              </h2>
+              <p
+                className="text-center text-sm"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Cette page a été ouverte dans votre navigateur par défaut.<br />
+                Elle se rechargera automatiquement ici dès que vous fermez la fenêtre externe.
+              </p>
+              <button
+                onClick={() => {
+                  if (externalWindowRef.current && !externalWindowRef.current.closed) {
+                    externalWindowRef.current.close();
+                  }
+                  setIsExternalWindowOpen(false);
+                  externalWindowRef.current = null;
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium"
+                style={{
+                  backgroundColor: 'var(--accent-primary)',
+                  color: 'white',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'opacity 0.2s',
+                }}
+                onMouseOver={(e) => (e.currentTarget as HTMLButtonElement).style.opacity = '0.9'}
+                onMouseOut={(e) => (e.currentTarget as HTMLButtonElement).style.opacity = '1'}
+              >
+                Fermer le message
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

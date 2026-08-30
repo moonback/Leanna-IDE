@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom';
 // Monaco Editor - lazy loaded to reduce initial bundle
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.Editor })));
 // Panels - lazy loaded
-const DocumentPanel = lazy(() => import('../components/panels/DocumentPanel').then(m => ({ default: m.DocumentPanel })));
-const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel').then(m => ({ default: m.SandboxPanel })));
-const VisionPanel = lazy(() => import('../components/panels/VisionPanel').then(m => ({ default: m.VisionPanel })));
-const DocumentsView = lazy(() => import('./DocumentsView'));
-const NotebooksView = lazy(() => import('./NotebooksView'));
-const RichDocumentViewerLazy = lazy(() => import('../components/ide/RichDocumentViewer').then(m => ({ default: m.RichDocumentViewer })));
+const DocumentPanel = lazy(() => import('../components/panels/DocumentPanel.js').then(m => ({ default: m.DocumentPanel })));
+const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel.js').then(m => ({ default: m.SandboxPanel })));
+const VisionPanel = lazy(() => import('../components/panels/VisionPanel.js').then(m => ({ default: m.VisionPanel })));
+const DocumentsView = lazy(() => import('./DocumentsView.js'));
+const NotebooksView = lazy(() => import('./NotebooksView.js'));
+const RichDocumentViewerLazy = lazy(() => import('../components/ide/RichDocumentViewer.js').then(m => ({ default: m.RichDocumentViewer })));
 import { X } from 'lucide-react';
 import type { RichDocument } from '../components/ide/RichDocumentViewer.js';
 import { IdeModal, type ModalMode } from '../components/ide/IdeModal.js';
@@ -54,6 +54,7 @@ import { AgentActivityOverlay } from '../components/ide/AgentActivityOverlay.js'
 import { TemplateSelectorModal } from '../components/templates/TemplateSelectorModal.js';
 import TerminalPanel from '../components/panels/TerminalPanel.js';
 import type { TerminalPanelHandle } from '../components/panels/TerminalPanel.js';
+import { useToast } from '../components/ui/Toast.js';
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -67,6 +68,7 @@ export default function IdeView() {
   const { activity, clearActivity, connected, disconnect, connect, muted, toggleMute, isBusy, reasoning, sendVideoFrame, sendRawMessage } = useLiveAPIContext();
   const { isSharing: screenShareEnabled, toggleScreenShare } = useScreenShare();
   const navigate = useNavigate();
+  const { info: toastInfo } = useToast();
 
   // Settings navigation handler
   const openSettings = useCallback(() => navigate('/settings'), [navigate]);
@@ -251,6 +253,11 @@ export default function IdeView() {
     const browserPath = `__browser__:${url}`;
     openFileAt(browserPath);
   }, [openFileAt]);
+
+  // Notification quand une URL est ouverte dans une fenêtre externe
+  const handleBrowserExternalOpen = useCallback(() => {
+    toastInfo('La page a été ouverte dans une nouvelle fenêtre');
+  }, [toastInfo]);
 
   // ── Handle AI-triggered file open ──────────────────────────────────────────
 
@@ -872,6 +879,7 @@ export default function IdeView() {
                           url={browserUrl}
                           onClose={() => { setShowBrowser(false); setBrowserUrl(undefined); }}
                           onOpenInNewTab={openUrlInNewTab}
+                          onOpenExternal={handleBrowserExternalOpen}
                           fullWidth
                         />
                       </div>
@@ -950,6 +958,7 @@ export default function IdeView() {
                                                   url={activeFile.browserUrl}
                                                   onClose={() => fileSystem.closeTab(activeFile.path)}
                                                   onOpenInNewTab={openUrlInNewTab}
+                                                  onOpenExternal={handleBrowserExternalOpen}
                                                   fullWidth
                                                 />
                                               ) : markdownPreview && activeFile.language === 'markdown' ? (
@@ -959,6 +968,7 @@ export default function IdeView() {
                                                   url={`http://localhost:${SERVER_PORT}/workspace-preview/${encodeURIComponent(activeFile.path)}`}
                                                   onClose={() => setHtmlPreview(false)}
                                                   onOpenInNewTab={openUrlInNewTab}
+                                                  onOpenExternal={handleBrowserExternalOpen}
                                                   fullWidth
                                                 />
                                               ) : /\.(png|jpg|jpeg|gif|webp|bmp|ico)$/i.test(activeFile.path) ? (
