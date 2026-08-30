@@ -383,6 +383,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const [threads, setThreads] = useState<{ id: string; title: string; createdAt: string }[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [showThreadList, setShowThreadList] = useState(false);
+  const [showContextMenu, setShowContextMenu] = useState(false);
   // ─── Folder Picker (save as MD) ───────────────────────────────────────────
   const [folderPickerMsg, setFolderPickerMsg] = useState<ChatMessage | null>(null);
   const [sandboxFolders, setSandboxFolders] = useState<SandboxFolder[]>([]);
@@ -610,6 +611,18 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     };
   }, []);
 
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (showContextMenu && !target.closest?.('.context-menu-container')) {
+        setShowContextMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showContextMenu]);
+
 
   // ─── Copy to Clipboard ────────────────────────────────────────────────────
 
@@ -804,6 +817,15 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     { cmd: '/insights', desc: 'Extraire les insights', prompt: 'Extrais les insights et conclusions clés des sources' },
     { cmd: '/glossaire', desc: 'Créer un glossaire', prompt: 'Crée un glossaire des termes importants trouvés dans les sources' },
     { cmd: '/plan', desc: 'Plan de révision', prompt: 'Crée un plan de révision structuré basé sur les sources' },
+  ], []);
+
+  const contextSuggestions = useMemo(() => [
+    { label: "Suggère moi des améliorations", prompt: "Suggère moi des améliorations pour ce contenu" },
+    { label: "Résumé complet", prompt: "Fais un résumé complet de toutes les sources" },
+    { label: "Points clés", prompt: "Quels sont les points clés à retenir de ces sources?" },
+    { label: "Actions recommandées", prompt: "Quelles actions ou décisions recommandes-tu basé sur ce contenu?" },
+    { label: "Analyse complète", prompt: "Fais une analyse complète et détaillée du contenu" },
+    { label: "Lacunes et opportunités", prompt: "Quelles sont les lacunes, faiblesses ou opportunités dans ces sources?" },
   ], []);
 
   const showSlashMenu = input.startsWith('/') && !input.includes(' ');
@@ -2125,7 +2147,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
           />
 
           {/* Right action buttons */}
-          <div className="flex items-center gap-1 px-2 py-2 flex-shrink-0">
+          <div className="relative flex items-center gap-1 px-2 py-2 flex-shrink-0 context-menu-container">
             <motion.button
               onClick={() => handleDeepDive()}
               disabled={!input.trim() || loading}
@@ -2163,6 +2185,48 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
                 <GitCompare className="w-4 h-4" />
               </motion.button>
             )}
+
+            {/* Context Menu Button */}
+            <motion.button
+              onClick={() => setShowContextMenu(!showContextMenu)}
+              disabled={loading}
+              whileTap={!loading ? { scale: 0.88 } : undefined}
+              transition={{ duration: 0.1 }}
+              className="p-2 rounded-lg disabled:opacity-25 hover:bg-[var(--accent-subtle)] transition-colors duration-150"
+              style={{ color: 'var(--accent-primary)' }}
+              title="Demandes avec contexte complet"
+            >
+              <Lightbulb className="w-4 h-4" />
+            </motion.button>
+
+            {/* Context Menu Dropdown */}
+            <AnimatePresence>
+              {showContextMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  className="absolute bottom-full right-0 mb-1 z-50 w-60 rounded-xl overflow-hidden shadow-xl"
+                  style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+                >
+                  <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-base)' }}>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                      Demandes avec contexte complet
+                    </p>
+                  </div>
+                  {contextSuggestions.map((s) => (
+                    <button
+                      key={s.label}
+                      onClick={() => { setInput(''); handleSend(s.prompt); setShowContextMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--accent-subtle)]"
+                    >
+                      <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                      <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{s.label}</span>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Separator */}
             <div className="w-px h-5 mx-1" style={{ backgroundColor: 'var(--border-base)' }} />
