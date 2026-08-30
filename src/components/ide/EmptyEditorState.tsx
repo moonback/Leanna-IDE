@@ -488,7 +488,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
       {/* ── Contenu ── */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <div className="w-full max-w-[1000px]">
+        <div className="w-full max-w-[1200px]">
           {/* ── NIVEAU 1 : Header avec salutation premium ── */}
           <motion.div 
             className="mb-2 flex items-baseline gap-4"
@@ -544,7 +544,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
           <motion.button
             type="button"
             onClick={handleConnect}
-            className="ai-interactive ai-hero group w-full mx-auto flex items-center gap-4 p-6 mb-10 text-left rounded-[22px]"
+            className="ai-interactive ai-hero group w-full mx-auto flex items-center gap-4 p-6 mb-5 text-left rounded-[22px]"
             style={{
               backgroundColor: 'var(--surface)',
               border: '2px solid var(--primary)',
@@ -626,7 +626,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
           {/* ── NIVEAU 4 : Actions secondaires compactes ── */}
           <motion.div
-            className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-12"
+            className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5"
             {...makeEntranceProps(0.12)}
           >
             <CompactActionCard
