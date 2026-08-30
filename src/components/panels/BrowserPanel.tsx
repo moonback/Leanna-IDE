@@ -72,16 +72,188 @@ interface BrowserPanelProps {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-export const BROWSER_HOME_URL = 'https://www.google.com/webhp?igu=1';
+// Page d'accueil par défaut - DuckDuckGo pour la vie privée, mais peut être configuré
+// L'utilisateur peut changer cette constante pour son moteur préféré
+export const BROWSER_HOME_URL = 'https://duckduckgo.com';
+
+// Mappings des sites populaires pour navigation directe
+const SITE_MAPPINGS: Record<string, string> = {
+  // Moteurs de recherche
+  'google': 'https://www.google.com',
+  'bing': 'https://www.bing.com',
+  'duckduckgo': 'https://duckduckgo.com',
+  'yahoo': 'https://search.yahoo.com',
+  'ecosia': 'https://www.ecosia.org',
+  
+  // Réseaux sociaux
+  'facebook': 'https://www.facebook.com',
+  'twitter': 'https://twitter.com',
+  'x': 'https://x.com',
+  'instagram': 'https://www.instagram.com',
+  'linkedin': 'https://www.linkedin.com',
+  'reddit': 'https://www.reddit.com',
+  'tiktok': 'https://www.tiktok.com',
+  'youtube': 'https://www.youtube.com',
+  'whatsapp': 'https://web.whatsapp.com',
+  'telegram': 'https://web.telegram.org',
+  'discord': 'https://discord.com/app',
+  
+  // Sites d'information et encyclopédies
+  'wikipedia': 'https://www.wikipedia.org',
+  'wiktionary': 'https://www.wiktionary.org',
+  'wikinews': 'https://www.wikinews.org',
+  'imdb': 'https://www.imdb.com',
+  'rotten tomatoes': 'https://www.rottentomatoes.com',
+  'rottentomatoes': 'https://www.rottentomatoes.com',
+  
+  // Commerce
+  'amazon': 'https://www.amazon.com',
+  'ebay': 'https://www.ebay.com',
+  'etsy': 'https://www.etsy.com',
+  'aliexpress': 'https://www.aliexpress.com',
+  
+  // Actualités
+  'bbc': 'https://www.bbc.com',
+  'cnn': 'https://www.cnn.com',
+  'nytimes': 'https://www.nytimes.com',
+  'guardian': 'https://www.theguardian.com',
+  'lemonde': 'https://www.lemonde.fr',
+  'lefigaro': 'https://www.lefigaro.fr',
+  
+  // Développement et technologie
+  'github': 'https://github.com',
+  'gitlab': 'https://gitlab.com',
+  'stackoverflow': 'https://stackoverflow.com',
+  'stack overflow': 'https://stackoverflow.com',
+  'npm': 'https://www.npmjs.com',
+  'docker': 'https://www.docker.com',
+  'aws': 'https://aws.amazon.com',
+  'azure': 'https://azure.microsoft.com',
+  'google cloud': 'https://cloud.google.com',
+  
+  // Productivité
+  'gmail': 'https://mail.google.com',
+  'outlook': 'https://outlook.live.com',
+  'protonmail': 'https://mail.proton.me',
+  'notion': 'https://www.notion.so',
+  'trello': 'https://trello.com',
+  'slack': 'https://slack.com',
+  'zoom': 'https://zoom.us',
+  'calendar': 'https://calendar.google.com',
+  'google calendar': 'https://calendar.google.com',
+  
+  // Éducation
+  'coursera': 'https://www.coursera.org',
+  'udemy': 'https://www.udemy.com',
+  'edx': 'https://www.edx.org',
+  'khan academy': 'https://www.khanacademy.org',
+  'khanacademy': 'https://www.khanacademy.org',
+  
+  // Divertissement
+  'netflix': 'https://www.netflix.com',
+  'spotify': 'https://open.spotify.com',
+  'apple music': 'https://music.apple.com',
+  'applemusic': 'https://music.apple.com',
+  'twitch': 'https://www.twitch.tv',
+  'hulu': 'https://www.hulu.com',
+  'disney+': 'https://www.disneyplus.com',
+  'disney plus': 'https://www.disneyplus.com',
+  'prime video': 'https://www.primevideo.com',
+  'primevideo': 'https://www.primevideo.com',
+  
+  // Voyage
+  'booking': 'https://www.booking.com',
+  'airbnb': 'https://www.airbnb.com',
+  'expedia': 'https://www.expedia.com',
+  'tripadvisor': 'https://www.tripadvisor.com',
+  'skyscanner': 'https://www.skyscanner.com',
+  
+  // Santé
+  'webmd': 'https://www.webmd.com',
+  'mayoclinic': 'https://www.mayoclinic.org',
+  'nhs': 'https://www.nhs.uk',
+  
+  // Finances
+  'paypal': 'https://www.paypal.com',
+  'revolut': 'https://www.revolut.com',
+  'wise': 'https://wise.com',
+  'binance': 'https://www.binance.com',
+  'coinbase': 'https://www.coinbase.com',
+};
+
+// Sites avec moteurs de recherche internes pour les requêtes
+const SEARCH_SITES: Record<string, string> = {
+  'amazon': 'https://www.amazon.com/s?k=',
+  'ebay': 'https://www.ebay.com/sch/i.html?_nkw=',
+  'youtube': 'https://www.youtube.com/results?search_query=',
+  'wikipedia': 'https://en.wikipedia.org/w/index.php?search=',
+  'github': 'https://github.com/search?q=',
+  'stackoverflow': 'https://stackoverflow.com/search?q=',
+  'npm': 'https://www.npmjs.com/search?q=',
+  'imdb': 'https://www.imdb.com/find/?q=',
+  'rotten tomatoes': 'https://www.rottentomatoes.com/search?search=',
+  'rottentomatoes': 'https://www.rottentomatoes.com/search?search=',
+  'github user': 'https://github.com/',
+  'github repo': 'https://github.com/',
+};
 
 export function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return BROWSER_HOME_URL;
+  
+  // Si c'est déjà une URL complète, la retourner telle quelle
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/.test(trimmed) && !trimmed.includes(' ')) {
+  
+  // Si c'est un domaine valide (ex: example.com, sub.example.co.uk), ajouter https://
+  // Regex amélioré pour gérer les domaines multi-niveaux
+  if (/^[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/i.test(trimmed) && !trimmed.includes(' ')) {
     return `https://${trimmed}`;
   }
-  return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
+  
+  // Vérifier si c'est un nom de site connu (navigation directe)
+  const lowerTrimmed = trimmed.toLowerCase();
+  if (SITE_MAPPINGS[lowerTrimmed]) {
+    return SITE_MAPPINGS[lowerTrimmed];
+  }
+  
+  // Vérifier si c'est une recherche sur un site spécifique avec préfixe site:
+  // Format: "site:amazon chaussures"
+  const siteSearchWithPrefix = trimmed.match(/^site:([a-zA-Z0-9-]+)\s+(.+)$/);
+  if (siteSearchWithPrefix) {
+    const siteName = siteSearchWithPrefix[1].toLowerCase();
+    const searchQuery = siteSearchWithPrefix[2];
+    
+    // Si le site a un moteur de recherche interne
+    if (SEARCH_SITES[siteName]) {
+      return SEARCH_SITES[siteName] + encodeURIComponent(searchQuery);
+    }
+    
+    // Sinon, essayer de construire une URL de recherche
+    return `https://www.${siteName}.com/search?q=${encodeURIComponent(searchQuery)}`;
+  }
+  
+  // Vérifier si c'est une recherche sur un site spécifique SANS préfixe
+  // Format: "amazon chaussures" -> seulement si le premier mot est dans SEARCH_SITES
+  // Cela évite de traiter "comment apprendre" comme une recherche sur site "comment"
+  const words = trimmed.split(/\s+/);
+  if (words.length >= 2) {
+    const potentialSite = words[0].toLowerCase();
+    
+    // Vérifier si le premier mot est un site avec moteur de recherche interne
+    if (SEARCH_SITES[potentialSite]) {
+      const searchQuery = words.slice(1).join(' ');
+      return SEARCH_SITES[potentialSite] + encodeURIComponent(searchQuery);
+    }
+    
+    // Vérifier si le premier mot est un site connu (mapping) - navigation directe
+    if (SITE_MAPPINGS[potentialSite]) {
+      // Dans ce cas, on va directement vers le site, pas une recherche
+      return SITE_MAPPINGS[potentialSite];
+    }
+  }
+  
+  // Requête de recherche générale - utiliser DuckDuckGo (plus respectueux de la vie privée)
+  return `https://duckduckgo.com/?q=${encodeURIComponent(trimmed)}`;
 }
 
 function isHttps(url: string): boolean {
