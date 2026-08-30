@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type { ConnectionStatus } from './useLiveAPI.js';
 
 export interface UseWebSocketOptions {
@@ -41,21 +41,28 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
   // Keep statusRef in sync so connect() closures always see the latest value
   statusRef.current = status;
 
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current !== null) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
+
   const disconnect = useCallback((intentional = true) => {
     if (intentional) {
       intentionalDisconnectRef.current = true;
-      if (reconnectTimerRef.current !== null) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
+      clearReconnectTimer();
       reconnectCountRef.current = 0;
     }
 
-    wsRef.current?.close();
+    const ws = wsRef.current;
+    if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+      ws.close();
+    }
     wsRef.current = null;
     setStatus('idle');
     onLog(intentional ? 'Disconnected' : 'Connection lost', 'system');
-  }, [onLog]);
+  }, [onLog, clearReconnectTimer]);
 
   const connect = useCallback((activeSkills: string[] = [], mode: 'full' | 'ask' = 'full', onInitAudio: () => Promise<void>, onCleanupAudio: () => void) => {
     if (statusRef.current !== 'idle') return;
@@ -348,6 +355,18 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
       setStatus('idle');
     });
   }, [onLog, disconnect]);
+
+
+
+  useEffect(() => () => {
+    clearReconnectTimer();
+    const ws = wsRef.current;
+    if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+      ws.close(1000, 'component unmounted');
+    }
+    wsRef.current = null;
+    onCleanupAudioRef.current?.();
+  }, [clearReconnectTimer]);
 
   const sendAudioData = useCallback((base64Data: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
