@@ -83,6 +83,20 @@
   --border: rgba(15, 23, 42, 0.08);
 }
 
+/* Premium layout tokens — shared page framing values used
+   by app-content, notebook header and responsive rules below. */
+:root {
+  --premium-content-max: 1440px;
+  --premium-page-gutter: clamp(16px, 3vw, 32px);
+  --premium-section-gap: clamp(24px, 4vw, 48px);
+  --premium-control-height: 40px;
+  --premium-control-height-touch: 36px;
+  --premium-card-radius: 16px;
+  --premium-panel-radius: 18px;
+  --premium-border: color-mix(in srgb, var(--border-base) 78%, transparent);
+  --premium-divider: color-mix(in srgb, var(--border-base) 55%, transparent);
+}
+
 /* ═══════════════════════════════════════════════
    THEME TOKEN GROUPS — IMPORTANT
    This file defines FIVE selectable themes: dark, light,
@@ -591,12 +605,12 @@
 /* Global theme transitions — smooth dark/light swap */
 *, *::before, *::after {
   transition:
-    background-color 0.25s ease,
-    border-color 0.25s ease,
-    color 0.2s ease,
-    box-shadow 0.25s ease,
-    opacity 0.2s ease,
-    transform 0.2s ease;
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.18s ease,
+    opacity 0.16s ease,
+    transform 0.16s ease;
 }
 /* Never transition animations or transforms (breaks motion) */
 [class*="animate-"], [data-motion], canvas, video {
@@ -635,12 +649,6 @@ button,
 [role="button"],
 a[href] {
   cursor: pointer;
-}
-
-/* Focus states for accessibility */
-:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
 }
 
 /* Animation utility classes */
@@ -708,23 +716,39 @@ a[href] {
 }
 
 body {
-  background-color: var(--bg-base);
+  background:
+    radial-gradient(circle at 50% -20%, color-mix(in srgb, var(--accent-primary) 3%, transparent), transparent 34rem),
+    var(--bg-base);
   color: var(--text-primary);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
   @apply font-sans antialiased overflow-hidden;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Focus ring */
 :focus-visible {
-  outline: 2px solid var(--accent-primary);
+  outline: 2px solid color-mix(in srgb, var(--accent-primary) 78%, white);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 4px var(--accent-subtle);
 }
 
 /* ═══════════════════════════════════════════════
    SKELETON LOADERS
 ═══════════════════════════════════════════════ */
 .skeleton {
-  background: linear-gradient(90deg, var(--bg-input) 25%, transparent 50%, var(--bg-input) 75%);
+  background: linear-gradient(90deg, var(--bg-input) 25%, var(--bg-panel) 50%, var(--bg-input) 75%);
   background-size: 200% 100%;
   animation: var(--animate-skeleton);
   border-radius: var(--radius-sm);
@@ -759,9 +783,9 @@ body {
 ═══════════════════════════════════════════════ */
 .Leanna-ring {
   box-shadow:
-    0 0 32px var(--orb-glow-active),
-    0 0 64px color-mix(in srgb, var(--orb-glow-active) 40%, transparent),
-    inset 0 0 24px color-mix(in srgb, var(--accent-primary) 15%, transparent);
+    0 0 22px var(--orb-glow-active),
+    0 0 42px color-mix(in srgb, var(--orb-glow-active) 24%, transparent),
+    inset 0 0 18px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 /* ═══════════════════════════════════════════════
@@ -942,16 +966,16 @@ body {
 
 
 .t-heading {
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 .t-caption {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-family: var(--font-mono);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.045em;
   text-transform: uppercase;
   color: var(--text-dimmed);
 }
@@ -963,18 +987,20 @@ body {
   display: flex;
   height: 100dvh;
   overflow: hidden;
+  background: var(--bg-base);
 }
 .app-content {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   position: relative;
+  background: transparent;
 }
-
-.Leanna-ring {
-  box-shadow:
-    0 0 24px var(--orb-glow-active),
-    0 0 56px color-mix(in srgb, var(--orb-glow-active) 30%, transparent),
-    inset 0 0 20px color-mix(in srgb, var(--accent-primary) 12%, transparent);
+.app-content > main,
+.app-content > section {
+  max-width: var(--premium-content-max);
+  margin-inline: auto;
+  padding-inline: var(--premium-page-gutter);
 }
 
 
@@ -982,16 +1008,17 @@ body {
    GLASS MORPHISM UTILITY
 ═══════════════════════════════════════════════ */
 .glass {
-  background: var(--glass-bg);
+  background: color-mix(in srgb, var(--glass-bg) 88%, var(--bg-panel));
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-border);
 }
 .glass-strong {
-  background: var(--glass-bg);
+  background: color-mix(in srgb, var(--glass-bg) 94%, var(--bg-panel));
   backdrop-filter: blur(24px) saturate(1.4);
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
   border: 1px solid var(--border-base);
+  box-shadow: var(--shadow-sm);
 }
 
 
@@ -1001,8 +1028,9 @@ body {
    MARKDOWN PREVIEW BODY
 ═══════════════════════════════════════════════ */
 .markdown-body {
+  max-width: 78ch;
   font-size: 14px;
-  line-height: 1.75;
+  line-height: 1.72;
   color: var(--text-primary);
 }
 
@@ -1014,6 +1042,7 @@ body {
 .markdown-body h6 {
   font-weight: 600;
   line-height: 1.3;
+  letter-spacing: -0.025em;
   margin-top: 1.5em;
   margin-bottom: 0.5em;
   color: var(--text-primary);
@@ -1071,10 +1100,11 @@ body {
 .markdown-body pre {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-base);
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   padding: 1em 1.25em;
   overflow-x: auto;
   margin-bottom: 1em;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-base) 35%, transparent);
 }
 .markdown-body pre code {
   background: transparent;
@@ -1125,7 +1155,7 @@ body {
 ═══════════════════════════════════════════════ */
 .chat-markdown {
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.65;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -1184,7 +1214,7 @@ body {
 .chat-markdown pre {
   background-color: var(--bg-base);
   border: 1px solid var(--border-base);
-  border-radius: 6px;
+  border-radius: 10px;
   padding: 0.6em 0.8em;
   margin: 0.5em 0;
   overflow-x: auto;
@@ -1261,6 +1291,35 @@ body {
    SIDEBAR ENHANCEMENTS
 ═══════════════════════════════════════════════ */
 
+.Leanna-sidebar {
+  color: var(--text-secondary);
+  background: var(--bg-sidebar) !important;
+  border-color: var(--border-base) !important;
+  box-shadow: none !important;
+}
+
+.Leanna-sidebar button,
+.Leanna-sidebar [role="button"] {
+  border-radius: 10px;
+}
+
+.Leanna-sidebar button:hover,
+.Leanna-sidebar [role="button"]:hover {
+  background: var(--ctrl-hover);
+}
+
+.Leanna-sidebar button[aria-current="page"],
+.Leanna-sidebar button[data-active="true"],
+.Leanna-sidebar .active {
+  background: var(--nav-active-bg);
+  color: var(--text-primary);
+}
+
+.Leanna-sidebar button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 /* Glow effect on active sidebar icon */
 .sidebar-icon-active {
   position: relative;
@@ -1271,13 +1330,13 @@ body {
   inset: -3px;
   border-radius: var(--radius-md);
   background: var(--accent-glow);
-  opacity: 0.5;
-  filter: blur(8px);
+  opacity: 0.18;
+  filter: blur(10px);
   z-index: -1;
   transition: opacity 0.3s ease;
 }
 .sidebar-icon-active:hover::after {
-  opacity: 0.75;
+  opacity: 0.28;
 }
 
 /* ═══════════════════════════════════════════════
@@ -1286,10 +1345,10 @@ body {
 
 /* Bottom status bar with distinct background */
 .status-bar-enhanced {
-  background-color: var(--bg-secondary);
+  background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
   border-top: 1px solid var(--border-base);
   backdrop-filter: blur(12px);
-  box-shadow: 0 -1px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 -1px 6px rgba(0,0,0,0.08);
 }
 
 /* ═══════════════════════════════════════════════
@@ -1299,6 +1358,7 @@ body {
 .card-hover-gradient {
   position: relative;
   overflow: hidden;
+  border-radius: var(--premium-card-radius);
 }
 .card-hover-gradient::before {
   content: '';
@@ -1320,7 +1380,7 @@ body {
 }
 .card-hover-gradient:hover {
   border-color: var(--border-strong);
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ═══════════════════════════════════════════════
@@ -1413,6 +1473,13 @@ body {
 
   .Leanna-ring {
     box-shadow: 0 0 12px var(--orb-glow-active) !important;
+  }
+
+  .card-hover-gradient:hover,
+  .interactive-surface:active,
+  .notebook-primary-small:hover,
+  .notebook-fab:hover {
+    transform: none !important;
   }
 }
 
@@ -1545,16 +1612,6 @@ body {
 }
 
 /* ═══════════════════════════════════════════════
-   FOCUS IMPROVEMENTS — Meilleure visibilité
-═══════════════════════════════════════════════ */
-:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-  box-shadow: 0 0 0 4px var(--accent-subtle);
-}
-
-/* ═══════════════════════════════════════════════
    DENSITY MODES — Compact / Balanced / Comfortable
 ═══════════════════════════════════════════════ */
 [data-density="compact"] {
@@ -1606,7 +1663,7 @@ body {
 }
 
 .interactive-surface:active {
-  transform: scale(0.98);
+  transform: translateY(1px);
 }
 
 /* ═══════════════════════════════════════════════
@@ -1652,21 +1709,26 @@ body {
    holds regardless of how light/dark that theme's accent is.
 ═══════════════════════════════════════════════ */
 :root[data-theme="dark"] {
-  --notebook-bg: #1b1b1f;
-  --notebook-canvas: #0a1628;
-  --notebook-surface: #0a1628;
-  --notebook-surface-muted: rgba(255, 255, 255, 0.06);
-  --notebook-surface-elevated: #0a1628;
-  --notebook-border: rgba(255, 255, 255, 0.08);
-  --notebook-card-bg: rgba(44, 44, 52, 0.9);
-  --notebook-card-hover: rgba(52, 52, 62, 0.95);
+  --notebook-bg: #07111f;              /* outermost shell — deepest navy */
+  --notebook-canvas: #0a1628;          /* main workspace canvas */
+  --notebook-surface: #0c1a30;         /* cards / panels — one step lighter */
+  --notebook-surface-muted: rgba(168, 199, 250, 0.06);
+  --notebook-surface-elevated: #0f2040; /* modals / popovers — highest layer */
+  --notebook-border: rgba(168, 199, 250, 0.11); /* accent-tinted border */
+  --notebook-card-bg: rgba(11, 24, 45, 0.95);   /* navy, not neutral grey */
+  --notebook-card-hover: rgba(14, 30, 57, 0.98);
   --notebook-accent: #a8c7fa;
-  --notebook-accent-text: #1b1b1f;
-  --notebook-accent-surface: rgba(168, 199, 250, 0.08);
-  --notebook-accent-hover: rgba(168, 199, 250, 0.14);
-  --notebook-studio-bg: #0a1628;
+  --notebook-accent-text: #07111f;
+  --notebook-accent-surface: rgba(168, 199, 250, 0.09);
+  --notebook-accent-hover: rgba(168, 199, 250, 0.15);
+  --notebook-studio-bg: #070f1c;       /* studio sidebar matches shell */
   --notebook-chat-user: rgba(168, 199, 250, 0.12);
-  --notebook-chat-ai: transparent;
+  --notebook-chat-ai: rgba(168, 199, 250, 0.03);
+  /* Extra tokens for polished effects */
+  --notebook-glow: rgba(168, 199, 250, 0.18);
+  --notebook-shadow-sm: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --notebook-shadow-md: 0 4px 12px rgba(0,0,0,0.45), 0 2px 4px rgba(0,0,0,0.25);
+  --notebook-shadow-lg: 0 8px 24px rgba(0,0,0,0.5), 0 4px 8px rgba(0,0,0,0.3);
 }
 :root[data-theme="light"] {
   --notebook-bg: #f8f9fa;
@@ -1751,33 +1813,35 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Header — clean top bar */
+/* Header — clean top bar with glassmorphism */
 .notebook-header {
-  min-height: 64px;
+  min-height: 56px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 24px;
+  padding: 10px var(--premium-page-gutter, 20px);
   border-bottom: 1px solid var(--notebook-border);
   background: var(--notebook-surface-elevated);
+  box-shadow: 0 1px 0 var(--notebook-border), var(--notebook-shadow-sm, 0 2px 8px rgba(0,0,0,0.2));
 }
 .notebook-title {
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.3;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 .notebook-subtitle {
   margin-top: 2px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-muted);
   font-weight: 400;
+  letter-spacing: 0.01em;
 }
 .notebook-eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -1805,6 +1869,7 @@ body {
   border-right: 0;
   border-left: 1px solid var(--notebook-border);
   background: var(--notebook-studio-bg);
+  box-shadow: -2px 0 12px rgba(0,0,0,0.15);
 }
 
 /* Main content area */
@@ -1815,8 +1880,8 @@ body {
 
 /* Segmented tabs — pill style */
 .notebook-segmented {
-  padding: 4px;
-  gap: 4px;
+  padding: 3px;
+  gap: 2px;
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
@@ -1834,17 +1899,18 @@ body {
   font-weight: 500;
   cursor: pointer;
   border: none;
-  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  min-height: var(--premium-control-height-touch, 36px);
+  transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
 }
 .notebook-segment:focus-visible,
 .notebook-ghost-button:focus-visible,
 .notebook-icon-button:focus-visible,
 .notebook-primary-small:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.3);
+  box-shadow: 0 0 0 3px var(--notebook-glow, rgba(129, 140, 248, 0.3));
 }
 .notebook-segment {
-  padding: 6px 14px;
+  padding: 5px 13px;
   font-size: 13px;
 }
 .notebook-segment[data-active="true"],
@@ -1852,16 +1918,16 @@ body {
 .notebook-icon-button[data-active="true"] {
   background: var(--notebook-accent-surface);
   color: var(--notebook-accent);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 .notebook-ghost-button {
-  min-height: 32px;
   padding: 6px 12px;
   font-size: 13px;
 }
 .notebook-icon-button {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
+  min-height: 0;
   border-radius: 50%;
 }
 .notebook-segment:hover,
@@ -1869,22 +1935,23 @@ body {
 .notebook-icon-button:hover {
   background: var(--notebook-surface-muted);
   color: var(--text-primary);
+  transform: translateY(-0.5px);
 }
 
 /* Primary action button (small) */
 .notebook-primary-small {
-  min-height: 32px;
   padding: 6px 14px;
   background: var(--notebook-accent);
   color: var(--notebook-accent-text);
   font-size: 13px;
   font-weight: 600;
   border-radius: var(--notebook-radius-pill);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-primary) 16%, transparent);
 }
 .notebook-primary-small:hover {
-  opacity: 0.9;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.16);
+  opacity: 1;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--accent-primary) 18%, transparent);
 }
 
 /* Pills & counts */
@@ -1915,24 +1982,25 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 36px;
+  min-height: var(--premium-control-height-touch, 36px);
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
-  padding: 0 12px;
+  padding: 0 14px;
   color: var(--text-muted);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 .notebook-search-field:focus-within {
   border-color: var(--notebook-accent);
-  box-shadow: 0 0 0 2px var(--notebook-accent-surface);
+  background: var(--notebook-accent-surface);
+  box-shadow: 0 0 0 3px var(--notebook-glow, rgba(168,199,250,0.15));
 }
 .notebook-search-field input {
   min-width: 0;
   width: 100%;
   background: transparent;
   outline: none;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-primary);
 }
 
@@ -1968,32 +2036,34 @@ body {
 
 /* Note cards */
 .notebook-note-card {
-  border-radius: var(--notebook-radius-lg);
+  border-radius: var(--premium-card-radius, var(--notebook-radius-lg));
   background: var(--notebook-card-bg);
   padding: 16px 20px;
   border: 1px solid var(--notebook-border);
-  transition: background-color 0.15s, box-shadow 0.15s, border-color 0.15s;
+  box-shadow: var(--notebook-shadow-sm, 0 1px 4px rgba(0,0,0,0.15));
+  transition: background-color 0.18s, box-shadow 0.18s, border-color 0.18s;
 }
 .notebook-note-card:hover {
   background: var(--notebook-card-hover);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  border-color: var(--notebook-accent);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--notebook-border);
 }
 
 /* Studio panel cards (Generate / Audio) */
 .notebook-studio-card {
-  border-radius: var(--notebook-radius-lg);
+  border-radius: var(--premium-card-radius, var(--notebook-radius-lg));
   background: var(--notebook-card-bg);
   border: 1px solid var(--notebook-border);
   padding: 16px;
   cursor: pointer;
+  box-shadow: var(--notebook-shadow-sm, 0 1px 4px rgba(0,0,0,0.15));
   transition: all 0.2s ease;
 }
 .notebook-studio-card:hover {
   background: var(--notebook-accent-surface);
   border-color: var(--notebook-accent);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+  box-shadow: var(--notebook-shadow-md, 0 4px 16px rgba(0,0,0,0.25));
 }
 
 /* Chat message bubbles — NotebookLM style */
@@ -2001,17 +2071,19 @@ body {
   border-radius: var(--notebook-radius-lg);
   padding: 12px 16px;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 .notebook-chat-message[data-role="user"] {
   background: var(--notebook-chat-user);
+  border: 1px solid var(--notebook-border);
   margin-left: auto;
-  max-width: 85%;
-  border-bottom-right-radius: 4px;
+  max-width: 82%;
+  border-bottom-right-radius: 5px;
+  box-shadow: var(--notebook-shadow-sm, 0 1px 4px rgba(0,0,0,0.12));
 }
 .notebook-chat-message[data-role="assistant"] {
   background: var(--notebook-chat-ai);
-  max-width: 95%;
+  max-width: 96%;
 }
 
 /* Suggestion chips — Google style */
@@ -2019,7 +2091,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 5px 13px;
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
@@ -2034,6 +2106,8 @@ body {
   background: var(--notebook-accent-surface);
   border-color: var(--notebook-accent);
   color: var(--notebook-accent);
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
 }
 
 /* Empty state styling */
@@ -2046,32 +2120,7 @@ body {
   padding: 40px 24px;
   gap: 12px;
 }
-/* Skeleton loading animation */
-.skeleton {
-  background: linear-gradient(90deg, var(--bg-input) 25%, var(--bg-panel) 50%, var(--bg-input) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-/* Custom scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--border-base);
-  border-radius: 20px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--text-dimmed);
-}
 .notebook-empty-state-icon {
   width: 48px;
   height: 48px;
@@ -2107,12 +2156,28 @@ body {
 
 /* Typography utilities — 2 values only for notebooks */
 .notebook-heading {
-  letter-spacing: -0.01em;
+  letter-spacing: -0.025em;
   line-height: 1.2;
 }
 .notebook-body {
   letter-spacing: -0.005em;
   line-height: 1.5;
+}
+
+/* Custom scrollbar (used inside the notebook panels) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--notebook-border, var(--scroll-thumb));
+  border-radius: 20px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--notebook-accent, var(--scroll-thumb-hover));
+  opacity: 0.6;
 }
 
 /* ═══════════════════════════════════════════════
@@ -2166,14 +2231,12 @@ body {
 }
 .Leanna-ide-shell {
   background:
-    radial-gradient(circle at 22% -12%, color-mix(in srgb, var(--accent-primary) 9%, transparent), transparent 30rem),
+    radial-gradient(circle at 50% -18%, color-mix(in srgb, var(--accent-primary) 4%, transparent), transparent 28rem),
     var(--ide-shell-bg);
 }
 .Leanna-ide-workspace {
-  background: color-mix(in srgb, var(--ide-panel-bg) 72%, transparent);
-}
-.Leanna-sidebar {
-  color: var(--text-secondary);
+  background: var(--ide-panel-bg);
+  border-color: var(--ide-shell-border);
 }
 .Leanna-sidebar button:focus-visible {
   outline: 2px solid var(--accent-primary);
@@ -2195,268 +2258,12 @@ body {
           restrained effects, touch-friendly controls.
 ═══════════════════════════════════════════════════════════════════════════ */
 
-:root {
-  --premium-content-max: 1440px;
-  --premium-page-gutter: clamp(16px, 3vw, 32px);
-  --premium-section-gap: clamp(24px, 4vw, 48px);
-  --premium-control-height: 40px;
-  --premium-control-height-touch: 36px;
-  --premium-card-radius: 16px;
-  --premium-panel-radius: 18px;
-  --premium-border: color-mix(in srgb, var(--border-base) 78%, transparent);
-  --premium-divider: color-mix(in srgb, var(--border-base) 55%, transparent);
-}
-
-/* Global hierarchy */
-html {
-  background: var(--bg-base);
-}
-
-body {
-  background:
-    radial-gradient(circle at 50% -20%, color-mix(in srgb, var(--accent-primary) 3%, transparent), transparent 34rem),
-    var(--bg-base);
-  color: var(--text-primary);
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-}
-
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
-
-button {
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* Reduce the visual noise caused by applying transitions to every element. */
-*,
-*::before,
-*::after {
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease,
-    opacity 0.16s ease,
-    box-shadow 0.18s ease;
-}
-
-[class*="animate-"],
-[data-motion],
-canvas,
-video,
-.Leanna-ring {
-  transition: none !important;
-}
-
-/* Premium page framing */
-.app-layout {
-  background: var(--bg-base);
-}
-
-.app-content {
-  min-width: 0;
-  background: transparent;
-}
-
-.app-content > main,
-.app-content > section {
-  max-width: var(--premium-content-max);
-  margin-inline: auto;
-  padding-inline: var(--premium-page-gutter);
-}
-
-/* Sidebar: quiet by default, clear active state. */
-.Leanna-sidebar {
-  background: var(--bg-sidebar) !important;
-  border-color: var(--border-base) !important;
-  box-shadow: none !important;
-}
-
-.Leanna-sidebar button,
-.Leanna-sidebar [role="button"] {
-  border-radius: 10px;
-}
-
-.Leanna-sidebar button:hover,
-.Leanna-sidebar [role="button"]:hover {
-  background: var(--ctrl-hover);
-}
-
-.Leanna-sidebar button[aria-current="page"],
-.Leanna-sidebar button[data-active="true"],
-.Leanna-sidebar .active {
-  background: var(--nav-active-bg);
-  color: var(--text-primary);
-}
-
-.sidebar-icon-active::after {
-  opacity: 0.18;
-  filter: blur(10px);
-}
-
-.sidebar-icon-active:hover::after {
-  opacity: 0.28;
-}
-
-/* Workspace shell: remove the oversized atmospheric glow. */
-.Leanna-ide-shell {
-  background:
-    radial-gradient(
-      circle at 50% -18%,
-      color-mix(in srgb, var(--accent-primary) 4%, transparent),
-      transparent 28rem
-    ),
-    var(--ide-shell-bg);
-}
-
-.Leanna-ide-workspace {
-  background: var(--ide-panel-bg);
-  border-color: var(--ide-shell-border);
-}
-
-/* Surfaces */
-.glass {
-  background: color-mix(in srgb, var(--glass-bg) 88%, var(--bg-panel));
-  border-color: var(--glass-border);
-  box-shadow: none;
-}
-
-.glass-strong {
-  background: color-mix(in srgb, var(--glass-bg) 94%, var(--bg-panel));
-  border-color: var(--border-base);
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(22px) saturate(1.08);
-  -webkit-backdrop-filter: blur(22px) saturate(1.08);
-}
-
-/* Generic cards / interactive surfaces */
-.card-hover-gradient {
-  border-radius: var(--premium-card-radius);
-}
-
-.card-hover-gradient::before {
-  opacity: 0 !important;
-  background: none;
-}
-
-.card-hover-gradient:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-sm);
-}
-
-.interactive-surface:hover {
-  background-color: var(--ctrl-hover);
-  border-color: var(--border-strong);
-}
-
-.interactive-surface:active {
-  transform: translateY(1px);
-}
-
-/* Buttons: less pill-heavy, more product-like. */
-.notebook-primary-small,
-.notebook-fab {
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-primary) 16%, transparent);
-}
-
-.notebook-primary-small:hover,
-.notebook-fab:hover {
-  opacity: 1;
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px color-mix(in srgb, var(--accent-primary) 18%, transparent);
-}
-
-/* Typography */
-.t-heading {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-}
-
-.t-caption {
-  font-size: 0.6875rem;
-  letter-spacing: 0.045em;
-}
-
-.notebook-title,
-.notebook-heading,
-.markdown-body h1,
-.markdown-body h2,
-.markdown-body h3 {
-  letter-spacing: -0.025em;
-}
-
-/* Notebook: keep the existing structure, but make it calmer and more spacious. */
-.notebook-workspace {
-  background: var(--notebook-bg);
-}
-
-.notebook-header {
-  min-height: 56px;
-  padding: 10px var(--premium-page-gutter);
-  background: var(--notebook-surface-elevated);
-  border-bottom-color: var(--notebook-border);
-}
-
-.notebook-source-row {
-  min-height: 48px;
-}
-
-.notebook-note-card,
-.notebook-studio-card {
-  border-radius: var(--premium-card-radius);
-}
-
-.notebook-note-card:hover,
-.notebook-studio-card:hover {
-  border-color: var(--notebook-border);
-  box-shadow: var(--shadow-sm);
-  transform: none;
-}
-
-/* Markdown / chat: readable without looking boxed-in. */
-.markdown-body {
-  max-width: 78ch;
-  line-height: 1.72;
-}
-
-.markdown-body pre {
-  border-radius: 12px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-base) 35%, transparent);
-}
-
-.chat-markdown {
-  line-height: 1.65;
-}
-
-.chat-markdown pre {
-  border-radius: 10px;
-}
-
-/* Orb remains the visual signature, but with a tighter halo. */
-.Leanna-ring {
-  box-shadow:
-    0 0 22px var(--orb-glow-active),
-    0 0 42px color-mix(in srgb, var(--orb-glow-active) 24%, transparent),
-    inset 0 0 18px color-mix(in srgb, var(--accent-primary) 10%, transparent);
-}
-
-/* Status bar should feel like a quiet system layer. */
-.status-bar-enhanced {
-  background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
-  border-top-color: var(--border-base);
-  box-shadow: 0 -1px 6px rgba(0, 0, 0, 0.08);
-}
-
-/* Focus: visible, premium, not neon. */
-:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent-primary) 78%, white);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px var(--accent-subtle);
+/* More generous desktop breathing room. */
+@media (min-width: 1024px) {
+  .app-content > main,
+  .app-content > section {
+    padding-inline: clamp(24px, 3vw, 40px);
+  }
 }
 
 /* Better touch targets on smaller screens. */
@@ -2475,17 +2282,6 @@ video,
     padding-inline: 16px;
   }
 
-  .notebook-segment,
-  .notebook-ghost-button,
-  .notebook-icon-button,
-  .notebook-primary-small {
-    min-height: var(--premium-control-height-touch);
-  }
-
-  .notebook-search-field {
-    min-height: var(--premium-control-height-touch);
-  }
-
   .notebook-note-card,
   .notebook-studio-card {
     border-radius: 14px;
@@ -2493,14 +2289,6 @@ video,
 
   .notebook-chat-message {
     padding: 12px 14px;
-  }
-}
-
-/* More generous desktop breathing room. */
-@media (min-width: 1024px) {
-  .app-content > main,
-  .app-content > section {
-    padding-inline: clamp(24px, 3vw, 40px);
   }
 }
 
@@ -2520,14 +2308,4 @@ video,
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   box-shadow: none;
-}
-
-/* Respect reduced motion. */
-@media (prefers-reduced-motion: reduce) {
-  .card-hover-gradient:hover,
-  .interactive-surface:active,
-  .notebook-primary-small:hover,
-  .notebook-fab:hover {
-    transform: none !important;
-  }
 }

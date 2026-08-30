@@ -522,7 +522,7 @@ async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = 
     cwd: root,
     timeout: TIMEOUT_MS,
     maxBuffer: 2 * 1024 * 1024,
-    shell: false,
+    shell: true,
     env: { ...process.env },
   };
 
@@ -642,7 +642,7 @@ async function runLintDirect(targets: string[] = []): Promise<ProcessResult & { 
       cwd: root,
       timeout: TIMEOUT_MS,
       maxBuffer: 2 * 1024 * 1024,
-      shell: false,
+      shell: true,
     });
     const stdout = truncate(result.stdout || "");
     const stderr = truncate(result.stderr || "");

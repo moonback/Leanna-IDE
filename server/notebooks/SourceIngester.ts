@@ -191,8 +191,15 @@ export class SourceIngester {
     // Détection de langue simple
     const language = this.detectLanguage(rawText);
 
-    // Génération du résumé et mots-clés via LLM
-    const { summary, keywords } = await this.generateSummaryAndKeywords(rawText, title);
+    // Lancer en parallèle : résumé LLM + vectorisation des chunks
+    // Les deux sont indépendants — inutile d'attendre l'un avant l'autre.
+    const chunkPayload = chunks.map(c => ({ id: c.id, content: c.content }));
+
+    const [{ summary, keywords }] = await Promise.all([
+      this.generateSummaryAndKeywords(rawText, title),
+      embeddingStore.indexChunks(chunkPayload, id, notebookId)
+        .catch(e => log.warn(`Embedding indexation partielle: ${e.message}`)),
+    ]);
 
     const source: Source = {
       id,
@@ -211,13 +218,6 @@ export class SourceIngester {
     };
 
     log.info(`✅ Source créée: "${title}" — ${wordCount} mots, ${chunks.length} chunks`);
-
-    // Vectorisation des chunks via Gemini Embeddings (async, non-bloquant)
-    embeddingStore.indexChunks(
-      chunks.map(c => ({ id: c.id, content: c.content })),
-      id,
-      notebookId
-    ).catch(e => log.warn(`Embedding indexation partielle: ${e.message}`));
 
     return source;
   }

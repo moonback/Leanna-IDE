@@ -612,7 +612,7 @@ export async function validateSandbox(): Promise<SandboxValidationResult> {
       cwd: SELF_ROOT,
       timeout: 120_000,
       maxBuffer: 10 * 1024 * 1024,
-      shell: false,
+      shell: true,
     });
     stdout = result.stdout || "";
     stderr = result.stderr || "";

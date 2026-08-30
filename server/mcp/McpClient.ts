@@ -254,7 +254,7 @@ export class McpClient extends EventEmitter {
     this.process = spawn(resolvedCommand, args, {
       env: mergedEnv,
       stdio: ['pipe', 'pipe', 'pipe'],
-      shell: false, // Permet l'exécution de commandes comme npx/uvx
+      shell: true, // Permet l'exécution de commandes comme npx/uvx
       windowsHide: true,
     });
 

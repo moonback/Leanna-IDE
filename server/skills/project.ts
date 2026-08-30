@@ -175,7 +175,7 @@ export const projectSkill: Skill = {
               cwd: parentDir,
               timeout: SCAFFOLD_TIMEOUT_MS,
               maxBuffer: MAX_BUFFER,
-              shell: false,
+              shell: true,
               env: {
                 ...process.env,
                 // Forcer le mode non-interactif pour les outils CLI

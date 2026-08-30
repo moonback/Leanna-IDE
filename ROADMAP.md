@@ -100,7 +100,7 @@ Phase 5: Production (v1.0+) 📋 Planifiee
 ### Objectifs principaux
 
 #### 1. Stabilisation et Performance
-- [ ] Amelioration des performances de l'indexation
+- [x] Amelioration des performances de l'indexation
 - [ ] Optimisation de la consommation memoire
 - [ ] Reduction de la latence WebSocket
 - [ ] Gestion des erreurs plus robuste
