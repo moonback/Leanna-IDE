@@ -1,44 +1,34 @@
 import React from 'react';
 import {
-  FileCode2, FileText, FileJson, FileImage,
-  File, Settings, Database, Globe, Type, Sql,
+  FileText, FileJson, FileImage,
+  File, Settings, Database, Globe, Type,
   Terminal, BookOpen, Palette, ShieldCheck,
-  Zap, BrainCircuit, Code2, TestTube2
+  Zap, BrainCircuit, Code2
 } from 'lucide-react';
 
-// ── Couleurs par extension - Utilisant les couleurs Maysson (#00c2ff et #ff8c00) ─────────
+// ── Couleurs par extension — basées sur les tokens du design system ─────────
+const cyan = 'var(--accent-primary)';
+const orange = 'var(--accent-secondary)';
+const muted = 'var(--text-muted)';
+const doc = 'var(--text-secondary)';
+
 const EXT_COLOR: Record<string, string> = {
-  // TypeScript - Bleu cyan Maysson
-  ts: '#00c2ff', tsx: '#00c2ff',
-  // JavaScript - Orange Maysson
-  js: '#ff8c00', jsx: '#ff8c00', cjs: '#ff8c00', mjs: '#ff8c00',
-  // Markup
-  html: '#ff8c00',
-  // Style - Bleu cyan
-  css: '#00c2ff', scss: '#00bfff', sass: '#00bfff',
-  // Data
-  json: '#ff8c00', 
-  yaml: '#00c2ff', yml: '#00c2ff',
-  // Database
-  sql: '#ff8c00',
-  // Doc
-  md: 'white', txt: 'var(--text-muted)',
-  // Config
-  env: '#ff8c00', 
-  gitignore: '#ff8c00', 
-  lock: 'var(--text-muted)',
-  toml: '#00c2ff',
-  // Python
-  py: '#00c2ff',
-  // Shell
-  sh: '#00c2ff', bash: '#00c2ff',
-  zsh: '#00c2ff',
-  // Config files
-  config: '#00c2ff',
-  cfg: '#00c2ff',
-  ini: '#00c2ff',
-  // Other
-  cjs_: '#ff8c00',
+  ts: cyan, tsx: cyan,
+  js: orange, jsx: orange, cjs: orange, mjs: orange,
+  html: orange,
+  css: cyan, scss: cyan, sass: cyan,
+  json: orange,
+  yaml: cyan, yml: cyan,
+  sql: orange,
+  md: doc, txt: muted,
+  env: orange,
+  gitignore: orange,
+  lock: muted,
+  toml: cyan,
+  py: cyan,
+  sh: cyan, bash: cyan, zsh: cyan,
+  config: cyan, cfg: cyan, ini: cyan,
+  cjs_: orange,
 };
 
 // ── Icône par extension ────────────────────────────────────────────────────
@@ -71,19 +61,19 @@ export function FileIcon({ filePath, size = 15 }: FileIconProps) {
 
   // Cas spéciaux par nom de fichier
   if (name === '.env' || name.startsWith('.env.')) {
-    return <Settings size={size} color="#ff8c00" />;
+    return <Settings size={size} color={orange} />;
   }
   if (name === '.gitignore') {
-    return <ShieldCheck size={size} color="#ff8c00" />;
+    return <ShieldCheck size={size} color={orange} />;
   }
   if (name === 'package.json' || name === 'package-lock.json') {
-    return <FileJson size={size} color="#ff8c00" />;
+    return <FileJson size={size} color={orange} />;
   }
   if (name === 'tsconfig.json' || name === 'vite.config.ts' || name === 'tailwind.config.js') {
-    return <Settings size={size} color="#00c2ff" />;
+    return <Settings size={size} color={cyan} />;
   }
   if (name === 'README.md' || name.startsWith('README.')) {
-    return <BookOpen size={size} color="white" />;
+    return <BookOpen size={size} color={doc} />;
   }
 
   const parts = name.split('.');
