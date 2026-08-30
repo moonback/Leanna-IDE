@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type { ConnectionStatus } from './useLiveAPI.js';
 
 export interface UseWebSocketOptions {
@@ -10,6 +10,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
   const [status, setStatus] = useState<ConnectionStatus>('idle');
   const statusRef = useRef<ConnectionStatus>('idle');
   const wsRef = useRef<WebSocket | null>(null);
+  const mountedRef = useRef(true);
 
   // ── auto-reconnect ────────────────────────────────────────────────────────
   const reconnectSkillsRef = useRef<string[]>([]);
@@ -38,24 +39,35 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
   const connected = status === 'connected';
   const connecting = status === 'connecting';
 
+  const safeSetStatus = useCallback((nextStatus: ConnectionStatus) => {
+    if (mountedRef.current) setStatus(nextStatus);
+  }, []);
+
   // Keep statusRef in sync so connect() closures always see the latest value
   statusRef.current = status;
+
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current !== null) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
 
   const disconnect = useCallback((intentional = true) => {
     if (intentional) {
       intentionalDisconnectRef.current = true;
-      if (reconnectTimerRef.current !== null) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
+      clearReconnectTimer();
       reconnectCountRef.current = 0;
     }
 
-    wsRef.current?.close();
+    const ws = wsRef.current;
+    if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+      ws.close();
+    }
     wsRef.current = null;
-    setStatus('idle');
+    safeSetStatus('idle');
     onLog(intentional ? 'Disconnected' : 'Connection lost', 'system');
-  }, [onLog]);
+  }, [onLog, clearReconnectTimer, safeSetStatus]);
 
   const connect = useCallback((activeSkills: string[] = [], mode: 'full' | 'ask' = 'full', onInitAudio: () => Promise<void>, onCleanupAudio: () => void) => {
     if (statusRef.current !== 'idle') return;
@@ -65,7 +77,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
     // Mémoriser les callbacks audio pour les réutiliser lors des reconnexions GoAway
     onInitAudioRef.current = onInitAudio;
     onCleanupAudioRef.current = onCleanupAudio;
-    setStatus('connecting');
+    safeSetStatus('connecting');
     onLog('Initializing...', 'system');
 
     // Helper for scheduling reconnect
@@ -100,7 +112,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
       cleanupAudio: () => void,
       conversationId: string | null,
     ) => {
-      setStatus('connecting');
+      safeSetStatus('connecting');
       initAudio().then(() => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const params = new URLSearchParams();
@@ -122,7 +134,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
         ws.onopen = () => {
           reconnectCountRef.current = 0; // reset après reconnexion réussie
           goAwayPendingRef.current = false;
-          setStatus('connected');
+          safeSetStatus('connected');
           onLog(conversationId ? (pendingContextSummaryRef.current ? 'Session reprise après dépassement de tokens (avec résumé de contexte)' : 'Session reprise après expiration GoAway') : 'Connected to Core', 'info');          // Injecter le résumé de contexte si disponible (fallback client-side pour context_overflow)
           // Le serveur l'injecte aussi via context_resume=1, mais ce message garantit
           // que le contexte est disponible même si Supabase est indisponible.
@@ -190,13 +202,13 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
           if (intentionalDisconnectRef.current) {
             intentionalDisconnectRef.current = false;
             wsRef.current = null;
-            setStatus('idle');
+            safeSetStatus('idle');
             onLog('Disconnected', 'system');
             return;
           }
 
           wsRef.current = null;
-          setStatus('idle');
+          safeSetStatus('idle');
 
           if (goAwayPendingRef.current) {
             // Fermeture déclenchée par GoAway : reconnecter immédiatement (0ms) en
@@ -229,7 +241,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
       }).catch(err => {
         console.error('Failed to initialize audio', err);
         onLog('Failed to start audio / WebSocket', 'error');
-        setStatus('idle');
+        safeSetStatus('idle');
       });
     };
 
@@ -246,7 +258,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
 
       ws.onopen = () => {
         reconnectCountRef.current = 0;
-        setStatus('connected');
+        safeSetStatus('connected');
         onLog('Connected to Core', 'info');
         // Injecter le résumé de contexte si disponible (cas de reconnexion context_overflow
         // déclenchée avant que goAwayPendingRef ait pu router vers connectWithConversationId)
@@ -308,13 +320,13 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
         if (intentionalDisconnectRef.current) {
           intentionalDisconnectRef.current = false;
           wsRef.current = null;
-          setStatus('idle');
+          safeSetStatus('idle');
           onLog('Disconnected', 'system');
           return;
         }
 
         wsRef.current = null;
-        setStatus('idle');
+        safeSetStatus('idle');
 
         if (goAwayPendingRef.current) {
           const convId = pendingConversationIdRef.current;
@@ -345,9 +357,20 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
     }).catch(err => {
       console.error('Failed to initialize audio', err);
       onLog('Failed to start audio / WebSocket', 'error');
-      setStatus('idle');
+      safeSetStatus('idle');
     });
-  }, [onLog, disconnect]);
+  }, [onLog, disconnect, safeSetStatus]);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+    clearReconnectTimer();
+    const ws = wsRef.current;
+    if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+      ws.close(1000, 'component unmounted');
+    }
+    wsRef.current = null;
+    onCleanupAudioRef.current?.();
+  }, [clearReconnectTimer]);
 
   const sendAudioData = useCallback((base64Data: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

@@ -115,7 +115,7 @@ function deduplicate<T>(key: string, factory: () => Promise<T>): Promise<T> {
   // Cleanup
   promise.finally(() => {
     const current = inFlightRequests.get(key);
-    if (current === inFlightRequests.get(key)) {
+    if (current?.promise === promise) {
       inFlightRequests.delete(key);
     }
   });
@@ -181,11 +181,7 @@ export const realtimeCache = {
   },
   
   setTree(tree: TreeEntry[]): void {
-    if (treeCache) {
-      treeCache.value = tree;
-      treeCache.timestamp = Date.now();
-      treeCache.stale = false;
-    }
+    treeCache = { value: tree, timestamp: Date.now(), stale: false };
   },
   
   invalidateTree(): void {
@@ -262,11 +258,7 @@ export const realtimeCache = {
   },
   
   setSandboxStatus(status: SandboxStatus): void {
-    if (statusCache) {
-      statusCache.value = status;
-      statusCache.timestamp = Date.now();
-      statusCache.stale = false;
-    }
+    statusCache = { value: status, timestamp: Date.now(), stale: false };
   },
   
   invalidateSandboxStatus(): void {
@@ -299,11 +291,7 @@ export const realtimeCache = {
   },
   
   setSandboxDiff(diff: SandboxDiff): void {
-    if (diffCache) {
-      diffCache.value = diff;
-      diffCache.timestamp = Date.now();
-      diffCache.stale = false;
-    }
+    diffCache = { value: diff, timestamp: Date.now(), stale: false };
   },
   
   invalidateSandboxDiff(): void {
@@ -440,16 +428,8 @@ export const realtimeCache = {
       treeCache.stale = true;
     }
     readFileCache.clear();
-    if (statusCache) {
-      statusCache.value = null as any;
-      statusCache.timestamp = 0;
-      statusCache.stale = true;
-    }
-    if (diffCache) {
-      diffCache.value = null as any;
-      diffCache.timestamp = 0;
-      diffCache.stale = true;
-    }
+    statusCache = null;
+    diffCache = null;
     inFlightRequests.clear();
   }
 };
