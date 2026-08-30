@@ -28,7 +28,7 @@ const MOD = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navi
   ? '⌘'
   : 'Ctrl';
 
-const MAX_RECENT_FILES = 3;
+const MAX_RECENT_FILES = 2;
 const ENTRANCE_SPRING = { type: 'spring' as const, bounce: 0, duration: 0.4 };
 
 // ─── Validation des fichiers récents ────────────────────────────────────
