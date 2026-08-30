@@ -174,7 +174,7 @@ function splitCommandLine(cmd: string): string[] {
 // commande arbitraire. On bloque désormais tout caractère de contrôle et les
 // métacaractères shell usuels (guillemets, glob, sous-shell, chemin parent).
 //
-// NOTE (revue) : la plupart des exécutions passent par execFile(..., { shell: false }),
+// NOTE (revue) : la plupart des exécutions passent par execFile(..., { shell: true }),
 // donc l'essentiel de ces caractères n'est pas interprété par un shell — sauf
 // pour npm.cmd/npx.cmd sur Windows (voir needsShellWrapper), où shell:true est
 // utilisé avec un tableau d'arguments correctement échappé par Node. Ce filtre

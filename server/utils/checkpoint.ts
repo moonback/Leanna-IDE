@@ -46,7 +46,7 @@ export async function validateBuild(): Promise<{ valid: boolean; errors?: string
       cwd: SELF_ROOT,
       timeout: 60_000,
       maxBuffer: MAX_BUFFER,
-      shell: false,
+      shell: true,
       env: { ...process.env },
     });
     return { valid: true };
