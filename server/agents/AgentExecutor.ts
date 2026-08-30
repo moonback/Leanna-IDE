@@ -278,7 +278,7 @@ export class AgentExecutor {
       const generatedWriteResult = await this.fileWriter.writeFromAgentOutput(task, resultText);
       const generatedRegistration = await this.registerGeneratedWrites(generatedWriteResult.written, toolExecution);
       const writeResult = {
-        written: [...new Set([...toolExecution.filesModified, ...generatedRegistration.verified])],
+        written: Array.from(new Set<string>()),
         errors: [...toolExecution.errors.map((error) => ({ path: "tool-call", error })), ...generatedWriteResult.errors, ...generatedRegistration.errors],
       };
       const durationMs = Date.now() - startTime;
@@ -314,11 +314,11 @@ export class AgentExecutor {
 
       // ── Étape 5: Les délégations ne partent qu'après une exécution vérifiée ──
       const subTaskIds = await this.dispatchDelegations(task, resultText);
-      if (subTaskIds.length > 0) {
+      if (subTaskIds.length > 0 && task.result) {
         task.result.delegatedSubTasks = subTaskIds;
       }
 
-      log.info(`[task:${taskShortId}] ✅ [${agent.name}] Terminé en ${(durationMs / 1000).toFixed(1)}s — ${task.result.summary}`);
+      log.info(`[task:${taskShortId}] ✅ [${agent.name}] Terminé en ${(durationMs / 1000).toFixed(1)}s — ${task.result?.summary ?? ''}`);
       this.notifier.notify(task, "completed");
     } catch (error) {
       const durationMs = Date.now() - startTime;
@@ -399,7 +399,7 @@ export class AgentExecutor {
       // Identifier les fichiers nouvellement lus ou modifiés dans ce tour
       const currentFiles = new Set([...state.filesRead, ...state.filesModified]);
       const newlyTouchedThisTurn = new Set(
-        [...currentFiles].filter(f => 
+        Array.from(currentFiles).filter(f => 
           !newlyTouchedBeforeTurn.has(f) || 
           (state.fileSnapshots.get(f) !== filesBeforeTurn.get(f))
         )
@@ -681,7 +681,7 @@ ${truncated}
 
   private async registerGeneratedWrites(paths: string[], state: ToolExecutionState): Promise<{ verified: string[]; errors: { path: string; error: string }[] }> {
     const verified: string[] = []; const errors: { path: string; error: string }[] = [];
-    for (const filePath of [...new Set(paths)]) {
+    for (const filePath of Array.from(new Set(paths))) {
       state.touchedFiles.add(filePath);
       if (!await this.refreshFileSnapshot(filePath, state, "après la génération", true)) { errors.push({ path: filePath, error: "Relecture post-écriture impossible." }); continue; }
       const verification = await this.callToolWithTimeout("verify_file", { path: filePath });
@@ -737,7 +737,7 @@ ${truncated}
         // 3) suppression de _project_file côté appel (ex: verify_project_file → verify_file)
         const callWithoutProject = call.name.replace("_project_file", "_file");
         const callBase = call.name.replace("_project_file", "");
-        const resolved = [...EXECUTABLE_AGENT_TOOLS].find(
+        const resolved = Array.from(EXECUTABLE_AGENT_TOOLS).find(
           (tool) =>
             tool.startsWith(call.name) ||
             call.name.startsWith(tool.replace("_project_file", "")) ||
@@ -884,19 +884,19 @@ ${truncated}
     resultText: string,
     toolExecution: ToolExecutionState
   ) {
-    const filesRead = [...new Set([
+    const filesRead = Array.from(new Set([
       ...fileContents
         .map((content) => content.match(/^--- (.+) ---/m)?.[1])
         .filter((path): path is string => Boolean(path)),
       ...toolExecution.filesRead,
-    ])];
-    const toolsExecuted = [...new Set([
+    ]));
+    const toolsExecuted = Array.from(new Set([
       "agent_execute",
       ...(task.context.metadata?.projectContextDiscovered === true ? ["list_project_files"] : []),
       ...(filesRead.length > 0 ? ["read_project_file"] : []),
       ...toolExecution.toolsExecuted,
       ...(writeResult.written.length > 0 ? ["write_project_file/apply_patch puis verify_file"] : []),
-    ])];
+    ]));
     const findings = this.extractFindings(resultText);
     const completion = toolExecution.workspace.completionReport(toolExecution.touchedFiles);
     const writeRequired = ["writer", "formatter", "proofreader", "translator"].includes(task.role)
@@ -1209,7 +1209,7 @@ ${truncated}
    */
   private async resolveContextFiles(task: AgentTask, capabilities: string[]): Promise<string[]> {
     const mentionedFiles = this.extractMentionedFiles(task);
-    const hardExplicitFiles: string[] = [...new Set(task.context.files)].filter(Boolean) as string[];
+    const hardExplicitFiles: string[] = Array.from(new Set<string>()).filter(Boolean) as string[];
 
     // Si des fichiers explicites sont fournis par l'appelant (pas extraits), les utiliser directement
     if (hardExplicitFiles.length > 0 && !capabilities.includes("list_project_files")) {
@@ -1236,7 +1236,7 @@ ${truncated}
         .filter(Boolean) as string[];
 
       // Combiner : fichiers explicites + fichiers résolus + sélection structurante
-      const priorityFiles = [...new Set([...hardExplicitFiles, ...resolvedMentioned])];
+      const priorityFiles = Array.from(new Set<string>());
 
       if (priorityFiles.length >= 10) {
         const selected: string[] = priorityFiles.slice(0, 10);
@@ -1287,7 +1287,7 @@ ${truncated}
         matches.push(candidate);
       }
     }
-    return [...new Set(matches)];
+    return Array.from(new Set(matches));
   }
 
   /** Conserve les fichiers d'entrée utiles sans dépasser le budget de contexte. */
@@ -1304,7 +1304,7 @@ ${truncated}
       "server/skills/agents.ts",
     ];
     const preferredRank = new Map(preferredFiles.map((file, index) => [file.replace(/\\/g, "/"), index]));
-    const normalizedFiles = [...new Set(files.map((file) => file.replace(/\\/g, "/"))) ]
+    const normalizedFiles = Array.from(new Set(files.map((file) => file.replace(/\\/g, "/"))))
       .filter((file) => !file.startsWith(".git/") && !file.startsWith(".Leanna/") && !file.includes("/node_modules/"));
 
     return normalizedFiles
@@ -1318,7 +1318,7 @@ ${truncated}
 
   private async readContextFiles(files: string[]): Promise<string[]> {
     const fileContents: string[] = [];
-    for (const [index, file] of files.slice(0, 10).entries()) {
+    for (const [index, file] of Array.from(files.slice(0, 10).entries())) {
       try {
         // Le premier fichier est le fichier principal résolu par la tâche :
         // injecter son contenu complet évite que le modèle travaille sur une

@@ -38,7 +38,7 @@ import { QuitConfirmDialog } from './sidebar/QuitConfirmDialog.js';
 import { AgentStatusBlock } from './sidebar/AgentStatusBlock.js';
 import { buildAIMenuItems } from './sidebar/buildAIMenuItems.js';
 import { useIDEState } from './sidebar/useIDEState.js';
-import type { UnifiedSidebarProps, SidebarContext } from './sidebar/types.js';
+import type { UnifiedSidebarProps, SidebarContext, IDEPanelState, IDEPanelActions } from './sidebar/types.js';
 
 // Re-export types for consumers
 export type { UnifiedSidebarProps } from './sidebar/types.js';
@@ -100,7 +100,8 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
       {/* Mobile Toggle Button */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="md:hidden fixed top-3 left-3 z-50 p-2.5 rounded-md border text-[var(--text-primary)] transition-all duration-200 hover:bg-[var(--bg-secondary)] shadow-sm"
+        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg border text-[var(--text-primary)] transition-all duration-200 hover:bg-[var(--bg-secondary)] shadow-lg"
+
         style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
         aria-label="Menu principal"
       >
@@ -120,21 +121,17 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
       )}
 
       <motion.nav
-        className={`Leanna-sidebar flex flex-col items-center select-none relative ${mobileOpen ? 'mobile-open' : ''}`}
+        className={`Leanna-sidebar flex flex-col items-center select-none relative ${mobileOpen ? 'mobile-open' : ''} bg-[var(--ide-sidebar-bg)] border-r border-[var(--ide-shell-border)] rounded-l-[var(--radius-base)] gap-1 shadow-inner`}
+
         initial={false}
         animate={{ x: 0 }}
         transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
         style={{
           width: '56px',
-          borderRight: '1px solid var(--ide-shell-border)',
-          backgroundColor: 'var(--ide-sidebar-bg)',
           height: '100%',
           paddingBottom: '12px',
-          boxShadow: 'none',
-          borderTopLeftRadius: 'var(--radius-base)',
-          borderBottomLeftRadius: 'var(--radius-base)',
-          gap: '4px',
         }}
+
         aria-label="Navigation principale"
       >
         {/* ═══ BRAND LOGO ═══ */}
@@ -312,8 +309,8 @@ function IDEToolsSections({
   assistantConnected,
   skipAnimation,
 }: {
-  state: import('./sidebar/types').IDEPanelState;
-  actions: import('./sidebar/types').IDEPanelActions;
+  state: IDEPanelState;
+  actions: IDEPanelActions;
   assistantConnected: boolean;
   skipAnimation: boolean;
 }) {
@@ -419,7 +416,8 @@ function GlobalNavSection({
             animate={{ opacity: 1, scale: 1, x: 0 }}
             exit={{ opacity: 0, scale: 0.95, x: -10 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
-            className="absolute left-[52px] bottom-0 z-50 py-1.5 rounded-lg border shadow-lg origin-top-left"
+            className="absolute left-[64px] bottom-0 z-50 py-2 rounded-xl border shadow-2xl origin-top-left"
+
             style={{
               backgroundColor: 'var(--bg-panel)',
               borderColor: 'var(--border-base)',
@@ -438,7 +436,8 @@ function GlobalNavSection({
                     handleClick();
                     setSubmenuOpen(false);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs font-medium transition-all duration-150 rounded-md hover:bg-[var(--bg-secondary)]"
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-xs font-medium transition-all duration-150 rounded-md hover:bg-[var(--bg-secondary)] hover:text-[var(--accent-primary)]"
+
                   style={{
                     color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)',
                     backgroundColor: isActive ? 'var(--accent-subtle)' : undefined,

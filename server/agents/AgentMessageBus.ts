@@ -161,7 +161,7 @@ export class AgentMessageBus extends EventEmitter {
    * Désabonne tous les handlers d'un agent.
    */
   unsubscribeAll(agentRole: AgentRole): void {
-    for (const [id, sub] of this.subscriptions) {
+    for (const [id, sub] of Array.from(this.subscriptions)) {
       if (sub.agentRole === agentRole) {
         this.subscriptions.delete(id);
       }
@@ -368,11 +368,11 @@ export class AgentMessageBus extends EventEmitter {
 
     // Collecter tous les rôles
     const allRoles = new Set<AgentRole>();
-    for (const sub of this.subscriptions.values()) {
+    for (const sub of Array.from(this.subscriptions.values())) {
       allRoles.add(sub.agentRole);
     }
 
-    for (const role of allRoles) {
+    for (const role of Array.from(allRoles)) {
       const messageCount = this.routingMetrics.agentMessageCount.get(role) ?? 0;
       const activeMessages = this.routingMetrics.agentActiveMessages.get(role) ?? 0;
       const avgProcessingTime = this.routingMetrics.agentAvgProcessingTime.get(role) ?? 0;
@@ -400,7 +400,7 @@ export class AgentMessageBus extends EventEmitter {
   }> {
     const state: Record<AgentRole, { currentIndex: number; subscriberCount: number }> = {};
 
-    for (const [role, subIds] of this.roundRobinState.subscribers) {
+    for (const [role, subIds] of Array.from(this.roundRobinState.subscribers)) {
       state[role] = {
         currentIndex: this.roundRobinState.index.get(role) ?? 0,
         subscriberCount: subIds.length
@@ -505,7 +505,7 @@ export class AgentMessageBus extends EventEmitter {
     const successful = this.metrics.filter((m) => m.success).length;
 
     const deadLetterQueue: Record<string, number> = {};
-    for (const [role, entries] of this.deadLetterQueue) {
+    for (const [role, entries] of Array.from(this.deadLetterQueue)) {
       const active = entries.filter((e) => Date.now() - e.enqueuedAt < DEAD_LETTER_TTL_MS);
       if (active.length > 0) deadLetterQueue[role] = active.length;
     }
@@ -538,7 +538,7 @@ export class AgentMessageBus extends EventEmitter {
     this.roundRobinState.subscribers.clear();
     this.roundRobinState.index.clear();
 
-    for (const sub of this.subscriptions.values()) {
+    for (const sub of Array.from(this.subscriptions.values())) {
       if (!this.roundRobinState.subscribers.has(sub.agentRole)) {
         this.roundRobinState.subscribers.set(sub.agentRole, []);
       }
@@ -591,7 +591,7 @@ export class AgentMessageBus extends EventEmitter {
   private selectAgentForLoadBalancing(targetRole: AgentRole): string | null {
     const availableHandlers: Array<{ subId: string; load: number; avgTime: number }> = [];
 
-    for (const sub of this.subscriptions.values()) {
+    for (const sub of Array.from(this.subscriptions.values())) {
       if (sub.agentRole !== targetRole) continue;
 
       const subId = sub.id;
@@ -698,7 +698,7 @@ export class AgentMessageBus extends EventEmitter {
   ): Promise<void> {
     const handlers: Array<{ handler: MessageHandler; subId: string }> = [];
 
-    for (const sub of this.subscriptions.values()) {
+    for (const sub of Array.from(this.subscriptions.values())) {
       if (
         sub.agentRole === targetRole &&
         (sub.messageType === "*" || sub.messageType === message.type)
@@ -834,7 +834,7 @@ export class AgentMessageBus extends EventEmitter {
     const handlers: Array<{ handler: MessageHandler; subId: string }> = [];
     const seen = new Set<AgentRole>();
 
-    for (const sub of this.subscriptions.values()) {
+    for (const sub of Array.from(this.subscriptions.values())) {
       // Éviter de diffuser à l'émetteur lui-même
       if (sub.agentRole === message.from) continue;
       // Un seul handler par rôle pour le broadcast

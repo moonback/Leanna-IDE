@@ -135,7 +135,7 @@ export class DelegationParser {
     const validRoles = getValidRoles();
     if (!targetRole || !validRoles.has(targetRole)) {
       return {
-        warning: `Bloc #${blockIndex}: rôle "${cibleRaw}" invalide. Valides: ${[...validRoles].join(", ")}`,
+        warning: `Bloc #${blockIndex}: rôle "${cibleRaw}" invalide. Valides: ${Array.from(validRoles).join(", ")}`,
       };
     }
 
@@ -295,7 +295,7 @@ export class DelegationParser {
     }
 
     // Dernier recours : vérifier si un rôle valide est contenu dans le texte
-    for (const role of validRoles) {
+    for (const role of Array.from(validRoles)) {
       if (cleaned.includes(role)) return role;
     }
 

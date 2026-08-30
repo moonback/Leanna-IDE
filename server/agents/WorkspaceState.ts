@@ -84,7 +84,7 @@ export class WorkspaceState {
   get(path: string): WorkspaceFileState | undefined { const state = this.files.get(this.key(path)); return state ? this.clone(state) : undefined; }
 
   completionReport(modifiedPaths: Iterable<string>): WorkspaceCompletionReport {
-    const modified = [...new Set([...modifiedPaths].map((filePath) => this.key(filePath)))];
+    const modified = Array.from(new Set(Array.from(modifiedPaths).map((filePath) => this.key(filePath))));
     const files = modified.map((filePath) => this.files.get(filePath) ?? { path: filePath, exists: false, contentHash: "", hash: "", version: 0, status: "error" as const, errors: ["État de fichier absent."] });
     const errors = files.flatMap((file) => file.status === "verified" && file.verifiedHash === file.contentHash && file.verification?.ok && file.verification.status === "success" ? [] : [`${file.path}: vérification actuelle réussie requise (status ${file.status}).`, ...file.errors.map((error) => `${file.path}: ${error}`)]);
     return { passed: errors.length === 0, modifiedFiles: modified, errors, files: files.map((file) => this.clone(file)) };

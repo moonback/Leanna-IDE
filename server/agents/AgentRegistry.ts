@@ -82,7 +82,7 @@ export class AgentRegistry {
 
     this.initialized = true;
     log.info(
-      `✅ AgentRegistry initialisé avec ${this.agents.size} agent(s): ${[...this.agents.keys()].join(", ")}`
+      `✅ AgentRegistry initialisé avec ${this.agents.size} agent(s): ${Array.from(this.agents.keys()).join(", ")}`
     );
   }
 
@@ -90,7 +90,7 @@ export class AgentRegistry {
    * Arrête tous les agents proprement.
    */
   shutdown(): void {
-    for (const agent of this.agents.values()) {
+    for (const agent of Array.from(this.agents.values())) {
       agent.stop();
     }
     this.agents.clear();

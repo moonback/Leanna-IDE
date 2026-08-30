@@ -170,7 +170,7 @@ export class AgentOrchestrator {
   }): Promise<OrchestrationPlan> {
     const orchestrationId = randomUUID();
 
-    log.info(`🎯 Orchestration "${params.title}" — ${params.tasks.length} tâche(s), agents: ${[...new Set(params.tasks.map(t => t.role))].join(", ")}`);
+    log.info(`🎯 Orchestration "${params.title}" — ${params.tasks.length} tâche(s), agents: ${Array.from(new Set(params.tasks.map(t => t.role))).join(", ")}`);
 
     const agentTasks: AgentTask[] = [];
     const dependencies: Record<string, string[]> = {};

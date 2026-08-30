@@ -95,7 +95,7 @@ export function getLastValidationResult() {
 // ── Internal ────────────────────────────────────────────────────────────────
 
 function notifyAll(data: any) {
-  for (const notify of subscribers) {
+  for (const notify of Array.from(subscribers)) {
     try { notify(data); } catch { /* ignore */ }
   }
   // Also dispatch as a window event for the StatusBar (via WebSocket → client)
