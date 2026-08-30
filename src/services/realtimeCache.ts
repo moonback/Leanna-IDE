@@ -115,7 +115,7 @@ function deduplicate<T>(key: string, factory: () => Promise<T>): Promise<T> {
   // Cleanup
   promise.finally(() => {
     const current = inFlightRequests.get(key);
-    if (current === inFlightRequests.get(key)) {
+    if (current?.promise === promise) {
       inFlightRequests.delete(key);
     }
   });
