@@ -206,6 +206,31 @@ export async function handleCustomSkillCall(toolName: string, args: Record<strin
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Fonction utilitaire pour résoudre un identifiant de skill (UUID ou nom)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Résout un identifiant de skill (peut être un UUID ou un nom) et retourne l'ID réel */
+async function resolveSkillId(idOrName: string): Promise<string> {
+  // Si c'est un UUID valide, le retourner directement
+  if (uuidRegex.test(idOrName)) {
+    return idOrName;
+  }
+  
+  // Sinon, chercher par nom (avec ou sans préfixe custom_)
+  const skills = await getAllCustomSkills();
+  const normalizedName = idOrName.replace(/^custom_/, "");
+  const skill = skills.find(s => s.name === idOrName || s.name === normalizedName);
+  
+  if (!skill) {
+    throw new Error(`Skill non trouvé avec l'identifiant: ${idOrName}`);
+  }
+  
+  return skill.id;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Skill exposé à l'IA pour la gestion CRUD des custom skills
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -240,29 +265,31 @@ export const customSkillsManagementSkill: Skill = {
     },
     {
       name: "update_custom_skill",
-      description: "Modifier un skill personnalisé existant.",
+      description: "Modifier un skill personnalisé existant. Utilisez soit l'UUID (id) soit le nom (name) pour identifier le skill.",
       parameters: {
         type: "OBJECT",
         properties: {
           id: { type: "STRING", description: "UUID du skill à modifier" },
-          name: { type: "STRING", description: "Nouveau nom (optionnel)" },
+          name: { type: "STRING", description: "Nom du skill à modifier (alternative à id)" },
+          new_name: { type: "STRING", description: "Nouveau nom (optionnel)" },
           description: { type: "STRING", description: "Nouvelle description (optionnel)" },
           parameters: { type: "ARRAY", description: "Nouveaux paramètres (optionnel)", items: { type: "OBJECT" } },
           instruction: { type: "STRING", description: "Nouvelle instruction (optionnel)" },
           enabled: { type: "BOOLEAN", description: "Activer/désactiver le skill" },
         },
-        required: ["id"],
+        required: [],
       },
     },
     {
       name: "delete_custom_skill",
-      description: "Supprimer définitivement un skill personnalisé.",
+      description: "Supprimer définitivement un skill personnalisé. Utilisez soit l'UUID (id) soit le nom (name) pour identifier le skill.",
       parameters: {
         type: "OBJECT",
         properties: {
           id: { type: "STRING", description: "UUID du skill à supprimer" },
+          name: { type: "STRING", description: "Nom du skill à supprimer (alternative à id)" },
         },
-        required: ["id"],
+        required: [],
       },
     },
   ],
@@ -310,16 +337,32 @@ export const customSkillsManagementSkill: Skill = {
         }
 
         case "update_custom_skill": {
-          if (!args.id) return { error: "ID requis" };
+          if (!args.id && !args.name) {
+            return { error: "ID ou name requis pour identifier le skill" };
+          }
+          
+          // Résoudre l'ID du skill
+          const identifier = args.id || args.name;
+          let skillId: string;
+          try {
+            skillId = await resolveSkillId(identifier!);
+          } catch (err: any) {
+            return { error: err.message };
+          }
+          
           const updates: any = {};
-          if (args.name) { nameSchema.parse(args.name); updates.name = args.name; }
+          if (args.new_name) { nameSchema.parse(args.new_name); updates.name = args.new_name; }
+          else if (args.name && args.name !== identifier) { 
+            nameSchema.parse(args.name); 
+            updates.name = args.name; 
+          }
           if (args.description !== undefined) updates.description = args.description;
           if (args.parameters !== undefined) updates.parameters = args.parameters;
           if (args.instruction !== undefined) updates.instruction = args.instruction;
           if (args.enabled !== undefined) updates.enabled = args.enabled;
           if (args.category !== undefined) updates.category = args.category;
 
-          const updated = await updateCustomSkill(args.id, updates);
+          const updated = await updateCustomSkill(skillId, updates);
           invalidateCustomSkillsCache();
           return {
             success: true,
@@ -333,8 +376,20 @@ export const customSkillsManagementSkill: Skill = {
         }
 
         case "delete_custom_skill": {
-          if (!args.id) return { error: "ID requis" };
-          await deleteCustomSkill(args.id);
+          if (!args.id && !args.name) {
+            return { error: "ID ou name requis pour identifier le skill" };
+          }
+          
+          // Résoudre l'ID du skill
+          const identifier = args.id || args.name;
+          let skillId: string;
+          try {
+            skillId = await resolveSkillId(identifier!);
+          } catch (err: any) {
+            return { error: err.message };
+          }
+          
+          await deleteCustomSkill(skillId);
           invalidateCustomSkillsCache();
           return { success: true, message: "Skill supprimé." };
         }
