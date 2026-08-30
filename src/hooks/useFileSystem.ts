@@ -48,7 +48,7 @@ export function useFileSystem() {
   // Load diff status from sandbox API
   const loadDiff = useCallback(async (force = true) => {
     try {
-      const { sandboxApi } = await import('../services/sandboxApi');
+      const { sandboxApi } = await import('../services/sandboxApi.js');
       const data = await sandboxApi.getDiff(force);
       if (data.status === 'success' && Array.isArray((data as any).diff)) {
         const map = new Map<string, DiffInfo>();
@@ -104,7 +104,7 @@ export function useFileSystem() {
       const changedPath = detail.path as string;
       // Si le fichier modifié est ouvert, le recharger depuis le disque
       const openFile = openFiles.find(f => f.path === changedPath || f.path.endsWith(changedPath));
-      if (openFile) {
+      if (openFile && !openFile.path.startsWith('__browser__:')) {
         (async () => {
           try {
             const content = await ideApi.readFile(openFile.path);
@@ -147,6 +147,23 @@ export function useFileSystem() {
       return;
     }
 
+    // Check if this is a browser tab (prefixed with __browser__:)
+    const browserPrefix = '__browser__:';
+    if (filePath.startsWith(browserPrefix)) {
+      const url = filePath.slice(browserPrefix.length);
+      const newFile: OpenFile = {
+        path: filePath,
+        content: '',
+        dirty: false,
+        language: '',
+        type: 'browser',
+        browserUrl: url,
+      };
+      setOpenFiles((prev) => [...prev.filter((f) => f.path !== filePath), newFile]);
+      setActivePath(filePath);
+      return;
+    }
+
     // Fichiers binaires (images) : on les ouvre sans lire le contenu texte
     const isBinary = /\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|pdf)$/i.test(filePath);
 
@@ -157,6 +174,7 @@ export function useFileSystem() {
         content,
         dirty: false,
         language: getLanguage(filePath),
+        type: 'file',
       };
       // Ensure no duplicates by filtering out any existing entry with the same path first
       setOpenFiles((prev) => [...prev.filter((f) => f.path !== filePath), newFile]);
@@ -168,6 +186,10 @@ export function useFileSystem() {
 
   // Save active file
   const saveFile = useCallback(async (filePath: string, content: string) => {
+    // Don't try to save browser tabs
+    if (filePath.startsWith('__browser__:')) {
+      return;
+    }
     try {
       await ideApi.saveFile(filePath, content);
       setOpenFiles((prev) =>
@@ -180,6 +202,10 @@ export function useFileSystem() {
 
   // Update file content (mark as dirty)
   const updateFileContent = useCallback((filePath: string, content: string) => {
+    // Don't try to update browser tabs
+    if (filePath.startsWith('__browser__:')) {
+      return;
+    }
     setOpenFiles((prev) =>
       prev.map((file) =>
         file.path === filePath ? { ...file, content, dirty: file.content !== content } : file
@@ -189,6 +215,10 @@ export function useFileSystem() {
 
   // Reload file from disk (used when assistant modifies it) — returns new content
   const reloadFile = useCallback(async (filePath: string): Promise<string | null> => {
+    // Don't try to reload browser tabs
+    if (filePath.startsWith('__browser__:')) {
+      return null;
+    }
     try {
       const content = await ideApi.readFile(filePath);
       setOpenFiles((prev) =>
@@ -206,6 +236,10 @@ export function useFileSystem() {
 
   // Force-reload: close the tab then reopen it fresh from disk
   const forceReloadFile = useCallback(async (filePath: string): Promise<void> => {
+    // Don't try to reload browser tabs
+    if (filePath.startsWith('__browser__:')) {
+      return;
+    }
     try {
       const content = await ideApi.readFile(filePath);
       // Atomically replace the file entry so Monaco gets a brand-new value prop

@@ -37,7 +37,7 @@ import { ChatPanel } from '../components/ide/ChatPanel.js';
 import { LiveSkillsMonitor } from '../components/ide/LiveSkillsMonitor.js';
 import { WorkflowPanel } from '../components/ide/WorkflowPanel.js';
 import { McpPanel } from '../components/panels/McpPanel.js';
-import { BrowserPanel } from '../components/panels/BrowserPanel.js';
+import { BrowserPanel, BROWSER_HOME_URL } from '../components/panels/BrowserPanel.js';
 import { MarkdownPreview } from '../components/ide/MarkdownPreview.js';
 import { ImagePreview } from '../components/ide/ImagePreview.js';
 import { EmptyEditorState } from '../components/ide/EmptyEditorState.js';
@@ -232,17 +232,25 @@ export default function IdeView() {
     setShowSandbox(false);
     setShowKnowledge(false);
     setShowNotebooks(false);
-    setShowBrowser(false);
     setShowHistory(false);
     setShowAutomation(false);
     setShowMemory(false);
     setRichDocument(null);
+
+    // Toujours fermer showBrowser quand on ouvre un fichier/onglet
+    setShowBrowser(false);
 
     await fileSystem.openFile(filePath);
     if (typeof line === 'number') {
       navigateToPosition(line, column);
     }
   }, [fileSystem, navigateToPosition]);
+
+  // Ouverture d'une URL dans un nouvel onglet navigateur
+  const openUrlInNewTab = useCallback((url: string) => {
+    const browserPath = `__browser__:${url}`;
+    openFileAt(browserPath);
+  }, [openFileAt]);
 
   // ── Handle AI-triggered file open ──────────────────────────────────────────
 
@@ -728,7 +736,7 @@ export default function IdeView() {
         onToggleDocuments={() => setShowDocuments(v => !v)}
         onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
         onToggleMcp={() => setShowMcp(v => !v)}
-        onToggleBrowser={() => setShowBrowser(v => !v)}
+        onToggleBrowser={() => openUrlInNewTab(BROWSER_HOME_URL)}
         onToggleVision={() => setVisionEnabled(v => !v)}
         onToggleScreenShare={toggleScreenShare}
         onToggleMode={() => {
@@ -863,6 +871,7 @@ export default function IdeView() {
                         <BrowserPanel
                           url={browserUrl}
                           onClose={() => { setShowBrowser(false); setBrowserUrl(undefined); }}
+                          onOpenInNewTab={openUrlInNewTab}
                           fullWidth
                         />
                       </div>
@@ -935,12 +944,21 @@ export default function IdeView() {
                       ) : showMemory ? (
                         <MemoryPanel onClose={() => setShowMemory(false)} />
                       ) : activeFile ? (
-                                              markdownPreview && activeFile.language === 'markdown' ? (
+                                              // Onglet navigateur
+                                              activeFile.type === 'browser' && activeFile.browserUrl ? (
+                                                <BrowserPanel
+                                                  url={activeFile.browserUrl}
+                                                  onClose={() => fileSystem.closeTab(activeFile.path)}
+                                                  onOpenInNewTab={openUrlInNewTab}
+                                                  fullWidth
+                                                />
+                                              ) : markdownPreview && activeFile.language === 'markdown' ? (
                                                 <MarkdownPreview content={activeFile.content} />
                                               ) : htmlPreview && activeFile.language === 'html' ? (
                                                 <BrowserPanel
                                                   url={`http://localhost:${SERVER_PORT}/workspace-preview/${encodeURIComponent(activeFile.path)}`}
                                                   onClose={() => setHtmlPreview(false)}
+                                                  onOpenInNewTab={openUrlInNewTab}
                                                   fullWidth
                                                 />
                                               ) : /\.(png|jpg|jpeg|gif|webp|bmp|ico)$/i.test(activeFile.path) ? (

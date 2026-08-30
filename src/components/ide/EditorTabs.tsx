@@ -5,6 +5,16 @@ import { FileIcon } from './FileIcon.js';
 import { fileName } from '../../utils/fileUtils.js';
 import type { OpenFile } from '../../types/ide.js';
 
+// Helper to extract hostname from URL for display
+function getHostnameDisplay(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
 type EditorTabsProps = {
   openFiles: OpenFile[];
   activePath: string | null;
@@ -60,6 +70,14 @@ export function EditorTabs({
       <div className="flex flex-1 h-full overflow-x-auto overflow-y-hidden custom-scrollbar">
         {openFiles.map((file) => {
           const isActive = activePath === file.path;
+          const isBrowserTab = file.type === 'browser';
+          const displayName = isBrowserTab && file.browserUrl 
+            ? getHostnameDisplay(file.browserUrl) 
+            : fileName(file.path);
+          const tabTitle = isBrowserTab && file.browserUrl 
+            ? file.browserUrl 
+            : file.path;
+          
           return (
             <div
               key={file.path}
@@ -72,7 +90,7 @@ export function EditorTabs({
                 maxWidth: '180px',
               }}
               onClick={() => onSelectTab(file.path)}
-              title={file.path}
+              title={tabTitle}
             >
               {/* Top active tab indicator line — animated slide */}
               {isActive && (
@@ -86,12 +104,16 @@ export function EditorTabs({
 
               {/* File Icon */}
               <div className="flex-shrink-0 opacity-80 group-hover:opacity-100">
-                <FileIcon filePath={file.path} />
+                {isBrowserTab ? (
+                  <Globe size={13} style={{ color: 'var(--accent-primary)' }} />
+                ) : (
+                  <FileIcon filePath={file.path} />
+                )}
               </div>
 
               {/* Filename */}
               <span className="flex-1 truncate font-medium">
-                {fileName(file.path)}
+                {displayName}
               </span>
 
               {/* Status / Close indicators */}

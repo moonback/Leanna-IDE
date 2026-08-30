@@ -14,6 +14,8 @@ export type OpenFile = {
   content: string;
   dirty: boolean;
   language: string;
+  type?: 'file' | 'browser';
+  browserUrl?: string;
 };
 
 export type IdeSettings = {

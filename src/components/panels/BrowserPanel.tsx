@@ -64,6 +64,8 @@ interface BrowserPanelProps {
   fullWidth?: boolean;
   /** Largeur fixe en mode panneau latéral. Ignoré si fullWidth=true. */
   width?: string;
+  /** Callback pour ouvrir l'URL dans un nouvel onglet de l'application */
+  onOpenInNewTab?: (url: string) => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -88,6 +90,7 @@ function isHttps(url: string): boolean {
 
 export function BrowserPanel({
   onClose,
+  onOpenInNewTab,
   url: controlledUrl,
   defaultUrl = BROWSER_HOME_URL,
   fullWidth = false,
