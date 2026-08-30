@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { shell } from 'electron';
 import {
   ArrowLeft,
   ArrowRight,
@@ -342,13 +343,12 @@ export function BrowserPanel({
   }, []);
   const handleHome = useCallback(() => navigateTo(BROWSER_HOME_URL), [navigateTo]);
   // Référence pour l'intervalle de vérification de la fenêtre externe
-  const externalWindowCheckRef = useRef<NodeJS.Timeout | null>(null);
+  const externalWindowCheckRef = useRef<number | null>(null);
 
   const handleOpenInNewWindow = useCallback(() => {
     // Dans Electron, on utilise toujours shell.openExternal pour ouvrir dans le navigateur par défaut
     // window.open() ne fonctionne pas correctement dans Electron pour les fenêtres externes
     try {
-      const { shell } = require('electron');
       shell.openExternal(currentUrl);
       
       // Avec shell.openExternal, on ne peut pas détecter quand la fenêtre est fermée
