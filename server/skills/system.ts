@@ -4,26 +4,43 @@ import { promisify } from "util";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { SELF_ROOT, normalizeSelfPath, resolveRealPathWithinSelf } from "../utils/selfRoot.js";
+import { SELF_ROOT, resolveRealPathWithinSelf } from "../utils/selfRoot.js";
 import { requestConfirmation } from "../utils/confirmationBridge.js";
+import { isSandboxActive, getSandboxRoot } from "../utils/sandbox.js";
 
 const execFileAsync = promisify(execFile);
 
-// Retourne la racine du projet actif sélectionné par l'utilisateur (SELF_ROOT).
+/**
+ * Retourne la racine d'exécution pour les commandes shell lancées par l'assistant.
+ * Si le sandbox est actif (READY), les commandes s'exécutent dans la copie isolée
+ * plutôt que dans le workspace réel — l'assistant ne peut pas affecter le projet
+ * principal tant que les modifications ne sont pas synchronisées.
+ */
 function getProjectRoot(): string {
+    if (isSandboxActive()) {
+        return getSandboxRoot();
+    }
     return SELF_ROOT;
 }
 
 /**
- * Resolves `target` against the project root and rejects anything that
- * escapes it *textually*. Delegates to the centralized normalizeSelfPath.
+ * Resolves `target` against the execution root (sandbox if active, SELF_ROOT otherwise)
+ * and rejects anything that escapes it *textually*.
  */
 function normalizeProjectPath(target: string): string | null {
-    return normalizeSelfPath(target);
+    const root = getProjectRoot();
+    if (!root) return null;
+    const resolved = path.resolve(root, target);
+    if (resolved === root || resolved.startsWith(root + path.sep)) {
+        return resolved;
+    }
+    return null;
 }
 
 /**
  * SECURITY: guards against symlink escape. Delegates to resolveRealPathWithinSelf.
+ * Note: symlink resolution still checks against SELF_ROOT since the sandbox is
+ * a subdirectory of the project and real paths are expected within it.
  */
 async function resolveRealPathWithinProject(candidatePath: string): Promise<string | null> {
     return resolveRealPathWithinSelf(candidatePath);
