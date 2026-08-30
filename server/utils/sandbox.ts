@@ -459,6 +459,9 @@ async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash:
  * Rafraîchit le sandbox depuis le repo principal.
  */
 export async function discardSandbox(): Promise<void> {
+  if (!SELF_ROOT) {
+    throw new Error("Aucun projet sélectionné. Impossible d'abandonner le sandbox.");
+  }
   sandboxModifiedFiles.clear();
   const sandboxBase = getSandboxRoot();
   // Re-sync depuis le principal
@@ -696,6 +699,9 @@ export async function validateSandbox(): Promise<SandboxValidationResult> {
  * depuis le code source principal. Équivalent à initSandbox() mais force la recréation.
  */
 export async function resetSandbox(): Promise<{ created: boolean; path: string; filesCopied: number }> {
+  if (!SELF_ROOT) {
+    throw new Error("Aucun projet sélectionné. Impossible de réinitialiser le sandbox.");
+  }
   beginSandboxInitialization();
   const sandboxBase = getSandboxRoot();
   // Supprimer le sandbox existant s'il existe

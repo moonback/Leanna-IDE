@@ -65,6 +65,7 @@ export const StatusBar = memo(function StatusBar({
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetCode, setResetCode] = useState('');
+  const [resetError, setResetError] = useState<string | null>(null);
   const resetInputRef = useRef<HTMLInputElement | null>(null);
   
   const [mcpStatus, setMcpStatus] = useState<'ok' | 'error' | 'loading'>('loading');
@@ -127,6 +128,7 @@ export const StatusBar = memo(function StatusBar({
   }, []);
 
   const handleConfirmReset = useCallback(async () => {
+    setResetError(null);
     try {
       const token = localStorage.getItem('Leanna_api_token');
       const headers: Record<string, string> = {
@@ -139,13 +141,16 @@ export const StatusBar = memo(function StatusBar({
         body: JSON.stringify({ code: resetCode }),
       });
       const data = await res.json();
-      if (data.status === 'success') {
+      if (res.ok && data.status === 'success') {
         setShowResetConfirm(false);
         setResetCode('');
         window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+      } else {
+        // Show error to user
+        setResetError(data.error || 'Erreur lors de la réinitialisation');
       }
     } catch {
-      /* silent */
+      setResetError('Erreur réseau');
     }
   }, [resetCode]);
 
@@ -155,6 +160,7 @@ export const StatusBar = memo(function StatusBar({
       if (e.key === 'Escape') {
         setShowResetConfirm(false);
         setResetCode('');
+        setResetError(null);
       }
     };
     window.addEventListener('keydown', handler);
@@ -386,6 +392,7 @@ export const StatusBar = memo(function StatusBar({
           onClick={() => {
             setShowResetConfirm(false);
             setResetCode('');
+            setResetError(null);
           }}
           role="dialog"
           aria-modal="true"
@@ -425,6 +432,11 @@ export const StatusBar = memo(function StatusBar({
               <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                 Entrez le code de confirmation pour valider la réinitialisation du sandbox.
               </p>
+              {resetError && (
+                <p className="text-xs text-red-500" style={{ color: 'var(--color-error)' }}>
+                  {resetError}
+                </p>
+              )}
               <input
                 ref={resetInputRef}
                 type="text"
@@ -447,7 +459,7 @@ export const StatusBar = memo(function StatusBar({
             <div className="flex items-center justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: 'var(--border-base)' }}>
               <button
                 type="button"
-                onClick={() => { setShowResetConfirm(false); setResetCode(''); }}
+                onClick={() => { setShowResetConfirm(false); setResetCode(''); setResetError(null); }}
                 className="rounded-lg border px-3 py-1.5 text-sm font-medium transition hover:bg-white/10"
                 style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
               >

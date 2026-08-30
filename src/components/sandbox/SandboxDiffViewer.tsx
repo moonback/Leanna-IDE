@@ -535,11 +535,13 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
         headers: getAuthHeaders(),
       });
       const data = await res.json();
-      if (data.status === 'success') {
+      if (res.ok && data.status === 'success') {
         setFeedback({ type: 'success', msg: 'Toutes les modifications rejetées' });
         setFiles([]);
         setSelectedFile(null);
         window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+      } else {
+        setFeedback({ type: 'error', msg: data.error || 'Erreur lors de l\'abandon des modifications' });
       }
     } catch {
       setFeedback({ type: 'error', msg: 'Erreur réseau' });

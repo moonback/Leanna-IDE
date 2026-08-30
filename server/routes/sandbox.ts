@@ -233,7 +233,13 @@ export function createSandboxRouter(): Router {
       await discardSandbox();
       res.json({ status: 'success' });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      const message = e.message || 'Erreur interne';
+      // 400 if no project is selected (client error)
+      if (message.includes('Aucun projet sélectionné') || message.includes('aucun projet')) {
+        res.status(400).json({ status: 'error', error: message });
+      } else {
+        res.status(500).json({ status: 'error', error: message });
+      }
     }
   });
 
@@ -271,7 +277,13 @@ export function createSandboxRouter(): Router {
         target: 'sandbox',
         details: JSON.stringify({ error: e.message }),
       });
-      res.status(500).json({ error: e.message });
+      const message = e.message || 'Erreur interne';
+      // 400 if no project is selected (client error)
+      if (message.includes('Aucun projet sélectionné') || message.includes('aucun projet')) {
+        res.status(400).json({ status: 'error', error: message });
+      } else {
+        res.status(500).json({ status: 'error', error: message });
+      }
     }
   });
 
