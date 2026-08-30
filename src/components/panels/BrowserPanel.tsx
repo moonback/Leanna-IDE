@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Loader2,
   Bot,
+  ExternalLink,
 } from 'lucide-react';
 
 // ─── Types webview (Electron-specific, non exposés par le tsconfig) ───────────
@@ -158,6 +159,14 @@ export function BrowserPanel({
     webviewRef.current?.reload();
   }, []);
   const handleHome = useCallback(() => navigateTo(BROWSER_HOME_URL), [navigateTo]);
+  const handleOpenInNewWindow = useCallback(() => {
+    try {
+      const { shell } = require('electron');
+      shell.openExternal(currentUrl);
+    } catch {
+      window.open(currentUrl, '_blank', 'noopener,noreferrer');
+    }
+  }, [currentUrl]);
 
   // ── Événements webview ──────────────────────────────────────────────────────
 
@@ -1357,6 +1366,16 @@ export function BrowserPanel({
             aria-label="Page d'accueil"
           >
             <Home size={13} style={{ color: 'var(--text-muted)' }} />
+          </button>
+
+          <button
+            type="button"
+            onClick={handleOpenInNewWindow}
+            className="p-1.5 rounded transition hover:bg-white/10"
+            title="Ouvrir dans une nouvelle fenêtre"
+            aria-label="Ouvrir dans une nouvelle fenêtre"
+          >
+            <ExternalLink size={13} style={{ color: 'var(--text-muted)' }} />
           </button>
 
           {/* URL bar */}
