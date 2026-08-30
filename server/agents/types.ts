@@ -188,6 +188,14 @@ export interface TaskContext {
   previousResults?: TaskResult[];
   /** Métadonnées libres */
   metadata?: Record<string, unknown>;
+  /** Suggestions de pivot pour l'autonomie améliorée */
+  pivotSuggestions?: Array<{
+    iteration: number;
+    alternatives: Array<{ description: string; action: string; successProbability: number }>;
+    errorAnalysis: { totalErrors: number; categories: string[]; riskScore: number };
+  }>;
+  /** Questions de clarification pour l'utilisateur */
+  clarificationQuestions?: string[];
 }
 
 /** Résultat de l'exécution d'une tâche */

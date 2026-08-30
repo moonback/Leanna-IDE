@@ -20,12 +20,19 @@
  *   - Nombre max d'itérations atteint (configurable, défaut: 3)
  *   - Timeout global dépassé
  *   - Deux itérations consécutives produisent le même résultat (détection de boucle)
+ *
+ * Améliorations implémentées :
+ *   - Détection précoce des erreurs avec analyse sémantique
+ *   - Stratégies de pivot : questionnement, recherche contextuelle, délégation
+ *   - Proactivité accrue avec propositions d'alternatives
  */
 import { randomUUID } from "crypto";
 import type { AgentTask, TaskResult } from "./types.js";
 import { AgentExecutor } from "./AgentExecutor.js";
 import { getAgentDefinition } from "./roles.js";
 import { createLogger } from "../utils/logger.js";
+import { EarlyErrorDetection, createEarlyErrorDetection, type ErrorAnalysisReport } from "./EarlyErrorDetection.js";
+import { PivotStrategies, createPivotStrategies, type PivotDecision, type PivotType } from "./PivotStrategies.js";
 
 const log = createLogger("AutonomousLoop");
 
@@ -89,10 +96,26 @@ const MAX_CUMULATIVE_ERRORS = 6;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export class AutonomousLoop {
+  // Nouveaux composants pour l'amélioration de l'autonomie
+  private readonly earlyErrorDetection: EarlyErrorDetection;
+  private readonly pivotStrategies: PivotStrategies;
+  
+  // État pour le tracking des échecs et des pivots
+  private consecutiveFailures: number = 0;
+  private lastPivotDecision?: PivotDecision;
+  private pivotHistory: PivotDecision[] = [];
+  
+  // Historique des analyses d'erreurs pour le contexte
+  private errorAnalysisHistory: ErrorAnalysisReport[] = [];
+
   constructor(
     private readonly executor: AgentExecutor,
     private readonly config: LoopConfig = DEFAULT_CONFIG
-  ) {}
+  ) {
+    // Initialiser les modules d'amélioration
+    this.earlyErrorDetection = createEarlyErrorDetection();
+    this.pivotStrategies = createPivotStrategies();
+  }
 
   /**
    * Exécute une tâche dans la boucle autonome.
@@ -142,8 +165,29 @@ export class AutonomousLoop {
         break;
       }
 
-      // ── OBSERVE : analyser le résultat ──
+      // ── OBSERVE : analyser le résultat avec détection précoce des erreurs ──
       const observation = await this.observe(task, result);
+      
+      // Analyser avec le module de détection précoce des erreurs
+      const errorAnalysis = this.earlyErrorDetection.analyzeExecutionReport({
+        success: result.success,
+        details: result.details,
+        fileValidationErrors: result.fileValidationErrors,
+        filesModified: result.filesModified,
+        errors: observation.verifyErrors,
+      });
+      
+      // Mettre à jour l'historique des analyses
+      this.errorAnalysisHistory.push(errorAnalysis);
+      
+      // Mettre à jour le compteur d'échecs
+      if (!result.success) {
+        this.consecutiveFailures++;
+        this.pivotStrategies.updateAfterIteration(false, errorAnalysis.errors);
+      } else {
+        this.consecutiveFailures = 0;
+        this.pivotStrategies.updateAfterIteration(true, []);
+      }
 
       const record: IterationRecord = {
         iteration,
@@ -160,10 +204,24 @@ export class AutonomousLoop {
         verifyErrors: observation.verifyErrors,
       };
 
-      // ── DECIDE : décider de continuer ou non ──
-      const decision = this.decide(observation, iterations, iteration);
+      // ── DECIDE : décider de continuer ou non, avec stratégies de pivot ──
+      const decision = await this.decideWithPivotStrategies(
+        observation, 
+        iterations, 
+        iteration, 
+        errorAnalysis,
+        task,
+        result,
+        elapsed
+      );
       record.decision = decision.action;
       record.decisionReason = decision.reason;
+      
+      // Stocker la décision de pivot si applicable
+      if (decision.pivotDecision) {
+        this.lastPivotDecision = decision.pivotDecision;
+        this.pivotHistory.push(decision.pivotDecision);
+      }
       iterations.push(record);
 
       log.info(
@@ -436,6 +494,359 @@ export class AutonomousLoop {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // DECIDE avec Stratégies de Pivot
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Décision de continuation/arrêt avec intégration des stratégies de pivot.
+   * Cette méthode étend la logique de décision de base avec :
+   * - Détection précoce des erreurs
+   * - Stratégies de pivot (questionnement, recherche contextuelle, délégation)
+   * - Proactivité accrue avec propositions d'alternatives
+   */
+  private async decideWithPivotStrategies(
+    obs: ObservationReport,
+    history: IterationRecord[],
+    currentIteration: number,
+    errorAnalysis: ErrorAnalysisReport,
+    task: AgentTask,
+    result: TaskResult,
+    elapsedTimeMs: number
+  ): Promise<LoopDecisionWithPivot> {
+    const agent = getAgentDefinition(task.role);
+    
+    // 1. D'abord, vérifier les stratégies de pivot
+    const pivotContext: any = {
+      task,
+      previousResult: result,
+      errorAnalysis,
+      iterationCount: currentIteration,
+      maxIterations: this.config.maxIterations,
+      elapsedTimeMs,
+      iterationHistory: history.map(h => ({
+        iteration: h.iteration,
+        errors: [], // On pourrait enrichir cela avec les erreurs historiques
+        success: !h.verifyErrors || h.verifyErrors.length === 0,
+        decision: h.decision,
+      })),
+      availableTools: this.getAvailableTools(),
+      availableAgents: this.getAvailableAgents(),
+    };
+
+    const pivotDecision = await this.pivotStrategies.decidePivot(pivotContext);
+    
+    // 2. Si une stratégie de pivot nécessite une action immédiate (questionnement ou arrêt),
+    // donner la priorité au pivot
+    if (pivotDecision.type === "questioning" || pivotDecision.type === "stop") {
+      return {
+        action: pivotDecision.type === "stop" ? "stop" : "stop",
+        reason: pivotDecision.reason,
+        pivotDecision,
+      };
+    }
+
+    // 3. Pour les autres types de pivot, appliquer la logique de décision normale
+    // mais en tenant compte de la décision de pivot
+    const baseDecision = this.decide(obs, history, currentIteration);
+    
+    // 4. Si une recherche contextuelle est nécessaire, EXÉCUTER la recherche
+    if (pivotDecision.type === "contextual_research" && pivotDecision.researchQuery) {
+      log.info(
+        `[${agent.name}] Recherche contextuelle nécessaire: ${pivotDecision.researchQuery}`
+      );
+      
+      // Exécuter la recherche via l'executor (si l'outil est disponible)
+      const researchResult = await this.executeBrowserResearch(pivotDecision.researchQuery);
+      if (researchResult) {
+        // Intégrer les résultats de la recherche dans le contexte de la tâche
+        this.enrichContextWithResearchResults(task, researchResult, errorAnalysis);
+      }
+    }
+    
+    // 5. Intégrer la proactivité : si on a un échec, proposer des alternatives
+    if (!result.success) {
+      // Proposer des alternatives proactivement
+      this.handleProactiveSuggestions(errorAnalysis, task, result);
+    }
+
+    // 6. Si une délégation est recommandée, l'inclure dans la décision
+    if (pivotDecision.type === "delegation" && pivotDecision.targetAgent) {
+      log.info(
+        `[${agent.name}] Délégation recommandée vers: ${pivotDecision.targetAgent}`
+      );
+      // On pourrait ici déléguer à l'agent cible
+    }
+
+    return {
+      ...baseDecision,
+      pivotDecision,
+    };
+  }
+
+  /**
+   * Gère les suggestions proactives lors d'un échec.
+   * Propose des alternatives dès le premier échec.
+   */
+  private handleProactiveSuggestions(
+    errorAnalysis: ErrorAnalysisReport,
+    task: AgentTask,
+    result: TaskResult
+  ): void {
+    const agent = getAgentDefinition(task.role);
+    const { errors, categories, riskScore } = errorAnalysis;
+
+    if (errors.length === 0) return;
+
+    // Générer des alternatives
+    const alternatives = this.pivotStrategies.generateAlternatives(errorAnalysis, task);
+    
+    if (alternatives.length > 0) {
+      const alternativeDescriptions = alternatives
+        .slice(0, 3)
+        .map(alt => `  - ${alt.description} (succès: ${(alt.successProbability * 100).toFixed(0)}%)`)
+        .join('\n');
+
+      log.info(
+        `[${agent.name}] ⚡ PROACTIF: ${alternatives.length} alternative(s) disponible(s) pour résoudre les erreurs:`
+      );
+      log.info(alternativeDescriptions);
+
+      // Ajouter les alternatives au contexte de la tâche pour la prochaine itération
+      this.enrichContextWithAlternatives(task, alternatives, errorAnalysis);
+    }
+
+    // Générer des questions si nécessaire (après 2 échecs ou score de risque élevé)
+    if (this.consecutiveFailures >= 2 || riskScore > 0.7) {
+      const questions = this.pivotStrategies.generateClarificationQuestion(errorAnalysis, task);
+      
+      if (questions.length > 0) {
+        log.warn(
+          `[${agent.name}] ❓ QUESTIONNEMENT: Après ${this.consecutiveFailures} échec(s), clarification nécessaire:`
+        );
+        for (const question of questions) {
+          log.warn(`  - ${question}`);
+        }
+
+        // Ajouter les questions au contexte pour la communication utilisateur
+        this.enrichContextWithQuestions(task, questions);
+      }
+    }
+
+    // Recommandations basées sur l'analyse des erreurs
+    if (errorAnalysis.recommendations.length > 0) {
+      log.info(
+        `[${agent.name}] 💡 RECOMMANDATIONS:`
+      );
+      for (const recommendation of errorAnalysis.recommendations.slice(0, 3)) {
+        log.info(`  - ${recommendation}`);
+      }
+    }
+  }
+
+  /**
+   * Enrichit le contexte de la tâche avec les alternatives proposées
+   */
+  private enrichContextWithAlternatives(
+    task: AgentTask,
+    alternatives: any[],
+    errorAnalysis: ErrorAnalysisReport
+  ): void {
+    const alternativeSection = [
+      ``,
+      `## Alternatives Proposées (Proactivité Accrue)`,
+      ``,
+      `J'ai détecté des erreurs et je propose les alternatives suivantes :`,
+      ...alternatives.map((alt: any) => `
+- **${alt.description}** (probabilité: ${(alt.successProbability * 100).toFixed(0)}%, complexité: ${alt.complexity})
+`),
+      ``,
+      `Tu peux choisir l'une de ces approches ou continuer normalement.`,
+    ].join('\n');
+
+    if (!task.context.pivotSuggestions) {
+      task.context.pivotSuggestions = [];
+    }
+    task.context.pivotSuggestions.push({
+      iteration: this.errorAnalysisHistory.length,
+      alternatives: alternatives.map((alt: any) => ({
+        description: alt.description,
+        action: alt.action,
+        successProbability: alt.successProbability,
+      })),
+      errorAnalysis: {
+        totalErrors: errorAnalysis.totalErrors,
+        categories: errorAnalysis.categories,
+        riskScore: errorAnalysis.riskScore,
+      },
+    });
+  }
+
+  /**
+   * Enrichit le contexte de la tâche avec les questions pour l'utilisateur
+   */
+  private enrichContextWithQuestions(task: AgentTask, questions: string[]): void {
+    if (!task.context.clarificationQuestions) {
+      task.context.clarificationQuestions = [];
+    }
+    task.context.clarificationQuestions = [...task.context.clarificationQuestions, ...questions];
+
+    // Ajouter une indication dans la description de la tâche
+    if (questions.length > 0) {
+      const questionsSection = [
+        ``,
+        `## Questions pour clarification (Pivot par Questionnement)`,
+        ``,
+        `Pour mieux résoudre cette tâche, pourriez-vous répondre à ces questions :`,
+        ...questions.map(q => `- ${q}`),
+        ``,
+      ].join('\n');
+
+      task.description = `${task.description}\n${questionsSection}`;
+    }
+  }
+
+  /**
+   * Récupère la liste des outils disponibles pour les stratégies de pivot
+   */
+  private getAvailableTools(): string[] {
+    // Pour l'instant, retourner les outils connus
+    // En réalité, cela devrait provenir de la configuration de l'agent
+    return [
+      "list_project_files",
+      "read_project_file",
+      "write_project_file",
+      "modify_project_file",
+      "verify_file",
+      "browser_research",
+      "reasoning_think",
+      "agent_execute",
+    ];
+  }
+
+  /**
+   * Récupère la liste des agents disponibles pour la délégation
+   */
+  private getAvailableAgents(): string[] {
+    // Pour l'instant, retourner les rôles d'agents connus
+    // En réalité, cela devrait provenir de l'AgentOrchestrator
+    return [
+      "developer",
+      "code_reviewer",
+      "debugger",
+      "tester",
+      "architect",
+      "devops",
+      "sysadmin",
+      "generalist",
+    ];
+  }
+
+  /**
+   * Exécute une recherche browser_research pour résoudre les erreurs
+   */
+  private async executeBrowserResearch(query: string): Promise<string | null> {
+    const agent = getAgentDefinition(this.executor as any);
+    
+    try {
+      // Utiliser le skillHandler de l'executor pour appeler browser_research
+      const skillHandler = (this.executor as any).skillHandler;
+      if (skillHandler) {
+        log.info(`[Browser Research] Exécution de la recherche: "${query}"`);
+        
+        const result = await skillHandler("browser_research", { 
+          query: query, 
+          maxSources: 3 
+        });
+        
+        if (result && result.success !== false) {
+          log.info(`[Browser Research] Recherche réussie`);
+          return typeof result === 'string' ? result : JSON.stringify(result);
+        } else {
+          log.warn(`[Browser Research] Recherche échouée: ${result?.error || 'inconnu'}`);
+        }
+      } else {
+        log.warn(`[Browser Research] skillHandler non disponible`);
+      }
+    } catch (error) {
+      log.error(`[Browser Research] Erreur lors de la recherche: ${(error as Error).message}`);
+    }
+    
+    return null;
+  }
+
+  /**
+   * Enrichit le contexte de la tâche avec les résultats de la recherche
+   */
+  private enrichContextWithResearchResults(
+    task: AgentTask,
+    researchResult: string,
+    errorAnalysis: ErrorAnalysisReport
+  ): void {
+    const agent = getAgentDefinition(task.role);
+    
+    // Ajouter les résultats de la recherche au contexte
+    const researchSection = [
+      ``,
+      `## Résultats de la recherche contextuelle (Pivot par Recherche)`,
+      ``,
+      `J'ai effectué une recherche pour résoudre les erreurs détectées:`,
+      ``,
+      researchResult,
+      ``,
+      `Source: recherche web automatique`,
+    ].join('\n');
+
+    // Ajouter au contexte de la tâche
+    if (!task.context.metadata) {
+      task.context.metadata = {};
+    }
+    
+    task.context.metadata.researchResults = [
+      ...(task.context.metadata.researchResults as any[] || []),
+      {
+        query: errorAnalysis.errors.map(e => e.message).join('; '),
+        result: researchResult,
+        categories: errorAnalysis.categories,
+        riskScore: errorAnalysis.riskScore,
+        timestamp: new Date().toISOString(),
+      }
+    ];
+
+    // Ajouter à la description de la tâche
+    task.description = `${task.description}\n${researchSection}`;
+
+    log.info(
+      `[${agent.name}] Contexte enrichi avec les résultats de la recherche`
+    );
+  }
+
+  /**
+   * Réinitialise l'état interne de la boucle pour une nouvelle tâche
+   */
+  reset(): void {
+    this.consecutiveFailures = 0;
+    this.lastPivotDecision = undefined;
+    this.pivotHistory = [];
+    this.errorAnalysisHistory = [];
+    this.earlyErrorDetection.reset();
+    this.pivotStrategies.reset();
+  }
+
+  /**
+   * Récupère l'historique des décisions de pivot
+   */
+  getPivotHistory(): any[] {
+    return [...this.pivotHistory];
+  }
+
+  /**
+   * Récupère l'historique des analyses d'erreurs
+   */
+  getErrorAnalysisHistory(): ErrorAnalysisReport[] {
+    return [...this.errorAnalysisHistory];
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // ACT — Enrichissement du contexte pour la prochaine itération
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -549,4 +960,11 @@ interface ObservationReport {
   confidenceScore: number;
   resultLength: number;
   resultSummary: string;
+}
+
+// Type de retour étendu pour la décision avec pivot
+interface LoopDecisionWithPivot {
+  action: LoopDecision;
+  reason: string;
+  pivotDecision?: PivotDecision;
 }
