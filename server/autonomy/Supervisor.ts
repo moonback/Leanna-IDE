@@ -2,19 +2,35 @@
  * SUPERVISOR — Boucle de contrôle côté serveur.
  *
  * Le Supervisor intercepte les résultats des outils après exécution
- * et injecte des instructions correctives dans la session Gemini Live
- * quand des problèmes sont détectés (verify échoue, tests cassés, etc.)
+ * et prépare des instructions correctives à injecter dans la session
+ * Gemini Live quand des problèmes sont détectés (verify échoue,
+ * build cassé, tests cassés, etc.)
  *
- * C'est la pièce manquante entre "le modèle reçoit le résultat d'erreur"
- * et "le modèle est FORCÉ de corriger avant de continuer".
+ * IMPORTANT — Contrat d'appel :
+ * Le Supervisor ne fait AUCUNE injection automatique. Chaque méthode
+ * `evaluate*` retourne { needsCorrection, directive }. C'est à
+ * l'appelant (le serveur) de rappeler explicitement
+ * `supervisor.injectDirective(result.directive)` si needsCorrection
+ * est vrai. C'est la pièce manquante entre "le modèle reçoit le
+ * résultat d'erreur" et "le modèle est FORCÉ de corriger avant de
+ * continuer" — mais cette pièce doit être câblée par l'appelant.
  *
  * Architecture:
  *   handleToolCall()
  *     → skillManager.handleToolCall()
- *     → Supervisor.evaluate(result)
- *       → Si problème: inject correction directive via sendClientContent
- *       → Si boucle: escalate ou abort
+ *     → const result = await Supervisor.evaluate(...)
+ *     → if (result.needsCorrection) supervisor.injectDirective(result.directive)
  *     → session.sendToolResponse()
+ *
+ * Modèle de progression (aligné sur le module "Moteur d'Autonomie") :
+ *   - Chaque "approche" tolère `attemptsPerApproach` échecs (défaut 2).
+ *   - Après ce seuil, ou dès qu'une erreur identique se répète (boucle),
+ *     un PIVOT est forcé : l'approche suivante démarre.
+ *   - Après `maxApproaches` approches épuisées (défaut 3, donc 6
+ *     tentatives max), ESCALADE obligatoire vers l'utilisateur.
+ *   - `MAX_TOTAL_CORRECTIONS` reste un coupe-circuit séparé, au niveau
+ *     de la session entière (tous fichiers confondus) — un garde-fou
+ *     indépendant du compteur par fichier, pas une redite de celui-ci.
  */
 
 import { createLogger } from "../utils/logger.js";
@@ -26,8 +42,10 @@ const log = createLogger("Supervisor");
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface SupervisorConfig {
-  /** Max retries avant escalation (défaut: 3) */
-  maxRetries: number;
+  /** Échecs tolérés par approche avant pivot forcé (défaut: 2) */
+  attemptsPerApproach: number;
+  /** Nombre d'approches distinctes avant escalade obligatoire (défaut: 3) */
+  maxApproaches: number;
   /** Active la correction automatique (défaut: true) */
   autoCorrect: boolean;
   /** Active le suivi de mission persistant (défaut: true) */
@@ -41,6 +59,7 @@ export interface VerifyFailure {
   errors: string;
   timestamp: number;
   attemptNumber: number;
+  approachNumber: number;
 }
 
 export interface MissionObjective {
@@ -59,12 +78,74 @@ export interface MissionObjective {
 
 export type SessionInjector = (message: string) => void;
 
+/**
+ * Sous-ensemble typé des champs de résultat réellement lus par ce module.
+ * Le format exact varie selon l'outil (verify_file, build), donc tous les
+ * champs restent optionnels — mais au moins typés, plus de `any`.
+ */
+export interface VerifyResult {
+  ok?: boolean;
+  status?: string;
+  valid?: boolean;
+  allIssues?: Array<{
+    type?: string;
+    rule?: string;
+    file?: string;
+    line?: number;
+    message?: string;
+  }>;
+  typecheck?: PhaseResult;
+  tsc?: PhaseResult;
+  lint?: PhaseResult;
+  test?: PhaseResult;
+  error?: string;
+  message?: string;
+  stderr?: string;
+  stdout?: string;
+}
+
+export interface PhaseResult {
+  ok?: boolean;
+  exitCode?: number;
+  output?: unknown;
+  stdout?: unknown;
+  stderr?: unknown;
+  errors?: unknown;
+  violations?: unknown;
+}
+
+export interface BuildResult {
+  valid: boolean;
+  errors?: string;
+}
+
+interface EvaluationOutcome {
+  needsCorrection: boolean;
+  directive?: string;
+}
+
+/** Nombre d'erreurs passées conservées pour la détection de boucle (comprend l'erreur courante). */
+const ERROR_HISTORY_SIZE = 4; // 1 courante + 3 précédentes — cohérent avec les directives ("une des 3 dernières tentatives")
+
+/** Clé interne utilisée pour tracker les échecs de build global dans le même mécanisme que les fichiers. */
+const GLOBAL_BUILD_KEY = "__global_build__";
+
+interface FileHistory {
+  /** Tentatives dans l'approche courante */
+  attemptInApproach: number;
+  /** Numéro de l'approche courante (démarre à 1) */
+  approachNumber: number;
+  /** Historique glissant des erreurs (la plus récente en dernier) */
+  lastErrors: string[];
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Supervisor
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const DEFAULT_CONFIG: SupervisorConfig = {
-  maxRetries: 3,
+  attemptsPerApproach: 2,
+  maxApproaches: 3,
   autoCorrect: true,
   trackMission: true,
   actionTimeout: 30000,
@@ -75,16 +156,19 @@ export class Supervisor {
   private currentMission: MissionObjective | null = null;
   private injector: SessionInjector | null = null;
 
-  /** Historique des corrections par fichier (pour détection de boucles) */
-  private correctionHistory: Map<string, { count: number; lastErrors: string[] }> = new Map();
+  /** Historique des corrections par fichier (pour détection de boucles et suivi d'approche) */
+  private correctionHistory: Map<string, FileHistory> = new Map();
 
-  /** Fichiers bloqués après détection de boucle */
+  /** Fichiers bloqués après épuisement des approches (escalade déclenchée sur CE fichier) */
   private blockedFiles: Set<string> = new Set();
+
+  /** Mission mise en pause suite à une escalade globale (coupe-circuit de session) */
+  private missionPaused = false;
 
   /** Timestamp de la dernière directive injectée par fichier (pour backoff) */
   private lastDirectiveAt: Map<string, number> = new Map();
 
-  /** Compteur global de corrections dans la session */
+  /** Compteur global de corrections dans la session (tous fichiers confondus) */
   private totalCorrections = 0;
   private static readonly MAX_TOTAL_CORRECTIONS = 10;
 
@@ -123,6 +207,7 @@ export class Supervisor {
       verifyFailures: [],
       corrections: 0,
     };
+    this.missionPaused = false;
 
     log.info(`🎯 Mission démarrée: "${description}" (${this.currentMission.id})`);
     return this.currentMission;
@@ -147,21 +232,20 @@ export class Supervisor {
     this.blockedFiles.clear();
     this.lastDirectiveAt.clear();
     this.totalCorrections = 0;
+    this.missionPaused = false;
   }
 
   // ─── Évaluation post-outil ────────────────────────────────────────────────
 
   /**
    * Évalue le résultat d'un verify_file et décide de la réaction.
-   * Retourne true si une correction a été injectée (le modèle va recevoir une directive).
+   * Retourne true si une correction devrait être injectée par l'appelant.
+   * Async : applique réellement le backoff exponentiel avant de retourner,
+   * au lieu de le calculer puis l'ignorer.
    */
-  evaluateVerifyResult(
-    filePath: string,
-    verifyResult: any,
-  ): { needsCorrection: boolean; directive?: string } {
+  async evaluateVerifyResult(filePath: string, verifyResult: VerifyResult): Promise<EvaluationOutcome> {
     // Si verify passe → tout va bien
     if (verifyResult?.ok === true || verifyResult?.status === "success" || verifyResult?.status === "ok" || verifyResult?.valid === true) {
-      // Nettoyer le compteur pour ce fichier
       this.correctionHistory.delete(filePath);
       if (this.currentMission) {
         this.currentMission.touchedFiles.add(filePath);
@@ -169,125 +253,160 @@ export class Supervisor {
       return { needsCorrection: false };
     }
 
-    // Extraire les erreurs
     const errors = this.extractErrors(verifyResult);
     if (!errors) {
       return { needsCorrection: false };
     }
 
-    // Tracker le fichier
     if (this.currentMission) {
       this.currentMission.touchedFiles.add(filePath);
     }
 
-    // Vérifier le nombre de retries pour ce fichier
-    const history = this.correctionHistory.get(filePath) || { count: 0, lastErrors: [] };
-    history.count++;
-    // Garder un historique glissant (max 5 dernières erreurs pour détecter les alternances)
-    history.lastErrors.push(errors);
-    if (history.lastErrors.length > 5) history.lastErrors.shift();
-    this.correctionHistory.set(filePath, history);
-
-    // Détection de boucle élargie : erreur identique à l'une des 3 dernières tentatives
-    const recentErrors = history.lastErrors.slice(0, -1); // tout sauf la courante
-    const isLoop = recentErrors.some((prev) => prev === errors);
-
-    // --- Trop de retries globaux → escalation (toujours prioritaire) ---
-    if (this.totalCorrections >= Supervisor.MAX_TOTAL_CORRECTIONS) {
-      log.warn(`⚠️ Limite de corrections globale atteinte (${Supervisor.MAX_TOTAL_CORRECTIONS}). Escalation.`);
-      this.blockedFiles.add(filePath);
-      return {
-        needsCorrection: true,
-        directive: this.buildEscalationDirective(filePath, errors),
-      };
-    }
-
-    // --- Boucle détectée (erreur déjà vue) → bloquer le fichier immédiatement ---
-    if (isLoop) {
-      log.warn(`🔄 Boucle détectée sur ${filePath} (attempt #${history.count}). Fichier bloqué.`);
-      this.blockedFiles.add(filePath);
-      this.totalCorrections++; // compter la tentative ratée pour atteindre MAX
-      if (this.currentMission) {
-        this.currentMission.corrections++;
-        this.currentMission.verifyFailures.push({
-          file: filePath,
-          errors,
-          timestamp: Date.now(),
-          attemptNumber: history.count,
-        });
-      }
-      return {
-        needsCorrection: true,
-        directive: this.buildLoopBreakDirective(filePath, errors),
-      };
-    }
-
-    // --- Trop de retries sur ce fichier → pivot ---
-    if (history.count > this.config.maxRetries) {
-      log.warn(`⚠️ Fichier ${filePath}: ${history.count} tentatives échouées. Pivot nécessaire.`);
-      this.totalCorrections++;
-      if (this.currentMission) {
-        this.currentMission.corrections++;
-        this.currentMission.verifyFailures.push({
-          file: filePath,
-          errors,
-          timestamp: Date.now(),
-          attemptNumber: history.count,
-        });
-      }
-      return {
-        needsCorrection: true,
-        directive: this.buildPivotDirective(filePath, errors, history.count),
-      };
-    }
-
-    // --- Cas normal : backoff exponentiel puis injection ---
-    const backoffMs = Supervisor.BACKOFF_BASE_MS * Math.pow(2, history.count - 1);
-    const lastAt = this.lastDirectiveAt.get(filePath) ?? 0;
-    const elapsed = Date.now() - lastAt;
-    if (elapsed < backoffMs) {
-      const wait = backoffMs - elapsed;
-      log.debug(`⏳ Backoff ${wait}ms pour ${filePath} (attempt #${history.count})`);
-      // On retourne la directive quand même — l'appelant peut attendre ou ignorer
-    }
-    this.lastDirectiveAt.set(filePath, Date.now());
-
-    this.totalCorrections++;
-    if (this.currentMission) {
-      this.currentMission.corrections++;
-      this.currentMission.verifyFailures.push({
-        file: filePath,
-        errors,
-        timestamp: Date.now(),
-        attemptNumber: history.count,
-      });
-    }
-
-    log.info(`🔧 Correction #${history.count} pour ${filePath} (backoff: ${backoffMs}ms)`);
-    return {
-      needsCorrection: true,
-      directive: this.buildCorrectionDirective(filePath, errors, history.count),
-    };
+    return this.evaluateFailure(filePath, errors);
   }
 
   /**
    * Évalue un résultat de build global.
+   * Passe désormais par le même mécanisme anti-boucle / pivot / escalade
+   * que les fichiers individuels (auparavant : aucun suivi, aucune limite).
    */
-  evaluateBuildResult(result: { valid: boolean; errors?: string }): {
-    needsCorrection: boolean;
-    directive?: string;
-  } {
-    if (result.valid) return { needsCorrection: false };
+  async evaluateBuildResult(result: BuildResult): Promise<EvaluationOutcome> {
+    if (result.valid) {
+      this.correctionHistory.delete(GLOBAL_BUILD_KEY);
+      return { needsCorrection: false };
+    }
+    return this.evaluateFailure(GLOBAL_BUILD_KEY, result.errors || "Build failed");
+  }
 
+  /**
+   * Logique commune de suivi d'échec (fichier ou build global), partagée
+   * pour éviter que l'un des deux points d'entrée échappe au système
+   * anti-boucle / pivot / escalade.
+   */
+  private async evaluateFailure(key: string, errors: string): Promise<EvaluationOutcome> {
+    const isBuild = key === GLOBAL_BUILD_KEY;
+    const label = isBuild ? "build global" : key;
+
+    // --- Fichier déjà bloqué : ne pas relancer de cycle, renvoyer directement l'escalade ---
+    if (this.blockedFiles.has(key)) {
+      return {
+        needsCorrection: true,
+        directive: this.buildEscalationDirective(key, errors),
+      };
+    }
+
+    const history = this.correctionHistory.get(key) || {
+      attemptInApproach: 0,
+      approachNumber: 1,
+      lastErrors: [],
+    };
+    history.attemptInApproach++;
+    history.lastErrors.push(errors);
+    if (history.lastErrors.length > ERROR_HISTORY_SIZE) history.lastErrors.shift();
+    this.correctionHistory.set(key, history);
+
+    // Boucle : erreur identique à une des tentatives précédentes (hors la courante)
+    const recentErrors = history.lastErrors.slice(0, -1);
+    const isLoop = recentErrors.some((prev) => prev === errors);
+
+    const recordFailure = (attemptNumber: number, approachNumber: number) => {
+      this.totalCorrections++;
+      if (this.currentMission && !isBuild) {
+        this.currentMission.corrections++;
+        this.currentMission.verifyFailures.push({
+          file: key,
+          errors,
+          timestamp: Date.now(),
+          attemptNumber,
+          approachNumber,
+        });
+      } else if (this.currentMission && isBuild) {
+        this.currentMission.corrections++;
+      }
+    };
+
+    // --- Coupe-circuit de session : trop de corrections tous fichiers confondus ---
+    if (this.totalCorrections >= Supervisor.MAX_TOTAL_CORRECTIONS) {
+      log.warn(`⚠️ Limite de corrections de session atteinte (${Supervisor.MAX_TOTAL_CORRECTIONS}). Mission mise en pause.`);
+      this.missionPaused = true;
+      this.blockedFiles.add(key);
+      recordFailure(history.attemptInApproach, history.approachNumber);
+      return {
+        needsCorrection: true,
+        directive: this.buildEscalationDirective(key, errors, /*sessionWide*/ true),
+      };
+    }
+
+    // --- Boucle détectée → pivot immédiat, quel que soit le compte de tentatives ---
+    if (isLoop) {
+      log.warn(`🔄 Boucle détectée sur ${label} (approche #${history.approachNumber}, tentative #${history.attemptInApproach}).`);
+      recordFailure(history.attemptInApproach, history.approachNumber);
+      return this.advanceApproachOrEscalate(key, errors, history, /*forcedByLoop*/ true);
+    }
+
+    // --- Seuil de tentatives par approche atteint → pivot ---
+    if (history.attemptInApproach >= this.config.attemptsPerApproach) {
+      log.warn(`⚠️ ${label}: ${history.attemptInApproach} tentatives échouées sur l'approche #${history.approachNumber}.`);
+      recordFailure(history.attemptInApproach, history.approachNumber);
+      return this.advanceApproachOrEscalate(key, errors, history, /*forcedByLoop*/ false);
+    }
+
+    // --- Cas normal : backoff exponentiel réellement appliqué, puis directive de correction ---
+    const backoffMs = Supervisor.BACKOFF_BASE_MS * Math.pow(2, history.attemptInApproach - 1);
+    const lastAt = this.lastDirectiveAt.get(key) ?? 0;
+    const elapsed = Date.now() - lastAt;
+    if (elapsed < backoffMs) {
+      const wait = backoffMs - elapsed;
+      log.debug(`⏳ Backoff ${wait}ms pour ${label} (tentative #${history.attemptInApproach})`);
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+    this.lastDirectiveAt.set(key, Date.now());
+
+    recordFailure(history.attemptInApproach, history.approachNumber);
+
+    log.info(`🔧 Correction #${history.attemptInApproach} (approche #${history.approachNumber}) pour ${label}`);
     return {
       needsCorrection: true,
-      directive: this.buildGlobalBuildDirective(result.errors || "Build failed"),
+      directive: this.buildCorrectionDirective(key, errors, history.attemptInApproach),
     };
   }
 
   /**
+   * Fait progresser vers l'approche suivante, ou escalade si le nombre
+   * maximal d'approches est atteint. Centralise la règle "2 tentatives
+   * × 3 approches = 6 max" partagée avec le module Moteur d'Autonomie.
+   */
+  private advanceApproachOrEscalate(
+    key: string,
+    errors: string,
+    history: FileHistory,
+    forcedByLoop: boolean,
+  ): EvaluationOutcome {
+    if (history.approachNumber >= this.config.maxApproaches) {
+      log.warn(`⛔ ${key}: approches épuisées (${history.approachNumber}/${this.config.maxApproaches}). Escalade.`);
+      this.blockedFiles.add(key);
+      return {
+        needsCorrection: true,
+        directive: this.buildEscalationDirective(key, errors),
+      };
+    }
+
+    // Nouvelle approche : réinitialiser le compteur de tentatives, garder l'historique d'erreurs
+    // (utile pour continuer à détecter les boucles même après un pivot).
+    history.approachNumber++;
+    history.attemptInApproach = 0;
+    this.correctionHistory.set(key, history);
+
+    const directive = forcedByLoop
+      ? this.buildLoopBreakDirective(key, errors, history.approachNumber)
+      : this.buildPivotDirective(key, errors, history.approachNumber);
+
+    return { needsCorrection: true, directive };
+  }
+
+  /**
    * Injecte une directive dans la session Gemini Live.
-   * C'est ici que le superviseur FORCE le modèle à agir.
+   * Rien n'appelle cette méthode automatiquement — voir le contrat d'appel en tête de fichier.
    */
   injectDirective(directive: string): void {
     if (!this.injector) {
@@ -297,13 +416,30 @@ export class Supervisor {
     this.injector(directive);
   }
 
+  /**
+   * La mission est-elle en pause suite à une escalade de session ?
+   * L'appelant peut vérifier ce flag avant de relancer des corrections automatiques.
+   */
+  isMissionPaused(): boolean {
+    return this.missionPaused;
+  }
+
+  /**
+   * Reprend une mission mise en pause après validation humaine explicite.
+   */
+  resumeMission(): void {
+    this.missionPaused = false;
+    this.totalCorrections = 0;
+    log.info("▶️ Mission reprise après validation humaine.");
+  }
+
   // ─── Construction des directives ─────────────────────────────────────────
 
   private buildCorrectionDirective(file: string, errors: string, attempt: number): string {
     return [
       `[SUPERVISOR — CORRECTION REQUISE]`,
       ``,
-      `Le fichier "${file}" contient des erreurs après ta modification (tentative ${attempt}/${this.config.maxRetries}).`,
+      `Le fichier "${file}" contient des erreurs après ta modification (tentative ${attempt}/${this.config.attemptsPerApproach}).`,
       ``,
       `Erreurs détectées:`,
       errors.slice(0, 500),
@@ -317,11 +453,11 @@ export class Supervisor {
     ].join("\n");
   }
 
-  private buildPivotDirective(file: string, errors: string, attempts: number): string {
+  private buildPivotDirective(file: string, errors: string, newApproachNumber: number): string {
     return [
       `[SUPERVISOR — PIVOT REQUIS]`,
       ``,
-      `Le fichier "${file}" a échoué ${attempts} fois avec des approches similaires.`,
+      `Le fichier "${file}" a épuisé son approche actuelle. Nouvelle approche : #${newApproachNumber}/${this.config.maxApproaches}.`,
       ``,
       `Dernières erreurs:`,
       errors.slice(0, 300),
@@ -333,16 +469,16 @@ export class Supervisor {
       `   - Peut-être la structure du code doit changer`,
       `   - Peut-être un import manque ou un type est incorrect`,
       `   - Peut-être le fichier entier doit être réécrit (write_project_file)`,
-      `4. Si tu es bloqué, explique le problème à l'utilisateur et demande de l'aide.`,
+      `4. Si tu es bloqué après cette approche, la suivante sera la dernière avant escalade.`,
     ].join("\n");
   }
 
-  private buildLoopBreakDirective(file: string, errors: string): string {
+  private buildLoopBreakDirective(file: string, errors: string, newApproachNumber: number): string {
     return [
       `[SUPERVISOR — BOUCLE DÉTECTÉE]`,
       ``,
       `Tu produis les MÊMES erreurs sur "${file}" après correction.`,
-      `Tes corrections précédentes ne changent pas le résultat.`,
+      `Tes corrections précédentes ne changent pas le résultat. Nouvelle approche forcée : #${newApproachNumber}/${this.config.maxApproaches}.`,
       ``,
       `Erreurs (identiques aux précédentes):`,
       errors.slice(0, 300),
@@ -355,18 +491,21 @@ export class Supervisor {
     ].join("\n");
   }
 
-  private buildEscalationDirective(_file: string, _errors: string): string {
+  private buildEscalationDirective(_file: string, _errors: string, sessionWide = false): string {
+    const reason = sessionWide
+      ? `Le coupe-circuit de session a été atteint (${this.totalCorrections}/${Supervisor.MAX_TOTAL_CORRECTIONS} corrections tous fichiers confondus).`
+      : `Toutes les approches disponibles (${this.config.maxApproaches}) ont échoué sur ce fichier.`;
     return [
       `[SUPERVISOR — ESCALATION]`,
       ``,
-      `Trop de corrections ont été nécessaires (${this.totalCorrections}/${Supervisor.MAX_TOTAL_CORRECTIONS}).`,
+      reason,
       `Cela indique un problème structurel.`,
       ``,
       `INSTRUCTION:`,
       `1. Explique à l'utilisateur ce qui bloque.`,
       `2. Résume les erreurs persistantes.`,
       `3. Propose des options : rollback, approche différente, ou aide humaine.`,
-      `4. N'essaie PLUS de corriger automatiquement sans validation humaine.`,
+      `4. N'essaie PLUS de corriger automatiquement sans validation humaine (voir resumeMission()).`,
     ].join("\n");
   }
 
@@ -389,21 +528,21 @@ export class Supervisor {
 
   // ─── Utilitaires ─────────────────────────────────────────────────────────
 
-  private extractErrors(verifyResult: any): string | null {
+  private extractErrors(verifyResult: VerifyResult): string | null {
     if (!verifyResult) return "verify_file n'a retourné aucun résultat.";
     const parts: string[] = [];
 
     if (Array.isArray(verifyResult.allIssues)) {
-      parts.push(...verifyResult.allIssues.slice(0, 20).map((issue: any) =>
+      parts.push(...verifyResult.allIssues.slice(0, 20).map((issue) =>
         `[${issue.type ?? "verification"}/${issue.rule ?? "unknown"}] ${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? "Erreur"}`
       ));
     }
 
-    const addPhase = (label: string, phase: any) => {
+    const addPhase = (label: string, phase?: PhaseResult) => {
       if (!phase || phase.ok !== false) return;
       const output = [phase.output, phase.stdout, phase.stderr, phase.errors, phase.violations]
         .flatMap((value) => Array.isArray(value)
-          ? value.map((item) => typeof item === "string" ? item : item?.message ?? JSON.stringify(item))
+          ? value.map((item) => typeof item === "string" ? item : (item as { message?: string })?.message ?? JSON.stringify(item))
           : value ? [String(value)] : [])
         .filter(Boolean)
         .join("\n");
@@ -422,8 +561,9 @@ export class Supervisor {
   }
 
   /**
-   * Vérifie si un fichier est bloqué (boucle de correction détectée).
-   * Utilisé par le serveur pour rejeter les écritures sur ce fichier.
+   * Vérifie si un fichier (ou le build global) est bloqué après escalade.
+   * Utilisé par le serveur pour rejeter les écritures sur ce fichier
+   * ou pour suspendre les tentatives de build automatique.
    */
   isFileBlocked(filePath: string): boolean {
     return this.blockedFiles.has(filePath);
@@ -438,6 +578,7 @@ export class Supervisor {
     this.blockedFiles.clear();
     this.lastDirectiveAt.clear();
     this.totalCorrections = 0;
+    this.missionPaused = false;
   }
 
   /**
@@ -446,14 +587,16 @@ export class Supervisor {
   getStats(): {
     totalCorrections: number;
     activeMission: string | null;
+    missionPaused: boolean;
     filesWithIssues: string[];
     blockedFiles: string[];
   } {
     return {
       totalCorrections: this.totalCorrections,
       activeMission: this.currentMission?.description ?? null,
+      missionPaused: this.missionPaused,
       filesWithIssues: Array.from(this.correctionHistory.entries())
-        .filter(([_, h]) => h.count > 0)
+        .filter(([_, h]) => h.attemptInApproach > 0 || h.approachNumber > 1)
         .map(([f]) => f),
       blockedFiles: Array.from(this.blockedFiles),
     };
