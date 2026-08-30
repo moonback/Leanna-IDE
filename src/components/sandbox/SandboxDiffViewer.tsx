@@ -33,6 +33,25 @@ function getAuthHeaders(): Record<string, string> {
   return token ? { 'x-Leanna-token': token } : {};
 }
 
+// Supprime les lignes vides au début et à la fin pour éviter les artefacts de diff
+function trimEmptyLines(content: string): string {
+  const lines = content.split('\n');
+  let start = 0;
+  let end = lines.length;
+
+  // Supprime les lignes vides au début
+  while (start < end && lines[start] === '') {
+    start++;
+  }
+
+  // Supprime les lignes vides à la fin
+  while (end > start && lines[end - 1] === '') {
+    end--;
+  }
+
+  return lines.slice(start, end).join('\n');
+}
+
 function computeDiff(original: string, modified: string): DiffLine[] {
   const oldLines = original.split('\n');
   const newLines = modified.split('\n');
@@ -114,17 +133,37 @@ function computeWordDiff(oldText: string, newText: string): {
 }
 
 function tokenize(text: string): string[] {
-  return text.match(/\S+|\s+/g) || [''];
+  // Amélioré : capture les mots, espaces, et caractères spéciaux séparément
+  // pour une meilleure détection des petits changements
+  const tokens = text.match(/(\S+)|(\s+)|([\n])/g) || [];
+  // Fusionne les tokens consécutifs de même type (sauf newlines)
+  const merged: string[] = [];
+  for (const token of tokens) {
+    const last = merged[merged.length - 1];
+    // Fusionne avec le dernier token si même type (non-vide et pas newline)
+    if (last && last !== '\n' && token !== '\n' && 
+        ((/\S/.test(last) && /\S/.test(token)) || 
+         (/\s/.test(last) && /\s/.test(token)))) {
+      merged[merged.length - 1] = last + token;
+    } else {
+      merged.push(token);
+    }
+  }
+  return merged.length > 0 ? merged : [''];
 }
 
 function mergeSegments(tokens: string[], marks: boolean[]): Array<{ text: string; highlight: boolean }> {
   const segments: Array<{ text: string; highlight: boolean }> = [];
   for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    // Ignore les newlines isolés pour éviter les segments vides
+    if (token === '\n') continue;
+    
     const last = segments[segments.length - 1];
     if (last && last.highlight === marks[i]) {
-      last.text += tokens[i];
+      last.text += token;
     } else {
-      segments.push({ text: tokens[i], highlight: marks[i] });
+      segments.push({ text: token, highlight: marks[i] });
     }
   }
   return segments;
@@ -201,8 +240,13 @@ const SyntaxLine = memo(function SyntaxLine({
           seg.highlight ? (
             <mark
               key={i}
-              className="rounded-sm px-[2px] py-[1px]"
-              style={{ backgroundColor: 'rgba(217,119,6,0.3)', color: 'var(--color-error)', textDecoration: 'none' }}
+              className="rounded-sm px-[1px] py-[0px]"
+              style={{
+                backgroundColor: 'rgba(251, 191, 36, 0.5)',
+                color: 'var(--text-primary)',
+                textDecoration: 'none',
+                borderRadius: '2px',
+              }}
             >
               {seg.text}
             </mark>
@@ -372,8 +416,9 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
         });
         const data = await res.json();
         if (data.status === 'success') {
-          setOriginalContent(data.original ?? '');
-          setModifiedContent(data.modified ?? '');
+          // Nettoie les lignes vides au début/fin pour éviter les artefacts de diff
+          setOriginalContent(trimEmptyLines(data.original ?? ''));
+          setModifiedContent(trimEmptyLines(data.modified ?? ''));
         }
       } catch {
         /* silent */
@@ -1183,7 +1228,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
           Ajouté
         </span>
         <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
-          <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: 'rgba(217,119,6,0.35)' }} />
+          <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: 'rgba(251,191,36,0.5)' }} />
           Mot modifié
         </span>
         <span className="ml-auto text-xs" style={{ color: 'var(--text-dimmed)' }}>
