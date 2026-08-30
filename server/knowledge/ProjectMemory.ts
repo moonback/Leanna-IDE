@@ -979,7 +979,7 @@ export class ProjectMemory {
    * à partir de commentaires de code ou de documents.
    * Pattern détectés : TODO, FIXME, NOTE, DECISION, ARCHITECTURE, etc.
    */
-  captureArchitectureDecision(content: string, sourceFile?: string, context?: string): string[] {
+  captureArchitectureDecision(content: string, sourceFile?: string): string[] {
     const decisions: string[] = [];
     const patterns = [
       // Patterns de décision d'architecture
@@ -1029,7 +1029,7 @@ export class ProjectMemory {
    */
   captureCodeConventions(content: string, sourceFile?: string, language?: string): string[] {
     const conventions: string[] = [];
-    const languageHint = language || (sourceFile ? sourceFile.split('.').pop() : 'unknown');
+    const languageHint = language || (sourceFile ? sourceFile.split('.').pop() || 'unknown' : 'unknown');
 
     // Patterns de conventions par langage
     const patterns: Record<string, RegExp[]> = {
@@ -1113,14 +1113,12 @@ export class ProjectMemory {
     options: {
       sourceFile?: string;
       language?: string;
-      categoryHints?: string[];
       autoPersist?: boolean;
     } = {}
   ): { capturedFacts: string[]; decisionCount: number; conventionCount: number } {
     const {
       sourceFile,
       language,
-      categoryHints = [],
       autoPersist = true,
     } = options;
 
@@ -1129,7 +1127,7 @@ export class ProjectMemory {
     let conventionCount = 0;
 
     // 1. Capturer les décisions d'architecture
-    const decisions = this.captureArchitectureDecision(content, sourceFile, language);
+    const decisions = this.captureArchitectureDecision(content, sourceFile);
     decisionCount = decisions.length;
     capturedFacts.push(...decisions);
 
@@ -1198,7 +1196,6 @@ export class ProjectMemory {
     const result = this.captureFromContent(content, {
       sourceFile,
       language,
-      categoryHints: [analysisType],
       autoPersist: true,
     });
 

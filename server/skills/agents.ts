@@ -80,10 +80,7 @@ export const agentsSkill: Skill = {
     {
       name: "agent_delegate",
       description:
-        "Délègue une tâche à UN agent spécialisé parmi les 14 rôles disponibles (Code & Ingénierie : coder, refactor, debugger, reviewer, tester, security, architect ; Rédaction : writer, formatter, researcher, proofreader, translator, summarizer, planner). " +
-        "La tâche s'exécute en arrière-plan. Utilise \`agent_status\` avec le taskId retourné pour suivre la progression. " +
-        "Pour plusieurs rôles simultanés, utilise agent_orchestrate. " +
-        "Délégations automatiques recommandées : implémentation → coder ; revue de code → reviewer ; tests automatisés → tester ; sécurité → security ; diagnostic de bug → debugger ; planification/stack → planner ; recherche/impact → researcher ; relecture doc → proofreader.",
+        "Délègue une tâche à un agent spécialisé. Utilise \`agent_status\` avec le taskId pour suivre la progression. Pour plusieurs rôles, utilise agent_orchestrate.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -100,10 +97,7 @@ export const agentsSkill: Skill = {
     {
       name: "agent_orchestrate",
       description:
-        "Orchestre plusieurs agents en parallèle ou en séquence avec dépendances. " +
-        "Chaque tâche dans la liste doit avoir un rôle UNIQUE parmi les 14 rôles ('coder', 'reviewer', 'tester', 'planner', etc.) — jamais plusieurs rôles combinés dans une même tâche. " +
-        "Pour créer une dépendance entre tâches du même plan, indique dans dependsOn le titre exact de chaque tâche prérequise ; les IDs de tâches existantes restent aussi acceptés. " +
-        "Retourne un orchestrationId : utilise agent_status avec cet ID pour suivre l'avancement global.",
+        "Orchestre plusieurs agents en parallèle ou en séquence. Utilise dependsOn pour les dépendances. Retourne un orchestrationId pour suivre avec agent_status.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -133,10 +127,7 @@ export const agentsSkill: Skill = {
     {
       name: "agent_status",
       description:
-        "Consulte le statut d'une tâche ou d'une orchestration par son ID. " +
-        "Utilise agent_status pour toute question de progression, d'état, d'avancement ou de suivi avant de lancer de nouvelles délégations. " +
-        "Accepte indifféremment un taskId (retourné par agent_delegate) ou un orchestrationId (retourné par agent_orchestrate / agent_collaborate). " +
-        "C'est la seule commande correcte pour interroger l'état d'une exécution en cours.",
+        "Consulte le statut d'une tâche ou orchestration par son ID. Utilise agent_status pour toute question de progression avant de déléguer.",
       parameters: {
         type: "OBJECT",
         properties: { taskId: { type: "STRING", description: "ID de la tâche ou orchestration" } },
@@ -180,17 +171,7 @@ export const agentsSkill: Skill = {
     {
       name: "agent_collaborate",
       description:
-        "Lance une collaboration structurée entre agents selon un pattern prédéfini. " +
-        "Les agents communiquent entre eux via le bus de messages et se délèguent des " +
-        "sous-tâches de manière autonome. " +
-        "Patterns disponibles : " +
-        "'feature-engineering' (architect→coder→tester→reviewer), " +
-        "'code-review-and-fix' (reviewer→debugger→tester), " +
-        "'tech-stack-analysis-and-memory' (researcher→planner→reviewer), " +
-        "'document-complet' (planner→writer→proofreader→formatter), " +
-        "'traduction-verifiee' (writer→translator→proofreader), " +
-        "'recherche-redaction' (researcher→planner→writer→proofreader). " +
-        "Utilise agent_list_collaboration_patterns pour voir les détails.",
+        "Lance une collaboration structurée entre agents selon un pattern prédéfini. Utilise agent_list_collaboration_patterns pour voir les patterns disponibles.",
       parameters: {
         type: "OBJECT",
         properties: {

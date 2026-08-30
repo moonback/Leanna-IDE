@@ -64,6 +64,7 @@ export class ToolRegistry {
   private eventBus?: EventBus;
   private callHistory: ToolCallMetrics[] = [];
   private static readonly MAX_HISTORY = 500;
+  private readCache = new Map<string, { value: any; expires: number }>();
 
   constructor(config: ToolRegistryConfig = {}) {
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 30_000;
@@ -173,6 +174,15 @@ export class ToolRegistry {
     args: Record<string, unknown>,
     options: ToolCallOptions = {}
   ): Promise<unknown> {
+    // Cache pour read_project_file et list_project_files
+    if (name === 'read_project_file' || name === 'list_project_files') {
+      const key = `${name}:${JSON.stringify(args)}`;
+      const cached = this.readCache.get(key);
+      if (cached && Date.now() < cached.expires) {
+        return cached.value;
+      }
+    }
+
     const entry = this.tools.get(name);
     if (!entry) {
       throw new ToolNotFoundError(name, this.getSuggestions(name));
@@ -199,6 +209,12 @@ export class ToolRegistry {
           timeoutMs,
           options.context
         );
+
+        // Mettre en cache pour les outils de lecture
+        if (name === 'read_project_file' || name === 'list_project_files') {
+          const key = `${name}:${JSON.stringify(args)}`;
+          this.readCache.set(key, { value: result, expires: Date.now() + 5000 });
+        }
 
         const durationMs = Date.now() - startTime;
         this.recordMetrics(entry, name, durationMs, true, options.agentId);

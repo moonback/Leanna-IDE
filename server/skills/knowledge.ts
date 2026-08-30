@@ -38,7 +38,6 @@ const STRATEGY_VALUES: ContextStrategy[] = [
 const DETAIL_VALUES: ContextDetailLevel[] = ["compact", "standard", "verbose"];
 
 const IMPACT_MODES: ImpactMode[] = ["quick", "standard", "deep", "reverse"];
-const RISK_LEVELS: RiskLevel[] = ["low", "medium", "high", "critical"];
 
 export const knowledgeSkill: Skill = {
   name: "knowledge",
@@ -46,9 +45,7 @@ export const knowledgeSkill: Skill = {
     {
       name: "knowledge_build_context",
       description:
-        "🔎 Outil PRINCIPAL de compréhension projet. Combine en un appel : recherche sémantique, mémoire projet, graphe de dépendances, score de compréhension et recommandations. " +
-        "À utiliser en début de mission (≥ 2 fichiers ou architecture inconnue). " +
-        "Retourne un ContextBatch réutilisable pour toutes les sous-tâches — ne pas rappeler pour chaque fichier.",
+        "🔎 Outil PRINCIPAL de compréhension projet. Combine recherche sémantique, mémoire projet et graphe de dépendances. À utiliser en début de mission. Retourne un ContextBatch réutilisable.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -86,9 +83,7 @@ export const knowledgeSkill: Skill = {
     {
       name: "knowledge_semantic_search",
       description:
-        "🔍 Recherche sémantique dans le codebase : combine noms d'entités, chemins de fichiers et contenu textuel (TF-IDF). " +
-        "Plus efficace que search_in_files pour un concept dont tu ignores les mots exacts. " +
-        "Lance en parallèle avec knowledge_search_entities si les deux sont pertinents.",
+        "🔍 Recherche sémantique dans le codebase : combine noms d'entités, chemins et contenu textuel (TF-IDF). Plus efficace que search_in_files pour un concept dont tu ignores les mots exacts.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -791,7 +786,7 @@ export const knowledgeSkill: Skill = {
         log("reindex (scanAll)...");
 
         const start = Date.now();
-        const mod = await import("../knowledge/ProjectIndexer");
+        const mod = await import("../knowledge/ProjectIndexer.js");
         await mod.projectIndexer.scanAll();
         const duration = ((Date.now() - start) / 1000).toFixed(2);
 

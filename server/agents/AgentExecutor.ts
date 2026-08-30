@@ -345,11 +345,13 @@ export class AgentExecutor {
    * structurés, mais ne peut ni lancer bash ni sortir du workspace.
    * Limité à MAX_TOOL_TURNS tours pour éviter les boucles infinies.
    */
-  private static readonly MAX_TOOL_TURNS = 8;
+  private static readonly MAX_TOOL_TURNS = 4;          // 8 → 4
   /** Taille maximale d’une observation cumulée envoyée au modèle suivant. */
-  private static readonly MAX_OBSERVATION_CHARS = 240_000;
+  private static readonly MAX_OBSERVATION_CHARS = 80_000; // 240k → 80k
   /** Limite de sécurité par snapshot, supérieure aux composants UI usuels. */
-  private static readonly MAX_FILE_CONTEXT_CHARS = 200_000;
+  private static readonly MAX_FILE_CONTEXT_CHARS = 50_000; // 200k → 50k
+ /** Limite maximale de fichiers dans le contexte incrémental */
+  private static readonly MAX_FILES_IN_CONTEXT = 5;
 
   private async executeToolLoop(
     agent: { name: string; capabilities: string[] },
@@ -411,9 +413,11 @@ export class AgentExecutor {
       // Construire le contexte des fichiers lus avec DIFF INCréMENTAL
       // Seul les fichiers NOUVELLEMENT lus ou MODIFIÉS sont envoyés en entier
       // Les autres sont juste référencés avec leur hash pour vérification
+      // Limiter à MAX_FILES_IN_CONTEXT fichiers
+      const limitedNewlyTouched = new Set([...newlyTouchedThisTurn].slice(0, AgentExecutor.MAX_FILES_IN_CONTEXT));
       const fileContextSection = this.buildIncrementalFileContext(
         state.fileSnapshots,
-        newlyTouchedThisTurn
+        limitedNewlyTouched
       );
 
       // Log pour le suivi des optimisations

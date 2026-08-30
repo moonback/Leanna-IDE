@@ -1,23 +1,28 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
+import { Page } from "puppeteer";
 import { assertSafeUrl, addAllowedDomain } from "./automationHelpers.js";
 
 addAllowedDomain('duckduckgo.com');
 addAllowedDomain('html.duckduckgo.com');
 
-let browser: Browser | null = null;
-let page: Page | null = null;
+let browser: any | null = null;
+let page: any | null = null;
+
+async function getPuppeteer() {
+  return await import('puppeteer');
+}
 /** Stores the last captured selectors so automation_type/click can validate against them. */
 let lastSnapshotSelectors: Set<string> = new Set();
 
 const NAV_TIMEOUT_MS = 15000;
 
-async function ensurePage(): Promise<Page> {
+async function ensurePage(): Promise<any> {
     if (!browser || !browser.connected) {
+        const puppeteer = await getPuppeteer();
         const isProd = process.env.NODE_ENV === 'production';
         const launchArgs = isProd
             ? ['--disable-dev-shm-usage', '--disable-gpu']
             : ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'];
-        browser = await puppeteer.launch({
+        browser = await puppeteer.default.launch({
             args: launchArgs,
             headless: true
         });
@@ -439,7 +444,7 @@ export async function handleExtract(validated: { selector: string }) {
     if (!page) return { error: "Aucune page ouverte." };
     try {
         await page.waitForSelector(validated.selector, { timeout: 3000 });
-        const content = await page.$eval(validated.selector, el => (el as HTMLElement).innerText.substring(0, 5000));
+        const content = await page.$eval(validated.selector, (el: Element) => (el as HTMLElement).innerText.substring(0, 5000));
         return { status: "success", content };
     } catch {
         return { error: `Sélecteur introuvable: ${validated.selector}` };
@@ -588,7 +593,7 @@ export async function handleAnalyzeScreenshot(validated: { imageBase64: string; 
         // Utiliser le générateur de texte pour analyser l'image
         // Note: Cela nécessite que le modèle supporte l'analyse d'images (multimodal)
         // ou qu'un service OCR externe soit utilisé
-        const { generateText } = await import("../utils/textGeneration");
+        const { generateText } = await import("../utils/textGeneration.js");
         
         const analysis = await generateText({
             prompt: `Analyse cette capture d'écran et réponds à la demande suivante : ${prompt}
@@ -637,7 +642,6 @@ export async function handleDownloadFile(validated: { url: string; saveToSandbox
 
         // Vérifier le type de contenu
         const contentType = tempPage.mainFrame().response()?.headers()['content-type'] || '';
-        const content = await tempPage.content();
 
         // Si c'est du HTML, extraire le contenu principal
         if (contentType.includes('text/html')) {
@@ -665,7 +669,7 @@ export async function handleDownloadFile(validated: { url: string; saveToSandbox
 
         let savedPath: string | null = null;
         if (saveToSandbox) {
-            const { getSandboxRoot } = await import("../utils/sandbox");
+            const { getSandboxRoot } = await import("../utils/sandbox.js");
             const fs = await import('fs');
             const path = await import('path');
             
@@ -688,7 +692,7 @@ export async function handleDownloadFile(validated: { url: string; saveToSandbox
             contentType: response.headers.get('content-type') || 'application/octet-stream',
             content: fileContent,
             size: fileBuffer.byteLength,
-            savedToSandbox,
+            saveToSandbox,
             savedPath,
         };
     } catch (error: any) {
@@ -728,7 +732,7 @@ export async function handleSaveSession(validated: { name: string }) {
         };
 
         // Sauvegarder dans la sandbox
-        const { getSandboxRoot } = await import("../utils/sandbox");
+        const { getSandboxRoot } = await import("../utils/sandbox.js");
         const fs = await import('fs');
         const path = await import('path');
         
@@ -765,7 +769,7 @@ export async function handleRestoreSession(validated: { name: string }) {
     if (!page) return { error: "Aucune page ouverte. Utilisez automation_navigate d'abord." };
 
     try {
-        const { getSandboxRoot } = await import("../utils/sandbox");
+        const { getSandboxRoot } = await import("../utils/sandbox.js");
         const fs = await import('fs');
         const path = await import('path');
         
@@ -813,7 +817,7 @@ export async function handleListSessions() {
     console.log(`[Automation] Liste des sessions sauvegardées`);
 
     try {
-        const { getSandboxRoot } = await import("../utils/sandbox");
+        const { getSandboxRoot } = await import("../utils/sandbox.js");
         const fs = await import('fs');
         const path = await import('path');
         
@@ -857,7 +861,7 @@ export async function handleDeleteSession(validated: { name: string }) {
     console.log(`[Automation] Suppression de la session: ${validated.name}`);
 
     try {
-        const { getSandboxRoot } = await import("../utils/sandbox");
+        const { getSandboxRoot } = await import("../utils/sandbox.js");
         const fs = await import('fs');
         const path = await import('path');
         
