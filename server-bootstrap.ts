@@ -1,6 +1,6 @@
 import path from "path";
 import dotenv from "dotenv";
-import { decrypt } from "./server/utils/crypto";
+import { decrypt } from "./server/utils/crypto.js";
 
 const configRoot = process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || process.cwd();
 dotenv.config({ path: path.join(configRoot, ".env") });
@@ -39,7 +39,7 @@ function validateSupabaseEnvironment(): void {
 }
 
 validateSupabaseEnvironment();
-void import("./server").catch((error) => {
+void import("./server.js").catch((error) => {
   const details = error instanceof Error ? (error.stack || error.message) : String(error);
   process.stderr.write(`[Bootstrap] Échec du démarrage du serveur: ${details}\n`);
   process.exitCode = 1;

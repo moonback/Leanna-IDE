@@ -1652,21 +1652,26 @@ body {
    holds regardless of how light/dark that theme's accent is.
 ═══════════════════════════════════════════════ */
 :root[data-theme="dark"] {
-  --notebook-bg: #1b1b1f;
-  --notebook-canvas: #0a1628;
-  --notebook-surface: #0a1628;
-  --notebook-surface-muted: rgba(255, 255, 255, 0.06);
-  --notebook-surface-elevated: #0a1628;
-  --notebook-border: rgba(255, 255, 255, 0.08);
-  --notebook-card-bg: rgba(44, 44, 52, 0.9);
-  --notebook-card-hover: rgba(52, 52, 62, 0.95);
+  --notebook-bg: #07111f;              /* outermost shell — deepest navy */
+  --notebook-canvas: #0a1628;          /* main workspace canvas */
+  --notebook-surface: #0c1a30;         /* cards / panels — one step lighter */
+  --notebook-surface-muted: rgba(168, 199, 250, 0.06);
+  --notebook-surface-elevated: #0f2040; /* modals / popovers — highest layer */
+  --notebook-border: rgba(168, 199, 250, 0.11); /* accent-tinted border */
+  --notebook-card-bg: rgba(11, 24, 45, 0.95);   /* navy, not neutral grey */
+  --notebook-card-hover: rgba(14, 30, 57, 0.98);
   --notebook-accent: #a8c7fa;
-  --notebook-accent-text: #1b1b1f;
-  --notebook-accent-surface: rgba(168, 199, 250, 0.08);
-  --notebook-accent-hover: rgba(168, 199, 250, 0.14);
-  --notebook-studio-bg: #0a1628;
+  --notebook-accent-text: #07111f;
+  --notebook-accent-surface: rgba(168, 199, 250, 0.09);
+  --notebook-accent-hover: rgba(168, 199, 250, 0.15);
+  --notebook-studio-bg: #070f1c;       /* studio sidebar matches shell */
   --notebook-chat-user: rgba(168, 199, 250, 0.12);
-  --notebook-chat-ai: transparent;
+  --notebook-chat-ai: rgba(168, 199, 250, 0.03);
+  /* Extra tokens for polished effects */
+  --notebook-glow: rgba(168, 199, 250, 0.18);
+  --notebook-shadow-sm: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --notebook-shadow-md: 0 4px 12px rgba(0,0,0,0.45), 0 2px 4px rgba(0,0,0,0.25);
+  --notebook-shadow-lg: 0 8px 24px rgba(0,0,0,0.5), 0 4px 8px rgba(0,0,0,0.3);
 }
 :root[data-theme="light"] {
   --notebook-bg: #f8f9fa;
@@ -1737,10 +1742,10 @@ body {
   --notebook-chat-ai: transparent;
 }
 :root {
-  --notebook-radius-sm: 8px;
-  --notebook-radius-md: 12px;
-  --notebook-radius-lg: 16px;
-  --notebook-radius-xl: 24px;
+  --notebook-radius-sm: 6px;
+  --notebook-radius-md: 10px;
+  --notebook-radius-lg: 14px;
+  --notebook-radius-xl: 20px;
   --notebook-radius-pill: 999px;
 }
 
@@ -1751,33 +1756,35 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Header — clean top bar */
+/* Header — clean top bar with glassmorphism */
 .notebook-header {
-  min-height: 64px;
+  min-height: 60px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 24px;
+  padding: 10px 20px;
   border-bottom: 1px solid var(--notebook-border);
   background: var(--notebook-surface-elevated);
+  box-shadow: 0 1px 0 var(--notebook-border), var(--notebook-shadow-sm, 0 2px 8px rgba(0,0,0,0.2));
 }
 .notebook-title {
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.3;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 .notebook-subtitle {
   margin-top: 2px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-muted);
   font-weight: 400;
+  letter-spacing: 0.01em;
 }
 .notebook-eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -1805,6 +1812,7 @@ body {
   border-right: 0;
   border-left: 1px solid var(--notebook-border);
   background: var(--notebook-studio-bg);
+  box-shadow: -2px 0 12px rgba(0,0,0,0.15);
 }
 
 /* Main content area */
@@ -1815,8 +1823,8 @@ body {
 
 /* Segmented tabs — pill style */
 .notebook-segmented {
-  padding: 4px;
-  gap: 4px;
+  padding: 3px;
+  gap: 2px;
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
@@ -1834,17 +1842,17 @@ body {
   font-weight: 500;
   cursor: pointer;
   border: none;
-  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
 }
 .notebook-segment:focus-visible,
 .notebook-ghost-button:focus-visible,
 .notebook-icon-button:focus-visible,
 .notebook-primary-small:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.3);
+  box-shadow: 0 0 0 3px var(--notebook-glow, rgba(129, 140, 248, 0.3));
 }
 .notebook-segment {
-  padding: 6px 14px;
+  padding: 5px 13px;
   font-size: 13px;
 }
 .notebook-segment[data-active="true"],
@@ -1852,7 +1860,7 @@ body {
 .notebook-icon-button[data-active="true"] {
   background: var(--notebook-accent-surface);
   color: var(--notebook-accent);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 .notebook-ghost-button {
   min-height: 32px;
@@ -1860,8 +1868,8 @@ body {
   font-size: 13px;
 }
 .notebook-icon-button {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
 }
 .notebook-segment:hover,
@@ -1869,6 +1877,7 @@ body {
 .notebook-icon-button:hover {
   background: var(--notebook-surface-muted);
   color: var(--text-primary);
+  transform: translateY(-0.5px);
 }
 
 /* Primary action button (small) */
@@ -1880,11 +1889,12 @@ body {
   font-size: 13px;
   font-weight: 600;
   border-radius: var(--notebook-radius-pill);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.15);
 }
 .notebook-primary-small:hover {
-  opacity: 0.9;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.16);
+  opacity: 0.92;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+  transform: translateY(-0.5px);
 }
 
 /* Pills & counts */
@@ -1919,20 +1929,21 @@ body {
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
-  padding: 0 12px;
+  padding: 0 14px;
   color: var(--text-muted);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 .notebook-search-field:focus-within {
   border-color: var(--notebook-accent);
-  box-shadow: 0 0 0 2px var(--notebook-accent-surface);
+  background: var(--notebook-accent-surface);
+  box-shadow: 0 0 0 3px var(--notebook-glow, rgba(168,199,250,0.15));
 }
 .notebook-search-field input {
   min-width: 0;
   width: 100%;
   background: transparent;
   outline: none;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-primary);
 }
 
@@ -1972,12 +1983,14 @@ body {
   background: var(--notebook-card-bg);
   padding: 16px 20px;
   border: 1px solid var(--notebook-border);
-  transition: background-color 0.15s, box-shadow 0.15s, border-color 0.15s;
+  box-shadow: var(--notebook-shadow-sm, 0 1px 4px rgba(0,0,0,0.15));
+  transition: background-color 0.18s, box-shadow 0.18s, border-color 0.18s, transform 0.15s;
 }
 .notebook-note-card:hover {
   background: var(--notebook-card-hover);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: var(--notebook-shadow-md, 0 4px 12px rgba(0,0,0,0.2));
   border-color: var(--notebook-accent);
+  transform: translateY(-1px);
 }
 
 /* Studio panel cards (Generate / Audio) */
@@ -1987,13 +2000,14 @@ body {
   border: 1px solid var(--notebook-border);
   padding: 16px;
   cursor: pointer;
+  box-shadow: var(--notebook-shadow-sm, 0 1px 4px rgba(0,0,0,0.15));
   transition: all 0.2s ease;
 }
 .notebook-studio-card:hover {
   background: var(--notebook-accent-surface);
   border-color: var(--notebook-accent);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+  box-shadow: var(--notebook-shadow-md, 0 4px 16px rgba(0,0,0,0.25));
 }
 
 /* Chat message bubbles — NotebookLM style */
@@ -2001,17 +2015,19 @@ body {
   border-radius: var(--notebook-radius-lg);
   padding: 12px 16px;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 .notebook-chat-message[data-role="user"] {
   background: var(--notebook-chat-user);
+  border: 1px solid var(--notebook-border);
   margin-left: auto;
-  max-width: 85%;
-  border-bottom-right-radius: 4px;
+  max-width: 82%;
+  border-bottom-right-radius: 5px;
+  box-shadow: var(--notebook-shadow-sm, 0 1px 4px rgba(0,0,0,0.12));
 }
 .notebook-chat-message[data-role="assistant"] {
   background: var(--notebook-chat-ai);
-  max-width: 95%;
+  max-width: 96%;
 }
 
 /* Suggestion chips — Google style */
@@ -2019,7 +2035,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 5px 13px;
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
@@ -2034,6 +2050,8 @@ body {
   background: var(--notebook-accent-surface);
   border-color: var(--notebook-accent);
   color: var(--notebook-accent);
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
 }
 
 /* Empty state styling */
@@ -2060,17 +2078,18 @@ body {
 
 /* Custom scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 3px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--border-base);
+  background: var(--notebook-border, var(--border-base));
   border-radius: 20px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--text-dimmed);
+  background: var(--notebook-accent, var(--text-dimmed));
+  opacity: 0.6;
 }
 .notebook-empty-state-icon {
   width: 48px;
@@ -2089,20 +2108,20 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
+  padding: 9px 18px;
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-accent);
   color: var(--notebook-accent-text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   border: none;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.1);
-  transition: box-shadow 0.2s, transform 0.2s;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25), 0 1px 3px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2);
+  transition: box-shadow 0.2s, transform 0.15s;
 }
 .notebook-fab:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.12);
-  transform: translateY(-1px);
+  box-shadow: 0 5px 18px rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.2);
+  transform: translateY(-1.5px);
 }
 
 /* Typography utilities — 2 values only for notebooks */
