@@ -112,40 +112,135 @@ export class ProjectIndexer {
     return this.customProjectRoot || SELF_ROOT;
   }
 
-  // ─── Scan complet ─────────────────────────────────────────────────────────
-
   /**
    * Scanne tous les fichiers du projet et met à jour le KnowledgeGraph.
-   * C'est la méthode principale à appeler au démarrage.
+   * Si le projet n'a subi aucune modification (fichiers, mtime, taille),
+   * le cache existant est réutilisé instantanément sans ré-indexation lourde.
+   *
+   * @param options.force Force la ré-indexation complète même si le cache est à jour
    */
-  async scanAll(): Promise<{
+  async scanAll(options: { force?: boolean } = {}): Promise<{
     totalFiles: number;
     totalEntities: number;
     durationMs: number;
+    cached?: boolean;
   }> {
     const startTime = Date.now();
     const root = this.getActiveProjectRoot();
-    log.info(`🔍 Scan complet du projet (root: ${root})...`);
+    const force = options.force ?? false;
 
-    // 0. Initialiser Tree-sitter en parallèle du walk
-    const astInitPromise = astParser.init();
-
-    // 1. Lister tous les fichiers
+    // 1. Lister tous les fichiers sur disque (opération rapide < 50ms)
     const files: string[] = [];
     await this.walkDirectory(root, files, root);
-    log.info(`📋 ${files.length} fichiers trouvés`);
 
-    await astInitPromise;
+    // 2. Vérification différentielle intelligente contre le cache existant
+    if (!force && knowledgeGraph.isInitialized()) {
+      const cachedFiles = knowledgeGraph.getAllFiles();
+      if (cachedFiles.length > 0) {
+        const cachedMap = new Map(cachedFiles.map((f) => [f.path, f]));
+        const diskFilesSet = new Set(files);
+
+        const addedFiles: string[] = [];
+        const modifiedFiles: string[] = [];
+        const deletedFiles: string[] = [];
+
+        // Détecter ajouts et modifications
+        for (const relPath of files) {
+          const cached = cachedMap.get(relPath);
+          if (!cached) {
+            addedFiles.push(relPath);
+            continue;
+          }
+
+          const absPath = path.join(root, relPath);
+          try {
+            const stat = fs.statSync(absPath);
+            const cachedMtimeMs = Date.parse(cached.lastModified);
+            // Vérifier taille et date de modification (marge 1.5s pour précision FS)
+            if (stat.size !== cached.size || Math.abs(stat.mtimeMs - cachedMtimeMs) > 1500) {
+              modifiedFiles.push(relPath);
+            }
+          } catch {
+            modifiedFiles.push(relPath);
+          }
+        }
+
+        // Détecter suppressions
+        for (const cached of cachedFiles) {
+          if (!diskFilesSet.has(cached.path)) {
+            deletedFiles.push(cached.path);
+          }
+        }
+
+        // ── CAS A : Aucun changement sur le projet ──────────────────────────────
+        if (addedFiles.length === 0 && modifiedFiles.length === 0 && deletedFiles.length === 0) {
+          const stats = knowledgeGraph.getStats();
+          const durationMs = Date.now() - startTime;
+          log.info(
+            `⚡ Projet inchangé — utilisation du cache existant (${cachedFiles.length} fichiers, ${stats.totalEntities} entités) (${durationMs}ms)`
+          );
+
+          // Initialiser Tree-sitter en arrière-plan sans bloquer
+          astParser.init().catch(() => {});
+
+          return {
+            totalFiles: cachedFiles.length,
+            totalEntities: stats.totalEntities,
+            durationMs,
+            cached: true,
+          };
+        }
+
+        // ── CAS B : Changements légers / partiels (mise à jour incrémentale) ─────
+        const totalChanges = addedFiles.length + modifiedFiles.length + deletedFiles.length;
+        if (totalChanges <= 60) {
+          log.info(
+            `⚡ Changements détectés (${addedFiles.length} ajout(s), ${modifiedFiles.length} modifié(s), ${deletedFiles.length} supprimé(s)) — mise à jour incrémentale...`
+          );
+
+          await astParser.init();
+
+          // Supprimer les fichiers disparus
+          for (const delPath of deletedFiles) {
+            knowledgeGraph.removeFile(delPath);
+            astCallGraph.removeFile(delPath);
+          }
+
+          // Scanner et enrichir les fichiers ajoutés/modifiés
+          for (const changedPath of [...addedFiles, ...modifiedFiles]) {
+            await this.scanFile(changedPath);
+          }
+
+          const stats = knowledgeGraph.getStats();
+          const durationMs = Date.now() - startTime;
+          log.info(
+            `✅ Mise à jour incrémentale terminée: ${stats.totalFiles} fichiers, ${stats.totalEntities} entités (${(durationMs / 1000).toFixed(1)}s)`
+          );
+
+          return {
+            totalFiles: stats.totalFiles,
+            totalEntities: stats.totalEntities,
+            durationMs,
+            cached: false,
+          };
+        }
+      }
+    }
+
+    // ── CAS C : Scan complet (premier démarrage ou force: true) ───────────────
+    log.info(`🔍 Scan complet du projet (root: ${root}, ${files.length} fichiers)...`);
+
+    // Initialiser Tree-sitter
+    await astParser.init();
     const astReady = astParser.isReady;
     if (astReady) {
       log.info("🌳 Tree-sitter prêt — enrichissement AST activé");
     }
 
-    // 2. Parser chaque fichier (regex) + enrichissement AST
+    // Parser chaque fichier (regex) + enrichissement AST
     const parsedFiles: FileNode[] = [];
     const astResults = new Map<string, ASTFileResult>();
     let totalEntities = 0;
-
     for (const relativePath of files) {
       try {
         const absPath = path.join(root, relativePath);
@@ -169,13 +264,13 @@ export class ProjectIndexer {
       }
     }
 
-    // 3. Alimenter le KnowledgeGraph
+    // Alimenter le KnowledgeGraph
     knowledgeGraph.update(parsedFiles);
 
-    // 4. Extraire les relations sémantiques (regex) + relations AST (calls précis)
+    // Extraire les relations sémantiques (regex) + relations AST (calls précis)
     const allRelations = this.extractAllRelations(parsedFiles, root);
 
-    // 4b. Relations d'appels inter-fichiers depuis l'AST
+    // Relations d'appels inter-fichiers depuis l'AST
     if (astResults.size > 0) {
       const astCallRelations = relationExtractor.extractASTCallRelations(astResults, knowledgeGraph.getAllFiles());
       allRelations.push(...astCallRelations);
@@ -184,7 +279,7 @@ export class ProjectIndexer {
 
     knowledgeGraph.setRelations(allRelations);
 
-    // 5. Construire le graphe d'appels AST en mémoire
+    // Construire le graphe d'appels AST en mémoire
     if (astResults.size > 0) {
       for (const [, astResult] of astResults) {
         astCallGraph.updateFile(astResult, astResults);
@@ -197,12 +292,13 @@ export class ProjectIndexer {
     knowledgeGraph.save();
 
     const durationMs = Date.now() - startTime;
-    log.info(`✅ Scan terminé: ${parsedFiles.length} fichiers, ${totalEntities} entités, ${allRelations.length} relations (${(durationMs / 1000).toFixed(1)}s)`);
+    log.info(`✅ Scan complet terminé: ${parsedFiles.length} fichiers, ${totalEntities} entités, ${allRelations.length} relations (${(durationMs / 1000).toFixed(1)}s)`);
 
     return {
       totalFiles: parsedFiles.length,
       totalEntities,
       durationMs,
+      cached: false,
     };
   }
 
