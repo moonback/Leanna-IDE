@@ -1,70 +1,70 @@
 import express from "express";
 import path from "path";
-import { createRateLimitBundle, applyGlobalRateLimits, applyStaticAndCompression, type RateLimitDeps, } from "./server/config/rateLimits";
-import { setupGracefulShutdown } from "./server/lifecycle";
+import { createRateLimitBundle, applyGlobalRateLimits, applyStaticAndCompression, type RateLimitDeps, } from "./server/config/rateLimits.js";
+import { setupGracefulShutdown } from "./server/lifecycle.js";
 // vite est importé dynamiquement en dev uniquement (voir plus bas)
 import { WebSocketServer, WebSocket } from "ws";
 import { GoogleGenAI } from "@google/genai";
-import { agentOrchestrator } from "./server/agents";
-import { mcpBridge } from "./server/mcp";
-import { type ProfileConfig } from "./server/prompts/systemInstruction";
-import { loadScheduledTasks, stopAllScheduledTasks } from "./server/skills/automation";
-import { loadWorkflows, stopAllWorkflowTimers } from "./server/skills/workflow";
+import { agentOrchestrator } from "./server/agents/index.js";
+import { mcpBridge } from "./server/mcp/index.js";
+import { type ProfileConfig } from "./server/prompts/systemInstruction.js";
+import { loadScheduledTasks, stopAllScheduledTasks } from "./server/skills/automation.js";
+import { loadWorkflows, stopAllWorkflowTimers } from "./server/skills/workflow.js";
 import fs from "fs";
-import { authenticateRequest, authenticateToken } from "./server/security";
-import { SELF_ROOT, Leanna_APP_ROOT, initSelfRoot, hasProject } from "./server/utils/selfRoot";
-import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox";
+import { authenticateRequest, authenticateToken } from "./server/security.js";
+import { SELF_ROOT, Leanna_APP_ROOT, initSelfRoot, hasProject } from "./server/utils/selfRoot.js";
+import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox.js";
 
-import { knowledgeGraph, projectIndexer, projectMemory } from "./server/knowledge";
+import { knowledgeGraph, projectIndexer, projectMemory } from "./server/knowledge/index.js";
 
-import { loadGeminiKeys, createGeminiClient } from "./server/utils/geminiKeyPool";
-import { encrypt } from "./server/utils/crypto";
-import { setTextGenerationProfile } from "./server/utils/textGeneration";
+import { loadGeminiKeys, createGeminiClient } from "./server/utils/geminiKeyPool.js";
+import { encrypt } from "./server/utils/crypto.js";
+import { setTextGenerationProfile } from "./server/utils/textGeneration.js";
 
 // Routeurs modulaires
-import healthRouter from "./server/routes/health";
-import { knowledgeRouter, memoryRouter, impactRouter, understandingRouter } from "./server/routes/knowledge";
+import healthRouter from "./server/routes/health.js";
+import { knowledgeRouter, memoryRouter, impactRouter, understandingRouter } from "./server/routes/knowledge/index.js";
 
 // Sprint 1 — routeurs extraits de server.ts
-import { createAgentBuilderRouter } from "./server/routes/agent-builder";
-import { createAgentRegistrationRouter } from "./server/routes/agent-registration";
-import { createCustomAgentsRouter } from "./server/routes/custom-agents-router";
-import { createGeminiKeysRouter } from "./server/routes/gemini-keys";
-import { createSandboxRouter, createVerifyExitCodeRouter } from "./server/routes/sandbox";
-import { createCheckpointRouter } from "./server/routes/checkpoint";
-import ideRouter from "./server/routes/ide";
-import { createBrowserRouter } from "./server/routes/browser";
-import { attachLiveWebSocket } from "./server/live/LiveSocketHandler";
-import { createExportRouter } from "./server/routes/export";
+import { createAgentBuilderRouter } from "./server/routes/agent-builder.js";
+import { createAgentRegistrationRouter } from "./server/routes/agent-registration.js";
+import { createCustomAgentsRouter } from "./server/routes/custom-agents-router.js";
+import { createGeminiKeysRouter } from "./server/routes/gemini-keys.js";
+import { createSandboxRouter, createVerifyExitCodeRouter } from "./server/routes/sandbox.js";
+import { createCheckpointRouter } from "./server/routes/checkpoint.js";
+import ideRouter from "./server/routes/ide.js";
+import { createBrowserRouter } from "./server/routes/browser.js";
+import { attachLiveWebSocket } from "./server/live/LiveSocketHandler.js";
+import { createExportRouter } from "./server/routes/export.js";
 
-import { createGithubRouter } from "./server/routes/github";
-import { createAgentsRouter } from "./server/routes/agents";
-import workflowsRouter from "./server/routes/workflows";
-import { createCustomSkillsRouter } from "./server/routes/custom-skills";
-import auditRouter from "./server/routes/audit";
-import { createProfileRouter, createTokensRouter } from "./server/routes/profile";
-import { createOpenRouterRouter } from "./server/routes/openrouter";
-import { createTokensOptimizationRouter } from "./server/routes/tokens-optimization";
-import { createSummarizeContextRouter } from "./server/routes/summarize-context";
-import { createWorkspaceRouter } from "./server/routes/workspace";
-import { createSelfRootRouter } from "./server/routes/self-root";
-import safeguardsRouter from "./server/routes/safeguards";
-import { createUploadDocumentRouter } from "./server/routes/upload-document";
-import { createDocumentsRouter } from "./server/routes/documents";
-import skillsRouter from "./server/routes/skills";
-import mcpRouter from "./server/routes/mcp";
-import { createTerminalRouter, setupTerminalWebSocket } from "./server/routes/terminal";
-import memoriesRouter from "./server/routes/memories";
-import conversationsRouter from "./server/routes/conversations";
-import listsRouter from "./server/routes/lists";
-import automationRouter from "./server/routes/automation";
-import { createNotebooksRouter } from "./server/routes/notebooks";
-import { createTTSRouter } from "./server/routes/tts";
-import { notebookManager } from "./server/notebooks";
-import { backupService } from "./server/notebooks/BackupService";
-import { sourceProcessingQueue } from "./server/notebooks/ProcessingQueue";
-import { chatResponseCache, ragSearchCache } from "./server/notebooks/ResponseCache";
-import { sourceIngester } from "./server/notebooks/SourceIngester";
+import { createGithubRouter } from "./server/routes/github.js";
+import { createAgentsRouter } from "./server/routes/agents.js";
+import workflowsRouter from "./server/routes/workflows.js";
+import { createCustomSkillsRouter } from "./server/routes/custom-skills.js";
+import auditRouter from "./server/routes/audit.js";
+import { createProfileRouter, createTokensRouter } from "./server/routes/profile.js";
+import { createOpenRouterRouter } from "./server/routes/openrouter.js";
+import { createTokensOptimizationRouter } from "./server/routes/tokens-optimization.js";
+import { createSummarizeContextRouter } from "./server/routes/summarize-context.js";
+import { createWorkspaceRouter } from "./server/routes/workspace.js";
+import { createSelfRootRouter } from "./server/routes/self-root.js";
+import safeguardsRouter from "./server/routes/safeguards.js";
+import { createUploadDocumentRouter } from "./server/routes/upload-document.js";
+import { createDocumentsRouter } from "./server/routes/documents.js";
+import skillsRouter from "./server/routes/skills.js";
+import mcpRouter from "./server/routes/mcp.js";
+import { createTerminalRouter, setupTerminalWebSocket } from "./server/routes/terminal.js";
+import memoriesRouter from "./server/routes/memories.js";
+import conversationsRouter from "./server/routes/conversations.js";
+import listsRouter from "./server/routes/lists.js";
+import automationRouter from "./server/routes/automation.js";
+import { createNotebooksRouter } from "./server/routes/notebooks/index.js";
+import { createTTSRouter } from "./server/routes/tts.js";
+import { notebookManager } from "./server/notebooks/index.js";
+import { backupService } from "./server/notebooks/BackupService.js";
+import { sourceProcessingQueue } from "./server/notebooks/ProcessingQueue.js";
+import { chatResponseCache, ragSearchCache } from "./server/notebooks/ResponseCache.js";
+import { sourceIngester } from "./server/notebooks/SourceIngester.js";
 
 // Charger les clés Gemini
 loadGeminiKeys().catch(e => console.error('[GeminiKeyPool] Erreur au chargement initial:', e));
@@ -132,13 +132,13 @@ process.on('uncaughtException', (error) => {
     await loadWorkflows();
 
     // 3. Seulement après le chargement complet, vérifier/créer l'audit workflow
-    const { ensureAuditWorkflow } = await import("./server/workflows/audit-workflow");
+    const { ensureAuditWorkflow } = await import("./server/workflows/audit-workflow.js");
     await ensureAuditWorkflow();
 
     // 4. Restauration des tâches agents depuis Supabase (recovery crash)
-    const { agentOrchestrator: orch, agentPersistence } = await import("./server/agents");
+    const { agentOrchestrator: orch, agentPersistence } = await import("./server/agents/index.js");
     if (agentPersistence.isAvailable) {
-      orch.restoreFromPersistence().then(({ tasks, orchestrations }) => {
+      orch.restoreFromPersistence().then(({ tasks, orchestrations }: any) => {
         if (tasks > 0 || orchestrations > 0) {
           console.log(`[AgentPersistence] ✅ Restauré: ${tasks} tâche(s), ${orchestrations} orchestration(s)`);
         }
@@ -149,22 +149,22 @@ process.on('uncaughtException', (error) => {
 
     // 5. Indexation du Knowledge Graph — seulement si un projet est actif
     if (hasProject()) {
-      projectIndexer.scanAll().then(stats => {
+      projectIndexer.scanAll().then((stats: any) => {
         console.log(`[KnowledgeGraph] ✅ Projet indexé: ${stats.totalFiles} fichiers, ${stats.totalEntities} entités (${(stats.durationMs / 1000).toFixed(1)}s)`);
         // 5b. Activer l'indexation incrémentale via FileWatcher
         projectIndexer.startWatching();
 
         // 6. Extraction automatique des documents du workspace
         import("./server/knowledge/WorkspaceIndexer.js").then(({ workspaceIndexer }) => {
-          workspaceIndexer.extractAll().then(docStats => {
+          workspaceIndexer.extractAll().then((docStats: any) => {
             console.log(`[WorkspaceIndexer] ✅ ${docStats.totalExtracted} document(s) extrait(s), ${docStats.totalWords} mots, ${docStats.totalSections} sections (${(docStats.durationMs / 1000).toFixed(1)}s)`);
             // 6b. Activer l'extraction incrémentale
             workspaceIndexer.startWatching();
-          }).catch(e => {
+          }).catch((e: any) => {
             console.error('[WorkspaceIndexer] ❌ Erreur extraction:', e.message);
           });
         });
-      }).catch(e => {
+      }).catch((e: any) => {
         console.error('[KnowledgeGraph] ❌ Erreur indexation:', e.message);
       });
     } else {
@@ -233,35 +233,33 @@ function getGeminiAI(): GoogleGenAI {
 // Utilisation de bootstrapRuntimeSync pour une initialisation centralisée.
 // Toutes les skills sont enregistrées une seule fois dans le ToolRegistry.
 // Compatible avec CommonJS (pas de top-level await).
-import { bootstrapRuntimeSync } from "./server/runtime/bootstrap";
-import { Observability } from "./server/runtime/Observability";
-import type { AgentRuntime } from "./server/runtime/AgentRuntime";
-import type { SkillManagerV2 } from "./server/runtime/compat/SkillManagerV2";
+import { bootstrapRuntimeSync } from "./server/runtime/bootstrap.js";
+import { Observability } from "./server/runtime/Observability.js";
 
 // Importer toutes les skills pour l'initialisation
-import { automationSkill } from "./server/skills/automation";
-import { browserSkill } from "./server/skills/browser";
-import { codebaseSkill } from "./server/skills/codebase";
-import { githubSkill } from "./server/skills/github";
-import { guidelinesSkill } from "./server/skills/guidelines";
-import { historySkill } from "./server/skills/history";
-import { knowledgeSkill } from "./server/skills/knowledge";
-import { listSkill } from "./server/skills/list";
-import { memorySkill } from "./server/skills/memory";
-import { reasoningSkill } from "./server/skills/reasoning";
-import { systemSkill } from "./server/skills/system";
-import { timeSkill } from "./server/skills/time";
-import { verifySkill } from "./server/skills/verify";
-import { weatherSkill } from "./server/skills/weather";
-import { projectSkill } from "./server/skills/project";
-import { agentsSkill } from "./server/skills/agents";
-import { missionSkill } from "./server/skills/mission";
-import { aiStudioDirectivesSkill } from "./server/skills/aiStudioDirectives";
-import { documentLinkerSkill } from "./server/skills/documentLinker";
-import { documentKnowledgeSkill } from "./server/skills/documentKnowledge";
-import { richDocumentSkill } from "./server/skills/richDocument";
+import { automationSkill } from "./server/skills/automation.js";
+import { browserSkill } from "./server/skills/browser.js";
+import { codebaseSkill } from "./server/skills/codebase.js";
+import { githubSkill } from "./server/skills/github.js";
+import { guidelinesSkill } from "./server/skills/guidelines.js";
+import { historySkill } from "./server/skills/history.js";
+import { knowledgeSkill } from "./server/skills/knowledge.js";
+import { listSkill } from "./server/skills/list.js";
+import { memorySkill } from "./server/skills/memory.js";
+import { reasoningSkill } from "./server/skills/reasoning.js";
+import { systemSkill } from "./server/skills/system.js";
+import { timeSkill } from "./server/skills/time.js";
+import { verifySkill } from "./server/skills/verify.js";
+import { weatherSkill } from "./server/skills/weather.js";
+import { projectSkill } from "./server/skills/project.js";
+import { agentsSkill } from "./server/skills/agents.js";
+import { missionSkill } from "./server/skills/mission.js";
+import { aiStudioDirectivesSkill } from "./server/skills/aiStudioDirectives.js";
+import { documentLinkerSkill } from "./server/skills/documentLinker.js";
+import { documentKnowledgeSkill } from "./server/skills/documentKnowledge.js";
+import { richDocumentSkill } from "./server/skills/richDocument.js";
 
-const { runtime, skillManager, prompts } = bootstrapRuntimeSync({
+const { runtime, skillManager } = bootstrapRuntimeSync({
   skills: [
     automationSkill, browserSkill, codebaseSkill, githubSkill,
     guidelinesSkill, historySkill, knowledgeSkill, listSkill,
@@ -276,9 +274,9 @@ const { runtime, skillManager, prompts } = bootstrapRuntimeSync({
     
     // Initialiser le Mission System (doit être fait après que les outils soient enregistrés)
     try {
-      const missionModule = await import("./server/mission");
+      const missionModule = await import("./server/mission/index.js");
       const { Executor } = missionModule;
-      const { initMissionSystem } = await import("./server/skills/mission");
+      const { initMissionSystem } = await import("./server/skills/mission.js");
       const executor = new Executor();
       executor.setSkillHandler((name: string, args: any) => sm.handleToolCall(name, args));
       const skillNames = sm.getToolDeclarations().map((d: any) => d.name);
@@ -304,7 +302,7 @@ observability.attach(runtime.events);
 agentOrchestrator.setSkillHandler((name: string, args: any) => skillManager.handleToolCall(name, args));
 
 // Connecter le Workflow Engine
-import { setWorkflowSkillHandler } from "./server/skills/workflow";
+import { setWorkflowSkillHandler } from "./server/skills/workflow.js";
 setWorkflowSkillHandler((name: string, args: any) => skillManager.handleToolCall(name, args));
 
 console.log(`[Server] ✓ AgentOrchestrator et Workflow Engine connectés au nouveau SkillManagerV2.`);
@@ -383,7 +381,7 @@ try {
 } catch { /* non bloquant */ }
 
 // Wire checkpoint git guard avec le profil courant
-import("./server/utils/checkpoint").then(({ setCheckpointProfileGetter }) => {
+import("./server/utils/checkpoint.js").then(({ setCheckpointProfileGetter }) => {
   setCheckpointProfileGetter(() => currentProfile);
 }).catch(() => {});
 
@@ -472,8 +470,8 @@ async function startServer() {
   app.use("/api/agents", createAgentsRouter(skillManager));
 
   // ─── Routes Runtime V2 (nouveau système, coexistence) ────────────────────
-  const { createAgentsRouterV2 } = await import("./server/runtime/routes/agents");
-  const { createMetricsRouter } = await import("./server/runtime/routes/metrics");
+  const { createAgentsRouterV2 } = await import("./server/runtime/routes/agents.js");
+  const { createMetricsRouter } = await import("./server/runtime/routes/metrics.js");
   app.use("/api/v2/agents", createAgentsRouterV2(runtimeV2));
   app.use("/api/v2/metrics", createMetricsRouter(runtimeV2));
 
@@ -561,8 +559,8 @@ async function startServer() {
   // Il sera initialisé automatiquement lors du setSelfRoot() côté /api/self-root/change.
   if (hasProject()) {
     try {
-      const sandboxModule = await import("./server/utils/sandbox");
-      const sandboxWatcherModule = await import("./server/utils/sandboxWatcher");
+      const sandboxModule = await import("./server/utils/sandbox.js");
+      const sandboxWatcherModule = await import("./server/utils/sandboxWatcher.js");
       const sandboxRoot = sandboxModule.getSandboxRoot();
       if (fs.existsSync(sandboxRoot)) {
         sandboxWatcherModule.startWatching();
@@ -654,7 +652,7 @@ async function startServer() {
   setupTerminalWebSocket(terminalWss, apiToken);
 
   // ── Agent Orchestrator: broadcaster d'événements vers les clients WebSocket ──
-  agentOrchestrator.setEventBroadcaster((event) => {
+  agentOrchestrator.setEventBroadcaster((event: any) => {
     const payload = JSON.stringify(event);
     for (const client of wss.clients) {
       if (client.readyState === WebSocket.OPEN) {
