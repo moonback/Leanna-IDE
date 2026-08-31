@@ -199,7 +199,7 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
             const isFail = step.status === 'failed';
             const color = isRun ? 'var(--color-accent-alt)' : isDone ? 'var(--color-success)' : isFail ? 'var(--color-error)' : 'var(--text-muted)';
             return (
-              <div key={step.index} className="flex items-baseline gap-2">
+              <div key={step.id} className="flex items-baseline gap-2">
                 {isRun
                   ? <Loader2 style={{ width: 9, height: 9, color, flexShrink: 0 }} className={reduceMotion ? '' : 'animate-spin mt-px'} />
                   : isDone
@@ -229,12 +229,12 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
         <div className="flex items-center gap-1.5 px-3 pb-2">
           {reduceMotion ? (
             [0, 1, 2].map(i => (
-              <div key={i} className="w-1 h-1 rounded-full" style={{ backgroundColor: 'var(--color-accent-alt)', opacity: 0.6 }} />
+              <div key={`dot-${i}`} className="w-1 h-1 rounded-full" style={{ backgroundColor: 'var(--color-accent-alt)', opacity: 0.6 }} />
             ))
           ) : (
             [0, 1, 2].map(i => (
               <motion.div
-                key={i}
+                key={`dot-${i}`}
                 className="w-1 h-1 rounded-full"
                 style={{ backgroundColor: 'var(--color-accent-alt)' }}
                 animate={{ opacity: [0.3, 1, 0.3] }}

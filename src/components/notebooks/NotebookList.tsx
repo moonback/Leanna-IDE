@@ -256,7 +256,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
-                key={i}
+                key={`skeleton-${i}`}
                 className="rounded-2xl border overflow-hidden"
                 style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-card-bg)' }}
               >
