@@ -105,6 +105,8 @@ function createWindow(splash, splashMinEnd) {
     icon: getWindowIcon(),
   });
 
+  win.maximize();
+
   const port = process.env.VITE_SERVER_PORT || 4000;
   const startUrl = process.env.ELECTRON_START_URL || `http://127.0.0.1:${port}`;
   log('Loading URL:', startUrl);
@@ -123,6 +125,7 @@ function createWindow(splash, splashMinEnd) {
       if (splash && !splash.isDestroyed()) {
         splash.close();
       }
+      win.maximize();
       win.show();
       win.focus();
     }, remaining);
