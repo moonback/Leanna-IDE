@@ -8,7 +8,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BookOpen, RefreshCw, Loader2, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
-import { sanitizeMarkdownHtml, safeMarkdownParse } from '../../utils/sanitizeMarkdownHtml';
+import { safeMarkdownParse } from '../../utils/sanitizeMarkdownHtml';
 
 interface Props {
   notebookId: string;
