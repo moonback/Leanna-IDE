@@ -12,6 +12,7 @@
  *   import { sanitizeMarkdownHtml } from '../utils/sanitizeMarkdownHtml';
  *   const safeHtml = sanitizeMarkdownHtml(marked.parse(text));
  */
+import { marked } from 'marked';
 
 // Allowed HTML tags for markdown rendering
 export const ALLOWED_TAGS = new Set([
