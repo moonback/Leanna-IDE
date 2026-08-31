@@ -31,7 +31,7 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 | :--- | :--- | :--- | :--- |
 | **P0** | Sécurisation et fiabilisation des endpoints sans validation de schéma | ✅ Livré (Sprint 1) | Middleware `validateBody` et schémas Zod déployés sur les routeurs critiques (`custom-agents`, `mcp`, `agents`, `tts`). Extension progressive aux autres routeurs secondaires. |
 | **P0** | Définition d'un pipeline CI/CD automatisé | 📋 Planifié | Aucun workflow de test ou de build automatique n'est configuré dans `.github/workflows`. |
-| **P1** | Finalisation de la migration Runtime V2 | 🚧 En cours | Coexistence actuelle entre `SkillManager` V1 et `SkillManagerV2` / `ToolRegistry` nécessitant une unification définitive. |
+| **P1** | Finalisation de la migration Runtime V2 | ✅ Livré | Unification complète sur `SkillManagerV2` / `ToolRegistry` (`server/runtime/`) et suppression de l'ancien `SkillManager` V1 obsolète. |
 | **P1** | Couverture de tests e2e pour les WebSockets | 📋 Planifié | Les tests actuels couvrent principalement les utilitaires unitaires (`server/**/*.test.ts`) mais manquent d'intégration sur `/live` et `/terminal`. |
 | **P2** | Nettoyage des routes Git désactivées | 📋 Planifié | Le routeur `/api/git` retourne actuellement un code 404 hardcodé ; il doit être soit supprimé, soit réintégré proprement via l'API GitHub. |
 | **P2** | Optimisation du cache d'embeddings Notebooks | 🚧 En cours | Réduction de la latence lors de la réindexation de gros volumes documentaires. |
@@ -62,8 +62,7 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
    - *Impact* : Incertitude juridique sur la distribution et l'usage open-source.
    - *Action recommandée* : Ajouter un fichier `LICENSE` (ex: Apache-2.0 ou MIT) à la racine du dépôt.
 2. **Coexistence de deux systèmes de runtime (`server/skills/SkillManager.ts` vs `server/runtime/`)**
-   - *Impact* : Complexité de maintenance et surcharge mémoire lors du chargement des modules.
-   - *Action recommandée* : Achever la dépréciation de `SkillManager` V1 au profit exclusif de `bootstrapRuntimeSync`.
+   - *Statut* : ✅ **Résolu** — `SkillManager` V1 supprimé au profit exclusif de `SkillManagerV2` / `ToolRegistry`.
 3. **Routeur `/api/git` désactivé de manière abrupte**
    - *Impact* : Incohérence dans l'API REST retournant une erreur 404 statique.
    - *Action recommandée* : Nettoyer les routes mortes ou documenter formellement la bascule vers `/api/github`.

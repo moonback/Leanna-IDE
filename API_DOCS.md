@@ -272,7 +272,7 @@ curl -X GET "http://127.0.0.1:4000/api/ide/file?path=package.json" \
 ```json
 {
   "path": "package.json",
-  "content": "{\n  \"name\": \"Leanna\",\n  \"version\": \"0.6.0\"\n}"
+  "content": "{\n  \"name\": \"Leanna\",\n  \"version\": \"0.7.0\"\n}"
 }
 ```
 

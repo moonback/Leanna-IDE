@@ -15,7 +15,7 @@ Leanna est un IDE augmenté par l'IA et un système d'exploitation pour dévelop
 
 ## Badges
 
-[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](package.json)
+[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](package.json)
 [![Runtime](https://img.shields.io/badge/node-%3E%3D22.0.0-green.svg)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0.0-3178C6.svg)](tsconfig.json)
 [![Framework](https://img.shields.io/badge/React-19.0.1-61DAFB.svg)](package.json)
