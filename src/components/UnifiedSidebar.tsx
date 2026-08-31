@@ -312,8 +312,8 @@ function IDEToolsSections({
   assistantConnected,
   skipAnimation,
 }: {
-  state: import('./sidebar/types').IDEPanelState;
-  actions: import('./sidebar/types').IDEPanelActions;
+  state: import('./sidebar/types.js').IDEPanelState;
+  actions: import('./sidebar/types.js').IDEPanelActions;
   assistantConnected: boolean;
   skipAnimation: boolean;
 }) {
