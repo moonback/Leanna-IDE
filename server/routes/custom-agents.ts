@@ -6,6 +6,7 @@
 import type { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
+import { z } from "zod";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 import { dynamicAgentRegistry } from "../agents/DynamicAgentRegistry.js";
 import { agentRegistry } from "../agents/AgentRegistry.js";
@@ -13,6 +14,32 @@ import { getAgentDefinition } from "../agents/roles.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("CustomAgentsAPI");
+
+// ── Schémas de validation ────────────────────────────────────────────────────
+
+/** Schéma d'un agent personnalisé à créer */
+const AgentDraftSchema = z.object({
+  name: z.string().min(1, "Le nom est requis"),
+  role: z.string().min(1, "Le rôle est requis").regex(/^[a-zA-Z0-9_-]+$/, "Le rôle ne peut contenir que des lettres, chiffres, tirets et underscores"),
+  description: z.string().optional(),
+  systemPrompt: z.string().optional(),
+  capabilities: z.array(z.string()).optional(),
+  tools: z.array(z.string()).optional(),
+  maxConcurrency: z.number().int().min(1).max(10).optional(),
+  defaultTimeoutMs: z.number().int().min(1000).max(600_000).optional(),
+  triggerKeywords: z.array(z.string()).optional(),
+});
+
+/** Schéma de mise à jour partielle d'un agent (toutes les clés sont optionnelles) */
+const AgentUpdateSchema = AgentDraftSchema.partial().strict();
+
+/** Schéma d'import d'agents en masse */
+const AgentImportSchema = z.object({
+  agents: z.array(z.object({
+    name: z.string().min(1),
+    role: z.string().min(1).regex(/^[a-zA-Z0-9_-]+$/),
+  }).passthrough()),
+});
 
 function getAgentsFilePath(): string {
   return path.join(SELF_ROOT, ".Leanna", "custom-agents.json");
@@ -111,23 +138,30 @@ export function handleListAgents(_req: Request, res: Response): void {
 /** POST /api/custom-agents — Créer un nouvel agent */
 export function handleCreateAgent(req: Request, res: Response): void {
   try {
-    const draft = req.body;
-    if (!draft?.name || !draft?.role) {
-      return res.status(400).json({ error: "name et role sont requis" });
+    const parsed = AgentDraftSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "Corps de requête invalide.",
+        details: parsed.error.errors.map((e) => ({ field: e.path.join(".") || "(root)", message: e.message })),
+      });
+      return;
     }
+    const draft = parsed.data;
     
     // Vérifier que le rôle n'existe pas déjà dans les agents statiques
     if (getAgentDefinition(draft.role)) {
-      return res.status(409).json({
+      res.status(409).json({
         error: `Le rôle "${draft.role}" est déjà utilisé par un agent statique`,
       });
+      return;
     }
     
     // Vérifier que le rôle n'existe pas déjà dans les agents dynamiques
     if (dynamicAgentRegistry.hasAgent(draft.role)) {
-      return res.status(409).json({
+      res.status(409).json({
         error: `Le rôle "${draft.role}" est déjà enregistré comme agent personnalisé`,
       });
+      return;
     }
     
     const agents = readAgents();
@@ -178,7 +212,15 @@ export function handleCreateAgent(req: Request, res: Response): void {
 export function handleUpdateAgent(req: Request, res: Response): void {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const parsed = AgentUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "Corps de requête invalide.",
+        details: parsed.error.errors.map((e) => ({ field: e.path.join(".") || "(root)", message: e.message })),
+      });
+      return;
+    }
+    const updates = parsed.data;
     const agents = readAgents();
     const idx = agents.findIndex((a: any) => a.id === id);
     if (idx === -1) {
@@ -236,8 +278,15 @@ export function handleDeleteAgent(req: Request, res: Response): void {
 /** POST /api/custom-agents/import — Importer des agents depuis JSON */
 export function handleImportAgents(req: Request, res: Response): void {
   try {
-    const imported = req.body?.agents;
-    if (!Array.isArray(imported)) return res.status(400).json({ error: "Format invalide, attendu { agents: [...] }" });
+    const parsed = AgentImportSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "Format invalide, attendu { agents: [...] }",
+        details: parsed.error.errors.map((e) => ({ field: e.path.join(".") || "(root)", message: e.message })),
+      });
+      return;
+    }
+    const imported = parsed.data.agents;
 
     const agents = readAgents();
     let count = 0;
@@ -265,16 +314,17 @@ export function handleImportAgents(req: Request, res: Response): void {
         
         // Enregistrer dans le registre dynamique
         try {
+          const anyItem = item as any;
           dynamicAgentRegistry.registerAgent({
             role: item.role,
             name: item.name,
-            description: item.description || '',
-            systemPrompt: item.systemPrompt || '',
-            capabilities: item.capabilities || item.tools || [],
-            maxConcurrency: item.maxConcurrency ?? 2,
-            defaultTimeoutMs: item.defaultTimeoutMs ?? 60_000,
+            description: anyItem.description || '',
+            systemPrompt: anyItem.systemPrompt || '',
+            capabilities: anyItem.capabilities || anyItem.tools || [],
+            maxConcurrency: anyItem.maxConcurrency ?? 2,
+            defaultTimeoutMs: anyItem.defaultTimeoutMs ?? 60_000,
             version: "1.0.0",
-            tags: item.triggerKeywords || [],
+            tags: anyItem.triggerKeywords || [],
             isActive: true,
             author: "agent-builder",
           });

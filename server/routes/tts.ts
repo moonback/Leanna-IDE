@@ -8,7 +8,25 @@
  */
 
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { generateSpeech, generateSpeechStreaming, getTTSStats, clearTTSCache } from "../utils/geminiTTS.js";
+
+// ── Schémas de validation ────────────────────────────────────────────────────
+
+const TtsSpeakSchema = z.object({
+  text: z.string().min(1, "Le champ 'text' est requis").max(10_000, "Le texte est trop long (max 10 000 caractères). Utilisez /speak-stream."),
+  voice: z.string().optional(),
+  speed: z.number().min(0.25).max(4.0).optional(),
+  provider: z.string().optional(),
+  noCache: z.boolean().optional(),
+});
+
+const TtsSpeakStreamSchema = z.object({
+  text: z.string().min(1, "Le champ 'text' est requis"),
+  voice: z.string().optional(),
+  speed: z.number().min(0.25).max(4.0).optional(),
+  provider: z.string().optional(),
+});
 
 export function createTTSRouter(): Router {
   const router = Router();
@@ -20,21 +38,19 @@ export function createTTSRouter(): Router {
    */
   router.post("/speak", async (req: Request, res: Response) => {
     try {
-      const { text, voice, speed, provider, noCache } = req.body;
-
-      if (!text || typeof text !== "string" || text.trim().length === 0) {
-        res.status(400).json({ error: "Le champ 'text' est requis et ne peut pas être vide." });
+      const parsed = TtsSpeakSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Corps de requête invalide.",
+          details: parsed.error.errors.map((e) => ({ field: e.path.join(".") || "(root)", message: e.message })),
+        });
         return;
       }
-
-      if (text.length > 10_000) {
-        res.status(400).json({ error: "Le texte est trop long (max 10 000 caractères). Utilisez /speak-stream." });
-        return;
-      }
+      const { text, voice, speed, provider, noCache } = parsed.data;
 
       const audio = await generateSpeech(text, {
         voiceName: voice,
-        speed: speed ? Number(speed) : undefined,
+        speed,
         provider: provider as any,
         noCache: !!noCache,
       });
@@ -57,12 +73,15 @@ export function createTTSRouter(): Router {
    */
   router.post("/speak-stream", async (req: Request, res: Response) => {
     try {
-      const { text, voice, speed, provider } = req.body;
-
-      if (!text || typeof text !== "string" || text.trim().length === 0) {
-        res.status(400).json({ error: "Le champ 'text' est requis." });
+      const parsed = TtsSpeakStreamSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Corps de requête invalide.",
+          details: parsed.error.errors.map((e) => ({ field: e.path.join(".") || "(root)", message: e.message })),
+        });
         return;
       }
+      const { text, voice, speed, provider } = parsed.data;
 
       // Setup SSE
       res.setHeader("Content-Type", "text/event-stream");
@@ -73,7 +92,7 @@ export function createTTSRouter(): Router {
 
       const generator = generateSpeechStreaming(text, {
         voiceName: voice,
-        speed: speed ? Number(speed) : undefined,
+        speed,
         provider: provider as any,
       });
 

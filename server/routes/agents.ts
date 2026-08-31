@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2.js';
 import {
   agentOrchestrator,
@@ -14,6 +15,28 @@ import {
   getToolsForAgent,
 } from '../agents/index.js';
 import { AgentPersistence } from '../agents/AgentPersistence.js';
+
+// ── Schémas de validation ────────────────────────────────────────────────────
+
+const CollaborateSchema = z.object({
+  patternName: z.string().min(1, "patternName requis"),
+  context: z.object({
+    title: z.string().min(1, "context.title requis"),
+    description: z.string().min(1, "context.description requis"),
+    files: z.array(z.string()).optional(),
+    instructions: z.string().optional(),
+  }),
+});
+
+const DelegateSchema = z.object({
+  role: z.string().min(1, "role requis"),
+  title: z.string().min(1, "title requis"),
+  description: z.string().min(1, "description requis"),
+  files: z.array(z.string()).optional(),
+  instructions: z.string().optional(),
+  priority: z.enum(["low", "normal", "high", "critical"]).optional(),
+  timeoutMs: z.number().int().min(0).optional(),
+});
 
 // Type compatible avec l'ancien SkillManager pour une migration progressive
 type SkillManager = SkillManagerV2;
@@ -121,21 +144,14 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    */
   router.post('/collaborate', async (req: Request, res: Response) => {
     try {
-      const { patternName, context } = req.body as {
-        patternName: string;
-        context: {
-          title: string;
-          description: string;
-          files?: string[];
-          instructions?: string;
-        };
-      };
-
-      if (!patternName || !context?.title || !context?.description) {
+      const parsed = CollaborateSchema.safeParse(req.body);
+      if (!parsed.success) {
         return res.status(400).json({
-          error: 'patternName, context.title et context.description sont requis',
+          error: 'Corps de requête invalide.',
+          details: parsed.error.errors.map((e) => ({ field: e.path.join('.') || '(root)', message: e.message })),
         });
       }
+      const { patternName, context } = parsed.data;
 
       const plan = await agentOrchestrator.collaborateByPattern({ patternName, context });
       return res.status(202).json({
@@ -157,7 +173,14 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    */
   router.post('/delegate-autonomous', async (req: Request, res: Response) => {
     try {
-      const task = await agentOrchestrator.delegateAutonomously(req.body);
+      const parsed = DelegateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: 'Corps de requête invalide.',
+          details: parsed.error.errors.map((e) => ({ field: e.path.join('.') || '(root)', message: e.message })),
+        });
+      }
+      const task = await agentOrchestrator.delegateAutonomously(parsed.data);
       return res.status(202).json({
         taskId: task.id,
         role: task.role,

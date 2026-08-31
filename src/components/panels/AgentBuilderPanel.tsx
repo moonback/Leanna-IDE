@@ -45,9 +45,9 @@ const CAPABILITY_PRESETS = [
 const AVATAR_OPTIONS = ['🤖', '🧠', '⚡', '🔧', '🎯', '🛡️', '📝', '🔍', '🚀', '💡', '🎨', '🏗️', '📊', '🔬', '🌐', '🗂️'];
 
 const COLOR_OPTIONS = [
-  'var(--accent-secondary)', 'var(--color-success)', 'var(--color-error)', 'var(--color-warning)', 'var(--color-accent-alt)',
-  'var(--color-warning)', 'var(--accent-primary)', 'var(--color-error)', 'var(--color-success)', 'var(--color-accent-alt)',
-  'var(--accent-secondary)', 'var(--color-accent-alt)', 'var(--color-warning)', 'var(--accent-secondary)', 'var(--color-success)',
+  '#6366f1', '#3b82f6', '#0ea5e9', '#06b6d4', '#14b8a6',
+  '#10b981', '#84cc16', '#eab308', '#f59e0b', '#f97316',
+  '#ef4444', '#ec4899', '#d946ef', '#a855f7', '#8b5cf6',
 ];
 
 const MODEL_OPTIONS = [
@@ -64,7 +64,7 @@ const EMPTY_DRAFT: CustomAgentDraft = {
   role: '',
   description: '',
   avatar: '🤖',
-  color: 'var(--accent-secondary)',
+  color: '#6366f1',
   systemPrompt: '',
   capabilities: [],
   tools: [],
