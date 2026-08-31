@@ -370,13 +370,13 @@ export class AgentExecutor {
   }
 
     // ─── Helpers internes ───────────────────────────────────────────────────
-  private static readonly MAX_TOOL_TURNS = 8;
+  private static readonly MAX_TOOL_TURNS = 10;
   /** Taille maximale d’une observation cumulée envoyée au modèle suivant. */
   private static readonly MAX_OBSERVATION_CHARS = 80_000;
   /** Limite de sécurité par snapshot, supérieure aux composants UI usuels. */
   private static readonly MAX_FILE_CONTEXT_CHARS = 50_000;
   /** Limite maximale de fichiers dans le contexte incrémental */
-  private static readonly MAX_FILES_IN_CONTEXT = 5;
+  private static readonly MAX_FILES_IN_CONTEXT = 10;
 
   private async executeToolLoop(
     agent: { name: string; capabilities: string[] },
