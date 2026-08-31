@@ -57,6 +57,7 @@ Leanna est un environnement de développement intégré (IDE) et système d'expl
 
 ### Fonctionnalités développeur
 * **Orchestration d'agents autonomes & Fleet** : Architecture multi-agents (Architecte, Développeur, Testeur, Sécurité, etc.) communicant via un bus de messages interne (`agentMessageBus`).
+* **Knowledge System & Analyse Syntaxique Tree-sitter** : Indexation AST WASM incrémentale du codebase, cartographie bidirectionnelle des appels (`ASTCallGraph`), extraction de signatures typées, chaînes d'appels BFS et détection des dépendances intra-classe (`this.method()`).
 * **Runtime V2 & Extensibilité Skills** : Système unifié de déclaration et d'exécution d'outils (`ToolRegistry`, `SkillManagerV2`), supportant les custom skills créés à la volée.
 * **Passerelle MCP (Model Context Protocol)** : Connexion à des serveurs MCP tiers (stdio / SSE) pour étendre les outils disponibles tout en appliquant une validation de chemin stricte.
 * **Garde-fous & Checkpoints Git automatiques** : Snapshots Git créés avant chaque modification destructive, détection de boucles de correction via le `Supervisor` et confirmation utilisateur pour les fichiers critiques.

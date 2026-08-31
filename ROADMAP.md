@@ -13,6 +13,8 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 * [x] **Éditeur de code Monaco Editor** (`src/views/IdeView.tsx`) : Navigation dans l'arborescence, recherche globale et modifications avec garde-fous.
 * [x] **Système d'Agents & Bus de Messages** (`server/agents/`) : Découplage des rôles, matrice de délégation et bus de communication inter-agents.
 * [x] **Gestionnaire de Notebooks & RAG** (`server/notebooks/`) : Ingestion multi-formats (PDF, TXT, MD, DOCX), chunking, recherche sémantique et génération de résumés/slides.
+* [x] **Indexation AST Incrémentale par Tree-sitter & Call-Graph** (`server/knowledge/ASTParser.ts`, `server/knowledge/ASTCallGraph.ts`) : Analyse syntaxique WASM fine des fonctions, signatures typées, dépendances intra/inter-fichiers et chaîne d'appels récursive.
+* [x] **Mode Multi-Workspace Sécurisé** (`server/utils/selfRoot.ts`, `server/routes/self-root.ts`) : Gestion multi-projets avec isolation stricte, persistance dans `workspaces.json` et garde-fous sandbox.
 * [x] **Journalisation d'Audit NDJSON** (`server/audit.ts`) : Enregistrement de chaque action avec horodatage et détails.
 * [x] **Circuit Breaker HTTP Frontend** (`src/main.tsx`) : Protection contre la saturation de sockets TCP en cas d'indisponibilité backend.
 * [x] **Intégration Electron Desktop** (`electron/main.cjs`, `electron/preload.cjs`) : Packaging Windows NSIS, splash screen et bridge IPC.
@@ -37,9 +39,8 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 ## V2+ — Long terme (Évolutions structurelles)
 
 * 💡 **Idée : Support natif de conteneurs Docker pour le Sandbox** : Remplacer l'isolation par dossier miroir `.Leanna/sandbox` par des conteneurs éphémères légers pour isoler également l'exécution des commandes shell `run_project_command`.
-* 💡 **Idée : Indexation AST incrémentale par Treesitter** : Améliorer le `KnowledgeGraph` en analysant les arbres de syntaxe abstraite complets pour une cartographie des dépendances inter-fonctions encore plus fine.
-* 💡 **Idée : Mode Multi-Workspace sécurisé** : Permettre l'ouverture de dépôts externes tout en conservant le modèle de garde-fous et de validation stricte de `selfRoot`.
 * 💡 **Idée : Support multi-fournisseurs voix locale** : Intégration de modèles vocaux locaux (ex: Whisper / Piper) pour réduire la dépendance au cloud en mode hors-ligne.
+
 
 ---
 

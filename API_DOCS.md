@@ -699,6 +699,100 @@ Oui — `x-leanna-token`
 
 ---
 
+## Knowledge System & Call-Graph AST
+
+### `GET /api/knowledge/health`
+
+#### Description
+Scanne l'état de santé du graphe de connaissances, la mémoire projet, les cycles de dépendances et les métadonnées du workspace.
+
+#### Réponse succès (200 OK)
+```json
+{
+  "status": "success",
+  "health": { "overall": "healthy", "isInitialized": true, "warnings": [] },
+  "knowledgeGraph": { "totalFiles": 515, "totalEntities": 8359, "totalLines": 72400 },
+  "dependencyGraph": { "cycleCount": 0, "cycles": [] },
+  "projectMemory": { "totalFacts": 24, "structuralFacts": 8 }
+}
+```
+
+---
+
+### `GET /api/knowledge/ast/stats`
+
+#### Description
+Retourne les métriques globales du moteur Tree-sitter et du graphe d'appels bidirectionnel.
+
+#### Réponse succès (200 OK)
+```json
+{
+  "status": "success",
+  "astReady": true,
+  "stats": {
+    "totalNodes": 4337,
+    "totalEdges": 31028,
+    "resolvedEdges": 5405,
+    "crossFileEdges": 1935
+  }
+}
+```
+
+---
+
+### `GET /api/knowledge/ast/functions`
+
+#### Description
+Recherche et liste les fonctions, méthodes et composants indexés par Tree-sitter avec leurs plages de lignes et signatures typées.
+
+#### Paramètres Query
+* `q` *(optionnel)* : Mot-clé ou nom de fonction.
+* `file` *(optionnel)* : Filtre par sous-chemin de fichier.
+* `limit` *(optionnel, défaut 50)* : Nombre max de résultats.
+
+---
+
+### `GET /api/knowledge/ast/callers`
+
+#### Description
+Trouve toutes les fonctions qui appellent une fonction donnée (analyse d'impact / appelants).
+
+#### Paramètres Query
+* `fn` *(requis)* : Nom de la fonction ou méthode.
+* `file` *(optionnel)* : Chemin du fichier.
+* `class` *(optionnel)* : Nom de la classe si méthode.
+
+---
+
+### `GET /api/knowledge/ast/callees`
+
+#### Description
+Trouve toutes les fonctions et méthodes appelées par une fonction donnée (y compris appels `this.method()`).
+
+#### Paramètres Query
+* `fn` *(requis)* : Nom de la fonction source.
+* `file` *(optionnel)* : Chemin du fichier.
+
+---
+
+### `GET /api/knowledge/ast/chain`
+
+#### Description
+Déroule l'arborescence complète et récursive des appels (BFS) à partir d'une fonction racine jusqu'à N niveaux de profondeur.
+
+#### Paramètres Query
+* `fn` *(requis)* : Fonction racine.
+* `depth` *(optionnel, défaut 4)* : Profondeur de recherche BFS.
+
+---
+
+### `POST /api/knowledge/reindex`
+
+#### Description
+Déclenche une réindexation complète du projet par `ProjectIndexer` et reconstruit le `KnowledgeGraph` et l'arbre AST Tree-sitter.
+
+---
+
 ## Interfaces Non-HTTP
 
 ### WebSocket `/live` (Gemini Live API Bridge)

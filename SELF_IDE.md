@@ -138,13 +138,29 @@ scheduleValidation();
 
 ---
 
-## 5. Sandboxing MCP (Phase 4)
+## 5. Moteur AST Tree-sitter & Call-Graph
+
+Leanna analyse le codebase en profondeur grâce au moteur **Tree-sitter WASM** (`server/knowledge/ASTParser.ts`) et au graphe d'appels bidirectionnel (`server/knowledge/ASTCallGraph.ts`).
+
+### Outils disponibles pour l'assistant :
+
+| Outil | Usage |
+|---|---|
+| `knowledge_ast_callers` | Trouve tous les appelants d'une fonction (qui en dépend ?) |
+| `knowledge_ast_callees` | Trouve toutes les fonctions appelées par une fonction |
+| `knowledge_ast_call_chain` | Déroule l'arbre récursif BFS d'exécution |
+| `knowledge_ast_file_inspect` | Inspecte l'AST d'un fichier (signatures typées, plages de lignes, classes) |
+| `knowledge_build_context` | Collecte le contexte optimal (fichiers, faits, AST) pour une mission |
+
+---
+
+## 6. Sandboxing MCP (Phase 4)
 
 Les serveurs MCP externes peuvent exposer des outils qui reçoivent des chemins. `McpBridge.sanitizePathArgs()` intercepte tous les arguments dont la clé ressemble à un chemin (`path`, `file`, `dir`, `cwd`, `target`, `source`, `destination`…) et vérifie qu'ils restent dans `SELF_ROOT`. Un chemin hors périmètre lève une erreur avant l'appel du tool.
 
 ---
 
-## 6. Configuration développeur
+## 7. Configuration développeur
 
 En développement uniquement, vous pouvez surcharger le root pour les tests :
 
