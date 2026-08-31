@@ -54,22 +54,335 @@ function resolveLeannaAppRoot(): string {
 const Leanna_APP_ROOT = resolveLeannaAppRoot();
 export { Leanna_APP_ROOT };
 
-// ── Persistance du projet sélectionné ────────────────────────────────────────
+// ── Persistance du projet sélectionné et Registre Multi-Workspace ────────────
 
 /**
  * Fichier de config interne (dans le dossier Leanna) qui mémorise
  * le dernier projet sélectionné par l'utilisateur.
- * IMPORTANT : situé dans le .Leanna/ du repo Leanna lui-même,
- * pas dans le workspace projet.
  */
 function getPersistedProjectPath(): string {
   return path.join(Leanna_APP_ROOT, ".Leanna", "lastProject.json");
+}
+
+/**
+ * Fichier de config interne qui mémorise la liste de tous les workspaces connus.
+ */
+function getPersistedWorkspacesPath(): string {
+  return path.join(Leanna_APP_ROOT, ".Leanna", "workspaces.json");
+}
+
+export interface WorkspaceEntry {
+  id: string;
+  name: string;
+  path: string;
+  siteUrl?: string;
+  lastOpened: string;
+  createdAt: string;
+  isGit: boolean;
+  gitBranch?: string;
+}
+
+export interface WorkspaceValidationResult {
+  valid: boolean;
+  resolvedPath: string | null;
+  error?: string;
+  isGit: boolean;
+  gitBranch?: string;
+  hasPackageJson: boolean;
+  hasTsConfig: boolean;
+  suspiciousSymlinksCount: number;
 }
 
 interface PersistedProjectData {
   projectRoot: string;
   /** URL optionnelle du site associé au projet (docs, app déployée, etc.) */
   siteUrl?: string;
+}
+
+function generateWorkspaceId(targetPath: string): string {
+  const normalized = path.resolve(targetPath).toLowerCase().replace(/\\/g, "/");
+  let hash = 0;
+  for (let i = 0; i < normalized.length; i++) {
+    hash = (hash << 5) - hash + normalized.charCodeAt(i);
+    hash |= 0;
+  }
+  const cleanName = path.basename(targetPath).toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+  return `${cleanName || "workspace"}_${Math.abs(hash).toString(36)}`;
+}
+
+export function loadWorkspaces(): WorkspaceEntry[] {
+  try {
+    const configPath = getPersistedWorkspacesPath();
+    if (!fs.existsSync(configPath)) return [];
+    const data = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    if (Array.isArray(data)) {
+      return data.filter(
+        (item): item is WorkspaceEntry =>
+          Boolean(item && typeof item.path === "string" && typeof item.id === "string")
+      );
+    }
+  } catch (e) {
+    if (process.env.LOG_LEVEL === "debug") {
+      console.debug("[SelfRoot] loadWorkspaces ignoré:", (e as Error).message);
+    }
+  }
+  return [];
+}
+
+export function saveWorkspaces(workspaces: WorkspaceEntry[]): void {
+  try {
+    const configPath = getPersistedWorkspacesPath();
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify(workspaces, null, 2), "utf-8");
+  } catch (e: any) {
+    console.warn("[SelfRoot] Impossible de sauvegarder les workspaces:", e.message);
+  }
+}
+
+export function listWorkspaces(): WorkspaceEntry[] {
+  const workspaces = loadWorkspaces();
+  // Trier par date de dernier accès décroissante
+  return workspaces.sort(
+    (a, b) => new Date(b.lastOpened).getTime() - new Date(a.lastOpened).getTime()
+  );
+}
+
+export function addOrUpdateWorkspace(
+  projectPath: string,
+  siteUrl?: string,
+  customName?: string
+): WorkspaceEntry {
+  const resolved = path.resolve(projectPath);
+  const workspaces = loadWorkspaces();
+  const existingIndex = workspaces.findIndex(
+    (w) => path.resolve(w.path).toLowerCase() === resolved.toLowerCase()
+  );
+
+  const isGit = fs.existsSync(path.join(resolved, ".git"));
+  let gitBranch: string | undefined;
+  if (isGit) {
+    try {
+      const headPath = path.join(resolved, ".git", "HEAD");
+      if (fs.existsSync(headPath)) {
+        const headContent = fs.readFileSync(headPath, "utf-8").trim();
+        if (headContent.startsWith("ref: refs/heads/")) {
+          gitBranch = headContent.replace("ref: refs/heads/", "").trim();
+        } else {
+          gitBranch = headContent.substring(0, 7);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const now = new Date().toISOString();
+  let entry: WorkspaceEntry;
+
+  if (existingIndex >= 0) {
+    const existing = workspaces[existingIndex];
+    entry = {
+      ...existing,
+      path: resolved,
+      name: customName?.trim() || existing.name || path.basename(resolved) || "Workspace",
+      siteUrl: siteUrl !== undefined ? (siteUrl.trim() || undefined) : existing.siteUrl,
+      lastOpened: now,
+      isGit,
+      gitBranch: gitBranch || existing.gitBranch,
+    };
+    workspaces[existingIndex] = entry;
+  } else {
+    entry = {
+      id: generateWorkspaceId(resolved),
+      name: customName?.trim() || path.basename(resolved) || "Workspace",
+      path: resolved,
+      siteUrl: siteUrl?.trim() || undefined,
+      lastOpened: now,
+      createdAt: now,
+      isGit,
+      gitBranch,
+    };
+    workspaces.unshift(entry);
+  }
+
+  saveWorkspaces(workspaces);
+  return entry;
+}
+
+export function removeWorkspace(idOrPath: string): boolean {
+  const workspaces = loadWorkspaces();
+  const target = idOrPath.trim().toLowerCase();
+  const filtered = workspaces.filter(
+    (w) => w.id.toLowerCase() !== target && path.resolve(w.path).toLowerCase() !== path.resolve(idOrPath).toLowerCase()
+  );
+  if (filtered.length !== workspaces.length) {
+    saveWorkspaces(filtered);
+    return true;
+  }
+  return false;
+}
+
+export function updateWorkspaceMeta(
+  idOrPath: string,
+  updates: { name?: string; siteUrl?: string }
+): WorkspaceEntry | null {
+  const workspaces = loadWorkspaces();
+  const target = idOrPath.trim().toLowerCase();
+  const idx = workspaces.findIndex(
+    (w) => w.id.toLowerCase() === target || path.resolve(w.path).toLowerCase() === path.resolve(idOrPath).toLowerCase()
+  );
+  if (idx < 0) return null;
+
+  const current = workspaces[idx];
+  const updated: WorkspaceEntry = {
+    ...current,
+    name: updates.name?.trim() ? updates.name.trim() : current.name,
+    siteUrl: updates.siteUrl !== undefined ? (updates.siteUrl.trim() || undefined) : current.siteUrl,
+  };
+  workspaces[idx] = updated;
+  saveWorkspaces(workspaces);
+
+  // Si c'est le workspace actif, mettre à jour WORKSPACE_SITE_URL
+  if (path.resolve(current.path).toLowerCase() === path.resolve(SELF_ROOT).toLowerCase()) {
+    if (updates.siteUrl !== undefined) {
+      WORKSPACE_SITE_URL = updates.siteUrl.trim();
+    }
+  }
+
+  return updated;
+}
+
+/**
+ * Valide un chemin de workspace candidat avant ouverture.
+ * Empêche d'ouvrir des répertoires systèmes dangereux ou des chemins invalides.
+ */
+export async function validateWorkspacePath(candidatePath: string): Promise<WorkspaceValidationResult> {
+  if (!candidatePath || !candidatePath.trim()) {
+    return {
+      valid: false,
+      resolvedPath: null,
+      error: "Le chemin du dossier est requis.",
+      isGit: false,
+      hasPackageJson: false,
+      hasTsConfig: false,
+      suspiciousSymlinksCount: 0,
+    };
+  }
+
+  const resolved = path.resolve(candidatePath.trim());
+
+  // 1. Interdire les racines de disques ou répertoires système critiques
+  const isRootOrSystem = isProhibitedSystemPath(resolved);
+  if (isRootOrSystem) {
+    return {
+      valid: false,
+      resolvedPath: resolved,
+      error: `Ouverture refusée : '${resolved}' est un répertoire système ou une racine de disque protégé.`,
+      isGit: false,
+      hasPackageJson: false,
+      hasTsConfig: false,
+      suspiciousSymlinksCount: 0,
+    };
+  }
+
+  // 2. Vérifier existence et type dossier
+  if (!fs.existsSync(resolved)) {
+    return {
+      valid: false,
+      resolvedPath: resolved,
+      error: `Le chemin spécifié n'existe pas : ${resolved}`,
+      isGit: false,
+      hasPackageJson: false,
+      hasTsConfig: false,
+      suspiciousSymlinksCount: 0,
+    };
+  }
+
+  try {
+    const stat = fs.statSync(resolved);
+    if (!stat.isDirectory()) {
+      return {
+        valid: false,
+        resolvedPath: resolved,
+        error: `Le chemin spécifié n'est pas un dossier : ${resolved}`,
+        isGit: false,
+        hasPackageJson: false,
+        hasTsConfig: false,
+        suspiciousSymlinksCount: 0,
+      };
+    }
+  } catch (e: any) {
+    return {
+      valid: false,
+      resolvedPath: resolved,
+      error: `Impossible d'accéder au dossier : ${e.message}`,
+      isGit: false,
+      hasPackageJson: false,
+      hasTsConfig: false,
+      suspiciousSymlinksCount: 0,
+    };
+  }
+
+  // 3. Inspecter git, package.json, tsconfig.json
+  const isGit = fs.existsSync(path.join(resolved, ".git"));
+  let gitBranch: string | undefined;
+  if (isGit) {
+    try {
+      const headPath = path.join(resolved, ".git", "HEAD");
+      if (fs.existsSync(headPath)) {
+        const headContent = fs.readFileSync(headPath, "utf-8").trim();
+        if (headContent.startsWith("ref: refs/heads/")) {
+          gitBranch = headContent.replace("ref: refs/heads/", "").trim();
+        } else {
+          gitBranch = headContent.substring(0, 7);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const hasPackageJson = fs.existsSync(path.join(resolved, "package.json"));
+  const hasTsConfig = fs.existsSync(path.join(resolved, "tsconfig.json"));
+
+  return {
+    valid: true,
+    resolvedPath: resolved,
+    isGit,
+    gitBranch,
+    hasPackageJson,
+    hasTsConfig,
+    suspiciousSymlinksCount: 0,
+  };
+}
+
+/**
+ * Détecte si un chemin cible une racine de système ou un répertoire critique interdit.
+ */
+function isProhibitedSystemPath(resolved: string): boolean {
+  const norm = resolved.replace(/\\/g, "/").toLowerCase();
+  // Racines Windows ou POSIX: C:/, D:/, /
+  if (/^[a-z]:\/?$/i.test(norm) || norm === "/") {
+    return true;
+  }
+  // Répertoires Windows sensibles
+  const prohibitedPrefixes = [
+    "c:/windows",
+    "c:/program files",
+    "c:/program files (x86)",
+    "c:/programdata",
+    "/etc",
+    "/sys",
+    "/proc",
+    "/root",
+    "/bin",
+    "/sbin",
+    "/usr/bin",
+    "/usr/sbin",
+  ];
+  return prohibitedPrefixes.some(
+    (prefix) => norm === prefix || norm.startsWith(prefix + "/")
+  );
 }
 
 function loadPersistedProject(): PersistedProjectData | null {
@@ -147,6 +460,7 @@ export function initSelfRoot(): void {
     const override = process.env.Leanna_SELF_ROOT_OVERRIDE.trim();
     if (fs.existsSync(override) && fs.statSync(override).isDirectory()) {
       SELF_ROOT = path.resolve(override);
+      addOrUpdateWorkspace(SELF_ROOT, WORKSPACE_SITE_URL || undefined);
       console.log(`[SelfRoot] Override actif: ${SELF_ROOT}`);
       return;
     }
@@ -156,6 +470,7 @@ export function initSelfRoot(): void {
   if (persisted) {
     SELF_ROOT = persisted.projectRoot;
     WORKSPACE_SITE_URL = persisted.siteUrl ?? "";
+    addOrUpdateWorkspace(SELF_ROOT, WORKSPACE_SITE_URL || undefined);
     console.log(`[SelfRoot] Projet restauré: ${SELF_ROOT}`);
     if (WORKSPACE_SITE_URL) {
       console.log(`[SelfRoot] URL site: ${WORKSPACE_SITE_URL}`);
@@ -171,10 +486,14 @@ export function initSelfRoot(): void {
  * Change la racine du workspace à chaud.
  * Valide que le chemin existe et contient du code source.
  * siteUrl est optionnel — s'il est undefined, la valeur existante est conservée.
+ * Enregistre le workspace dans le registre multi-workspace.
  * Retourne le nouveau chemin ou lève une erreur.
  */
-export function setSelfRoot(newPath: string, siteUrl?: string): string {
+export function setSelfRoot(newPath: string, siteUrl?: string, customName?: string): string {
   const resolved = path.resolve(newPath);
+  if (isProhibitedSystemPath(resolved)) {
+    throw new Error(`Chemin interdit (racine ou répertoire système) : ${resolved}`);
+  }
   if (!fs.existsSync(resolved)) {
     throw new Error(`Le chemin n'existe pas: ${resolved}`);
   }
@@ -188,6 +507,8 @@ export function setSelfRoot(newPath: string, siteUrl?: string): string {
     WORKSPACE_SITE_URL = siteUrl.trim();
   }
   persistProject(resolved, WORKSPACE_SITE_URL || undefined);
+  // Enregistrer ou mettre à jour dans le registre multi-workspaces
+  addOrUpdateWorkspace(resolved, WORKSPACE_SITE_URL || undefined, customName);
   console.log(`[SelfRoot] Leanna root verrouillé: ${SELF_ROOT}`);
   if (WORKSPACE_SITE_URL) {
     console.log(`[SelfRoot] URL site persistée: ${WORKSPACE_SITE_URL}`);
@@ -202,6 +523,7 @@ export function setWorkspaceSiteUrl(url: string): void {
   WORKSPACE_SITE_URL = url.trim();
   if (SELF_ROOT) {
     persistProject(SELF_ROOT, WORKSPACE_SITE_URL || undefined);
+    addOrUpdateWorkspace(SELF_ROOT, WORKSPACE_SITE_URL || undefined);
   }
   console.log(`[SelfRoot] URL site mise à jour: ${WORKSPACE_SITE_URL || "(effacée)"}`);
 }
@@ -209,7 +531,7 @@ export function setWorkspaceSiteUrl(url: string): void {
 /**
  * Réinitialise le workspace : remet SELF_ROOT et WORKSPACE_SITE_URL à "" en mémoire
  * et supprime le fichier de persistance lastProject.json.
- * À appeler quand l'utilisateur veut changer de projet.
+ * Note : les entrées dans workspaces.json sont conservées pour permettre la re-sélection rapide.
  */
 export function resetSelfRoot(): void {
   SELF_ROOT = "";

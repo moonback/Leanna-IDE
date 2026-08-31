@@ -18,7 +18,8 @@
  */
 
 import path from "path";
-import type { EntityRelation, FileNode, CodeEntity } from "./types.js";
+import type { EntityRelation, FileNode, CodeEntity, ASTFileResult } from "./types.js";
+import { astCallGraph } from "./ASTCallGraph.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RelationExtractor
@@ -673,6 +674,118 @@ export class RelationExtractor {
       }
     }
     return best;
+  }
+
+  // ─── Relations d'appels AST ────────────────────────────────────────────────
+
+  /**
+   * Produit des EntityRelation de type "calls" à partir des résultats AST.
+   * Confiance = 0.95 (vs 0.80 pour les regex).
+   *
+   * Stratégie :
+   *  1. Pour chaque ASTCall résolu (inter-fichier), créer une relation calls
+   *  2. Pour les appels intra-fichier (this.method()), créer des relations intra
+   *  3. Dédupliquer par (caller, callee, sourceLine)
+   *
+   * @param astResults Map filePath → ASTFileResult (les fichiers parsés lors du scan)
+   * @param allFiles   Tous les FileNode du KnowledgeGraph (pour résolution)
+   */
+  extractASTCallRelations(
+    astResults: Map<string, ASTFileResult>,
+    allFiles: FileNode[]
+  ): EntityRelation[] {
+    const relations: EntityRelation[] = [];
+    const seenKeys = new Set<string>();
+
+    // Construire un index des fonctions exportées par fichier (pour la résolution)
+    const exportIndex = new Map<string, { filePath: string; type: FileNode["entities"][number]["type"] }>();
+    for (const file of allFiles) {
+      for (const entity of file.entities) {
+        if (entity.modifiers?.includes("export")) {
+          exportIndex.set(entity.name, { filePath: file.path, type: entity.type });
+        }
+      }
+    }
+
+    for (const [filePath, astResult] of astResults) {
+      if (astResult.usedFallback) continue;
+
+      // Relations inter-fichiers via le call-graph AST
+      const crossEdges = astCallGraph.getCrossFileCallEdges(filePath);
+      for (const edge of crossEdges) {
+        const key = `${edge.callerId}→${edge.calleeId}@${edge.sourceLine}`;
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+
+        const calleeNode = exportIndex.get(edge.calleeName);
+        relations.push({
+          source: {
+            name: edge.callerId.split("#")[1] ?? edge.callerId,
+            filePath,
+            type: "function",
+          },
+          target: {
+            name: edge.calleeName,
+            filePath: calleeNode?.filePath ?? `(external:${edge.calleeName})`,
+            type: (calleeNode?.type as any) ?? "function",
+          },
+          relationType: "calls",
+          confidence: edge.isResolved ? 0.95 : 0.75,
+          sourceLine: edge.sourceLine,
+        });
+      }
+
+      // Relations intra-fichier (this.method()) — graphe d'appels au sein d'une classe
+      relations.push(...this.extractIntraFileCallGraph(astResult));
+    }
+
+    return relations;
+  }
+
+  /**
+   * Extrait les relations d'appels intra-fichier depuis l'AST.
+   * Cible principalement les appels de méthode (this.foo(), super.bar()),
+   * qui sont totalement invisibles pour les regex.
+   */
+  private extractIntraFileCallGraph(astResult: ASTFileResult): EntityRelation[] {
+    const relations: EntityRelation[] = [];
+    const seenKeys = new Set<string>();
+    const filePath = astResult.filePath;
+
+    // Construire un index des méthodes connues dans ce fichier
+    const localMethodNames = new Set<string>();
+    for (const fn of astResult.functions) {
+      localMethodNames.add(fn.name);
+    }
+
+    for (const call of astResult.calls) {
+      // Ne garder que les appels vers une fonction locale et de type "this.x"
+      const isIntraClass = call.calleeObject === "this" || localMethodNames.has(call.callee);
+      if (!isIntraClass) continue;
+      if (call.callerFunction === call.callee) continue; // appel récursif direct
+
+      const key = `${call.callerFunction}→${call.callee}@${call.lineNumber}`;
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+
+      relations.push({
+        source: {
+          name: call.callerFunction,
+          filePath,
+          type: call.callerClass ? "method" : "function",
+        },
+        target: {
+          name: call.callee,
+          filePath,
+          type: "function",
+        },
+        relationType: "calls",
+        confidence: 0.92,
+        sourceLine: call.lineNumber,
+      });
+    }
+
+    return relations;
   }
 }
 

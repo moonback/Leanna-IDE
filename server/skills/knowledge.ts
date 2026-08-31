@@ -267,12 +267,95 @@ export const knowledgeSkill: Skill = {
       name: "knowledge_reindex",
       description:
         "🔄 Force une ré-indexation COMPLÈTE du projet par ProjectIndexer. Tous les fichiers sont rescannés, " +
-        "le KnowledgeGraph est reconstruit. Lent (~1-10s selon taille projet) mais nécessaire si " +
-        "l'index est obsolète ou que knowledge_status signale des warnings.",
+        "le KnowledgeGraph et le call-graph AST Tree-sitter sont reconstruits.",
       parameters: {
         type: "OBJECT",
         properties: {},
         required: [],
+      },
+    },
+    {
+      name: "knowledge_ast_callers",
+      description:
+        "🌳 AST Call-Graph : Trouve toutes les fonctions/méthodes qui appellent une fonction donnée (qui dépend de cette fonction ?). Très utile pour analyser l'impact avant de modifier une fonction.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          function_name: {
+            type: "STRING",
+            description: "Nom de la fonction ou méthode ciblée (ex: 'parseFile', 'updateFile', 'getUser').",
+          },
+          file_path: {
+            type: "STRING",
+            description: "Chemin du fichier contenant la fonction (optionnel, pour désambiguïser).",
+          },
+          class_name: {
+            type: "STRING",
+            description: "Nom de la classe si c'est une méthode (optionnel).",
+          },
+        },
+        required: ["function_name"],
+      },
+    },
+    {
+      name: "knowledge_ast_callees",
+      description:
+        "🌳 AST Call-Graph : Trouve toutes les fonctions/méthodes appelées par une fonction donnée (que fait et appelle cette fonction ?). Permet de comprendre le flux d'exécution interne et les dépendances.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          function_name: {
+            type: "STRING",
+            description: "Nom de la fonction ou méthode (ex: 'scanAll', 'handleFileChanges').",
+          },
+          file_path: {
+            type: "STRING",
+            description: "Chemin du fichier contenant la fonction (optionnel).",
+          },
+          class_name: {
+            type: "STRING",
+            description: "Nom de la classe si c'est une méthode (optionnel).",
+          },
+        },
+        required: ["function_name"],
+      },
+    },
+    {
+      name: "knowledge_ast_call_chain",
+      description:
+        "🌳 AST Call-Graph : Déroule l'arborescence complète et récursive des appels (BFS) à partir d'une fonction racine jusqu'à une profondeur donnée.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          function_name: {
+            type: "STRING",
+            description: "Nom de la fonction racine.",
+          },
+          file_path: {
+            type: "STRING",
+            description: "Chemin du fichier (optionnel).",
+          },
+          depth: {
+            type: "NUMBER",
+            description: "Profondeur maximale de recherche (défaut: 3, max: 6).",
+          },
+        },
+        required: ["function_name"],
+      },
+    },
+    {
+      name: "knowledge_ast_file_inspect",
+      description:
+        "🌳 AST File Inspect : Inspecte l'AST Tree-sitter d'un fichier précis. Retourne toutes les fonctions/méthodes avec lignes exactes, signatures TypeScript typées, paramètres et appels détectés.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          file_path: {
+            type: "STRING",
+            description: "Chemin du fichier à inspecter (ex: 'server/knowledge/ProjectIndexer.ts').",
+          },
+        },
+        required: ["file_path"],
       },
     },
   ],
@@ -336,6 +419,24 @@ export const knowledgeSkill: Skill = {
       include_warnings: z.boolean().optional().default(true),
     }),
     knowledge_reindex: z.object({}),
+    knowledge_ast_callers: z.object({
+      function_name: z.string().min(1, "Le nom de fonction ne peut être vide").trim(),
+      file_path: z.string().trim().optional(),
+      class_name: z.string().trim().optional(),
+    }),
+    knowledge_ast_callees: z.object({
+      function_name: z.string().min(1, "Le nom de fonction ne peut être vide").trim(),
+      file_path: z.string().trim().optional(),
+      class_name: z.string().trim().optional(),
+    }),
+    knowledge_ast_call_chain: z.object({
+      function_name: z.string().min(1, "Le nom de fonction ne peut être vide").trim(),
+      file_path: z.string().trim().optional(),
+      depth: z.number().int().positive().max(6).optional().default(3),
+    }),
+    knowledge_ast_file_inspect: z.object({
+      file_path: z.string().min(1, "Le chemin de fichier ne peut être vide").trim(),
+    }),
   },
   handleToolCall: async (name, args) => {
     const log = (msg: string) => console.log(`[KnowledgeSkill] ${msg}`);
@@ -805,6 +906,159 @@ export const knowledgeSkill: Skill = {
         };
       } catch (e: any) {
         log(`ERROR reindex: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_ast_callers
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_ast_callers") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_ast_callers, args);
+        log(`ast_callers fn='${validated.function_name}' file='${validated.file_path ?? ""}'`);
+
+        const callers = await knowledgeGraph.getFunctionCallers(
+          validated.function_name,
+          validated.file_path ?? "",
+          validated.class_name
+        );
+
+        return {
+          status: "success",
+          function_name: validated.function_name,
+          callers_count: callers.length,
+          callers: callers.map((c) => ({
+            caller_id: c.callerId,
+            source_line: c.sourceLine,
+            is_await: c.isAwait,
+            is_resolved: c.isResolved,
+          })),
+        };
+      } catch (e: any) {
+        log(`ERROR ast_callers: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_ast_callees
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_ast_callees") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_ast_callees, args);
+        log(`ast_callees fn='${validated.function_name}' file='${validated.file_path ?? ""}'`);
+
+        const callees = await knowledgeGraph.getFunctionCallees(
+          validated.function_name,
+          validated.file_path ?? "",
+          validated.class_name
+        );
+
+        return {
+          status: "success",
+          function_name: validated.function_name,
+          callees_count: callees.length,
+          callees: callees.map((c) => ({
+            callee_name: c.calleeName,
+            callee_object: c.calleeObject ?? null,
+            source_line: c.sourceLine,
+            is_await: c.isAwait,
+            is_intra_class: c.calleeObject === "this",
+            is_resolved: c.isResolved,
+          })),
+        };
+      } catch (e: any) {
+        log(`ERROR ast_callees: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_ast_call_chain
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_ast_call_chain") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_ast_call_chain, args);
+        log(`ast_call_chain fn='${validated.function_name}' depth=${validated.depth}`);
+
+        const { astCallGraph } = await import("../knowledge/index.js");
+        const chain = astCallGraph.getCallChain(
+          validated.function_name,
+          validated.file_path ?? "",
+          undefined,
+          validated.depth
+        );
+
+        return {
+          status: "success",
+          root: chain.root,
+          nodes_count: chain.nodes.length,
+          edges_count: chain.edges.length,
+          max_depth_reached: chain.maxDepthReached,
+          nodes: chain.nodes.map((n) => ({
+            id: n.id,
+            function_name: n.functionName,
+            class_name: n.className ?? null,
+            file_path: n.filePath,
+          })),
+          edges: chain.edges.map((e) => ({
+            caller: e.callerId,
+            callee: e.calleeName,
+            line: e.sourceLine,
+            is_await: e.isAwait,
+          })),
+        };
+      } catch (e: any) {
+        log(`ERROR ast_call_chain: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_ast_file_inspect
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_ast_file_inspect") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_ast_file_inspect, args);
+        log(`ast_file_inspect file='${validated.file_path}'`);
+
+        const astData = knowledgeGraph.getASTResult(validated.file_path);
+        const { astCallGraph } = await import("../knowledge/index.js");
+        const fileGraph = astCallGraph.getFileCallGraph(validated.file_path);
+
+        return {
+          status: "success",
+          file_path: validated.file_path,
+          has_ast: !!astData && !astData.usedFallback,
+          functions: (astData?.functions ?? []).map((f) => ({
+            name: f.name,
+            class_name: f.className ?? null,
+            lines: `${f.lineStart}-${f.lineEnd}`,
+            params: f.params,
+            return_type: f.returnType ?? null,
+            is_async: f.isAsync,
+            is_arrow: f.isArrow,
+            is_exported: f.isExported,
+          })),
+          classes: (astData?.classes ?? []).map((c) => ({
+            name: c.name,
+            super_class: c.superClass ?? null,
+            interfaces: c.interfaces,
+            methods: c.methods.map((m) => m.name),
+          })),
+          calls_summary: {
+            total_calls_in_file: fileGraph.edges.length,
+            calls: fileGraph.edges.map((e) => ({
+              caller: e.callerId,
+              callee: e.calleeName,
+              line: e.sourceLine,
+              is_await: e.isAwait,
+            })),
+          },
+        };
+      } catch (e: any) {
+        log(`ERROR ast_file_inspect: ${e.message}`);
         return { error: e.message };
       }
     }

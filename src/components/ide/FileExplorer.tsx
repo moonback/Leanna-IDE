@@ -2,10 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
   Folder, FolderOpen, Plus, RefreshCw, ChevronRight, ChevronDown,
   Shield, Search, X, ArrowDownAZ, ArrowUpZA, Layers, GripVertical,
-  Eye, EyeOff, FolderInput,
+  FolderInput,
 } from 'lucide-react';
 import { FileIcon } from './FileIcon.js';
-import { Breadcrumb } from './Breadcrumb.js';
 import { Tooltip } from '../ui/Tooltip.js';
 import type { TreeEntry } from '../../types/ide.js';
 import { sandboxApi } from '../../services/sandboxApi.js';
@@ -371,11 +370,8 @@ const FileExplorer = memo(function FileExplorer({
         <Tooltip
           content="Changer de projet racine"
           as="button"
-          onClick={async () => {
-            try {
-              await fetch('/api/self-root/clear', { method: 'POST' });
-            } catch { /* best-effort */ }
-            window.location.reload();
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher'));
           }}
           className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs font-semibold transition-colors hover:opacity-90 shadow-sm"
           style={{
@@ -460,7 +456,7 @@ const FileExplorer = memo(function FileExplorer({
             <Plus size={12} style={{ color: 'var(--text-muted)' }} />
           </Tooltip>
           <Tooltip content="Actualiser" as="button" onClick={onRefresh} className="rounded p-1 hover:bg-white/5 transition">
-            <RefreshCcw size={12} style={{ color: 'var(--text-muted)' }} />
+            <RefreshCw size={12} style={{ color: 'var(--text-muted)' }} />
           </Tooltip>
       </div>
 

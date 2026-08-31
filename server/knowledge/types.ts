@@ -415,6 +415,105 @@ export const codeEntitySchema = z.object({
   metadata: z.record(z.any()).optional(),
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Types AST (Tree-sitter) — non persistés, reconstruits au démarrage
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Paramètre typé extrait de l'AST */
+export interface ASTParam {
+  /** Nom du paramètre */
+  name: string;
+  /** Type TypeScript si présent (ex: "string", "Options | null") */
+  type?: string;
+  /** Paramètre optionnel (? ou avec valeur par défaut) */
+  optional: boolean;
+}
+
+/** Fonction ou méthode extraite par l'AST */
+export interface ASTFunction {
+  /** Nom de la fonction/méthode */
+  name: string;
+  /** Chemin du fichier (relatif) */
+  filePath: string;
+  /** Ligne de début (1-based) */
+  lineStart: number;
+  /** Ligne de fin (1-based) */
+  lineEnd: number;
+  /** Paramètres avec types */
+  params: ASTParam[];
+  /** Type de retour TypeScript si annoté */
+  returnType?: string;
+  /** Fonction async */
+  isAsync: boolean;
+  /** Exportée du module */
+  isExported: boolean;
+  /** Méthode d'une classe */
+  isMethod: boolean;
+  /** Nom de la classe parente (si méthode) */
+  className?: string;
+  /** Fonction fléchée assignée à une variable */
+  isArrow: boolean;
+}
+
+/** Classe extraite par l'AST */
+export interface ASTClass {
+  /** Nom de la classe */
+  name: string;
+  /** Chemin du fichier */
+  filePath: string;
+  /** Ligne de début */
+  lineStart: number;
+  /** Ligne de fin */
+  lineEnd: number;
+  /** Classe parente (extends) */
+  superClass?: string;
+  /** Interfaces implémentées */
+  interfaces: string[];
+  /** Méthodes membres */
+  methods: ASTFunction[];
+  /** Exportée */
+  isExported: boolean;
+}
+
+/** Appel de fonction extrait par l'AST */
+export interface ASTCall {
+  /** Nom de la fonction appelante (contexte englobant) */
+  callerFunction: string;
+  /** Nom de la classe appelante (si méthode) */
+  callerClass?: string;
+  /** Nom de la fonction/méthode appelée */
+  callee: string;
+  /** Objet sur lequel elle est appelée (ex: "this", "kg", "fs") */
+  calleeObject?: string;
+  /** Ligne dans le fichier source */
+  lineNumber: number;
+  /** Appelé avec await */
+  isAwait: boolean;
+  /** Appel de méthode enchaîné (ex: a.b().c()) */
+  isChained: boolean;
+}
+
+/** Résultat AST complet d'un fichier */
+export interface ASTFileResult {
+  /** Langage analysé */
+  language: "typescript" | "javascript" | "tsx" | "jsx";
+  /** Chemin du fichier */
+  filePath: string;
+  /** Fonctions et méthodes extraites */
+  functions: ASTFunction[];
+  /** Classes extraites */
+  classes: ASTClass[];
+  /** Appels de fonctions détectés */
+  calls: ASTCall[];
+  /** Temps de parsing (ms) */
+  parseTimeMs: number;
+  /**
+   * true si Tree-sitter était indisponible et les résultats proviennent
+   * du fallback regex (moins précis).
+   */
+  usedFallback: boolean;
+}
+
 export const knowledgeGraphSchema = z.object({
   projectRoot: z.string(),
   files: z.record(z.any()),

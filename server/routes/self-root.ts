@@ -10,7 +10,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
   router.get('/status', async (_req: Request, res: Response) => {
     try {
       // SELF_ROOT est lu dynamiquement (peut avoir changé depuis le démarrage)
-      const { SELF_ROOT, WORKSPACE_SITE_URL, hasProject } = await import('../utils/selfRoot');
+      const { SELF_ROOT, WORKSPACE_SITE_URL, hasProject } = await import('../utils/selfRoot.js');
 
       if (!hasProject()) {
         return res.json({
@@ -37,7 +37,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
 
       // Utiliser le cache git_status s'il est disponible (évite un spawn)
       try {
-        const { gitStatusCache } = await import('../skills/git');
+        const { gitStatusCache } = await import('../skills/git.js');
         const cached = gitStatusCache.get(SELF_ROOT);
         if (cached && cached.branch) {
           gitBranch = cached.branch;
@@ -65,9 +65,82 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         const parts = abOutput.split(/\s+/);
         if (parts.length === 2) { behind = parseInt(parts[0], 10) || 0; ahead = parseInt(parts[1], 10) || 0; }
       } catch {}
-      res.json({ rootPath: SELF_ROOT, locked: true, siteUrl: WORKSPACE_SITE_URL || '', gitBranch, gitStatus, lastCommit, lastCommitDate, aheadBehind: { ahead, behind } });
+      return res.json({ rootPath: SELF_ROOT, locked: true, siteUrl: WORKSPACE_SITE_URL || '', gitBranch, gitStatus, lastCommit, lastCommitDate, aheadBehind: { ahead, behind } });
     } catch (e: any) {
-      res.status(500).json({ error: e.message || 'Erreur interne' });
+      return res.status(500).json({ error: e.message || 'Erreur interne' });
+    }
+  });
+
+  // ── Multi-Workspace Endpoints ───────────────────────────────────────────────
+
+  // GET /api/self-root/workspaces — Liste tous les dépôts enregistrés
+  router.get('/workspaces', async (_req: Request, res: Response) => {
+    try {
+      const { listWorkspaces, SELF_ROOT, WORKSPACE_SITE_URL, hasProject } = await import('../utils/selfRoot.js');
+      const workspaces = listWorkspaces();
+      return res.json({
+        workspaces,
+        activeRoot: hasProject() ? SELF_ROOT : null,
+        siteUrl: WORKSPACE_SITE_URL || '',
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message || 'Erreur lors de la récupération des workspaces.' });
+    }
+  });
+
+  // POST /api/self-root/workspaces/validate — Pré-valide un chemin avant ouverture
+  router.post('/workspaces/validate', async (req: Request, res: Response) => {
+    try {
+      const Schema = z.object({
+        path: z.string().min(1, 'Le chemin est requis.'),
+      });
+      const parsed = Schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ valid: false, error: parsed.error.errors[0]?.message ?? 'Chemin invalide.' });
+      }
+      const { validateWorkspacePath } = await import('../utils/selfRoot.js');
+      const result = await validateWorkspacePath(parsed.data.path);
+      return res.json(result);
+    } catch (e: any) {
+      return res.status(500).json({ valid: false, error: e.message || 'Erreur de validation.' });
+    }
+  });
+
+  // DELETE /api/self-root/workspaces/:id — Supprimer un workspace de l'historique (sans supprimer les fichiers sur disque)
+  router.delete('/workspaces/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res.status(400).json({ error: 'ID du workspace requis.' });
+      }
+      const { removeWorkspace } = await import('../utils/selfRoot.js');
+      const removed = removeWorkspace(id);
+      return res.json({ success: removed, id });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message || 'Erreur lors de la suppression du workspace.' });
+    }
+  });
+
+  // PATCH /api/self-root/workspaces/:id — Mettre à jour le nom ou le siteUrl d'un workspace
+  router.patch('/workspaces/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const Schema = z.object({
+        name: z.string().min(1).optional(),
+        siteUrl: z.string().url('URL invalide.').optional().or(z.literal('')),
+      });
+      const parsed = Schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Paramètres invalides.' });
+      }
+      const { updateWorkspaceMeta } = await import('../utils/selfRoot.js');
+      const updated = updateWorkspaceMeta(id, parsed.data);
+      if (!updated) {
+        return res.status(404).json({ error: 'Workspace introuvable.' });
+      }
+      return res.json({ success: true, workspace: updated });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message || 'Erreur lors de la mise à jour.' });
     }
   });
 
@@ -77,13 +150,21 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
       const ChangeSchema = z.object({
         path: z.string().min(1, 'Le chemin est requis.'),
         userConfirmed: z.boolean().optional(),
+        name: z.string().optional(),
         siteUrl: z.string().url('URL invalide.').optional().or(z.literal('')),
       });
       const parsed = ChangeSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Paramètres invalides.' });
       }
-      const { path: newPath, userConfirmed, siteUrl } = parsed.data;
+      const { path: newPath, userConfirmed, siteUrl, name: customName } = parsed.data;
+
+      // 1. Pré-validation stricte du chemin
+      const { validateWorkspacePath } = await import('../utils/selfRoot.js');
+      const validation = await validateWorkspacePath(newPath.trim());
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error || 'Chemin non valide ou inaccessible.' });
+      }
 
       // Si la demande vient de l'UI Settings (confirmation locale déjà affichée),
       // on bypass la confirmation WS qui nécessite une session vocale active.
@@ -109,49 +190,50 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
       }
       if (!approved) return res.status(403).json({ error: 'Changement refusé par l\'utilisateur.' });
 
-      const { switchSandboxProject } = await import('../utils/sandbox');
+      const { switchSandboxProject } = await import('../utils/sandbox.js');
 
       // La transition verrouille synchroniquement les écritures, recopie le
       // sandbox, redémarre le watcher, puis seulement publie l'état READY.
       const newRoot = await switchSandboxProject(newPath.trim());
       console.log(`[Sandbox] Sandbox READY pour le nouveau projet: ${newRoot}`);
 
-      // Persister l'URL du site si fournie
+      // Persister l'URL du site et nom si fournis
+      const { setWorkspaceSiteUrl, addOrUpdateWorkspace } = await import('../utils/selfRoot.js');
       if (siteUrl !== undefined) {
-        const { setWorkspaceSiteUrl } = await import('../utils/selfRoot');
         setWorkspaceSiteUrl(siteUrl);
       }
+      addOrUpdateWorkspace(newRoot, siteUrl || undefined, customName);
 
       // 3. Recharger et réindexer le Knowledge System pour le nouveau projet
       try {
-        const { knowledgeGraph } = await import('../knowledge/KnowledgeGraph');
-        const { projectMemory } = await import('../knowledge/ProjectMemory');
-        const { projectIndexer } = await import('../knowledge/ProjectIndexer');
+        const { knowledgeGraph } = await import('../knowledge/KnowledgeGraph.js');
+        const { projectMemory } = await import('../knowledge/ProjectMemory.js');
+        const { projectIndexer } = await import('../knowledge/ProjectIndexer.js');
         knowledgeGraph.load();
         projectMemory.load();
         projectIndexer.scanAll().catch(() => {});
         console.log(`[KnowledgeGraph] Rechargement pour: ${newRoot}`);
       } catch { /* silent */ }
 
-      res.json({ status: 'success', newRoot, siteUrl: siteUrl ?? '' });
+      return res.json({ status: 'success', newRoot, siteUrl: siteUrl ?? '' });
     } catch (e: any) {
-      res.status(400).json({ error: e.message });
+      return res.status(400).json({ error: e.message });
     }
   });
 
   // POST /api/self-root/clear — effacer le projet persisté (pour re-sélection)
   router.post('/clear', async (_req: Request, res: Response) => {
     try {
-      const { resetSelfRoot } = await import('../utils/selfRoot');
+      const { resetSelfRoot } = await import('../utils/selfRoot.js');
       resetSelfRoot();
       // Désactiver le sandbox
       try {
-        const { deactivateSandbox } = await import('../utils/sandbox');
+        const { deactivateSandbox } = await import('../utils/sandbox.js');
         deactivateSandbox();
       } catch { /* silent */ }
-      res.json({ status: 'success' });
+      return res.json({ status: 'success' });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   });
 
@@ -206,30 +288,30 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
       }
 
       // Activer le nouveau projet (même flux que /change)
-      const { switchSandboxProject } = await import('../utils/sandbox');
+      const { switchSandboxProject } = await import('../utils/sandbox.js');
 
       const newRoot = await switchSandboxProject(finalPath);
       console.log(`[Sandbox] Sandbox READY pour le nouveau projet: ${newRoot}`);
 
       // Persister l'URL du site si fournie
       if (siteUrl !== undefined) {
-        const { setWorkspaceSiteUrl } = await import('../utils/selfRoot');
+        const { setWorkspaceSiteUrl } = await import('../utils/selfRoot.js');
         setWorkspaceSiteUrl(siteUrl);
       }
 
       // Recharger le Knowledge System pour le nouveau projet (vide)
       try {
-        const { knowledgeGraph } = await import('../knowledge/KnowledgeGraph');
-        const { projectMemory } = await import('../knowledge/ProjectMemory');
-        const { projectIndexer } = await import('../knowledge/ProjectIndexer');
+        const { knowledgeGraph } = await import('../knowledge/KnowledgeGraph.js');
+        const { projectMemory } = await import('../knowledge/ProjectMemory.js');
+        const { projectIndexer } = await import('../knowledge/ProjectIndexer.js');
         knowledgeGraph.load();
         projectMemory.load();
         projectIndexer.scanAll().catch(() => {});
       } catch { /* silent */ }
 
-      res.json({ status: 'success', newRoot, siteUrl: siteUrl ?? '' });
+      return res.json({ status: 'success', newRoot, siteUrl: siteUrl ?? '' });
     } catch (e: any) {
-      res.status(400).json({ error: e.message });
+      return res.status(400).json({ error: e.message });
     }
   });
 
@@ -306,8 +388,6 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
     }
 
     // ── Lancer le scaffolding ─────────────────────────────────────────────────
-    // FIX: Sur Windows on utilise shell:true avec le nom de commande simple (npm/npx).
-    // Ne jamais utiliser shell:false + .cmd sur Windows — spawn échoue ou crash.
     const isWin = osModule.default.platform() === 'win32';
     const args  = fwConfig.args(projectName);
 
@@ -320,8 +400,6 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
     try {
       child = spawn(fwConfig.bin, args, {
         cwd: parentDir,
-        // FIX: shell:true est obligatoire sur Windows pour trouver npm/npx
-        // (ce sont des scripts .cmd qui ne peuvent pas être exécutés directement).
         shell: isWin,
         env: {
           ...process.env,
@@ -362,9 +440,6 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
       finish();
     });
 
-    // FIX: Le handler async DOIT être intégralement wrappé dans un try/catch.
-    // Sans ça, toute erreur dans le bloc async devient une unhandled promise rejection
-    // qui crash le process tsx et coupe toutes les connexions actives.
     child.on('close', (code) => {
       (async () => {
         try {
@@ -385,15 +460,15 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
           sendLog(`🔌 Activation du workspace…`);
 
           try {
-            const { switchSandboxProject } = await import('../utils/sandbox');
+            const { switchSandboxProject } = await import('../utils/sandbox.js');
 
             const newRoot = await switchSandboxProject(projectPath);
             sendLog(`📦 Sandbox READY: ${newRoot}`);
 
             try {
-              const { knowledgeGraph } = await import('../knowledge/KnowledgeGraph');
-              const { projectMemory }  = await import('../knowledge/ProjectMemory');
-              const { projectIndexer } = await import('../knowledge/ProjectIndexer');
+              const { knowledgeGraph } = await import('../knowledge/KnowledgeGraph.js');
+              const { projectMemory }  = await import('../knowledge/ProjectMemory.js');
+              const { projectIndexer } = await import('../knowledge/ProjectIndexer.js');
               knowledgeGraph.load();
               projectMemory.load();
               projectIndexer.scanAll().catch(() => {});
@@ -408,21 +483,17 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
             sendEvent('error', { error: activateErr.message });
           }
         } catch (outerErr: any) {
-          // Filet de sécurité : aucune erreur ne doit sortir de ce handler async
           console.error('[SelfRoot/scaffold] Erreur inattendue dans close handler:', outerErr);
           try { sendEvent('error', { error: outerErr?.message ?? String(outerErr) }); } catch { /* ignore */ }
         } finally {
           finish();
         }
       })().catch((e) => {
-        // Double filet — si même l'IIFE throw, loguer et fermer proprement
         console.error('[SelfRoot/scaffold] IIFE échoué:', e);
         finish();
       });
     });
 
-    // FIX: Ne tuer le child que si la réponse est déjà terminée.
-    // Sinon, une reconnexion HMR de Vite tuerait le scaffold en cours.
     req.on('close', () => {
       if (res.writableEnded && !child.killed) {
         child.kill();
@@ -441,17 +512,16 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'URL invalide.' });
       }
-      const { setWorkspaceSiteUrl, hasProject } = await import('../utils/selfRoot');
+      const { setWorkspaceSiteUrl, hasProject } = await import('../utils/selfRoot.js');
       if (!hasProject()) {
         return res.status(400).json({ error: 'Aucun projet actif.' });
       }
       setWorkspaceSiteUrl(parsed.data.siteUrl);
-      res.json({ status: 'success', siteUrl: parsed.data.siteUrl });
+      return res.json({ status: 'success', siteUrl: parsed.data.siteUrl });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   });
 
   return router;
 }
-

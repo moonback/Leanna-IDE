@@ -28,7 +28,15 @@ import type {
   KnowledgeGraphState,
   KnowledgeStats,
   EntityRelation,
+  ASTFileResult,
 } from "./types.js";
+import type { CallNode, CallEdge } from "./ASTCallGraph.js";
+
+/** Import lazy de ASTCallGraph pour éviter les dépendances circulaires au chargement */
+async function getASTCallGraph() {
+  const { astCallGraph } = await import("./ASTCallGraph.js");
+  return astCallGraph;
+}
 
 const log = createLogger("KnowledgeGraph");
 
@@ -45,6 +53,11 @@ export class KnowledgeGraph {
   private state: KnowledgeGraphState;
   private dirty: boolean = false;
   private updateListeners: Set<() => void> = new Set();
+  /**
+   * Index AST en mémoire — non persisté, reconstruit à chaque démarrage.
+   * Contient les résultats Tree-sitter bruts par chemin de fichier.
+   */
+  private astIndex: Map<string, ASTFileResult> = new Map();
 
   constructor() {
     this.state = this.createEmptyState();
@@ -317,6 +330,54 @@ export class KnowledgeGraph {
   }
 
   /**
+   * Met à jour les résultats AST d'un fichier dans l'index en mémoire.
+   * Appelé par ProjectIndexer après chaque parse Tree-sitter.
+   */
+  setASTResult(filePath: string, result: ASTFileResult): void {
+    this.astIndex.set(filePath, result);
+  }
+
+  /**
+   * Retourne le résultat AST d'un fichier (null si non dispo ou fallback).
+   */
+  getASTResult(filePath: string): ASTFileResult | undefined {
+    return this.astIndex.get(filePath);
+  }
+
+  /**
+   * Retourne le call-graph AST d'un fichier (fonctions + appels).
+   * Délègue vers ASTCallGraph (chargement lazy pour éviter les circularités).
+   */
+  async getCallGraph(filePath: string): Promise<{ nodes: CallNode[]; edges: CallEdge[] }> {
+    const cg = await getASTCallGraph();
+    return cg.getFileCallGraph(filePath);
+  }
+
+  /**
+   * Retourne les fonctions qui appellent une fonction donnée.
+   */
+  async getFunctionCallers(
+    functionName: string,
+    filePath: string,
+    className?: string
+  ): Promise<CallEdge[]> {
+    const cg = await getASTCallGraph();
+    return cg.getCallers(functionName, filePath, className);
+  }
+
+  /**
+   * Retourne les fonctions appelées par une fonction donnée.
+   */
+  async getFunctionCallees(
+    functionName: string,
+    filePath: string,
+    className?: string
+  ): Promise<CallEdge[]> {
+    const cg = await getASTCallGraph();
+    return cg.getCallees(functionName, filePath, className);
+  }
+
+  /**
    * Génère un résumé textuel compact du KnowledgeGraph pour injection dans le contexte LLM.
    * Optimisé pour consommer peu de tokens.
    */
@@ -364,6 +425,14 @@ export class KnowledgeGraph {
         .map(([type, count]) => `${type}(${count})`)
         .join(", ");
       lines.push(`   Relations: ${this.state.relations.length} | ${summary}`);
+    }
+
+    // Statistiques AST call-graph (si Tree-sitter a indexé des fichiers)
+    if (this.astIndex.size > 0) {
+      const astFiles = this.astIndex.size;
+      const totalFns = [...this.astIndex.values()].reduce((s, r) => s + r.functions.length, 0);
+      const totalCalls = [...this.astIndex.values()].reduce((s, r) => s + r.calls.length, 0);
+      lines.push(`   🌳 AST: ${astFiles} fichiers, ${totalFns} fonctions, ${totalCalls} appels indexés`);
     }
 
     return lines.join("\n");

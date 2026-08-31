@@ -46,6 +46,7 @@ Leanna est un environnement de développement intégré (IDE) et système d'expl
 
 ### Fonctionnalités utilisateur
 * **Assistant Vocal & Multimodal Live** : Interaction en direct via WebSocket audio PCM 16kHz bidirectionnel et vision (partage d'écran / webcam) avec `gemini-3.1-flash-live-preview`.
+* **Mode Multi-Workspace Sécurisé** : Ouverture, enregistrement et bascule instantanée entre dépôts externes avec isolation stricte du périmètre (`SELF_ROOT`), historique des workspaces (`.Leanna/workspaces.json`), validation préventive de sécurité et badges Git.
 * **Éditeur de code intelligent (IDE)** : Édition avec Monaco Editor, arborescence de fichiers, coloration syntaxique, recherche globale avec regex, onglets multiples et panneau de prévisualisation web.
 * **Mode Bac à Sable (Sandbox)** : Isolation complète des modifications de fichiers dans un miroir `.Leanna/sandbox`, avec calcul de diff, validation syntaxique/TypeScript en temps réel et synchronisation sélective.
 * **Gestionnaire de Notebooks & RAG** : Indexation de documents multiples (PDF, Markdown, texte, code), découpage en chunks, recherche sémantique, génération automatique de guides d'étude, FAQ, résumés, timelines et diapositives Reveal.js.
@@ -56,13 +57,14 @@ Leanna est un environnement de développement intégré (IDE) et système d'expl
 
 ### Fonctionnalités développeur
 * **Orchestration d'agents autonomes & Fleet** : Architecture multi-agents (Architecte, Développeur, Testeur, Sécurité, etc.) communicant via un bus de messages interne (`agentMessageBus`).
+* **Knowledge System & Analyse Syntaxique Tree-sitter** : Indexation AST WASM incrémentale du codebase, cartographie bidirectionnelle des appels (`ASTCallGraph`), extraction de signatures typées, chaînes d'appels BFS et détection des dépendances intra-classe (`this.method()`).
 * **Runtime V2 & Extensibilité Skills** : Système unifié de déclaration et d'exécution d'outils (`ToolRegistry`, `SkillManagerV2`), supportant les custom skills créés à la volée.
 * **Passerelle MCP (Model Context Protocol)** : Connexion à des serveurs MCP tiers (stdio / SSE) pour étendre les outils disponibles tout en appliquant une validation de chemin stricte.
 * **Garde-fous & Checkpoints Git automatiques** : Snapshots Git créés avant chaque modification destructive, détection de boucles de correction via le `Supervisor` et confirmation utilisateur pour les fichiers critiques.
 * **Optimiseur de contexte & Pool de clés Gemini** : Calcul automatique des tokens, compactage/résumé automatique des conversations pour éviter les dépassements de fenêtre de contexte, et rotation dynamique des clés API Gemini sur erreur 429.
 
 ### Fonctionnalités administrateur & Sécurité
-* **Périmètre Self-Root verrouillé** : Confinement strict de l'IDE à son propre répertoire racine (`SELF_ROOT`), empêchant toute lecture/écriture arbitraire hors périmètre.
+* **Périmètre Self-Root & Multi-Workspace verrouillé** : Confinement strict de l'ensemble des compétences IA et des opérations système au dépôt actif (`SELF_ROOT`), avec blocage préventif des racines disques (`C:\`, `/etc`) et détection des évasions par symlinks.
 * **Journalisation d'audit NDJSON** : Enregistrement structuré de chaque action (création, écriture, suppression, exécution de commande) dans `.Leanna-audit.log`.
 * **Protection par jeton d'accès** : Middleware de vérification `x-leanna-token` sur tous les endpoints HTTP `/api/*` et poignées de main WebSocket.
 * **Code de sécurité Sandbox** : Désactivation du bac à sable protégée par un code à 6 chiffres (`SANDBOX_EXIT_CODE`).

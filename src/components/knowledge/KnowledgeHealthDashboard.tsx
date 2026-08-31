@@ -1,7 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useEffect, useState, useCallback } from 'react';
 import {
-  Activity,
   CheckCircle2,
   AlertTriangle,
   XCircle,
@@ -10,15 +8,13 @@ import {
   Layers,
   Database,
   GitBranch,
-  ShieldCheck,
+  GitFork,
   Zap,
   Folder,
-  Code2,
   HardDrive,
-  Cpu,
-  Info,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
+import { ASTCallGraphExplorer } from './ASTCallGraphExplorer.js';
 
 interface HealthData {
   status: string;
@@ -76,7 +72,7 @@ export function KnowledgeHealthDashboard() {
   const [loading, setLoading] = useState(true);
   const [reindexing, setReindexing] = useState(false);
   const [reextracting, setReextracting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'memory' | 'documents' | 'dependencies'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'ast' | 'memory' | 'documents' | 'dependencies'>('overview');
 
   const fetchHealth = useCallback(async () => {
     setLoading(true);
@@ -386,10 +382,11 @@ export function KnowledgeHealthDashboard() {
 
       {/* Tabs Section */}
       <div className="space-y-4">
-        <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: 'var(--border-base)' }}>
+        {/* Tabs Navigation */}
+        <div className="flex items-center gap-2 border-b pb-2 overflow-x-auto" style={{ borderColor: 'var(--border-base)' }}>
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'bg-white/10 text-white shadow-sm'
                 : 'text-muted hover:text-white hover:bg-white/5'
@@ -398,8 +395,19 @@ export function KnowledgeHealthDashboard() {
             Vue d'Ensemble
           </button>
           <button
+            onClick={() => setActiveTab('ast')}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'ast'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm'
+                : 'text-cyan-400/80 hover:text-cyan-300 hover:bg-cyan-500/10'
+            }`}
+          >
+            <GitFork className="w-3.5 h-3.5" />
+            AST & Call-Graph
+          </button>
+          <button
             onClick={() => setActiveTab('memory')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'memory'
                 ? 'bg-white/10 text-white shadow-sm'
                 : 'text-muted hover:text-white hover:bg-white/5'
@@ -409,7 +417,7 @@ export function KnowledgeHealthDashboard() {
           </button>
           <button
             onClick={() => setActiveTab('documents')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'documents'
                 ? 'bg-white/10 text-white shadow-sm'
                 : 'text-muted hover:text-white hover:bg-white/5'
@@ -420,7 +428,7 @@ export function KnowledgeHealthDashboard() {
           {dg.cycleCount > 0 && (
             <button
               onClick={() => setActiveTab('dependencies')}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === 'dependencies'
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                   : 'text-amber-400/80 hover:bg-amber-500/10'
@@ -431,6 +439,13 @@ export function KnowledgeHealthDashboard() {
             </button>
           )}
         </div>
+
+        {/* Tab: AST Call-Graph Explorer */}
+        {activeTab === 'ast' && (
+          <div className="pt-2">
+            <ASTCallGraphExplorer />
+          </div>
+        )}
 
         {/* Tab 1: Overview Details */}
         {activeTab === 'overview' && (

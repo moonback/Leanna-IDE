@@ -33,7 +33,7 @@ flowchart TB
         end
 
         subgraph CoreEngine ["Moteur Fondamental & Sécurité"]
-            SelfRoot["SelfRoot & Path Security<br/>(SELF_ROOT)"]
+            SelfRoot["Multi-Workspace & Path Security<br/>(SELF_ROOT & workspaces.json)"]
             SandboxEngine["Sandbox Mirror Manager<br/>(.Leanna/sandbox)"]
             SkillRuntime["SkillManagerV2 & ToolRegistry"]
             AgentBus["AgentMessageBus & Orchestrator"]
@@ -75,8 +75,8 @@ flowchart TB
 
 Leanna fonctionne selon les principes architecturaux suivants :
 
-1. **Auto-hébergement & Périmètre Self-Root** : L'IDE est conçu pour opérer sur le code source du projet (`SELF_ROOT`). Tous les accès au système de fichiers sont strictement validés et restreints.
-2. **Isolation par Sandbox** : Par défaut, toute écriture effectuée par l'utilisateur ou par l'IA est appliquée dans un dossier miroir `.Leanna/sandbox`. Les modifications ne sont reportées dans le projet principal qu'après validation TypeScript (`tsc --noEmit`) et approbation explicite (`sync` ou `accept-file`).
+1. **Mode Multi-Workspace & Périmètre Self-Root** : L'IDE gère dynamiquement plusieurs dépôts externes tout en confinant rigoureusement toutes les compétences IA, explorateurs et opérations au projet actif (`SELF_ROOT`). Les dépôts sont persistés dans `.Leanna/workspaces.json` et les chemins candidats sont pré-validés (rejet des racines disques et dossiers système).
+2. **Isolation par Sandbox** : Par défaut, toute écriture effectuée par l'utilisateur ou par l'IA est appliquée dans un dossier miroir `.Leanna/sandbox` du workspace actif. Les modifications ne sont reportées dans le projet principal qu'après validation TypeScript (`tsc --noEmit`) et approbation explicite (`sync` ou `accept-file`).
 3. **Dialogue Multimodal Temps Réel** : L'interface échange des flux audio PCM 16kHz et des captures vidéo/écran directement avec l'API Gemini Live. Lorsque l'IA décide d'exécuter une action, elle invoque des outils (`functionDeclarations`) interceptés côté backend par le `LiveSocketHandler`.
 4. **Coexistence Runtime V1 & V2** : Le système migre progressivement d'un `SkillManager` historique vers une architecture découplée `ToolRegistry` + `RuntimeV2` tout en conservant une compatibilité ascendante complète.
 
@@ -142,18 +142,31 @@ server/
 └── utils/              # SelfRoot, Sandbox, Checkpoint Git, Cryptographie, RateLimiting
 ```
 
-### Middlewares & Sécurité HTTP
-1. **Rate Limiting** (`server/config/rateLimits.ts`) :
-   - `strictLimiter` (10 000 req / 15 min en prod) sur l'ensemble de `/api`.
-   - `pollingLimiter` (30 000 req / min en prod) sur `/api/ide`, `/api/sandbox`, `/api/knowledge`.
-   - `authLimiter` (150 req / 5 min) sur les routes d'authentification.
-   - `notebookChatLimiter` (30 req / min) et `notebookEmbeddingLimiter` (50 req / 5 min).
-   - Les requêtes issues de la boucle locale (`127.0.0.1`, `::1`) ou en mode `dev` bypassent ces limites via `skipForLocal`.
-2. **Authentification** (`server/security.ts`) :
-   - Vérifie la présence du token configuré dans `Leanna_API_TOKEN` via l'en-tête `x-leanna-token` ou le cookie `Leanna_token`.
-   - Appliqué à l'ensemble des routes `/api/*` (hors `/api/health`).
-3. **Protection Réseau** :
-   - Par défaut, le serveur écoute uniquement sur `127.0.0.1`. L'écoute sur `0.0.0.0` sans `Leanna_API_TOKEN` provoque un arrêt immédiat du serveur par sécurité (`process.exit(1)`).
+### Knowledge System & Analyse Syntaxique Tree-sitter
+Le sous-système `server/knowledge/` offre une compréhension sémantique et structurelle approfondie du projet :
+
+```text
+server/knowledge/
+├── ASTParser.ts          # Moteur d'analyse syntaxique Tree-sitter (WASM) pour TS/TSX/JS
+├── ASTCallGraph.ts       # Graphe d'appels bidirectionnel (qui appelle qui, BFS call chain)
+├── ProjectIndexer.ts     # Scanneur de projet et synchroniseur AST incrémental
+├── KnowledgeGraph.ts     # Graphe unifié des entités, relations et dépendances
+├── RelationExtractor.ts  # Détecteur sémantique (calls 0.95, extends, composes, tests)
+├── FileWatcher.ts        # Surveillance événementielle et ré-indexation à chaud
+├── WorkspaceIndexer.ts   # Extraction documentaire du workspace (.md, .txt, .rst...)
+├── DocumentStore.ts      # Index sémantique et liens inter-documents
+├── DependencyGraph.ts    # Détecteur de cycles DFS et métriques de couplage
+├── ProjectMemory.ts      # Faits métier, architecture et conventions protégées
+└── UnderstandingEngine.ts # Synthèse contextuelle et calcul de scores pour le LLM
+```
+
+* **Indexation AST Incrémentale** :
+  - Utilise `web-tree-sitter` (WASM) avec les grammaires TypeScript, TSX et JavaScript sans nécessiter de compilation native.
+  - Extrait les positions de code exactes (`lineStart` à `lineEnd`), les paramètres typés et les annotations de retour.
+  - Détecte les appels de fonctions directs, chaînés, en contexte `await` ainsi que les appels de méthodes intra-classe (`this.method()`).
+* **Graphe d'Appels Bidirectionnel (`ASTCallGraph`)** :
+  - Maintient en mémoire la cartographie des appelants (`getCallers`), des fonctions appelées (`getCallees`) et des chaînes d'exécution récursives (`getCallChain`).
+  - Mis à jour instantanément à chaque modification de fichier via le `FileWatcher`.
 
 ---
 
