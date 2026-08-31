@@ -72,7 +72,7 @@ interface TSParserInstance {
   delete(): void;
 }
 
-interface TreeSitterModule {
+export interface TreeSitterModule {
   init(): Promise<void>;
   Language: {
     load(wasmPath: string): Promise<TSLanguage>;

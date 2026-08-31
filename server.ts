@@ -150,7 +150,11 @@ process.on('uncaughtException', (error) => {
     // 5. Indexation du Knowledge Graph — seulement si un projet est actif
     if (hasProject()) {
       projectIndexer.scanAll().then((stats: any) => {
-        console.log(`[KnowledgeGraph] ✅ Projet indexé: ${stats.totalFiles} fichiers, ${stats.totalEntities} entités (${(stats.durationMs / 1000).toFixed(1)}s)`);
+        if (stats.cached) {
+          console.log(`[KnowledgeGraph] ⚡ Projet inchangé: ${stats.totalFiles} fichiers, ${stats.totalEntities} entités (chargé depuis le cache en ${stats.durationMs}ms)`);
+        } else {
+          console.log(`[KnowledgeGraph] ✅ Projet indexé: ${stats.totalFiles} fichiers, ${stats.totalEntities} entités (${(stats.durationMs / 1000).toFixed(1)}s)`);
+        }
         // 5b. Activer l'indexation incrémentale via FileWatcher
         projectIndexer.startWatching();
 
