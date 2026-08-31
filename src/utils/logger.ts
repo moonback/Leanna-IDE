@@ -43,28 +43,28 @@ export const logger = {
    * Debug level - verbose logging for development
    */
   debug(namespace: string, message: string, ...args: unknown[]): void {
-    log('debug', namespace, message, ...args);
+    _logInternal('debug', namespace, message, ...args);
   },
 
   /**
    * Info level - general information
    */
   info(namespace: string, message: string, ...args: unknown[]): void {
-    log('info', namespace, message, ...args);
+    _logInternal('info', namespace, message, ...args);
   },
 
   /**
    * Warn level - potentially harmful situations
    */
   warn(namespace: string, message: string, ...args: unknown[]): void {
-    log('warn', namespace, message, ...args);
+    _logInternal('warn', namespace, message, ...args);
   },
 
   /**
    * Error level - error events that might still allow the application to continue running
    */
   error(namespace: string, message: string, ...args: unknown[]): void {
-    log('error', namespace, message, ...args);
+    _logInternal('error', namespace, message, ...args);
   },
 
   /**
@@ -86,7 +86,7 @@ export const logger = {
 /**
  * Internal log function that handles the actual logging
  */
-function log(level: LogLevel, namespace: string, message: string, ...args: unknown[]): void {
+function _logInternal(level: LogLevel, namespace: string, message: string, ...args: unknown[]): void {
   if (!defaultConfig.enabled) return;
   
   // Check if this level should be logged
@@ -147,12 +147,15 @@ export function createLogger(namespace: string) {
  * In production, only warn and error levels are logged to the console.
  * Debug and info logs are suppressed in production builds.
  */
-export const log = {
+export const consoleWrapper = {
   debug: (message: string, ...args: unknown[]) => logger.debug('global', message, ...args),
   info: (message: string, ...args: unknown[]) => logger.info('global', message, ...args),
   warn: (message: string, ...args: unknown[]) => logger.warn('global', message, ...args),
   error: (message: string, ...args: unknown[]) => logger.error('global', message, ...args),
 };
+
+// Backwards compatibility alias
+export const log = consoleWrapper;
 
 /**
  * Development-only console.log wrapper

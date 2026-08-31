@@ -1,16 +1,16 @@
 /**
- * ConfirmDialog — Modale de confirmation générique et réutilisable.
- * Remplace window.confirm pour une expérience cohérente avec le thème de l'application.
+ * ConfirmDialog — Generic reusable confirmation modal.
+ * Replaces window.confirm for consistent theming in the application.
  *
- * Utilisation:
+ * Usage:
  *   const { confirm } = useConfirm();
  *   const result = await confirm({
- *     title: 'Supprimer le fichier',
- *     message: 'Êtes-vous sûr de vouloir supprimer ce fichier ?',
- *     confirmLabel: 'Supprimer',
- *     cancelLabel: 'Annuler',
+ *     title: 'Delete file',
+ *     message: 'Are you sure you want to delete this file?',
+ *     confirmLabel: 'Delete',
+ *     cancelLabel: 'Cancel',
  *   });
- *   if (result) { /* action confirmée */ }
+ *   if (result) { // action confirmed }
  */
 
 import React, { createContext, useCallback, useContext, useState } from 'react';
