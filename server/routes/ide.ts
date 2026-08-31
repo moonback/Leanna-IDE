@@ -11,6 +11,7 @@ const router = Router();
 router.get('/tree', async (req: Request, res: Response) => {
   try {
     const root = getWorkspaceRoot(req);
+    if (!root) return res.status(200).json({ path: '', entries: [] });
     const walk = (current: string, _rel = '.'): any[] => {
       const entries = fs.readdirSync(current, { withFileTypes: true });
       return entries
@@ -39,6 +40,7 @@ router.get('/tree', async (req: Request, res: Response) => {
 router.get('/tree-workspace', async (req: Request, res: Response) => {
   try {
     const root = getDefaultWorkspaceRoot();
+    if (!root) return res.status(200).json({ path: '', entries: [] });
     const walk = (current: string): any[] => {
       const entries = fs.readdirSync(current, { withFileTypes: true });
       return entries
