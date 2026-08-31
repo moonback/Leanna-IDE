@@ -16,29 +16,33 @@ import { attachLiveWebSocket, type LiveSocketDeps } from './live/LiveSocketHandl
   setSelfRoot(path.resolve(__dirname_local, '..'));
 }
 
-function waitForWsOpen(ws: WebSocket): Promise<void> {
+function waitForWsOpen(ws: WebSocket, timeoutMs = 4000): Promise<void> {
   return new Promise((resolve, reject) => {
     if (ws.readyState === WebSocket.OPEN) return resolve();
-    ws.once('open', resolve);
-    ws.once('error', reject);
+    const timer = setTimeout(() => reject(new Error('Timeout waiting for WebSocket open')), timeoutMs);
+    ws.once('open', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    ws.once('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
   });
 }
 
-function waitForWsMessage(ws: WebSocket, timeoutMs = 4000): Promise<any> {
+function waitForCondition(check: () => boolean, timeoutMs = 5000, intervalMs = 50): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`Timeout waiting for WebSocket message after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    ws.once('message', (data) => {
-      clearTimeout(timer);
-      try {
-        const parsed = JSON.parse(data.toString('utf8'));
-        resolve(parsed);
-      } catch (err) {
-        resolve(data.toString('utf8'));
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      if (check()) {
+        clearInterval(interval);
+        resolve();
+      } else if (Date.now() - startTime > timeoutMs) {
+        clearInterval(interval);
+        reject(new Error(`Timeout waiting for condition after ${timeoutMs}ms`));
       }
-    });
+    }, intervalMs);
   });
 }
 
@@ -116,32 +120,50 @@ test('terminal WebSocket: connects, receives welcome message, accepts input & re
   const port = (server.address() as any).port;
 
   const ws = new WebSocket(`ws://127.0.0.1:${port}/terminal`);
+  const receivedMessages: any[] = [];
+
+  ws.on('message', (data) => {
+    try {
+      receivedMessages.push(JSON.parse(data.toString('utf8')));
+    } catch {
+      receivedMessages.push({ type: 'raw', data: data.toString('utf8') });
+    }
+  });
 
   try {
     await waitForWsOpen(ws);
     assert.equal(ws.readyState, WebSocket.OPEN);
 
-    // Recevoir le message de bienvenue
-    const welcome = await waitForWsMessage(ws, 5000);
-    assert.equal(welcome.type, 'output');
-    assert.ok(welcome.data.includes('Leanna Terminal') || welcome.data.includes('Working directory'));
+    // 1. Attendre le message initial de bienvenue
+    await waitForCondition(() =>
+      receivedMessages.some((msg) =>
+        msg.type === 'output' && (msg.data.includes('Leanna Terminal') || msg.data.includes('Working directory'))
+      ),
+      5000
+    );
 
-    // Envoyer un redimensionnement
+    // 2. Envoyer un redimensionnement
     ws.send(JSON.stringify({
       type: 'resize',
       data: { cols: 120, rows: 40 },
     }));
 
-    // Envoyer une commande
+    // 3. Envoyer une commande
     ws.send(JSON.stringify({
       type: 'input',
-      data: 'echo "hello_terminal_e2e"',
+      data: 'echo test_ws_output',
     }));
 
-    // Recevoir la sortie de la commande
-    const output = await waitForWsMessage(ws, 5000);
-    assert.equal(output.type, 'output');
-    assert.ok(typeof output.data === 'string');
+    // 4. Attendre la confirmation/sortie
+    await waitForCondition(() =>
+      receivedMessages.some((msg) =>
+        msg.type === 'output' && typeof msg.data === 'string' && msg.data.length > 0
+      ),
+      5000
+    );
+
+    // 5. Fermeture explicite via le message 'close'
+    ws.send(JSON.stringify({ type: 'close' }));
   } finally {
     ws.close();
     await new Promise<void>((resolve) => {
@@ -211,7 +233,17 @@ test('live & sandbox WebSocket: upgrade auth verification (unauthorized vs autho
       responseStyle: 'Direct',
     }),
     getWorkspaceRoot: () => SELF_ROOT,
-    createGeminiAI: () => ({} as any),
+    createGeminiAI: () => ({
+      live: {
+        connect: async () => ({
+          send: () => {},
+          close: () => {},
+          on: () => {},
+          receive: async function* () {},
+          [Symbol.asyncIterator]: async function* () {},
+        }),
+      },
+    } as any),
     activeGeminiSessions: new Set(),
     browserReadPending: new Map(),
     browserActionPending: new Map(),

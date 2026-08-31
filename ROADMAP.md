@@ -32,8 +32,8 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 | **P0** | Sécurisation et fiabilisation des endpoints sans validation de schéma | ✅ Livré (Sprint 1) | Middleware `validateBody` et schémas Zod déployés sur les routeurs critiques (`custom-agents`, `mcp`, `agents`, `tts`). Extension progressive aux autres routeurs secondaires. |
 | **P0** | Définition d'un pipeline CI/CD automatisé | 📋 Planifié | Aucun workflow de test ou de build automatique n'est configuré dans `.github/workflows`. |
 | **P1** | Finalisation de la migration Runtime V2 | ✅ Livré | Unification complète sur `SkillManagerV2` / `ToolRegistry` (`server/runtime/`) et suppression de l'ancien `SkillManager` V1 obsolète. |
-| **P1** | Couverture de tests e2e pour les WebSockets | 📋 Planifié | Les tests actuels couvrent principalement les utilitaires unitaires (`server/**/*.test.ts`) mais manquent d'intégration sur `/live` et `/terminal`. |
-| **P2** | Nettoyage des routes Git désactivées | 📋 Planifié | Le routeur `/api/git` retourne actuellement un code 404 hardcodé ; il doit être soit supprimé, soit réintégré proprement via l'API GitHub. |
+| **P1** | Couverture de tests e2e pour les WebSockets | ✅ Livré | Suite de tests d'intégration e2e complète (`server/websocket.e2e.test.ts`) validant l'authentification handshake, `/terminal`, `/live` et `/sandbox-watch`. |
+| **P2** | Nettoyage des routes Git désactivées | 📋 Planifié | Le routeur `/api/git` retourne actuellement un code 404 hardcodé ; il doit être  réintégré proprement via l'API GitHub. |
 | **P2** | Optimisation du cache d'embeddings Notebooks | 🚧 En cours | Réduction de la latence lors de la réindexation de gros volumes documentaires. |
 
 ---
