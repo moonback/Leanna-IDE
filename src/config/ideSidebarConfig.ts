@@ -1,13 +1,14 @@
 /**
  * Configuration externe de la sidebar IDE.
- * Organisée en sous-menus par catégorie pour réduire le nombre d'icônes visibles.
+ * Réorganisée en 5 icônes principales par domaine fonctionnel.
  *
  * Icônes visibles (5 au total) :
- * 1. Explorateur (accès direct — le plus utilisé)
- * 2. Fichiers & Code (sous-menu : Recherche)
- * 3. Source & Déploiement (sous-menu : Git, Sandbox, Workflow)
- * 4. Données & Outils (sous-menu : Knowledge, Santé, MCP, Médias)
- * 5. (IA via le menu agent en bas — inchangé)
+ * 1. Explorateur (accès direct)
+ * 2. Code (sous-menu : Recherche, Terminal, Prévisualisation)
+ * 3. Git & CI/CD (sous-menu : Sandbox, Workflow)
+ * 4. Données (sous-menu : Knowledge, Notebooks, Documents, Santé système)
+ * 5. Outils (sous-menu : Agent Builder, Caméra, Partage écran)
+ * (IA via le menu agent en bas — inchangé)
  */
 
 import {
@@ -52,7 +53,7 @@ export interface SidebarSectionConfig {
 
 export const sidebarSections: SidebarSectionConfig[] = [
 
-  // ═══ Explorateur — accès direct (icône toujours visible) ═══
+  // ═══ 1. EXPLORATEUR — accès direct (icône toujours visible) ═══
   {
     id: 'explorer',
     label: 'Explorateur',
@@ -61,7 +62,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
         id: 'explorer',
         type: 'button',
         icon: FolderTree,
-        label: 'Explorateur (Ctrl+Shift+E)',
+        label: 'Explorateur',
         shortcut: 'Ctrl+Shift+E',
         stateKey: 'showExplorer',
         actionKey: 'onToggleExplorer',
@@ -69,51 +70,59 @@ export const sidebarSections: SidebarSectionConfig[] = [
     ],
   },
 
-  // ═══ Code & Recherche ═══
+  // ═══ 2. CODE — sous-menu pour les outils de code ═══
   {
-    id: 'code-exec',
-    label: 'Code & Recherche',
+    id: 'code',
+    label: 'Code',
     items: [
       {
+        id: 'code-menu',
+        type: 'submenu',
+        icon: Terminal,
+        label: 'Code',
+        children: [
+          {
             id: 'search',
             type: 'button',
             icon: Search,
-            label: 'Recherche (Ctrl+Shift+F)',
+            label: 'Recherche',
             shortcut: 'Ctrl+Shift+F',
             stateKey: 'showGlobalSearch',
             actionKey: 'onToggleSearch',
           },
-      {
-        id: 'terminal',
-        type: 'button',
-        icon: Terminal,
-        label: 'Terminal (Ctrl+`)',
-        shortcut: 'Ctrl+`',
-        stateKey: 'showTerminal',
-        actionKey: 'onToggleTerminal',
-      },
-      {
-        id: 'browser',
-        type: 'button',
-        icon: Globe,
-        label: 'Preview (Ctrl+Shift+B)',
-        shortcut: 'Ctrl+Shift+B',
-        stateKey: 'showBrowser',
-        actionKey: 'onToggleBrowser',
+          {
+            id: 'terminal',
+            type: 'button',
+            icon: Terminal,
+            label: 'Terminal',
+            shortcut: 'Ctrl+`',
+            stateKey: 'showTerminal',
+            actionKey: 'onToggleTerminal',
+          },
+          {
+            id: 'browser',
+            type: 'button',
+            icon: Globe,
+            label: 'Prévisualisation',
+            shortcut: 'Ctrl+Shift+B',
+            stateKey: 'showBrowser',
+            actionKey: 'onToggleBrowser',
+          },
+        ],
       },
     ],
   },
 
-  // ═══ Source & Déploiement — sous-menu Git, CI/CD, etc. ═══
+  // ═══ 3. GIT & CI/CD — sous-menu pour versionnement et déploiement ═══
   {
-    id: 'source-deploy',
-    label: 'Source & Déploiement',
+    id: 'git-cicd',
+    label: 'Git & CI/CD',
     items: [
       {
-        id: 'source-menu',
+        id: 'git-menu',
         type: 'submenu',
         icon: GitBranch,
-        label: 'Source & Déploiement',
+        label: 'Git & CI/CD',
         children: [
           {
             id: 'sandbox',
@@ -127,7 +136,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
             id: 'workflow',
             type: 'button',
             icon: Workflow,
-            label: 'Workflow (CI/CD)',
+            label: 'Workflow CI/CD',
             stateKey: 'showWorkflow',
             actionKey: 'onToggleWorkflow',
           },
@@ -136,38 +145,38 @@ export const sidebarSections: SidebarSectionConfig[] = [
     ],
   },
 
-  // ═══ Données & Outils — sous-menu Knowledge, Monitoring, MCP, Médias ═══
+  // ═══ 4. DONNÉES — sous-menu pour knowledge et outils analytiques ═══
   {
-    id: 'data-tools',
-    label: 'Données & Outils',
+    id: 'data',
+    label: 'Données',
     items: [
       {
-        id: 'knowledge',
-        type: 'button',
-        icon: Database,
-        label: 'Knowledge System',
-        stateKey: 'showKnowledge',
-        actionKey: 'onToggleKnowledge',
-      },
-      {
-        id: 'notebooks-panel',
-        type: 'button',
-        icon: BookOpen,
-        label: 'Notebooks RAG',
-        stateKey: 'showNotebooks',
-        actionKey: 'onToggleNotebooks',
-      },
-      {
-        id: 'tools-menu',
+        id: 'data-menu',
         type: 'submenu',
-        icon: Wrench,
-        label: 'Autres outils',
+        icon: Database,
+        label: 'Données',
         children: [
+          {
+            id: 'knowledge',
+            type: 'button',
+            icon: Database,
+            label: 'Knowledge',
+            stateKey: 'showKnowledge',
+            actionKey: 'onToggleKnowledge',
+          },
+          {
+            id: 'notebooks-panel',
+            type: 'button',
+            icon: BookOpen,
+            label: 'Notebooks',
+            stateKey: 'showNotebooks',
+            actionKey: 'onToggleNotebooks',
+          },
           {
             id: 'documents',
             type: 'button',
             icon: FileStack,
-            label: 'Documents (analyse croisée)',
+            label: 'Documents',
             stateKey: 'showDocuments',
             actionKey: 'onToggleDocuments',
           },
@@ -183,15 +192,31 @@ export const sidebarSections: SidebarSectionConfig[] = [
           //   id: 'mcp',
           //   type: 'button',
           //   icon: Cable,
-          //   label: 'Serveurs MCP (outils externes)',
+          //   label: 'Serveurs MCP',
           //   stateKey: 'showMcp',
           //   actionKey: 'onToggleMcp',
           // },
+        ],
+      },
+    ],
+  },
+
+  // ═══ 5. OUTILS — sous-menu pour outils avancés ═══
+  {
+    id: 'tools',
+    label: 'Outils',
+    items: [
+      {
+        id: 'tools-menu',
+        type: 'submenu',
+        icon: Wrench,
+        label: 'Outils',
+        children: [
           {
             id: 'agent-builder',
             type: 'button',
             icon: Wand2,
-            label: 'Agent Builder (créer des agents)',
+            label: 'Agent Builder',
             stateKey: 'showAgentBuilder',
             actionKey: 'onToggleAgentBuilder',
           },
@@ -199,7 +224,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
             id: 'vision',
             type: 'button',
             icon: Camera,
-            label: 'Caméra (Vision)',
+            label: 'Caméra',
             stateKey: 'visionEnabled',
             actionKey: 'onToggleVision',
             requiresAssistant: true,
@@ -208,7 +233,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
             id: 'screen-share',
             type: 'button',
             icon: Monitor,
-            label: "Partage d'écran",
+            label: 'Partage écran',
             stateKey: 'screenShareEnabled',
             actionKey: 'onToggleScreenShare',
             requiresAssistant: true,
@@ -218,7 +243,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
     ],
   },
 
-  // ═══ IA & Agent — items exposés via le flyout du status agent ═══
+  // ═══ IA — items exposés via le flyout du status agent (non compté dans les 5 icônes) ═══
   {
     id: 'ai-agent',
     label: 'Intelligence Artificielle',
@@ -227,7 +252,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
         id: 'chat',
         type: 'button',
         icon: MessageCircle,
-        label: 'Chat IA (Ctrl+L)',
+        label: 'Chat',
         shortcut: 'Ctrl+L',
         stateKey: 'showChat',
         actionKey: 'onToggleChat',
@@ -237,7 +262,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
         id: 'agents',
         type: 'button',
         icon: Bot,
-        label: 'Agents multi-rôles',
+        label: 'Agents',
         stateKey: 'showAgents',
         actionKey: 'onToggleAgents',
         requiresAssistant: true,
@@ -246,17 +271,16 @@ export const sidebarSections: SidebarSectionConfig[] = [
         id: 'fleet',
         type: 'button',
         icon: Users,
-        label: "Flotte d'agents autonomes",
+        label: 'Flotte',
         stateKey: 'showFleet',
         actionKey: 'onToggleFleet',
         requiresAssistant: true,
       },
-
       {
         id: 'missions',
         type: 'button',
         icon: Crosshair,
-        label: 'Missions autonomes',
+        label: 'Missions',
         stateKey: 'showMissions',
         actionKey: 'onToggleMissions',
         requiresAssistant: true,
@@ -265,7 +289,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
         id: 'skills-monitor',
         type: 'button',
         icon: ChartNoAxesColumnIncreasing,
-        label: "Suivi de l'Agent",
+        label: 'Suivi Agent',
         stateKey: 'showSkillsMonitor',
         actionKey: 'onToggleSkillsMonitor',
         requiresAssistant: true,
