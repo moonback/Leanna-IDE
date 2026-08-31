@@ -1,5 +1,5 @@
 /**
- * DocumentExtractor — Extraction automatique des documents du workspace
+ * WorkspaceIndexer — Extraction automatique des documents du workspace
  *
  * Scanne le workspace pour trouver tous les fichiers documentaires
  * (.md, .txt, .rst, .adoc, .tex, .log, .csv) et les indexe automatiquement
@@ -7,12 +7,12 @@
  * via le FileWatcher.
  *
  * Architecture :
- *   DocumentExtractor.extractAll()
+ *   WorkspaceIndexer.extractAll()
  *     ├── walkDirectory() → liste les fichiers documents
  *     ├── extractDocument() → parse chaque fichier
  *     └── documentStore.addDocument() → stocke dans le store
  *
- *   DocumentExtractor.extractFile(relativePath)
+ *   WorkspaceIndexer.extractFile(relativePath)
  *     └── parseDocument() → documentStore.addOrUpdate()
  */
 
@@ -26,7 +26,7 @@ import { isSandboxActive, getSandboxRoot } from "../utils/sandbox.js";
 import { fileWatcher } from "./FileWatcher.js";
 import type { FileChangeEvent } from "./FileWatcher.js";
 
-const log = createLogger("DocumentExtractor");
+const log = createLogger("WorkspaceIndexer");
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
@@ -129,10 +129,10 @@ export interface ExtractionStats {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DocumentExtractor
+// WorkspaceIndexer
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export class DocumentExtractor {
+export class WorkspaceIndexer {
   private extractedPaths: Set<string> = new Set();
 
   /**
@@ -687,4 +687,4 @@ export class DocumentExtractor {
 
 // ─── Singleton ────────────────────────────────────────────────────────────────
 
-export const documentExtractor = new DocumentExtractor();
+export const workspaceIndexer = new WorkspaceIndexer();

@@ -325,11 +325,11 @@ router.get('/watcher', (_req: Request, res: Response) => {
 router.get('/documents', async (_req: Request, res: Response) => {
   try {
     const { getDocumentStore } = await import('../../knowledge/DocumentStore');
-    const { documentExtractor } = await import('../../knowledge/DocumentExtractor');
+    const { workspaceIndexer } = await import('../../knowledge/WorkspaceIndexer.js');
     const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
     const store = getDocumentStore(root);
     const docs = store.getAllDocuments();
-    const extractorStats = documentExtractor.getStats();
+    const extractorStats = workspaceIndexer.getStats();
 
     res.json({
       status: 'success',
@@ -354,10 +354,10 @@ router.get('/documents', async (_req: Request, res: Response) => {
 // POST /api/knowledge/documents/reextract — Force une ré-extraction complète
 router.post('/documents/reextract', async (_req: Request, res: Response) => {
   try {
-    const { documentExtractor } = await import('../../knowledge/DocumentExtractor');
+    const { workspaceIndexer } = await import('../../knowledge/WorkspaceIndexer.js');
     const { getDocumentStore } = await import('../../knowledge/DocumentStore');
     
-    const stats = await documentExtractor.extractAll();
+    const stats = await workspaceIndexer.extractAll();
     
     // Détecter les liens entre documents après extraction
     const store = getDocumentStore();

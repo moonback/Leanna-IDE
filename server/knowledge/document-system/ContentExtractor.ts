@@ -1,5 +1,5 @@
 /**
- * DocumentExtractor — Extraction de contenu depuis différents formats
+ * ContentExtractor — Extraction de contenu depuis différents formats
  *
  * Supporte :
  *   • PDF (via pdf-parse)
@@ -28,7 +28,7 @@ import type {
   DocumentType,
 } from "./types.js";
 
-const log = createLogger("DocumentExtractor");
+const log = createLogger("ContentExtractor");
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Constantes
@@ -38,10 +38,10 @@ const DEFAULT_MAX_CHARS = 200_000;
 const SECTION_ID_PREFIX = "sec_";
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DocumentExtractor
+// ContentExtractor
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export class DocumentExtractor {
+export class ContentExtractor {
 
   /**
    * Extrait le contenu d'un fichier selon son type.
@@ -541,4 +541,4 @@ export class DocumentExtractor {
 // Singleton
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const documentExtractor = new DocumentExtractor();
+export const contentExtractor = new ContentExtractor();

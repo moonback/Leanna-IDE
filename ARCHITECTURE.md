@@ -149,8 +149,14 @@ server/
 ├── knowledge/                  # Moteur de connaissances
 │   ├── KnowledgeGraph.ts       # Graphe de connaissances
 │   ├── ProjectIndexer.ts      # Indexation automatique
+│   ├── WorkspaceIndexer.ts    # Indexation des documents workspace
 │   ├── SemanticSearch.ts       # Recherche semantique
-│   └── FileWatcher.ts          # Surveillance fichiers
+│   ├── FileWatcher.ts          # Surveillance fichiers
+│   └── document-system/       # Système de documents
+│       ├── ContentExtractor.ts # Extraction de contenu (PDF, HTML, etc.)
+│       ├── DocumentAnalyzer.ts # Analyse intelligente via LLM
+│       ├── DocumentMemory.ts   # Stockage persistant
+│       └── DocumentSearchEngine.ts # Recherche sémantique
 ├── mcp/                        # Model Context Protocol
 │   ├── McpBridge.ts            # Bridge MCP
 │   └── McpClient.ts           # Client MCP
@@ -576,3 +582,55 @@ interface ServerMessage {
 2. Appliquer via Supabase Dashboard ou CLI
 3. Creer l'interface TypeScript
 4. Creer le client dans `server/utils/` ou directement dans le service
+
+---
+
+## ⚠️ Points de vigilance architecturale
+
+### 1. Noms de classes uniques
+
+**Problème résolu** : Deux classes `DocumentExtractor` existaient avec des responsabilités différentes.
+
+| Classe | Fichier | Rôle |
+|--------|--------|------|
+| `WorkspaceIndexer` | `server/knowledge/WorkspaceIndexer.ts` | Indexation automatique du workspace (scan filesystem, intégration FileWatcher) |
+| `ContentExtractor` | `server/knowledge/document-system/ContentExtractor.ts` | Extraction de contenu multi-format (PDF, HTML, Markdown, URLs) |
+
+**Utilisation** :
+- `workspaceIndexer` pour l'indexation automatique des fichiers locaux
+- `contentExtractor` pour parser des documents uploadés ou distants
+
+### 2. Composants Frontend - Éviter la duplication
+
+**Structure clarifiée** :
+
+| Type | Dossier | Rôle | À utiliser |
+|------|--------|------|------------|
+| Views | `src/views/` | Vues principales (pleine page) | Pour les pages complètes |
+| IDE Panels | `src/components/ide/` | Wrappers pour l'IDE | `MemoryPanel`, `HistoryPanel` (wrappers) |
+| Standalone Panels | `src/components/panels/` | Panneaux latéraux autonomes | Pour les fonctionnalités côté |
+| Notebook Panels | `src/components/notebooks/` | Composants spécifiques notebooks | `GeneratedDocsPanel` (ex-HistoryPanel) |
+
+**Règles** :
+- ✅ **Utiliser** `src/components/ide/MemoryPanel.tsx` (wrapper de `MemoriesView`) pour l'affichage IDE
+- ✅ **Utiliser** `src/components/ide/HistoryPanel.tsx` (wrapper de `HistoryView`) pour l'affichage IDE
+- ✅ **Utiliser** `src/views/MemoriesView.tsx` pour la vue complète mémoires
+- ✅ **Utiliser** `src/views/HistoryView.tsx` pour la vue complète conversations
+- ✅ **Utiliser** `src/components/notebooks/GeneratedDocsPanel.tsx` pour l'historique des documents générés
+- ❌ **Ne pas utiliser** `panels/MemoryPanel.tsx` (supprimé - duplicate)
+- ❌ **Ne pas utiliser** `panels/ConversationHistoryPanel.tsx` (supprimé - duplicate)
+
+### 3. Routes vs Skills
+
+**Différence fondamentale** :
+
+| Dossier | Rôle | Public |
+|--------|------|--------|
+| `server/routes/*` | Endpoints HTTP (Express Router) | Frontend via REST API |
+| `server/skills/*` | Capacités IA (appelables par Leanna) | SkillManager pour délégation |
+
+**Exemple** :
+- `routes/agents.ts` → Endpoints HTTP pour gérer les agents (`GET /api/agents/status`)
+- `skills/agents.ts` → Skill IA pour déléguer des tâches aux agents (`agent_delegate_task`)
+
+C'est intentionnel et nécessaire pour la séparation des concerns.
