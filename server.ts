@@ -155,13 +155,13 @@ process.on('uncaughtException', (error) => {
         projectIndexer.startWatching();
 
         // 6. Extraction automatique des documents du workspace
-        import("./server/knowledge/DocumentExtractor").then(({ documentExtractor }) => {
-          documentExtractor.extractAll().then(docStats => {
-            console.log(`[DocumentExtractor] ✅ ${docStats.totalExtracted} document(s) extrait(s), ${docStats.totalWords} mots, ${docStats.totalSections} sections (${(docStats.durationMs / 1000).toFixed(1)}s)`);
+        import("./server/knowledge/WorkspaceIndexer.js").then(({ workspaceIndexer }) => {
+          workspaceIndexer.extractAll().then(docStats => {
+            console.log(`[WorkspaceIndexer] ✅ ${docStats.totalExtracted} document(s) extrait(s), ${docStats.totalWords} mots, ${docStats.totalSections} sections (${(docStats.durationMs / 1000).toFixed(1)}s)`);
             // 6b. Activer l'extraction incrémentale
-            documentExtractor.startWatching();
+            workspaceIndexer.startWatching();
           }).catch(e => {
-            console.error('[DocumentExtractor] ❌ Erreur extraction:', e.message);
+            console.error('[WorkspaceIndexer] ❌ Erreur extraction:', e.message);
           });
         });
       }).catch(e => {

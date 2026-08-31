@@ -1,5 +1,5 @@
 /**
- * HistoryPanel — Affichage de l'historique des documents générés
+ * GeneratedDocsPanel — Affichage des documents générés
  * 
  * Ce panneau affiche la liste des documents précédemment générés
  * avec possibilité de les consulter ou supprimer.
@@ -77,7 +77,7 @@ function useFluidTransition() {
   };
 }
 
-export function HistoryPanel({ notebookId, sources, onRefresh, onViewDoc }: Props) {
+export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }: Props) {
   const { success, error: toastError } = useToast();
   const [generatedDocs, setGeneratedDocs] = useState<GeneratedDoc[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<GeneratedDoc | null>(null);

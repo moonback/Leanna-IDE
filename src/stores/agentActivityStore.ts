@@ -37,6 +37,7 @@ let toolActivities: ToolActivityEntry[] = [];
 let agentTasks: AgentTaskEntry[] = [];
 let listeners: Listener[] = [];
 let initialized = false;
+let cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Tool-Agent Mapping
@@ -222,7 +223,33 @@ export function initActivityStore() {
   window.addEventListener('Leanna-tool-done', handleToolDone);
   window.addEventListener('Leanna-agent-event', handleAgentEvent);
   // Cleanup every 3s
-  setInterval(cleanup, 3000);
+  cleanupInterval = setInterval(cleanup, 3000);
+}
+
+/**
+ * Nettoie toutes les ressources du store (event listeners, interval)
+ * Doit être appelé lors de la fermeture de l'application ou du reload
+ * pour éviter les fuites mémoire.
+ */
+export function destroyActivityStore() {
+  if (!initialized) return;
+  
+  // Nettoyer les event listeners
+  window.removeEventListener('Leanna-tool-start', handleToolStart);
+  window.removeEventListener('Leanna-tool-done', handleToolDone);
+  window.removeEventListener('Leanna-agent-event', handleAgentEvent);
+  
+  // Nettoyer l'interval de cleanup
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+  
+  // Réinitialiser l'état
+  toolActivities = [];
+  agentTasks = [];
+  listeners = [];
+  initialized = false;
 }
 
 export function getToolActivities(): ToolActivityEntry[] {

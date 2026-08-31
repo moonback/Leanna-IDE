@@ -13,7 +13,7 @@
 
 import { createLogger } from "../../utils/logger.js";
 import { documentMemory } from "./DocumentMemory.js";
-import { documentExtractor } from "./DocumentExtractor.js";
+import { contentExtractor } from "./ContentExtractor.js";
 import { documentSearchEngine } from "./DocumentSearchEngine.js";
 import type {
   KnowledgeDocument,
@@ -75,7 +75,7 @@ export class DocumentAnalyzer {
     log.info(`Ingestion document: ${fileName}`);
 
     // 1. Extraction du contenu
-    const extraction = await documentExtractor.extract(filePath, mimeType, {
+    const extraction = await contentExtractor.extract(filePath, mimeType, {
       extractEntities: true,
       detectSections: true,
       ...options.extractionOptions,
@@ -97,7 +97,7 @@ export class DocumentAnalyzer {
     const document = documentMemory.addDocument({
       title: fileName.replace(/\.[^.]+$/, ""),
       source: filePath,
-      type: documentExtractor.detectType(fileName, mimeType),
+      type: contentExtractor.detectType(fileName, mimeType),
       mimeType,
       fileSize: extraction.metadata.charCount || extraction.text.length,
       extractedText: extraction.text,
@@ -152,7 +152,7 @@ export class DocumentAnalyzer {
   ): Promise<KnowledgeDocument> {
     log.info(`Ingestion buffer: ${fileName}`);
 
-    const extraction = await documentExtractor.extractFromBuffer(buffer, fileName, mimeType, {
+    const extraction = await contentExtractor.extractFromBuffer(buffer, fileName, mimeType, {
       extractEntities: true,
       detectSections: true,
       ...options.extractionOptions,
@@ -168,7 +168,7 @@ export class DocumentAnalyzer {
     const document = documentMemory.addDocument({
       title: fileName.replace(/\.[^.]+$/, ""),
       source: `upload://${fileName}`,
-      type: documentExtractor.detectType(fileName, mimeType),
+      type: contentExtractor.detectType(fileName, mimeType),
       mimeType,
       fileSize: buffer.length,
       extractedText: extraction.text,
@@ -206,7 +206,7 @@ export class DocumentAnalyzer {
   ): Promise<KnowledgeDocument> {
     log.info(`Ingestion URL: ${url}`);
 
-    const extraction = await documentExtractor.extractFromURL(url, {
+    const extraction = await contentExtractor.extractFromURL(url, {
       extractEntities: true,
       detectSections: true,
     });

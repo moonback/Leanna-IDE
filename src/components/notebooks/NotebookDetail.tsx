@@ -22,7 +22,7 @@ import { SourceViewer } from './SourceViewer.js';
 import { NotebookChat } from './NotebookChat.js';
 import { NotesPanel, type NoteEditorData } from './NotesPanel.js';
 import { GeneratePanel } from './GeneratePanel.js';
-import { HistoryPanel } from './HistoryPanel.js';
+import { GeneratedDocsPanel } from './GeneratedDocsPanel.js';
 import { AudioOverviewPanel } from './AudioOverviewPanel.js';
 import { SourcesPanelSkeleton } from '../ui/Skeleton.js';
 
@@ -316,7 +316,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       case 'generate':
         return <GeneratePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />;
       case 'history':
-        return <HistoryPanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />;
+        return <GeneratedDocsPanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />;
       case 'audio':
         return <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />;
       default:

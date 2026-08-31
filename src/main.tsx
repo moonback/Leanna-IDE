@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfileProvider } from './context/UserProfileContext.js';
 import { ToastProvider } from './components/ui/Toast.js';
+import { ConfirmDialogProvider } from './components/ui/ConfirmDialog.js';
+import { patchConsole } from './utils/logger.js';
 import { LiveAPIContext } from './context/LiveAPIContext.js';
 import { ScreenShareProvider, useScreenShare } from './context/ScreenShareContext.js';
 import { useLiveAPI } from './hooks/useLiveAPI.js';
@@ -530,15 +532,20 @@ function Layout() {
   );
 }
 
+// Patch console in production to suppress console.log/debug noise
+patchConsole();
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <UserProfileProvider>
       <ToastProvider>
-        <BrowserRouter>
-          <AuthGate>
-            <Layout />
-          </AuthGate>
-        </BrowserRouter>
+        <ConfirmDialogProvider>
+          <BrowserRouter>
+            <AuthGate>
+              <Layout />
+            </AuthGate>
+          </BrowserRouter>
+        </ConfirmDialogProvider>
       </ToastProvider>
     </UserProfileProvider>
   </StrictMode>,

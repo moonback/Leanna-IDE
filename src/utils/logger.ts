@@ -43,28 +43,28 @@ export const logger = {
    * Debug level - verbose logging for development
    */
   debug(namespace: string, message: string, ...args: unknown[]): void {
-    log('debug', namespace, message, ...args);
+    _logInternal('debug', namespace, message, ...args);
   },
 
   /**
    * Info level - general information
    */
   info(namespace: string, message: string, ...args: unknown[]): void {
-    log('info', namespace, message, ...args);
+    _logInternal('info', namespace, message, ...args);
   },
 
   /**
    * Warn level - potentially harmful situations
    */
   warn(namespace: string, message: string, ...args: unknown[]): void {
-    log('warn', namespace, message, ...args);
+    _logInternal('warn', namespace, message, ...args);
   },
 
   /**
    * Error level - error events that might still allow the application to continue running
    */
   error(namespace: string, message: string, ...args: unknown[]): void {
-    log('error', namespace, message, ...args);
+    _logInternal('error', namespace, message, ...args);
   },
 
   /**
@@ -86,7 +86,7 @@ export const logger = {
 /**
  * Internal log function that handles the actual logging
  */
-function log(level: LogLevel, namespace: string, message: string, ...args: unknown[]): void {
+function _logInternal(level: LogLevel, namespace: string, message: string, ...args: unknown[]): void {
   if (!defaultConfig.enabled) return;
   
   // Check if this level should be logged
@@ -143,10 +143,96 @@ export function createLogger(namespace: string) {
  * 
  * This provides a drop-in replacement for direct console.log calls
  * while maintaining the same API.
+ * 
+ * In production, only warn and error levels are logged to the console.
+ * Debug and info logs are suppressed in production builds.
  */
-export const log = {
+export const consoleWrapper = {
   debug: (message: string, ...args: unknown[]) => logger.debug('global', message, ...args),
   info: (message: string, ...args: unknown[]) => logger.info('global', message, ...args),
   warn: (message: string, ...args: unknown[]) => logger.warn('global', message, ...args),
   error: (message: string, ...args: unknown[]) => logger.error('global', message, ...args),
 };
+
+// Backwards compatibility alias
+export const log = consoleWrapper;
+
+/**
+ * Development-only console.log wrapper
+ * 
+ * In development: logs to console
+ * In production: no-op (logs nothing)
+ * 
+ * Use this instead of direct console.log() calls to avoid console pollution in production.
+ * 
+ * Example:
+ *   import { devLog } from '../utils/logger';
+ *   devLog('Debug info', someObject); // Only logs in development
+ */
+export function devLog(message: string, ...args: unknown[]): void {
+  if (isDev) {
+    console.log(`[DEV] ${message}`, ...args);
+  }
+}
+
+/**
+ * Production-safe console.log wrapper
+ * 
+ * In development: logs to console with [LOG] prefix
+ * In production: logs only if level is warn or error (respects logger configuration)
+ * 
+ * This is a drop-in replacement for console.log that respects production settings.
+ * 
+ * Example:
+ *   import { safeLog } from '../utils/logger';
+ *   safeLog('Application started'); // Logs in dev, suppressed in prod
+ *   safeLog('Warning!', 'warn'); // Logs in both dev and prod
+ */
+export function safeLog(message: string, level: LogLevel = 'info', ...args: unknown[]): void {
+  switch (level) {
+    case 'debug':
+      logger.debug('global', message, ...args);
+      break;
+    case 'info':
+      logger.info('global', message, ...args);
+      break;
+    case 'warn':
+      logger.warn('global', message, ...args);
+      break;
+    case 'error':
+      logger.error('global', message, ...args);
+      break;
+  }
+}
+
+/**
+ * Patches console.log, console.info, console.debug to use the logger
+ * 
+ * WARNING: This mutates the global console object. Use with caution.
+ * Recommended to call this early in the application initialization.
+ * 
+ * In production, this will suppress most console output (except warnings and errors).
+ */
+export function patchConsole(): void {
+  if (!isDev) {
+    // In production, override console methods to use our logger
+    const originalConsole = { ...console };
+    
+    console.log = (...args: unknown[]) => {
+      logger.info('console', args.join(' '));
+    };
+    console.info = (...args: unknown[]) => {
+      logger.info('console', args.join(' '));
+    };
+    console.debug = (...args: unknown[]) => {
+      // Suppress debug logs in production
+    };
+    // Keep warn and error as-is or redirect to logger
+    console.warn = (...args: unknown[]) => {
+      logger.warn('console', args.join(' '));
+    };
+    console.error = (...args: unknown[]) => {
+      logger.error('console', args.join(' '));
+    };
+  }
+}

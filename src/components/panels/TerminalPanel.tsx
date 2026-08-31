@@ -768,7 +768,7 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive,
           </div>
         ) : (
           lines.map((line, index) => (
-            <div key={index} style={{ minHeight: '1.5em', textAlign: 'left' }}>
+            <div key={`${index}-${line.slice(0, 100)}`} style={{ minHeight: '1.5em', textAlign: 'left' }}>
               {formatAnsiText(line.trimEnd())}
             </div>
           ))

@@ -45,7 +45,7 @@ import { SelfEditBanner } from '../components/ide/SelfEditBanner.js';
 import { SandboxDiffViewer } from '../components/sandbox/SandboxDiffViewer.js';
 import { AgentPanel } from '../components/panels/AgentPanel.js';
 import { AgentBuilderPanel } from '../components/panels/AgentBuilderPanel.js';
-import { initActivityStore } from '../stores/agentActivityStore.js';
+import { initActivityStore, destroyActivityStore } from '../stores/agentActivityStore.js';
 import { MissionPanel } from '../components/panels/MissionPanel.js';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard.js';
 import { AgentFleetPanel } from '../components/panels/AgentFleetPanel.js';
@@ -74,7 +74,10 @@ export default function IdeView() {
   const openSettings = useCallback(() => navigate('/settings'), [navigate]);
 
   // Initialize the global activity store (listens to events even when panel is closed)
-  useEffect(() => { initActivityStore(); }, []);
+  useEffect(() => {
+    initActivityStore();
+    return () => destroyActivityStore();
+  }, []);
 
   // Check if assistant is currently working
   const assistantWorking = activity.some(step => step.status === 'running') || isBusy;

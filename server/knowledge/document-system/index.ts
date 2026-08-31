@@ -4,7 +4,7 @@
  * Système de gestion de connaissances orienté DOCUMENTS.
  * Remplace le paradigme code-centric par une approche documentaire :
  *
- *   DocumentExtractor → extraction de contenu (PDF, TXT, MD, HTML, URL)
+ *   ContentExtractor → extraction de contenu (PDF, TXT, MD, HTML, URL)
  *   DocumentMemory    → stockage persistant (documents, faits, relations)
  *   DocumentSearchEngine → recherche sémantique (BM25, full-text)
  *   DocumentAnalyzer  → analyse intelligente (résumés, faits, relations)
@@ -44,8 +44,8 @@ export type {
   DocumentKnowledgeStats,
 } from "./types.js";
 
-// DocumentExtractor
-export { DocumentExtractor, documentExtractor } from "./DocumentExtractor.js";
+// ContentExtractor
+export { ContentExtractor, contentExtractor } from "./ContentExtractor.js";
 
 // DocumentMemory
 export { DocumentMemory, documentMemory } from "./DocumentMemory.js";

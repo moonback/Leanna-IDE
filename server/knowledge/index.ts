@@ -122,13 +122,13 @@ export {
   type DocumentStoreData,
 } from "./DocumentStore.js";
 
-// Sprint 12 — DocumentExtractor (extraction automatique des documents du workspace)
+// Sprint 12 — WorkspaceIndexer (extraction automatique des documents du workspace)
 export {
-  DocumentExtractor,
-  documentExtractor,
+  WorkspaceIndexer,
+  workspaceIndexer,
   type ExtractedDocument,
   type DocumentSection,
   type DocumentMetadata,
   type ExtractionStats,
-} from "./DocumentExtractor.js";
+} from "./WorkspaceIndexer.js";
 

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Code, Plus, Trash2, RefreshCw, FileCode, X, Search, Layers3, Clock3 } from 'lucide-react';
 import { useToast } from '../components/ui/Toast.js';
+import { useConfirm } from '../components/ui/ConfirmDialog.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 
 interface SnippetSummary {
@@ -19,6 +20,7 @@ interface SnippetDetails {
 
 export default function ListsView() {
   const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const [snippets, setSnippets] = useState<SnippetSummary[]>([]);
   const [selected, setSelected] = useState<SnippetDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,9 +111,16 @@ export default function ListsView() {
 
   const handleDeleteSnippet = useCallback(async () => {
     if (!selected) return;
-    if (!window.confirm(`Supprimer le snippet '${selected.name}' ? Cette action est irréversible.`)) {
-      return;
-    }
+    
+    const confirmed = await confirm({
+      title: 'Supprimer le snippet',
+      message: `Supprimer le snippet '${selected.name}' ? Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+      cancelLabel: 'Annuler',
+      variant: 'danger',
+    });
+    
+    if (!confirmed) return;
 
     setActiveAction('delete');
     try {
@@ -131,7 +140,7 @@ export default function ListsView() {
     } finally {
       setActiveAction(null);
     }
-  }, [selected, loadSnippets, success, toastError]);
+  }, [selected, loadSnippets, success, toastError, confirm]);
 
   const filteredSnippets = snippets.filter(snippet =>
     snippet.name.toLowerCase().includes(searchTerm.toLowerCase().trim())

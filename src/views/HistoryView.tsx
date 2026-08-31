@@ -279,14 +279,14 @@ function formatMessageContent(content: string): React.ReactNode {
     const lines = content.split('\n');
     if (lines.length <= 1) return content;
     return lines.map((line, i) => (
-      <React.Fragment key={i}>
+      <React.Fragment key={`${i}-${line.slice(0, 50)}`}>
         {line}
         {i < lines.length - 1 && <br />}
       </React.Fragment>
     ));
   }
   return paragraphs.map((para, i) => (
-    <p key={i} className={i > 0 ? 'mt-2' : ''}>
+    <p key={`${i}-${para.slice(0, 50)}`} className={i > 0 ? 'mt-2' : ''}>
       {para.split('\n').map((line, j, arr) => (
         <React.Fragment key={j}>
           {line}

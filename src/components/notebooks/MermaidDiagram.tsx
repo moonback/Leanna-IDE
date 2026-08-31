@@ -24,6 +24,7 @@ function initMermaid() {
     // SECURITY: Use 'strict' to sanitize labels/tooltips and disable JS callbacks.
     // This prevents XSS via mermaid diagrams with malicious click handlers.
     // Note: Diagram code can originate from AI-generated notebook content (untrusted).
+    // htmlLabels is disabled to prevent HTML injection in flowchart labels.
     securityLevel: 'strict',
     fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: 12,
@@ -33,7 +34,7 @@ function initMermaid() {
     },
     flowchart: {
       useMaxWidth: true,
-      htmlLabels: true,
+      htmlLabels: false,  // SECURITY: Disable to prevent HTML injection
       curve: 'basis',
     },
   });
