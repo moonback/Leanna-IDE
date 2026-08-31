@@ -16,6 +16,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     showSettings: props.showSettings ?? false,
     showRunMenu: props.showRunMenu ?? false,
     showSandbox: props.showSandbox ?? false,
+    showGitHub: props.showGitHub ?? false,
     showWorkflow: props.showWorkflow ?? false,
     showSkillsMonitor: props.showSkillsMonitor ?? false,
     showChat: props.showChat ?? false,
@@ -35,7 +36,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
   }), [
     props.showExplorer, props.showGlobalSearch,
     props.showSettings, props.showRunMenu,
-    props.showSandbox, props.showWorkflow, props.showSkillsMonitor,
+    props.showSandbox, props.showGitHub, props.showWorkflow, props.showSkillsMonitor,
     props.showChat, props.showAgents, props.showAgentBuilder, props.showMissions,
     props.showKnowledge, props.showDocuments, props.showNotebooks, props.showSystemHealth, props.showMcp,
     props.showFleet, props.showBrowser, props.showTerminal,
@@ -48,6 +49,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     onToggleSettings: props.onToggleSettings ?? noop,
     onToggleRunMenu: props.onToggleRunMenu ?? noop,
     onToggleSandbox: props.onToggleSandbox ?? noop,
+    onToggleGitHub: props.onToggleGitHub ?? noop,
     onToggleWorkflow: props.onToggleWorkflow ?? noop,
     onToggleSkillsMonitor: props.onToggleSkillsMonitor ?? noop,
     onToggleChat: props.onToggleChat ?? noop,
@@ -67,7 +69,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
   }), [
     props.onToggleExplorer, props.onToggleSearch,
     props.onToggleSettings, props.onToggleRunMenu,
-    props.onToggleSandbox, props.onToggleWorkflow, props.onToggleSkillsMonitor,
+    props.onToggleSandbox, props.onToggleGitHub, props.onToggleWorkflow, props.onToggleSkillsMonitor,
     props.onToggleChat, props.onToggleAgents, props.onToggleAgentBuilder, props.onToggleMissions,
     props.onToggleKnowledge, props.onToggleNotebooks, props.onToggleDocuments, props.onToggleSystemHealth, props.onToggleMcp,
     props.onToggleFleet, props.onToggleBrowser, props.onToggleTerminal,

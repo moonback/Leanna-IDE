@@ -13,7 +13,7 @@
 
 import {
   Search,
-  GitBranch, Camera, Monitor,
+  GitBranch, Github, Camera, Monitor,
   MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Cable, Container, Bot, Crosshair, Database,
   Activity, Wrench, Users, FileStack,
@@ -124,6 +124,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
         icon: GitBranch,
         label: 'Git & CI/CD',
         children: [
+          {
+            id: 'github',
+            type: 'button',
+            icon: Github,
+            label: 'GitHub',
+            stateKey: 'showGitHub',
+            actionKey: 'onToggleGitHub',
+          },
           {
             id: 'sandbox',
             type: 'button',

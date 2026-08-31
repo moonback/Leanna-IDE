@@ -6,6 +6,7 @@ const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ defa
 const DocumentPanel = lazy(() => import('../components/panels/DocumentPanel.js').then(m => ({ default: m.DocumentPanel })));
 const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel.js').then(m => ({ default: m.SandboxPanel })));
 const VisionPanel = lazy(() => import('../components/panels/VisionPanel.js').then(m => ({ default: m.VisionPanel })));
+const GitHubPanel = lazy(() => import('../components/ide/GitHubPanel.js').then(m => ({ default: m.GitHubPanel })));
 const DocumentsView = lazy(() => import('./DocumentsView.js'));
 const NotebooksView = lazy(() => import('./NotebooksView.js'));
 const RichDocumentViewerLazy = lazy(() => import('../components/ide/RichDocumentViewer.js').then(m => ({ default: m.RichDocumentViewer })));
@@ -141,6 +142,7 @@ export default function IdeView() {
   const [showRunMenu, setShowRunMenu] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
+  const [showGitHub, setShowGitHub] = useState(false);
   const [showMcp, setShowMcp] = useState(false);
   const [showBrowser, setShowBrowser] = useState(false);
   const [browserUrl, setBrowserUrl] = useState<string | undefined>(undefined);
@@ -700,6 +702,7 @@ export default function IdeView() {
         showGlobalSearch={showGlobalSearch}
         showRunMenu={showRunMenu}
         showSandbox={showSandbox}
+        showGitHub={showGitHub}
         showWorkflow={showWorkflow}
         showSkillsMonitor={showSkillsMonitor}
         showChat={showChat}
@@ -723,6 +726,7 @@ export default function IdeView() {
         onToggleSearch={() => setShowGlobalSearch(v => !v)}
         onToggleRunMenu={() => setShowRunMenu(v => !v)}
         onToggleSandbox={toggleSandbox}
+        onToggleGitHub={() => setShowGitHub(v => !v)}
         onToggleWorkflow={() => setShowWorkflow(v => !v)}
         onToggleSkillsMonitor={() => setShowSkillsMonitor(v => !v)}
         onToggleChat={() => setShowChat(v => !v)}
@@ -1023,6 +1027,13 @@ export default function IdeView() {
             {/* Workflow Panel */}
             {showWorkflow && (
               <WorkflowPanel onClose={() => setShowWorkflow(false)} />
+            )}
+
+            {/* GitHub Panel */}
+            {showGitHub && (
+              <Suspense fallback={null}>
+                <GitHubPanel onClose={() => setShowGitHub(false)} />
+              </Suspense>
             )}
 
             {/* MCP Panel */}
