@@ -514,7 +514,9 @@ export function BrowserPanel({
         })()`;
         const raw = await wv.executeJavaScript(clickScript);
         let parsed: any = {};
-        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch {}
+        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch (e) {
+          console.debug('[BrowserPanel] JSON parse failed (click action):', e, raw);
+        }
         if (parsed?.error) {
           await postActionResult(detail.requestId, null, parsed.error);
           return;
@@ -523,7 +525,8 @@ export function BrowserPanel({
           try {
             const content = await wv.executeJavaScript(`document.body.innerText.substring(0, 3000)`);
             postActionResult(detail.requestId, { content });
-          } catch {
+          } catch (e) {
+            console.debug('[BrowserPanel] Failed to get page content:', e);
             postActionResult(detail.requestId, {});
           }
         }, 1200);
@@ -562,7 +565,9 @@ export function BrowserPanel({
         })()`;
         const raw = await wv.executeJavaScript(typeScript);
         let parsed: any = {};
-        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch {}
+        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch (e) {
+          console.debug('[BrowserPanel] JSON parse failed (type action):', e, raw);
+        }
         if (parsed?.error) {
           await postActionResult(detail.requestId, null, parsed.error);
           return;
@@ -958,7 +963,9 @@ export function BrowserPanel({
         await moveCursorToElement(wv, `[role="${detail.role}"]`).catch(() => {/* ignore si pas trouvé */ });
         const raw = await wv.executeJavaScript(clickByRoleScript);
         let parsed: any = {};
-        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch {}
+        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch (e) {
+          console.debug('[BrowserPanel] JSON parse failed (clickByRole):', e, raw);
+        }
         if (parsed?.error) {
           postActionResult(detail.requestId, null, parsed.error);
           return;
@@ -1057,7 +1064,9 @@ export function BrowserPanel({
       try {
         const raw = await wv.executeJavaScript(typeByLabelScript);
         let parsed: any = {};
-        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch {}
+        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch (e) {
+          console.debug('[BrowserPanel] JSON parse failed (typeByLabel):', e, raw);
+        }
         if (parsed?.error) {
           postActionResult(detail.requestId, null, parsed.error);
           return;
@@ -1216,7 +1225,9 @@ export function BrowserPanel({
       try {
         const raw = await wv.executeJavaScript(script);
         let parsed: any = {};
-        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch {}
+        try { parsed = typeof raw === 'string' && raw.startsWith('{') ? JSON.parse(raw) : {}; } catch (e) {
+          console.debug('[BrowserPanel] JSON parse failed (scrollAndClick):', e, raw);
+        }
         if (!parsed.found) {
           postActionResult(detail.requestId, { found: false });
           return;

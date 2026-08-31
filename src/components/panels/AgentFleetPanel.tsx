@@ -234,7 +234,9 @@ export function AgentFleetPanel({ inline = false, onClose }: AgentFleetPanelProp
       });
 
       setTimeout(() => {
-        fetchJSON<BusMetrics>('/api/agents/bus/metrics').then(setMetrics).catch(() => {});
+        fetchJSON<BusMetrics>('/api/agents/bus/metrics').then(setMetrics).catch((err) => {
+          console.debug('[AgentFleetPanel] Failed to fetch bus metrics:', err);
+        });
       }, 400);
     };
 

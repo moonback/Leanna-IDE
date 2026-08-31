@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BookOpen, RefreshCw, Loader2, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { sanitizeMarkdownHtml, safeMarkdownParse } from '../../utils/sanitizeMarkdownHtml';
 
 interface Props {
   notebookId: string;
@@ -134,73 +135,9 @@ export function SourcesSummaryCard({ notebookId, sourcesCount, sourcesHash }: Pr
                 <div
                   className="text-xs leading-[1.7] space-y-1"
                   style={{ color: 'var(--text-secondary)' }}
-                >
-                  {summary.split('\n').map((line, i) => {
-                    // Headers (### or ##)
-                    if (line.startsWith('### ') || line.startsWith('## ')) {
-                      const text = line.replace(/^#{2,3}\s*/, '');
-                      return (
-                        <p key={i} className="text-xs font-semibold mt-2 mb-0.5" style={{ color: 'var(--text-primary)' }}>
-                          {text}
-                        </p>
-                      );
-                    }
-
-                    // Bold line (entire line is bold)
-                    if (/^\*\*.+\*\*$/.test(line.trim())) {
-                      const text = line.trim().replace(/^\*\*|\*\*$/g, '');
-                      return (
-                        <p key={i} className="text-xs font-semibold mt-1.5 mb-0.5" style={{ color: 'var(--text-primary)' }}>
-                          {text}
-                        </p>
-                      );
-                    }
-
-                    // Inline bold + italic
-                    let rendered = line
-                      .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary);font-weight:600">$1</strong>')
-                      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                      .replace(/`(.*?)`/g, '<code style="background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:3px;font-size:10px;font-family:monospace">$1</code>');
-
-                    // Bullet points
-                    if (/^\s*[-•]\s/.test(line)) {
-                      return (
-                        <div key={i} className="flex gap-1.5 pl-1 my-0.5">
-                          <span className="text-xs mt-px flex-shrink-0" style={{ color: 'var(--accent-primary)', opacity: 0.7 }}>•</span>
-                          <p
-                            className="flex-1"
-                            dangerouslySetInnerHTML={{ __html: rendered.replace(/^\s*[-•]\s*/, '') }}
-                          />
-                        </div>
-                      );
-                    }
-
-                    // Numbered lists
-                    const numMatch = line.match(/^\s*(\d+)[.)]\s+(.*)$/);
-                    if (numMatch) {
-                      const num = numMatch[1];
-                      const rest = rendered.replace(/^\s*\d+[.)]\s*/, '');
-                      return (
-                        <div key={i} className="flex gap-1.5 pl-1 my-0.5">
-                          <span className="text-xs font-medium mt-px flex-shrink-0 w-3 text-right" style={{ color: 'var(--accent-primary)', opacity: 0.7 }}>{num}.</span>
-                          <p className="flex-1" dangerouslySetInnerHTML={{ __html: rest }} />
-                        </div>
-                      );
-                    }
-
-                    // Empty line → spacing
-                    if (line.trim() === '') return <div key={i} className="h-1" />;
-
-                    // Regular paragraph
-                    return (
-                      <p
-                        key={i}
-                        className="my-0.5"
-                        dangerouslySetInnerHTML={{ __html: rendered }}
-                      />
-                    );
-                  })}
-                </div>
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with safeMarkdownParse
+                  dangerouslySetInnerHTML={{ __html: safeMarkdownParse(summary) }}
+                />
               )}
 
               {loading && summary && (

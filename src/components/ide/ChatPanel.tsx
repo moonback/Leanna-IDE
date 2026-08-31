@@ -5,6 +5,7 @@ import {
   Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2,
 } from 'lucide-react';
 import { marked } from 'marked';
+import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile, type UserProfile } from '../../context/UserProfileContext.js';
 import { ActivityFeed } from './ActivityFeed.js';
@@ -108,15 +109,21 @@ const ChatMarkdown = memo(function ChatMarkdown({ text }: { text: string }) {
   const html = useMemo(() => {
     try {
       const result = marked.parse(text, { gfm: true, breaks: true });
-      return typeof result === 'string' ? result : '';
+      return typeof result === 'string' ? sanitizeMarkdownHtml(result) : '';
     } catch {
-      return text;
+      // If parsing fails, escape the original content as plain text
+      const escaped = String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      return `<p>${escaped}</p>`;
     }
   }, [text]);
 
   return (
     <div
       className="chat-markdown"
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with sanitizeMarkdownHtml
       dangerouslySetInnerHTML={{ __html: html }}
       style={{
         fontSize: '0.9rem',

@@ -28,7 +28,7 @@ import { AgentRepairLoop } from "./AgentRepairLoop.js";
 const log = createLogger("AgentExecutor");
 
 /** Handler externe pour exécuter les actions d'un agent */
-export type SkillHandler = (name: string, args: any) => Promise<any>;
+export type SkillHandler<TArgs = unknown, TResult = unknown> = (name: string, args: TArgs) => Promise<TResult>;
 
 interface AgentToolCall {
   name: string;
@@ -632,7 +632,7 @@ ${truncated}
   }
 
   /** Sérialise une observation sans tronquer le contenu des lectures complètes. */
-  private formatToolObservation(toolName: string, result: any): string {
+  private formatToolObservation(toolName: string, result: unknown): string {
     const serialized = JSON.stringify(result) ?? String(result);
     const limit = ["read_project_file", "read_file_outline"].includes(toolName)
       ? AgentExecutor.MAX_FILE_CONTEXT_CHARS
@@ -643,25 +643,44 @@ ${truncated}
     return `- ${toolName}: succès — ${serialized.slice(0, limit)}${suffix}`;
   }
 
-  private formatToolFailure(result: any): string {
+  private formatToolFailure(result: unknown): string {
     if (!result) return "outil sans résultat";
-    const phases = [result.typecheck ?? result.tsc, result.lint, result.test].filter(Boolean);
-    const details = phases.flatMap((phase: any) => [
-      phase.output,
-      phase.stdout,
-      phase.stderr,
-      phase.errors,
-      phase.violations,
-    ].flatMap((value: any) => Array.isArray(value)
-      ? value.map((item) => typeof item === "string" ? item : item?.message ?? JSON.stringify(item))
-      : value ? [String(value)] : []));
-    const issues = Array.isArray(result.allIssues)
-      ? result.allIssues.map((issue: any) => `${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? JSON.stringify(issue)}`)
+    const resultObj = result as Record<string, unknown>;
+    const phases = [resultObj.typecheck ?? resultObj.tsc, resultObj.lint, resultObj.test].filter(Boolean);
+    const details = phases.flatMap((phase: unknown) => {
+      const phaseObj = phase as Record<string, unknown>;
+      return [
+        phaseObj.output,
+        phaseObj.stdout,
+        phaseObj.stderr,
+        phaseObj.errors,
+        phaseObj.violations,
+      ].flatMap((value: unknown) => {
+        if (Array.isArray(value)) {
+          return value.map((item: unknown) => {
+            if (typeof item === "string") return item;
+            const itemObj = item as Record<string, unknown>;
+            return itemObj?.message ?? JSON.stringify(item);
+          });
+        }
+        return value ? [String(value)] : [];
+      });
+    });
+    const issues = Array.isArray(resultObj.allIssues)
+      ? (resultObj.allIssues as Array<Record<string, unknown>>).map((issue) => 
+          `${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? JSON.stringify(issue)}`)
       : [];
-    const streams = [result.stdout, result.stderr, result.message, result.error, ...details, ...issues]
+    const streams = [
+      resultObj.stdout,
+      resultObj.stderr,
+      resultObj.message,
+      resultObj.error,
+      ...details,
+      ...issues
+    ]
       .filter(Boolean)
       .join("\n");
-    return streams.slice(0, 5000) || `outil en échec (code ${result.exitCode ?? "inconnu"})`;
+    return streams.slice(0, 5000) || `outil en échec (code ${(resultObj as { exitCode?: string }).exitCode ?? "inconnu"})`;
   }
 
   private async refreshFileSnapshot(

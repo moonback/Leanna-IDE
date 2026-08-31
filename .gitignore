@@ -13,6 +13,8 @@ release/
 .vscode/
 .Leanna-audit.log
 .Leanna-profile.json
+# TypeScript build info
+*.tsbuildinfo
 # task.md
 Leanna-prompt.md 
 

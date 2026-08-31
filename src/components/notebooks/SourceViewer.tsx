@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { FileText, Loader2, X, RefreshCw, Tag } from 'lucide-react';
 import { marked } from 'marked';
+import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml';
 
 interface SourceData {
   id: string;
@@ -279,44 +280,6 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
 
 /* ─── Markdown / Text renderer ─────────────────────────────────────────────── */
 
-const ALLOWED_TAGS = new Set([
-  'a', 'blockquote', 'br', 'code', 'del', 'em', 'h1', 'h2', 'h3', 'h4',
-  'h5', 'h6', 'hr', 'li', 'ol', 'p', 'pre', 'strong', 'table', 'tbody',
-  'td', 'th', 'thead', 'tr', 'ul', 'sup', 'sub', 'span',
-]);
-
-const ALLOWED_ATTRIBUTES: Record<string, Set<string>> = {
-  a: new Set(['href', 'title']),
-  code: new Set(['class']),
-};
-
-function sanitizeHtml(html: string): string {
-  const template = document.createElement('template');
-  template.innerHTML = html;
-
-  for (const element of Array.from(template.content.querySelectorAll('*'))) {
-    const tagName = element.tagName.toLowerCase();
-    if (!ALLOWED_TAGS.has(tagName)) {
-      element.replaceWith(...Array.from(element.childNodes));
-      continue;
-    }
-    const allowed = ALLOWED_ATTRIBUTES[tagName] ?? new Set<string>();
-    for (const attr of Array.from(element.attributes)) {
-      const name = attr.name.toLowerCase();
-      if (!allowed.has(name) || name.startsWith('on')) {
-        element.removeAttribute(attr.name);
-      }
-    }
-  }
-
-  for (const link of Array.from(template.content.querySelectorAll('a[href]'))) {
-    link.setAttribute('rel', 'noopener noreferrer');
-    link.setAttribute('target', '_blank');
-  }
-
-  return template.innerHTML;
-}
-
 function RenderedContent({ content, type }: { content: string; type?: string }) {
   const html = useMemo(() => {
     if (!content) return '';
@@ -324,7 +287,7 @@ function RenderedContent({ content, type }: { content: string; type?: string }) 
       const isMarkdownLike = type === 'markdown' || type === 'text';
       if (isMarkdownLike) {
         const result = marked.parse(content, { gfm: true, breaks: true });
-        return typeof result === 'string' ? sanitizeHtml(result) : '';
+        return typeof result === 'string' ? sanitizeMarkdownHtml(result) : '';
       }
       // Fallback: wrap in <pre> for other text types
       const escaped = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -338,7 +301,7 @@ function RenderedContent({ content, type }: { content: string; type?: string }) 
     <div
       className="markdown-body max-w-none"
       style={{ color: 'var(--text-primary)' }}
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: controlled HTML from markdown parser
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with sanitizeMarkdownHtml
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

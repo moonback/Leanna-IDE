@@ -508,12 +508,16 @@ export default function IdeView() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'K') {
         e.preventDefault();
         // Créer un checkpoint
-        fetch('/api/checkpoint/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'checkpoint manuel (Ctrl+Shift+K)' }) }).catch(() => {});
+        fetch('/api/checkpoint/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'checkpoint manuel (Ctrl+Shift+K)' }) }).catch((err) => {
+          console.error('[IdeView] Failed to create checkpoint:', err);
+        });
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
         e.preventDefault();
         // Lancer la validation build
-        fetch('/api/safeguards/validate', { method: 'POST' }).catch(() => {});
+        fetch('/api/safeguards/validate', { method: 'POST' }).catch((err) => {
+          console.error('[IdeView] Failed to validate safeguards:', err);
+        });
       }
       // Markdown preview toggle (Ctrl+Shift+M) — only when a .md file is active
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {

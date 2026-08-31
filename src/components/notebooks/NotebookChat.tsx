@@ -507,7 +507,9 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       ttsAbortRef.current = null;
     }
     if (ttsAudioCtxRef.current && ttsAudioCtxRef.current.state !== 'closed') {
-      ttsAudioCtxRef.current.close().catch(() => {});
+      ttsAudioCtxRef.current.close().catch((err) => {
+        console.debug('[NotebookChat] TTS AudioContext close failed:', err);
+      });
       ttsAudioCtxRef.current = null;
     }
     ttsNextStartRef.current = 0;
@@ -606,7 +608,9 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     return () => {
       if (ttsAbortRef.current) ttsAbortRef.current.abort();
       if (ttsAudioCtxRef.current && ttsAudioCtxRef.current.state !== 'closed') {
-        ttsAudioCtxRef.current.close().catch(() => {});
+        ttsAudioCtxRef.current.close().catch((err) => {
+          console.debug('[NotebookChat] TTS AudioContext close failed (cleanup):', err);
+        });
       }
     };
   }, []);
