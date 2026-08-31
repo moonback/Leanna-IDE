@@ -14,9 +14,6 @@ Leanna est un IDE augmenté par l'IA et un système d'exploitation pour dévelop
 [![Desktop](https://img.shields.io/badge/Electron-43.1.0-47848F.svg)](package.json)
 [![AI](https://img.shields.io/badge/%40google%2Fgenai-2.4.0-EA4335.svg)](package.json)
 
-> ⚠️ À compléter : statut CI/build non détecté dans le dépôt (aucun workflow GitHub Actions de CI actif).
-
----
 
 ## Stack technique
 
