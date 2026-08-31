@@ -18,6 +18,7 @@ import {
   Filter, PenLine, Brain, Target, BookOpen, FolderInput,
   FileBarChart, Lightbulb, Zap, X, ArrowRight, ArrowLeft, Presentation,
 } from 'lucide-react';
+import { Tooltip } from '../ui/Tooltip.js';
 import { SlidePreviewModal } from './SlidePreviewModal.js';
 import { useToast } from '../ui/Toast.js';
 import { useProfile } from '../../context/UserProfileContext.js';
@@ -1531,9 +1532,9 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
             {/* Document header — sticky */}
             <div className="flex items-start gap-3 pb-6 border-b sticky top-0 z-10 pt-2 notebooklm-doc-header" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-canvas, var(--bg-base))', backdropFilter: 'blur(12px)' }}>
               {onClose && (
-                <button onClick={onClose} className="notebook-icon-button flex-shrink-0 mt-0.5" title="Retour">
+                <Tooltip content="Retour" as="button" onClick={onClose} className="notebook-icon-button flex-shrink-0 mt-0.5">
                   <ArrowLeft className="h-4 w-4" />
-                </button>
+                </Tooltip>
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">

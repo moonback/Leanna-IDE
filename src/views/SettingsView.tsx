@@ -6,6 +6,7 @@ import {
   User, Cpu, Globe, SlidersHorizontal, Languages,
   Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot
 } from 'lucide-react';
+import { Tooltip } from '../components/ui/Tooltip.js';
 import { useProfile } from '../context/UserProfileContext.js';
 import { useToast } from '../components/ui/Toast.js';
 import {
@@ -142,13 +143,14 @@ export default function SettingsView() {
         {/* Title */}
         <div className="px-4.5 pt-4 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <button
+            <Tooltip
+              content="Retour"
+              as="button"
               onClick={() => navigate(-1)}
               className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-[var(--ctrl-hover)]"
-              title="Retour"
             >
               <ArrowLeft className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
-            </button>
+            </Tooltip>
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-secondary)' }}>
                 Paramètres

@@ -4,6 +4,7 @@ import {
   ExternalLink, RefreshCw, Loader2, X, BookOpen, Eye,
   ChevronDown, ChevronRight, FolderOpen,
 } from 'lucide-react';
+import { Tooltip } from '../ui/Tooltip.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -265,16 +266,17 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
           )}
         </div>
         <div className="flex items-center gap-1">
-          <button
+          <Tooltip
+            content="Rafraîchir"
+            as="button"
             onClick={() => { if (tab === 'repos') fetchRepos(); else if (tab === 'issues') fetchIssues(); else if (tab === 'prs') fetchPRs(); else fetchNotifications(); }}
             className="p-1 rounded hover:bg-white/10"
-            title="Rafraîchir"
           >
             {loading ? <Loader2 size={12} className="animate-spin" style={{ color: 'var(--text-muted)' }} /> : <RefreshCw size={12} style={{ color: 'var(--text-muted)' }} />}
-          </button>
-          <button onClick={onClose} className="p-1 rounded hover:bg-white/10" title="Fermer">
+          </Tooltip>
+          <Tooltip content="Fermer" as="button" onClick={onClose} className="p-1 rounded hover:bg-white/10">
             <X size={12} style={{ color: 'var(--text-muted)' }} />
-          </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -334,9 +336,9 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
                   style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                   onKeyDown={(e) => e.key === 'Enter' && searchRepos()}
                 />
-                <button onClick={searchRepos} className="px-2 py-1 rounded hover:bg-white/10" title="Rechercher">
+                <Tooltip content="Rechercher" as="button" onClick={searchRepos} className="px-2 py-1 rounded hover:bg-white/10">
                   <Search size={12} style={{ color: 'var(--text-muted)' }} />
-                </button>
+                </Tooltip>
               </div>
 
               {repos.map((repo) => (

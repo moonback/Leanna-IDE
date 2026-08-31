@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FileIcon } from './FileIcon.js';
+import { Tooltip } from '../ui/Tooltip.js';
 import {
   Search, X, CaseSensitive, Regex, ChevronRight,
   ChevronDown, Loader2,
@@ -202,22 +203,24 @@ export function GlobalSearch({ onOpenFile, onClose }: GlobalSearchProps) {
 
           {/* Options */}
           <div className="flex items-center gap-0.5 border-l pl-1.5" style={{ borderColor: 'var(--border-base)' }}>
-            <button
-              title="Respecter la casse"
+            <Tooltip
+              content="Respecter la casse"
+              as="button"
               onClick={() => setCaseSensitive(v => !v)}
               className={`rounded p-1 text-xs transition ${caseSensitive ? 'bg-[var(--accent-primary)]/30' : 'hover:bg-white/10'}`}
               style={{ color: caseSensitive ? 'var(--accent-primary)' : 'var(--text-muted)' }}
             >
               <CaseSensitive size={12} />
-            </button>
-            <button
-              title="Expression régulière"
+            </Tooltip>
+            <Tooltip
+              content="Expression régulière"
+              as="button"
               onClick={() => setUseRegex(v => !v)}
               className={`rounded p-1 text-xs transition ${useRegex ? 'bg-[var(--accent-primary)]/30' : 'hover:bg-white/10'}`}
               style={{ color: useRegex ? 'var(--accent-primary)' : 'var(--text-muted)' }}
             >
               <Regex size={12} />
-            </button>
+            </Tooltip>
           </div>
         </div>
       </div>

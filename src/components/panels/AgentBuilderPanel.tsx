@@ -6,6 +6,7 @@ import {
   Palette, Brain, Wrench, Zap, Settings2, Eye,
   Play, RotateCcw, Pencil, Check, AlertTriangle,
 } from 'lucide-react';
+import { Tooltip } from '../ui/Tooltip.js';
 import {
   getCustomAgents, createCustomAgent, updateCustomAgent,
   deleteCustomAgent, duplicateCustomAgent, exportCustomAgents,
@@ -559,14 +560,14 @@ function AgentCard({
         {/* Actions */}
         <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={(e) => e.stopPropagation()}>
-          <button onClick={onDuplicate} className="p-1 rounded hover:bg-white/10" title="Dupliquer"
+          <Tooltip content="Dupliquer" as="button" onClick={onDuplicate} className="p-1 rounded hover:bg-white/10"
             style={{ color: 'var(--text-muted)' }}>
             <Copy size={12} />
-          </button>
-          <button onClick={onDelete} className="p-1 rounded hover:bg-[var(--color-error-subtle)]" title="Supprimer"
+          </Tooltip>
+          <Tooltip content="Supprimer" as="button" onClick={onDelete} className="p-1 rounded hover:bg-[var(--color-error-subtle)]"
             style={{ color: 'var(--color-error)' }}>
             <Trash2 size={12} />
-          </button>
+          </Tooltip>
         </div>
       </div>
     </motion.div>
