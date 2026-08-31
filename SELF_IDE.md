@@ -6,11 +6,13 @@
 
 ## 1. Principe
 
-Leanna un IDE généraliste multi-projets. C'est un IDE : l'application ne peut modifier que le repo qui est ouvert. 
+Leanna est un IDE multi-workspaces sécurisé : l'utilisateur peut ouvrir et basculer entre n'importe quels dépôts externes tout en garantissant que **l'IA et les outils restent strictement confinés au projet actif**. 
 
 Cette contrainte est **structurelle**, pas cosmétique :
-- La racine du projet (`SELF_ROOT`) est résolue une seule fois au démarrage.
-- Tous les accès filesystem passent par une validation de chemin centralisée.
+- Le workspace actif (`SELF_ROOT`) est la source unique de vérité pour toutes les compétences IA, explorateurs et sandbox.
+- L'historique et le registre des dépôts sont stockés dans `.Leanna/workspaces.json` sous la racine interne de l'application (`Leanna_APP_ROOT`).
+- Les chemins système racine (`C:\`, `/`, `C:\Windows`, etc.) sont bloqués dès la pré-validation (`validateWorkspacePath`).
+- Tous les accès filesystem passent par une validation de chemin centralisée et un suivi anti-symlink escape.
 - Les fichiers critiques nécessitent une confirmation explicite avant modification.
 - Chaque écriture crée un checkpoint git automatique (rollback trivial).
 
@@ -18,13 +20,17 @@ Cette contrainte est **structurelle**, pas cosmétique :
 
 ## 2. Le module `selfRoot.ts`
 
-`server/utils/selfRoot.ts` est la **source unique de vérité** pour le périmètre autorisé.
+`server/utils/selfRoot.ts` est la **source unique de vérité** pour le périmètre autorisé et le registre multi-workspaces.
 
 ### Exports
 
 | Export | Type | Rôle |
 |--------|------|------|
-| `SELF_ROOT` | `string` | Racine absolue et immuable du repo Leanna |
+| `SELF_ROOT` | `string` | Racine absolue du workspace actif courant |
+| `listWorkspaces()` | `() => WorkspaceEntry[]` | Retourne la liste des dépôts enregistrés triés par date de dernier accès |
+| `validateWorkspacePath(path)` | `(string) => Promise<WorkspaceValidationResult>` | Valide un chemin candidat, empêche l'accès aux dossiers systèmes et audite les symlinks |
+| `addOrUpdateWorkspace(path, siteUrl?, name?)` | `(...) => WorkspaceEntry` | Enregistre ou actualise un dépôt dans `.Leanna/workspaces.json` |
+| `removeWorkspace(idOrPath)` | `(string) => boolean` | Retire un workspace du registre (sans supprimer les fichiers sur disque) |
 | `normalizeSelfPath(target)` | `(string) => string \| null` | Résout un chemin relatif et vérifie qu'il reste dans `SELF_ROOT`. Retourne `null` si sortie du périmètre |
 | `isWriteForbidden(absPath)` | `(string) => boolean` | `true` si le chemin est totalement interdit en écriture (`.git/config`, `node_modules`…) |
 | `isCriticalFile(absPath)` | `(string) => boolean` | `true` si le fichier nécessite une confirmation utilisateur (`server.ts`, `.env`…) |

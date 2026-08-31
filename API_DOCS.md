@@ -45,6 +45,161 @@ curl -X GET http://127.0.0.1:4000/api/health
 
 ---
 
+## Multi-Workspace & Périmètre Self-Root
+
+### `GET /api/self-root/status`
+
+#### Description
+Retourne l'état actuel du périmètre `SELF_ROOT`, les métadonnées Git du workspace actif et l'état de synchronisation.
+
+#### Authentification
+Non (ou `x-leanna-token` si configuré)
+
+#### Réponse succès (200 OK)
+```json
+{
+  "rootPath": "C:/Users/Mayss/Desktop/mon-projet",
+  "locked": true,
+  "siteUrl": "https://mon-site.com",
+  "gitBranch": "main",
+  "gitStatus": "clean",
+  "lastCommit": "feat: init project",
+  "lastCommitDate": "il y a 2 heures",
+  "aheadBehind": { "ahead": 0, "behind": 0 }
+}
+```
+
+---
+
+### `GET /api/self-root/workspaces`
+
+#### Description
+Retourne la liste de tous les dépôts enregistrés dans `.Leanna/workspaces.json`, triés par date de dernier accès, ainsi que le workspace actif.
+
+#### Authentification
+Non (ou `x-leanna-token` si configuré)
+
+#### Réponse succès (200 OK)
+```json
+{
+  "workspaces": [
+    {
+      "id": "mon_projet_1a2b3c",
+      "name": "Mon Projet",
+      "path": "C:/Users/Mayss/Desktop/mon-projet",
+      "siteUrl": "https://mon-site.com",
+      "lastOpened": "2026-08-31T17:40:00.000Z",
+      "createdAt": "2026-08-31T12:00:00.000Z",
+      "isGit": true,
+      "gitBranch": "main"
+    }
+  ],
+  "activeRoot": "C:/Users/Mayss/Desktop/mon-projet",
+  "siteUrl": "https://mon-site.com"
+}
+```
+
+---
+
+### `POST /api/self-root/workspaces/validate`
+
+#### Description
+Pré-valide la sécurité d'un chemin de dépôt externe avant tentative d'ouverture (vérification d'existence, interdiction des racines systèmes, inspection Git).
+
+#### Authentification
+Non (ou `x-leanna-token` si configuré)
+
+#### Corps de la requête (JSON)
+```json
+{
+  "path": "C:/Users/Mayss/Desktop/mon-projet"
+}
+```
+
+#### Réponse succès (200 OK)
+```json
+{
+  "valid": true,
+  "resolvedPath": "C:/Users/Mayss/Desktop/mon-projet",
+  "isGit": true,
+  "gitBranch": "main",
+  "hasPackageJson": true,
+  "hasTsConfig": true,
+  "suspiciousSymlinksCount": 0
+}
+```
+
+---
+
+### `POST /api/self-root/change`
+
+#### Description
+Bascule le workspace actif vers un nouveau dépôt de manière atomique. Réinitialise le sandbox, recharge le graphe de connaissances et la mémoire projet.
+
+#### Authentification
+Oui / Confirmation interactive (sauf si `userConfirmed: true` depuis l'UI)
+
+#### Corps de la requête (JSON)
+```json
+{
+  "path": "C:/Users/Mayss/Desktop/mon-projet",
+  "userConfirmed": true,
+  "name": "Mon Projet",
+  "siteUrl": "https://mon-site.com"
+}
+```
+
+#### Réponse succès (200 OK)
+```json
+{
+  "status": "success",
+  "newRoot": "C:/Users/Mayss/Desktop/mon-projet",
+  "siteUrl": "https://mon-site.com"
+}
+```
+
+---
+
+### `DELETE /api/self-root/workspaces/:id`
+
+#### Description
+Retire un workspace du registre de l'historique `.Leanna/workspaces.json` sans supprimer les fichiers sur le disque.
+
+#### Authentification
+Non (ou `x-leanna-token` si configuré)
+
+#### Réponse succès (200 OK)
+```json
+{
+  "success": true,
+  "id": "mon_projet_1a2b3c"
+}
+```
+
+---
+
+### `PATCH /api/self-root/workspaces/:id`
+
+#### Description
+Met à jour le nom personnalisé ou l'URL du site associé à un workspace enregistré.
+
+#### Corps de la requête (JSON)
+```json
+{
+  "name": "Nouveau Nom",
+  "siteUrl": "https://doc.mon-site.com"
+}
+```
+
+---
+
+### `POST /api/self-root/clear`
+
+#### Description
+Réinitialise le workspace actif (`SELF_ROOT` remis à vide) et désactive le Sandbox.
+
+---
+
 ## Système de Fichiers & IDE
 
 ### `GET /api/ide/tree`
