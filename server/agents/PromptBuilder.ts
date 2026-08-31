@@ -38,6 +38,10 @@ export class PromptBuilder {
       }
     }
 
+    const allowedToolsList = (agent.capabilities && agent.capabilities.length > 0)
+      ? agent.capabilities.join(", ")
+      : "list_project_files, read_project_file, read_file_outline, search_in_files, write_project_file, apply_patch, verify_file";
+
     parts.push(
       "",
       "## Contrat d'exécution obligatoire",
@@ -51,8 +55,8 @@ export class PromptBuilder {
       "- Fichiers modifiés : ...",
       "- Outils/commandes exécutés : ...",
       "- Vérification : PASS ou FAIL, avec le résultat observé.",
-      "Les seuls appels structurés exécutables sont : list_project_files, read_project_file, read_file_outline, search_in_files, analyze_project_file, write_project_file, apply_patch, patch_project_file, verify_*, reasoning_think et knowledge_*. Ne demande jamais bash, shell, find, ls ou /workspace.",
-      "Pour enrichir la mémoire projet avec des découvertes durables (stack, conventions, architecture), utilise knowledge_memory_add.",
+      `Les seuls appels structurés autorisés pour ton rôle sont : ${allowedToolsList}. Ne demande jamais bash, shell, find, ls ou /workspace.`,
+      "Pour enrichir la mémoire projet avec des découvertes durables (stack, conventions, architecture), utilise knowledge_memory_add si disponible.",
       "Pour déléguer à un autre agent, écris un bloc textuel ## DÉLÉGATION dans ta réponse. N'émets JAMAIS {\"tool_calls\":[{\"name\":\"agent_delegate\"...}]} ni agent_orchestrate — ces outils ne sont pas disponibles ici.",
       "Sans preuve concrète, déclare explicitement la tâche incomplète et explique le blocage."
     );

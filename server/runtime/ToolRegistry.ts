@@ -67,7 +67,7 @@ export class ToolRegistry {
   private readCache = new Map<string, { value: any; expires: number }>();
 
   constructor(config: ToolRegistryConfig = {}) {
-    this.defaultTimeoutMs = config.defaultTimeoutMs ?? 30_000;
+    this.defaultTimeoutMs = config.defaultTimeoutMs ?? 120_000;
     this.enableMetrics = config.enableMetrics ?? true;
     this.eventBus = config.eventBus;
   }

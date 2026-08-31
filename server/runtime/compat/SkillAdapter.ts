@@ -70,9 +70,36 @@ function adaptDeclaration(
       return skill.handleToolCall(decl.name, args, options.context);
     },
     category: options.category ?? skill.name,
-    timeoutMs: options.timeoutMs ?? 30_000,
+    timeoutMs: options.timeoutMs ?? inferTimeout(decl.name),
     permissions: options.permissions ?? inferPermissions(decl.name, skill.name),
   };
+}
+
+const ADAPTED_TOOL_TIMEOUTS: Record<string, number> = {
+  agent_execute: 180_000,
+  reasoning_think: 180_000,
+  agent_orchestrate: 180_000,
+  verify_full: 180_000,
+  verify_typecheck: 120_000,
+  verify_lint: 120_000,
+  verify_file: 60_000,
+  analyze_project_file: 90_000,
+  knowledge_build_context: 90_000,
+  knowledge_impact_analyze: 90_000,
+  knowledge_graph_query: 60_000,
+  knowledge_semantic_search: 45_000,
+  write_project_file: 60_000,
+  apply_patch: 60_000,
+  patch_project_file: 60_000,
+  modify_project_file: 60_000,
+  search_in_files: 45_000,
+  read_project_file: 30_000,
+  read_file_outline: 20_000,
+  list_project_files: 20_000,
+};
+
+function inferTimeout(toolName: string): number {
+  return ADAPTED_TOOL_TIMEOUTS[toolName] ?? 60_000;
 }
 
 /**

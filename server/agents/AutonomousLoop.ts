@@ -21,10 +21,9 @@
  *   - Timeout global dépassé
  *   - Deux itérations consécutives produisent le même résultat (détection de boucle)
  */
-import { randomUUID } from "crypto";
 import type { AgentTask, TaskResult } from "./types.js";
 import { AgentExecutor } from "./AgentExecutor.js";
-import { getAgentDefinition } from "./roles.js";
+import { getAgentDefinitionOrThrow } from "./roles.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("AutonomousLoop");
@@ -99,7 +98,7 @@ export class AutonomousLoop {
    * Peut lancer plusieurs itérations selon la décision interne.
    */
   async run(task: AgentTask): Promise<LoopResult> {
-    const agent = getAgentDefinition(task.role);
+    const agent = getAgentDefinitionOrThrow(task.role);
     const globalStart = Date.now();
     const iterations: IterationRecord[] = [];
     let iteration = 0;
@@ -131,8 +130,8 @@ export class AutonomousLoop {
       const iterStart = Date.now();
 
       // ── ACT : exécuter l'itération ──
+      log.info(`[${agent.name}] 🔄 ACT — itération ${iteration}/${this.config.maxIterations}: "${task.title}"`);
       await this.executor.execute(task);
-
       const iterDuration = Date.now() - iterStart;
       const result = task.result;
 
@@ -166,9 +165,23 @@ export class AutonomousLoop {
       record.decisionReason = decision.reason;
       iterations.push(record);
 
+      const confPct = (observation.confidenceScore * 100).toFixed(0);
+      const verifyTag = observation.verifyErrors.length > 0
+        ? ` | ❌ Erreurs vérif: ${observation.verifyErrors.slice(0, 2).join("; ")}`
+        : " | ✅ Vérifications OK";
+      const retryTag = observation.hasRetrySignal ? " | 🔁 RETRY signal" : "";
+      const filesTag = record.filesWritten.length > 0
+        ? ` | 💾 Fichiers: [${record.filesWritten.join(", ")}]`
+        : "";
+      const deleg = record.delegationsSent > 0 ? ` | 🔀 Délég: ${record.delegationsSent}` : "";
+
       log.info(
-        `[${agent.name}] Itération ${iteration} — confiance: ${(observation.confidenceScore * 100).toFixed(0)}% — décision: ${decision.action} (${decision.reason})`
+        `[${agent.name}] 📊 Itération ${iteration}/${this.config.maxIterations} (${(record.durationMs / 1000).toFixed(1)}s) — Confiance: ${confPct}% | Décision: ${decision.action}${retryTag}${verifyTag}${filesTag}${deleg}`
       );
+      log.debug(`[${agent.name}] Décision raison: ${decision.reason}`);
+      if (result.summary) {
+        log.debug(`[${agent.name}] Résumé itération: ${result.summary.slice(0, 200)}`);
+      }
 
       if (decision.action !== "continue") {
         finalDecision = decision.action;
@@ -191,9 +204,18 @@ export class AutonomousLoop {
     }
 
     const totalDuration = Date.now() - globalStart;
+    const successCount = iterations.filter(i => i.decision === "stop" || (i.filesWritten.length > 0 && !i.retrySignal)).length;
     log.info(
-      `✅ [${agent.name}] AutonomousLoop terminé — ${iteration} itération(s) en ${(totalDuration / 1000).toFixed(1)}s — décision finale: ${finalDecision}`
+      `[${agent.name}] 🏁 AutonomousLoop terminé — ${iteration} itération(s) en ${(totalDuration / 1000).toFixed(1)}s — Décision: ${finalDecision}`
     );
+    if (iterations.length > 1) {
+      const confScores = iterations.map(i => `${i.iteration}:${(i.confidenceScore * 100).toFixed(0)}%`).join(" → ");
+      log.debug(`[${agent.name}] Progression confiance: ${confScores}`);
+      const totalFilesWritten = new Set(iterations.flatMap(i => i.filesWritten)).size;
+      if (totalFilesWritten > 0) {
+        log.info(`[${agent.name}] Total fichiers modifiés sur toutes itérations: ${totalFilesWritten}`);
+      }
+    }
 
     return {
       finalTask: task,
@@ -246,7 +268,7 @@ export class AutonomousLoop {
     // fourni une vérification complète, afin d’éviter le double travail.
     if (result.filesModified?.length && !evidencePassed) {
       try {
-        const { runValidation } = await import("../utils/postEditValidator");
+        const { runValidation } = await import("../utils/postEditValidator.js");
         const buildResult = await runValidation();
         if (!buildResult.valid && buildResult.errors) {
           verifyErrors.push(`build: ${buildResult.errors.slice(0, 500)}`);
@@ -342,7 +364,7 @@ export class AutonomousLoop {
   private decide(
     obs: ObservationReport,
     history: IterationRecord[],
-    currentIteration: number
+    _currentIteration: number
   ): { action: LoopDecision; reason: string } {
     // ── Budget d'erreurs cumulées — arrêt forcé si trop d'erreurs au total ──
     const totalCumulativeErrors = history.reduce(
@@ -359,25 +381,29 @@ export class AutonomousLoop {
     // ── Détection de boucle : comparer les summaries des itérations ──
     if (history.length >= 1) {
       const lastSummary = history[history.length - 1].resultSummary;
+      const lastRecord = history[history.length - 1];
 
       // Comparaison par similarité textuelle entre les deux derniers résumés
+      // Éviter les faux positifs sur résumés très courts (< 40 caractères)
+      const hasSubstantialSummary = (lastSummary?.length ?? 0) >= 40 && (obs.resultSummary?.length ?? 0) >= 40;
       const similarity = this.stringSimilarity(lastSummary, obs.resultSummary);
-      if (similarity > LOOP_DETECTION_SIMILARITY) {
+
+      if (hasSubstantialSummary && similarity > LOOP_DETECTION_SIMILARITY) {
         return {
           action: "stop_loop_detected",
           reason: `Résultat trop similaire au précédent (similarité: ${(similarity * 100).toFixed(0)}%)`,
         };
       }
 
-      // Double vérification : deux itérations successives avec summaries identiques
+      // Double vérification : deux itérations successives avec summaries identiques et sans progrès
       if (history.length >= 2) {
         const prev1 = history[history.length - 1].resultSummary;
         const prev2 = history[history.length - 2].resultSummary;
         const prevSimilarity = this.stringSimilarity(prev1, prev2);
-        if (prevSimilarity > LOOP_DETECTION_SIMILARITY) {
+        if (prevSimilarity > LOOP_DETECTION_SIMILARITY && obs.verifyErrors.length === lastRecord.verifyErrors.length) {
           return {
             action: "stop_loop_detected",
-            reason: `Deux itérations consécutives quasi-identiques détectées (${(prevSimilarity * 100).toFixed(0)}%)`,
+            reason: `Deux itérations consécutives quasi-identiques détectées sans progression (${(prevSimilarity * 100).toFixed(0)}%)`,
           };
         }
       }
@@ -520,8 +546,6 @@ export class AutonomousLoop {
   }
 
   private editDistance(a: string, b: string): number {
-    const m = a.length;
-    const n = b.length;
     // Optimisation : limiter à 200 chars pour ne pas bloquer sur de gros textes
     const sa = a.slice(0, 200);
     const sb = b.slice(0, 200);

@@ -1,112 +1,35 @@
 /**
- * Tests pour MessageBusMonitor
- * 
- * Teste :
- * - Collection de métriques
- * - Détection d'anomalies
- * - Génération de rapports
- * - Fonctionnalités de surveillance
+ * Tests pour MessageBusMonitor (Node test runner)
  */
 
-import { describe, it, expect, beforeEach, vi, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "events";
+import { describe, it, beforeEach } from "node:test";
+import assert from "node:assert/strict";
 import {
   MessageBusMonitor,
   messageBusMonitor,
-  type MonitorAlert,
-  type HealthStatus
 } from "./MessageBusMonitor.js";
 import { agentMessageBus } from "./AgentMessageBus.js";
-
-// Mock du logger
-vi.mock("../utils/logger", () => ({
-  createLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  })
-}));
-
-// Mock de l'agentMessageBus
-vi.mock("./AgentMessageBus", () => {
-  
-  class MockAgentMessageBus extends EventEmitter {
-    private messages: any[] = [];
-    
-    constructor() {
-      super();
-    }
-    
-    publish(message: any) {
-      this.messages.push(message);
-      this.emit("message", message);
-    }
-    
-    getMonitoringReport() {
-      return {
-        bus: {
-          totalMessages: this.messages.length,
-          successRate: 1,
-          byMessageType: {},
-          pendingRequests: 0,
-          activeSubscriptions: 0,
-          deadLetterQueue: {}
-        },
-        routing: {
-          strategyUsage: {
-            direct: this.messages.length,
-            broadcast: 0,
-            "round-robin": 0,
-            "load-balanced": 0
-          },
-          agentLoad: {},
-          roundRobinState: {}
-        },
-        traceEnabled: true,
-        timestamp: new Date().toISOString()
-      };
-    }
-    
-    getMetrics() {
-      return {
-        totalMessages: this.messages.length,
-        successRate: 1,
-        byAgentRole: {},
-        byMessageType: {},
-        pendingRequests: 0,
-        activeSubscriptions: 0,
-        deadLetterQueue: {}
-      };
-    }
-  }
-  
-  return {
-    agentMessageBus: new MockAgentMessageBus()
-  };
-});
 
 describe("MessageBusMonitor", () => {
   let monitor: MessageBusMonitor;
 
   beforeEach(() => {
     monitor = new MessageBusMonitor();
-    vi.clearAllMocks();
   });
 
   // ─── Tests de base ───────────────────────────────────────────────────────
   
   describe("Initialisation", () => {
     it("devrait créer une instance avec des valeurs par défaut", () => {
-      expect(monitor).toBeInstanceOf(MessageBusMonitor);
+      assert.ok(monitor instanceof MessageBusMonitor);
     });
 
     it("devrait avoir un état de santé initial valide", () => {
       const health = monitor.getHealthStatus();
       
-      expect(health.healthy).toBe(true);
-      expect(health.issues).toHaveLength(0);
-      expect(health.metrics.uptime).toBeGreaterThan(0);
+      assert.equal(health.healthy, true);
+      assert.equal(health.issues.length, 0);
+      assert.ok(health.metrics.uptime >= 0);
     });
   });
 
@@ -116,13 +39,13 @@ describe("MessageBusMonitor", () => {
     it("devrait retourner un état sain initialement", () => {
       const health = monitor.getHealthStatus();
       
-      expect(health.healthy).toBe(true);
-      expect(health.issues).toEqual([]);
+      assert.equal(health.healthy, true);
+      assert.deepEqual(health.issues, []);
     });
 
     it("devrait détecter un taux de succès bas comme problème", () => {
-      // Simuler un taux de succès bas
-      vi.spyOn(agentMessageBus, "getMonitoringReport").mockReturnValue({
+      const originalMethod = agentMessageBus.getMonitoringReport;
+      agentMessageBus.getMonitoringReport = () => ({
         bus: {
           totalMessages: 100,
           successRate: 0.7, // 70% - en dessous de 90%
@@ -133,21 +56,25 @@ describe("MessageBusMonitor", () => {
         },
         routing: {
           strategyUsage: { direct: 100, broadcast: 0, "round-robin": 0, "load-balanced": 0 },
-          agentLoad: {},
-          roundRobinState: {}
+          agentLoad: {} as any,
+          roundRobinState: {} as any
         },
         traceEnabled: true,
         timestamp: new Date().toISOString()
       });
 
-      const health = monitor.getHealthStatus();
-      
-      expect(health.healthy).toBe(false);
-      expect(health.issues).toContain("Taux de succès bas");
+      try {
+        const health = monitor.getHealthStatus();
+        assert.equal(health.healthy, false);
+        assert.ok(health.issues.some((issue) => issue.includes("succès")));
+      } finally {
+        agentMessageBus.getMonitoringReport = originalMethod;
+      }
     });
 
     it("devrait détecter une dead-letter queue trop grande", () => {
-      vi.spyOn(agentMessageBus, "getMonitoringReport").mockReturnValue({
+      const originalMethod = agentMessageBus.getMonitoringReport;
+      agentMessageBus.getMonitoringReport = () => ({
         bus: {
           totalMessages: 100,
           successRate: 1,
@@ -158,17 +85,20 @@ describe("MessageBusMonitor", () => {
         },
         routing: {
           strategyUsage: { direct: 100, broadcast: 0, "round-robin": 0, "load-balanced": 0 },
-          agentLoad: {},
-          roundRobinState: {}
+          agentLoad: {} as any,
+          roundRobinState: {} as any
         },
         traceEnabled: true,
         timestamp: new Date().toISOString()
       });
 
-      const health = monitor.getHealthStatus();
-      
-      expect(health.healthy).toBe(false);
-      expect(health.issues).toContain("Dead-letter queue trop grande");
+      try {
+        const health = monitor.getHealthStatus();
+        assert.equal(health.healthy, false);
+        assert.ok(health.issues.some((issue) => issue.includes("Dead-letter")));
+      } finally {
+        agentMessageBus.getMonitoringReport = originalMethod;
+      }
     });
   });
 
@@ -178,24 +108,24 @@ describe("MessageBusMonitor", () => {
     it("devrait générer un dashboard textuel", () => {
       const dashboard = monitor.generateDashboard();
       
-      expect(typeof dashboard).toBe("string");
-      expect(dashboard).toContain("TABLEAU DE BORD");
-      expect(dashboard).toContain("ÉTAT DE SANTÉ");
-      expect(dashboard).toContain("ROUTAGE");
+      assert.equal(typeof dashboard, "string");
+      assert.ok(dashboard.includes("TABLEAU DE BORD"));
+      assert.ok(dashboard.includes("ÉTAT DE SANTÉ"));
+      assert.ok(dashboard.includes("ROUTAGE"));
     });
 
     it("devrait générer un graphe de flux vide initialement", () => {
       const graph = monitor.generateMessageFlowGraph();
       
-      expect(graph.nodes).toHaveLength(0);
-      expect(graph.edges).toHaveLength(0);
+      assert.equal(graph.nodes.length, 0);
+      assert.equal(graph.edges.length, 0);
     });
 
     it("devrait générer une visualisation ASCII du graphe", () => {
       const ascii = monitor.generateASCIIFlowGraph();
       
-      expect(typeof ascii).toBe("string");
-      expect(ascii).toContain("GRAPHE DE FLUX");
+      assert.equal(typeof ascii, "string");
+      assert.ok(ascii.includes("GRAPHE DE FLUX"));
     });
   });
 
@@ -204,13 +134,12 @@ describe("MessageBusMonitor", () => {
   describe("Configuration", () => {
     it("devrait configurer la taille maximale de l'historique", () => {
       monitor.setMaxHistorySize(200);
-      // On ne peut pas vérifier directement car c'est privé, mais pas d'erreur
-      expect(true).toBe(true);
+      assert.ok(true);
     });
 
     it("devrait configurer le nombre maximal de métriques agrégées", () => {
       monitor.setMaxAggregatedMetrics(100);
-      expect(true).toBe(true);
+      assert.ok(true);
     });
   });
 
@@ -218,13 +147,12 @@ describe("MessageBusMonitor", () => {
   
   describe("Nettoyage", () => {
     it("devrait réinitialiser toutes les données", () => {
-      // Ajouter des données
       // @ts-ignore - Accès interne pour le test
       monitor.alerts.set("test", { id: "test", severity: "info", type: "test", title: "Test", message: "Test", timestamp: new Date().toISOString() });
       
       monitor.reset();
       
-      expect(monitor.getActiveAlerts()).toHaveLength(0);
+      assert.equal(monitor.getActiveAlerts().length, 0);
     });
   });
 });
@@ -233,6 +161,6 @@ describe("MessageBusMonitor", () => {
 
 describe("MessageBusMonitor Singleton", () => {
   it("devrait exporter une instance singleton", () => {
-    expect(messageBusMonitor).toBeInstanceOf(MessageBusMonitor);
+    assert.ok(messageBusMonitor instanceof MessageBusMonitor);
   });
 });

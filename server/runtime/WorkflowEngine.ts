@@ -65,7 +65,7 @@ export class WorkflowEngine {
   constructor(config: WorkflowEngineConfig) {
     this.tools = config.tools;
     this.eventBus = config.eventBus;
-    this.defaultStepTimeoutMs = config.defaultStepTimeoutMs ?? 30_000;
+    this.defaultStepTimeoutMs = config.defaultStepTimeoutMs ?? 120_000;
   }
 
   // ─── Gestion des workflows ─────────────────────────────────────────────────
@@ -224,7 +224,7 @@ export class WorkflowEngine {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         const result = await this.tools.call(step.action, resolvedArgs, {
-          timeoutMs: step.timeoutMs ?? this.defaultStepTimeoutMs,
+          timeoutMs: step.timeoutMs,
         });
 
         return {

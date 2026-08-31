@@ -7,12 +7,16 @@
 import type { AgentTask, OrchestrationPlan, TaskResult } from "./types.js";
 import { getAgentDefinition } from "./roles.js";
 import { AgentExecutor } from "./AgentExecutor.js";
+import { ProgressNotifier } from "./ProgressNotifier.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("TaskScheduler");
 
 export class TaskScheduler {
-  constructor(private executor: AgentExecutor) {}
+  constructor(
+    private executor: AgentExecutor,
+    private notifier?: ProgressNotifier
+  ) {}
 
   /**
    * Exécute un plan d'orchestration complet.
@@ -60,6 +64,7 @@ export class TaskScheduler {
               durationMs: 0,
             };
             failed.add(b.id);
+            this.notifier?.notify(b, "failed");
           }
           break;
         }
@@ -72,6 +77,8 @@ export class TaskScheduler {
 
       // Lancer les tâches prêtes en parallèle
       const executions = ready.map(async (task) => {
+        const taskShortId = task.id.slice(0, 8);
+        const agentName = getAgentDefinition(task.role)?.name ?? task.role;
         // Injecter les résultats des dépendances dans le contexte
         const deps = plan.dependencies[task.id] ?? [];
         const previousResults: TaskResult[] = deps
@@ -80,14 +87,20 @@ export class TaskScheduler {
 
         if (previousResults.length > 0) {
           task.context.previousResults = previousResults;
+          log.debug(`[${orchShortId}] [task:${taskShortId}] [${agentName}] Contexte injecté: ${previousResults.length} résultat(s) de dépendance(s)`);
         }
 
+        log.info(`[${orchShortId}] [task:${taskShortId}] ➤ [${agentName}] Lancement: "${task.title}" | Dépendances satisfaites: ${deps.length > 0 ? deps.map(d => d.slice(0, 8)).join(", ") : "aucune"}`);
+        const taskStart = Date.now();
         await this.executor.execute(task);
+        const taskMs = Date.now() - taskStart;
 
         if (task.status === "completed") {
           completed.add(task.id);
+          log.info(`[${orchShortId}] [task:${taskShortId}] ✅ [${agentName}] Terminé en ${(taskMs / 1000).toFixed(1)}s | Progression: ${completed.size + failed.size}/${plan.tasks.length}`);
         } else {
           failed.add(task.id);
+          log.warn(`[${orchShortId}] [task:${taskShortId}] ❌ [${agentName}] Échoué en ${(taskMs / 1000).toFixed(1)}s — ${task.result?.error ?? "raison inconnue"} | Progression: ${completed.size + failed.size}/${plan.tasks.length}`);
         }
       });
 
@@ -109,6 +122,7 @@ export class TaskScheduler {
             durationMs: 0,
           };
           failed.add(task.id);
+          this.notifier?.notify(task, "failed");
           log.warn(`[${orchShortId}] Tâche "${task.title}" annulée (dépendance échouée)`);
         }
       }

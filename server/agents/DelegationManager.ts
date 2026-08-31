@@ -208,7 +208,7 @@ export class DelegationManager {
         }
         
         // Sinon, c'est une délégation unique
-        const delegation = this.parseSingleDelegation(parsed, fromRole, 0);
+        const delegation = this.parseSingleDelegation(parsed, fromRole, 0, true);
         return delegation ? [delegation] : [];
       }
       
@@ -229,12 +229,14 @@ export class DelegationManager {
   private parseSingleDelegation(
     data: unknown,
     fromRole: AgentRole,
-    index: number
+    index: number,
+    throwOnError = false
   ): StructuredDelegation | null {
     try {
       const validated = structuredDelegationSchema.parse(data);
       return this.validateAndEnrichDelegation(validated, fromRole);
     } catch (error) {
+      if (throwOnError) throw error;
       log.warn(`Délégation #${index} invalide : ${(error as Error).message}`);
       return null;
     }
@@ -412,7 +414,7 @@ export class DelegationManager {
         type: "task_request",
         from: fromRole,
         to: validatedDelegation.targetRole,
-        priority: validatedDelegation.priority,
+        priority: validatedDelegation.priority ?? "medium",
         timestamp,
         payload: messagePayload,
         correlationId: delegationId

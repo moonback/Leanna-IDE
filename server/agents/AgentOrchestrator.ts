@@ -36,7 +36,7 @@ export class AgentOrchestrator {
   // Composants spécialisés
   private notifier = new ProgressNotifier();
   private executor = new AgentExecutor(this.notifier);
-  private scheduler = new TaskScheduler(this.executor);
+  private scheduler = new TaskScheduler(this.executor, this.notifier);
 
   // Registry des agents autonomes (partagé via singleton)
   private registry: AgentRegistry = agentRegistry;
@@ -458,19 +458,34 @@ export class AgentOrchestrator {
     const byStatus: Record<TaskStatus, number> = {
       pending: 0, running: 0, completed: 0, incomplete: 0, failed: 0, cancelled: 0,
     };
-    const byRole: Record<AgentRole, number> = {
-      writer: 0, formatter: 0, researcher: 0, proofreader: 0, translator: 0, summarizer: 0, planner: 0,
+    const byRole: Record<string, number> = {
+      coder: 0,
+      refactor: 0,
+      debugger: 0,
+      reviewer: 0,
+      tester: 0,
+      security: 0,
+      architect: 0,
+      writer: 0,
+      formatter: 0,
+      researcher: 0,
+      proofreader: 0,
+      translator: 0,
+      summarizer: 0,
+      planner: 0,
     };
 
     for (const task of allTasks) {
-      byStatus[task.status]++;
-      byRole[task.role]++;
+      if (byStatus[task.status] !== undefined) {
+        byStatus[task.status]++;
+      }
+      byRole[task.role] = (byRole[task.role] ?? 0) + 1;
     }
 
     const activeOrchestrations = Array.from(this.orchestrations.values())
       .filter((o) => o.status === "running" || o.status === "pending").length;
 
-    return { totalTasks: allTasks.length, byStatus, byRole, activeOrchestrations };
+    return { totalTasks: allTasks.length, byStatus, byRole: byRole as Record<AgentRole, number>, activeOrchestrations };
   }
 }
 

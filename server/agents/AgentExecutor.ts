@@ -173,8 +173,9 @@ export class AgentExecutor {
     const timeoutMs = AgentExecutor.TOOL_TIMEOUTS[toolName] ?? 
                      AgentExecutor.TOOL_TIMEOUTS['default'];
     
+    let timer: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timer = setTimeout(() => {
         reject(new Error(`Outil timeout après ${timeoutMs}ms`));
       }, timeoutMs);
     });
@@ -191,6 +192,10 @@ export class AgentExecutor {
         throw new Error(`[${toolName}] ${(error as Error).message}`);
       }
       throw error;
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
     }
   }
 
@@ -251,31 +256,41 @@ export class AgentExecutor {
     this.incrementRunning(task.role);
     this.notifier.notify(task, "started");
 
+    log.info(`[task:${taskShortId}] 🟡 [${agent.name}] Rôle: ${task.role} | Titre: "${task.title}" | Fichiers contexte: ${task.context.files.length}`);
+
     try {
       // ── Étape 1: Découverte puis lecture bornée du contexte ──
-      // Les audits sans fichiers explicites doivent examiner le dépôt, pas demander
-      // au modèle de fournir lui-même une archive ou des chemins locaux.
-      log.debug(`[${agent.name}] Préparation du contexte projet...`);
+      log.debug(`[task:${taskShortId}] [${agent.name}] 📂 Étape 1/5 — Résolution des fichiers de contexte...`);
       const contextFiles = await this.resolveContextFiles(task, agent.capabilities);
       const fileContents = await this.readContextFiles(contextFiles);
+      log.debug(`[task:${taskShortId}] [${agent.name}] 📂 Contexte résolu — ${contextFiles.length} fichier(s) chargé(s): [${contextFiles.slice(0, 4).join(", ")}${contextFiles.length > 4 ? ` +${contextFiles.length - 4}` : ""}]`);
 
       // ── Étape 2: Construction du prompt ──
+      log.debug(`[task:${taskShortId}] [${agent.name}] 📝 Étape 2/5 — Construction du prompt...`);
       const executionPrompt = this.promptBuilder.build(agent, task, fileContents);
-      log.debug(`[${agent.name}] Prompt: ${executionPrompt.length} chars`);
+      log.debug(`[task:${taskShortId}] [${agent.name}] 📝 Prompt construit — ${executionPrompt.length} caractères`);
 
       // ── Étape 3: Exécution directe par l'agent ──
-      log.debug(`[${agent.name}] Exécution via agent_execute...`);
+      log.info(`[task:${taskShortId}] [${agent.name}] 🤖 Étape 3/5 — Exécution agent_execute (LLM)...`);
       const thinkResult = await this.callToolWithTimeout("agent_execute", {
         prompt: executionPrompt,
       });
 
       const initialResultText = this.resultParser.normalizeResult(thinkResult);
+      log.debug(`[task:${taskShortId}] [${agent.name}] 🤖 Réponse initiale: ${initialResultText.length} chars`);
       const toolExecution = await this.executeToolLoop(agent, executionPrompt, initialResultText);
       const resultText = toolExecution.resultText;
-      log.debug(`[${agent.name}] Résultat final: ${resultText.length} chars après ${toolExecution.observations.length} observation(s) d'outil`);
+      log.info(`[task:${taskShortId}] [${agent.name}] 🔧 Boucle outils terminée — ${toolExecution.toolsExecuted.length} outil(s) exécuté(s), ${toolExecution.filesRead.length} fichier(s) lu(s), ${toolExecution.filesModified.length} fichier(s) modifié(s), ${toolExecution.errors.length} erreur(s)`);
 
       // ── Étape 4: Matérialisation et vérification des modifications ──
+      log.debug(`[task:${taskShortId}] [${agent.name}] 💾 Étape 4/5 — Écriture et vérification des fichiers...`);
       const generatedWriteResult = await this.fileWriter.writeFromAgentOutput(task, resultText);
+      if (generatedWriteResult.written.length > 0) {
+        log.debug(`[task:${taskShortId}] [${agent.name}] 💾 Fichiers écrits par FileWriter: [${generatedWriteResult.written.join(", ")}]`);
+      }
+      if (generatedWriteResult.errors.length > 0) {
+        log.warn(`[task:${taskShortId}] [${agent.name}] 💾 Erreurs d'écriture FileWriter: ${generatedWriteResult.errors.map(e => `${e.path}: ${e.error}`).join(" | ")}`);
+      }
       const generatedRegistration = await this.registerGeneratedWrites(generatedWriteResult.written, toolExecution);
       const writeResult = {
         written: [...new Set([...toolExecution.filesModified, ...generatedRegistration.verified])],
@@ -288,6 +303,9 @@ export class AgentExecutor {
 
       // Extraire les opérations de mémoire projet des observations
       const memoryOperations = this.extractMemoryOperations(toolExecution.observations);
+
+      log.debug(`[task:${taskShortId}] [${agent.name}] 🔍 Étape 5/5 — Évaluation des preuves d'exécution...`);
+      log.debug(`[task:${taskShortId}] [${agent.name}] 🔍 Fichiers écrits+vérifiés: [${writeResult.written.join(", ") || "aucun"}] | Erreurs: ${writeResult.errors.length} | Vérification: ${success ? "PASS ✅" : "FAIL ❌"}`);
 
       // Un texte non exceptionnel ne suffit jamais : completed nécessite des preuves
       // observables collectées par l'exécuteur, pas seulement déclarée par le modèle.
@@ -307,18 +325,26 @@ export class AgentExecutor {
       };
 
       if (!success) {
-        log.warn(`⚠️ [${agent.name}] Résultat incomplet — ${incompleteReason}`);
+        log.warn(`[task:${taskShortId}] ⚠️ [${agent.name}] Résultat incomplet après ${(durationMs / 1000).toFixed(1)}s — Cause: ${incompleteReason}`);
+        if (toolExecution.errors.length > 0) {
+          log.warn(`[task:${taskShortId}] [${agent.name}] Erreurs outils: ${toolExecution.errors.slice(0, 3).join(" | ")}`);
+        }
         this.notifier.notify(task, "failed");
         return;
+      }
+
+      if (memoryOperations.length > 0) {
+        log.info(`[task:${taskShortId}] [${agent.name}] 🧠 ${memoryOperations.length} entrée(s) mémoire projet enregistrée(s)`);
       }
 
       // ── Étape 5: Les délégations ne partent qu'après une exécution vérifiée ──
       const subTaskIds = await this.dispatchDelegations(task, resultText);
       if (subTaskIds.length > 0) {
         task.result.delegatedSubTasks = subTaskIds;
+        log.info(`[task:${taskShortId}] [${agent.name}] 🔀 ${subTaskIds.length} sous-tâche(s) déléguée(s): [${subTaskIds.map(id => id.slice(0, 8)).join(", ")}]`);
       }
 
-      log.info(`[task:${taskShortId}] ✅ [${agent.name}] Terminé en ${(durationMs / 1000).toFixed(1)}s — ${task.result.summary}`);
+      log.info(`[task:${taskShortId}] ✅ [${agent.name}] Terminé en ${(durationMs / 1000).toFixed(1)}s — ${writeResult.written.length} fichier(s) modifié(s) — ${task.result.summary}`);
       this.notifier.notify(task, "completed");
     } catch (error) {
       const durationMs = Date.now() - startTime;
@@ -331,10 +357,15 @@ export class AgentExecutor {
         durationMs,
       };
 
-      log.error(`[task:${taskShortId}] ❌ [${agent.name}] Échec après ${(durationMs / 1000).toFixed(1)}s: ${(error as Error).message}`);
+      log.error(`[task:${taskShortId}] ❌ [${agent.name}] Échec après ${(durationMs / 1000).toFixed(1)}s`);
+      log.error(`[task:${taskShortId}] [${agent.name}] Erreur: ${(error as Error).message}`);
+      if ((error as Error).stack) {
+        log.debug(`[task:${taskShortId}] [${agent.name}] Stack: ${(error as Error).stack?.split("\n").slice(0, 4).join(" | ")}`);
+      }
       this.notifier.notify(task, "failed");
     } finally {
       this.decrementRunning(task.role);
+      log.debug(`[task:${taskShortId}] [${agent.name}] Concurrence: ${this.getRunningCount(task.role)} tâche(s) en cours pour ce rôle`);
     }
   }
 
@@ -382,7 +413,14 @@ export class AgentExecutor {
 
     for (let turn = 0; turn < AgentExecutor.MAX_TOOL_TURNS; turn++) {
       const calls = this.extractToolCalls(state.resultText);
-      if (calls.length === 0) break;
+      if (calls.length === 0) {
+        if (turn === 0) {
+          log.debug(`[${agent.name}] Aucun appel d'outil détecté — réponse directe sans outil`);
+        }
+        break;
+      }
+
+      log.info(`[${agent.name}] 🔧 Tour ${turn + 1}/${AgentExecutor.MAX_TOOL_TURNS} — ${calls.length} appel(s) d'outil: [${calls.map(c => c.name).join(", ")}]`);
 
       // Si on atteint l'avant-dernier tour, forcer la synthèse après exécution
       const isLastAllowedTurn = turn >= AgentExecutor.MAX_TOOL_TURNS - 2;
@@ -842,8 +880,12 @@ ${truncated}
       }
 
       try {
-        log.info(`[${agent.name}] Exécution outil structuré: ${call.name} args=${JSON.stringify(call.parameters).slice(0, 200)}`);
+        const argSummary = JSON.stringify(call.parameters).slice(0, 150);
+        log.debug(`[${agent.name}] ⚙️  ${call.name}(${argSummary})`);
+        const toolStart = Date.now();
         const result = await this.callToolWithTimeout(call.name, call.parameters);
+        const toolMs = Date.now() - toolStart;
+        log.debug(`[${agent.name}] ⚙️  ${call.name} → ${result?.status ?? (result?.ok === false ? "failed" : "ok")} (${toolMs}ms)`);
         state.toolsExecuted.push(call.name);
         if (isWriteCall && requestedPath) state.touchedFiles.add(requestedPath);
         if (result?.error || result?.status === "failed") {
@@ -853,7 +895,8 @@ ${truncated}
             const instruction = this.repairInstruction(state, requestedPath, result?.allIssues, JSON.stringify(call.parameters));
             state.observations.push(`- ${call.name} ${requestedPath}: échec — ${error}\n${instruction}`);
           } else {
-            state.errors.push(`${call.name}: ${error}`);
+            // Pour les outils non-écriture (read, list, search, verify d'exploration),
+            // l'échec est une observation de travail transmise au modèle pour qu'il s'ajuste.
             state.observations.push(`- ${call.name}: échec — ${error}`);
           }
           continue;
@@ -922,7 +965,7 @@ ${truncated}
     ])];
     const findings = this.extractFindings(resultText);
     const completion = toolExecution.workspace.completionReport(toolExecution.touchedFiles);
-    const writeRequired = ["writer", "formatter", "proofreader", "translator"].includes(task.role)
+    const writeRequired = ["writer", "formatter", "proofreader", "translator", "coder", "refactor", "debugger"].includes(task.role)
       // Une sous-tâche explicitement orientée lecture/analyse n'exige pas d'écriture.
       // On détecte cela par l'absence totale de mot-clé d'écriture dans le titre/description
       // ET par la présence de mots-clés d'analyse.
@@ -973,13 +1016,24 @@ ${truncated}
   /** Extrait des constats opérationnels, pas les sections de planification. */
   private extractFindings(resultText: string): string[] {
     const section = resultText.match(
-      /##\s*(?:Résultats vérifiés|Findings|Constats|Détails|Details)\s*\n([\s\S]*?)(?=\n##|$)/i
+      /##\s*(?:Résultats vérifiés|Findings|Constats|Détails|Details|Synthèse|Synthese|Propositions?|Recommandations?|Analyse|Audit)\s*\n([\s\S]*?)(?=\n##|$)/i
     )?.[1] ?? "";
-    return section
+    const findings = section
       .split("\n")
-      .map((line) => line.replace(/^\s*(?:[-*]|\d+[.)])\s*/, "").trim())
+      .map((line) => line.replace(/^\s*(?:[-*]|\d+[.)]|#{1,4})\s*/, "").trim())
       .filter((line) => line.length >= 12)
       .filter((line) => !/^(?:je vais|je dois|il faut|je commencerai|i will|i need to)/i.test(line))
+      .slice(0, 20);
+
+    if (findings.length > 0) return findings;
+
+    // Si aucune section spécifique n'a matché, extraire les lignes informatives du résultat
+    return resultText
+      .split("\n")
+      .map((line) => line.replace(/^\s*(?:[-*]|\d+[.)]|#{1,4})\s*/, "").trim())
+      .filter((line) => line.length >= 15)
+      .filter((line) => !/^(?:je vais|je dois|il faut|je commencerai|i will|i need to)/i.test(line))
+      .filter((line) => !line.startsWith("{") && !line.startsWith("<|tool_call>"))
       .slice(0, 20);
   }
 
@@ -1014,17 +1068,16 @@ ${truncated}
   }
 
   /**
-   * Détecte si une tâche est purement analytique/lecture et ne requiert donc pas d'écriture.
+   * Détecte si une tâche est purement analytique/lecture/rédactionnelle et ne requiert donc pas d'écriture de fichier de code.
    * Utilisé pour assouplir le vérificateur writeRequired.
    */
   private isAnalysisOnlyTask(task: AgentTask): boolean {
     const text = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.toLowerCase();
-    // Si le titre/description mentionne explicitement une modification, une correction, une création,
-    // on considère qu'une écriture est attendue.
-    const writingSignal = /\b(?:modifier?|modifi[e é]|crée?r?|write|implement|apply|patch|fix|correct|refactor|add|update|change)\b/i;
+    // Si le titre/description mentionne explicitement une modification/écriture de fichier de code
+    const writingSignal = /\b(?:modifier\s+le\s+code|écrire\s+le\s+fichier|write_project_file|apply_patch|patch_project_file)\b/i;
     if (writingSignal.test(text)) return false;
-    // Mots-clés indiquant une tâche d'analyse pure
-    const analysisSignal = /\b(?:analys|inspect|audit|review|check|read|lire|analyser|examin|rapport|report|résumé|summary|checkpoint\s+git|identifier|liste|list)\b/i;
+    // Mots-clés indiquant une tâche d'analyse, proposition, synthèse, rapport, recommandation, audit
+    const analysisSignal = /\b(?:analys|inspect|audit|review|check|read|lire|analyser|examin|rapport|report|résumé|summary|checkpoint\s+git|identifier|liste|list|propos|proposition|suggestion|recommand|conseil|avis|contenu)\b/i;
     return analysisSignal.test(text);
   }
 
@@ -1074,20 +1127,25 @@ ${truncated}
     const subTaskIds: string[] = [];
     const nextDepth = depth + 1;
 
-    // Lancer toutes les délégations en parallèle (fire-and-forget)
-    const dispatches = delegations.map((delegation: ParsedDelegation) =>
-      this.sendDelegation(parentTask, delegation, nextDepth).then((taskId) => {
-        if (taskId) subTaskIds.push(taskId);
-      })
-    );
+    try {
+      // Lancer toutes les délégations en parallèle (fire-and-forget)
+      const dispatches = delegations.map((delegation: ParsedDelegation) =>
+        this.sendDelegation(parentTask, delegation, nextDepth).then((taskId) => {
+          if (taskId) subTaskIds.push(taskId);
+        })
+      );
 
-    await Promise.allSettled(dispatches);
+      await Promise.allSettled(dispatches);
 
-    log.info(
-      `[${agent.name}] ${subTaskIds.length}/${delegations.length} délégation(s) envoyée(s) sur le bus (profondeur: ${nextDepth})`
-    );
+      log.info(
+        `[${agent.name}] ${subTaskIds.length}/${delegations.length} délégation(s) envoyée(s) sur le bus (profondeur: ${nextDepth})`
+      );
 
-    return subTaskIds;
+      return subTaskIds;
+    } finally {
+      // Nettoyer la chaîne seulement une fois tous les dispatches de ce parent terminés
+      this.delegationChains.delete(parentTask.id);
+    }
   }
 
   /**
@@ -1186,10 +1244,6 @@ ${truncated}
         `[${agent.name}] Échec envoi délégation → [${delegation.targetRole}]: ${(err as Error).message}`
       );
       return null;
-    } finally {
-      // Nettoyer la chaîne après l'envoi (succès ou échec)
-      // La chaîne sera recréée si une nouvelle délégation part de cette tâche
-      this.delegationChains.delete(parentTask.id);
     }
   }
 
