@@ -5,6 +5,7 @@
  */
 import { lazy, Suspense } from 'react';
 import { X } from 'lucide-react';
+import { Tooltip } from '../ui/Tooltip.js';
 
 const MemoriesView = lazy(() => import('../../views/MemoriesView'));
 
@@ -16,14 +17,15 @@ export function MemoryPanel({ onClose }: MemoryPanelProps) {
   return (
     <div className="relative flex flex-col h-full w-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
       {/* Bouton fermer en overlay */}
-      <button
+      <Tooltip
+        content="Fermer"
+        as="button"
         onClick={onClose}
         className="absolute top-3 right-4 z-10 flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-[var(--ctrl-hover)] border"
         style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-        title="Fermer"
       >
         <X className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
-      </button>
+      </Tooltip>
 
       {/* MemoriesView prend tout l'espace */}
       <div className="flex-1 min-h-0 w-full overflow-hidden">

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FileIcon } from './FileIcon.js';
+import { Tooltip } from '../ui/Tooltip.js';
 import {
   Search, Command, Save, WrapText, Map, AlignJustify,
   X, ArrowUp, ArrowDown, CornerDownLeft,
@@ -303,9 +304,9 @@ export function CommandPalette({
             style={{ color: 'var(--text-primary)' }}
           />
           {query && (
-            <button onClick={() => setQuery('')} className="rounded p-0.5 hover:bg-white/10" title="Effacer la recherche">
+            <Tooltip content="Effacer la recherche" as="button" onClick={() => setQuery('')} className="rounded p-0.5 hover:bg-white/10">
               <X size={12} style={{ color: 'var(--text-muted)' }} />
-            </button>
+            </Tooltip>
           )}
         </div>
 

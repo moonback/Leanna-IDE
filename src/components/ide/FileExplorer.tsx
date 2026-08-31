@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
-  Folder, FolderOpen, Plus, RefreshCcw, ChevronRight, ChevronDown,
+  Folder, FolderOpen, Plus, RefreshCw, ChevronRight, ChevronDown,
   Shield, Search, X, ArrowDownAZ, ArrowUpZA, Layers, GripVertical,
   Eye, EyeOff, FolderInput,
 } from 'lucide-react';
 import { FileIcon } from './FileIcon.js';
 import { Breadcrumb } from './Breadcrumb.js';
+import { Tooltip } from '../ui/Tooltip.js';
 import type { TreeEntry } from '../../types/ide.js';
 import { sandboxApi } from '../../services/sandboxApi.js';
 
@@ -367,7 +368,9 @@ const FileExplorer = memo(function FileExplorer({
         className="p-2 border-b"
         style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
       >
-        <button
+        <Tooltip
+          content="Changer de projet racine"
+          as="button"
           onClick={async () => {
             try {
               await fetch('/api/self-root/clear', { method: 'POST' });
@@ -380,11 +383,10 @@ const FileExplorer = memo(function FileExplorer({
             color: 'var(--accent-primary)',
             border: '1px solid color-mix(in srgb, var(--accent-primary) 25%, transparent)',
           }}
-          title="Changer de projet racine"
         >
           <FolderInput size={14} />
           <span>Changer de projet</span>
-        </button>
+        </Tooltip>
       </div>
 
       {/* Explorer Header */}
@@ -432,27 +434,19 @@ const FileExplorer = memo(function FileExplorer({
             style={{ color: 'var(--text-primary)' }}
           />
           {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="opacity-50 hover:opacity-100 transition"
-              title="Effacer"
-            >
+            <Tooltip content="Effacer" as="button" onClick={() => setSearchQuery('')} className="opacity-50 hover:opacity-100 transition">
               <X size={10} style={{ color: 'var(--text-muted)' }} />
-            </button>
+            </Tooltip>
           )}
         </div>
       )}
 
       {/* Breadcrumb */}
       <div className="border-b px-3.5 py-1.5" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}>
-        <button
-            onClick={toggleSearch}
-            className="rounded p-1 hover:bg-white/5 transition"
-            title="Rechercher"
-            style={{ color: showSearch ? 'var(--accent-primary)' : 'var(--text-muted)' }}
-          >
+        <Tooltip content="Rechercher" as="button" onClick={toggleSearch} className="rounded p-1 hover:bg-white/5 transition"
+          style={{ color: showSearch ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
             <Search size={12} />
-          </button>
+        </Tooltip>
           {/* Sort cycling */}
           <button
             onClick={() => setSortMode(nextSort)}
@@ -462,20 +456,12 @@ const FileExplorer = memo(function FileExplorer({
           >
             <SortIcon mode={sortMode} />
           </button>
-          <button
-            onClick={onCreateFile}
-            className="rounded p-1 hover:bg-white/5 transition"
-            title="Nouveau fichier"
-          >
+          <Tooltip content="Nouveau fichier" as="button" onClick={onCreateFile} className="rounded p-1 hover:bg-white/5 transition">
             <Plus size={12} style={{ color: 'var(--text-muted)' }} />
-          </button>
-          <button
-            onClick={onRefresh}
-            className="rounded p-1 hover:bg-white/5 transition"
-            title="Actualiser"
-          >
+          </Tooltip>
+          <Tooltip content="Actualiser" as="button" onClick={onRefresh} className="rounded p-1 hover:bg-white/5 transition">
             <RefreshCcw size={12} style={{ color: 'var(--text-muted)' }} />
-          </button>
+          </Tooltip>
       </div>
 
       {/* Sort mode indicator (when not default) */}
@@ -490,13 +476,11 @@ const FileExplorer = memo(function FileExplorer({
         >
           <SortIcon mode={sortMode} />
           <span>{sortLabel(sortMode)}</span>
-          <button
-            className="ml-auto opacity-60 hover:opacity-100 transition"
+          <Tooltip content="Réinitialiser le tri" as="button" className="ml-auto opacity-60 hover:opacity-100 transition"
             onClick={() => setSortMode('name-asc')}
-            title="Réinitialiser le tri"
           >
             <X size={9} />
-          </button>
+          </Tooltip>
         </div>
       )}
 
