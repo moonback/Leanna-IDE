@@ -370,7 +370,7 @@ export class AgentExecutor {
   }
 
     // ─── Helpers internes ───────────────────────────────────────────────────
-  private static readonly MAX_TOOL_TURNS = 4;
+  private static readonly MAX_TOOL_TURNS = 8;
   /** Taille maximale d’une observation cumulée envoyée au modèle suivant. */
   private static readonly MAX_OBSERVATION_CHARS = 80_000;
   /** Limite de sécurité par snapshot, supérieure aux composants UI usuels. */
