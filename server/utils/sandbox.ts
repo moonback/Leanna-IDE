@@ -39,7 +39,7 @@ const EXCLUDE_PATTERNS = [
   "dist",
   "build",
   "release",
-  ".Leanna/sandbox",  // éviter la récursion
+  ".Leanna",
   ".Leanna-audit.log",
 ];
 
@@ -356,7 +356,7 @@ async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash:
   }
 
   try {
-    const { createCheckpoint } = await import("./checkpoint");
+    const { createCheckpoint } = await import("./checkpoint.js");
     checkpointHash = await createCheckpoint(`avant sync sandbox (${sandboxModifiedFiles.size} fichiers)`);
   } catch (e) { console.warn("[Sandbox] Création du checkpoint échouée (non bloquant):", (e as Error).message); }
 
@@ -408,7 +408,7 @@ async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash:
     // git_status vise le dépôt principal, jamais le sandbox : toute synchronisation
     // réussie invalide son cache immédiatement.
     try {
-      const { gitStatusCache } = await import("../skills/git");
+      const { gitStatusCache } = await import("../skills/git.js");
       gitStatusCache.invalidate(SELF_ROOT);
     } catch (error) {
       console.warn("[Sandbox] Invalidation du cache Git ignorée:", (error as Error).message);
@@ -462,13 +462,18 @@ export async function discardSandbox(): Promise<void> {
   if (!SELF_ROOT) {
     throw new Error("Aucun projet sélectionné. Impossible d'abandonner le sandbox.");
   }
+  beginSandboxInitialization();
+  const { stopWatching, startWatching } = await import("./sandboxWatcher.js");
+  stopWatching();
+
   sandboxModifiedFiles.clear();
   const sandboxBase = getSandboxRoot();
   // Re-sync depuis le principal
   if (fs.existsSync(sandboxBase)) {
-    await fs.promises.rm(sandboxBase, { recursive: true, force: true });
+    await emptyDirectory(sandboxBase);
   }
   await initSandbox();
+  startWatching();
   activateSandbox();
   console.log("[Sandbox] Modifications abandonnées, sandbox rafraîchi.");
 }
@@ -515,7 +520,7 @@ export async function acceptFile(relPath: string): Promise<{ applied: boolean }>
     }
     sandboxModifiedFiles.delete(normalized);
     try {
-      const { gitStatusCache } = await import("../skills/git");
+      const { gitStatusCache } = await import("../skills/git.js");
       gitStatusCache.invalidate(SELF_ROOT);
     } catch (error) {
       console.warn("[Sandbox] Invalidation du cache Git ignorée:", (error as Error).message);
@@ -703,18 +708,23 @@ export async function resetSandbox(): Promise<{ created: boolean; path: string; 
     throw new Error("Aucun projet sélectionné. Impossible de réinitialiser le sandbox.");
   }
   beginSandboxInitialization();
+  const { stopWatching, startWatching } = await import("./sandboxWatcher.js");
+  stopWatching();
+
   const sandboxBase = getSandboxRoot();
-  // Supprimer le sandbox existant s'il existe
+  // Supprimer le contenu existant
   if (fs.existsSync(sandboxBase)) {
-    await fs.promises.rm(sandboxBase, { recursive: true, force: true });
+    await emptyDirectory(sandboxBase);
+  } else {
+    await fs.promises.mkdir(sandboxBase, { recursive: true });
   }
 
   // Recréer le sandbox frais (même logique que initSandbox)
-  await fs.promises.mkdir(sandboxBase, { recursive: true });
   const copied = await syncDirectory(SELF_ROOT, sandboxBase);
 
   sandboxModifiedFiles.clear();
   lastSyncTimestamp = Date.now();
+  startWatching();
   activateSandbox();
 
   console.log(`[Sandbox] Réinitialisé: ${copied} fichiers copiés → ${sandboxBase}`);
@@ -847,10 +857,10 @@ export function activateSandbox(): void {
  */
 export async function switchSandboxProject(projectPath: string): Promise<string> {
   beginSandboxInitialization();
-  const { stopWatching, startWatching } = await import("./sandboxWatcher");
+  const { stopWatching, startWatching } = await import("./sandboxWatcher.js");
   stopWatching();
 
-  const { setSelfRoot } = await import("./selfRoot");
+  const { setSelfRoot } = await import("./selfRoot.js");
   const newRoot = setSelfRoot(projectPath);
   await initSandbox();
   startWatching();
@@ -859,6 +869,23 @@ export async function switchSandboxProject(projectPath: string): Promise<string>
 }
 
 // ── Helpers internes ─────────────────────────────────────────────────────────
+
+/**
+ * Supprime le contenu d'un dossier sans supprimer le dossier racine lui-même.
+ * Évite les verrous Windows sur le descripteur de dossier parent.
+ */
+async function emptyDirectory(dir: string): Promise<void> {
+  if (!fs.existsSync(dir)) return;
+  const entries = await fs.promises.readdir(dir);
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry);
+    try {
+      await fs.promises.rm(fullPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch (e: any) {
+      console.warn(`[Sandbox] Avertissement suppression ${fullPath}:`, e.message);
+    }
+  }
+}
 
 /**
  * Copie récursivement un dossier source vers une destination,
