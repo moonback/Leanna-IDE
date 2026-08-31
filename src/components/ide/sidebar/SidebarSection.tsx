@@ -153,10 +153,10 @@ function SubmenuItem({ icon, label, children, state, actions }: SubmenuItemProps
 
 // ─── Separator ───────────────────────────────────────────────────────────────
 
-export function SidebarSeparator({ thin }: { thin?: boolean }) {
+export function SidebarSeparator({ thin, className }: { thin?: boolean; className?: string }) {
   return (
     <div
-      className="w-full flex items-center justify-center"
+      className={`w-full flex items-center justify-center${className ? ` ${className}` : ''}`}
       style={{ padding: thin ? '3px 0' : '5px 0' }}
       aria-hidden="true"
     >

@@ -97,43 +97,130 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
 
   return (
     <>
-      {/* Mobile Toggle Button */}
-      <button
+      {/* Mobile Toggle Button - Enhanced */}
+      <motion.button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="md:hidden fixed top-3 left-3 z-50 p-2.5 rounded-md border text-[var(--text-primary)] transition-all duration-200 hover:bg-[var(--bg-secondary)] shadow-sm"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+        className="md:hidden fixed top-3 left-3 z-50 p-2.5 rounded-lg border text-[var(--text-primary)] transition-all duration-200 hover:bg-[var(--bg-secondary)] shadow-md group"
+        style={{ 
+          borderColor: 'var(--border-base)', 
+          backgroundColor: 'var(--bg-panel)',
+          backdropFilter: 'blur(8px)',
+        }}
         aria-label="Menu principal"
+        whileHover={{ scale: 1.05, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
+        whileTap={{ scale: 0.95 }}
       >
-        <Menu className="w-4 h-4" />
-      </button>
+        <Menu className="w-4 h-4 transition-transform duration-200 group-hover:rotate-90" />
+      </motion.button>
 
-      {/* Mobile Backdrop Overlay */}
-      {mobileOpen && (
-        <motion.div
-          onClick={() => setMobileOpen(false)}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="md:hidden fixed inset-0 z-30 bg-black/60 backdrop-blur-sm"
-        />
-      )}
+      {/* Mobile Backdrop Overlay - Enhanced */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            onClick={() => setMobileOpen(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="md:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-md"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Global Sidebar Styles Injection - Using CSS variables */}
+      <style>{`
+        .sidebar-flyout-menu {
+          --flyout-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+          --flyout-border-radius: 8px;
+          --flyout-min-width: 200px;
+        }
+        
+        /* Custom scrollbar for flyout menus */
+        .sidebar-flyout-menu::-webkit-scrollbar {
+          width: 6px;
+        }
+        .sidebar-flyout-menu::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .sidebar-flyout-menu::-webkit-scrollbar-thumb {
+          background: var(--scrollbar-thumb, rgba(128, 128, 128, 0.4));
+          border-radius: 3px;
+        }
+        .sidebar-flyout-menu::-webkit-scrollbar-thumb:hover {
+          background: var(--scrollbar-thumb-hover, rgba(128, 128, 128, 0.6));
+        }
+        
+        /* Tooltip styling */
+        .sidebar-tooltip {
+          position: absolute;
+          left: 100%;
+          top: 50%;
+          transform: translateY(-50%);
+          margin-left: 8px;
+          padding: 6px 10px;
+          font-size: 11px;
+          font-weight: 500;
+          white-space: nowrap;
+          background: var(--bg-tooltip, var(--bg-panel));
+          color: var(--text-primary);
+          border: 1px solid var(--border-base);
+          border-radius: 6px;
+          box-shadow: var(--shadow-lg, 0 4px 12px rgba(0,0,0,0.25));
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.2s ease, transform 0.2s ease;
+          z-index: 1000;
+          max-width: 220px;
+        }
+        
+        .sidebar-tooltip::after {
+          content: '';
+          position: absolute;
+          left: -6px;
+          top: 50%;
+          transform: translateY(-50%);
+          border-width: 6px 6px 6px 0;
+          border-style: solid;
+          border-color: transparent var(--border-base, #ccc) transparent transparent;
+        }
+        
+        .group:hover .sidebar-tooltip {
+          opacity: 1;
+          transform: translateY(-50%) translateX(4px);
+        }
+        
+        /* Separator opacity styles */
+        .sidebar-separator-low-opacity {
+          opacity: 0.4 !important;
+        }
+        .sidebar-separator-medium-opacity {
+          opacity: 0.6 !important;
+        }
+      `}</style>
 
       <motion.nav
         className={`Leanna-sidebar flex flex-col items-center select-none relative ${mobileOpen ? 'mobile-open' : ''}`}
         initial={false}
         animate={{ x: 0 }}
-        transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+        transition={{ 
+          type: 'spring', 
+          bounce: 0, 
+          duration: mobileOpen ? 0.3 : 0.4 
+        }}
         style={{
-          width: '56px',
-          borderRight: '1px solid var(--ide-shell-border)',
+          width: mobileOpen ? '280px' : 'var(--ide-sidebar-width)',
+          borderRight: '1px solid var(--ide-sidebar-border)',
           backgroundColor: 'var(--ide-sidebar-bg)',
           height: '100%',
           paddingBottom: '12px',
-          boxShadow: 'none',
+          boxShadow: mobileOpen ? 'var(--shadow-xl, 0 8px 32px rgba(0,0,0,0.3))' : 'none',
           borderTopLeftRadius: 'var(--radius-base)',
           borderBottomLeftRadius: 'var(--radius-base)',
-          gap: '4px',
+          gap: '2px',
+          zIndex: mobileOpen ? 40 : 'auto',
+          position: mobileOpen ? 'fixed' : 'relative',
+          left: 0,
+          top: 0,
         }}
         aria-label="Navigation principale"
       >
@@ -156,31 +243,36 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
 
         {context === 'ide' && (
           <>
-            <SidebarSeparator thin />
+            <SidebarSeparator thin className="sidebar-separator-low-opacity" />
             {/* ═══ AGENT STATUS (IDE only) ═══ */}
             <motion.div
               initial={false}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="w-full pb-2"
+              transition={{ duration: 0.3, delay: 0.1 }}
+              className="w-full pb-2 pt-1"
             >
-              <AgentStatusBlock
-                assistantConnected={props.assistantConnected ?? false}
-                assistantWorking={props.assistantWorking ?? false}
-                assistantMuted={props.assistantMuted ?? false}
-                assistantMenuOpen={assistantMenuOpen}
-                assistantMenuRef={assistantMenuRef}
-                setAssistantMenuOpen={setAssistantMenuOpen}
-                aiMenuItems={aiMenuItems}
-                state={state}
-                actions={actions}
-                mode={props.mode ?? 'full'}
-                onToggleChat={props.onToggleChat ?? noop}
-                onToggleMode={props.onToggleMode ?? noop}
-                onConnectAssistant={props.onConnectAssistant ?? noop}
-                onDisconnectAssistant={props.onDisconnectAssistant ?? noop}
-                onMuteToggle={props.onMuteToggle ?? noop}
-              />
+              <div className="group relative w-full">
+                <AgentStatusBlock
+                  assistantConnected={props.assistantConnected ?? false}
+                  assistantWorking={props.assistantWorking ?? false}
+                  assistantMuted={props.assistantMuted ?? false}
+                  assistantMenuOpen={assistantMenuOpen}
+                  assistantMenuRef={assistantMenuRef}
+                  setAssistantMenuOpen={setAssistantMenuOpen}
+                  aiMenuItems={aiMenuItems}
+                  state={state}
+                  actions={actions}
+                  mode={props.mode ?? 'full'}
+                  onToggleChat={props.onToggleChat ?? noop}
+                  onToggleMode={props.onToggleMode ?? noop}
+                  onConnectAssistant={props.onConnectAssistant ?? noop}
+                  onDisconnectAssistant={props.onDisconnectAssistant ?? noop}
+                  onMuteToggle={props.onMuteToggle ?? noop}
+                />
+                <div className="sidebar-tooltip">
+                  {props.assistantConnected ? 'IA Connectée' : 'Connecter IA'}
+                </div>
+              </div>
             </motion.div>
           </>
         )}
@@ -188,7 +280,7 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
 
       {/* ═══ BOTTOM — fixed ═══ */}
       <div className="w-full flex flex-col items-center flex-shrink-0 pt-2">
-        <SidebarSeparator thin />
+        <SidebarSeparator thin className="sidebar-separator-low-opacity mb-1" />
         
         <GlobalNavSection
           context={context}
@@ -204,7 +296,7 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
           onToggleNotebooks={props.onToggleNotebooks ?? noop}
         />
 
-        <SidebarSeparator thin />
+        <SidebarSeparator thin className="sidebar-separator-low-opacity my-1" />
         
         <FooterSection
           context={context}
@@ -215,18 +307,19 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
         {/* Quit App (Electron) */}
         {(window as any).electronAPI && (
           <>
-            <SidebarSeparator thin />
+            <SidebarSeparator thin className="sidebar-separator-low-opacity my-0.5" />
             <motion.div
-              whileHover={{ scale: 1.02 }}
-              transition={{ duration: 0.15 }}
-              className="w-full"
+              whileHover={{ scale: 1.02, x: 2 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              className="w-full group relative"
             >
               <SidebarItem
                 icon={Power}
                 active={false}
                 onClick={() => setShowQuitConfirm(true)}
-                title="Quitter Leanna "
+                title="Quitter Leanna"
               />
+              <div className="sidebar-tooltip">Quitter l'application</div>
             </motion.div>
             <QuitConfirmDialog
               open={showQuitConfirm}
@@ -247,60 +340,62 @@ function BrandLogo({ theme, onNavigate }: { theme: string; onNavigate: () => voi
   return (
     <div
       className="w-full h-[72px] flex items-center justify-center flex-shrink-0"
-      style={{ borderBottom: '1px solid var(--ide-shell-border)' }}
+      style={{ borderBottom: '1px solid var(--ide-sidebar-border)' }}
     >
       <motion.button
         type="button"
-        className="w-[44px] h-[44px] rounded-xl overflow-hidden flex items-center justify-center cursor-pointer transition-all duration-300 relative"
+        className="w-[44px] h-[44px] rounded-xl overflow-hidden flex items-center justify-center cursor-pointer transition-all duration-300 relative group"
         style={{
           background: 'var(--ide-sidebar-item-bg)',
           boxShadow: 'none',
-          border: '1px solid var(--ide-shell-border)',
+          border: '1px solid var(--ide-sidebar-border)',
         }}
         onClick={onNavigate}
-        title="Leanna "
         aria-label="Retourner à l'éditeur"
         whileHover={{
           scale: 1.1,
-          boxShadow: '0 0 16px rgba(0, 194, 255, 0.25), 0 4px 12px rgba(0,0,0,0.2)',
-          borderColor: 'rgba(0, 194, 255, 0.5)',
+          boxShadow: '0 0 16px rgba(var(--accent-primary-rgb, 0, 194, 255), 0.25), 0 4px 12px rgba(0,0,0,0.15)',
+          borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, transparent)',
         }}
         whileTap={{ scale: 0.92 }}
       >
-        {/* Subtle glow effect on hover */}
+        {/* Subtle glow effect on hover - now more subtle */}
         <motion.div
           className="absolute inset-0 rounded-xl pointer-events-none"
           initial={{ opacity: 0 }}
           whileHover={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
           style={{
-            background: 'radial-gradient(circle at center, rgba(0, 194, 255, 0.15) 0%, transparent 70%)',
+            background: 'radial-gradient(circle at center, color-mix(in srgb, var(--accent-primary) 10%, transparent) 0%, transparent 70%)',
           }}
         />
         
-        {/* Animated border ring */}
+        {/* Animated border ring - dynamic color from accent */}
         <motion.div
           className="absolute inset-[-2px] rounded-xl pointer-events-none"
           style={{
-            border: '1px solid rgba(0, 194, 255, 0.2)',
+            border: '1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent)',
           }}
           animate={{ 
             scale: [1, 1.05, 1], 
-            opacity: [0.3, 0.7, 0.3] 
+            opacity: [0.2, 0.5, 0.2] 
           }}
           transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
         />
         
         <motion.img
           src={theme === 'dark' ? logoDark : logoLight}
-          alt="Leanna "
+          alt="Leanna"
           className="w-[32px] h-[32px] object-contain"
           whileHover={{ 
-            scale: 1.15, 
-            rotate: [0, -5, 5, 0] 
+            scale: 1.12, 
+            rotate: [0, -4, 4, 0] 
           }}
           transition={{ duration: 0.4, ease: 'easeInOut' }}
         />
+        
+        {/* Tooltip */}
+        <div className="sidebar-tooltip">Retour à l'éditeur</div>
       </motion.button>
     </div>
   );
@@ -320,8 +415,19 @@ function IDEToolsSections({
   const stateRecord = state as unknown as Record<string, boolean | string | null>;
   const actionsRecord = actions as unknown as Record<string, () => void>;
 
+  // Extract shortcuts from sidebar config for tooltips
+  const getTooltipText = (section: typeof sidebarSections[number]) => {
+    if (section.items.length === 1 && section.items[0].type === 'button') {
+      const item = section.items[0];
+      const baseText = section.label || item.label;
+      const shortcut = item.shortcut ? ` (${item.shortcut})` : '';
+      return baseText + shortcut;
+    }
+    return section.label || '';
+  };
+
   return (
-    <div className="w-full flex flex-col gap-0.5 pt-3">
+    <div className="w-full flex flex-col gap-0 pt-2">
       {sidebarSections.map((section, idx) => (
         <motion.div
           key={section.id}
@@ -330,17 +436,25 @@ function IDEToolsSections({
           animate={{ opacity: 1, x: 0 }}
           transition={{ 
             delay: skipAnimation ? 0 : idx * 0.05, 
-            duration: 0.25, 
+            duration: 0.3, 
             ease: [0.25, 0.46, 0.45, 0.94] 
           }}
         >
-          <SidebarSection
-            config={section}
-            state={stateRecord}
-            actions={actionsRecord}
-            assistantConnected={assistantConnected}
-          />
-          {idx < sidebarSections.length - 1 && <SidebarSeparator thin />}
+          <div className="group relative w-full">
+            <SidebarSection
+              config={section}
+              state={stateRecord}
+              actions={actionsRecord}
+              assistantConnected={assistantConnected}
+            />
+            {/* Enhanced tooltip with shortcuts */}
+            <div className="sidebar-tooltip">
+              {getTooltipText(section)}
+            </div>
+          </div>
+          {idx < sidebarSections.length - 1 && (
+            <SidebarSeparator thin className="sidebar-separator-medium-opacity my-0.5" />
+          )}
         </motion.div>
       ))}
     </div>
@@ -404,27 +518,33 @@ function GlobalNavSection({
 
   return (
     <div className="w-full flex flex-col items-center relative" role="navigation" aria-label="Navigation globale" ref={submenuRef}>
-      <SidebarItem
-        icon={LayoutList}
-        active={anyActive || submenuOpen}
-        onClick={() => setSubmenuOpen(prev => !prev)}
-        title="Historique · Mémoires · Tâches"
-        hasSubmenu
-      />
+      <div className="group relative w-full">
+        <SidebarItem
+          icon={LayoutList}
+          active={anyActive || submenuOpen}
+          onClick={() => setSubmenuOpen(prev => !prev)}
+          title="Navigation globale"
+          hasSubmenu
+        />
+        <div className="sidebar-tooltip">Historique · Mémoires · Tâches · Documents</div>
+      </div>
 
       <AnimatePresence>
         {submenuOpen && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, x: -10 }}
-            animate={{ opacity: 1, scale: 1, x: 0 }}
-            exit={{ opacity: 0, scale: 0.95, x: -10 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            className="absolute left-[52px] bottom-0 z-50 py-1.5 rounded-lg border shadow-lg origin-top-left"
+            initial={{ opacity: 0, scale: 0.95, x: -10, y: 0 }}
+            animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, x: -10, y: 0 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="absolute left-[52px] bottom-0 z-50 py-1 rounded-lg border shadow-lg origin-top-left sidebar-flyout-menu"
             style={{
               backgroundColor: 'var(--bg-panel)',
               borderColor: 'var(--border-base)',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-              minWidth: '180px',
+              boxShadow: 'var(--flyout-shadow)',
+              minWidth: 'var(--flyout-min-width)',
+              borderRadius: 'var(--flyout-border-radius)',
+              maxHeight: '80vh',
+              overflowY: 'auto',
             }}
           >
             {subItems.map(({ id, path, icon: Icon, label, active, onClick }) => {
@@ -438,15 +558,41 @@ function GlobalNavSection({
                     handleClick();
                     setSubmenuOpen(false);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs font-medium transition-all duration-150 rounded-md hover:bg-[var(--bg-secondary)]"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs font-medium transition-all duration-150 rounded-md group/item"
                   style={{
                     color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)',
-                    backgroundColor: isActive ? 'var(--accent-subtle)' : undefined,
+                    backgroundColor: isActive ? 'var(--accent-subtle)' : 'transparent',
                   }}
-                  whileHover={{ x: 2 }}
+                  whileHover={{ 
+                    x: 4, 
+                    backgroundColor: 'var(--bg-secondary)' 
+                  }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <Icon size={14} />
-                  <span>{label}</span>
+                  <Icon 
+                    size={14} 
+                    style={{ 
+                      color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      transition: 'color 0.2s ease'
+                    }} 
+                  />
+                  <span 
+                    style={{ 
+                      fontWeight: isActive ? 600 : 500,
+                      transition: 'all 0.2s ease'
+                    }}
+                  >{label}</span>
+                  
+                  {/* Subtle highlight bar for active items */}
+                  {isActive && (
+                    <motion.div
+                      className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 rounded-r-sm"
+                      style={{ backgroundColor: 'var(--accent-primary)' }}
+                      initial={{ width: 0 }}
+                      animate={{ width: 2 }}
+                      transition={{ duration: 0.2 }}
+                    />
+                  )}
                 </motion.button>
               );
             })}
@@ -458,7 +604,6 @@ function GlobalNavSection({
 }
 
 function FooterSection({
-  context,
   currentPath,
   navigate,
 }: {
@@ -469,15 +614,17 @@ function FooterSection({
   return (
     <div className="w-full flex flex-col items-center gap-0.5" role="navigation" aria-label="Paramètres">
       <motion.div
-        whileHover={{ scale: 1.02 }}
-        transition={{ duration: 0.15 }}
+        whileHover={{ scale: 1.02, x: 2 }}
+        transition={{ duration: 0.15, ease: 'easeOut' }}
+        className="group relative w-full"
       >
         <SidebarItem
           icon={Settings}
           active={currentPath === '/settings'}
           onClick={() => navigate('/settings')}
-          title="Paramètres"
+          title="Paramètres (Ctrl+,)"
         />
+        <div className="sidebar-tooltip">Paramètres</div>
       </motion.div>
     </div>
   );
