@@ -1,7 +1,9 @@
 {
   "name": "Leanna",
-  "private": true,
-  "version": "0.7.0",
+  "private": false,
+  "version": "0.8.0",
+  "license": "MIT",
+  "author": "Mayss",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {

@@ -41,10 +41,43 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 
 ## V2+ — Long terme (Évolutions structurelles)
 
-* 💡 **Idée : Support natif de conteneurs Docker pour le Sandbox** : Remplacer l'isolation par dossier miroir `.Leanna/sandbox` par des conteneurs éphémères légers.
-* 💡 **Idée : Support multi-fournisseurs voix locale** : Intégration de modèles vocaux locaux (ex: Whisper / Piper) pour réduire la dépendance au cloud.
-* 💡 **Idée : GitHub Actions depuis l'IDE** : Déclenchement et visualisation des workflows CI/CD directement depuis le panneau GitHub sans quitter l'IDE.
-* 💡 **Idée : Création d'issues et PRs depuis l'IDE** : Formulaires de création inline pour issues et pull requests avec sélection de labels, assignees et milestone.
+> Ces évolutions représentent la vision à 6–18 mois du projet. Elles sont classées par domaine fonctionnel, de l'isolation système aux capacités IA avancées.
+
+---
+
+### 🐳 Infrastructure & Isolation
+
+* 💡 **Conteneurs Docker pour le Sandbox** : Remplacer l'isolation par dossier miroir `.Leanna/sandbox` par des conteneurs éphémères Docker (ou Podman) pour isoler également l'exécution des commandes shell. Chaque session sandbox obtiendrait un réseau, un système de fichiers et un PID namespace dédiés, éliminant tout risque d'évasion vers le système hôte.
+
+* 💡 **Sandboxing WebAssembly pour les outils IA** : Faire tourner certains outils de traitement (analyse AST, exécution de scripts Python légers) dans un runtime WASM (Wasmtime / WASI) directement dans le processus Node.js, sans overhead Docker et sans accès au système de fichiers hôte.
+
+---
+
+### 🤖 IA & Modèles
+
+* 💡 **Support multi-fournisseurs voix locale** : Intégration de Whisper (STT) et Piper (TTS) en mode local pour fonctionner hors-ligne et réduire la dépendance à Gemini Live. La sélection du moteur serait configurable par profil utilisateur.
+
+* 💡 **Routing intelligent entre modèles IA** : Ajouter un orchestrateur de modèles qui choisit automatiquement entre Gemini, OpenRouter et les modèles locaux (Ollama) selon la nature de la tâche (coût, latence, confidentialité des données). Les décisions de routing seraient traçables dans l'audit log.
+
+* 💡 **Mémoire long-terme sémantique persistante** : Enrichir le système de mémoire Supabase avec une indexation vectorielle pgvector complète sur l'historique des conversations, les décisions prises et les artefacts générés. L'assistant se souviendrait de contextes de sessions antérieures avec un score de pertinence.
+
+---
+
+### � IDE & Workflow Développeur
+
+* 💡 **GitHub Actions depuis l'IDE** : Déclenchement et visualisation des workflows CI/CD directement depuis le panneau GitHub — logs en streaming temps réel, statut des jobs, re-run de pipelines et visualisation de l'arbre des steps sans quitter l'éditeur.
+
+* 💡 **Création d'issues et PRs inline** : Formulaires de création intégrés à l'IDE pour issues et pull requests, avec sélection de labels, assignees, milestone, et pré-remplissage intelligent du titre et de la description à partir du code sélectionné ou des erreurs console.
+
+* 💡 **Diff visuel Monaco avec revue de code IA** : Intégrer un diff-editor Monaco côte à côte pour la revue de PR, avec annotations IA inline (suggestions, détection de régressions, commentaires de revue automatisés) déposés directement sur les lignes modifiées.
+
+---
+
+### 🌐 Collaboration & Partage
+
+* 💡 **Mode collaboratif multi-curseurs (CRDT)** : Permettre à plusieurs développeurs de co-éditer le même fichier en temps réel via un protocole CRDT (Yjs / Automerge) synchronisé par WebSocket, avec présence de curseurs colorés et résolution automatique des conflits.
+
+* 💡 **Marketplace d'agents et de skills** : Créer un registre public de skills et d'agents personnalisés exportables, installables en un clic depuis l'Agent Builder. Les agents pourraient être versionnés, notés et publiés par la communauté avec validation de sécurité automatisée.
 
 ---
 
@@ -58,12 +91,3 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 * Réduire la taille du bundle de production en améliorant le code-splitting des dépendances lourdes (`monaco-editor`, `mermaid`, `recharts`).
 * Ajouter un linter automatisé ESLint/Prettier dans les hooks Husky pré-commit.
 
-### Détection des problèmes observés lors de l'audit
-
-1. **Absence de licence explicite**
-   - *Impact* : Incertitude juridique sur la distribution et l'usage open-source.
-   - *Action recommandée* : Ajouter un fichier `LICENSE` (ex: Apache-2.0 ou MIT) à la racine du dépôt.
-2. **Coexistence de deux systèmes de runtime (`server/skills/SkillManager.ts` vs `server/runtime/`)**
-   - *Statut* : ✅ **Résolu** — `SkillManager` V1 supprimé au profit exclusif de `SkillManagerV2` / `ToolRegistry`.
-3. **Routeur `/api/git` désactivé de manière abrupte**
-   - *Statut* : ✅ **Résolu** — `/api/git` réintégré et unifié avec le routeur GitHub fonctionnel.

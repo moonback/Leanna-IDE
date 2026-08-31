@@ -15,7 +15,8 @@ Leanna est un IDE augmenté par l'IA et un système d'exploitation pour dévelop
 
 ## Badges
 
-[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](package.json)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](package.json)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/node-%3E%3D22.0.0-green.svg)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0.0-3178C6.svg)](tsconfig.json)
 [![Framework](https://img.shields.io/badge/React-19.0.1-61DAFB.svg)](package.json)
@@ -222,4 +223,4 @@ Jarvis-os-ori/
 
 ## Licence
 
-> ⚠️ À compléter : aucune licence n'a été détectée dans le dépôt (champ `license` absent de `package.json` et aucun fichier `LICENSE` présent).
+Ce projet est distribué sous licence **MIT**. Voir le fichier [LICENSE](LICENSE) pour les détails complets.
