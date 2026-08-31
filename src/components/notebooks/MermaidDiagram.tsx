@@ -21,7 +21,10 @@ function initMermaid() {
   mermaid.initialize({
     startOnLoad: false,
     theme: 'dark',
-    securityLevel: 'loose',
+    // SECURITY: Use 'strict' to sanitize labels/tooltips and disable JS callbacks.
+    // This prevents XSS via mermaid diagrams with malicious click handlers.
+    // Note: Diagram code can originate from AI-generated notebook content (untrusted).
+    securityLevel: 'strict',
     fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: 12,
     mindmap: {

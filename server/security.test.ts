@@ -19,7 +19,8 @@ test('authenticateRequest allows requests when no token is configured', () => {
 });
 
 test('authenticateRequest rejects mismatched API tokens', () => {
-  const req = { headers: { 'x-Leanna-token': 'wrong' } } as any;
+  // Note: Node/Express lowercases all header names, so we test with lowercase
+  const req = { headers: { 'x-leanna-token': 'wrong' } } as any;
   const result = authenticateRequest(req, { apiToken: 'secret' });
 
   assert.equal(result.ok, false);
@@ -28,7 +29,8 @@ test('authenticateRequest rejects mismatched API tokens', () => {
 });
 
 test('authenticateRequest accepts a matching token', () => {
-  const req = { headers: { 'x-Leanna-token': 'secret' } } as any;
+  // Note: Node/Express lowercases all header names, so we test with lowercase
+  const req = { headers: { 'x-leanna-token': 'secret' } } as any;
   assert.deepEqual(authenticateRequest(req, { apiToken: 'secret' }), { ok: true });
 });
 

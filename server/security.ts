@@ -17,7 +17,8 @@ export function authenticateRequest(req: { headers?: Record<string, string | str
     return { ok: true };
   }
 
-  const headerValue = req.headers?.['x-Leanna-token'];
+  // Note: Node/Express always lowercases header names in req.headers
+  const headerValue = req.headers?.['x-leanna-token'];
   const token = Array.isArray(headerValue) ? headerValue[0] : headerValue;
 
   if (token === configuredToken) {
