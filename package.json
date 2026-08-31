@@ -3,6 +3,25 @@
   "private": false,
   "version": "0.8.0",
   "license": "MIT",
+  "description": "Your AI-powered coding companion",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/moonback/Leanna-IDE.git"
+  },
+  "keywords": [
+    "ai",
+    "coding",
+    "assistant",
+    "electron",
+    "react",
+    "vite"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "bugs": {
+    "url": "https://github.com/moonback/Leanna-IDE/issues"
+  },
   "author": "Mayss",
   "type": "module",
   "main": "electron/main.cjs",
