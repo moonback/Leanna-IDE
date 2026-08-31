@@ -248,16 +248,16 @@ export const sidebarSections: SidebarSectionConfig[] = [
     id: 'ai-agent',
     label: 'Intelligence Artificielle',
     items: [
-      {
-        id: 'chat',
-        type: 'button',
-        icon: MessageCircle,
-        label: 'Chat',
-        shortcut: 'Ctrl+L',
-        stateKey: 'showChat',
-        actionKey: 'onToggleChat',
-        requiresAssistant: true,
-      },
+      // {
+      //   id: 'chat',
+      //   type: 'button',
+      //   icon: MessageCircle,
+      //   label: 'Chat',
+      //   shortcut: 'Ctrl+L',
+      //   stateKey: 'showChat',
+      //   actionKey: 'onToggleChat',
+      //   requiresAssistant: true,
+      // },
       {
         id: 'agents',
         type: 'button',
