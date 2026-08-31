@@ -458,12 +458,9 @@ async function startServer() {
   app.use("/api/automation", automationRouter);
   app.use("/api/workflows", workflowsRouter);
   app.use("/api/custom-skills", createCustomSkillsRouter(skillManager));
-  // Git désactivé — toutes les routes retournent 404
-  // app.use("/api/git", createGitRouter(skillManager, () => currentProfile));
-  app.use("/api/git", (_req, res) => {
-    res.status(404).json({ status: "disabled", error: "Git est entièrement désactivé." });
-  });
-  app.use("/api/github", createGithubRouter(skillManager));
+  const githubRouter = createGithubRouter(skillManager);
+  app.use("/api/git", githubRouter);
+  app.use("/api/github", githubRouter);
   app.use("/api/agents", createAgentsRouter(skillManager));
 
   // ─── Routes Runtime V2 (nouveau système, coexistence) ────────────────────

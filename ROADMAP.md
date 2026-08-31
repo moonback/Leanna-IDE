@@ -33,7 +33,7 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 | **P0** | Définition d'un pipeline CI/CD automatisé | 📋 Planifié | Aucun workflow de test ou de build automatique n'est configuré dans `.github/workflows`. |
 | **P1** | Finalisation de la migration Runtime V2 | ✅ Livré | Unification complète sur `SkillManagerV2` / `ToolRegistry` (`server/runtime/`) et suppression de l'ancien `SkillManager` V1 obsolète. |
 | **P1** | Couverture de tests e2e pour les WebSockets | ✅ Livré | Suite de tests d'intégration e2e complète (`server/websocket.e2e.test.ts`) validant l'authentification handshake, `/terminal`, `/live` et `/sandbox-watch`. |
-| **P2** | Nettoyage des routes Git désactivées | 📋 Planifié | Le routeur `/api/git` retourne actuellement un code 404 hardcodé ; il doit être  réintégré proprement via l'API GitHub. |
+| **P2** | Nettoyage des routes Git désactivées | ✅ Livré | Le routeur `/api/git` et `/api/github` sont unifiés sur `createGithubRouter` avec support complet des commits, repos, issues et PRs. |
 | **P2** | Optimisation du cache d'embeddings Notebooks | 🚧 En cours | Réduction de la latence lors de la réindexation de gros volumes documentaires. |
 
 ---
@@ -64,5 +64,4 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 2. **Coexistence de deux systèmes de runtime (`server/skills/SkillManager.ts` vs `server/runtime/`)**
    - *Statut* : ✅ **Résolu** — `SkillManager` V1 supprimé au profit exclusif de `SkillManagerV2` / `ToolRegistry`.
 3. **Routeur `/api/git` désactivé de manière abrupte**
-   - *Impact* : Incohérence dans l'API REST retournant une erreur 404 statique.
-   - *Action recommandée* : Nettoyer les routes mortes ou documenter formellement la bascule vers `/api/github`.
+   - *Statut* : ✅ **Résolu** — `/api/git` réintégré et unifié avec le routeur GitHub fonctionnel.
