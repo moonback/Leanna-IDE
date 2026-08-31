@@ -78,6 +78,16 @@ export class ASTCallGraph {
   /** Map nom de fonction → node IDs possibles (pour résolution) */
   private nameIndex = new Map<string, CallNodeId[]>();
 
+  /**
+   * Vide l'ensemble du graphe d'appels.
+   */
+  clear(): void {
+    this.nodes.clear();
+    this.outEdges.clear();
+    this.inEdges.clear();
+    this.nameIndex.clear();
+  }
+
   // ─── Mise à jour du graphe ─────────────────────────────────────────────────
 
   /**

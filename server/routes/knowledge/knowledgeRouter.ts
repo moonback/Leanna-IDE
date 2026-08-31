@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { Router, Request, Response } from 'express';
 import { knowledgeGraph, projectIndexer, projectMemory, understandingEngine, dependencyGraph, learningEngine, fileWatcher } from '../../knowledge/index.js';
 import { SELF_ROOT } from '../../utils/selfRoot.js';
@@ -239,7 +241,8 @@ router.get('/dashboard', (_req: Request, res: Response) => {
 // POST /api/knowledge/reindex
 router.post('/reindex', async (_req: Request, res: Response) => {
   try {
-    const stats = await projectIndexer.scanAll();
+    const stats = await projectIndexer.scanAll({ force: true });
+    await projectIndexer.buildASTIndex();
     res.json({
       status: 'success',
       stats: {
@@ -429,7 +432,11 @@ router.get('/documents/search', async (req: Request, res: Response): Promise<voi
 router.get('/ast/stats', async (_req: Request, res: Response) => {
   try {
     const { astCallGraph, astParser } = await import('../../knowledge/index.js');
-    const cgStats = astCallGraph.getStats();
+    let cgStats = astCallGraph.getStats();
+    if (cgStats.totalNodes === 0 && knowledgeGraph.isInitialized()) {
+      await projectIndexer.buildASTIndex();
+      cgStats = astCallGraph.getStats();
+    }
     res.json({
       status: 'success',
       astReady: astParser.isReady,
@@ -453,8 +460,21 @@ router.get('/ast/file', async (req: Request, res: Response): Promise<void> => {
       res.status(400).json({ error: 'Le paramètre "file" est requis.' });
       return;
     }
-    const { astCallGraph } = await import('../../knowledge/index.js');
-    const astData = knowledgeGraph.getASTResult(filePath);
+    const { astCallGraph, astParser } = await import('../../knowledge/index.js');
+    let astData = knowledgeGraph.getASTResult(filePath);
+    if (!astData) {
+      const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
+      const absPath = path.join(root, filePath);
+      const content = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf-8') : null;
+      if (content) {
+        const ext = path.extname(filePath);
+        await astParser.init();
+        astData = await astParser.parseFile(content, filePath, ext);
+        if (!astData.usedFallback) {
+          knowledgeGraph.setASTResult(filePath, astData);
+        }
+      }
+    }
     const fileGraph = astCallGraph.getFileCallGraph(filePath);
 
     res.json({

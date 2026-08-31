@@ -180,8 +180,10 @@ export class ProjectIndexer {
             `⚡ Projet inchangé — utilisation du cache existant (${cachedFiles.length} fichiers, ${stats.totalEntities} entités) (${durationMs}ms)`
           );
 
-          // Initialiser Tree-sitter en arrière-plan sans bloquer
-          astParser.init().catch(() => {});
+          // Construire le Call-Graph AST en arrière-plan sans bloquer le démarrage
+          this.buildASTIndex(files).catch((err) => {
+            log.warn(`⚠️ Échec initialisation AST en arrière-plan: ${(err as Error).message}`);
+          });
 
           return {
             totalFiles: cachedFiles.length,
@@ -253,6 +255,7 @@ export class ProjectIndexer {
           const astResult = await astParser.parseFile(content, relativePath, fileNode.extension);
           if (!astResult.usedFallback) {
             astResults.set(relativePath, astResult);
+            knowledgeGraph.setASTResult(relativePath, astResult);
             this.enrichWithAST(fileNode, astResult);
           }
         }
@@ -348,6 +351,48 @@ export class ProjectIndexer {
   removeFile(relativePath: string): void {
     knowledgeGraph.removeFile(relativePath);
     this.refreshSemanticRelations();
+  }
+
+  /**
+   * Construit ou reconstruit le graphe d'appels AST en mémoire (Tree-sitter)
+   * pour les fichiers du projet.
+   */
+  async buildASTIndex(filesToProcess?: string[]): Promise<void> {
+    await astParser.init();
+    if (!astParser.isReady) {
+      log.warn("🌳 Tree-sitter non disponible pour l'index AST");
+      return;
+    }
+    const root = this.getActiveProjectRoot();
+    const targetFiles = filesToProcess || (knowledgeGraph.getAllFiles().map(f => f.path));
+    const astResults = new Map<string, ASTFileResult>();
+
+    for (const relPath of targetFiles) {
+      const ext = path.extname(relPath);
+      if (!ANALYZABLE_EXTENSIONS.has(ext)) continue;
+      const absPath = path.join(root, relPath);
+      const content = this._readContent(absPath);
+      if (!content) continue;
+
+      try {
+        const astResult = await astParser.parseFile(content, relPath, ext);
+        if (!astResult.usedFallback) {
+          astResults.set(relPath, astResult);
+          knowledgeGraph.setASTResult(relPath, astResult);
+        }
+      } catch (err) {
+        log.debug(`⚠️ Échec parsing AST ${relPath}: ${(err as Error).message}`);
+      }
+    }
+
+    if (astResults.size > 0) {
+      astCallGraph.clear();
+      for (const [, astResult] of astResults) {
+        astCallGraph.updateFile(astResult, astResults);
+      }
+      const cgStats = astCallGraph.getStats();
+      log.info(`📊 Call-graph AST initialisé: ${cgStats.totalNodes} fonctions, ${cgStats.totalEdges} appels (${cgStats.crossFileEdges} cross-file, ${cgStats.resolvedEdges} résolus)`);
+    }
   }
 
   // ─── Parsing d'un fichier ─────────────────────────────────────────────────
