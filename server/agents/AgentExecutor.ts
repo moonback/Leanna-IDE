@@ -369,19 +369,13 @@ export class AgentExecutor {
     }
   }
 
-  // ─── Helpers internes ─────────────────────────────────────────────────────
-
-  /**
-   * Boucle Observe → Act → Observe bornée. Le modèle peut demander des skills
-   * structurés, mais ne peut ni lancer bash ni sortir du workspace.
-   * Limité à MAX_TOOL_TURNS tours pour éviter les boucles infinies.
-   */
-  private static readonly MAX_TOOL_TURNS = 4;          // 8 → 4
+    // ─── Helpers internes ───────────────────────────────────────────────────
+  private static readonly MAX_TOOL_TURNS = 4;
   /** Taille maximale d’une observation cumulée envoyée au modèle suivant. */
-  private static readonly MAX_OBSERVATION_CHARS = 80_000; // 240k → 80k
+  private static readonly MAX_OBSERVATION_CHARS = 80_000;
   /** Limite de sécurité par snapshot, supérieure aux composants UI usuels. */
-  private static readonly MAX_FILE_CONTEXT_CHARS = 50_000; // 200k → 50k
- /** Limite maximale de fichiers dans le contexte incrémental */
+  private static readonly MAX_FILE_CONTEXT_CHARS = 50_000;
+  /** Limite maximale de fichiers dans le contexte incrémental */
   private static readonly MAX_FILES_IN_CONTEXT = 5;
 
   private async executeToolLoop(
@@ -422,8 +416,8 @@ export class AgentExecutor {
 
       log.info(`[${agent.name}] 🔧 Tour ${turn + 1}/${AgentExecutor.MAX_TOOL_TURNS} — ${calls.length} appel(s) d'outil: [${calls.map(c => c.name).join(", ")}]`);
 
-      // Si on atteint l'avant-dernier tour, forcer la synthèse après exécution
-      const isLastAllowedTurn = turn >= AgentExecutor.MAX_TOOL_TURNS - 2;
+      // Forcer la synthèse uniquement au tout dernier tour
+      const isLastAllowedTurn = turn >= AgentExecutor.MAX_TOOL_TURNS - 1;
 
       // Sauvegarder l'état précédent pour le diff incrémental
       const filesBeforeTurn = new Map(state.fileSnapshots);
@@ -449,9 +443,6 @@ export class AgentExecutor {
       newlyTouchedThisTurn.forEach(f => state.newlyTouchedFiles.add(f));
 
       // Construire le contexte des fichiers lus avec DIFF INCréMENTAL
-      // Seul les fichiers NOUVELLEMENT lus ou MODIFIÉS sont envoyés en entier
-      // Les autres sont juste référencés avec leur hash pour vérification
-      // Limiter à MAX_FILES_IN_CONTEXT fichiers
       const limitedNewlyTouched = new Set([...newlyTouchedThisTurn].slice(0, AgentExecutor.MAX_FILES_IN_CONTEXT));
       const fileContextSection = this.buildIncrementalFileContext(
         state.fileSnapshots,
@@ -469,13 +460,13 @@ export class AgentExecutor {
 
       // ── Compter les lectures répétées sans écriture ──────────────────────
       const readsSinceWrite = state.filesRead.length - state.filesModified.length;
-      const stallNote = readsSinceWrite >= 2
-        ? `\n⚠️ Tu as lu ${readsSinceWrite} fois le fichier sans avoir émis de apply_patch. Produis maintenant un apply_patch ou déclare le blocage.`
+      const stallNote = (readsSinceWrite >= 1 && state.filesModified.length === 0)
+        ? `\n💡 Tu as lu ${readsSinceWrite} fichier(s). Si cette tâche requiert une modification de code, émets MAINTENANT un modify_project_file, patch_project_file ou write_project_file.`
         : "";
 
       const synthesisInstruction = isLastAllowedTurn
         ? "⚠️ C'est ton dernier tour d'appels d'outils. Tu DOIS maintenant produire le résultat final. Ne demande plus d'appels d'outils."
-        : `Poursuis la tâche avec ces observations. Les appels bash/shell et les chemins /workspace ne sont pas disponibles.\nUtilise uniquement les skills structurés autorisés si une action supplémentaire est indispensable.\nPour apply_patch, fournis un diff unifié complet avec les lignes \`---\`, \`+++\` et \`@@\`; le backend refuse un patch dont le contexte ne correspond pas exactement au fichier courant.\nSinon, rends maintenant le résultat final vérifié.\nNe renvoie jamais un plan seul ni un JSON tool_calls sans résultat final.${stallNote}`;
+        : `Poursuis la tâche avec ces observations. Les appels bash/shell et les chemins /workspace ne sont pas disponibles.\nUtilise les skills structurés autorisés pour appliquer les changements (modify_project_file / patch_project_file / write_project_file) puis verify_file.\nPour apply_patch, fournis un diff unifié complet avec les lignes \`---\`, \`+++\` et \`@@\`.\nUne fois les actions exécutées et vérifiées, rends le résultat final avec la section ## Résultats vérifiés.\nNe renvoie jamais un plan seul ni un JSON tool_calls sans résultat final.${stallNote}`;
 
       // Ne remplacer que le snapshot du fichier dans le followUp —
       // le prompt initial (contrat d'exécution, liste des outils) doit toujours être présent.
@@ -815,7 +806,7 @@ ${truncated}
       }
 
       const requestedPath = typeof call.parameters.path === "string" ? call.parameters.path : undefined;
-      const isWriteCall = requestedPath && ["write_project_file", "apply_patch", "patch_project_file"].includes(call.name);
+      const isWriteCall = requestedPath && ["write_project_file", "apply_patch", "patch_project_file", "modify_project_file"].includes(call.name);
       const pathKey = requestedPath?.replace(/\\/g, "/").replace(/^\.\//, "");
 
       // ── Validations préventives pour éviter les erreurs courantes ──────────────────
@@ -961,10 +952,10 @@ ${truncated}
       ...(task.context.metadata?.projectContextDiscovered === true ? ["list_project_files"] : []),
       ...(filesRead.length > 0 ? ["read_project_file"] : []),
       ...toolExecution.toolsExecuted,
-      ...(writeResult.written.length > 0 ? ["write_project_file/apply_patch puis verify_file"] : []),
+      ...(writeResult.written.length > 0 ? ["write_project_file/modify_project_file/patch_project_file puis verify_file"] : []),
     ])];
     const findings = this.extractFindings(resultText);
-    const completion = toolExecution.workspace.completionReport(toolExecution.touchedFiles);
+    const completion = toolExecution.workspace.completionReport(writeResult.written);
     const writeRequired = ["writer", "formatter", "proofreader", "translator", "coder", "refactor", "debugger"].includes(task.role)
       // Une sous-tâche explicitement orientée lecture/analyse n'exige pas d'écriture.
       // On détecte cela par l'absence totale de mot-clé d'écriture dans le titre/description
@@ -979,7 +970,7 @@ ${truncated}
       ...completion.errors,
       ...(declaredFailure ? [`Le rapport final déclare un échec : ${declaredFailure}`] : []),
       ...(planningOnly ? ["La sortie décrit un plan sans résultat d'exécution."] : []),
-      ...(writeRequired && writeResult.written.length === 0 ? ["Aucun fichier confirmé par write_project_file puis verify_file."] : []),
+      ...(writeRequired && writeResult.written.length === 0 ? ["Aucun fichier confirmé par write_project_file, modify_project_file ou patch_project_file puis verify_file."] : []),
       ...(readEvidenceRequired && filesRead.length === 0 ? ["Aucun fichier lu : audit impossible à vérifier."] : []),
       ...(readEvidenceRequired && findings.length === 0 ? ["Aucun constat concret fourni."] : []),
     ];
@@ -1074,7 +1065,7 @@ ${truncated}
   private isAnalysisOnlyTask(task: AgentTask): boolean {
     const text = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.toLowerCase();
     // Si le titre/description mentionne explicitement une modification/écriture de fichier de code
-    const writingSignal = /\b(?:modifier\s+le\s+code|écrire\s+le\s+fichier|write_project_file|apply_patch|patch_project_file)\b/i;
+    const writingSignal = /\b(?:modifier\s+le\s+code|écrire\s+le\s+fichier|write_project_file|apply_patch|patch_project_file|modify_project_file)\b/i;
     if (writingSignal.test(text)) return false;
     // Mots-clés indiquant une tâche d'analyse, proposition, synthèse, rapport, recommandation, audit
     const analysisSignal = /\b(?:analys|inspect|audit|review|check|read|lire|analyser|examin|rapport|report|résumé|summary|checkpoint\s+git|identifier|liste|list|propos|proposition|suggestion|recommand|conseil|avis|contenu)\b/i;

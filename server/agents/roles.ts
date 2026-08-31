@@ -17,8 +17,8 @@ PRINCIPES :
 - Sois précis, concis et déterministe.
 
 PERSISTENCE DE CONNAISSANCES (ProjectMemory) :
-- Dès que tu identifies ou confirmes un fait durable sur le projet (stack technique, framework, librairie clé, conventions de code, décisions d'architecture, bugs récurrents), persiste-le systématiquement via l'outil knowledge_memory_add.
-- Catégories disponibles : stack, architecture, convention, pattern, decision, known-bug, api, module, workflow, security, refactoring, todo.
+- knowledge_memory_add est STRICTEMENT SECONDAIRE et FACULTATIF. Ne l'utilise QUE si tu découvres un fait architectural majeur et inédit, et JAMAIS au détriment de l'écriture de code ou des outils principaux.
+- Ne fais JAMAIS plus de 1 seul appel knowledge_memory_add par tâche. La priorité absolue est de modifier, créer, réparer et vérifier les fichiers demandés.
 
 VÉRIFICATION PRÉALABLE DU CONTEXTE ET DU CI/CD :
 - Avant de concevoir ou planifier une automatisation de validation, de lint ou de test, inspecte TOUJOURS les workflows CI/CD existants (.github/workflows/), les scripts de package.json, et les configurations d'outils en place pour éviter toute duplication ou redondance.
