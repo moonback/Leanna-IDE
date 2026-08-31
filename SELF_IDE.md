@@ -1,15 +1,15 @@
 # Leanna — IDE 
 
-> Leanna ne lit, n'écrit et n'exécute **que sur son propre code source**. Ce document décrit l'architecture self-referential et explique comment étendre les skills en respectant le périmètre verrouillé.
+> Leanna ne lit, n'écrit et n'exécute **que sur le code source du projet ouvert**. Ce document décrit l'architecture self-referential et explique comment étendre les skills en respectant le périmètre verrouillé.
 
 ---
 
 ## 1. Principe
 
-Leanna n'est pas un IDE généraliste multi-projets. C'est un IDE **auto-hébergé** : l'application ne peut modifier que le repo qui la fait tourner. Il n'existe aucun moyen d'ouvrir un workspace externe ou de cloner un autre dépôt.
+Leanna un IDE généraliste multi-projets. C'est un IDE : l'application ne peut modifier que le repo qui est ouvert. 
 
 Cette contrainte est **structurelle**, pas cosmétique :
-- La racine du projet (`SELF_ROOT`) est résolue une seule fois au démarrage et ne change jamais.
+- La racine du projet (`SELF_ROOT`) est résolue une seule fois au démarrage.
 - Tous les accès filesystem passent par une validation de chemin centralisée.
 - Les fichiers critiques nécessitent une confirmation explicite avant modification.
 - Chaque écriture crée un checkpoint git automatique (rollback trivial).

@@ -75,7 +75,7 @@ flowchart TB
 
 Leanna fonctionne selon les principes architecturaux suivants :
 
-1. **Auto-hébergement & Périmètre Self-Root** : L'IDE est conçu pour opérer sur son propre code source (`SELF_ROOT`). Tous les accès au système de fichiers sont strictement validés et restreints.
+1. **Auto-hébergement & Périmètre Self-Root** : L'IDE est conçu pour opérer sur le code source du projet (`SELF_ROOT`). Tous les accès au système de fichiers sont strictement validés et restreints.
 2. **Isolation par Sandbox** : Par défaut, toute écriture effectuée par l'utilisateur ou par l'IA est appliquée dans un dossier miroir `.Leanna/sandbox`. Les modifications ne sont reportées dans le projet principal qu'après validation TypeScript (`tsc --noEmit`) et approbation explicite (`sync` ou `accept-file`).
 3. **Dialogue Multimodal Temps Réel** : L'interface échange des flux audio PCM 16kHz et des captures vidéo/écran directement avec l'API Gemini Live. Lorsque l'IA décide d'exécuter une action, elle invoque des outils (`functionDeclarations`) interceptés côté backend par le `LiveSocketHandler`.
 4. **Coexistence Runtime V1 & V2** : Le système migre progressivement d'un `SkillManager` historique vers une architecture découplée `ToolRegistry` + `RuntimeV2` tout en conservant une compatibilité ascendante complète.
@@ -197,7 +197,7 @@ Lorsque `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` sont renseignés, les tabl
 
 ## Sécurité & Garde-fous
 
-Leanna met en œuvre plusieurs couches défensives pour encadrer l'auto-modification du code source :
+Leanna met en œuvre plusieurs couches défensives pour encadrer la modification du code source :
 
 ```mermaid
 flowchart TD
