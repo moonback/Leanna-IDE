@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, memo } from 'react';
 import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import mermaid from 'mermaid';
+import { Tooltip } from '../ui/Tooltip.js';
 
 interface Props {
   code: string;
@@ -149,19 +150,19 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
           <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Utilisez le zoom et faites défiler pour explorer les branches.</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={() => updateZoom(-0.1)} disabled={zoom <= 0.55} className="p-1.5 rounded-md hover:bg-white/5 disabled:opacity-30" title="Réduire le zoom" aria-label="Réduire le zoom">
+          <Tooltip content="Réduire le zoom" as="button" onClick={() => updateZoom(-0.1)} disabled={zoom <= 0.55} className="p-1.5 rounded-md hover:bg-white/5 disabled:opacity-30">
             <ZoomOut className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-          </button>
+          </Tooltip>
           <span className="w-10 text-center text-xs font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>{Math.round(zoom * 100)}%</span>
-          <button onClick={() => updateZoom(0.1)} disabled={zoom >= 1.5} className="p-1.5 rounded-md hover:bg-white/5 disabled:opacity-30" title="Agrandir le zoom" aria-label="Agrandir le zoom">
+          <Tooltip content="Agrandir le zoom" as="button" onClick={() => updateZoom(0.1)} disabled={zoom >= 1.5} className="p-1.5 rounded-md hover:bg-white/5 disabled:opacity-30">
             <ZoomIn className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-          </button>
-          <button onClick={() => setZoom(0.85)} className="p-1.5 rounded-md hover:bg-white/5" title="Réinitialiser le zoom" aria-label="Réinitialiser le zoom">
+          </Tooltip>
+          <Tooltip content="Réinitialiser le zoom" as="button" onClick={() => setZoom(0.85)} className="p-1.5 rounded-md hover:bg-white/5">
             <RotateCcw className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-          </button>
-          <button onClick={() => setExpanded((current) => !current)} className="p-1.5 rounded-md hover:bg-white/5" title={expanded ? 'Réduire la carte' : 'Agrandir la carte'} aria-label={expanded ? 'Réduire la carte' : 'Agrandir la carte'}>
+          </Tooltip>
+          <Tooltip content={expanded ? 'Réduire la carte' : 'Agrandir la carte'} as="button" onClick={() => setExpanded((current) => !current)} className="p-1.5 rounded-md hover:bg-white/5">
             {expanded ? <Minimize2 className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /> : <Maximize2 className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />}
-          </button>
+          </Tooltip>
         </div>
       </div>
       <div className={`overflow-auto custom-scrollbar p-4 ${expanded ? 'flex-1' : 'max-h-[65vh]'}`}>

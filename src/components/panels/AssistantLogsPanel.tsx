@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Bot, RefreshCw, ScrollText, X } from 'lucide-react';
+import { Tooltip } from '../ui/Tooltip.js';
 
 type LogScope = 'assistant' | 'agents' | 'all';
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -91,8 +92,12 @@ export function AssistantLogsPanel({ onClose }: AssistantLogsPanelProps) {
             <div><h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Logs Assistant</h2><p className="text-xs" style={{ color: 'var(--text-muted)' }}>Session active · 1 000 entrées retenues côté serveur</p></div>
           </div>
           <div className="flex items-center gap-1">
-            <button type="button" onClick={load} className="p-2 rounded-lg hover:bg-white/10" title="Rafraîchir" aria-label="Rafraîchir les logs"><RefreshCw size={14} className={loading ? 'animate-spin' : ''} /></button>
-            <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/10" title="Fermer" aria-label="Fermer les logs"><X size={15} /></button>
+            <Tooltip content="Rafraîchir les logs" as="button" type="button" onClick={load} className="p-2 rounded-lg hover:bg-white/10">
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            </Tooltip>
+            <Tooltip content="Fermer les logs" as="button" type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/10">
+              <X size={15} />
+            </Tooltip>
           </div>
         </header>
         <div className="flex gap-2 p-3" style={{ borderBottom: '1px solid var(--border-base)' }}>
