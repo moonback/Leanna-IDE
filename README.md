@@ -61,6 +61,7 @@ Leanna est un IDE augmenté par l'IA et un système d'exploitation pour dévelop
 * **Navigateur Web autonome** : Navigation, capture d'écran, extraction de texte, inspection DOM et formulaires via webview et Puppeteer.
 * **Synthèse Vocale & Audio** : Support TTS multivoix et lecteur audio pour les résumés et briefings générés.
 * **Gestion des listes et tâches** : Création et gestion de listes de tâches synchronisées avec Supabase.
+* **Intégration GitHub native** : Panneau GitHub intégré à l'IDE avec 5 onglets (Commits locaux avec détail des fichiers, Repos, Issues, Pull Requests, Notifications), détection automatique du repo courant, filtres open/closed, badges de compteurs et lien direct vers GitHub.
 
 ### Fonctionnalités développeur
 * **Orchestration d'agents autonomes & Fleet** : Architecture multi-agents (Architecte, Développeur, Testeur, Sécurité, etc.) communicant via un bus de messages interne (`agentMessageBus`) avec support d'agents personnalisés dynamiques.
@@ -121,7 +122,7 @@ Renseignez les variables nécessaires dans le fichier `.env` ou `.env.local` à 
 | `SUPABASE_SERVICE_ROLE_KEY` | Clé de service Supabase pour accès BDD complet | `<YOUR_SUPABASE_SERVICE_ROLE_KEY>` | Non |
 | `OPENROUTER_API_KEY` | Clé API OpenRouter pour modèles alternatifs | `<YOUR_OPENROUTER_KEY>` | Non |
 | `OPENROUTER_MODEL` | Modèle par défaut pour OpenRouter | `google/gemini-2.0-flash-001` | Non |
-| `GITHUB_TOKEN` | Jeton d'accès personnel GitHub | `ghp_<SECRET>` | Non |
+| `GITHUB_TOKEN` | Jeton d'accès personnel GitHub (requis pour l'intégration GitHub dans l'IDE) | `ghp_<SECRET>` | Non (Recommandé) |
 | `ENABLE_CHAIN_OF_THOUGHT` | Active l'affichage de la chaîne de réflexion IA | `true` | Non (Défaut: true) |
 | `FORCE_TIERED_TOOLS` | Filtre dynamiquement les outils envoyés à Gemini par pertinence | `true` | Non (Défaut: true) |
 | `NODE_ENV` | Environnement d'exécution (`development`, `production`, `test`) | `development` | Non |

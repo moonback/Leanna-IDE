@@ -13,12 +13,12 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 * [x] **Éditeur de code Monaco Editor** (`src/views/IdeView.tsx`) : Navigation dans l'arborescence, recherche globale et modifications avec garde-fous.
 * [x] **Système d'Agents & Bus de Messages** (`server/agents/`) : Découplage des rôles, matrice de délégation et bus de communication inter-agents.
 * [x] **Gestionnaire de Notebooks & RAG** (`server/notebooks/`) : Ingestion multi-formats (PDF, TXT, MD, DOCX), chunking, recherche sémantique et génération de résumés/slides.
-* [x] **Validation Stricte Zod des Requêtes API** (`server/middleware/validateBody.ts`, `server/routes/`) : Middleware réutilisable de validation de schémas et typage strict sur les endpoints critiques (`/api/custom-agents`, `/api/mcp`, `/api/agents`, `/api/tts`).
-* [x] **Agent Builder & Registre d'Agents Personnalisés** (`server/routes/custom-agents.ts`, `src/components/panels/AgentBuilderPanel.tsx`) : Création visuelle d'agents, import/export JSON, enregistrement dynamique dans le runtime et persistance locale.
-* [x] **Indexation AST Incrémentale par Tree-sitter & Call-Graph** (`server/knowledge/ASTParser.ts`, `server/knowledge/ASTCallGraph.ts`) : Analyse syntaxique WASM fine des fonctions, signatures typées, dépendances intra/inter-fichiers et chaîne d'appels récursive.
-* [x] **Mode Multi-Workspace Sécurisé** (`server/utils/selfRoot.ts`, `server/routes/self-root.ts`) : Gestion multi-projets avec isolation stricte, persistance dans `workspaces.json` et garde-fous sandbox.
+* [x] **Validation Stricte Zod des Requêtes API** (`server/middleware/validateBody.ts`, `server/routes/`) : Middleware réutilisable de validation de schémas et typage strict.
+* [x] **Agent Builder & Registre d'Agents Personnalisés** (`server/routes/custom-agents.ts`, `src/components/panels/AgentBuilderPanel.tsx`) : Création visuelle d'agents, import/export JSON, enregistrement dynamique.
+* [x] **Indexation AST Incrémentale par Tree-sitter & Call-Graph** (`server/knowledge/ASTParser.ts`, `server/knowledge/ASTCallGraph.ts`) : Analyse syntaxique WASM fine, signatures typées, dépendances et chaîne d'appels.
+* [x] **Mode Multi-Workspace Sécurisé** (`server/utils/selfRoot.ts`, `server/routes/self-root.ts`) : Gestion multi-projets avec isolation stricte et persistance dans `workspaces.json`.
 * [x] **Journalisation d'Audit NDJSON** (`server/audit.ts`) : Enregistrement de chaque action avec horodatage et détails.
-* [x] **Circuit Breaker HTTP Frontend** (`src/main.tsx`) : Protection contre la saturation de sockets TCP en cas d'indisponibilité backend.
+* [x] **Circuit Breaker HTTP Frontend** (`src/main.tsx`) : Protection contre la saturation de sockets TCP.
 * [x] **Intégration Electron Desktop** (`electron/main.cjs`, `electron/preload.cjs`) : Packaging Windows NSIS, splash screen et bridge IPC.
 
 ---
@@ -29,20 +29,22 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 
 | Priorité | Élément | Statut | Justification technique |
 | :--- | :--- | :--- | :--- |
-| **P0** | Sécurisation et fiabilisation des endpoints sans validation de schéma | ✅ Livré (Sprint 1) | Middleware `validateBody` et schémas Zod déployés sur les routeurs critiques (`custom-agents`, `mcp`, `agents`, `tts`). Extension progressive aux autres routeurs secondaires. |
+| **P0** | Sécurisation et fiabilisation des endpoints sans validation de schéma | ✅ Livré | Middleware `validateBody` et schémas Zod déployés sur les routeurs critiques. |
 | **P0** | Définition d'un pipeline CI/CD automatisé | 📋 Planifié | Aucun workflow de test ou de build automatique n'est configuré dans `.github/workflows`. |
-| **P1** | Finalisation de la migration Runtime V2 | ✅ Livré | Unification complète sur `SkillManagerV2` / `ToolRegistry` (`server/runtime/`) et suppression de l'ancien `SkillManager` V1 obsolète. |
-| **P1** | Couverture de tests e2e pour les WebSockets | ✅ Livré | Suite de tests d'intégration e2e complète (`server/websocket.e2e.test.ts`) validant l'authentification handshake, `/terminal`, `/live` et `/sandbox-watch`. |
-| **P2** | Nettoyage des routes Git désactivées | ✅ Livré | Le routeur `/api/git` et `/api/github` sont unifiés sur `createGithubRouter` avec support complet des commits, repos, issues et PRs. |
+| **P1** | Finalisation de la migration Runtime V2 | ✅ Livré | Unification complète sur `SkillManagerV2` / `ToolRegistry` et suppression de l'ancien V1. |
+| **P1** | Couverture de tests e2e pour les WebSockets | ✅ Livré | Suite de tests d'intégration e2e complète validant l'authentification handshake, `/terminal`, `/live` et `/sandbox-watch`. |
+| **P1** | **Intégration GitHub complète dans l'IDE** | ✅ Livré (v0.8.0) | Panneau GitHub natif (`src/components/ide/GitHubPanel.tsx`) avec 5 onglets : Commits locaux (avec détail diff par fichier), Repos (filtre live + recherche GitHub), Issues (filtres open/closed/all), PRs (filtres + draft), Notifications (badges non-lus). Accès via la sidebar Git & CI/CD. |
+| **P2** | Nettoyage des routes Git désactivées | ✅ Livré | `/api/git` et `/api/github` unifiés sur `createGithubRouter` avec support complet. |
 | **P2** | Optimisation du cache d'embeddings Notebooks | 🚧 En cours | Réduction de la latence lors de la réindexation de gros volumes documentaires. |
 
 ---
 
 ## V2+ — Long terme (Évolutions structurelles)
 
-* 💡 **Idée : Support natif de conteneurs Docker pour le Sandbox** : Remplacer l'isolation par dossier miroir `.Leanna/sandbox` par des conteneurs éphémères légers pour isoler également l'exécution des commandes shell `run_project_command`.
-* 💡 **Idée : Support multi-fournisseurs voix locale** : Intégration de modèles vocaux locaux (ex: Whisper / Piper) pour réduire la dépendance au cloud en mode hors-ligne.
-
+* 💡 **Idée : Support natif de conteneurs Docker pour le Sandbox** : Remplacer l'isolation par dossier miroir `.Leanna/sandbox` par des conteneurs éphémères légers.
+* 💡 **Idée : Support multi-fournisseurs voix locale** : Intégration de modèles vocaux locaux (ex: Whisper / Piper) pour réduire la dépendance au cloud.
+* 💡 **Idée : GitHub Actions depuis l'IDE** : Déclenchement et visualisation des workflows CI/CD directement depuis le panneau GitHub sans quitter l'IDE.
+* 💡 **Idée : Création d'issues et PRs depuis l'IDE** : Formulaires de création inline pour issues et pull requests avec sélection de labels, assignees et milestone.
 
 ---
 

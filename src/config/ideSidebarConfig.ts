@@ -14,10 +14,10 @@
 import {
   Search,
   GitBranch, Github, Camera, Monitor,
-  MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
-  Cable, Container, Bot, Crosshair, Database,
+  FolderTree, ChartNoAxesColumnIncreasing, Workflow,
+  Container, Bot, Crosshair, Database,
   Activity, Wrench, Users, FileStack,
-  Wand2, BookOpen, Globe, Terminal, Eye,
+  Wand2, BookOpen, Globe, Terminal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
