@@ -793,6 +793,163 @@ Déclenche une réindexation complète du projet par `ProjectIndexer` et reconst
 
 ---
 
+## Agents Personnalisés (`/api/custom-agents`)
+
+Gestion CRUD et persistance locale (`.Leanna/custom-agents.json`) des agents personnalisés créés via l'Agent Builder, avec validation Zod stricte.
+
+### `GET /api/custom-agents`
+Retourne la liste complète de tous les agents personnalisés enregistrés.
+
+### `POST /api/custom-agents`
+Crée un nouvel agent personnalisé et l'enregistre dynamiquement dans le runtime.
+
+#### Corps de requête (JSON validé Zod)
+```json
+{
+  "name": "Expert Python",
+  "role": "python_expert",
+  "description": "Agent spécialisé en développement et tests Python",
+  "systemPrompt": "Tu es un expert Python...",
+  "capabilities": ["python_exec", "read_project_file"],
+  "maxConcurrency": 2,
+  "defaultTimeoutMs": 60000,
+  "triggerKeywords": ["python", "pytest", "django"]
+}
+```
+
+### `PUT /api/custom-agents/:id`
+Met à jour les propriétés d'un agent personnalisé existant. Rejette toute clé non autorisée (`strict`).
+
+### `DELETE /api/custom-agents/:id`
+Supprime un agent et le désenregistre du registre dynamique.
+
+### `POST /api/custom-agents/import`
+Importe un lot d'agents personnalisés depuis une structure `{ "agents": [...] }`.
+
+---
+
+## Intégration MCP (Model Context Protocol) (`/api/mcp`)
+
+Gestion du pont MCP pour connecter des serveurs d'outils externes (Stdio / SSE).
+
+### `GET /api/mcp/servers`
+Liste les serveurs MCP configurés et leur statut (connecté, déconnecté, erreur).
+
+### `POST /api/mcp/servers`
+Ajoute et démarre un nouveau serveur MCP.
+
+#### Corps de requête (JSON validé Zod)
+```json
+{
+  "id": "github-mcp",
+  "name": "GitHub Tool Server",
+  "transport": "stdio",
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-github"],
+  "env": { "GITHUB_TOKEN": "ghp_xxx" }
+}
+```
+
+### `PUT /api/mcp/servers/:id`
+Met à jour la configuration d'un serveur MCP.
+
+### `POST /api/mcp/servers/:id/toggle`
+Active ou désactive un serveur MCP (`{ "enabled": true }`).
+
+### `GET /api/mcp/tools`
+Retourne l'ensemble des outils découverts sur tous les serveurs MCP actifs.
+
+### `POST /api/mcp/tools/call`
+Exécute un outil MCP spécifique.
+
+#### Corps de requête (JSON validé Zod)
+```json
+{
+  "tool": "github_create_issue",
+  "arguments": {
+    "title": "Bug fix",
+    "body": "Description..."
+  }
+}
+```
+
+---
+
+## Flotte d'Agents Autonomes & Collaboration (`/api/agents`)
+
+### `GET /api/agents/fleet`
+Statut en temps réel de tous les agents de la flotte (rôles statiques et dynamiques).
+
+### `POST /api/agents/collaborate`
+Lance une session de collaboration multi-agents structurée selon un pattern prédéfini.
+
+#### Corps de requête (JSON validé Zod)
+```json
+{
+  "patternName": "feature_development",
+  "context": {
+    "title": "Implémentation Auth JWT",
+    "description": "Créer le module d'authentification et les tests associés",
+    "files": ["server/auth.ts", "tests/auth.test.ts"]
+  }
+}
+```
+
+### `POST /api/agents/delegate-autonomous`
+Délègue de manière asynchrone une tâche à un agent autonome avec sous-délégation automatique.
+
+#### Corps de requête (JSON validé Zod)
+```json
+{
+  "role": "coder",
+  "title": "Refactoring des routes",
+  "description": "Ajouter la validation Zod sur les contrôleurs",
+  "priority": "high",
+  "timeoutMs": 120000
+}
+```
+
+---
+
+## Synthèse Vocale TTS (`/api/tts`)
+
+### `POST /api/tts/speak`
+Synthétise un texte en audio PCM (base64) avec mise en cache.
+
+#### Corps de requête (JSON validé Zod)
+```json
+{
+  "text": "Bonjour, je suis votre assistant Jarvis.",
+  "voice": "Puck",
+  "speed": 1.0,
+  "noCache": false
+}
+```
+
+### `POST /api/tts/speak-stream`
+Génère le flux audio en Server-Sent Events (SSE) pour les réponses longues.
+
+---
+
+## Format Standardisé des Erreurs de Validation (400 Bad Request)
+
+Toutes les routes équipées de la validation Zod renvoient un format uniforme en cas d'erreur de corps :
+```json
+{
+  "error": "Corps de requête invalide.",
+  "details": [
+    {
+      "field": "role",
+      "message": "Le rôle ne peut contenir que des lettres, chiffres, tirets et underscores"
+    }
+  ]
+}
+```
+
+---
+
+
+
 ## Interfaces Non-HTTP
 
 ### WebSocket `/live` (Gemini Live API Bridge)

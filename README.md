@@ -33,6 +33,7 @@ Leanna est un environnement de développement intégré (IDE) et système d'expl
 | **TailwindCSS** | Framework utilitaire CSS (compilateur v4) | `^4.1.14` |
 | **Monaco Editor** | Éditeur de code intégré (moteur VS Code) | `^0.53.0` |
 | **Motion** | Animations et transitions d'interface | `^12.23.24` |
+| **Zod** | Validation de schémas et typage strict des requêtes | `^3.25.76` |
 | **@google/genai** | SDK officiel Google Gemini (Gemini Live API & Text Gen) | `^2.4.0` |
 | **Supabase JS** | Client de persistance distante (mémoires, historique, workflows, RAG) | `^2.110.2` |
 | **Puppeteer** | Automatisation et navigation Web headless | `^25.3.0` |
@@ -47,6 +48,7 @@ Leanna est un environnement de développement intégré (IDE) et système d'expl
 ### Fonctionnalités utilisateur
 * **Assistant Vocal & Multimodal Live** : Interaction en direct via WebSocket audio PCM 16kHz bidirectionnel et vision (partage d'écran / webcam) avec `gemini-3.1-flash-live-preview`.
 * **Mode Multi-Workspace Sécurisé** : Ouverture, enregistrement et bascule instantanée entre dépôts externes avec isolation stricte du périmètre (`SELF_ROOT`), historique des workspaces (`.Leanna/workspaces.json`), validation préventive de sécurité et badges Git.
+* **Agent Builder Visuel** : Interface de création, personnalisation (avatar, couleur, instructions système, presets d'outils, modèles) et test d'agents personnalisés avec import/export JSON.
 * **Éditeur de code intelligent (IDE)** : Édition avec Monaco Editor, arborescence de fichiers, coloration syntaxique, recherche globale avec regex, onglets multiples et panneau de prévisualisation web.
 * **Mode Bac à Sable (Sandbox)** : Isolation complète des modifications de fichiers dans un miroir `.Leanna/sandbox`, avec calcul de diff, validation syntaxique/TypeScript en temps réel et synchronisation sélective.
 * **Gestionnaire de Notebooks & RAG** : Indexation de documents multiples (PDF, Markdown, texte, code), découpage en chunks, recherche sémantique, génération automatique de guides d'étude, FAQ, résumés, timelines et diapositives Reveal.js.
@@ -56,7 +58,8 @@ Leanna est un environnement de développement intégré (IDE) et système d'expl
 * **Gestion des listes et tâches** : Création et gestion de listes de tâches synchronisées avec Supabase.
 
 ### Fonctionnalités développeur
-* **Orchestration d'agents autonomes & Fleet** : Architecture multi-agents (Architecte, Développeur, Testeur, Sécurité, etc.) communicant via un bus de messages interne (`agentMessageBus`).
+* **Orchestration d'agents autonomes & Fleet** : Architecture multi-agents (Architecte, Développeur, Testeur, Sécurité, etc.) communicant via un bus de messages interne (`agentMessageBus`) avec support d'agents personnalisés dynamiques.
+* **Validation Stricte Zod (`validateBody`)** : Middleware universel garantissant le filtrage des champs inconnus, le typage strict et la prévention des injections de propriétés sur les endpoints REST.
 * **Knowledge System & Analyse Syntaxique Tree-sitter** : Indexation AST WASM incrémentale du codebase, cartographie bidirectionnelle des appels (`ASTCallGraph`), extraction de signatures typées, chaînes d'appels BFS et détection des dépendances intra-classe (`this.method()`).
 * **Runtime V2 & Extensibilité Skills** : Système unifié de déclaration et d'exécution d'outils (`ToolRegistry`, `SkillManagerV2`), supportant les custom skills créés à la volée.
 * **Passerelle MCP (Model Context Protocol)** : Connexion à des serveurs MCP tiers (stdio / SSE) pour étendre les outils disponibles tout en appliquant une validation de chemin stricte.

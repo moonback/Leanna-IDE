@@ -17,13 +17,15 @@ flowchart TB
 
     subgraph BackendServer ["Serveur Backend (Node.js / Express)"]
         AuthMiddleware["Auth Gate & Rate Limiting<br/>(x-leanna-token)"]
+        ZodValidator["Validation Zod Universelle<br/>(server/middleware/validateBody.ts)"]
         
         subgraph Routers ["Routeurs API REST"]
             IDERouter["/api/ide<br/>(Filesystem / Search)"]
             SandboxRouter["/api/sandbox<br/>(Isolation / Diffs)"]
-            AgentsRouter["/api/agents & /api/v2/*<br/>(Orchestration / Fleet)"]
+            AgentsRouter["/api/agents & /api/custom-agents<br/>(Orchestration / Fleet / Builder)"]
+            MCPRouter["/api/mcp<br/>(Stdio & SSE Tool Bridge)"]
             NotebooksRouter["/api/notebooks<br/>(RAG / Sources)"]
-            OtherRouters["/api/workflows, /api/mcp, /api/profile..."]
+            OtherRouters["/api/workflows, /api/tts, /api/profile..."]
         end
 
         subgraph Sockets ["WebSockets (/live, /terminal, /sandbox-watch)"]
@@ -95,7 +97,7 @@ L'interface utilisateur est développée en **React 19** avec **TypeScript** et 
 * **Composants majeurs** :
   - `IdeView` (`src/views/IdeView.tsx`) : Environnement de travail avec Monaco Editor, arborescence virtuelle, onglets et panneaux latéraux rétractables.
   - `UnifiedSidebar` : Barre latérale unique supportant les contextes `global` et `ide`.
-  - `Panels` (`src/components/panels/`) : Panneaux spécialisés pour le Terminal, le Navigateur webview, les Métriques d'agents, la Flotte d'agents, les Tâches planifiées, les Workflows, les MCP et l'Audit.
+  - `Panels` (`src/components/panels/`) : Panneaux spécialisés pour le Terminal, le Navigateur webview, les Métriques d'agents, la Flotte d'agents (`AgentFleetPanel`), le Constructeur visuel d'agents (`AgentBuilderPanel`), les Tâches planifiées, les Workflows, les MCP et l'Audit.
   - `StartupProjectModal` : Modale de démarrage permettant de sélectionner ou changer le projet cible géré par `SELF_ROOT`.
 
 ---
@@ -131,16 +133,25 @@ Le serveur backend repose sur **Express 4** (`server.ts` et `server-bootstrap.ts
 
 ```text
 server/
-├── routes/             # Contrôleurs et points d'accès HTTP REST
+├── routes/             # Contrôleurs et points d'accès HTTP REST modulaires
+├── middleware/         # Middlewares Express dont validateBody (Zod validation)
 ├── live/               # Sessions Gemini Live WebSocket et dispatch d'outils
 ├── runtime/            # Runtime V2, registre d'outils, observabilité
-├── agents/             # Flotte d'agents, bus de communication, matrice de délégation
+├── agents/             # Flotte d'agents, registre dynamique, bus de messages
 ├── autonomy/           # Superviseur anti-boucles de régression
 ├── knowledge/          # Knowledge Graph, WorkspaceIndexer et mémoire projet
 ├── notebooks/          # Moteur RAG, découpage, extraction et file de traitement
-├── mcp/                # Bridge de protocoles MCP
+├── mcp/                # Bridge de protocoles MCP (Stdio & SSE)
 └── utils/              # SelfRoot, Sandbox, Checkpoint Git, Cryptographie, RateLimiting
 ```
+
+### Couche de Validation & Sécurité des Données Entrantes
+* **Middleware `validateBody<T>(schema: ZodSchema<T>)`** (`server/middleware/validateBody.ts`) :
+  - Intercepte et parse `req.body` avec `schema.safeParse()`.
+  - Supprime les champs non déclarés (strip) ou rejette les propriétés interdites (`.strict()`).
+  - Renvoie un code `HTTP 400` structuré avec le détail des champs invalides avant d'atteindre la logique métier.
+* **Registre Dynamique d'Agents (`DynamicAgentRegistry`)** :
+  - Permet l'enregistrement, l'activation, la désactivation et l'orchestration à chaud d'agents définis par l'utilisateur sans redémarrage du serveur.
 
 ### Knowledge System & Analyse Syntaxique Tree-sitter
 Le sous-système `server/knowledge/` offre une compréhension sémantique et structurelle approfondie du projet :
@@ -178,6 +189,8 @@ L'application utilise une architecture de persistance hybride (fichiers locaux +
 * `.env` / `.env.local` : Configuration chiffrée (AES-256-CBC via `server/utils/crypto.ts` pour les clés sensibles).
 * `.Leanna-profile.json` : Profil utilisateur et préférences d'assistant (chargé et surveillé en temps réel via `fs.watchFile`).
 * `.gemini-keys.json` : Pool de clés Google Gemini avec priorités, compteurs d'usage et état d'activation.
+* `.Leanna/custom-agents.json` : Définitions persistées des agents créés dans l'Agent Builder.
+* `.Leanna/workspaces.json` : Historique ordonné et métadonnées des espaces de travail configurés.
 * `.Leanna-audit.log` : Journal d'audit au format NDJSON consignant les actions système et modifications de code.
 
 ### Persistance Cloud (Supabase Postgres)
