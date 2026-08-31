@@ -307,13 +307,6 @@ setWorkflowSkillHandler((name: string, args: any) => skillManager.handleToolCall
 
 console.log(`[Server] ✓ AgentOrchestrator et Workflow Engine connectés au nouveau SkillManagerV2.`);
 
-// Démarrer le runtime
-runtimeV2.start().then(() => {
-  console.log(`[RuntimeV2] ✅ Runtime démarré — ${runtimeV2.listAgents().length} agents, EventBus actif`);
-}).catch((e: Error) => {
-  console.warn(`[RuntimeV2] Démarrage échoué (non bloquant): ${e.message}`);
-});
-
 
 // ── Registre des lectures de page browser en attente ─────────────────────────
 // browser_read_content insère une promesse ici ; POST /api/browser/content-result

@@ -76,6 +76,7 @@ export class AgentRuntime {
   // Config
   private config: RuntimeConfig;
   private started = false;
+  private startPromise: Promise<void> | null = null;
 
   constructor(config: Partial<RuntimeConfig> = {}) {
     this.config = { ...DEFAULT_RUNTIME_CONFIG, ...config };
@@ -106,13 +107,22 @@ export class AgentRuntime {
    */
   async start(): Promise<void> {
     if (this.started) return;
+    if (this.startPromise) return this.startPromise;
 
-    await this.memory.loadProject();
-    this.started = true;
+    this.startPromise = (async () => {
+      await this.memory.loadProject();
+      this.started = true;
 
-    console.log(
-      `[AgentRuntime] Démarré — ${this.agents.size} agent(s), ${this.tools.size} outil(s)`
-    );
+      console.log(
+        `[AgentRuntime] Démarré — ${this.agents.size} agent(s), ${this.tools.size} outil(s)`
+      );
+    })();
+
+    try {
+      await this.startPromise;
+    } finally {
+      this.startPromise = null;
+    }
   }
 
   /**
