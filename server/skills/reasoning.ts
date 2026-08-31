@@ -11,13 +11,7 @@ import { ChainOfThoughtExecutor, assessComplexity, type ComplexityLevel } from "
 let _lastTTSAnnouncementTime = 0;
 const TTS_ANNOUNCEMENT_COOLDOWN_MS = 30_000; // 30s minimum entre deux annonces
 
-function getProjectRoot(): string {
-  return SELF_ROOT;
-}
-
-function normalizeProjectPath(target: string): string | null {
-  return normalizeSelfPath(target);
-}
+import { getProjectRoot, normalizeProjectPath } from "./codebaseHelpers.js";
 
 function parseReasoningListCommand(command: unknown): string | null {
   if (typeof command !== "string") return null;

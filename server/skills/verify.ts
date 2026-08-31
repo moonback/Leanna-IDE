@@ -31,14 +31,7 @@ interface TestCacheEntry {
 const testCache = new Map<string, TestCacheEntry>();
 const TEST_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-// ── Workspace (verrouillé sur le self-root) ────────────────────────────────
-function getProjectRoot(): string {
-  return SELF_ROOT;
-}
-
-function normalizeProjectPath(target: string): string | null {
-  return normalizeSelfPath(target);
-}
+import { getProjectRoot, normalizeProjectPath } from "./codebaseHelpers.js";
 
 const TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_CHARS = 8_000;
