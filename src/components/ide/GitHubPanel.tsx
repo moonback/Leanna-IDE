@@ -203,9 +203,11 @@ function FilterDropdown({ value, options, onChange }: {
 
 interface GitHubPanelProps {
   onClose: () => void;
+  /** Quand true, le panneau occupe toute la zone principale (pas de border-l ni largeur fixe) */
+  fullWidth?: boolean;
 }
 
-export function GitHubPanel({ onClose }: GitHubPanelProps) {
+export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
   const [tab, setTab] = useState<Tab>('commits');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -412,8 +414,11 @@ export function GitHubPanel({ onClose }: GitHubPanelProps) {
 
   return (
     <div
-      className="border-l flex flex-col h-full"
-      style={{ width: '340px', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+      className={fullWidth ? 'flex flex-col h-full flex-1 min-w-0' : 'border-l flex flex-col h-full'}
+      style={fullWidth
+        ? { backgroundColor: 'var(--bg-panel)' }
+        : { width: '340px', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }
+      }
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div

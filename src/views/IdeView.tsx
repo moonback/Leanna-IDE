@@ -962,6 +962,10 @@ export default function IdeView() {
                         <AutomationPanel onClose={() => setShowAutomation(false)} />
                       ) : showMemory ? (
                         <MemoryPanel onClose={() => setShowMemory(false)} />
+                      ) : showGitHub ? (
+                        <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement GitHub…</div></div>}>
+                          <GitHubPanel onClose={() => setShowGitHub(false)} fullWidth />
+                        </Suspense>
                       ) : activeFile ? (
                                               // Onglet navigateur
                                               activeFile.type === 'browser' && activeFile.browserUrl ? (
@@ -1027,13 +1031,6 @@ export default function IdeView() {
             {/* Workflow Panel */}
             {showWorkflow && (
               <WorkflowPanel onClose={() => setShowWorkflow(false)} />
-            )}
-
-            {/* GitHub Panel */}
-            {showGitHub && (
-              <Suspense fallback={null}>
-                <GitHubPanel onClose={() => setShowGitHub(false)} />
-              </Suspense>
             )}
 
             {/* MCP Panel */}
