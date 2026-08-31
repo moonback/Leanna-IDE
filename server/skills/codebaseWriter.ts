@@ -174,12 +174,15 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
     const target = resolveSandboxWriteTarget(requestedPath);
     if (!target) return { error: "Chemin invalide ou en dehors du workspace." };
     if (!fs.existsSync(target.sandboxPath)) return { error: "Fichier introuvable." };
-    const content = await fs.promises.readFile(target.sandboxPath, "utf-8");
-    const startIdx = content.indexOf(startMarker);
-    const endIdx = startIdx >= 0 ? content.indexOf(endMarker, startIdx) : -1;
+    const rawContent = await fs.promises.readFile(target.sandboxPath, "utf-8");
+    const content = rawContent.replace(/\r\n/g, "\n");
+    const normalizedStartMarker = startMarker.replace(/\r\n/g, "\n");
+    const normalizedEndMarker = endMarker.replace(/\r\n/g, "\n");
+    const startIdx = content.indexOf(normalizedStartMarker);
+    const endIdx = startIdx >= 0 ? content.indexOf(normalizedEndMarker, startIdx) : -1;
     if (startIdx === -1) return { error: `startMarker introuvable dans le fichier: "${startMarker.slice(0, 80)}"` };
     if (endIdx === -1) return { error: `endMarker introuvable après startMarker: "${endMarker.slice(0, 80)}"` };
-    searchText = content.slice(startIdx, endIdx + endMarker.length);
+    searchText = content.slice(startIdx, endIdx + normalizedEndMarker.length);
     log.info(`[modify_project_file] Mode marker: searchText construit (${searchText.length} chars) depuis startMarker/endMarker`);
   }
 
@@ -190,11 +193,16 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
   if (isWriteForbidden(target.logicalPath)) return { error: `Écriture interdite sur ce fichier protégé: ${requestedPath}` };
   if (!fs.existsSync(normalized)) return { error: "Fichier introuvable." };
 
-  const content = await fs.promises.readFile(normalized, "utf-8");
-  if (!content.includes(searchText)) {
+  const raw = await fs.promises.readFile(normalized, "utf-8");
+  const isCrlf = raw.includes("\r\n");
+  const content = raw.replace(/\r\n/g, "\n");
+  const normalizedSearchText = searchText.replace(/\r\n/g, "\n");
+  const normalizedReplaceText = replaceText.replace(/\r\n/g, "\n");
+
+  if (!content.includes(normalizedSearchText)) {
     // ── Fuzzy match : trouver les passages les plus proches ─────────────────
     const lines = content.split("\n");
-    const searchLines = searchText.split("\n");
+    const searchLines = normalizedSearchText.split("\n");
     const firstSearchLine = searchLines[0].trim();
 
     // Chercher les lignes qui ressemblent à la première ligne du searchText
@@ -233,10 +241,11 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
     };
   }
 
-  const occurrences = content.split(searchText).length - 1;
-  const newContent = replaceAll
-    ? content.split(searchText).join(replaceText)
-    : content.replace(searchText, () => replaceText);
+  const occurrences = content.split(normalizedSearchText).length - 1;
+  const replacedContent = replaceAll
+    ? content.split(normalizedSearchText).join(normalizedReplaceText)
+    : content.replace(normalizedSearchText, () => normalizedReplaceText);
+  const newContent = isCrlf ? replacedContent.replace(/\n/g, "\r\n") : replacedContent;
 
   const critical = isCriticalFile(target.logicalPath);
   // Confirmation interactive (ou mise en file d'attente) pour fichiers critiques

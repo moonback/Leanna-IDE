@@ -1064,11 +1064,11 @@ ${truncated}
    */
   private isAnalysisOnlyTask(task: AgentTask): boolean {
     const text = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.toLowerCase();
-    // Si le titre/description mentionne explicitement une modification/écriture de fichier de code
-    const writingSignal = /\b(?:modifier\s+le\s+code|écrire\s+le\s+fichier|write_project_file|apply_patch|patch_project_file|modify_project_file)\b/i;
+    // Si le titre/description mentionne explicitement une modification/écriture de code ou contenu
+    const writingSignal = /\b(?:modifier|écriture|écrire|amélio|refactor|implément|créer|créa|ajust|corriger|correct|optimis|rédig|fix|update|write|patch|modify|create|improve|write_project_file|apply_patch|patch_project_file|modify_project_file)\b/i;
     if (writingSignal.test(text)) return false;
-    // Mots-clés indiquant une tâche d'analyse, proposition, synthèse, rapport, recommandation, audit
-    const analysisSignal = /\b(?:analys|inspect|audit|review|check|read|lire|analyser|examin|rapport|report|résumé|summary|checkpoint\s+git|identifier|liste|list|propos|proposition|suggestion|recommand|conseil|avis|contenu)\b/i;
+    // Mots-clés indiquant une tâche d'analyse pure, proposition, synthèse, rapport, recommandation, audit
+    const analysisSignal = /\b(?:analys|inspect|audit|review|check|read|lire|analyser|examin|rapport|report|résumé|summary|checkpoint\s+git|identifier|propos|proposition|suggestion|recommand|conseil|avis)\b/i;
     return analysisSignal.test(text);
   }
 
