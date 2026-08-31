@@ -34,9 +34,18 @@ import type {
 
 const log = createLogger("ASTParser");
 
-// Chemin vers node_modules (résolu depuis ce fichier)
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const NODE_MODULES = path.resolve(__dirname, "../../node_modules");
+// Chemin vers node_modules (résolu depuis ce fichier ou racine app)
+function getBaseDir(): string {
+  if (typeof __dirname !== "undefined") return __dirname;
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== "undefined" && import.meta.url) {
+      return path.dirname(fileURLToPath(import.meta.url));
+    }
+  } catch {}
+  return process.cwd();
+}
+const NODE_MODULES = path.resolve(process.env.ELECTRON_APP_PATH || getBaseDir(), process.env.ELECTRON_APP_PATH ? "node_modules" : "../../node_modules");
 
 // ─── Types internes Tree-sitter ───────────────────────────────────────────────
 

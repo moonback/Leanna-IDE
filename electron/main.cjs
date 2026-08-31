@@ -128,6 +128,19 @@ function createWindow(splash, splashMinEnd) {
     }, remaining);
   });
 
+  // Logger les messages de la console renderer dans le fichier de log
+  win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    log(`[Renderer L${level}] ${message} (${sourceId}:${line})`);
+  });
+
+  // Raccourci F12 ou Ctrl+Shift+I pour ouvrir/fermer les DevTools
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i'))) {
+      win.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
+
   // Ouvrir les DevTools automatiquement en mode debug
   if (DEBUG) {
     win.webContents.openDevTools({ mode: 'right' });
@@ -136,12 +149,12 @@ function createWindow(splash, splashMinEnd) {
 
   win.webContents.on('did-fail-load', (_e, errorCode, errorDescription) => {
     log('FAILED TO LOAD:', errorCode, errorDescription);
-    // Réessayer après 2s si le serveur n'est pas encore prêt
-    if (errorCode === -102 || errorCode === -6) {
+    // Réessayer après 1.5s si le serveur n'est pas encore prêt
+    if (errorCode === -102 || errorCode === -6 || errorCode === -105) {
       setTimeout(() => {
         log('Retrying load...');
         win.loadURL(startUrl);
-      }, 2000);
+      }, 1500);
     }
   });
 

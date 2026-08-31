@@ -532,21 +532,64 @@ function Layout() {
   );
 }
 
+class RootErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[RootErrorBoundary] Uncaught render error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-screen w-screen flex-col items-center justify-center p-6" style={{ backgroundColor: '#0a1628', color: '#f0f4ff', fontFamily: 'sans-serif' }}>
+          <div className="max-w-md w-full rounded-2xl border p-6 text-center" style={{ backgroundColor: '#0e2a47', borderColor: 'rgba(0, 194, 255, 0.3)' }}>
+            <h1 className="text-xl font-bold mb-2" style={{ color: '#00c2ff' }}>Une erreur est survenue</h1>
+            <p className="text-sm mb-4" style={{ color: '#b0c8e0' }}>
+              {this.state.error?.message || 'Erreur d’initialisation de l’application.'}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 rounded-xl text-sm font-medium transition-opacity hover:opacity-90 cursor-pointer"
+              style={{ backgroundColor: '#00c2ff', color: '#0a1628' }}
+            >
+              Recharger l’application
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Patch console in production to suppress console.log/debug noise
 patchConsole();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <UserProfileProvider>
-      <ToastProvider>
-        <ConfirmDialogProvider>
-          <BrowserRouter>
-            <AuthGate>
-              <Layout />
-            </AuthGate>
-          </BrowserRouter>
-        </ConfirmDialogProvider>
-      </ToastProvider>
-    </UserProfileProvider>
+    <RootErrorBoundary>
+      <UserProfileProvider>
+        <ToastProvider>
+          <ConfirmDialogProvider>
+            <BrowserRouter>
+              <AuthGate>
+                <Layout />
+              </AuthGate>
+            </BrowserRouter>
+          </ConfirmDialogProvider>
+        </ToastProvider>
+      </UserProfileProvider>
+    </RootErrorBoundary>
   </StrictMode>,
 );

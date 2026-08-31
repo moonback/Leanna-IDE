@@ -427,8 +427,8 @@ async function startServer() {
     if (apiToken) {
       res.cookie('Leanna_token', apiToken, {
         httpOnly: true,
-        sameSite: 'strict',
-        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        secure: false, // Serveur local HTTP (127.0.0.1) — secure:true bloquerait le cookie sous Electron
         path: '/'
       });
     }
@@ -633,7 +633,7 @@ async function startServer() {
     const distPath = path.join(getElectronAppRoot(), 'dist');
     console.log('[Server] Mode production — dist path:', distPath);
     app.use(express.static(distPath));
-    app.get('*all', (_req, res) => {
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
