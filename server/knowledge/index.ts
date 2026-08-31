@@ -4,12 +4,15 @@
  * Ce module ajoute à Leanna une capacité de compréhension profonde du projet :
  * - ProjectIndexer : scanne tous les fichiers et extrait les entités de code
  * - KnowledgeGraph : graphe permanent des connaissances du projet (persisté)
+ * - ASTParser       : moteur Tree-sitter pour l'analyse syntaxique complète
+ * - ASTCallGraph    : graphe d'appels inter et intra fichiers
  * - DependencyGraph : graphe orienté des dépendances entre fichiers
  * - ProjectMemory : mémoire projet dédiée (architecture, conventions, décisions)
  * - SemanticSearch : recherche sémantique dans le codebase
  *
  * Architecture :
- *   ProjectIndexer → KnowledgeGraph → ProjectKnowledge.json
+ *   ProjectIndexer → ASTParser (Tree-sitter) → ASTCallGraph
+ *                  → KnowledgeGraph → ProjectKnowledge.json
  *                                      ↓
  *   DependencyGraph ← KnowledgeGraph  ↓
  *   ImpactAnalyzer  ← DependencyGraph ↓
@@ -20,6 +23,16 @@
 // Sprint 1 — ProjectIndexer + KnowledgeGraph
 export { ProjectIndexer, projectIndexer } from "./ProjectIndexer.js";
 export { KnowledgeGraph, knowledgeGraph } from "./KnowledgeGraph.js";
+
+// AST Engine — Tree-sitter (WASM) + Call-graph
+export { ASTParser, astParser } from "./ASTParser.js";
+export {
+  ASTCallGraph,
+  astCallGraph,
+  type CallNode,
+  type CallEdge,
+  type CallChain,
+} from "./ASTCallGraph.js";
 
 // File Watcher — Indexation incrémentale
 export { FileWatcher, fileWatcher, type FileChangeEvent, type FileChangeType, type FileChangeHandler } from "./FileWatcher.js";
@@ -51,6 +64,12 @@ export type {
   PipelineContext,
   EntityRelation,
   EntityRelationType,
+  // Types AST (Tree-sitter)
+  ASTFileResult,
+  ASTFunction,
+  ASTClass,
+  ASTCall,
+  ASTParam,
 } from "./types.js";
 
 // Sprint 2 — DependencyGraph

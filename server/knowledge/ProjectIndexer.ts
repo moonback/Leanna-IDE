@@ -30,6 +30,9 @@ import { isSandboxActive, getSandboxRoot } from "../utils/sandbox.js";
 import { fileWatcher } from "./FileWatcher.js";
 import type { FileChangeEvent } from "./FileWatcher.js";
 import { relationExtractor } from "./RelationExtractor.js";
+import { astParser } from "./ASTParser.js";
+import { astCallGraph } from "./ASTCallGraph.js";
+import type { ASTFileResult } from "./types.js";
 
 const log = createLogger("ProjectIndexer");
 
@@ -124,22 +127,43 @@ export class ProjectIndexer {
     const root = this.getActiveProjectRoot();
     log.info(`🔍 Scan complet du projet (root: ${root})...`);
 
+    // 0. Initialiser Tree-sitter en parallèle du walk
+    const astInitPromise = astParser.init();
+
     // 1. Lister tous les fichiers
     const files: string[] = [];
     await this.walkDirectory(root, files, root);
     log.info(`📋 ${files.length} fichiers trouvés`);
 
-    // 2. Parser chaque fichier
+    await astInitPromise;
+    const astReady = astParser.isReady;
+    if (astReady) {
+      log.info("🌳 Tree-sitter prêt — enrichissement AST activé");
+    }
+
+    // 2. Parser chaque fichier (regex) + enrichissement AST
     const parsedFiles: FileNode[] = [];
+    const astResults = new Map<string, ASTFileResult>();
     let totalEntities = 0;
 
     for (const relativePath of files) {
       try {
+        const absPath = path.join(root, relativePath);
+        const content = this._readContent(absPath);
         const fileNode = await this.parseFile(relativePath);
-        if (fileNode) {
-          parsedFiles.push(fileNode);
-          totalEntities += fileNode.entities.length;
+        if (!fileNode) continue;
+
+        // Enrichissement AST si Tree-sitter disponible
+        if (astReady && content && ANALYZABLE_EXTENSIONS.has(fileNode.extension)) {
+          const astResult = await astParser.parseFile(content, relativePath, fileNode.extension);
+          if (!astResult.usedFallback) {
+            astResults.set(relativePath, astResult);
+            this.enrichWithAST(fileNode, astResult);
+          }
         }
+
+        parsedFiles.push(fileNode);
+        totalEntities += fileNode.entities.length;
       } catch (err) {
         log.debug(`⚠️ Échec parsing: ${relativePath} — ${(err as Error).message}`);
       }
@@ -148,9 +172,28 @@ export class ProjectIndexer {
     // 3. Alimenter le KnowledgeGraph
     knowledgeGraph.update(parsedFiles);
 
-    // 4. Extraire les relations sémantiques entre entités
+    // 4. Extraire les relations sémantiques (regex) + relations AST (calls précis)
     const allRelations = this.extractAllRelations(parsedFiles, root);
+
+    // 4b. Relations d'appels inter-fichiers depuis l'AST
+    if (astResults.size > 0) {
+      const astCallRelations = relationExtractor.extractASTCallRelations(astResults, knowledgeGraph.getAllFiles());
+      allRelations.push(...astCallRelations);
+      log.info(`🌳 AST call-graph: ${astCallRelations.length} relations d'appels supplémentaires`);
+    }
+
     knowledgeGraph.setRelations(allRelations);
+
+    // 5. Construire le graphe d'appels AST en mémoire
+    if (astResults.size > 0) {
+      for (const [, astResult] of astResults) {
+        astCallGraph.updateFile(astResult, astResults);
+      }
+      const cgStats = astCallGraph.getStats();
+      log.info(`📊 Call-graph AST: ${cgStats.totalNodes} fonctions, ${cgStats.totalEdges} appels (${cgStats.crossFileEdges} cross-file, ${cgStats.resolvedEdges} résolus)`);
+    }
+
+    // Persister le graphe de connaissances enrichi
     knowledgeGraph.save();
 
     const durationMs = Date.now() - startTime;
@@ -163,14 +206,36 @@ export class ProjectIndexer {
     };
   }
 
+  /** Lit le contenu d'un fichier de manière sécurisée (null si erreur/binaire). */
+  private _readContent(absPath: string): string | null {
+    try {
+      return fs.readFileSync(absPath, "utf-8");
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Scanne un seul fichier et met à jour le KnowledgeGraph.
    * Utile après une modification de fichier.
    */
   async scanFile(relativePath: string): Promise<FileNode | null> {
     try {
+      const root = this.getActiveProjectRoot();
+      const absPath = path.join(root, relativePath);
+      const content = this._readContent(absPath);
       const fileNode = await this.parseFile(relativePath);
+
       if (fileNode) {
+        // Enrichissement AST incrémental
+        if (astParser.isReady && content && ANALYZABLE_EXTENSIONS.has(fileNode.extension)) {
+          const astResult = await astParser.parseFile(content, relativePath, fileNode.extension);
+          if (!astResult.usedFallback) {
+            this.enrichWithAST(fileNode, astResult);
+            const allAst = new Map([[relativePath, astResult]]);
+            astCallGraph.updateFile(astResult, allAst);
+          }
+        }
         knowledgeGraph.updateFile(fileNode);
         this.refreshSemanticRelations();
         return fileNode;
@@ -792,25 +857,88 @@ export class ProjectIndexer {
    * Reconstruit les relations sur l'état courant après une indexation incrémentale.
    * Les relations (tests, appels, tables et imports) pouvant traverser les fichiers,
    * une reconstruction globale garantit l'absence de liens périmés.
+   * Les relations d'appels AST sont ajoutées si le call-graph est disponible.
    */
   private refreshSemanticRelations(): number {
-    const relations = this.extractAllRelations(
-      knowledgeGraph.getAllFiles(),
-      this.getActiveProjectRoot()
-    );
+    const allFiles = knowledgeGraph.getAllFiles();
+    const relations = this.extractAllRelations(allFiles, this.getActiveProjectRoot());
+
+    // Ajouter les relations d'appels AST cross-file
+    if (astParser.isReady) {
+      const astCallRelations = relationExtractor.extractASTCallRelations(
+        new Map(), // pas de nouveaux résultats AST lors du refresh
+        allFiles
+      );
+      relations.push(...astCallRelations);
+    }
+
     knowledgeGraph.setRelations(relations);
     knowledgeGraph.save();
     return relations.length;
   }
 
   /**
+   * Enrichit un FileNode avec les données de l'AST Tree-sitter :
+   * - lineEnd précis pour chaque entité
+   * - Signature enrichie avec paramètres et type de retour
+   * - Modificateurs additionnels (isArrow, isAsync validé par l'AST)
+   */
+  private enrichWithAST(fileNode: FileNode, astResult: ASTFileResult): void {
+    if (astResult.usedFallback || astResult.functions.length === 0) return;
+
+    // Construire un index des fonctions AST par nom+ligne
+    const astFnByName = new Map<string, typeof astResult.functions[number]>();
+    for (const fn of astResult.functions) {
+      astFnByName.set(fn.name, fn);
+      if (fn.className) {
+        astFnByName.set(`${fn.className}.${fn.name}`, fn);
+      }
+    }
+
+    // Enrichir les entités de type function/method/component
+    for (const entity of fileNode.entities) {
+      if (!['function', 'method', 'component', 'class'].includes(entity.type)) continue;
+
+      const astFn = astFnByName.get(entity.name) ??
+        (entity.type === 'method' && astFnByName.get(entity.name));
+
+      if (!astFn) continue;
+
+      // lineEnd précis
+      if (!entity.lineEnd || entity.lineEnd === entity.lineStart) {
+        entity.lineEnd = astFn.lineEnd;
+      }
+
+      // Enrichir la signature avec les paramètres typés
+      if (astFn.params.length > 0) {
+        const paramStr = astFn.params
+          .map(p => {
+            const optional = p.optional ? '?' : '';
+            return p.type ? `${p.name}${optional}: ${p.type}` : `${p.name}${optional}`;
+          })
+          .join(', ');
+        const ret = astFn.returnType ? `: ${astFn.returnType}` : '';
+        entity.signature = `${entity.name}(${paramStr})${ret}`;
+      }
+
+      // Modificateurs additionnels
+      if (astFn.isAsync && !entity.modifiers?.includes('async')) {
+        entity.modifiers = [...(entity.modifiers ?? []), 'async'];
+      }
+      if (astFn.isArrow && !entity.modifiers?.includes('arrow')) {
+        entity.modifiers = [...(entity.modifiers ?? []), 'arrow'];
+      }
+    }
+  }
+
+  /**
    * Extrait toutes les relations sémantiques de tous les fichiers parsés.
    */
-  private extractAllRelations(parsedFiles: FileNode[], root: string): import("./types").EntityRelation[] {
+  private extractAllRelations(parsedFiles: FileNode[], root: string): import("./types.js").EntityRelation[] {
     const allFiles: Record<string, FileNode> = {};
     for (const f of parsedFiles) allFiles[f.path] = f;
 
-    const allRelations: import("./types").EntityRelation[] = [];
+    const allRelations: import("./types.js").EntityRelation[] = [];
 
     for (const fileNode of parsedFiles) {
       // Ne traiter que les fichiers TypeScript/JavaScript
@@ -867,16 +995,30 @@ export class ProjectIndexer {
     let indexed = 0;
     let removed = 0;
     let errors = 0;
+    const astResultsBatch = new Map<string, ASTFileResult>();
 
     for (const event of events) {
       try {
         if (event.type === "deleted") {
           knowledgeGraph.removeFile(event.relativePath);
+          astCallGraph.removeFile(event.relativePath);
           removed++;
         } else {
           // "created" ou "modified" → re-parse le fichier
+          const root = this.getActiveProjectRoot();
+          const absPath = path.join(root, event.relativePath);
+          const content = this._readContent(absPath);
           const fileNode = await this.parseFile(event.relativePath);
+
           if (fileNode) {
+            // Enrichissement AST incrémental
+            if (astParser.isReady && content && ANALYZABLE_EXTENSIONS.has(fileNode.extension)) {
+              const astResult = await astParser.parseFile(content, event.relativePath, fileNode.extension);
+              if (!astResult.usedFallback) {
+                this.enrichWithAST(fileNode, astResult);
+                astResultsBatch.set(event.relativePath, astResult);
+              }
+            }
             knowledgeGraph.updateFile(fileNode);
             indexed++;
           }
@@ -888,6 +1030,11 @@ export class ProjectIndexer {
     }
 
     if (indexed > 0 || removed > 0) {
+      // Mise à jour du call-graph AST pour les fichiers modifiés
+      for (const [, astResult] of astResultsBatch) {
+        astCallGraph.updateFile(astResult, astResultsBatch);
+      }
+
       const relationCount = this.refreshSemanticRelations();
       const duration = Date.now() - t0;
       log.info(`⚡ Indexation incrémentale: +${indexed} ré-indexé(s), -${removed} supprimé(s), ${relationCount} relations${errors > 0 ? `, ${errors} erreur(s)` : ""} (${duration}ms)`);

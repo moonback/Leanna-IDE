@@ -324,7 +324,7 @@ router.get('/watcher', (_req: Request, res: Response) => {
 // GET /api/knowledge/documents — Documents extraits du workspace
 router.get('/documents', async (_req: Request, res: Response) => {
   try {
-    const { getDocumentStore } = await import('../../knowledge/DocumentStore');
+    const { getDocumentStore } = await import('../../knowledge/DocumentStore.js');
     const { workspaceIndexer } = await import('../../knowledge/WorkspaceIndexer.js');
     const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
     const store = getDocumentStore(root);
@@ -335,7 +335,7 @@ router.get('/documents', async (_req: Request, res: Response) => {
       status: 'success',
       extractor: extractorStats,
       documentCount: docs.length,
-      documents: docs.map(d => ({
+      documents: docs.map((d: any) => ({
         id: d.id,
         fileName: d.fileName,
         mimeType: d.mimeType,
@@ -355,7 +355,7 @@ router.get('/documents', async (_req: Request, res: Response) => {
 router.post('/documents/reextract', async (_req: Request, res: Response) => {
   try {
     const { workspaceIndexer } = await import('../../knowledge/WorkspaceIndexer.js');
-    const { getDocumentStore } = await import('../../knowledge/DocumentStore');
+    const { getDocumentStore } = await import('../../knowledge/DocumentStore.js');
     
     const stats = await workspaceIndexer.extractAll();
     
@@ -374,11 +374,11 @@ router.post('/documents/reextract', async (_req: Request, res: Response) => {
 });
 
 // POST /api/knowledge/documents/detect-links — Détecte les liens entre documents existants
-router.post('/documents/detect-links', async (_req: Request, res: Response) => {
+router.post('/documents/detect-links', async (req: Request, res: Response) => {
   try {
-    const { getDocumentStore } = await import('../../knowledge/DocumentStore');
+    const { getDocumentStore } = await import('../../knowledge/DocumentStore.js');
     const store = getDocumentStore();
-    const minSimilarity = typeof req.body.minSimilarity === 'number' ? req.body.minSimilarity : 0.2;
+    const minSimilarity = typeof req.body?.minSimilarity === 'number' ? req.body.minSimilarity : 0.2;
     
     const linksCount = store.detectAllLinks(minSimilarity);
     
@@ -401,7 +401,7 @@ router.get('/documents/search', async (req: Request, res: Response): Promise<voi
       return;
     }
     const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
-    const { getDocumentStore } = await importModule<{ getDocumentStore: any }>('../knowledge/DocumentStore');
+    const { getDocumentStore } = await importModule<{ getDocumentStore: any }>('../knowledge/DocumentStore.js');
     const store = getDocumentStore(root);
     const results = store.searchDocuments(query, 20);
     res.json({
@@ -421,4 +421,172 @@ router.get('/documents/search', async (req: Request, res: Response): Promise<voi
   }
 });
 
-export default router;
+// ═══════════════════════════════════════════════════════════════════════════════
+// Endpoints AST & Call-Graph (Tree-sitter)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/knowledge/ast/stats — Statistiques globales du Call-Graph AST
+router.get('/ast/stats', async (_req: Request, res: Response) => {
+  try {
+    const { astCallGraph, astParser } = await import('../../knowledge/index.js');
+    const cgStats = astCallGraph.getStats();
+    res.json({
+      status: 'success',
+      astReady: astParser.isReady,
+      stats: {
+        totalNodes: cgStats.totalNodes,
+        totalEdges: cgStats.totalEdges,
+        resolvedEdges: cgStats.resolvedEdges,
+        crossFileEdges: cgStats.crossFileEdges,
+      },
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/knowledge/ast/file — Détails AST complets d'un fichier (fonctions, classes, appels)
+router.get('/ast/file', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const filePath = typeof req.query.file === 'string' ? req.query.file.trim() : '';
+    if (!filePath) {
+      res.status(400).json({ error: 'Le paramètre "file" est requis.' });
+      return;
+    }
+    const { astCallGraph } = await import('../../knowledge/index.js');
+    const astData = knowledgeGraph.getASTResult(filePath);
+    const fileGraph = astCallGraph.getFileCallGraph(filePath);
+
+    res.json({
+      status: 'success',
+      filePath,
+      hasAST: !!astData && !astData.usedFallback,
+      ast: astData || null,
+      callGraph: fileGraph,
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/knowledge/ast/callers — Qui appelle cette fonction ?
+router.get('/ast/callers', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const fn = typeof req.query.fn === 'string' ? req.query.fn.trim() : '';
+    const file = typeof req.query.file === 'string' ? req.query.file.trim() : '';
+    const className = typeof req.query.class === 'string' ? req.query.class.trim() : undefined;
+
+    if (!fn) {
+      res.status(400).json({ error: 'Le paramètre "fn" est requis.' });
+      return;
+    }
+    const callers = await knowledgeGraph.getFunctionCallers(fn, file, className);
+    res.json({
+      status: 'success',
+      functionName: fn,
+      filePath: file,
+      className,
+      count: callers.length,
+      callers,
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/knowledge/ast/callees — Que appelle cette fonction ?
+router.get('/ast/callees', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const fn = typeof req.query.fn === 'string' ? req.query.fn.trim() : '';
+    const file = typeof req.query.file === 'string' ? req.query.file.trim() : '';
+    const className = typeof req.query.class === 'string' ? req.query.class.trim() : undefined;
+
+    if (!fn) {
+      res.status(400).json({ error: 'Le paramètre "fn" est requis.' });
+      return;
+    }
+    const callees = await knowledgeGraph.getFunctionCallees(fn, file, className);
+    res.json({
+      status: 'success',
+      functionName: fn,
+      filePath: file,
+      className,
+      count: callees.length,
+      callees,
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/knowledge/ast/chain — Chaîne d'appels récursive (BFS)
+router.get('/ast/chain', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const fn = typeof req.query.fn === 'string' ? req.query.fn.trim() : '';
+    const file = typeof req.query.file === 'string' ? req.query.file.trim() : '';
+    const className = typeof req.query.class === 'string' ? req.query.class.trim() : undefined;
+    const depth = typeof req.query.depth === 'string' ? parseInt(req.query.depth, 10) : 4;
+
+    if (!fn) {
+      res.status(400).json({ error: 'Le paramètre "fn" est requis.' });
+      return;
+    }
+    const { astCallGraph } = await import('../../knowledge/index.js');
+    const chain = astCallGraph.getCallChain(fn, file, className, depth);
+    res.json({
+      status: 'success',
+      chain,
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/knowledge/ast/functions — Recherche et liste de fonctions extraites par AST
+router.get('/ast/functions', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const query = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
+    const fileFilter = typeof req.query.file === 'string' ? req.query.file.trim().toLowerCase() : '';
+    const limit = typeof req.query.limit === 'string' ? Math.min(100, parseInt(req.query.limit, 10)) : 50;
+
+    const allFiles = knowledgeGraph.getAllFiles();
+    const results: Array<{
+      name: string;
+      filePath: string;
+      lineStart: number;
+      lineEnd?: number;
+      signature?: string;
+      modifiers?: string[];
+      type: string;
+    }> = [];
+
+    for (const f of allFiles) {
+      if (fileFilter && !f.path.toLowerCase().includes(fileFilter)) continue;
+      for (const ent of f.entities) {
+        if (!['function', 'method', 'component'].includes(ent.type)) continue;
+        if (query && !ent.name.toLowerCase().includes(query) && !f.path.toLowerCase().includes(query)) continue;
+        results.push({
+          name: ent.name,
+          filePath: f.path,
+          lineStart: ent.lineStart,
+          lineEnd: ent.lineEnd,
+          signature: ent.signature,
+          modifiers: ent.modifiers,
+          type: ent.type,
+        });
+        if (results.length >= limit) break;
+      }
+      if (results.length >= limit) break;
+    }
+
+    res.json({
+      status: 'success',
+      count: results.length,
+      functions: results,
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+export default router;

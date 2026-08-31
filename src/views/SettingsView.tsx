@@ -52,7 +52,7 @@ const NAV_GROUPS = [
   {
     label: 'Sécurité & Connaissances',
     items: [
-      { id: 'knowledge-settings', icon: Database, label: 'Knowledge System', keywords: 'graphe index mémoire faits dépendances santé codebase réindexer' },
+      { id: 'knowledge-settings', icon: Database, label: 'Knowledge System', keywords: 'graphe index ast arbre call-graph mémoire faits dépendances santé codebase réindexer fonctions' },
       { id: 'selfroot-settings', icon: Shield, label: 'Self-Root', keywords: 'workspace projet verrouillé périmètre branche' },
       { id: 'safeguards-settings', icon: ShieldCheck, label: 'Garde-fous', keywords: 'checkpoint rollback validation build test protection critique' },
       { id: 'audit-settings', icon: Database, label: 'Journal système', keywords: 'audit logs historique opérations traçabilité' },
