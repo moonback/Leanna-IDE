@@ -9,6 +9,8 @@ import type { TreeEntry } from '../../types/ide.js';
 import Tree from 'react-window-tree';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 
+const TreeComponent = Tree as any;
+
 type SortMode = 'name-asc' | 'name-desc' | 'type';
 
 export type DiffInfo = {
@@ -721,11 +723,8 @@ const FileExplorer = memo(function FileExplorer({
       >
         <div className="flex items-center gap-2 min-w-0">
           <button
-            onClick={async () => {
-              try {
-                await fetch('/api/self-root/clear', { method: 'POST' });
-              } catch { /* best-effort */ }
-              window.location.reload();
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher'));
             }}
             className="flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors hover:bg-[var(--bg-panel)]"
             style={{ color: 'var(--accent-primary)' }}
@@ -1011,7 +1010,7 @@ const FileExplorer = memo(function FileExplorer({
                 )}
               </div>
             )}
-            <Tree
+            <TreeComponent
               treeData={treeData}
               height={sandboxActive && showWorkspace ? 320 : 600}
               itemHeight={28}
@@ -1070,7 +1069,7 @@ const FileExplorer = memo(function FileExplorer({
                   )}
                 </div>
                 {showWorkspace && (
-                  <Tree
+                  <TreeComponent
                     treeData={wsTreeData}
                     height={280}
                     itemHeight={28}

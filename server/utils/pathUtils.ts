@@ -20,6 +20,10 @@ export {
   isWriteForbidden,
   isCriticalFile,
   resolveRealPathWithinSelf,
+  listWorkspaces,
+  validateWorkspacePath,
+  type WorkspaceEntry,
+  type WorkspaceValidationResult,
 } from "./selfRoot.js";
 
 export {
