@@ -5,11 +5,11 @@
 
 | Metric | Count |
 |--------|-------|
-| Total `title=` attributes | 317 |
-| Total `aria-label` attributes | 177 |
-| `title=` without nearby `aria-label` | 258 |
+| Total `title=` attributes | 293 |
+| Total `aria-label` attributes | 171 |
+| `title=` without nearby `aria-label` | 240 |
 | Button elements with `title=` only | 0 |
-| Files needing migration | 78 |
+| Files needing migration | 77 |
 
 ## 🚨 Critical Issues (Buttons with title only)
 
@@ -64,11 +64,6 @@ Buttons with `title=` but no `aria-label` are **not announced properly** by scre
 - `title=` count: 4
 - `aria-label` count: 0
 - Need migration: 4
-
-### components\ide\FileExplorerVirtualized.tsx
-- `title=` count: 18
-- `aria-label` count: 0
-- Need migration: 18
 
 ### components\ide\IdeModal.tsx
 - `title=` count: 1
@@ -477,24 +472,6 @@ With:
 - **undefined** (line 399): `Mode Sandbox actif — les modifications sont isolées`
 - **undefined** (line 408): `Mode Sandbox inactif — modifications directes sur les fichiers locaux`
 - **undefined** (line 454): `unknown`
-- **undefined** (line 328): `unknown`
-- **undefined** (line 349): `unknown`
-- **undefined** (line 362): `unknown`
-- **undefined** (line 745): `Changer de projet racine`
-- **undefined** (line 756): `unknown`
-- **undefined** (line 776): `Remonter d'un niveau`
-- **undefined** (line 791): `Mode Sandbox actif`
-- **undefined** (line 804): `Mode Sandbox inactif`
-- **undefined** (line 824): `Rechercher (Ctrl/Cmd+Shift+F)`
-- **undefined** (line 832): `unknown`
-- **undefined** (line 840): `unknown`
-- **undefined** (line 849): `Nouveau fichier`
-- **undefined** (line 856): `Actualiser`
-- **undefined** (line 891): `Effacer`
-- **undefined** (line 899): `Fermer la recherche`
-- **undefined** (line 940): `Réinitialiser le tri`
-- **undefined** (line 1065): `Cliquez sur un fichier pour examiner et valider les modifications`
-- **undefined** (line 1078): `Tous les fichiers sont validés et synchronisés sur le workspace réel`
 - **undefined** (line 100): `unknown`
 - **undefined** (line 334): `unknown`
 - **undefined** (line 289): `unknown`
@@ -685,8 +662,8 @@ With:
 - **undefined** (line 193): `unknown`
 - **undefined** (line 201): `Supprimer`
 - **undefined** (line 117): `unknown`
-- **undefined** (line 187): `Quitter`
-- **undefined** (line 148): `unknown`
+- **undefined** (line 197): `Quitter`
+- **undefined** (line 151): `unknown`
 - **undefined** (line 182): `Redimensionner`
 - **undefined** (line 228): `Quitter Leanna `
 - **undefined** (line 411): `Historique · Mémoires · Tâches`

@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Hash, TrendingUp, ArrowUp, ArrowDown, Clock, Sparkles, AlertTriangle, Gauge, Zap } from 'lucide-react';
 import { useLiveAPIContext } from '../context/LiveAPIContext.js';
 import { useProfile } from '../context/UserProfileContext.js';
+import { useToast } from '../components/ui/Toast.js';
 import type { TokenUsage } from '../hooks/useLiveAPI.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -58,6 +59,7 @@ export function TokenCounter() {
   const ref = useRef<HTMLDivElement>(null);
   const [animate, setAnimate] = useState(false);
   const prefersReducedMotion = useReducedMotion();
+  const { error: toastError } = useToast();
 
   // Fermer au clic extérieur
   useEffect(() => {
@@ -90,12 +92,13 @@ export function TokenCounter() {
       if (data.status === 'success') {
         setOptimization(data.optimization);
       }
-    } catch {
-      // Silently fail
+    } catch (e) {
+      toastError('Impossible de charger les stats d\'optimisation');
+      console.error('Erreur lors du chargement des stats d\'optimisation:', e);
     } finally {
       setLoadingOpt(false);
     }
-  }, []);
+  }, [toastError]);
 
   useEffect(() => {
     if (open) loadOptimization();

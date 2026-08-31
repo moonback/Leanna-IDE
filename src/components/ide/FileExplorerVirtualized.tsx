@@ -5,6 +5,7 @@ import {
   Eye, EyeOff, FolderInput,
 } from 'lucide-react';
 import { FileIcon } from './FileIcon.js';
+import { Tooltip } from '../ui/Tooltip.js';
 import type { TreeEntry } from '../../types/ide.js';
 import Tree from 'react-window-tree';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
@@ -323,46 +324,49 @@ function toDataNode(
         ) : (
           <FileIcon filePath={entry.path} size={16} />
         )}
-        <span
-          className={`truncate ${diffStatus ? 'font-medium' : 'font-normal'}`}
-          title={entry.name}
-          style={{ color: diffColor || 'var(--text-primary)' }}
-        >
-          {searchQuery ? (
-            <HighlightMatch text={entry.name} query={searchQuery} />
-          ) : (
-            entry.name
-          )}
-        </span>
+        <Tooltip content={entry.name}>
+          <span
+            className={`truncate ${diffStatus ? 'font-medium' : 'font-normal'}`}
+            style={{ color: diffColor || 'var(--text-primary)' }}
+          >
+            {searchQuery ? (
+              <HighlightMatch text={entry.name} query={searchQuery} />
+            ) : (
+              entry.name
+            )}
+          </span>
+        </Tooltip>
 
         {/* Diff stats améliorés */}
         {diffStatus && (
           <div className="ml-auto flex items-center gap-1 text-xs font-mono shrink-0 pl-2">
             {additions > 0 && (
-              <span
-                className="font-bold px-1.5 py-0.5 rounded"
-                style={{
-                  color: 'var(--color-success)',
-                  backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
-                  border: '1px solid color-mix(in srgb, var(--color-success) 25%, transparent)',
-                }}
-                title={`${additions} ligne(s) ajoutée(s)`}
-              >
-                +{additions}
-              </span>
+              <Tooltip content={`${additions} ligne(s) ajoutée(s)`}>
+                <span
+                  className="font-bold px-1.5 py-0.5 rounded"
+                  style={{
+                    color: 'var(--color-success)',
+                    backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--color-success) 25%, transparent)',
+                  }}
+                >
+                  +{additions}
+                </span>
+              </Tooltip>
             )}
             {deletions > 0 && (
-              <span
-                className="font-bold px-1.5 py-0.5 rounded"
-                style={{
-                  color: 'var(--color-error)',
-                  backgroundColor: 'color-mix(in srgb, var(--color-error) 15%, transparent)',
-                  border: '1px solid color-mix(in srgb, var(--color-error) 25%, transparent)',
-                }}
-                title={`${deletions} ligne(s) retirée(s)`}
-              >
-                -{deletions}
-              </span>
+              <Tooltip content={`${deletions} ligne(s) retirée(s)`}>
+                <span
+                  className="font-bold px-1.5 py-0.5 rounded"
+                  style={{
+                    color: 'var(--color-error)',
+                    backgroundColor: 'color-mix(in srgb, var(--color-error) 15%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--color-error) 25%, transparent)',
+                  }}
+                >
+                  -{deletions}
+                </span>
+              </Tooltip>
             )}
             {additions === 0 && deletions === 0 && (
               <span
@@ -733,7 +737,7 @@ const FileExplorer = memo(function FileExplorer({
         style={{ borderColor: 'var(--border-base)', minHeight: '44px' }}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <button
+          <Tooltip content="Changer de projet racine" as="button"
             onClick={async () => {
               try {
                 await fetch('/api/self-root/clear', { method: 'POST' });
@@ -742,21 +746,21 @@ const FileExplorer = memo(function FileExplorer({
             }}
             className="flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors hover:bg-[var(--bg-panel)]"
             style={{ color: 'var(--accent-primary)' }}
-            title="Changer de projet racine"
           >
             <FolderInput size={14} />
-          </button>
+          </Tooltip>
           <div className="min-w-0">
             <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
               Explorer
             </span>
-            <div
-              className="text-xs truncate font-mono"
-              style={{ color: 'var(--text-muted)' }}
-              title={currentDir || 'Racine'}
-            >
-              {currentDir === '.' ? '~/projet' : currentDir}
-            </div>
+            <Tooltip content={currentDir || 'Racine'}>
+              <div
+                className="text-xs truncate font-mono"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                {currentDir === '.' ? '~/projet' : currentDir}
+              </div>
+            </Tooltip>
           </div>
           {!loading && (
             <span
@@ -769,42 +773,42 @@ const FileExplorer = memo(function FileExplorer({
         </div>
         <div className="flex items-center gap-1">
           {currentDir && currentDir !== '.' && (
-            <button
+            <Tooltip content="Remonter d'un niveau" as="button"
               onClick={() => onNavigate(currentDir.split('/').slice(0, -1).join('/') || '.')}
               className="flex items-center rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--bg-panel)]"
               style={{ color: 'var(--accent-primary)' }}
-              title="Remonter d'un niveau"
             >
               <ChevronUp size={14} />
               <span className="hidden sm:inline ml-0.5">Parent</span>
-            </button>
+            </Tooltip>
           )}
           <div className="flex items-center gap-1">
             {sandboxActive ? (
-              <span
-                className="text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-sm"
-                style={{
-                  backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
-                  color: 'var(--color-success)',
-                  border: '1px solid color-mix(in srgb, var(--color-success) 30%, transparent)',
-                }}
-                title="Mode Sandbox actif"
-              >
-                <Shield size={10} />
-                SBX
-              </span>
+              <Tooltip content="Mode Sandbox actif">
+                <span
+                  className="text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-sm"
+                  style={{
+                    backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
+                    color: 'var(--color-success)',
+                    border: '1px solid color-mix(in srgb, var(--color-success) 30%, transparent)',
+                  }}
+                >
+                  <Shield size={10} />
+                  SBX
+                </span>
+              </Tooltip>
             ) : (
-              <span
-                className="text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
-                style={{
-                  backgroundColor: 'var(--bg-panel)',
-                  color: 'var(--text-dimmed)',
-                  border: '1px solid var(--border-base)',
-                }}
-                title="Mode Sandbox inactif"
-              >
-                <Shield size={10} />
-                SBX
+              <Tooltip content="Mode Sandbox inactif">
+                <span
+                  className="text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
+                  style={{
+                    backgroundColor: 'var(--bg-panel)',
+                    color: 'var(--text-dimmed)',
+                    border: '1px solid var(--border-base)',
+                  }}
+                >
+                  <Shield size={10} />
+                  SBX
               </span>
             )}
           </div>
@@ -816,47 +820,42 @@ const FileExplorer = memo(function FileExplorer({
         className="flex items-center gap-0.5 px-2 border-b"
         style={{ height: '36px', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
       >
-        <button
+        <Tooltip content="Rechercher (Ctrl/Cmd+Shift+F)" as="button"
           onClick={toggleSearch}
           className={`rounded-md p-1.5 transition-all duration-200 hover:bg-[var(--bg-panel)] hover:scale-105 ${
             showSearch ? 'bg-[var(--bg-panel)]' : ''
           }`}
-          title="Rechercher (Ctrl/Cmd+Shift+F)"
           style={{ color: showSearch ? 'var(--accent-primary)' : 'var(--text-muted)' }}
         >
           <Search size={14} />
-        </button>
-        <button
+        </Tooltip>
+        <Tooltip content={showHidden ? 'Masquer fichiers cachés' : 'Afficher fichiers cachés'} as="button"
           onClick={() => setShowHidden(!showHidden)}
           className="rounded-md p-1.5 transition-all duration-200 hover:bg-[var(--bg-panel)] hover:scale-105"
-          title={showHidden ? 'Masquer fichiers cachés' : 'Afficher fichiers cachés'}
           style={{ color: showHidden ? 'var(--accent-primary)' : 'var(--text-muted)' }}
         >
           {showHidden ? <Eye size={14} /> : <EyeOff size={14} />}
-        </button>
-        <button
+        </Tooltip>
+        <Tooltip content={sortLabel(sortMode)} as="button"
           onClick={() => setSortMode(nextSort)}
           className="rounded-md p-1.5 transition-all duration-200 hover:bg-[var(--bg-panel)] hover:scale-105"
-          title={sortLabel(sortMode)}
           style={{ color: sortMode !== 'name-asc' ? 'var(--accent-primary)' : 'var(--text-muted)' }}
         >
           <SortIcon mode={sortMode} />
-        </button>
+        </Tooltip>
         <div className="flex-1" />
-        <button
+        <Tooltip content="Nouveau fichier" as="button"
           onClick={onCreateFile}
           className="rounded-md p-1.5 transition-all duration-200 hover:bg-[var(--bg-panel)] hover:scale-105"
-          title="Nouveau fichier"
         >
           <Plus size={14} style={{ color: 'var(--text-muted)' }} />
-        </button>
-        <button
+        </Tooltip>
+        <Tooltip content="Actualiser" as="button"
           onClick={onRefresh}
           className="rounded-md p-1.5 transition-all duration-200 hover:bg-[var(--bg-panel)] hover:scale-105 hover:rotate-90"
-          title="Actualiser"
         >
           <RefreshCcw size={14} style={{ color: 'var(--text-muted)' }} />
-        </button>
+        </Tooltip>
       </div>
 
       {/* Search input amélioré */}
@@ -885,21 +884,19 @@ const FileExplorer = memo(function FileExplorer({
                 autoFocus
               />
               {searchQuery && (
-                <button
+                <Tooltip content="Effacer" as="button"
                   onClick={() => setSearchQuery('')}
                   className="rounded-full p-1 hover:bg-[var(--bg-panel)] transition"
-                  title="Effacer"
                 >
                   <X size={12} style={{ color: 'var(--text-muted)' }} />
-                </button>
+                </Tooltip>
               )}
-              <button
+              <Tooltip content="Fermer la recherche" as="button"
                 onClick={toggleSearch}
                 className="rounded-full p-1 hover:bg-[var(--bg-panel)] transition"
-                title="Fermer la recherche"
               >
                 <X size={12} style={{ color: 'var(--text-muted)' }} />
-              </button>
+              </Tooltip>
             </div>
             {searchQuery && (
               <div
@@ -934,13 +931,12 @@ const FileExplorer = memo(function FileExplorer({
         >
           <SortIcon mode={sortMode} />
           <span className="font-medium">{sortLabel(sortMode)}</span>
-          <button
+          <Tooltip content="Réinitialiser le tri" as="button"
             className="ml-auto rounded-full p-0.5 hover:bg-[var(--bg-panel)] transition"
             onClick={() => setSortMode('name-asc')}
-            title="Réinitialiser le tri"
           >
             <X size={10} />
-          </button>
+          </Tooltip>
         </div>
       )}
 
@@ -1056,29 +1052,32 @@ const FileExplorer = memo(function FileExplorer({
                   </span>
                   {sandboxModifiedCount > 0 ? (
                     <span
-                      className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1"
-                      style={{
-                        backgroundColor: 'color-mix(in srgb, var(--color-warning) 18%, transparent)',
-                        color: 'var(--color-warning)',
-                        border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)',
-                      }}
-                      title="Cliquez sur un fichier pour examiner et valider les modifications"
-                    >
-                      <span>{sandboxModifiedCount} modif{sandboxModifiedCount > 1 ? 's' : ''}</span>
-                      <span>↔</span>
-                    </span>
+                      <Tooltip content="Cliquez sur un fichier pour examiner et valider les modifications">
+                        <span
+                          className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1"
+                          style={{
+                            backgroundColor: 'color-mix(in srgb, var(--color-warning) 18%, transparent)',
+                            color: 'var(--color-warning)',
+                            border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)',
+                          }}
+                        >
+                          <span>{sandboxModifiedCount} modif{sandboxModifiedCount > 1 ? 's' : ''}</span>
+                          <span>↔</span>
+                        </span>
+                      </Tooltip>
                   ) : (
-                    <span
-                      className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1"
-                      style={{
-                        backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
-                        color: 'var(--color-success)',
-                        border: '1px solid color-mix(in srgb, var(--color-success) 30%, transparent)',
-                      }}
-                      title="Tous les fichiers sont validés et synchronisés sur le workspace réel"
-                    >
-                      <span>✓ Validé</span>
-                    </span>
+                    <Tooltip content="Tous les fichiers sont validés et synchronisés sur le workspace réel">
+                      <span
+                        className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1"
+                        style={{
+                          backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
+                          color: 'var(--color-success)',
+                          border: '1px solid color-mix(in srgb, var(--color-success) 30%, transparent)',
+                        }}
+                      >
+                        <span>✓ Validé</span>
+                      </span>
+                    </Tooltip>
                   )}
                 </div>
                 {showWorkspace && (
