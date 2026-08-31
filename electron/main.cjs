@@ -66,8 +66,8 @@ function startBackendServer() {
 
 function createSplashWindow() {
   const splash = new BrowserWindow({
-    width: 736,
-    height: 400,
+    width: 680,
+    height: 420,
     frame: false,
     transparent: true,
     resizable: false,
@@ -112,8 +112,13 @@ function createWindow(splash, splashMinEnd) {
 
   // Afficher la fenêtre principale une fois le contenu chargé
   win.webContents.on('did-finish-load', () => {
-    // Attendre que le splash ait duré au moins 5 secondes
-    const remaining = Math.max(0, (splashMinEnd || 0) - Date.now());
+    // Compléter la barre de progression sur le splash
+    if (splash && !splash.isDestroyed()) {
+      splash.webContents.executeJavaScript('if (typeof window.markComplete === "function") window.markComplete();').catch(() => {});
+    }
+
+    // Attendre la fin du cycle splash (minimum 4.5 secondes)
+    const remaining = Math.max(400, (splashMinEnd || 0) - Date.now());
     setTimeout(() => {
       if (splash && !splash.isDestroyed()) {
         splash.close();
