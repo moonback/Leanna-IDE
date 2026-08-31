@@ -1,7 +1,7 @@
 # Leanna
 
 ## Pitch
-Leanna est un environnement de développement intégré (IDE) et système d'exploitation augmenté par l'intelligence artificielle, conçu pour assister les développeurs et ingénieurs logiciels en temps réel. Grâce à une connexion vocale et multimodale bidirectionnelle avec Google Gemini Live et un système d'agents autonomes, Leanna permet d'explorer, éditer, tester et auditer le code source de manière interactive. L'application intègre un bac à sable sécurisé (Sandbox) et des garde-fous stricts afin de garantir l'intégrité et la résilience du code lors des modifications automatisées.
+Leanna est un IDE augmenté par l'IA et un système d'exploitation pour développeurs, pensé pour transformer la manière dont on écrit, teste et audite du code. Grâce à une connexion vocale et multimodale bidirectionnelle avec Google Gemini Live, Leanna permet d'explorer, éditer, tester et sécuriser un codebase en temps réel — comme si un ingénieur senior travaillait à vos côtés, en continu. Un système d'agents autonomes orchestre les tâches complexes, tandis qu'un bac à sable sécurisé et des garde-fous stricts garantissent que chaque modification automatisée préserve l'intégrité et la résilience du code.
 
 ---
 
