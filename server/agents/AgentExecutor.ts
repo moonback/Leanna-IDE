@@ -28,7 +28,7 @@ import { AgentRepairLoop } from "./AgentRepairLoop.js";
 const log = createLogger("AgentExecutor");
 
 /** Handler externe pour exécuter les actions d'un agent */
-export type SkillHandler = (name: string, args: any) => Promise<any>;
+export type SkillHandler<TArgs = unknown, TResult = unknown> = (name: string, args: TArgs) => Promise<TResult>;
 
 interface AgentToolCall {
   name: string;
@@ -345,11 +345,13 @@ export class AgentExecutor {
    * structurés, mais ne peut ni lancer bash ni sortir du workspace.
    * Limité à MAX_TOOL_TURNS tours pour éviter les boucles infinies.
    */
-  private static readonly MAX_TOOL_TURNS = 8;
+  private static readonly MAX_TOOL_TURNS = 4;          // 8 → 4
   /** Taille maximale d’une observation cumulée envoyée au modèle suivant. */
-  private static readonly MAX_OBSERVATION_CHARS = 240_000;
+  private static readonly MAX_OBSERVATION_CHARS = 80_000; // 240k → 80k
   /** Limite de sécurité par snapshot, supérieure aux composants UI usuels. */
-  private static readonly MAX_FILE_CONTEXT_CHARS = 200_000;
+  private static readonly MAX_FILE_CONTEXT_CHARS = 50_000; // 200k → 50k
+ /** Limite maximale de fichiers dans le contexte incrémental */
+  private static readonly MAX_FILES_IN_CONTEXT = 5;
 
   private async executeToolLoop(
     agent: { name: string; capabilities: string[] },
@@ -411,9 +413,11 @@ export class AgentExecutor {
       // Construire le contexte des fichiers lus avec DIFF INCréMENTAL
       // Seul les fichiers NOUVELLEMENT lus ou MODIFIÉS sont envoyés en entier
       // Les autres sont juste référencés avec leur hash pour vérification
+      // Limiter à MAX_FILES_IN_CONTEXT fichiers
+      const limitedNewlyTouched = new Set([...newlyTouchedThisTurn].slice(0, AgentExecutor.MAX_FILES_IN_CONTEXT));
       const fileContextSection = this.buildIncrementalFileContext(
         state.fileSnapshots,
-        newlyTouchedThisTurn
+        limitedNewlyTouched
       );
 
       // Log pour le suivi des optimisations
@@ -628,7 +632,7 @@ ${truncated}
   }
 
   /** Sérialise une observation sans tronquer le contenu des lectures complètes. */
-  private formatToolObservation(toolName: string, result: any): string {
+  private formatToolObservation(toolName: string, result: unknown): string {
     const serialized = JSON.stringify(result) ?? String(result);
     const limit = ["read_project_file", "read_file_outline"].includes(toolName)
       ? AgentExecutor.MAX_FILE_CONTEXT_CHARS
@@ -639,25 +643,44 @@ ${truncated}
     return `- ${toolName}: succès — ${serialized.slice(0, limit)}${suffix}`;
   }
 
-  private formatToolFailure(result: any): string {
+  private formatToolFailure(result: unknown): string {
     if (!result) return "outil sans résultat";
-    const phases = [result.typecheck ?? result.tsc, result.lint, result.test].filter(Boolean);
-    const details = phases.flatMap((phase: any) => [
-      phase.output,
-      phase.stdout,
-      phase.stderr,
-      phase.errors,
-      phase.violations,
-    ].flatMap((value: any) => Array.isArray(value)
-      ? value.map((item) => typeof item === "string" ? item : item?.message ?? JSON.stringify(item))
-      : value ? [String(value)] : []));
-    const issues = Array.isArray(result.allIssues)
-      ? result.allIssues.map((issue: any) => `${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? JSON.stringify(issue)}`)
+    const resultObj = result as Record<string, unknown>;
+    const phases = [resultObj.typecheck ?? resultObj.tsc, resultObj.lint, resultObj.test].filter(Boolean);
+    const details = phases.flatMap((phase: unknown) => {
+      const phaseObj = phase as Record<string, unknown>;
+      return [
+        phaseObj.output,
+        phaseObj.stdout,
+        phaseObj.stderr,
+        phaseObj.errors,
+        phaseObj.violations,
+      ].flatMap((value: unknown) => {
+        if (Array.isArray(value)) {
+          return value.map((item: unknown) => {
+            if (typeof item === "string") return item;
+            const itemObj = item as Record<string, unknown>;
+            return itemObj?.message ?? JSON.stringify(item);
+          });
+        }
+        return value ? [String(value)] : [];
+      });
+    });
+    const issues = Array.isArray(resultObj.allIssues)
+      ? (resultObj.allIssues as Array<Record<string, unknown>>).map((issue) => 
+          `${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? JSON.stringify(issue)}`)
       : [];
-    const streams = [result.stdout, result.stderr, result.message, result.error, ...details, ...issues]
+    const streams = [
+      resultObj.stdout,
+      resultObj.stderr,
+      resultObj.message,
+      resultObj.error,
+      ...details,
+      ...issues
+    ]
       .filter(Boolean)
       .join("\n");
-    return streams.slice(0, 5000) || `outil en échec (code ${result.exitCode ?? "inconnu"})`;
+    return streams.slice(0, 5000) || `outil en échec (code ${(resultObj as { exitCode?: string }).exitCode ?? "inconnu"})`;
   }
 
   private async refreshFileSnapshot(

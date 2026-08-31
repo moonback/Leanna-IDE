@@ -23,7 +23,7 @@ const log = createLogger("RAGEngine");
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
-const DEFAULT_MAX_CHUNKS = 10;
+const DEFAULT_MAX_CHUNKS = 6;      // 10 → 6
 const DEFAULT_MIN_RELEVANCE = 0.1;
 
 /** Poids de la recherche sémantique dans le score final */
@@ -35,7 +35,7 @@ const LEXICAL_WEIGHT = 0.35;
 const RRF_K = 60;
 
 /** Nombre de candidats à re-ranker via LLM */
-const RERANK_TOP_K = 20;
+const RERANK_TOP_K = 10;           // 20 → 10
 
 /** Active/désactive le re-ranking LLM (peut être désactivé pour économiser des tokens) */
 const RERANK_ENABLED = true;
@@ -45,9 +45,6 @@ const QUERY_EXPANSION_ENABLED = true;
 
 /** Nombre maximum de sous-questions générées lors de l'expansion */
 const QUERY_EXPANSION_MAX_SUBQUERIES = 3;
-
-/** Longueur minimale de la query pour déclencher l'expansion (les questions très courtes n'en bénéficient pas) */
-const QUERY_EXPANSION_MIN_LENGTH = 15;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -206,7 +203,9 @@ export class RAGEngine {
    */
   private async expandQuery(query: string): Promise<string[]> {
     // Désactivé ou query trop courte → pas d'expansion
-    if (!QUERY_EXPANSION_ENABLED || query.length < QUERY_EXPANSION_MIN_LENGTH) {
+    if (QUERY_EXPANSION_ENABLED && query.length > 20) { // condition
+      // Expansion active pour les requêtes suffisamment longues
+    } else {
       return [query];
     }
 

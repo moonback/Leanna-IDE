@@ -164,7 +164,9 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
       await fetch(`/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}`, {
         method: 'DELETE',
       });
-    } catch {}
+    } catch (err) {
+      console.error('[AudioOverviewPanel] Failed to delete overview:', err);
+    }
     setSelectedOverview(null);
     handleGenerate();
   }, [notebookId, selectedOverview, handleGenerate]);
@@ -303,7 +305,9 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
     }
     // Stop tout l'audio en cours
     if (audioCtxRef.current) {
-      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current.close().catch((err) => {
+        console.debug('[AudioOverviewPanel] AudioContext close failed:', err);
+      });
       audioCtxRef.current = null;
     }
     nextStartTimeRef.current = 0;
@@ -313,7 +317,9 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) abortControllerRef.current.abort();
-      if (audioCtxRef.current) audioCtxRef.current.close().catch(() => {});
+      if (audioCtxRef.current) audioCtxRef.current.close().catch((err) => {
+        console.debug('[AudioOverviewPanel] AudioContext close failed (cleanup):', err);
+      });
     };
   }, []);
 

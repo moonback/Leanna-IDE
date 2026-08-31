@@ -75,6 +75,10 @@ interface AgentMessageRow {
 export class AgentPersistence {
   private client: SupabaseClient | null = null;
   private available = false;
+  
+  // Batch des mises à jour de statut
+  private pendingUpdates: Map<string, Partial<AgentTaskRow>> = new Map();
+  private flushTimeout: NodeJS.Timeout | null = null;
 
   constructor() {
     const url = process.env.SUPABASE_URL;
@@ -131,6 +135,46 @@ export class AgentPersistence {
     }
   }
 
+  /**
+   * Planifie une mise à jour de statut pour batching.
+   */
+  scheduleUpdate(taskId: string, update: Partial<AgentTaskRow>): void {
+    this.pendingUpdates.set(taskId, { ...this.pendingUpdates.get(taskId), ...update });
+    if (!this.flushTimeout) {
+      this.flushTimeout = setTimeout(() => this.flushUpdates(), 5000);
+    }
+  }
+
+  /** Flush les mises à jour en batch vers Supabase */
+  private async flushUpdates(): Promise<void> {
+    if (!this.client || this.pendingUpdates.size === 0) return;
+    
+    try {
+      const updates = Array.from(this.pendingUpdates.entries());
+      this.pendingUpdates.clear();
+      this.flushTimeout = null;
+      
+      // Batch update - Supabase supporte les updates batch via RPC ou multiple requêtes
+      // Pour simplifier, on fait des updates individuelles mais groupées
+      for (const [taskId, update] of updates) {
+        const { error } = await this.client
+          .from("agent_tasks")
+          .update(update)
+          .eq("id", taskId);
+        
+        if (error) {
+          log.error(`flushUpdates ${taskId.slice(0, 8)}: ${error.message}`);
+        }
+      }
+      
+      log.debug(`✅ Batch flush: ${updates.length} mises à jour de tâches envoyées à Supabase`);
+    } catch (err) {
+      log.error(`flushUpdates exception: ${(err as Error).message}`);
+      // En cas d'erreur, réessayer après 5 secondes
+      this.flushTimeout = setTimeout(() => this.flushUpdates(), 5000);
+    }
+  }
+
   /** Met à jour le statut + résultat d'une tâche */
   async updateTaskStatus(
     taskId: string,
@@ -140,23 +184,14 @@ export class AgentPersistence {
     completedAt?: string
   ): Promise<void> {
     if (!this.client) return;
-    try {
-      const update: Partial<AgentTaskRow> = { status };
-      if (result !== undefined)     update.result       = result;
-      if (startedAt !== undefined)  update.started_at   = startedAt;
-      if (completedAt !== undefined) update.completed_at = completedAt;
-
-      const { error } = await this.client
-        .from("agent_tasks")
-        .update(update)
-        .eq("id", taskId);
-
-      if (error) {
-        log.error(`updateTaskStatus ${taskId.slice(0, 8)}: ${error.message}`);
-      }
-    } catch (err) {
-      log.error(`updateTaskStatus exception: ${(err as Error).message}`);
-    }
+    
+    const update: Partial<AgentTaskRow> = { status };
+    if (result !== undefined)     update.result       = result;
+    if (startedAt !== undefined)  update.started_at   = startedAt;
+    if (completedAt !== undefined) update.completed_at = completedAt;
+    
+    // Utiliser le batch au lieu de lupdate immédiat
+    this.scheduleUpdate(taskId, update);
   }
 
   /** Charge toutes les tâches non terminées (recovery au redémarrage) */

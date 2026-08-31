@@ -64,10 +64,15 @@ export class SystemPromptBuilder {
       userRole: config.userRole ?? "",
     };
 
+    const opts = { 
+      compact: true,           // Mode compact activé par défaut
+      ...config 
+    };
+
     const renderOpts = {
       variables,
-      compact: config.compact,
-      exclude: config.excludeSections,
+      compact: opts.compact,
+      exclude: opts.excludeSections,
     };
 
     const isAskMode = config.mode === "ask";

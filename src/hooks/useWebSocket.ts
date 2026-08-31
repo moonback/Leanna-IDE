@@ -135,7 +135,9 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
                 if (ws.readyState === WebSocket.OPEN) {
                   ws.send(JSON.stringify({ type: 'context_resume_summary', summary }));
                 }
-              } catch {}
+              } catch (err) {
+                onLog(`Failed to send context_resume_summary: ${err}`, 'error');
+              }
             }, 800);
           }
         };
@@ -173,7 +175,9 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
                 if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) {
                   setTimeout(() => ws.close(), 100);
                 }
-              } catch {}
+              } catch (err) {
+                onLog(`Failed to close WebSocket: ${err}`, 'error');
+              }
               return;
             }
 
@@ -258,7 +262,9 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
               if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'context_resume_summary', summary }));
               }
-            } catch {}
+            } catch (err) {
+              onLog(`Failed to send context_resume_summary (reconnect): ${err}`, 'error');
+            }
           }, 800);
         }
       };
@@ -292,7 +298,9 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
               if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
                 setTimeout(() => ws.close(), 100);
               }
-            } catch {}
+            } catch (err) {
+              onLog(`Failed to close WebSocket (reconnect): ${err}`, 'error');
+            }
             return;
           }
 

@@ -238,7 +238,7 @@ export const browserSkill: Skill = {
     {
       name: "browser_navigate",
       description:
-        "Ouvre le navigateur intégré et navigue vers une URL. Le navigateur s'affiche dans l'interface et l'utilisateur voit la page en temps réel. À utiliser dès que l'utilisateur donne une URL précise ou dit 'va sur', 'ouvre', 'montre-moi'. Après navigation, appelle browser_read_content() pour lire le contenu.",
+        "Ouvre le navigateur intégré et navigue vers une URL. Le navigateur s'affiche dans l'interface. Utilise browser_read_content() pour lire le contenu après navigation.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -253,7 +253,7 @@ export const browserSkill: Skill = {
     {
       name: "browser_open",
       description:
-        "Ouvre (affiche) le panneau navigateur intégré sans changer l'URL courante. Utile pour révéler le navigateur s'il est caché.",
+        "Ouvre le panneau navigateur intégré sans changer l'URL. Utile pour révéler le navigateur.",
       parameters: {
         type: "OBJECT",
         properties: {},
@@ -262,7 +262,7 @@ export const browserSkill: Skill = {
     {
       name: "browser_search",
       description:
-        "Effectue une recherche dans le navigateur intégré visible par l'utilisateur. À utiliser immédiatement dès que l'utilisateur dit 'cherche', 'recherche', 'trouve', 'googl'. Après la recherche, utilise browser_get_links() pour extraire les résultats et browser_navigate() pour ouvrir le meilleur lien.",
+        "Effectue une recherche dans le navigateur. Utilise browser_get_links() pour extraire les résultats et browser_navigate() pour ouvrir un lien.",
       parameters: {
         type: "OBJECT",
         properties: {

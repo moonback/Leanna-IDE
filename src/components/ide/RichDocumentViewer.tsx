@@ -7,6 +7,7 @@
 
 import { memo, useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { marked } from 'marked';
+import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml';
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ResponsiveContainer,
@@ -784,7 +785,7 @@ function TextRenderer({ block }: { block: TextBlock }) {
     if (!useMarkdown) return null;
     try {
       const result = marked.parse(block.content, { gfm: true, breaks: true });
-      return typeof result === 'string' ? result : null;
+      return typeof result === 'string' ? sanitizeMarkdownHtml(result) : null;
     } catch {
       return null;
     }
@@ -808,7 +809,7 @@ function TextRenderer({ block }: { block: TextBlock }) {
         <div
           className="rich-text-markdown text-sm leading-relaxed"
           style={{ color: 'var(--text-muted)' }}
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML contrôlé depuis marked
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with sanitizeMarkdownHtml
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (

@@ -334,7 +334,7 @@ export const automationSkill: Skill = {
       name: "automation_press_keys",
       description: "Envoie une séquence de touches au clavier (Enter, ArrowDown, Escape, Tab, Ctrl+A, etc.) avec délais humains.",
       parameters: z.object({
-        keys: z.array(z.string().min(1)).min(1, "Au moins une touche requise"),
+        keys: z.array(z.string()).min(1, "Au moins une touche requise"),
         pressEnter: z.boolean().optional().default(false)
       }),
       examples: [
@@ -608,7 +608,7 @@ export const automationSkill: Skill = {
       hoverMs: z.number().int().positive().optional()
     }),
     "automation_press_keys": z.object({
-      keys: z.array(z.string().min(1)).min(1, "Au moins une touche requise"),
+      keys: z.array(z.string()).min(1, "Au moins une touche requise"),
       pressEnter: z.boolean().optional().default(false)
     }),
     "automation_scroll": z.object({

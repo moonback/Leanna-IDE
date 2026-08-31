@@ -74,13 +74,11 @@ export function attachLiveWebSocket(
     getWorkspaceRoot,
     createGeminiAI,
     activeGeminiSessions,
-    browserReadPending,
-    browserActionPending,
   } = deps;
 
   // ── Sandbox Watcher WebSocket ────────────────────────────────────────────
   sandboxWss.on('connection', async (clientWs) => {
-    const { addWatchClient, startWatching } = await import('../utils/sandboxWatcher');
+    const { addWatchClient, startWatching } = await import('../utils/sandboxWatcher.js');
     console.log('[SandboxWatch] Client connecté');
     addWatchClient(clientWs);
     if (isSandboxActive()) {
@@ -118,7 +116,6 @@ export function attachLiveWebSocket(
 
     // ── Context window monitoring ────────────────────────────────────────
     const CONTEXT_WINDOW_TOKENS = 1_000_000;
-    const SAFE_BUDGET_TOKENS = Math.floor(CONTEXT_WINDOW_TOKENS * 0.85);
     const WARNING_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * 0.60);
     const CRITICAL_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * 0.85);
 
@@ -161,7 +158,7 @@ export function attachLiveWebSocket(
       } catch {}
     };
 
-    const monitorConversationContext = (prompt: number, completion: number, total: number) => {
+    const monitorConversationContext = (prompt: number, completion: number) => {
       conversationCtx.totalPromptTokens += prompt;
       conversationCtx.totalCompletionTokens += completion;
       conversationCtx.maxPromptTokensInTurn = Math.max(conversationCtx.maxPromptTokensInTurn, prompt);
@@ -262,7 +259,7 @@ export function attachLiveWebSocket(
           contextResumeSummary = data.summary;
           console.log(`[ContextResume] 📋 Résumé trouvé pour ${clientConvId} (${contextResumeSummary.length} chars)`);
         } else {
-          const messages = await getConversationMessages(clientConvId, 100);
+          const messages = await getConversationMessages(clientConvId, 12);
           if (messages.length >= 4) {
             const chatMsgs = messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
             const { summary } = await summarizeWithLLM(chatMsgs);
@@ -340,8 +337,6 @@ export function attachLiveWebSocket(
       ]);
 
       let filteredDeclarations: typeof declarations;
-      let scoringInfo: { always: string[]; dynamic: string[]; scored: { name: string; score: number }[] } | null = null;
-
       if (sessionMode === 'ask') {
         filteredDeclarations = declarations.filter(d =>
           ASK_MODE_ALLOWED_TOOLS.has(d.name) || (d as any)._mcpServerId || d.name.startsWith('custom_'),
@@ -355,7 +350,6 @@ export function attachLiveWebSocket(
             // Toujours inclure les custom skills même si le score est faible
             const customDeclarations = declarations.filter(d => d.name.startsWith('custom_') && !filteredDeclarations.some((fd: any) => fd.name === d.name));
             filteredDeclarations = [...filteredDeclarations, ...customDeclarations];
-            scoringInfo = { always: rel.alwaysLoaded, dynamic: rel.dynamicallyLoaded, scored: rel.scoredSkills };
           } else {
             filteredDeclarations = declarations.filter(d => TIER1_CORE_TOOLS.has(d.name) || d.name.startsWith('custom_'));
             filteredDeclarations.push({
@@ -372,7 +366,6 @@ export function attachLiveWebSocket(
                 required: ['category'],
               },
             } as any);
-            scoringInfo = { always: Array.from(TIER1_CORE_TOOLS), dynamic: [], scored: [] };
           }
         } else {
           filteredDeclarations = declarations;
@@ -412,8 +405,6 @@ export function attachLiveWebSocket(
       const voiceName = currentProfile.aiVoice || 'Aoede';
       const temperature = currentProfile.temperature ?? 0.9;
       const topP = currentProfile.topP ?? 0.95;
-      const systemTokensEst = Math.ceil((systemText.split(/\s+/).length * 1.3 + systemText.length / 4) / 2);
-
       const memoryBudgetTokens = 2000;
       const knowledgeBudgetTokens = 3000;
       const notebookBudgetTokens = 15_000;
@@ -634,7 +625,7 @@ export function attachLiveWebSocket(
               const promptTokens = usageMetadata.promptTokenCount ?? 0;
               const completionTokens = usageMetadata.candidatesTokenCount ?? usageMetadata.responseTokenCount ?? 0;
               const totalTokens = usageMetadata.totalTokenCount ?? 0;
-              monitorConversationContext(promptTokens, completionTokens, totalTokens);
+              monitorConversationContext(promptTokens, completionTokens);
               const cumulative = conversationCtx.totalPromptTokens + conversationCtx.totalCompletionTokens;
               clientWs.send(JSON.stringify({
                 token_usage: {
@@ -701,7 +692,7 @@ export function attachLiveWebSocket(
               if (closeReason === 'context_too_long' && conversationId) {
                 (async () => {
                   try {
-                    const messages = await getConversationMessages(conversationId!, 200);
+                    const messages = await getConversationMessages(conversationId!, 12);
                     if (messages.length >= 4) {
                       const { summary, method } = await summarizeWithLLM(messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })));
                       clientWs.send(JSON.stringify({ type: 'session_restart', reason: 'context_overflow', conversation_id: conversationId, turns_completed: conversationCtx.turns, summary, summaryMethod: method, messagesSummarized: messages.length }));
@@ -744,7 +735,7 @@ export function attachLiveWebSocket(
       sendContextSize(initialPromptSize, { turns: 0 });
 
       // ── Auto-summarize setup ────────────────────────────────────────
-      const AUTO_SUMMARIZE_COOLDOWN_MS = 5 * 60 * 1000;
+      const AUTO_SUMMARIZE_COOLDOWN_MS = 120_000; // 5 min → 2 min
       const MAX_AUTO_SUMMARIZES_PER_SESSION = 3;
       const MIN_MESSAGES_FOR_AUTO_SUMMARIZE = 8;
 
@@ -754,13 +745,13 @@ export function attachLiveWebSocket(
         if (now - conversationCtx.lastAutoSummarizeAt < AUTO_SUMMARIZE_COOLDOWN_MS) return;
         if (conversationCtx.autoSummarizeCount >= MAX_AUTO_SUMMARIZES_PER_SESSION) return;
 
-        const messages = await getConversationMessages(conversationId, 200);
+        const messages = await getConversationMessages(conversationId, 12);
         if (messages.length < MIN_MESSAGES_FOR_AUTO_SUMMARIZE) return;
 
         clientWs.send(JSON.stringify({ type: 'context_summarize_progress', status: 'running', auto: true }));
         try {
           const tokensBefore = conversationCtx.totalPromptTokens + conversationCtx.totalCompletionTokens;
-          const minKeep = 4;
+          const minKeep = 6;       // 2 → 6 (garder plus de messages récents)
           const toSummarize = messages.slice(0, -minKeep);
           const keptMessages = messages.slice(-minKeep);
           const { summary, method } = await summarizeWithLLM(toSummarize.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })));
@@ -836,10 +827,10 @@ export function attachLiveWebSocket(
               try {
                 clientWs.send(JSON.stringify({ type: 'context_summarize_progress', status: 'running' }));
                 if (!conversationId) { clientWs.send(JSON.stringify({ type: 'context_summarized', status: 'error', error: 'Aucune conversation active.' })); return; }
-                const messages = await getConversationMessages(conversationId, 200);
-                if (messages.length < 4) { clientWs.send(JSON.stringify({ type: 'context_summarized', status: 'error', error: 'Conversation trop courte (minimum 4 messages).' })); return; }
+                const messages = await getConversationMessages(conversationId, 12);
+                if (messages.length < 6) { clientWs.send(JSON.stringify({ type: 'context_summarized', status: 'error', error: 'Conversation trop courte (minimum 6 messages).' })); return; }
                 const tokensBefore = conversationCtx.totalPromptTokens + conversationCtx.totalCompletionTokens;
-                const minKeep = 4;
+                const minKeep = 6;       // 2 → 6 (garder plus de messages récents)
                 const toSummarize = messages.slice(0, -minKeep);
                 const keptMessages = messages.slice(-minKeep);
                 const { summary, method } = await summarizeWithLLM(toSummarize.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })));
@@ -869,8 +860,8 @@ export function attachLiveWebSocket(
           if (msg.type === 'save-rich-document' && msg.document && msg.path) {
             (async () => {
               try {
-                const { resolveSandboxWriteTarget } = await import('../skills/codebaseHelpers');
-                const { markFileModified, isSandboxActive: sbActive } = await import('../utils/sandbox');
+                const { resolveSandboxWriteTarget } = await import('../skills/codebaseHelpers.js');
+                const { markFileModified, isSandboxActive: sbActive } = await import('../utils/sandbox.js');
                 const outputPath: string = String(msg.path).trim();
                 if (!outputPath) { clientWs.send(JSON.stringify({ type: 'save-rich-document-result', status: 'error', error: 'Chemin manquant.' })); return; }
                 const target = resolveSandboxWriteTarget(outputPath);
@@ -888,7 +879,7 @@ export function attachLiveWebSocket(
           }
 
           if (msg.type === 'confirm-response' && msg.requestId) {
-            import('../utils/confirmationBridge').then(({ handleConfirmationResponse }) => {
+            import('../utils/confirmationBridge.js').then(({ handleConfirmationResponse }) => {
               handleConfirmationResponse(msg.requestId, msg.approved === true);
             });
           }
@@ -1049,7 +1040,7 @@ async function handleToolCall(
           const verifyResult = await skillManager.handleToolCall('verify_file', { path: verifyPath }, context);
           functionResponses.push({ id: `${call.id}_verify`, name: 'verify_file', response: verifyResult });
           clientWs.send(JSON.stringify({ tool_used: 'verify_file', info: JSON.stringify({ path: verifyPath }) }));
-          const evaluation = supervisor.evaluateVerifyResult(verifyPath, verifyResult);
+          const evaluation = await supervisor.evaluateVerifyResult(verifyPath, verifyResult);
           if (evaluation.needsCorrection && evaluation.directive) {
             setTimeout(() => {
               try {
