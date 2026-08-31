@@ -1,9 +1,19 @@
 /**
  * Tooltip — Composant tooltip unifié avec positionnement intelligent,
  * raccourci clavier optionnel et accessibilité.
+ * 
+ * Utilisation:
+ *   <Tooltip content="Description">
+ *     <button>Hover me</button>
+ *   </Tooltip>
+ * 
+ *   // Pour les boutons icônes avec accessibilité
+ *   <Tooltip content="Supprimer" as="button" onClick={handleDelete} aria-label="Supprimer">
+ *     <Trash2 />
+ *   </Tooltip>
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, forwardRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
 
@@ -20,24 +30,57 @@ export interface TooltipProps {
   children: React.ReactNode;
   /** Désactiver le tooltip */
   disabled?: boolean;
+  /** Élément HTML à rendre (par défaut: div) */
+  as?: 'button' | 'div' | 'span' | 'a';
+  /** Props supplémentaires à passer à l'élément trigger */
+  className?: string;
+  /** Style supplémentaire */
+  style?: React.CSSProperties;
+  /** onClick handler pour les boutons */
+  onClick?: (e: React.MouseEvent) => void;
+  /** onKeyDown handler */
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+  /** role pour l'accessibilité */
+  role?: string;
+  /** tabIndex pour la navigation clavier */
+  tabIndex?: number;
+  /** type pour les boutons */
+  type?: 'button' | 'submit' | 'reset';
+  /** disabled state */
+  isDisabled?: boolean;
+  /** Accessibilité: label pour les lecteurs d'écran. Si non fourni, utilise content */
+  'aria-label'?: string;
 }
 
-export function Tooltip({
-  content,
-  shortcut,
-  position = 'top',
-  delay = 400,
-  children,
-  disabled = false,
-}: TooltipProps) {
+export const Tooltip = forwardRef<HTMLElement, TooltipProps>(function Tooltip(
+  {
+    content,
+    shortcut,
+    position = 'top',
+    delay = 400,
+    children,
+    disabled = false,
+    as: Component = 'div',
+    className = '',
+    style = {},
+    onClick,
+    onKeyDown,
+    role,
+    tabIndex,
+    type,
+    isDisabled = false,
+    'aria-label': ariaLabel,
+  },
+  ref
+) {
   const [visible, setVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement>(null);
 
   const show = useCallback(() => {
-    if (disabled) return;
+    if (disabled || isDisabled) return;
     timerRef.current = setTimeout(() => setVisible(true), delay);
-  }, [delay, disabled]);
+  }, [delay, disabled, isDisabled]);
 
   const hide = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -64,15 +107,38 @@ export function Tooltip({
     right: 'right-full top-1/2 -translate-y-1/2 -mr-[3px] rotate-45',
   };
 
+  // Gérer l'aria-label: utiliser le prop aria-label ou content par défaut
+  const computedAriaLabel = ariaLabel || content;
+
+  // Props communes pour l'élément trigger
+  const triggerProps = {
+    ref: (node: HTMLElement) => {
+      triggerRef.current = node;
+      if (ref) {
+        if (typeof ref === 'function') ref(node);
+        else (ref as React.MutableRefObject<HTMLElement | null>).current = node;
+      }
+    },
+    className: clsx('relative inline-flex', className),
+    style,
+    onMouseEnter: show,
+    onMouseLeave: hide,
+    onFocus: show,
+    onBlur: hide,
+    onClick,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') hide();
+      onKeyDown?.(e);
+    },
+    role,
+    tabIndex: tabIndex ?? (onClick || role === 'button' ? 0 : undefined),
+    type: Component === 'button' ? type : undefined,
+    disabled: Component === 'button' ? (disabled || isDisabled) : undefined,
+    'aria-label': computedAriaLabel,
+  };
+
   return (
-    <div
-      ref={triggerRef}
-      className="relative inline-flex"
-      onMouseEnter={show}
-      onMouseLeave={hide}
-      onFocus={show}
-      onBlur={hide}
-    >
+    <Component {...triggerProps}>
       {children}
       <AnimatePresence>
         {visible && (
@@ -122,6 +188,9 @@ export function Tooltip({
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </Component>
   );
-}
+});
+
+// Export des types pour compatibilité
+export type { TooltipProps };

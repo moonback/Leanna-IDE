@@ -5,6 +5,7 @@ import {
   FolderX, FolderInput, Globe, X, Plus,
 } from 'lucide-react';
 import { ideApi } from '../services/ideApi.js';
+import { useToast } from '../components/ui/Toast.js';
 
 function getElectronAPI(): { selectFolder: () => Promise<string | null> } | null {
   const w = window as any;
@@ -29,13 +30,16 @@ export function StartupProjectModal() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { error: toastError } = useToast();
 
   const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
-    fetch('/api/self-root/status')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
+    const checkProjectStatus = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/self-root/status');
+        const data = await res.json();
         if (data?.noProject || !data?.rootPath) {
           setCurrentPath(null);
           setIsOpen(true);
@@ -44,9 +48,15 @@ export function StartupProjectModal() {
           setInputSiteUrl(data.siteUrl ?? '');
           setIsOpen(false);
         }
-      })
-      .catch(() => setIsOpen(true));
-  }, []);
+      } catch {
+        setIsOpen(true);
+        toastError('Impossible de vérifier le statut du projet');
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkProjectStatus();
+  }, [toastError]);
 
   const activate = useCallback(async (newRoot: string) => {
     ideApi.invalidateCache();

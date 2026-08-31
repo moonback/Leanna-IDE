@@ -1,9 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
-import { Play, Pause, Trash2, Zap, Clock, GitBranch } from 'lucide-react';
+import { Play, Pause, Trash2, Zap, Clock, GitBranch, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { WorkflowsPanel, WorkflowViewModel } from '../components/panels/WorkflowsPanel.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { useToast } from '../components/ui/Toast.js';
+import { EmptyState } from '../components/ui/EmptyState.js';
 
 interface ScheduledTask {
   id: string;
@@ -15,9 +17,11 @@ interface ScheduledTask {
 }
 
 export default function AutomationView() {
+  const { error: toastError } = useToast();
   const [activeTab, setActiveTab] = useState<'workflows' | 'tasks'>('workflows');
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [workflows, setWorkflows] = useState<WorkflowViewModel[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const fetchTasks = async () => {
     try {
@@ -27,6 +31,7 @@ export default function AutomationView() {
         setTasks(data.tasks);
       }
     } catch (error) {
+      toastError('Impossible de charger les tâches planifiées');
       console.error('Erreur lors de la récupération des tâches:', error);
     }
   };
@@ -39,13 +44,22 @@ export default function AutomationView() {
         setWorkflows(data.workflows);
       }
     } catch (error) {
+      toastError('Impossible de charger les workflows');
       console.error('Erreur lors de la récupération des workflows:', error);
     }
   };
 
   useEffect(() => {
-    fetchTasks();
-    fetchWorkflows();
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchTasks(), fetchWorkflows()]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
     const timer = setInterval(() => {
       fetchTasks();
       fetchWorkflows();
@@ -118,7 +132,12 @@ export default function AutomationView() {
       />
 
       <main className="custom-scrollbar flex-1 overflow-y-auto p-5 lg:p-7">
-        {activeTab === 'workflows' ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-4">
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Chargement des automatisations...</p>
+          </div>
+        ) : activeTab === 'workflows' ? (
           <WorkflowsPanel workflows={workflows} onRefresh={fetchWorkflows} />
         ) : tasks.length === 0 ? (
           <div className="border-2 border-dashed border-[var(--border-base)] rounded-2xl p-12 text-center bg-[var(--bg-panel)]">

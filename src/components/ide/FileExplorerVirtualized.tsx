@@ -106,19 +106,6 @@ function filterTreeOnlyDiffs(
   }, []);
 }
 
-function getAllDirectoryPaths(entries: TreeEntry[]): string[] {
-  const dirs: string[] = [];
-  for (const entry of entries) {
-    if (entry.type === 'directory') {
-      dirs.push(entry.path);
-      if (entry.children) {
-        dirs.push(...getAllDirectoryPaths(entry.children));
-      }
-    }
-  }
-  return dirs;
-}
-
 function countEntries(entries: TreeEntry[]): number {
   return entries.reduce((acc, e) => {
     if (e.type === 'file') return acc + 1;
@@ -444,7 +431,7 @@ const FileExplorer = memo(function FileExplorer({
 
     const checkSandbox = async (force = true) => {
       try {
-        const { sandboxApi } = await import('../../services/sandboxApi');
+        const { sandboxApi } = await import('../../services/sandboxApi.js');
         const [statusData, diffData] = await Promise.all([
           sandboxApi.getStatus(force),
           sandboxApi.getDiff(force),
@@ -1034,6 +1021,7 @@ const FileExplorer = memo(function FileExplorer({
               onExpand={handleTreeExpand}
               selectable={false}
               defaultExpandParent
+              prefixCls="rc-tree"
             />
 
             {/* Section Workspace améliorée */}
@@ -1092,6 +1080,7 @@ const FileExplorer = memo(function FileExplorer({
                     onExpand={handleWsTreeExpand}
                     selectable={false}
                     defaultExpandParent
+                    prefixCls="rc-tree"
                   />
                 )}
               </>

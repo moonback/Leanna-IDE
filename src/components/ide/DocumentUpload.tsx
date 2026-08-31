@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Paperclip, FileText, Image, Loader2, CheckCircle2, X, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Tooltip } from '../ui/Tooltip.js';
 
 interface DocumentUploadProps {
   connected: boolean;
@@ -81,18 +82,19 @@ export function DocumentUpload({ connected, onDocumentAnalyzed }: DocumentUpload
       />
 
       {/* Upload button */}
-      <button
+      <Tooltip
+        content="Uploader un document (PDF, image, texte)"
+        as="button"
         onClick={() => fileInputRef.current?.click()}
         disabled={!connected || uploading}
         className="p-1.5 rounded-lg transition-all disabled:opacity-30 hover:bg-white/10"
-        title="Uploader un document (PDF, image, texte)"
       >
         {uploading ? (
           <Loader2 size={14} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
         ) : (
           <Paperclip size={14} style={{ color: 'var(--text-muted)' }} />
         )}
-      </button>
+      </Tooltip>
 
       {/* Error toast */}
       <AnimatePresence>
