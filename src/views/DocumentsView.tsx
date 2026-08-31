@@ -299,23 +299,37 @@ function DocumentsTab() {
     }
   }, [success, toastError]);
 
-  const handleIngestUrl = useCallback(async () => {
-    const url = prompt('URL du document à ingérer :');
+  const [showUrlForm, setShowUrlForm] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [ingestingUrl, setIngestingUrl] = useState(false);
+
+  const handleIngestUrl = useCallback(async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const url = urlInput.trim();
     if (!url) return;
+    setIngestingUrl(true);
     try {
       const res = await fetch('/api/documents/ingest-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, collection: filterCollection || undefined }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: 'Upload failed' }));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
       const data = await res.json();
       success(`Page ingérée : "${data.document.title}"`);
+      setUrlInput('');
+      setShowUrlForm(false);
       await loadDocuments();
-    } catch {
-      toastError('Impossible d\'ingérer l\'URL');
+      await loadCollections();
+    } catch (err: any) {
+      toastError(err.message || 'Impossible d\'ingérer l\'URL');
+    } finally {
+      setIngestingUrl(false);
     }
-  }, [success, toastError, loadDocuments, filterCollection]);
+  }, [urlInput, success, toastError, loadDocuments, loadCollections, filterCollection]);
 
   return (
     <div className="p-5 lg:p-7 space-y-4">
@@ -341,9 +355,11 @@ function DocumentsTab() {
 
         {/* URL ingest */}
         <button
-          onClick={handleIngestUrl}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all hover:bg-white/5"
-          style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+          onClick={() => setShowUrlForm(prev => !prev)}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+            showUrlForm ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'hover:bg-white/5'
+          }`}
+          style={!showUrlForm ? { borderColor: 'var(--border-base)', color: 'var(--text-muted)' } : undefined}
         >
           <Globe className="w-3.5 h-3.5" />
           Depuis URL
@@ -383,6 +399,74 @@ function DocumentsTab() {
           {workspaceDocuments.length > 0 && ` (${workspaceDocuments.length} auto-extraits)`}
         </span>
       </div>
+
+      {/* URL ingest form */}
+      <AnimatePresence>
+        {showUrlForm && (
+          <motion.form
+            onSubmit={handleIngestUrl}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div
+              className="p-3.5 rounded-2xl border space-y-3"
+              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                  Ingérer un document depuis une URL
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowUrlForm(false)}
+                  className="p-1 rounded-lg hover:bg-white/5 transition"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={e => setUrlInput(e.target.value)}
+                  placeholder="https://example.com/article..."
+                  autoFocus
+                  required
+                  disabled={ingestingUrl}
+                  className="flex-1 px-3 py-2 rounded-xl text-xs outline-none border"
+                  style={{
+                    backgroundColor: 'var(--bg-input)',
+                    borderColor: 'var(--border-base)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={ingestingUrl || !urlInput.trim()}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
+                >
+                  {ingestingUrl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  {ingestingUrl ? 'Ingestion...' : 'Ingérer'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowUrlForm(false)}
+                  disabled={ingestingUrl}
+                  className="px-3 py-2 rounded-xl text-xs font-medium border hover:bg-white/5 transition"
+                  style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
 
       {/* Search */}
       <div className="relative">
