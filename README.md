@@ -1,6 +1,6 @@
 # Leanna
 <p align="center">
-  <img src="public/header-bg.png" alt="Leanna IA" width="100%" />
+  <img src="public/header.png" alt="Leanna IA" width="100%" />
 </p>
 ## Pitch
 Leanna est un IDE augmenté par l'IA et un système d'exploitation pour développeurs, pensé pour transformer la manière dont on écrit, teste et audite du code. Grâce à une connexion vocale et multimodale bidirectionnelle avec Google Gemini Live, Leanna permet d'explorer, éditer, tester et sécuriser un codebase en temps réel — comme si un ingénieur senior travaillait à vos côtés, en continu. Un système d'agents autonomes orchestre les tâches complexes, tandis qu'un bac à sable sécurisé et des garde-fous stricts garantissent que chaque modification automatisée préserve l'intégrité et la résilience du code.
