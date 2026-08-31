@@ -42,6 +42,17 @@ export interface SkillContext {
   custom?: Record<string, any>;
   /** Callback pour émettre des données en temps réel vers le client */
   emitToClient?: (data: any) => void;
+  /** Nom de la voix pour la synthèse vocale TTS */
+  voiceName?: string;
+  /** Indique si les annonces vocales de raisonnement sont activées */
+  reasoningVoiceEnabled?: boolean;
+  /** Callback pour notifier la session Live API d'une mise à jour de tâche en arrière-plan */
+  notifyLiveAPI?: (message: string) => void;
+  /** Callback pour émettre une action IDE vers le client */
+  emitIdeAction?: (action: any) => void;
+  /** Drapeaux d'attente d'action / lecture navigateur */
+  browserReadPending?: boolean;
+  browserActionPending?: boolean;
 }
 
 /**

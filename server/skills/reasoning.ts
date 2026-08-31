@@ -376,11 +376,11 @@ Critères retenus : [liste des dimensions de comparaison]
  * destinée à être prononcée vocalement.
  */
 function buildReasoningExplanation(
-  prompt: string,
+  prompt: string | undefined,
   strategy: Exclude<ThinkingStrategy, "auto">,
   complexity: ComplexityLevel
 ): string {
-  const lower = prompt.toLowerCase();
+  const lower = (prompt ?? "").toLowerCase();
 
   // Raisons basées sur la stratégie choisie
   const strategyReasons: Record<Exclude<ThinkingStrategy, "auto">, string> = {
@@ -428,7 +428,7 @@ function buildReasoningExplanation(
 }
 
 function autoSelectStrategy(prompt: string): Exclude<ThinkingStrategy, "auto"> {
-  const lower = prompt.toLowerCase();
+  const lower = (prompt ?? "").toLowerCase();
 
   // Déléguer la détection de complexité à assessComplexity
   const complexity = assessComplexity(prompt);
@@ -670,6 +670,12 @@ export const reasoningSkill: Skill = {
     // ── reasoning_think ─────────────────────────────────────────────────
     if (name === "reasoning_think") {
       const { prompt, strategy: requestedStrategy } = args;
+
+      // Guard: prompt est requis — retourne une erreur structurée plutôt que de crasher
+      if (!prompt || typeof prompt !== "string") {
+        return { error: "Le paramètre 'prompt' est requis pour reasoning_think." };
+      }
+
       const chosenStrategy: Exclude<ThinkingStrategy, "auto"> =
         !requestedStrategy || requestedStrategy === "auto"
           ? autoSelectStrategy(prompt)

@@ -1202,13 +1202,57 @@ export function getAgentDefinition(role: string): AgentDefinition | undefined {
 }
 
 /**
+ * Aliases de rôles pour rattraper les erreurs fréquentes du LLM
+ * (ex: "verifier" → "tester", "developer" → "coder").
+ */
+const ROLE_ALIASES: Record<string, string> = {
+  verifier: "tester",
+  developer: "coder",
+  dev: "coder",
+  "code-reviewer": "reviewer",
+  "code-review": "reviewer",
+  auditor: "reviewer",
+  "qa": "tester",
+  "qa-tester": "tester",
+  "test": "tester",
+  "debuger": "debugger",
+  "debug": "debugger",
+  "architect": "architect",
+  "refactorer": "refactor",
+  "refactoring": "refactor",
+  "security-audit": "security",
+  "proof-reader": "proofreader",
+  "proof_reader": "proofreader",
+  "translate": "translator",
+  "summarize": "summarizer",
+  "summary": "summarizer",
+  "plan": "planner",
+  "planning": "planner",
+  "research": "researcher",
+  "format": "formatter",
+  "write": "writer",
+};
+
+/**
  * Récupère la définition d'un agent, avec une erreur si non trouvé.
+ * Tente un alias de rôle avant de lancer une erreur.
  * @param role - Rôle de l'agent
  * @returns La définition de l'agent
  * @throws Error si l'agent n'est pas trouvé
  */
 export function getAgentDefinitionOrThrow(role: string): AgentDefinition {
-  const definition = getAgentDefinition(role);
+  let definition = getAgentDefinition(role);
+  if (!definition) {
+    // Tenter un alias (insensible à la casse)
+    const normalized = role?.toLowerCase?.() ?? role;
+    const aliased = ROLE_ALIASES[normalized];
+    if (aliased) {
+      definition = getAgentDefinition(aliased);
+      if (definition) {
+        console.warn(`[AgentOrchestrator] Rôle "${role}" remplacé par alias "${aliased}".`);
+      }
+    }
+  }
   if (!definition) {
     throw new Error(
       `Agent "${role}" introuvable. Vérifie que le rôle est correct ou que l'agent a été enregistré via l'Agent Builder.`

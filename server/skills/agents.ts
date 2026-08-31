@@ -334,7 +334,56 @@ export const agentsSkill: Skill = {
             })),
           };
         }
-        throw new Error(`Aucune tâche ou orchestration trouvée avec l'ID "${taskId}".`);
+
+        // Fuzzy match: recherche par préfixe d'ID ou par titre
+        const allOrchs = agentOrchestrator.listOrchestrations();
+        const query = taskId.toLowerCase();
+        const matchedOrch = allOrchs.find((o) =>
+          o.id.toLowerCase().startsWith(query) ||
+          o.title.toLowerCase().includes(query) ||
+          query.includes(o.title.toLowerCase().slice(0, 15))
+        );
+        if (matchedOrch) {
+          return {
+            type: "orchestration", id: matchedOrch.id, title: matchedOrch.title,
+            status: matchedOrch.status, createdAt: matchedOrch.createdAt, completedAt: matchedOrch.completedAt,
+            tasks: matchedOrch.tasks.map((t) => ({
+              id: t.id, role: t.role, title: t.title, status: t.status,
+              result: t.result ? { success: t.result.success, summary: t.result.summary } : null,
+            })),
+          };
+        }
+
+        const allTasks = agentOrchestrator.listTasks({ limit: 50 });
+        const matchedTask = allTasks.find((t) =>
+          t.id.toLowerCase().startsWith(query) ||
+          t.title.toLowerCase().includes(query) ||
+          query.includes(t.title.toLowerCase().slice(0, 15))
+        );
+        if (matchedTask) {
+          return {
+            type: "task", id: matchedTask.id, role: matchedTask.role, title: matchedTask.title,
+            status: matchedTask.status, priority: matchedTask.priority,
+            createdAt: matchedTask.createdAt, startedAt: matchedTask.startedAt, completedAt: matchedTask.completedAt,
+            result: matchedTask.result ?? null,
+          };
+        }
+
+        // Si aucune correspondance et que des orchestrations existent, retourner la dernière
+        if (allOrchs.length > 0 && (query === "latest" || query === "last" || query.includes("orchestration"))) {
+          const latest = allOrchs[0];
+          return {
+            type: "orchestration", id: latest.id, title: latest.title,
+            status: latest.status, createdAt: latest.createdAt, completedAt: latest.completedAt,
+            note: `ID '${taskId}' non trouvé directement. Dernière orchestration retournée.`,
+            tasks: latest.tasks.map((t) => ({
+              id: t.id, role: t.role, title: t.title, status: t.status,
+              result: t.result ? { success: t.result.success, summary: t.result.summary } : null,
+            })),
+          };
+        }
+
+        throw new Error(`Aucune tâche ou orchestration trouvée avec l'ID ou titre "${taskId}".`);
       }
 
       case "agent_list_tasks": {

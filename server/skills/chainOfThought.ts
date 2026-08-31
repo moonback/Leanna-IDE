@@ -67,6 +67,7 @@ export interface CoTContext {
  * La clé est un hash du prompt (normalisé).
  */
 export function assessComplexity(prompt: string): ComplexityLevel {
+  if (!prompt || typeof prompt !== "string") return "simple";
   const key = prompt.toLowerCase().replace(/\s+/g, " ").slice(0, 200);
   if (complexityCache.has(key)) {
     const cached = complexityCache.get(key)!;
@@ -84,7 +85,7 @@ export function assessComplexity(prompt: string): ComplexityLevel {
 }
 
 function assessComplexityRaw(prompt: string): ComplexityLevel {
-  const t = prompt.toLowerCase();
+  const t = (prompt ?? "").toLowerCase();
   const words = t.split(/\s+/).length;
 
   // Signaux critiques (sécurité, migration, systémique)
