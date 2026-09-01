@@ -649,7 +649,7 @@ curl -X POST http://127.0.0.1:4000/api/notebooks \
 ### `POST /api/notebooks/:id/sources/upload`
 
 #### Description
-Téléverse et extrait le contenu textuel d'un document (PDF, TXT, MD, Code, Image) pour l'associer au notebook.
+Téléverse et extrait le contenu textuel d'un document (PDF, TXT, MD, Code, Image) pour l'associer au notebook. Les PDF sont traités via `pdf-parse`, puis leur texte extrait est indexé et exploitable par le moteur documentaire.
 
 #### Authentification
 Oui — `x-leanna-token`
