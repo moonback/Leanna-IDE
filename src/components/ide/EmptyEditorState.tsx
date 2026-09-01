@@ -460,7 +460,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
   const handleConnect = useCallback(() => {
     if (!connected) connect([], 'full');
-    onOpenChat?.();
+    
   }, [connected, connect, onOpenChat]);
 
   return (
