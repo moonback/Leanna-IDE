@@ -80,6 +80,39 @@ test('POST /api/knowledge/reindex also reindexes project documents', async () =>
   }
 });
 
+test('POST /api/knowledge/reindex indexes pdf files from workspace', async () => {
+  const root = path.join(process.cwd(), '.tmp-knowledge-pdf-docs');
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.mkdirSync(root, { recursive: true });
+  fs.mkdirSync(path.join(root, '.Leanna'), { recursive: true });
+
+  const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n5 0 obj\n<< /Length 44 >>\nstream\nBT\n/F1 24 Tf\n100 700 Td\n(Hello World) Tj\nET\nendstream\nendobj\nxref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000213 00000 n \n0000000299 00000 n \ntrailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n393\n%%EOF');
+  fs.writeFileSync(path.join(root, 'sample.pdf'), pdfBytes);
+  setSelfRoot(root);
+
+  const app = express();
+  app.use(express.json());
+  app.use('/api/knowledge', knowledgeRouter);
+
+  const server = http.createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+  const address = server.address() as { port: number };
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${address.port}/api/knowledge/reindex`, { method: 'POST' });
+    assert.equal(res.status, 200);
+
+    const store = getDocumentStore(root);
+    const docs = store.getAllDocuments();
+    assert.ok(docs.some((doc) => doc.fileName === 'sample.pdf'));
+    const pdfDoc = docs.find((doc) => doc.fileName === 'sample.pdf');
+    assert.ok(pdfDoc?.extractedText?.toLowerCase().includes('hello world'));
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('switching workspace clears knowledge graph and project memory data', () => {
   const rootA = path.join(process.cwd(), '.tmp-knowledge-a');
   const rootB = path.join(process.cwd(), '.tmp-knowledge-b');

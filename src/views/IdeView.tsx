@@ -41,6 +41,7 @@ import { McpPanel } from '../components/panels/McpPanel.js';
 import { BrowserPanel, BROWSER_HOME_URL } from '../components/panels/BrowserPanel.js';
 import { MarkdownPreview } from '../components/ide/MarkdownPreview.js';
 import { ImagePreview } from '../components/ide/ImagePreview.js';
+import { PdfPreview } from '../components/ide/PdfPreview.js';
 import { EmptyEditorState } from '../components/ide/EmptyEditorState.js';
 import { SelfEditBanner } from '../components/ide/SelfEditBanner.js';
 import { SandboxDiffViewer } from '../components/sandbox/SandboxDiffViewer.js';
@@ -990,6 +991,8 @@ export default function IdeView() {
                                                   onOpenExternal={handleBrowserExternalOpen}
                                                   fullWidth
                                                 />
+                                              ) : /\.(pdf)$/i.test(activeFile.path) ? (
+                                                <PdfPreview filePath={activeFile.path} />
                                               ) : /\.(png|jpg|jpeg|gif|webp|bmp|ico)$/i.test(activeFile.path) ? (
                                                 <ImagePreview filePath={activeFile.path} />
                                               ) : (
