@@ -977,3 +977,317 @@ Toutes les routes équipées de la validation Zod renvoient un format uniforme e
   - `{ "type": "resize", "data": { "cols": 80, "rows": 24 } }`
 * **Messages Serveur → Client** :
   - Flux binaire ou texte brut de sortie standard (`stdout`/`stderr`).
+
+---
+
+## Marketplace d'Agents et de Skills (`/api/marketplace`)
+
+Registre communautaire d'agents, skills et bundles installables en un clic. Tous les endpoints sont protégés par le middleware `x-leanna-token`.
+
+### `GET /api/marketplace/search`
+
+Recherche paginée dans le catalogue avec filtres.
+
+**Query params** :
+
+| Param | Type | Description | Défaut |
+| :--- | :--- | :--- | :--- |
+| `query` | `string` | Recherche plein-texte (nom, description, tags, auteur) | — |
+| `type` | `agent\|skill\|bundle` | Filtrer par type de paquet | — |
+| `category` | `string` | Filtrer par catégorie (`code`, `devops`, `web`, `data`, `writing`, `security`, `productivity`, `ai`, `other`) | — |
+| `sort` | `popular\|recent\|rating\|installs` | Critère de tri | `popular` |
+| `page` | `number` | Numéro de page (1-indexed) | `1` |
+| `limit` | `number` | Nombre de résultats par page (max 50) | `20` |
+| `verified` | `boolean` | Filtrer sur les paquets certifiés | — |
+| `featured` | `boolean` | Filtrer sur les paquets mis en avant | — |
+| `tags` | `string` | Tags séparés par virgule | — |
+
+**Réponse `200`** :
+```json
+{
+  "success": true,
+  "packages": [ /* MarketplacePackage[] */ ],
+  "total": 10,
+  "page": 1,
+  "totalPages": 1
+}
+```
+
+---
+
+### `GET /api/marketplace/featured`
+
+Retourne les paquets mis en avant (`featured: true`), triés par popularité.
+
+**Réponse `200`** :
+```json
+{ "success": true, "packages": [ /* MarketplacePackage[] */ ] }
+```
+
+---
+
+### `GET /api/marketplace/installed`
+
+Retourne les paquets installés localement sur cette instance (marqués `_installed: true`).
+
+**Réponse `200`** :
+```json
+{ "success": true, "packages": [ /* MarketplacePackage[] avec _installed: true */ ] }
+```
+
+---
+
+### `GET /api/marketplace/stats`
+
+Statistiques globales du catalogue.
+
+**Réponse `200`** :
+```json
+{
+  "success": true,
+  "stats": {
+    "total": 10,
+    "agents": 6,
+    "skills": 2,
+    "bundles": 2,
+    "verified": 7,
+    "totalInstalls": 18770,
+    "installed": 3
+  }
+}
+```
+
+---
+
+### `GET /api/marketplace/package/:id`
+
+Retourne le détail complet d'un paquet (incluant README, reviews, rapport sécurité).
+
+**Réponse `200`** :
+```json
+{
+  "success": true,
+  "package": { /* MarketplacePackage complet avec _installed */ }
+}
+```
+
+**Réponse `404`** si le paquet est introuvable.
+
+---
+
+### `POST /api/marketplace/install`
+
+Installe un paquet : l'agent est enregistré dans le `DynamicAgentRegistry` et persisté dans `.Leanna/custom-agents.json` ; les skills sont créés dans Supabase `custom_skills` (si configuré).
+
+**Corps** :
+```json
+{ "packageId": "code-reviewer-pro", "version": "2.1.0" }
+```
+
+**Réponse `200`** :
+```json
+{
+  "success": true,
+  "packageId": "code-reviewer-pro",
+  "agentInstalled": true,
+  "skillsInstalled": 0,
+  "warnings": [],
+  "message": "\"Code Reviewer Pro\" installé avec succès. Agent disponible dans l'Agent Builder."
+}
+```
+
+**Réponse `403`** si le paquet est signalé (`trustLevel: "flagged"`).
+
+---
+
+### `POST /api/marketplace/uninstall`
+
+Désinstalle un paquet : supprime l'agent du registre dynamique et du JSON local.
+
+**Corps** :
+```json
+{ "packageId": "code-reviewer-pro" }
+```
+
+**Réponse `200`** :
+```json
+{ "success": true, "message": "\"Code Reviewer Pro\" désinstallé." }
+```
+
+---
+
+### `POST /api/marketplace/publish`
+
+Publie un nouveau paquet dans le registre local après validation de sécurité automatique. La publication est bloquée si des flags critiques sont détectés.
+
+**Corps** (schéma `PublishPackageSchema`) :
+```json
+{
+  "name": "Mon Agent Spécialisé",
+  "description": "Description courte du paquet (≤ 200 chars)",
+  "type": "agent",
+  "category": "code",
+  "tags": ["typescript", "review"],
+  "version": "1.0.0",
+  "author": "mon_pseudo",
+  "license": "MIT",
+  "avatar": "🤖",
+  "color": "#6366f1",
+  "agent": {
+    "name": "Mon Agent",
+    "role": "mon_agent",
+    "description": "...",
+    "systemPrompt": "Tu es un expert en...",
+    "capabilities": ["read_project_file", "reasoning_think"],
+    "tools": [],
+    "maxConcurrency": 2,
+    "defaultTimeoutMs": 60000,
+    "triggerKeywords": ["review", "audit"]
+  }
+}
+```
+
+**Réponse `200`** :
+```json
+{
+  "success": true,
+  "package": { /* MarketplacePackage */ },
+  "securityReport": {
+    "trustLevel": "community",
+    "score": 94,
+    "warnings": [],
+    "flags": [],
+    "summary": "Aucun problème détecté. Paquet approuvé."
+  }
+}
+```
+
+**Réponse `422`** si des flags critiques bloquent la publication.
+
+---
+
+### `POST /api/marketplace/rate`
+
+Soumet un avis sur un paquet et recalcule la note moyenne.
+
+**Corps** :
+```json
+{
+  "packageId": "code-reviewer-pro",
+  "rating": 5,
+  "comment": "Excellent agent, très utile au quotidien !",
+  "author": "dev_pro_42"
+}
+```
+
+**Réponse `200`** :
+```json
+{ "success": true, "newRating": 4.8, "reviewCount": 128 }
+```
+
+---
+
+### `POST /api/marketplace/validate-security`
+
+Lance le scan de sécurité sur un brouillon de paquet **sans** le publier. Utile pour un aperçu avant soumission.
+
+**Corps** : identique à `POST /api/marketplace/publish`
+
+**Réponse `200`** :
+```json
+{
+  "success": true,
+  "securityReport": {
+    "trustLevel": "community",
+    "analyzedAt": "2026-09-01T12:00:00.000Z",
+    "score": 94,
+    "warnings": [],
+    "flags": [],
+    "summary": "Aucun problème détecté."
+  }
+}
+```
+
+---
+
+### `GET /api/marketplace/export/:id`
+
+Télécharge un paquet complet au format JSON avec en-tête `Content-Disposition: attachment`.
+
+**Réponse** : Fichier JSON avec nom `{id}-v{version}.leanna.json`
+
+---
+
+### Schéma `MarketplacePackage`
+
+```typescript
+interface MarketplacePackage {
+  id: string;                    // Slug unique (ex: "code-reviewer-pro")
+  name: string;                  // Nom affiché
+  description: string;           // Description courte ≤ 200 chars
+  readme?: string;               // README Markdown
+  type: "agent" | "skill" | "bundle";
+  category: MarketplaceCategory; // "code" | "devops" | "web" | ...
+  tags: string[];
+  version: string;               // Semver (ex: "2.1.0")
+  versions: string[];            // Historique des versions
+  author: string;
+  license: string;
+  avatar: string;                // Emoji
+  color: string;                 // Hex (#rrggbb)
+  agent?: PackageAgentDefinition;
+  skills?: PackageSkillDefinition[];
+  security: {
+    trustLevel: "verified" | "community" | "unreviewed" | "flagged";
+    score: number;               // 0–100
+    warnings: string[];
+    flags: string[];             // Problèmes critiques
+    summary: string;
+    analyzedAt: string;
+  };
+  stats: {
+    downloads: number;
+    installs: number;
+    rating: number;              // Moyenne 0–5
+    reviewCount: number;
+    weeklyDownloads: number;
+  };
+  reviews: Array<{
+    id: string;
+    author: string;
+    rating: number;              // 1–5
+    comment: string;
+    createdAt: string;
+    helpful: number;
+  }>;
+  publishedAt: string;
+  updatedAt: string;
+  featured: boolean;
+  verified: boolean;
+  _installed?: boolean;          // Enrichissement serveur — non persisté
+}
+```
+
+---
+
+### Niveaux de confiance sécurité
+
+| Niveau | Couleur | Condition |
+| :--- | :--- | :--- |
+| `verified` | Vert | Certifié par l'équipe Leanna, score ≥ 95 |
+| `community` | Bleu | Validé par la communauté, score ≥ 80, aucun flag |
+| `unreviewed` | Gris | Non encore analysé |
+| `flagged` | Rouge | Flags critiques détectés — installation bloquée |
+
+**Patterns de sécurité analysés** (12 règles) :
+- Prompt injection (`ignore previous instructions`)
+- Utilisation de `eval()`
+- Accès aux variables d'environnement (`process.env`)
+- Import `child_process` ou appels `exec`/`execSync`
+- Commandes destructives (`sudo`, `rm -rf`)
+- Opérations SQL destructives (`DROP TABLE`, `TRUNCATE`)
+- Tentatives de role-jailbreak (`act as`, `pretend you are`)
+- Références à des secrets/tokens hardcodés
+- Requêtes HTTP externes non Leanna
+- Décodage base64 suspect
+

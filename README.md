@@ -6,16 +6,20 @@
 # Leanna
 
 ## Pitch
-Leanna est un IDE augmenté par l'IA et un système d'exploitation pour développeurs, pensé pour transformer la manière dont on écrit, teste et audite du code. Grâce à une connexion vocale et multimodale bidirectionnelle avec Google Gemini Live, Leanna permet d'explorer, éditer, tester et sécuriser un codebase en temps réel — comme si un ingénieur senior travaillait à vos côtés, en continu. Un système d'agents autonomes orchestre les tâches complexes, tandis qu'un bac à sable sécurisé et des garde-fous stricts garantissent que chaque modification automatisée préserve l'intégrité et la résilience du code.
+
+Leanna est un IDE augmenté par l'IA et un système d'exploitation pour développeurs, pensé pour transformer la manière dont on écrit, teste et audite du code. Grâce à une connexion vocale et multimodale bidirectionnelle avec Google Gemini Live, Leanna permet d'explorer, éditer, tester et sécuriser un codebase en temps réel — comme si un ingénieur senior travaillait à vos côtés, en continu.
+
+Un système d'agents autonomes orchestre les tâches complexes, tandis qu'un bac à sable sécurisé et des garde-fous stricts garantissent que chaque modification automatisée préserve l'intégrité et la résilience du code. Un **Marketplace communautaire** permet d'installer des agents et des skills prêts à l'emploi en un clic, directement depuis l'IDE.
 
 ---
+
 <p align="center">
   <img src="assets/images/header.png" alt="Leanna IA" width="100%" />
 </p>
 
 ## Badges
 
-[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](package.json)
+[![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](package.json)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/node-%3E%3D22.0.0-green.svg)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0.0-3178C6.svg)](tsconfig.json)
@@ -23,12 +27,13 @@ Leanna est un IDE augmenté par l'IA et un système d'exploitation pour dévelop
 [![Desktop](https://img.shields.io/badge/Electron-43.1.0-47848F.svg)](package.json)
 [![AI](https://img.shields.io/badge/%40google%2Fgenai-2.4.0-EA4335.svg)](package.json)
 
+---
 
 ## Stack technique
 
-| Technologie | Rôle | Version détectée |
+| Technologie | Rôle | Version |
 | :--- | :--- | :--- |
-| **Node.js** | Runtime serveur et scripts d'exécution | `>=22.20.1` (`@types/node`) |
+| **Node.js** | Runtime serveur et scripts d'exécution | `>=22.20.1` |
 | **TypeScript** | Typage statique frontend et backend | `^5.0.0` |
 | **Electron** | Conteneur applicatif Desktop (Main & Preload) | `^43.1.0` |
 | **Express** | Serveur HTTP backend et API REST | `^4.21.2` |
@@ -41,7 +46,7 @@ Leanna est un IDE augmenté par l'IA et un système d'exploitation pour dévelop
 | **Motion** | Animations et transitions d'interface | `^12.23.24` |
 | **Zod** | Validation de schémas et typage strict des requêtes | `^3.25.76` |
 | **@google/genai** | SDK officiel Google Gemini (Gemini Live API & Text Gen) | `^2.4.0` |
-| **Supabase JS** | Client de persistance distante (mémoires, historique, workflows, RAG) | `^2.110.2` |
+| **Supabase JS** | Client de persistance distante (mémoires, historique, RAG, custom skills) | `^2.110.2` |
 | **Puppeteer** | Automatisation et navigation Web headless | `^25.3.0` |
 | **pdf-parse** | Extraction textuelle de documents PDF | `^2.4.5` |
 | **esbuild** | Compilation et bundling du bootstrap serveur (`dist/server.cjs`) | `^0.25.0` |
@@ -51,44 +56,70 @@ Leanna est un IDE augmenté par l'IA et un système d'exploitation pour dévelop
 
 ## Fonctionnalités principales
 
-### Fonctionnalités utilisateur
+### Assistant & IA
+
 * **Assistant Vocal & Multimodal Live** : Interaction en direct via WebSocket audio PCM 16kHz bidirectionnel et vision (partage d'écran / webcam) avec `gemini-3.1-flash-live-preview`.
-* **Mode Multi-Workspace Sécurisé** : Ouverture, enregistrement et bascule instantanée entre dépôts externes avec isolation stricte du périmètre (`SELF_ROOT`), historique des workspaces (`.Leanna/workspaces.json`), validation préventive de sécurité et badges Git.
+* **Orchestration d'agents autonomes & Fleet** : Architecture multi-agents (Architecte, Développeur, Testeur, Sécurité, etc.) communicant via un bus de messages interne avec support d'agents personnalisés dynamiques.
 * **Agent Builder Visuel** : Interface de création, personnalisation (avatar, couleur, instructions système, presets d'outils, modèles) et test d'agents personnalisés avec import/export JSON.
-* **Éditeur de code intelligent (IDE)** : Édition avec Monaco Editor, arborescence de fichiers, coloration syntaxique, recherche globale avec regex, onglets multiples et panneau de prévisualisation web.
-* **Mode Bac à Sable (Sandbox)** : Isolation complète des modifications de fichiers dans un miroir `.Leanna/sandbox`, avec calcul de diff, validation syntaxique/TypeScript en temps réel et synchronisation sélective.
-* **Gestionnaire de Notebooks & RAG** : Indexation de documents multiples (PDF, Markdown, texte, code), découpage en chunks, recherche sémantique, génération automatique de guides d'étude, FAQ, résumés, timelines et diapositives Reveal.js.
-* **Terminal intégré** : Émulation de terminal PowerShell/Bash via WebSocket et PTY-like avec gestion de sessions multiples.
-* **Navigateur Web autonome** : Navigation, capture d'écran, extraction de texte, inspection DOM et formulaires via webview et Puppeteer.
-* **Synthèse Vocale & Audio** : Support TTS multivoix et lecteur audio pour les résumés et briefings générés.
-* **Gestion des listes et tâches** : Création et gestion de listes de tâches synchronisées avec Supabase.
-* **Intégration GitHub native** : Panneau GitHub intégré à l'IDE avec 5 onglets (Commits locaux avec détail des fichiers, Repos, Issues, Pull Requests, Notifications), détection automatique du repo courant, filtres open/closed, badges de compteurs et lien direct vers GitHub.
+* **Optimiseur de contexte & Pool de clés Gemini** : Calcul automatique des tokens, compactage/résumé automatique des conversations, rotation dynamique des clés API Gemini sur erreur 429.
 
-### Fonctionnalités développeur
-* **Orchestration d'agents autonomes & Fleet** : Architecture multi-agents (Architecte, Développeur, Testeur, Sécurité, etc.) communicant via un bus de messages interne (`agentMessageBus`) avec support d'agents personnalisés dynamiques.
-* **Validation Stricte Zod (`validateBody`)** : Middleware universel garantissant le filtrage des champs inconnus, le typage strict et la prévention des injections de propriétés sur les endpoints REST.
-* **Knowledge System & Analyse Syntaxique Tree-sitter** : Indexation AST WASM incrémentale du codebase, cartographie bidirectionnelle des appels (`ASTCallGraph`), extraction de signatures typées, chaînes d'appels BFS et détection des dépendances intra-classe (`this.method()`).
-* **Runtime V2 & Extensibilité Skills** : Système unifié de déclaration et d'exécution d'outils (`ToolRegistry`, `SkillManagerV2`), supportant les custom skills créés à la volée.
-* **Passerelle MCP (Model Context Protocol)** : Connexion à des serveurs MCP tiers (stdio / SSE) pour étendre les outils disponibles tout en appliquant une validation de chemin stricte.
-* **Garde-fous & Checkpoints Git automatiques** : Snapshots Git créés avant chaque modification destructive, détection de boucles de correction via le `Supervisor` et confirmation utilisateur pour les fichiers critiques.
-* **Optimiseur de contexte & Pool de clés Gemini** : Calcul automatique des tokens, compactage/résumé automatique des conversations pour éviter les dépassements de fenêtre de contexte, et rotation dynamique des clés API Gemini sur erreur 429.
+### 🛒 Marketplace d'agents et de skills *(nouveau v0.9.0)*
 
-### Fonctionnalités administrateur & Sécurité
-* **Périmètre Self-Root & Multi-Workspace verrouillé** : Confinement strict de l'ensemble des compétences IA et des opérations système au dépôt actif (`SELF_ROOT`), avec blocage préventif des racines disques (`C:\`, `/etc`) et détection des évasions par symlinks.
-* **Journalisation d'audit NDJSON** : Enregistrement structuré de chaque action (création, écriture, suppression, exécution de commande) dans `.Leanna-audit.log`.
-* **Protection par jeton d'accès** : Middleware de vérification `x-leanna-token` sur tous les endpoints HTTP `/api/*` et poignées de main WebSocket.
-* **Code de sécurité Sandbox** : Désactivation du bac à sable protégée par un code à 6 chiffres (`SANDBOX_EXIT_CODE`).
+Le Marketplace est accessible depuis la sidebar IDE : **Outils → Marketplace** (ou raccourci `Ctrl+K` dans le panel).
+
+**Catalogue communautaire** : 10 paquets seedés dès le démarrage — 6 agents spécialisés (Code Reviewer Pro, Security Auditor, Fullstack Architect, Doc Writer, Data Analyst, DevOps Pipeline Builder), 2 skills (Regex Builder, SQL Optimizer, Commit Generator) et 2 bundles (Python Suite).
+
+| Fonctionnalité | Détail |
+| :--- | :--- |
+| **Installation en un clic** | Agent → `DynamicAgentRegistry` + `custom-agents.json` · Skill → Supabase `custom_skills` |
+| **Désinstallation** | Suppression propre du registre dynamique et du JSON local |
+| **Notation communautaire** | Formulaire inline 1-5 étoiles + commentaire, recalcul de moyenne en temps réel |
+| **Validation sécurité** | 12 patterns OWASP/injection analysés sur prompts et instructions avant publication |
+| **Publication** | Formulaire avec scan sécurité live — bloqué si flags critiques détectés |
+| **Import glisser-déposer** | Fichiers `.leanna.json` exportés ou partagés par la communauté |
+| **Export JSON** | Téléchargement `{id}-v{version}.leanna.json` de n'importe quel paquet |
+| **Partage de lien** | Copie d'URL dans le presse-papier en un clic |
+| **Filtres avancés** | Par type (agent/skill/bundle), catégorie (9), tri (popularité/récence/note/installs) |
+| **Vue détail** | 4 onglets : Aperçu · Contenu (agent + skills) · Avis · Rapport sécurité |
+
+**Catégories disponibles** : Code · DevOps · Web · Data · Rédaction · Sécurité · Productivité · IA · Autre
+
+**API REST** : `GET/POST /api/marketplace/*` — search, featured, installed, stats, package/:id, install, uninstall, publish, rate, validate-security, export/:id
+
+### IDE & Workflow
+
+* **Mode Multi-Workspace Sécurisé** : Ouverture, enregistrement et bascule instantanée entre dépôts avec isolation stricte (`SELF_ROOT`), historique des workspaces, validation préventive et badges Git.
+* **Éditeur de code intelligent** : Monaco Editor, arborescence de fichiers, coloration syntaxique, recherche globale avec regex, onglets multiples et panneau de prévisualisation web.
+* **Intégration GitHub native** : Panneau GitHub avec 5 onglets (Commits locaux avec diff, Repos, Issues, PRs, Notifications), filtres et badges de compteurs.
+* **Terminal intégré** : Émulation PowerShell/Bash via WebSocket et PTY avec sessions multiples.
+* **Navigateur Web autonome** : Navigation, capture d'écran, extraction de texte et formulaires via webview + Puppeteer.
+
+### Données & Knowledge
+
+* **Mode Bac à Sable (Sandbox)** : Isolation des modifications dans un miroir `.Leanna/sandbox`, diff, validation TypeScript et synchronisation sélective.
+* **Gestionnaire de Notebooks & RAG** : Ingestion multi-formats (PDF, Markdown, texte, code), recherche sémantique, génération de guides, FAQ, résumés et diapositives Reveal.js.
+* **Knowledge System & AST Tree-sitter** : Indexation incrémentale WASM du codebase, cartographie bidirectionnelle des appels, signatures typées et chaînes d'appels BFS.
+* **Runtime V2 & Custom Skills** : `ToolRegistry` + `SkillManagerV2` — déclaration et exécution d'outils custom créés à la volée via Supabase.
+* **Passerelle MCP** : Connexion à des serveurs MCP tiers (stdio/SSE) avec validation de chemin stricte.
+
+### Sécurité & Administration
+
+* **Garde-fous & Checkpoints Git** : Snapshots avant chaque modification destructive, détection de boucles via le `Supervisor`, confirmation utilisateur pour fichiers critiques.
+* **Périmètre Self-Root verrouillé** : Confinement de l'IA au dépôt actif, blocage des racines disques et détection des évasions par symlinks.
+* **Journalisation d'audit NDJSON** : Enregistrement structuré de chaque action dans `.Leanna-audit.log`.
+* **Protection par jeton d'accès** : Middleware `x-leanna-token` sur tous les endpoints HTTP et WebSocket.
 
 ---
 
 ## Prérequis
 
 * **Système d'exploitation** : Windows 10/11 (x64), Linux ou macOS.
-* **Node.js** : Version `>= 22.0.0` recommandée (ES modules et compatibilité `@types/node`).
-* **Gestionnaire de paquets** : `npm` (version `>= 10.x`).
-* **Clé API Gemini** : Clé Google Gemini valide (requise pour le fonctionnement de l'assistant Live et de la génération de texte).
-* **Compte Supabase** *(Optionnel)* : URL et clé de rôle de service pour la persistance cloud (mémoires, historique, workflows, RAG).
-* **Clé API OpenRouter** *(Optionnel)* : Pour les modèles d'IA alternatifs et l'analyse de code complémentaire.
+* **Node.js** : `>= 22.0.0` (modules ES et `@types/node`).
+* **npm** : `>= 10.x`.
+* **Clé API Gemini** : Requise pour l'assistant Live et la génération de texte.
+* **Supabase** *(optionnel)* : URL + clé de service pour la persistance cloud des mémoires, historique, custom skills et RAG.
+* **OpenRouter** *(optionnel)* : Pour les modèles d'IA alternatifs.
+* **GitHub Token** *(optionnel)* : Pour l'intégration GitHub dans l'IDE.
 
 ---
 
@@ -104,29 +135,30 @@ npm install
 
 # 3. Configurer l'environnement
 cp .env.example .env
+# → Remplir GEMINI_API_KEY et Leanna_API_TOKEN dans .env
 ```
 
 ---
 
 ## Configuration
 
-Renseignez les variables nécessaires dans le fichier `.env` ou `.env.local` à la racine :
+Renseignez les variables dans `.env` ou `.env.local` à la racine :
 
-| Variable | Description | Exemple | Obligatoire |
-| :--- | :--- | :--- | :--- |
-| `GEMINI_API_KEY` | Clé API principale Google Gemini | `<YOUR_GEMINI_API_KEY>` | Oui |
-| `Leanna_API_TOKEN` | Jeton d'authentification pour sécuriser l'API et les WebSockets | `<YOUR_SECRET_TOKEN>` | Non (Recommandé) |
-| `SANDBOX_EXIT_CODE` | Code à 6 chiffres pour désactiver ou réinitialiser le Sandbox | `123456` | Non (Recommandé) |
-| `VITE_SERVER_PORT` | Port d'écoute du serveur backend HTTP/WebSocket | `4000` | Non (Défaut: 4000) |
-| `Leanna_LISTEN_HOST` | Hôte d'écoute TCP (limité à la boucle locale par défaut) | `127.0.0.1` | Non (Défaut: 127.0.0.1) |
-| `SUPABASE_URL` | URL de l'instance Supabase | `https://<ref>.supabase.co` | Non |
-| `SUPABASE_SERVICE_ROLE_KEY` | Clé de service Supabase pour accès BDD complet | `<YOUR_SUPABASE_SERVICE_ROLE_KEY>` | Non |
-| `OPENROUTER_API_KEY` | Clé API OpenRouter pour modèles alternatifs | `<YOUR_OPENROUTER_KEY>` | Non |
-| `OPENROUTER_MODEL` | Modèle par défaut pour OpenRouter | `google/gemini-2.0-flash-001` | Non |
-| `GITHUB_TOKEN` | Jeton d'accès personnel GitHub (requis pour l'intégration GitHub dans l'IDE) | `ghp_<SECRET>` | Non (Recommandé) |
-| `ENABLE_CHAIN_OF_THOUGHT` | Active l'affichage de la chaîne de réflexion IA | `true` | Non (Défaut: true) |
-| `FORCE_TIERED_TOOLS` | Filtre dynamiquement les outils envoyés à Gemini par pertinence | `true` | Non (Défaut: true) |
-| `NODE_ENV` | Environnement d'exécution (`development`, `production`, `test`) | `development` | Non |
+| Variable | Description | Obligatoire |
+| :--- | :--- | :--- |
+| `GEMINI_API_KEY` | Clé API Google Gemini | Oui |
+| `Leanna_API_TOKEN` | Jeton d'authentification API & WebSocket | Recommandé |
+| `SANDBOX_EXIT_CODE` | Code 6 chiffres pour désactiver le Sandbox | Recommandé |
+| `VITE_SERVER_PORT` | Port d'écoute HTTP/WS (défaut : `4000`) | Non |
+| `Leanna_LISTEN_HOST` | Hôte TCP (défaut : `127.0.0.1`) | Non |
+| `SUPABASE_URL` | URL instance Supabase | Non |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clé de service Supabase | Non |
+| `OPENROUTER_API_KEY` | Clé API OpenRouter | Non |
+| `OPENROUTER_MODEL` | Modèle OpenRouter par défaut | Non |
+| `GITHUB_TOKEN` | Personal Access Token GitHub | Recommandé |
+| `ENABLE_CHAIN_OF_THOUGHT` | Affichage de la réflexion IA (défaut : `true`) | Non |
+| `FORCE_TIERED_TOOLS` | Filtrage dynamique des outils Gemini (défaut : `true`) | Non |
+| `NODE_ENV` | Environnement (`development`, `production`, `test`) | Non |
 
 ---
 
@@ -134,41 +166,37 @@ Renseignez les variables nécessaires dans le fichier `.env` ou `.env.local` à 
 
 ### Développement
 
-Le serveur Express intègre Vite en mode middleware pour le rechargement à chaud (HMR) :
-
 ```bash
-# Lancement en mode Web (navigateur)
+# Mode Web (navigateur sur http://127.0.0.1:4000)
 npm run dev
 
-# Lancement en mode Desktop (Electron + Backend concurrents)
+# Mode Desktop (Electron + backend concurrents)
 npm run desktop
 
-# Lancement en mode Desktop avec DevTools ouverts
+# Mode Desktop avec DevTools ouverts
 npm run desktop:debug
 ```
-
-L'application est accessible par défaut sur `http://127.0.0.1:4000`.
 
 ### Production & Packaging
 
 ```bash
-# 1. Compiler le frontend (Vite) et le bundle serveur (esbuild)
+# Compiler frontend (Vite) + bundle serveur (esbuild)
 npm run build
 
-# 2. Démarrer le serveur autonome de production
+# Démarrer le serveur de production
 npm start
 
-# 3. Générer le paquet d'installation Desktop Windows (NSIS)
+# Générer l'installateur Windows NSIS
 npm run dist:win
 ```
 
 ### Tests & Qualité
 
 ```bash
-# Exécution de la suite de tests unitaires et d'intégration
+# Suite de tests unitaires et d'intégration
 npm test
 
-# Lancement du linter de projet
+# Linter de projet
 npm run lint
 ```
 
@@ -188,28 +216,79 @@ Jarvis-os-ori/
 │   ├── config/                 # Rate limiting et configuration serveurs
 │   ├── knowledge/              # Knowledge Graph, mémoire projet et indexation
 │   ├── live/                   # Gestionnaire de sessions WebSocket Gemini Live
-│   ├── mcp/                    # Pont et client Model Context Protocol (MCP)
+│   ├── marketplace/            # ← Registre Marketplace, types, validation sécurité
+│   │   ├── MarketplaceRegistry.ts   # Singleton — catalogue, install, publish, rate
+│   │   └── types.ts                 # Interfaces & schémas Zod du Marketplace
+│   ├── mcp/                    # Pont Model Context Protocol (MCP)
 │   ├── mission/                # Moteur d'exécution de missions autonomes
 │   ├── notebooks/              # Gestionnaire RAG, traitement de sources, cache
 │   ├── prompts/                # Directives système et construction des prompts
 │   ├── routes/                 # Routeurs d'API REST modulaires
+│   │   └── marketplace.ts      # ← API REST Marketplace (11 endpoints)
 │   ├── runtime/                # Moteur d'outils, observabilité et compatibilité V2
 │   ├── skills/                 # Implémentations concrètes des compétences (outils)
 │   └── utils/                  # Sandbox, checkpoints, cryptographie, self-root
 ├── src/                        # Frontend React 19 (SPA)
 │   ├── components/             # Composants d'interface, panneaux et modales
+│   │   └── panels/
+│   │       └── MarketplacePanel.tsx  # ← Panel Marketplace (SidePanel overlay)
 │   ├── context/                # Contextes React (LiveAPI, Profile, ScreenShare)
-│   ├── hooks/                  # Hooks personnalisés (LiveAPI, Terminal, Hotkeys)
-│   ├── services/               # Clients API et passerelles Supabase
+│   ├── hooks/                  # Hooks personnalisés
 │   ├── stores/                 # État global client
+│   │   └── marketplaceStore.ts # ← Store Marketplace (useSyncExternalStore)
 │   ├── views/                  # Vues applicatives (IDE, Documents, Automation...)
-│   └── main.tsx                # Point d'entrée React, circuit breaker fetch, routage
+│   └── main.tsx                # Point d'entrée React, circuit breaker, routage
 ├── supabase/                   # Schémas SQL et migrations BDD
 ├── tests/                      # Scripts et tests de validation e2e
-├── server.ts                   # Point de démarrage et configuration du serveur HTTP/WS
-├── server-bootstrap.ts         # Bootstrap déchiffrement d'environnement et initialisation
-└── package.json                # Définition du projet, dépendances et scripts
+├── server.ts                   # Point de démarrage du serveur HTTP/WS
+├── server-bootstrap.ts         # Bootstrap déchiffrement + initialisation
+└── package.json                # Dépendances et scripts
 ```
+
+---
+
+## Utiliser le Marketplace
+
+### Installer un paquet
+
+1. Ouvrir la sidebar IDE → **Outils** → **Marketplace**
+2. Parcourir le catalogue ou chercher avec `Ctrl+K`
+3. Cliquer **Installer** sur la carte — l'agent et/ou les skills sont immédiatement disponibles
+
+### Publier un paquet
+
+1. Onglet **Publier** dans le Marketplace
+2. Remplir le formulaire (nom, description, contenu agent/skill)
+3. Cliquer **Analyser la sécurité** — un rapport est généré automatiquement
+4. Si le score est ≥ 1 (pas de flags critiques), cliquer **Publier dans le Marketplace**
+
+### Importer un fichier local
+
+1. Onglet **Importer**
+2. Glisser-déposer un fichier `.leanna.json` ou cliquer pour le sélectionner
+3. Le(s) paquet(s) sont installés automatiquement
+
+### Exporter un paquet
+
+Dans la vue détail d'un paquet → icône **⬇** en haut à droite → téléchargement `{id}-v{version}.leanna.json`
+
+---
+
+## API Marketplace
+
+| Méthode | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/marketplace/search?query=&type=&category=&sort=&page=` | Recherche paginée avec filtres |
+| `GET` | `/api/marketplace/featured` | Paquets mis en avant |
+| `GET` | `/api/marketplace/installed` | Paquets installés localement |
+| `GET` | `/api/marketplace/stats` | Statistiques globales du catalogue |
+| `GET` | `/api/marketplace/package/:id` | Détail complet d'un paquet |
+| `POST` | `/api/marketplace/install` | Installer un paquet `{ packageId }` |
+| `POST` | `/api/marketplace/uninstall` | Désinstaller un paquet `{ packageId }` |
+| `POST` | `/api/marketplace/publish` | Publier un nouveau paquet |
+| `POST` | `/api/marketplace/rate` | Soumettre un avis `{ packageId, rating, comment, author }` |
+| `POST` | `/api/marketplace/validate-security` | Scanner sécurité sans publier |
+| `GET` | `/api/marketplace/export/:id` | Télécharger un paquet en JSON |
 
 ---
 
