@@ -400,13 +400,14 @@ export const StatusBar = memo(function StatusBar({
             onClick={handleReindex}
             disabled={reindexing || indexing.active}
             className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Réindexer le projet (KnowledgeGraph)"
+            title="Réindexer le projet, les documents et les documents extraits"
+            aria-label="Réindexer le projet, les documents et les documents extraits"
           >
             {reindexing || (indexing.active && indexing.phase !== 'done')
               ? <LoaderCircle size={12} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
               : <DatabaseZap size={12} style={{ color: 'var(--accent-primary)' }} />
             }
-            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Index</span>
+            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Index + Docs Extraits</span>
           </button>
         </div>
 

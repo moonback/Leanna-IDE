@@ -48,6 +48,38 @@ test('getDocumentStore isolates documents per active workspace', () => {
   assert.notEqual(storeA['filePath'], storeB['filePath']);
 });
 
+test('POST /api/knowledge/reindex also reindexes project documents', async () => {
+  const root = path.join(process.cwd(), '.tmp-knowledge-reindex-docs');
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.mkdirSync(root, { recursive: true });
+  fs.mkdirSync(path.join(root, '.Leanna'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'README.md'), '# Projet\n\nContenu documentaire pour la vérification du reindex.\n');
+  setSelfRoot(root);
+
+  const app = express();
+  app.use(express.json());
+  app.use('/api/knowledge', knowledgeRouter);
+
+  const server = http.createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+  const address = server.address() as { port: number };
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${address.port}/api/knowledge/reindex`, { method: 'POST' });
+    assert.equal(res.status, 200);
+
+    const data: any = await res.json();
+    assert.equal(data.status, 'success');
+
+    const store = getDocumentStore(root);
+    const docs = store.getAllDocuments();
+    assert.ok(docs.some((doc) => doc.fileName === 'README.md'));
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('switching workspace clears knowledge graph and project memory data', () => {
   const rootA = path.join(process.cwd(), '.tmp-knowledge-a');
   const rootB = path.join(process.cwd(), '.tmp-knowledge-b');
