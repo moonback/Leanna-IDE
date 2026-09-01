@@ -527,6 +527,207 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
     });
   });
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // POST /api/self-root/clone — Clone un dépôt git distant et l'active comme workspace
+  // Utilise Server-Sent Events (SSE) pour streamer la progression en temps réel.
+  // Body: { url: string, targetDir?: string }
+  // Events: { type: 'log', level, message } | { type: 'progress', phase, percent? }
+  //       | { type: 'done', status: 'success', newRoot } | { type: 'error', error }
+  // ─────────────────────────────────────────────────────────────────────────────
+  router.post('/clone', async (req: Request, res: Response) => {
+    const { spawn } = await import('child_process');
+    const fsModule   = await import('fs');
+    const pathModule = await import('path');
+    const osModule   = await import('os');
+
+    // ── Validation du body ────────────────────────────────────────────────────
+    const CloneSchema = z.object({
+      url:       z.string().min(1, 'L\'URL du dépôt est requise.'),
+      targetDir: z.string().optional(),
+    });
+    const parsed = CloneSchema.safeParse(req.body);
+
+    // ── Setup SSE ─────────────────────────────────────────────────────────────
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const sendEvent = (type: string, data: Record<string, unknown>) => {
+      if (res.writableEnded) return;
+      try { res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`); } catch { /* client gone */ }
+    };
+    const sendLog = (message: string, level: 'info' | 'warn' | 'error' = 'info') =>
+      sendEvent('log', { level, message: message.trimEnd() });
+    const finish = () => { try { if (!res.writableEnded) res.end(); } catch { /* ignore */ } };
+
+    if (!parsed.success) {
+      sendEvent('error', { error: parsed.error.errors[0]?.message ?? 'Paramètres invalides.' });
+      return finish();
+    }
+
+    const { url: repoUrl, targetDir: rawTargetDir } = parsed.data;
+
+    // Valider le format de l'URL (HTTPS ou SSH uniquement)
+    if (!/^https?:\/\//i.test(repoUrl) && !/^git@/i.test(repoUrl)) {
+      sendEvent('error', { error: 'Seules les URLs HTTPS et SSH (git@) sont autorisées.' });
+      return finish();
+    }
+
+    // Dériver le nom du dépôt depuis l'URL
+    const repoName = repoUrl.split('/').pop()?.replace(/\.git$/i, '').replace(/[^a-zA-Z0-9_\-. ]/g, '_') || 'repo';
+
+    // Dossier de destination
+    let parentDir: string;
+    if (rawTargetDir?.trim()) {
+      parentDir = pathModule.default.resolve(rawTargetDir.trim());
+    } else {
+      parentDir = pathModule.default.join(osModule.default.homedir(), 'Documents', 'Leanna-Projects');
+    }
+    const clonePath = pathModule.default.join(parentDir, repoName);
+
+    // Vérifier que la destination n'existe pas déjà
+    if (fsModule.default.existsSync(clonePath)) {
+      sendEvent('error', { error: `Le dossier de destination existe déjà: ${clonePath}`, clonePath });
+      return finish();
+    }
+
+    // Créer le dossier parent si nécessaire
+    try {
+      fsModule.default.mkdirSync(parentDir, { recursive: true });
+    } catch (e: any) {
+      sendEvent('error', { error: `Impossible de créer le dossier parent: ${e.message}` });
+      return finish();
+    }
+
+    sendLog(`🔗 Clonage de ${repoUrl}…`);
+    sendLog(`📁 Destination: ${clonePath}`);
+    sendLog(`⚙️  Commande: git clone ${repoUrl} ${clonePath}`);
+    sendLog(`─────────────────────────────────────────`);
+
+    const isWin = osModule.default.platform() === 'win32';
+
+    let child: import('child_process').ChildProcess;
+    try {
+      child = spawn('git', ['clone', '--progress', repoUrl, clonePath], {
+        shell: isWin,
+        env: { ...process.env },
+      });
+    } catch (spawnErr: any) {
+      sendLog(`❌ Impossible de lancer git: ${spawnErr.message}`, 'error');
+      sendEvent('error', { error: spawnErr.message });
+      return finish();
+    }
+
+    // git clone écrit sa progression sur stderr (comportement normal de git)
+    let stderrBuf = '';
+    let stdoutBuf = '';
+
+    child.stdout?.on('data', (chunk: Buffer) => {
+      stdoutBuf += chunk.toString('utf-8');
+      const lines = stdoutBuf.split('\n');
+      stdoutBuf = lines.pop() ?? '';
+      lines.forEach(l => { if (l.trim()) sendLog(l, 'info'); });
+    });
+
+    child.stderr?.on('data', (chunk: Buffer) => {
+      const text = chunk.toString('utf-8');
+      stderrBuf += text;
+      // Streamer chaque ligne de progression (git écrit "Receiving objects: X%...")
+      const lines = stderrBuf.split('\n');
+      stderrBuf = lines.pop() ?? '';
+      lines.forEach(l => {
+        const trimmed = l.trim();
+        if (!trimmed) return;
+        // Distinguer les lignes de progression des vraies erreurs
+        const isProgress = /^(Cloning|remote:|Receiving|Resolving|Counting|Compressing|Unpacking)/i.test(trimmed);
+        sendLog(trimmed, isProgress ? 'info' : 'warn');
+      });
+    });
+
+    child.on('error', (err) => {
+      sendLog(`❌ Erreur git: ${err.message}`, 'error');
+      sendEvent('error', { error: err.message });
+      finish();
+    });
+
+    child.on('close', (code) => {
+      (async () => {
+        try {
+          // Vider les buffers résiduels
+          if (stdoutBuf.trim()) sendLog(stdoutBuf, 'info');
+          if (stderrBuf.trim()) sendLog(stderrBuf, 'warn');
+          sendLog(`─────────────────────────────────────────`);
+
+          if (code !== 0 || !fsModule.default.existsSync(clonePath)) {
+            const errMsg = `Clonage échoué (code: ${code ?? 'inconnu'}).`;
+            sendLog(`❌ ${errMsg}`, 'error');
+            // Nettoyer le dossier partiellement cloné
+            try {
+              if (fsModule.default.existsSync(clonePath)) {
+                await fsModule.default.promises.rm(clonePath, { recursive: true, force: true });
+              }
+            } catch { /* silent */ }
+            sendEvent('error', { error: errMsg });
+            return;
+          }
+
+          sendLog(`✅ Clonage terminé avec succès !`);
+          sendLog(`🔌 Activation du workspace…`);
+
+          try {
+            const { switchSandboxProject } = await import('../utils/sandbox.js');
+            const newRoot = await switchSandboxProject(clonePath);
+            sendLog(`📦 Sandbox READY: ${newRoot}`);
+
+            const { addOrUpdateWorkspace } = await import('../utils/selfRoot.js');
+            addOrUpdateWorkspace(newRoot, undefined, repoName);
+
+            try {
+              const { knowledgeGraph } = await import('../knowledge/KnowledgeGraph.js');
+              const { projectMemory }  = await import('../knowledge/ProjectMemory.js');
+              const { projectIndexer } = await import('../knowledge/ProjectIndexer.js');
+              knowledgeGraph.load();
+              projectMemory.load();
+              projectIndexer.scanAll({
+                onProgress: (p) => broadcastKnowledgeProgress(p.phase, p.current, p.total, { file: p.file }),
+              }).then((stats: any) => {
+                broadcastKnowledgeProgress('done', stats.totalFiles, stats.totalFiles, {
+                  totalEntities: stats.totalEntities,
+                  durationMs: stats.durationMs,
+                  cached: stats.cached ?? false,
+                });
+              }).catch(() => {});
+              sendLog(`🧠 Knowledge System rechargé.`);
+            } catch { /* silent */ }
+
+            sendLog(`🎉 Workspace basculé sur: ${newRoot}`);
+            sendEvent('done', { status: 'success', newRoot, repoName });
+          } catch (activateErr: any) {
+            sendLog(`⚠️  Clone OK mais activation échouée: ${activateErr.message}`, 'warn');
+            sendEvent('error', { error: activateErr.message });
+          }
+        } catch (outerErr: any) {
+          console.error('[SelfRoot/clone] Erreur inattendue dans close handler:', outerErr);
+          try { sendEvent('error', { error: outerErr?.message ?? String(outerErr) }); } catch { /* ignore */ }
+        } finally {
+          finish();
+        }
+      })().catch((e) => {
+        console.error('[SelfRoot/clone] IIFE échoué:', e);
+        finish();
+      });
+    });
+
+    req.on('close', () => {
+      if (!res.writableEnded && !child.killed) {
+        child.kill();
+        console.log('[SelfRoot/clone] Client déconnecté — git tué.');
+      }
+    });
+  });
+
   // PATCH /api/self-root/site-url — mettre à jour uniquement l'URL du site
   router.patch('/site-url', async (req: Request, res: Response) => {
     try {
