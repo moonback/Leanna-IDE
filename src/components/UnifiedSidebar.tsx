@@ -251,28 +251,23 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
               transition={{ duration: 0.3, delay: 0.1 }}
               className="w-full pb-2 pt-1"
             >
-              <div className="group relative w-full">
-                <AgentStatusBlock
-                  assistantConnected={props.assistantConnected ?? false}
-                  assistantWorking={props.assistantWorking ?? false}
-                  assistantMuted={props.assistantMuted ?? false}
-                  assistantMenuOpen={assistantMenuOpen}
-                  assistantMenuRef={assistantMenuRef}
-                  setAssistantMenuOpen={setAssistantMenuOpen}
-                  aiMenuItems={aiMenuItems}
-                  state={state}
-                  actions={actions}
-                  mode={props.mode ?? 'full'}
-                  onToggleChat={props.onToggleChat ?? noop}
-                  onToggleMode={props.onToggleMode ?? noop}
-                  onConnectAssistant={props.onConnectAssistant ?? noop}
-                  onDisconnectAssistant={props.onDisconnectAssistant ?? noop}
-                  onMuteToggle={props.onMuteToggle ?? noop}
-                />
-                <div className="sidebar-tooltip">
-                  {props.assistantConnected ? 'IA Connectée' : 'Connecter IA'}
-                </div>
-              </div>
+              <AgentStatusBlock
+                assistantConnected={props.assistantConnected ?? false}
+                assistantWorking={props.assistantWorking ?? false}
+                assistantMuted={props.assistantMuted ?? false}
+                assistantMenuOpen={assistantMenuOpen}
+                assistantMenuRef={assistantMenuRef}
+                setAssistantMenuOpen={setAssistantMenuOpen}
+                aiMenuItems={aiMenuItems}
+                state={state}
+                actions={actions}
+                mode={props.mode ?? 'full'}
+                onToggleChat={props.onToggleChat ?? noop}
+                onToggleMode={props.onToggleMode ?? noop}
+                onConnectAssistant={props.onConnectAssistant ?? noop}
+                onDisconnectAssistant={props.onDisconnectAssistant ?? noop}
+                onMuteToggle={props.onMuteToggle ?? noop}
+              />
             </motion.div>
           </>
         )}

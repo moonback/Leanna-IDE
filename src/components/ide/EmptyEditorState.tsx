@@ -547,7 +547,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             className="ai-interactive ai-hero group w-full mx-auto flex items-center gap-4 p-6 mb-5 text-left rounded-[22px]"
             style={{
               backgroundColor: 'var(--surface)',
-              border: '2px solid var(--primary)',
+              border: '1px solid var(--accent-secondary)',
               height: '112px',
               minHeight: '112px',
               maxWidth: '600px',

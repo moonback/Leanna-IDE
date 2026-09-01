@@ -9,7 +9,7 @@ import { useCallback, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Mic, MicOff, Power, Sparkles, MessageCircle,
-  BrainCircuit, WifiOff, ChevronDown,
+  Bot, Cpu, ChevronDown,
 } from 'lucide-react';
 
 import { SidebarItem } from '../ide/sidebar/SidebarItem.js';
@@ -111,7 +111,7 @@ export function AgentStatusBlock({
         >
           {/* Principal action button */}
           <SidebarItem
-            icon={assistantConnected ? BrainCircuit : WifiOff}
+            icon={assistantConnected ? Cpu : Bot}
             active={assistantConnected && (state.showChat || assistantWorking)}
             onClick={handleMainClick}
             title={assistantConnected ? 'Chat IA (Ctrl+L) · Clic droit : menu' : 'Connecter l\'agent IA'}
