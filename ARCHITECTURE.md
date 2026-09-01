@@ -23,6 +23,7 @@ flowchart TB
             IDERouter["/api/ide<br/>(Filesystem / Search)"]
             SandboxRouter["/api/sandbox<br/>(Isolation / Diffs)"]
             AgentsRouter["/api/agents & /api/custom-agents<br/>(Orchestration / Fleet / Builder)"]
+            MarketplaceRouter["/api/marketplace<br/>(Registre / Install / Publish / Rate)"]
             MCPRouter["/api/mcp<br/>(Stdio & SSE Tool Bridge)"]
             NotebooksRouter["/api/notebooks<br/>(RAG / Sources)"]
             OtherRouters["/api/workflows, /api/tts, /api/profile..."]
@@ -189,7 +190,9 @@ L'application utilise une architecture de persistance hybride (fichiers locaux +
 * `.env` / `.env.local` : Configuration chiffrée (AES-256-CBC via `server/utils/crypto.ts` pour les clés sensibles).
 * `.Leanna-profile.json` : Profil utilisateur et préférences d'assistant (chargé et surveillé en temps réel via `fs.watchFile`).
 * `.gemini-keys.json` : Pool de clés Google Gemini avec priorités, compteurs d'usage et état d'activation.
-* `.Leanna/custom-agents.json` : Définitions persistées des agents créés dans l'Agent Builder.
+* `.Leanna/custom-agents.json` : Définitions persistées des agents créés dans l'Agent Builder ou installés depuis le Marketplace.
+* `.Leanna/marketplace-registry.json` : Paquets publiés localement dans le Marketplace (les paquets du catalogue communautaire sont seedés en mémoire).
+* `.Leanna/marketplace-installs.json` : Liste des IDs de paquets Marketplace installés sur cette instance.
 * `.Leanna/workspaces.json` : Historique ordonné et métadonnées des espaces de travail configurés.
 * `.Leanna-audit.log` : Journal d'audit au format NDJSON consignant les actions système et modifications de code.
 
@@ -212,8 +215,7 @@ Lorsque `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` sont renseignés, les tabl
 
 ## Services externes
 
-| Service | Rôle | Intégration | Configuration |
-| :--- | :--- | :--- | :--- |
+| Service | Rôle | Intégration | Configuration || :--- | :--- | :--- | :--- |
 | **Google Gemini Live API** | Modèle LLM multimodal temps réel (voix, vision, outils) | `@google/genai` (modèle `gemini-3.1-flash-live-preview`) | `GEMINI_API_KEY` ou `.gemini-keys.json` |
 | **Supabase** | Base de données relationnelle, pgvector et RLS | `@supabase/supabase-js` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
 | **OpenRouter** | Passerelle vers modèles LLM alternatifs | Requêtes HTTP REST (`https://openrouter.ai/api/v1`) | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` |

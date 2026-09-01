@@ -15,6 +15,7 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 * [x] **Gestionnaire de Notebooks & RAG** (`server/notebooks/`) : Ingestion multi-formats (PDF, TXT, MD, DOCX), chunking, recherche sémantique et génération de résumés/slides.
 * [x] **Validation Stricte Zod des Requêtes API** (`server/middleware/validateBody.ts`, `server/routes/`) : Middleware réutilisable de validation de schémas et typage strict.
 * [x] **Agent Builder & Registre d'Agents Personnalisés** (`server/routes/custom-agents.ts`, `src/components/panels/AgentBuilderPanel.tsx`) : Création visuelle d'agents, import/export JSON, enregistrement dynamique.
+* [x] **Marketplace d'Agents et de Skills** (`server/marketplace/`, `server/routes/marketplace.ts`, `src/components/panels/MarketplacePanel.tsx`) : Registre communautaire, installation en un clic, notation, publication avec validation sécurité automatisée, import/export JSON, accessible depuis `Outils → Marketplace` dans la sidebar IDE.
 * [x] **Indexation AST Incrémentale par Tree-sitter & Call-Graph** (`server/knowledge/ASTParser.ts`, `server/knowledge/ASTCallGraph.ts`) : Analyse syntaxique WASM fine, signatures typées, dépendances et chaîne d'appels.
 * [x] **Mode Multi-Workspace Sécurisé** (`server/utils/selfRoot.ts`, `server/routes/self-root.ts`) : Gestion multi-projets avec isolation stricte et persistance dans `workspaces.json`.
 * [x] **Journalisation d'Audit NDJSON** (`server/audit.ts`) : Enregistrement de chaque action avec horodatage et détails.
@@ -77,7 +78,18 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 
 * 💡 **Mode collaboratif multi-curseurs (CRDT)** : Permettre à plusieurs développeurs de co-éditer le même fichier en temps réel via un protocole CRDT (Yjs / Automerge) synchronisé par WebSocket, avec présence de curseurs colorés et résolution automatique des conflits.
 
-* ✅ **Marketplace d'agents et de skills** *(livré v0.9.0)* : Registre communautaire de 10 paquets seedés (agents, skills, bundles). Installation en un clic depuis la sidebar IDE (`Outils → Marketplace`). Versioning sémantique, notation communautaire (1-5 étoiles) et validation de sécurité automatisée par analyse statique des prompts (12 patterns OWASP/injection). Publication dans le registre local avec rapport de sécurité. Export JSON téléchargeable. Endpoints : `GET/POST /api/marketplace/*` (search, install, uninstall, publish, rate, export, validate-security).
+* ✅ **Marketplace d'agents et de skills** *(livré v0.9.0)* : Registre communautaire de 10 paquets seedés (6 agents, 2 skills, 2 bundles) avec persistence locale dans `.Leanna/marketplace-registry.json`. Interface `SidePanel` overlay (côté droit, fond IDE visible). Fonctionnalités complètes :
+  - **Catalogue** : recherche plein-texte, filtres type/catégorie/tri, pagination, raccourci `Ctrl+K`
+  - **Installation en un clic** : agent → `DynamicAgentRegistry` + `custom-agents.json` ; skill → Supabase `custom_skills`
+  - **Désinstallation** : suppression du registre dynamique et du fichier JSON
+  - **Détail paquet** : 4 onglets (Aperçu, Contenu, Avis, Sécurité), stats live, partage par lien
+  - **Notation communautaire** : formulaire inline (1-5 étoiles + commentaire), recalcul de moyenne
+  - **Validation sécurité automatisée** : 12 patterns OWASP/injection sur prompts/instructions avant publication
+  - **Publication** : formulaire avec scan sécurité live, blocage si flags critiques
+  - **Import glisser-déposer** : fichiers `.leanna.json` (paquets exportés ou partagés)
+  - **Export JSON** : téléchargement `{id}-v{version}.leanna.json`
+  - **Copie de lien** : partage URL dans le presse-papier
+  - **API REST** : 9 endpoints `GET/POST /api/marketplace/*` (search, featured, installed, stats, package/:id, install, uninstall, publish, rate, validate-security, export/:id)
 ---
 
 ## Backlog technique & Qualité
