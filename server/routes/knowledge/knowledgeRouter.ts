@@ -241,7 +241,16 @@ router.get('/dashboard', (_req: Request, res: Response) => {
 // POST /api/knowledge/reindex
 router.post('/reindex', async (_req: Request, res: Response) => {
   try {
-    const stats = await projectIndexer.scanAll({ force: true });
+    const { broadcastKnowledgeProgress } = await import('../../utils/knowledgeBroadcaster.js');
+    const stats = await projectIndexer.scanAll({
+      force: true,
+      onProgress: (p) => broadcastKnowledgeProgress(p.phase, p.current, p.total, { file: p.file }),
+    });
+    broadcastKnowledgeProgress('done', stats.totalFiles, stats.totalFiles, {
+      totalEntities: stats.totalEntities,
+      durationMs: stats.durationMs,
+      cached: false,
+    });
     await projectIndexer.buildASTIndex();
     res.json({
       status: 'success',
@@ -609,4 +618,4 @@ router.get('/ast/functions', async (req: Request, res: Response): Promise<void> 
   }
 });
 
-export default router;
+export default router;

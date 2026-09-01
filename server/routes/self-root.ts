@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { z } from 'zod';
 import { requestConfirmation } from '../utils/confirmationBridge.js';
+import { broadcastKnowledgeProgress } from '../utils/knowledgeBroadcaster.js';
 
 export function createSelfRootRouter(getWss: () => WebSocketServer | null): Router {
   const router = Router();
@@ -211,7 +212,15 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         const { projectIndexer } = await import('../knowledge/ProjectIndexer.js');
         knowledgeGraph.load();
         projectMemory.load();
-        projectIndexer.scanAll().catch(() => {});
+        projectIndexer.scanAll({
+          onProgress: (p) => broadcastKnowledgeProgress(p.phase, p.current, p.total, { file: p.file }),
+        }).then((stats: any) => {
+          broadcastKnowledgeProgress('done', stats.totalFiles, stats.totalFiles, {
+            totalEntities: stats.totalEntities,
+            durationMs: stats.durationMs,
+            cached: stats.cached ?? false,
+          });
+        }).catch(() => {});
         console.log(`[KnowledgeGraph] Rechargement pour: ${newRoot}`);
       } catch { /* silent */ }
 
@@ -306,7 +315,15 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         const { projectIndexer } = await import('../knowledge/ProjectIndexer.js');
         knowledgeGraph.load();
         projectMemory.load();
-        projectIndexer.scanAll().catch(() => {});
+        projectIndexer.scanAll({
+          onProgress: (p) => broadcastKnowledgeProgress(p.phase, p.current, p.total, { file: p.file }),
+        }).then((stats: any) => {
+          broadcastKnowledgeProgress('done', stats.totalFiles, stats.totalFiles, {
+            totalEntities: stats.totalEntities,
+            durationMs: stats.durationMs,
+            cached: stats.cached ?? false,
+          });
+        }).catch(() => {});
       } catch { /* silent */ }
 
       return res.json({ status: 'success', newRoot, siteUrl: siteUrl ?? '' });
@@ -471,7 +488,15 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
               const { projectIndexer } = await import('../knowledge/ProjectIndexer.js');
               knowledgeGraph.load();
               projectMemory.load();
-              projectIndexer.scanAll().catch(() => {});
+              projectIndexer.scanAll({
+                onProgress: (p) => broadcastKnowledgeProgress(p.phase, p.current, p.total, { file: p.file }),
+              }).then((stats: any) => {
+                broadcastKnowledgeProgress('done', stats.totalFiles, stats.totalFiles, {
+                  totalEntities: stats.totalEntities,
+                  durationMs: stats.durationMs,
+                  cached: stats.cached ?? false,
+                });
+              }).catch(() => {});
               sendLog(`🧠 Knowledge System rechargé.`);
             } catch { /* silent */ }
 

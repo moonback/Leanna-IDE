@@ -14,6 +14,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { createLogger } from "../utils/logger.js";
+import { SELF_ROOT } from "../utils/selfRoot.js";
 
 const log = createLogger("DocumentStore");
 
@@ -473,13 +474,17 @@ export class DocumentStore {
 // Singleton
 // ═══════════════════════════════════════════════════════════════════════════════
 
-let _documentStore: DocumentStore | null = null;
+const documentStoreCache = new Map<string, DocumentStore>();
 
 export function getDocumentStore(projectRoot?: string): DocumentStore {
-  if (!_documentStore) {
-    _documentStore = new DocumentStore(projectRoot);
+  const resolvedRoot = projectRoot ? path.resolve(projectRoot) : (SELF_ROOT || process.cwd());
+  const normalizedRoot = path.resolve(resolvedRoot);
+
+  if (!documentStoreCache.has(normalizedRoot)) {
+    documentStoreCache.set(normalizedRoot, new DocumentStore(normalizedRoot));
   }
-  return _documentStore;
+
+  return documentStoreCache.get(normalizedRoot)!;
 }
 
-export { _documentStore as documentStore };
+export const documentStore = getDocumentStore();

@@ -114,6 +114,8 @@ process.on('uncaughtException', (error) => {
   setTimeout(() => process.exit(1), 1000);
 });
 
+import { setKnowledgeBroadcaster, broadcastKnowledgeProgress } from "./server/utils/knowledgeBroadcaster.js";
+
 // ─── Séquence de démarrage async ──────────────────────────────────────────────
 // IMPORTANT: loadWorkflows() DOIT être awaité avant ensureAuditWorkflow().
 // Sans await, listWorkflows() retourne [] et ensureAuditWorkflow() crée un
@@ -149,7 +151,14 @@ process.on('uncaughtException', (error) => {
 
     // 5. Indexation du Knowledge Graph — seulement si un projet est actif
     if (hasProject()) {
-      projectIndexer.scanAll().then((stats: any) => {
+      projectIndexer.scanAll({
+        onProgress: (p) => broadcastKnowledgeProgress(p.phase, p.current, p.total, { file: p.file }),
+      }).then((stats: any) => {
+        broadcastKnowledgeProgress('done', stats.totalFiles, stats.totalFiles, {
+          totalEntities: stats.totalEntities,
+          durationMs: stats.durationMs,
+          cached: stats.cached ?? false,
+        });
         if (stats.cached) {
           console.log(`[KnowledgeGraph] ⚡ Projet inchangé: ${stats.totalFiles} fichiers, ${stats.totalEntities} entités (chargé depuis le cache en ${stats.durationMs}ms)`);
         } else {
@@ -641,6 +650,16 @@ async function startServer() {
 
   // WebSocket server for Live API
   const wss = new WebSocketServer({ noServer: true });
+
+  // Register knowledge progress broadcaster so the startup IIFE and routes can send scan events
+  setKnowledgeBroadcaster((msg: object) => {
+    const payload = JSON.stringify(msg);
+    for (const client of wss.clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        try { client.send(payload); } catch { /* ignore */ }
+      }
+    }
+  });
 
   // WebSocket server for Sandbox file watching (real-time)
   const sandboxWss = new WebSocketServer({ noServer: true });

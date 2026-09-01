@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import http from 'node:http';
+import path from 'node:path';
 import { knowledgeRouter } from './routes/knowledge/index.js';
+import { getDocumentStore } from './knowledge/DocumentStore.js';
 
 test('GET /api/knowledge/health returns knowledge system health structure', async () => {
   const app = express();
@@ -28,4 +30,15 @@ test('GET /api/knowledge/health returns knowledge system health structure', asyn
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
+});
+
+test('getDocumentStore isolates documents per active workspace', () => {
+  const rootA = path.join(process.cwd(), '.tmp-docstore-a');
+  const rootB = path.join(process.cwd(), '.tmp-docstore-b');
+
+  const storeA = getDocumentStore(rootA);
+  const storeB = getDocumentStore(rootB);
+
+  assert.notStrictEqual(storeA, storeB);
+  assert.notEqual(storeA['filePath'], storeB['filePath']);
 });
