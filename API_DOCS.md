@@ -200,6 +200,58 @@ Réinitialise le workspace actif (`SELF_ROOT` remis à vide) et désactive le Sa
 
 ---
 
+### `POST /api/self-root/clone` *(SSE)*
+
+#### Description
+Clone un dépôt Git distant (GitHub, GitLab, Bitbucket, SSH…) dans un dossier local, puis l'active automatiquement comme workspace. La réponse est un flux **Server-Sent Events** qui transmet la progression ligne par ligne en temps réel.
+
+#### Authentification
+Non (ou `x-leanna-token` si configuré)
+
+#### Corps de la requête (JSON)
+```json
+{
+  "url": "https://github.com/user/repository",
+  "targetDir": "C:/Users/Mayss/Documents/mes-projets"
+}
+```
+
+| Champ | Type | Requis | Description |
+| :--- | :--- | :--- | :--- |
+| `url` | string | Oui | URL HTTPS (`https://…`) ou SSH (`git@…`) du dépôt |
+| `targetDir` | string | Non | Dossier parent de destination. Défaut : `~/Documents/Leanna-Projects` |
+
+#### Format des événements SSE
+
+Chaque ligne reçue est un objet JSON préfixé `data:` :
+
+```
+data: {"type":"log","level":"info","message":"🔗 Clonage de https://github.com/user/repo…"}
+
+data: {"type":"log","level":"info","message":"Receiving objects:  45% (120/265)"}
+
+data: {"type":"done","status":"success","newRoot":"C:/Users/Mayss/Documents/Leanna-Projects/repo","repoName":"repo"}
+```
+
+| `type` | Champs supplémentaires | Signification |
+| :--- | :--- | :--- |
+| `log` | `level` (`info`/`warn`/`error`), `message` | Ligne de progression ou erreur git |
+| `done` | `status: "success"`, `newRoot`, `repoName` | Clone terminé, workspace activé |
+| `error` | `error` (message), `clonePath?` | Échec du clone (code git non-zero, URL invalide…) |
+
+#### Codes HTTP
+| Code | Signification |
+| :--- | :--- |
+| 200 | Flux SSE ouvert (résultat final dans l'événement `done` ou `error`) |
+| 400 | Corps invalide (URL manquante ou format non autorisé) |
+
+#### Notes
+- Le dossier de destination ne doit pas exister avant le clonage ; si c'est le cas, l'événement `error` est immédiatement émis avec le `clonePath`.
+- En cas d'échec partiel, le dossier partiellement cloné est nettoyé automatiquement.
+- Après succès, le sandbox est réinitialisé et le Knowledge System est réindexé exactement comme après `POST /api/self-root/change`.
+
+---
+
 ## Système de Fichiers & IDE
 
 ### `GET /api/ide/tree`

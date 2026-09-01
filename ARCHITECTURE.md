@@ -78,7 +78,7 @@ flowchart TB
 
 Leanna fonctionne selon les principes architecturaux suivants :
 
-1. **Mode Multi-Workspace & Périmètre Self-Root** : L'IDE gère dynamiquement plusieurs dépôts externes tout en confinant rigoureusement toutes les compétences IA, explorateurs et opérations au projet actif (`SELF_ROOT`). Les dépôts sont persistés dans `.Leanna/workspaces.json` et les chemins candidats sont pré-validés (rejet des racines disques et dossiers système).
+1. **Mode Multi-Workspace & Périmètre Self-Root** : L'IDE gère dynamiquement plusieurs dépôts externes tout en confinant rigoureusement toutes les compétences IA, explorateurs et opérations au projet actif (`SELF_ROOT`). Les dépôts sont persistés dans `.Leanna/workspaces.json` et les chemins candidats sont pré-validés (rejet des racines disques et dossiers système). L'utilisateur peut cloner directement un dépôt distant via une URL (GitHub, GitLab, SSH…) depuis la modale Multi-Workspace — le flux SSE `POST /api/self-root/clone` transmet la progression git en temps réel et active le workspace automatiquement à la fin.
 2. **Isolation par Sandbox** : Par défaut, toute écriture effectuée par l'utilisateur ou par l'IA est appliquée dans un dossier miroir `.Leanna/sandbox` du workspace actif. Les modifications ne sont reportées dans le projet principal qu'après validation TypeScript (`tsc --noEmit`) et approbation explicite (`sync` ou `accept-file`).
 3. **Dialogue Multimodal Temps Réel** : L'interface échange des flux audio PCM 16kHz et des captures vidéo/écran directement avec l'API Gemini Live. Lorsque l'IA décide d'exécuter une action, elle invoque des outils (`functionDeclarations`) interceptés côté backend par le `LiveSocketHandler`.
 4. **Lecture & Indexation des documents PDF** : Les fichiers PDF du workspace sont détectés, lus via `pdf-parse`, indexés dans le `WorkspaceIndexer` et exposés à l’IDE avec un aperçu document et un texte extrait exploitable par le moteur de connaissances.
@@ -100,7 +100,7 @@ L'interface utilisateur est développée en **React 19** avec **TypeScript** et 
   - `IdeView` (`src/views/IdeView.tsx`) : Environnement de travail avec Monaco Editor, arborescence virtuelle, onglets et panneaux latéraux rétractables.
   - `UnifiedSidebar` : Barre latérale unique supportant les contextes `global` et `ide`.
   - `Panels` (`src/components/panels/`) : Panneaux spécialisés pour le Terminal, le Navigateur webview, les Métriques d'agents, la Flotte d'agents (`AgentFleetPanel`), le Constructeur visuel d'agents (`AgentBuilderPanel`), les Tâches planifiées, les Workflows, les MCP et l'Audit.
-  - `StartupProjectModal` : Modale de démarrage permettant de sélectionner ou changer le projet cible géré par `SELF_ROOT`.
+  - `StartupProjectModal` : Modale de démarrage permettant de sélectionner ou changer le projet cible géré par `SELF_ROOT`. Comprend trois onglets : **Dépôts récents**, **Ouvrir local** (saisie de chemin + dialogue natif), et **Cloner** (URL Git → clone SSE en temps réel → activation automatique).
 
 ---
 
@@ -125,6 +125,7 @@ En mode Desktop, Leanna encapsule l'application dans **Electron 43** :
   - `electron/get-project-root` : racine courante de l'exécutable.
   - `electron/select-folder` : dialogue natif de sélection de répertoire.
   - `electron/get-screen-sources` : capture des flux d'écrans/fenêtres pour le partage multimodal.
+  - `electron/git-clone` : clone un dépôt git distant (`url`, `targetDir?`) via `child_process.execFile('git', ['clone', …])` avec timeout 5 min et nettoyage automatique en cas d'échec. Retourne `{ success, path?, repoName?, error? }`.
   - `electron/quit` : fermeture propre de l'application.
 
 ---

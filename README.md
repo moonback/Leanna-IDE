@@ -88,7 +88,7 @@ Le Marketplace est accessible depuis la sidebar IDE : **Outils → Marketplace**
 
 ### IDE & Workflow
 
-* **Mode Multi-Workspace Sécurisé** : Ouverture, enregistrement et bascule instantanée entre dépôts avec isolation stricte (`SELF_ROOT`), historique des workspaces, validation préventive et badges Git.
+* **Mode Multi-Workspace Sécurisé** : Ouverture, enregistrement et bascule instantanée entre dépôts avec isolation stricte (`SELF_ROOT`), historique des workspaces, validation préventive et badges Git. Clonage direct depuis une URL GitHub/GitLab avec progression en temps réel (SSE) et activation automatique du workspace cloné.
 * **Éditeur de code intelligent** : Monaco Editor, arborescence de fichiers, coloration syntaxique, recherche globale avec regex, onglets multiples et panneau de prévisualisation web.
 * **Prise en charge native des PDF** : Les fichiers PDF du workspace sont détectés, indexés et ouverts directement dans l’IDE avec aperçu document, extraction de texte et téléchargement.
 * **Intégration GitHub native** : Panneau GitHub avec 5 onglets (Commits locaux avec diff, Repos, Issues, PRs, Notifications), filtres et badges de compteurs.
