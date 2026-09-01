@@ -89,13 +89,14 @@ export class NotebookManager {
 
   // ─── CRUD Notebooks ──────────────────────────────────────────────────────
 
-  createNotebook(title: string, description = ""): Notebook {
+  createNotebook(title: string, description = "", workspaceId?: string): Notebook {
     const id = randomUUID();
     const colorIndex = this.notebooks.size % COLORS.length;
     const iconIndex = this.notebooks.size % ICONS.length;
 
     const notebook: Notebook = {
       id,
+      ...(workspaceId ? { workspaceId } : {}),
       title,
       description,
       sources: [],
@@ -111,7 +112,7 @@ export class NotebookManager {
 
     this.notebooks.set(id, notebook);
     this.persist(notebook);
-    log.info(`📓 Notebook créé: "${title}" (${id})`);
+    log.info(`📓 Notebook créé: "${title}" (${id})${workspaceId ? ` [workspace: ${workspaceId}]` : ""}`);
     return notebook;
   }
 
@@ -119,9 +120,16 @@ export class NotebookManager {
     return this.notebooks.get(id);
   }
 
-  getAllNotebooks(): Notebook[] {
-    return Array.from(this.notebooks.values())
+  getAllNotebooks(workspaceId?: string): Notebook[] {
+    const all = Array.from(this.notebooks.values())
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+    if (!workspaceId) return all;
+
+    // Retourne uniquement les notebooks de ce workspace.
+    // Les notebooks sans workspaceId (créés avant la migration) sont exclus
+    // une fois qu'un workspaceId est disponible, pour éviter de polluer tous les workspaces.
+    return all.filter(nb => nb.workspaceId === workspaceId);
   }
 
   updateNotebook(id: string, updates: Partial<Pick<Notebook, "title" | "description" | "color" | "icon">>): Notebook | undefined {
