@@ -77,8 +77,7 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 
 * 💡 **Mode collaboratif multi-curseurs (CRDT)** : Permettre à plusieurs développeurs de co-éditer le même fichier en temps réel via un protocole CRDT (Yjs / Automerge) synchronisé par WebSocket, avec présence de curseurs colorés et résolution automatique des conflits.
 
-* 💡 **Marketplace d'agents et de skills** : Créer un registre public de skills et d'agents personnalisés exportables, installables en un clic depuis l'Agent Builder. Les agents pourraient être versionnés, notés et publiés par la communauté avec validation de sécurité automatisée.
-
+* ✅ **Marketplace d'agents et de skills** *(livré v0.9.0)* : Registre communautaire de 10 paquets seedés (agents, skills, bundles). Installation en un clic depuis la sidebar IDE (`Outils → Marketplace`). Versioning sémantique, notation communautaire (1-5 étoiles) et validation de sécurité automatisée par analyse statique des prompts (12 patterns OWASP/injection). Publication dans le registre local avec rapport de sécurité. Export JSON téléchargeable. Endpoints : `GET/POST /api/marketplace/*` (search, install, uninstall, publish, rate, export, validate-security).
 ---
 
 ## Backlog technique & Qualité

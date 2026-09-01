@@ -17,7 +17,7 @@ import {
   FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Container, Bot, Crosshair, Database,
   Activity, Wrench, Users, FileStack,
-  Wand2, BookOpen, Globe, Terminal,
+  Wand2, BookOpen, Globe, Terminal, Store,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -227,6 +227,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Agent Builder',
             stateKey: 'showAgentBuilder',
             actionKey: 'onToggleAgentBuilder',
+          },
+          {
+            id: 'marketplace',
+            type: 'button',
+            icon: Store,
+            label: 'Marketplace',
+            stateKey: 'showMarketplace',
+            actionKey: 'onToggleMarketplace',
           },
           {
             id: 'vision',

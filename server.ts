@@ -502,6 +502,10 @@ async function startServer() {
   app.use("/api/agent-builder", createAgentBuilderRouter());
   app.use("/api/agent-registration", createAgentRegistrationRouter());
   app.use("/api/custom-agents", createCustomAgentsRouter());
+
+  // ── Marketplace d'agents et de skills ────────────────────────────────────
+  const { createMarketplaceRouter } = await import("./server/routes/marketplace.js");
+  app.use("/api/marketplace", createMarketplaceRouter());
   app.use("/api/gemini-keys", createGeminiKeysRouter());
   app.use("/api/sandbox", createSandboxRouter());
   app.use("/api/checkpoint", createCheckpointRouter());

@@ -46,6 +46,7 @@ import { SelfEditBanner } from '../components/ide/SelfEditBanner.js';
 import { SandboxDiffViewer } from '../components/sandbox/SandboxDiffViewer.js';
 import { AgentPanel } from '../components/panels/AgentPanel.js';
 import { AgentBuilderPanel } from '../components/panels/AgentBuilderPanel.js';
+import { MarketplacePanel } from '../components/panels/MarketplacePanel.js';
 import { initActivityStore, destroyActivityStore } from '../stores/agentActivityStore.js';
 import { MissionPanel } from '../components/panels/MissionPanel.js';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard.js';
@@ -152,6 +153,7 @@ export default function IdeView() {
   const [pendingChatMessage, setPendingChatMessage] = useState<{ text: string; displayText?: string } | null>(null);
   const [showAgents, setShowAgents] = useState(false);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
+  const [showMarketplace, setShowMarketplace] = useState(false);
   const [showFleet, setShowFleet] = useState(false);
   const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
@@ -708,6 +710,7 @@ export default function IdeView() {
         showChat={showChat}
         showAgents={showAgents}
         showAgentBuilder={showAgentBuilder}
+        showMarketplace={showMarketplace}
         showFleet={showFleet}
         showMissions={showMissions}
         showKnowledge={showKnowledge}
@@ -732,6 +735,7 @@ export default function IdeView() {
         onToggleChat={() => setShowChat(v => !v)}
         onToggleAgents={() => setShowAgents(v => !v)}
         onToggleAgentBuilder={() => setShowAgentBuilder(v => !v)}
+        onToggleMarketplace={() => setShowMarketplace(v => !v)}
         onToggleFleet={() => setShowFleet(v => !v)}
         onToggleMissions={() => setShowMissions(v => !v)}
         onToggleKnowledge={() => {
@@ -1187,6 +1191,11 @@ export default function IdeView() {
       {/* Agent Builder Panel — modal overlay */}
       {showAgentBuilder && (
         <AgentBuilderPanel inline onClose={() => setShowAgentBuilder(false)} />
+      )}
+
+      {/* Marketplace Panel — modal overlay */}
+      {showMarketplace && (
+        <MarketplacePanel onClose={() => setShowMarketplace(false)} />
       )}
 
       {/* Fleet Panel — modal overlay */}
