@@ -62,7 +62,14 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         lastCommitDate = execSync('git log -1 --pretty=format:%cr', execOpts).trim();
       } catch {}
       try {
-        const abOutput = execSync(`git rev-list --left-right --count origin/${gitBranch}...HEAD`, execOpts).trim();
+        // Use execFileSync instead of execSync with template literal to prevent
+        // shell injection if gitBranch ever contains shell metacharacters (audit L-2).
+        const { execFileSync } = await import('child_process');
+        const abOutput = execFileSync(
+          'git',
+          ['rev-list', '--left-right', '--count', `origin/${gitBranch}...HEAD`],
+          execOpts
+        ).trim();
         const parts = abOutput.split(/\s+/);
         if (parts.length === 2) { behind = parseInt(parts[0], 10) || 0; ahead = parseInt(parts[1], 10) || 0; }
       } catch {}

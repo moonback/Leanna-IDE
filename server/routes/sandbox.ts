@@ -475,15 +475,27 @@ export function createVerifyExitCodeRouter(): Router {
   router.post('/verify-exit-code', (req: Request, res: Response): void => {
     const { code } = req.body || {};
     const exitCode = process.env.SANDBOX_EXIT_CODE;
+    const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+
+    // Rate limiting strict
+    const rateCheck = checkExitCodeRateLimit(clientIp);
+    if (!rateCheck.allowed) {
+      res.status(429).json({ status: 'error', error: rateCheck.error });
+      return;
+    }
 
     if (!exitCode || exitCode.length !== 6) {
       res.status(403).json({ status: 'error', error: 'Code non configuré' });
       return;
     }
-    if (!code || code !== exitCode) {
+
+    if (!verifyExitCode(code, exitCode)) {
       res.status(403).json({ status: 'error', error: 'Code incorrect' });
       return;
     }
+
+    // Succès — réinitialiser le rate limit
+    resetExitCodeRateLimit(clientIp);
     res.json({ status: 'success' });
   });
   return router;

@@ -16,6 +16,8 @@
     "clean": "rm -rf dist server.js",
     "lint": "node scripts/lint.cjs",
     "test": "node --import tsx --test server/**/*.test.ts",
+    "audit:deps": "npm audit --production",
+    "audit:deps:full": "npm audit",
     "pack:win": "npm run build && electron-builder --win --dir",
     "dist:win": "npm run build && electron-builder --win"
   },
