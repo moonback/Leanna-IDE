@@ -272,6 +272,7 @@ import { aiStudioDirectivesSkill } from "./server/skills/aiStudioDirectives.js";
 import { documentLinkerSkill } from "./server/skills/documentLinker.js";
 import { documentKnowledgeSkill } from "./server/skills/documentKnowledge.js";
 import { richDocumentSkill } from "./server/skills/richDocument.js";
+import { createSmartSkills } from "./server/autonomy/SmartSkills.js";
 
 const { runtime, skillManager } = bootstrapRuntimeSync({
   skills: [
@@ -281,6 +282,7 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
     verifySkill, weatherSkill, projectSkill, agentsSkill,
     missionSkill, aiStudioDirectivesSkill, documentLinkerSkill,
     documentKnowledgeSkill, richDocumentSkill,
+    createSmartSkills((name: string, args: any) => skillManager.handleToolCall(name, args)),
   ],
   onReady: async (r, sm) => {
     // Charger les custom skills après l'initialisation de base

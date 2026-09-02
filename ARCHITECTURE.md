@@ -162,6 +162,20 @@ server/
 * **Registre Dynamique d'Agents (`DynamicAgentRegistry`)** :
   - Permet l'enregistrement, l'activation, la désactivation et l'orchestration à chaud d'agents définis par l'utilisateur sans redémarrage du serveur.
 
+### Boucle qualité post-modification
+
+Le skill composite `quality_loop` (`server/autonomy/SmartSkills.ts`) fournit un point d'entrée unique pour les modifications assistées par agent. Il capture une validation de référence avant écriture, applique le changement, puis exécute séquentiellement le formatage ciblé, le typecheck et la vérification du fichier avec ses tests associés. La séquence s'arrête dès qu'une phase échoue.
+
+Le résultat contient une synthèse du diff (`changed`, lignes ajoutées et supprimées) ainsi que les snapshots `baseline` et `current`. `AgentValidation.compare` tolère les erreurs préexistantes stables, mais transforme toute augmentation des erreurs de typecheck, lint, sécurité ou tests en régression bloquante. Aucune nouvelle tentative automatique n'est lancée par cette boucle ; la correction suivante doit être explicitement demandée.
+
+### Contexte traçable
+
+Les réponses fondées sur le workspace doivent transporter un registre de preuves, et non seulement du texte : `sourceId`, chemin ou URL, lignes utilisées, tests exécutés et extrait ayant servi à la réponse. Le renderer présente ce registre dans le bouton **Inspecter le contexte**. Une exclusion est persistée pour la réponse courante, déclenche une nouvelle sélection de contexte et invalide les citations associées à la source retirée. Le serveur doit refuser ou marquer toute citation dont la preuve n'est pas présente dans ce registre.
+
+### Plan d'action avant mission
+
+Une mission comportant plusieurs étapes passe par un état `planned` avant `running`. Le plan affiché contient `objectives`, `targetFiles`, `tools`, `risks`, `estimatedCost` (tokens, appels et durée) et `stopConditions`. L'utilisateur peut confirmer, modifier ou annuler le plan ; les conditions d'arrêt restent actives pendant l'exécution et toute violation termine la mission avec un rapport explicite.
+
 ### Knowledge System & Analyse Syntaxique Tree-sitter
 Le sous-système `server/knowledge/` offre une compréhension sémantique et structurelle approfondie du projet :
 

@@ -153,6 +153,12 @@ scheduleValidation();
 | `utils/postEditValidator.ts` | Lance `tsc --noEmit` automatiquement (debounce 2.5s) |
 | `audit.ts` | Journal NDJSON enrichi avec diff sommaire |
 
+## 4.1 Transparence des réponses et missions
+
+Toute réponse produite à partir du workspace doit conserver les preuves réellement utilisées : chemins ou sources, lignes, tests exécutés et extraits. Le panneau **Inspecter le contexte** permet de vérifier ces preuves et d'exclure une source pour la réponse en cours ; l'exclusion impose de recalculer le contexte avant toute nouvelle citation.
+
+Pour une mission multi-étapes, l'état `planned` précède l'état `running`. Le plan doit afficher les objectifs, fichiers ciblés, outils, risques, coût estimé et conditions d'arrêt. La confirmation de l'utilisateur est requise avant le premier outil d'écriture ou d'exécution, et une condition d'arrêt satisfaite termine la mission sans lancer l'étape suivante.
+
 ---
 
 ## 5. Moteur AST Tree-sitter, Call-Graph & Documents PDF

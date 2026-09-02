@@ -648,6 +648,23 @@ async function runLintDirect(targets: string[] = []): Promise<ProcessResult & { 
   }
 }
 
+async function runFormatDirect(target: string): Promise<ProcessResult> {
+  const root = getProjectRoot();
+  const nodeBin = process.platform === "win32" ? "node.exe" : "node";
+  const lintScript = path.join(root, "scripts", "lint.cjs");
+  try {
+    const result = await execFileAsync(nodeBin, [lintScript, "--fix", target], {
+      cwd: root,
+      timeout: TIMEOUT_MS,
+      maxBuffer: 2 * 1024 * 1024,
+      shell: true,
+    });
+    return { ok: true, stdout: truncate(result.stdout || ""), stderr: truncate(result.stderr || ""), exitCode: 0 };
+  } catch (error: any) {
+    return processResultFromError(error);
+  }
+}
+
 export const verifySkill: Skill = {
   name: "verify",
   declarations: [
@@ -676,6 +693,15 @@ export const verifySkill: Skill = {
           script: { type: "STRING", description: "Nom du script npm à exécuter : build, lint, typecheck ou test." },
         },
         required: ["script"],
+      },
+    },
+    {
+      name: "verify_format",
+      description: "Formate uniquement le fichier modifié (espaces finaux et fin de ligne), sans toucher aux autres fichiers.",
+      parameters: {
+        type: "OBJECT",
+        properties: { path: { type: "STRING", description: "Chemin relatif du fichier modifié." } },
+        required: ["path"],
       },
     },
     {
@@ -716,6 +742,7 @@ export const verifySkill: Skill = {
   inputSchemas: {
     verify_typecheck: z.object({}),
     verify_file: z.object({ path: z.string().min(1) }),
+    verify_format: z.object({ path: z.string().min(1) }),
     verify_run_script: z.object({ script: z.enum(["build", "lint", "typecheck", "test"]) }),
     verify_lint: z.object({}),
     verify_security: z.object({
@@ -955,6 +982,22 @@ export const verifySkill: Skill = {
           output: lintResult.output,
           violations: lintResult.violations,
           summary,
+        };
+      }
+
+      if (name === "verify_format") {
+        const validated = validateArgs(verifySkill.inputSchemas!["verify_format"], args);
+        const abs = normalizeProjectPath(validated.path);
+        if (!abs || !fs.existsSync(abs)) return { status: "failed", ok: false, error: `Fichier introuvable: ${validated.path}` };
+        const result = await runFormatDirect(validated.path);
+        return {
+          status: result.ok ? "success" : "failed",
+          ok: result.ok,
+          path: validated.path,
+          exitCode: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          message: result.ok ? `Formatage ciblé terminé pour ${validated.path}.` : `Échec du formatage ciblé pour ${validated.path}.`,
         };
       }
 

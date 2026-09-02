@@ -202,6 +202,25 @@ npm test
 npm run lint
 ```
 
+### Boucle qualité automatique
+
+Les agents disposent de l'outil `quality_loop` pour sécuriser une modification de fichier en une seule passe bornée :
+
+1. capture de la baseline existante ;
+2. modification du fichier ;
+3. formatage ciblé (`verify_format`) ;
+4. typecheck TypeScript ;
+5. vérification des tests associés ;
+6. analyse du diff et comparaison de régression.
+
+La boucle s'arrête à la première phase en échec. Elle ne relance pas automatiquement une correction sans limite et retourne `stoppedAt`, `errors`, `diff`, `baseline`, `current` et `regression` pour permettre une reprise explicite.
+
+### Contexte traçable et plan d'action
+
+Chaque réponse issue d'une recherche, d'un notebook ou d'une mission doit exposer ses preuves : fichier ou source, plage de lignes, test exécuté et extrait réellement utilisé. Le bouton **Inspecter le contexte** ouvre la liste de ces éléments ; chaque source peut être exclue, puis le contexte et la réponse doivent être recalculés. Une citation ne doit jamais être générée pour une source qui n'a pas été effectivement consultée.
+
+Avant toute mission multi-étapes, l'interface doit afficher un plan d'action confirmable avec les objectifs, fichiers ciblés, outils autorisés, risques, coût estimé (tokens/appels) et conditions d'arrêt. La mission ne démarre pas tant que le plan n'est pas accepté ou explicitement ajusté par l'utilisateur.
+
 ---
 
 ## Structure du projet

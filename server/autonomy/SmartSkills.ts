@@ -14,6 +14,7 @@
 
 import { Skill } from "../skills/base.js";
 import { createLogger } from "../utils/logger.js";
+import { AgentValidation, type RegressionReport, type ValidationSnapshot } from "../agents/AgentValidation.js";
 
 const log = createLogger("SmartSkills");
 
@@ -30,6 +31,18 @@ interface ValidatePatchResult {
   finalState: "valid" | "failed_max_retries" | "needs_human";
   errors?: string;
   corrections?: string[];
+}
+
+interface QualityLoopResult {
+  success: boolean;
+  stoppedAt: "modify" | "format" | "typecheck" | "tests" | "regression" | "complete";
+  file: string;
+  testFile: string | null;
+  diff: { changed: boolean; addedLines: number; removedLines: number };
+  baseline: ValidationSnapshot | null;
+  current: ValidationSnapshot | null;
+  regression: RegressionReport | null;
+  errors: string[];
 }
 
 interface ReadUntilUnderstoodResult {
@@ -65,6 +78,21 @@ export function createSmartSkills(skillHandler: SkillHandler): Skill {
   return {
     name: "smart",
     declarations: [
+      {
+        name: "quality_loop",
+        description:
+          "Modifie un fichier puis exécute une seule boucle qualité bornée : formatage ciblé, typecheck, tests associés, analyse du diff et rapport de non-régression. " +
+          "Arrête immédiatement à la première phase en échec et ne relance jamais automatiquement une tentative infinie.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            path: { type: "STRING", description: "Chemin relatif du fichier à modifier." },
+            search: { type: "STRING", description: "Texte exact à remplacer." },
+            replace: { type: "STRING", description: "Nouveau texte exact." },
+          },
+          required: ["path", "search", "replace"],
+        },
+      },
       {
         name: "validate_patch",
         description:
@@ -155,6 +183,8 @@ export function createSmartSkills(skillHandler: SkillHandler): Skill {
 
     async handleToolCall(name: string, args: any, context?: any): Promise<any> {
       switch (name) {
+        case "quality_loop":
+          return executeQualityLoop(skillHandler, args, context);
         case "validate_patch":
           return executeValidatePatch(skillHandler, args, context);
         case "read_until_understood":
@@ -166,6 +196,97 @@ export function createSmartSkills(skillHandler: SkillHandler): Skill {
       }
     },
   };
+}
+
+async function executeQualityLoop(
+  handler: SkillHandler,
+  args: { path: string; search: string; replace: string },
+  context?: any
+): Promise<QualityLoopResult> {
+  const { path, search, replace } = args;
+  const errors: string[] = [];
+  const readResult = await handler("read_project_file", { path }, context);
+  const before = asText(readResult);
+  if (readResult?.error || before === null) {
+    return { success: false, stoppedAt: "modify", file: path, testFile: null, diff: emptyDiff(), baseline: null, current: null, regression: null, errors: [`Lecture initiale échouée: ${readResult?.error ?? "contenu indisponible"}`] };
+  }
+
+  const baselineResult = await handler("verify_file", { path }, context);
+  const baseline = baselineResult?.error ? null : AgentValidation.snapshot(baselineResult);
+  const modifyResult = await handler("modify_project_file", { path, search, replace }, context);
+  if (modifyResult?.error) {
+    return { success: false, stoppedAt: "modify", file: path, testFile: null, diff: emptyDiff(), baseline, current: null, regression: null, errors: [`Modification échouée: ${modifyResult.error}`] };
+  }
+
+  const formatResult = await handler("verify_format", { path }, context);
+  if (!isSuccessful(formatResult)) {
+    return failureResult(path, "format", baseline, before, await readAfter(handler, path, context), formatResult);
+  }
+
+  const typecheckResult = await handler("verify_typecheck", {}, context);
+  if (!isSuccessful(typecheckResult)) {
+    return failureResult(path, "typecheck", baseline, before, await readAfter(handler, path, context), typecheckResult);
+  }
+
+  const testResult = await handler("verify_file", { path }, context);
+  const current = AgentValidation.snapshot(testResult);
+  const regression = baseline ? AgentValidation.compare(baseline, current) : null;
+  const after = await readAfter(handler, path, context);
+  const diff = calculateDiff(before, after);
+  if (!isSuccessful(testResult)) {
+    errors.push(extractVerifyErrors(testResult) ?? "Les tests concernés ont échoué.");
+    return { success: false, stoppedAt: "tests", file: path, testFile: testResult?.test?.file ?? null, diff, baseline, current, regression, errors };
+  }
+  if (regression && !regression.passed) {
+    return { success: false, stoppedAt: "regression", file: path, testFile: testResult?.test?.file ?? null, diff, baseline, current, regression, errors: regression.regressions.map((issue) => issue.message) };
+  }
+  return { success: true, stoppedAt: "complete", file: path, testFile: testResult?.test?.file ?? null, diff, baseline, current, regression, errors };
+}
+
+function isSuccessful(result: any): boolean {
+  return result?.ok === true || result?.status === "success" || result?.status === "ok";
+}
+
+function asText(result: any): string | null {
+  if (typeof result === "string") return result;
+  if (typeof result?.content === "string") return result.content;
+  return null;
+}
+
+async function readAfter(handler: SkillHandler, path: string, context?: any): Promise<string> {
+  return asText(await handler("read_project_file", { path }, context)) ?? "";
+}
+
+function emptyDiff(): QualityLoopResult["diff"] {
+  return { changed: false, addedLines: 0, removedLines: 0 };
+}
+
+function calculateDiff(before: string, after: string): QualityLoopResult["diff"] {
+  const oldLines = before.split("\n");
+  const newLines = after.split("\n");
+  let addedLines = 0;
+  let removedLines = 0;
+  const max = Math.max(oldLines.length, newLines.length);
+  for (let index = 0; index < max; index++) {
+    if (oldLines[index] !== newLines[index]) {
+      if (index < newLines.length) addedLines++;
+      if (index < oldLines.length) removedLines++;
+    }
+  }
+  return { changed: before !== after, addedLines, removedLines };
+}
+
+function failureResult(
+  path: string,
+  stoppedAt: QualityLoopResult["stoppedAt"],
+  baseline: ValidationSnapshot | null,
+  before: string,
+  after: string,
+  phaseResult: any
+): QualityLoopResult {
+  const current = AgentValidation.snapshot(phaseResult);
+  const regression = baseline ? AgentValidation.compare(baseline, current) : null;
+  return { success: false, stoppedAt, file: path, testFile: phaseResult?.test?.file ?? null, diff: calculateDiff(before, after), baseline, current, regression, errors: [extractVerifyErrors(phaseResult) ?? `${stoppedAt} échoué.`] };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

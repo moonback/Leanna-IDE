@@ -2,12 +2,71 @@
 
 Toutes les routes de l'API REST sont préfixées par `/api`.
 
+## Outils agent de qualité
+
+Les outils suivants sont exposés au runtime des agents, en complément des routes REST.
+
+### `quality_loop`
+
+Applique une modification puis exécute une boucle qualité bornée. L'outil ne prend aucune nouvelle tentative automatique après un échec.
+
+#### Paramètres
+
+```json
+{
+  "path": "server/example.ts",
+  "search": "const value = 1;",
+  "replace": "const value = 2;"
+}
+```
+
+#### Phases
+
+`read_project_file` → baseline `verify_file` → `modify_project_file` → `verify_format` → `verify_typecheck` → `verify_file` (lint et test associé) → diff/régression.
+
+#### Réponse
+
+Le résultat contient `success`, `stoppedAt`, `file`, `testFile`, `diff`, `baseline`, `current`, `regression` et `errors`. Les valeurs possibles de `stoppedAt` sont `modify`, `format`, `typecheck`, `tests`, `regression` et `complete`.
+
+### `verify_format`
+
+Formate uniquement le fichier indiqué. Il supprime les espaces blancs en fin de ligne et garantit une nouvelle ligne finale, sans modifier les autres fichiers.
+
 ### Format d'authentification
 Sauf mention contraire (notamment `/api/health`), tous les endpoints nécessitent un jeton secret si `Leanna_API_TOKEN` est défini dans l'environnement.
 
 * **En-tête HTTP** : `x-leanna-token: <SECRET>`
 * **Cookie HTTP** : `Leanna_token=<SECRET>`
 * **Paramètre de requête (WebSockets)** : `?token=<SECRET>`
+
+## Contrats de transparence IA
+
+Ces contrats décrivent les métadonnées attendues par les réponses Live, les missions et les notebooks. Ils ne constituent pas une route REST autonome.
+
+### Contexte traçable
+
+Une réponse qui utilise le workspace doit inclure un tableau `evidence` contenant uniquement les éléments effectivement consultés :
+
+```json
+{
+  "evidence": [
+    {
+      "sourceId": "server-skills-verify",
+      "kind": "file",
+      "path": "server/skills/verify.ts",
+      "lines": { "start": 740, "end": 812 },
+      "tests": ["server/skills/verify.test.ts"],
+      "excerpt": "..."
+    }
+  ]
+}
+```
+
+Le bouton **Inspecter le contexte** affiche cette liste. L'action **Exclure** retire une source du contexte de la réponse courante et déclenche un recalcul ; ses citations ne peuvent alors plus être utilisées.
+
+### Plan d'action explicite
+
+Avant le démarrage d'une mission multi-étapes, le client affiche puis fait confirmer un plan contenant : `objectives`, `targetFiles`, `tools`, `risks`, `estimatedCost` et `stopConditions`. Une annulation, un dépassement du coût estimé ou une condition d'arrêt satisfaite doit produire un état terminal explicite et empêcher l'étape suivante.
 
 ---
 
