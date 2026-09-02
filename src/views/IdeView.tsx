@@ -1121,6 +1121,7 @@ export default function IdeView() {
           onToggleAgents={() => setShowAgents(v => !v)}
           onToggleFleet={() => setShowFleet(v => !v)}
           onToggleLogs={() => setShowAssistantLogs(v => !v)}
+          onToggleGitHub={() => setShowGitHub(v => !v)}
         />
       </div>
 

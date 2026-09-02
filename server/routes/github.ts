@@ -8,6 +8,20 @@ type SkillManager = SkillManagerV2;
 export function createGithubRouter(skillManager: SkillManager): Router {
   const router = Router();
 
+  async function execGit(args: string[], timeout = 10000) {
+    const { execFile: execFileCb } = await import('child_process');
+    const { promisify: promisifyUtil } = await import('util');
+    const execFileP = promisifyUtil(execFileCb);
+    return execFileP('git', args, {
+      cwd: SELF_ROOT,
+      timeout,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+      maxBuffer: 1024 * 1024,
+    });
+  }
+
+  const workspaceGitPaths = ['.', ':(exclude).Leanna', ':(exclude).Leanna/**'];
+
   // GET /api/github/repos
   router.get('/repos', async (_req: Request, res: Response) => {
     try {
@@ -105,6 +119,51 @@ export function createGithubRouter(skillManager: SkillManager): Router {
     res.status(403).json({
       error: 'Le clonage direct de repos GitHub est désactivé. Clonez le repo localement puis importez-le via le sélecteur de projet.',
     });
+  });
+
+  // GET /api/github/status
+  router.get('/status', async (_req: Request, res: Response) => {
+    try {
+      const [{ stdout: statusOut }, { stdout: branchOut }] = await Promise.all([
+        execGit(['status', '--porcelain=v1', '--', ...workspaceGitPaths]),
+        execGit(['branch', '--show-current']),
+      ]);
+      const files = statusOut.split('\n').filter(Boolean).map(line => ({
+        index: line.slice(0, 1),
+        worktree: line.slice(1, 2),
+        path: line.slice(3),
+      }));
+      res.json({ branch: branchOut.trim(), files, clean: files.length === 0 });
+    } catch (e: any) {
+      res.status(500).json({ error: e.stderr?.trim() || e.message || 'Impossible de lire le statut Git.' });
+    }
+  });
+
+  // POST /api/github/commit
+  router.post('/commit', async (req: Request, res: Response) => {
+    try {
+      const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+      if (!message) return res.status(400).json({ error: 'Le message de commit est requis.' });
+      if (message.length > 200) return res.status(400).json({ error: 'Le message de commit ne doit pas dépasser 200 caractères.' });
+
+      const { stdout: statusOut } = await execGit(['status', '--porcelain=v1', '--', ...workspaceGitPaths]);
+      if (!statusOut.trim()) return res.status(400).json({ error: 'Aucune modification à committer.' });
+      await execGit(['add', '--all', '--', ...workspaceGitPaths]);
+      const { stdout } = await execGit(['commit', '-m', message]);
+      res.json({ success: true, output: stdout.trim() });
+    } catch (e: any) {
+      res.status(500).json({ error: e.stderr?.trim() || e.message || 'Impossible de créer le commit.' });
+    }
+  });
+
+  // POST /api/github/push
+  router.post('/push', async (_req: Request, res: Response) => {
+    try {
+      const { stdout } = await execGit(['push'], 30000);
+      res.json({ success: true, output: stdout.trim() || 'Push terminé.' });
+    } catch (e: any) {
+      res.status(500).json({ error: e.stderr?.trim() || e.message || 'Impossible de pousser vers GitHub.' });
+    }
   });
 
   // GET /api/github/commits

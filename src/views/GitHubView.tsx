@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { WorkspacePublishPanel } from '../components/github/WorkspacePublishPanel.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -282,6 +283,10 @@ export default function GitHubView() {
           </>
         }
       />
+
+      <div className="flex-shrink-0 px-6 pt-4">
+        <WorkspacePublishPanel onPublished={fetchCommits} />
+      </div>
 
       {/* ── Tabs ───────────────────────────────────────────── */}
       <div

@@ -65,3 +65,27 @@ test('github routes: GET /repos delegates to skillManager', async () => {
   }
 });
 
+test('github routes: POST /commit requires a message', async () => {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/github', createGithubRouter({ handleToolCall: async () => ({}) } as any));
+
+  const server: Server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const port = (server.address() as any).port;
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/github/commit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: '   ' }),
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json() as any;
+    assert.ok(body.error.includes('message'));
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
