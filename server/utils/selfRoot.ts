@@ -71,6 +71,15 @@ function getPersistedWorkspacesPath(): string {
   return path.join(Leanna_APP_ROOT, ".Leanna", "workspaces.json");
 }
 
+export interface FtpWorkspaceConfig {
+  host: string;
+  port: number;
+  user: string;
+  remotePath: string;
+  secure: boolean;
+  /** Le mot de passe n'est jamais persisté — uniquement conservé en mémoire de session. */
+}
+
 export interface WorkspaceEntry {
   id: string;
   name: string;
@@ -80,6 +89,9 @@ export interface WorkspaceEntry {
   createdAt: string;
   isGit: boolean;
   gitBranch?: string;
+  /** Présent uniquement pour les workspaces créés par connexion FTP. */
+  isFtp?: boolean;
+  ftpConfig?: FtpWorkspaceConfig;
 }
 
 export interface WorkspaceValidationResult {

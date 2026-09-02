@@ -48,6 +48,7 @@ import { createTokensOptimizationRouter } from "./server/routes/tokens-optimizat
 import { createSummarizeContextRouter } from "./server/routes/summarize-context.js";
 import { createWorkspaceRouter } from "./server/routes/workspace.js";
 import { createSelfRootRouter } from "./server/routes/self-root.js";
+import { createFtpRouter } from "./server/routes/ftp.js";
 import safeguardsRouter from "./server/routes/safeguards.js";
 import { createUploadDocumentRouter } from "./server/routes/upload-document.js";
 import { createDocumentsRouter } from "./server/routes/documents.js";
@@ -485,6 +486,7 @@ async function startServer() {
   app.use("/api/tokens", createSummarizeContextRouter());
   app.use("/api", createWorkspaceRouter(getWorkspaceRoot));
   app.use("/api/self-root", createSelfRootRouter(() => wss));
+  app.use("/api/ftp", createFtpRouter());
   app.use("/api/safeguards", safeguardsRouter);
 
   app.use("/api/upload-document", createUploadDocumentRouter(() => currentProfile));
