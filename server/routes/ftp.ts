@@ -2,10 +2,14 @@
  * ftp.ts — Routes REST pour la connexion FTP workspace.
  *
  * Endpoints :
- *   POST /api/ftp/test       — Teste la connexion (retourne ok/error)
- *   POST /api/ftp/download   — Télécharge le workspace FTP (SSE streaming)
- *   POST /api/ftp/push       — Pousse les fichiers locaux vers le FTP (SSE streaming)
- *   GET  /api/ftp/list       — Liste un répertoire FTP distant
+ *   POST /api/ftp/test          — Teste la connexion (retourne ok/error + auto-save si succès)
+ *   POST /api/ftp/download      — Télécharge le workspace FTP (SSE streaming + auto-save)
+ *   POST /api/ftp/push          — Pousse les fichiers locaux vers le FTP (SSE streaming)
+ *   POST /api/ftp/list          — Liste un répertoire FTP distant
+ *   POST /api/ftp/local-path    — Calcule le chemin miroir sans connexion
+ *   GET  /api/ftp/servers       — Liste les serveurs FTP enregistrés
+ *   DELETE /api/ftp/servers/:id — Supprime un serveur du registre
+ *   PATCH  /api/ftp/servers/:id — Renomme un serveur
  */
 
 import { Router, Request, Response } from "express";
@@ -18,6 +22,12 @@ import {
   ftpLocalMirrorPath,
   type FtpConfig,
 } from "../utils/ftpSync.js";
+import {
+  saveFtpServer,
+  listFtpServers,
+  removeFtpServer,
+  renameFtpServer,
+} from "../utils/selfRoot.js";
 
 export function createFtpRouter(): Router {
   const router = Router();
@@ -27,12 +37,13 @@ export function createFtpRouter(): Router {
     host: z.string().min(1, "L'hôte FTP est requis."),
     port: z.coerce.number().int().min(1).max(65535).default(21),
     user: z.string().min(1, "Le nom d'utilisateur est requis."),
-    password: z.string(), // peut être vide pour FTP anonyme
+    password: z.string(),
     remotePath: z.string().default("/"),
     secure: z.boolean().default(false),
   });
 
   // ── POST /api/ftp/test ──────────────────────────────────────────────────────
+  // Teste la connexion et, en cas de succès, enregistre le serveur dans le registre.
   router.post("/test", async (req: Request, res: Response) => {
     const parsed = FtpConfigSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -43,6 +54,19 @@ export function createFtpRouter(): Router {
 
     const config: FtpConfig = parsed.data;
     const result = await testFtpConnection(config);
+
+    if (result.ok) {
+      // Auto-save le serveur dès que la connexion réussit
+      const saved = saveFtpServer(
+        config.host,
+        config.port,
+        config.user,
+        config.remotePath,
+        config.secure
+      );
+      return res.json({ ...result, saved });
+    }
+
     return res.json(result);
   });
 
@@ -66,17 +90,9 @@ export function createFtpRouter(): Router {
 
     const sendEvent = (type: string, data: Record<string, unknown>) => {
       if (res.writableEnded) return;
-      try {
-        res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
-      } catch {
-        /* client disconnected */
-      }
+      try { res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`); } catch { /* gone */ }
     };
-    const finish = () => {
-      try {
-        if (!res.writableEnded) res.end();
-      } catch { /* ignore */ }
-    };
+    const finish = () => { try { if (!res.writableEnded) res.end(); } catch { /* ignore */ } };
 
     try {
       const localDir = await downloadFtpWorkspace(config, (info) => {
@@ -85,14 +101,24 @@ export function createFtpRouter(): Router {
 
       sendEvent("log", { level: "info", message: "🔌 Activation du workspace…" });
 
-      // Activer le workspace local via le mécanisme sandbox existant
       const { switchSandboxProject } = await import("../utils/sandbox.js");
       const newRoot = await switchSandboxProject(localDir);
 
-      // Persister dans le registre des workspaces avec les métadonnées FTP
+      // Persister dans le registre des workspaces
       const { addOrUpdateWorkspace } = await import("../utils/selfRoot.js");
       const workspaceName = `FTP: ${config.host}${config.remotePath !== "/" ? config.remotePath : ""}`;
       addOrUpdateWorkspace(newRoot, undefined, workspaceName);
+
+      // Persister/mettre à jour le serveur FTP avec le chemin miroir
+      const saved = saveFtpServer(
+        config.host,
+        config.port,
+        config.user,
+        config.remotePath,
+        config.secure,
+        { localMirrorPath: localDir }
+      );
+      sendEvent("log", { level: "info", message: `💾 Serveur FTP enregistré : ${saved.name}` });
 
       // Recharger le Knowledge System
       try {
@@ -106,7 +132,7 @@ export function createFtpRouter(): Router {
       } catch { /* silent */ }
 
       sendEvent("log", { level: "info", message: `🎉 Workspace FTP actif : ${newRoot}` });
-      sendEvent("done", { status: "success", newRoot, localDir });
+      sendEvent("done", { status: "success", newRoot, localDir, savedServer: saved });
     } catch (err: any) {
       sendEvent("log", { level: "error", message: `❌ ${err.message || String(err)}` });
       sendEvent("error", { error: err.message || String(err) });
@@ -120,8 +146,6 @@ export function createFtpRouter(): Router {
     const BodySchema = z.object({
       config: FtpConfigSchema,
       localRoot: z.string().min(1, "localRoot est requis."),
-      // Optionnel : liste de chemins relatifs à pousser (push sélectif)
-      // Si absent ou vide → push complet
       files: z.array(z.string()).optional().default([]),
     });
 
@@ -134,7 +158,6 @@ export function createFtpRouter(): Router {
 
     const { config, localRoot, files } = parsed.data;
 
-    // Setup SSE
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
@@ -143,21 +166,14 @@ export function createFtpRouter(): Router {
 
     const sendEvent = (type: string, data: Record<string, unknown>) => {
       if (res.writableEnded) return;
-      try {
-        res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
-      } catch { /* ignore */ }
+      try { res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`); } catch { /* ignore */ }
     };
-    const finish = () => {
-      try {
-        if (!res.writableEnded) res.end();
-      } catch { /* ignore */ }
-    };
+    const finish = () => { try { if (!res.writableEnded) res.end(); } catch { /* ignore */ } };
 
     try {
       const uploaded = await pushFtpChanges(config as FtpConfig, localRoot, files, (info) => {
         sendEvent("log", { level: info.level, message: info.message });
       });
-
       sendEvent("done", { status: "success", uploaded });
     } catch (err: any) {
       sendEvent("log", { level: "error", message: `❌ ${err.message || String(err)}` });
@@ -167,7 +183,7 @@ export function createFtpRouter(): Router {
     }
   });
 
-  // ── GET /api/ftp/list ───────────────────────────────────────────────────────
+  // ── POST /api/ftp/list ──────────────────────────────────────────────────────
   router.post("/list", async (req: Request, res: Response) => {
     const BodySchema = z.object({
       config: FtpConfigSchema,
@@ -176,9 +192,7 @@ export function createFtpRouter(): Router {
 
     const parsed = BodySchema.safeParse(req.body);
     if (!parsed.success) {
-      return res
-        .status(400)
-        .json({ error: parsed.error.errors[0]?.message ?? "Paramètres invalides." });
+      return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Paramètres invalides." });
     }
 
     try {
@@ -199,15 +213,44 @@ export function createFtpRouter(): Router {
     }
   });
 
-  // ── GET /api/ftp/local-path — Calcule le chemin miroir sans se connecter ────
+  // ── POST /api/ftp/local-path ────────────────────────────────────────────────
   router.post("/local-path", (req: Request, res: Response) => {
     const parsed = FtpConfigSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res
-        .status(400)
-        .json({ error: parsed.error.errors[0]?.message ?? "Paramètres invalides." });
+      return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Paramètres invalides." });
     }
     return res.json({ localPath: ftpLocalMirrorPath(parsed.data as FtpConfig) });
+  });
+
+  // ── GET /api/ftp/servers ────────────────────────────────────────────────────
+  router.get("/servers", (_req: Request, res: Response) => {
+    try {
+      const servers = listFtpServers();
+      return res.json({ servers });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || String(err) });
+    }
+  });
+
+  // ── DELETE /api/ftp/servers/:id ─────────────────────────────────────────────
+  router.delete("/servers/:id", (req: Request, res: Response) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: "ID requis." });
+    const removed = removeFtpServer(id);
+    return res.json({ success: removed, id });
+  });
+
+  // ── PATCH /api/ftp/servers/:id — renommer ───────────────────────────────────
+  router.patch("/servers/:id", (req: Request, res: Response) => {
+    const { id } = req.params;
+    const Schema = z.object({ name: z.string().min(1, "Le nom est requis.") });
+    const parsed = Schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Paramètres invalides." });
+    }
+    const updated = renameFtpServer(id, parsed.data.name);
+    if (!updated) return res.status(404).json({ error: "Serveur introuvable." });
+    return res.json({ success: true, server: updated });
   });
 
   return router;

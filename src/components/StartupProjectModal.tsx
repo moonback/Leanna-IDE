@@ -84,6 +84,23 @@ export function StartupProjectModal() {
   const ftpLogsEndRef = useRef<HTMLDivElement>(null);
   const ftpAbortRef   = useRef<(() => void) | null>(null);
 
+  interface SavedFtpServer {
+    id: string; name: string; host: string; port: number;
+    user: string; remotePath: string; secure: boolean;
+    lastConnected: string; localMirrorPath?: string;
+  }
+  const [savedFtpServers, setSavedFtpServers] = useState<SavedFtpServer[]>([]);
+
+  const fetchFtpServers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ftp/servers');
+      if (res.ok) {
+        const data = await res.json();
+        setSavedFtpServers(data.servers ?? []);
+      }
+    } catch { /* silent */ }
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { error: toastError } = useToast();
@@ -303,12 +320,13 @@ export function StartupProjectModal() {
       setFtpTestResult(data.ok
         ? { ok: true, info: data.serverInfo }
         : { ok: false, error: data.error });
+      if (data.ok) await fetchFtpServers();
     } catch (err: any) {
       setFtpTestResult({ ok: false, error: err.message || 'Erreur réseau' });
     } finally {
       setFtpStatus('idle');
     }
-  }, [ftpConfig]);
+  }, [ftpConfig, fetchFtpServers]);
 
   const handleFtpDownload = useCallback(async () => {
     setFtpStatus('downloading');
@@ -355,6 +373,7 @@ export function StartupProjectModal() {
               setFtpStatus('done');
               await activate(event.newRoot);
               await fetchWorkspaces();
+              await fetchFtpServers();
             } else if (event.type === 'error') {
               setFtpStatus('error');
               setFtpLogs(prev => [...prev, { level: 'error', message: event.error ?? 'Erreur inconnue' }]);
@@ -490,14 +509,14 @@ export function StartupProjectModal() {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={OVERLAY_FADE}
-        className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
+        className="fixed inset-0 z-[99999] flex items-center justify-center"
         style={{ backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}
       >
         <motion.div
           {...cardMotionProps}
           transition={MODAL_SPRING}
-          className="w-full max-w-xl rounded-2xl p-6 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-          style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+          className="w-full h-screen rounded-none p-6 shadow-2xl overflow-hidden flex flex-col"
+          style={{ backgroundColor: 'var(--bg-panel)', border: 'none' }}
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-4 flex-shrink-0">
@@ -586,7 +605,7 @@ export function StartupProjectModal() {
             </button>
             <button
               type="button"
-              onClick={() => { setActiveTab('ftp'); setFtpStatus('idle'); setFtpLogs([]); setFtpTestResult(null); }}
+              onClick={() => { setActiveTab('ftp'); setFtpStatus('idle'); setFtpLogs([]); setFtpTestResult(null); fetchFtpServers(); }}
               className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
                 activeTab === 'ftp' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
               }`}
@@ -601,7 +620,7 @@ export function StartupProjectModal() {
           </div>
 
           {/* ── Tab Content ── */}
-          <div className="flex-1 overflow-y-auto pr-1 space-y-3 min-h-[220px]">
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3">
             {activeTab === 'recent' && (
               <div className="space-y-2">
                 {workspaces.length === 0 ? (
@@ -674,6 +693,19 @@ export function StartupProjectModal() {
                                 >
                                   <GitBranch className="w-2.5 h-2.5" />
                                   {ws.gitBranch || 'git'}
+                                </span>
+                              )}
+                              {ws.name?.startsWith('FTP:') && (
+                                <span
+                                  className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.2 rounded"
+                                  style={{
+                                    backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+                                    border: '1px solid color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                                    color: 'var(--accent-primary)',
+                                  }}
+                                >
+                                  <Server className="w-2.5 h-2.5" />
+                                  FTP
                                 </span>
                               )}
                             </div>
@@ -1001,6 +1033,66 @@ export function StartupProjectModal() {
             {/* ── FTP Tab ── */}
             {activeTab === 'ftp' && (
               <div className="space-y-4">
+
+                {/* ── Saved FTP servers ── */}
+                {savedFtpServers.length > 0 && ftpStatus === 'idle' && (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                      Serveurs enregistrés
+                    </p>
+                    {savedFtpServers.map(srv => (
+                      <div
+                        key={srv.id}
+                        className="group flex items-center justify-between gap-2 p-2.5 rounded-xl border transition-all cursor-pointer hover:border-[var(--accent-primary)]"
+                        style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-base)' }}
+                        onClick={() => {
+                          setFtpHost(srv.host);
+                          setFtpPort(String(srv.port));
+                          setFtpUser(srv.user);
+                          setFtpRemotePath(srv.remotePath);
+                          setFtpSecure(srv.secure);
+                          setFtpPassword('');
+                          setFtpTestResult(null);
+                        }}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--accent-primary)' }}>
+                            <Server className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{srv.name}</p>
+                            <p className="text-[10px] font-mono truncate" style={{ color: 'var(--text-muted)' }}>
+                              {srv.user}@{srv.host}:{srv.port}{srv.remotePath !== '/' ? srv.remotePath : ''}
+                              {srv.secure ? ' · FTPS' : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <span className="text-[10px] opacity-50 hidden sm:block" style={{ color: 'var(--text-muted)' }}>
+                            {new Date(srv.lastConnected).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await fetch(`/api/ftp/servers/${srv.id}`, { method: 'DELETE' });
+                              await fetchFtpServers();
+                            }}
+                            className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-400 transition-all"
+                            style={{ color: 'var(--text-muted)' }}
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                          <ArrowRight className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" style={{ color: 'var(--accent-primary)' }} />
+                        </div>
+                      </div>
+                    ))}
+                    <div className="border-t pt-2" style={{ borderColor: 'var(--border-base)' }} />
+                  </div>
+                )}
+
                 {/* Connection form — hidden while downloading */}
                 {ftpStatus !== 'downloading' && ftpStatus !== 'done' && (
                   <>
