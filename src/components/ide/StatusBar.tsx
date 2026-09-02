@@ -407,7 +407,7 @@ export const StatusBar = memo(function StatusBar({
               ? <LoaderCircle size={12} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
               : <DatabaseZap size={12} style={{ color: 'var(--accent-primary)' }} />
             }
-            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Index + Docs Extraits</span>
+            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Réindexer</span>
           </button>
         </div>
 
