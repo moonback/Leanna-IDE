@@ -232,7 +232,14 @@ export function useLiveAPI() {
       addLog(`${msg.tool_used} — ${msg.info}`, 'action');
       completeActivity(msg.tool_used);
       // Dispatch for AgentPanel real-time tool tracking
-      window.dispatchEvent(new CustomEvent('Leanna-tool-done', { detail: { tool: msg.tool_used, info: msg.info } }));
+      window.dispatchEvent(new CustomEvent('Leanna-tool-done', {
+        detail: { tool: msg.tool_used, info: msg.info, result: msg.result },
+      }));
+      if (msg.tool_used === 'security_audit' && msg.result) {
+        window.dispatchEvent(new CustomEvent('Leanna-security-audit-report', {
+          detail: msg.result,
+        }));
+      }
     }
     if (msg.error) {
       addLog(msg.error, 'error');

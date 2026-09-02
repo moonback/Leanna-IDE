@@ -1113,7 +1113,11 @@ async function handleToolCall(
       updateContextGate(contextGate, call.name, call.args, response);
 
       functionResponses.push({ id: call.id, name: call.name, response });
-      clientWs.send(JSON.stringify({ tool_used: call.name, info: JSON.stringify(call.args) }));
+      clientWs.send(JSON.stringify({
+        tool_used: call.name,
+        info: JSON.stringify(call.args),
+        ...(call.name === 'security_audit' ? { result: response } : {}),
+      }));
 
       // Auto-verify
       const WRITE_TOOLS_VERIFY = ['write_project_file', 'modify_project_file', 'patch_project_file', 'rename_project_file'];
