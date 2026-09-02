@@ -1234,8 +1234,8 @@ button {
    CHAT MARKDOWN — Styles compacts pour les bulles de chat
 ═══════════════════════════════════════════════ */
 .chat-markdown {
-  font-size: 12px;
-  line-height: 1.65;
+  font-size: 0.875rem;
+  line-height: 1.625;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }

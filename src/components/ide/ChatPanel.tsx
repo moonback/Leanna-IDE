@@ -126,8 +126,6 @@ const ChatMarkdown = memo(function ChatMarkdown({ text }: { text: string }) {
       // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with sanitizeMarkdownHtml
       dangerouslySetInnerHTML={{ __html: html }}
       style={{
-        fontSize: '0.9rem',
-        lineHeight: '1.6',
         color: 'var(--text-primary)',
       }}
     />
@@ -227,24 +225,24 @@ const ChatMessage = memo(function ChatMessage({
           <div className="mt-2 text-left">
             <button
               type="button"
-              className="flex w-full items-center gap-2 px-2.5 py-2 rounded-lg text-xs transition-colors hover:bg-white/5"
+              className="flex w-full items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] transition-colors hover:bg-white/5"
               style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)', backgroundColor: 'color-mix(in srgb, var(--bg-input) 55%, transparent)' }}
               aria-expanded={showSources}
               aria-controls={`sources-${entry.id}`}
               onClick={() => setShowSources(value => !value)}
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-md" style={{ backgroundColor: 'var(--accent-subtle)' }}>
-                <Eye size={12} style={{ color: 'var(--accent-primary)' }} />
+              <span className="flex h-4 w-4 items-center justify-center rounded" style={{ backgroundColor: 'var(--accent-subtle)' }}>
+                <Eye size={10} style={{ color: 'var(--accent-primary)' }} />
               </span>
               <span className="font-medium">Sources utilisées</span>
-              <span className="rounded-full px-1.5 py-0.5 font-mono text-[10px]" style={{ color: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)' }}>
+              <span className="rounded-full px-1.5 py-px font-mono text-[9px]" style={{ color: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)' }}>
                 {visibleSources.length}
               </span>
-              <span className="ml-auto text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="ml-auto text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
                 {showSources ? 'Masquer' : 'Afficher'}
               </span>
               <ChevronDown
-                size={13}
+                size={11}
                 style={{
                   color: 'var(--text-dimmed)',
                   transform: showSources ? 'rotate(180deg)' : undefined,
@@ -267,15 +265,15 @@ const ChatMessage = memo(function ChatMessage({
                   <div className="divide-y" style={{ borderColor: 'var(--border-base)' }}>
                     {visibleSources.map(source => {
                       return (
-                        <div key={source.id} className="group flex items-center gap-2 px-2.5 py-2 min-w-0 transition-colors hover:bg-white/5">
-                          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded" style={{ backgroundColor: 'var(--accent-subtle)' }}>
-                            <Eye size={11} style={{ color: 'var(--accent-primary)' }} />
+                        <div key={source.id} className="group flex items-center gap-1.5 px-2 py-1.5 min-w-0 transition-colors hover:bg-white/5">
+                          <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded" style={{ backgroundColor: 'var(--accent-subtle)' }}>
+                            <Eye size={10} style={{ color: 'var(--accent-primary)' }} />
                           </span>
                           <div className="min-w-0 flex-1">
-                            <div className="font-mono text-xs truncate" title={source.path} style={{ color: 'var(--text-primary)' }}>
+                            <div className="font-mono text-[11px] truncate" title={source.path} style={{ color: 'var(--text-primary)' }}>
                               {source.path}
                             </div>
-                            <div className="flex items-center gap-2 text-[10px] truncate" style={{ color: 'var(--text-dimmed)' }}>
+                            <div className="flex items-center gap-1.5 text-[9px] truncate" style={{ color: 'var(--text-dimmed)' }}>
                               {source.lines && <span className="rounded px-1" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--text-muted)' }}>{source.lines}</span>}
                               <span className="truncate">via {source.tool}</span>
                             </div>
@@ -290,7 +288,7 @@ const ChatMessage = memo(function ChatMessage({
                               onExcludeSource?.(source);
                             }}
                           >
-                            <X size={11} style={{ color: 'var(--text-muted)' }} />
+                            <X size={10} style={{ color: 'var(--text-muted)' }} />
                           </button>
                         </div>
                       );
