@@ -15,12 +15,13 @@ import { verifySkill, parseTsErrors, parseLintResults, findAssociatedTestFile } 
 // ─── Tests unitaires du skill verify ─────────────────────────────────────────
 
 test("verify skill exposes all tool declarations", () => {
-  assert.equal(verifySkill.declarations.length, 7);
+  assert.equal(verifySkill.declarations.length, 8);
   const names = verifySkill.declarations.map((d: any) => d.name);
   assert.ok(names.includes("verify_typecheck"));
   assert.ok(names.includes("verify_file"));
   assert.ok(names.includes("verify_run_script"));
   assert.ok(names.includes("verify_lint"));
+  assert.ok(names.includes("verify_format"));
   assert.ok(names.includes("verify_syntax"));
 });
 
@@ -30,6 +31,7 @@ test("verify skill has input schemas for all tools", () => {
   assert.ok(verifySkill.inputSchemas!["verify_file"]);
   assert.ok(verifySkill.inputSchemas!["verify_run_script"]);
   assert.ok(verifySkill.inputSchemas!["verify_lint"]);
+  assert.ok(verifySkill.inputSchemas!["verify_format"]);
   assert.ok(verifySkill.inputSchemas!["verify_syntax"]);
 });
 

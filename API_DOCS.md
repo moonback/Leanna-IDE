@@ -2,12 +2,71 @@
 
 Toutes les routes de l'API REST sont préfixées par `/api`.
 
+## Outils agent de qualité
+
+Les outils suivants sont exposés au runtime des agents, en complément des routes REST.
+
+### `quality_loop`
+
+Applique une modification puis exécute une boucle qualité bornée. L'outil ne prend aucune nouvelle tentative automatique après un échec.
+
+#### Paramètres
+
+```json
+{
+  "path": "server/example.ts",
+  "search": "const value = 1;",
+  "replace": "const value = 2;"
+}
+```
+
+#### Phases
+
+`read_project_file` → baseline `verify_file` → `modify_project_file` → `verify_format` → `verify_typecheck` → `verify_file` (lint et test associé) → diff/régression.
+
+#### Réponse
+
+Le résultat contient `success`, `stoppedAt`, `file`, `testFile`, `diff`, `baseline`, `current`, `regression` et `errors`. Les valeurs possibles de `stoppedAt` sont `modify`, `format`, `typecheck`, `tests`, `regression` et `complete`.
+
+### `verify_format`
+
+Formate uniquement le fichier indiqué. Il supprime les espaces blancs en fin de ligne et garantit une nouvelle ligne finale, sans modifier les autres fichiers.
+
 ### Format d'authentification
 Sauf mention contraire (notamment `/api/health`), tous les endpoints nécessitent un jeton secret si `Leanna_API_TOKEN` est défini dans l'environnement.
 
 * **En-tête HTTP** : `x-leanna-token: <SECRET>`
 * **Cookie HTTP** : `Leanna_token=<SECRET>`
 * **Paramètre de requête (WebSockets)** : `?token=<SECRET>`
+
+## Contrats de transparence IA
+
+Ces contrats décrivent les métadonnées attendues par les réponses Live, les missions et les notebooks. Ils ne constituent pas une route REST autonome.
+
+### Contexte traçable
+
+Une réponse qui utilise le workspace doit inclure un tableau `evidence` contenant uniquement les éléments effectivement consultés :
+
+```json
+{
+  "evidence": [
+    {
+      "sourceId": "server-skills-verify",
+      "kind": "file",
+      "path": "server/skills/verify.ts",
+      "lines": { "start": 740, "end": 812 },
+      "tests": ["server/skills/verify.test.ts"],
+      "excerpt": "..."
+    }
+  ]
+}
+```
+
+Le bouton **Inspecter le contexte** affiche cette liste. L'action **Exclure** retire une source du contexte de la réponse courante et déclenche un recalcul ; ses citations ne peuvent alors plus être utilisées.
+
+### Plan d'action explicite
+
+Avant le démarrage d'une mission multi-étapes, le client affiche puis fait confirmer un plan contenant : `objectives`, `targetFiles`, `tools`, `risks`, `estimatedCost` et `stopConditions`. Une annulation, un dépassement du coût estimé ou une condition d'arrêt satisfaite doit produire un état terminal explicite et empêcher l'étape suivante.
 
 ---
 
@@ -249,6 +308,109 @@ data: {"type":"done","status":"success","newRoot":"C:/Users/Mayss/Documents/Lean
 - Le dossier de destination ne doit pas exister avant le clonage ; si c'est le cas, l'événement `error` est immédiatement émis avec le `clonePath`.
 - En cas d'échec partiel, le dossier partiellement cloné est nettoyé automatiquement.
 - Après succès, le sandbox est réinitialisé et le Knowledge System est réindexé exactement comme après `POST /api/self-root/change`.
+
+## Publication GitHub du workspace réel
+
+Le composant `WorkspacePublishPanel` (`src/components/github/WorkspacePublishPanel.tsx`) est accessible depuis le bouton **GitHub** de la status bar de l'IDE. Il agit sur le workspace actif, défini par `SELF_ROOT`.
+
+### `GET /api/github/status`
+
+Retourne la branche courante et les fichiers modifiés du workspace. Le dossier `.Leanna/` est explicitement exclu du résultat.
+
+Réponse :
+
+```json
+{
+  "branch": "main",
+  "clean": false,
+  "files": [
+    { "index": " ", "worktree": "M", "path": "src/example.ts" }
+  ]
+}
+```
+
+### `POST /api/github/commit`
+
+Ajoute et commit toutes les modifications du workspace, à l'exception de `.Leanna/`.
+
+Corps :
+
+```json
+{ "message": "Mise à jour du workspace" }
+```
+
+Le message est obligatoire et limité à 200 caractères. Aucun commit n'est créé si le workspace ne contient pas de modification suivie par Git.
+
+### `POST /api/github/push`
+
+Pousse le commit courant vers le remote Git configuré (`origin`). L'authentification Git doit être configurée localement, par exemple via le gestionnaire d'identifiants Git ou une clé SSH.
+
+Les opérations utilisent des arguments Git séparés, sans shell, et désactivent les prompts interactifs. `.Leanna/` est également déclaré dans `.gitignore` afin que ses fichiers locaux ne soient jamais ajoutés au dépôt.
+
+### Synchronisation FTP/FTPS
+
+Les endpoints FTP utilisent le schéma commun suivant. Le mot de passe est requis dans la requête mais n'est jamais persisté.
+
+```json
+{
+  "host": "ftp.example.com",
+  "port": 21,
+  "user": "deploy",
+  "password": "<SECRET>",
+  "remotePath": "/public_html",
+  "secure": false
+}
+```
+
+Le miroir local est créé sous `~/.Leanna/ftp-workspaces/<host>_<port>/<remotePath>/`. Les dossiers système courants et les liens symboliques sont ignorés pendant le téléchargement.
+
+### `POST /api/ftp/test`
+
+Teste la connexion, l'authentification et l'accès à `remotePath`. En cas de succès, les métadonnées de connexion sont enregistrées dans `.Leanna/ftp-servers.json` sans le mot de passe.
+
+Réponse succès :
+
+```json
+{
+  "ok": true,
+  "serverInfo": "12 entrée(s) visible(s) dans /public_html",
+  "saved": { "id": "...", "host": "ftp.example.com", "port": 21, "user": "deploy" }
+}
+```
+
+### `POST /api/ftp/download` *(SSE)*
+
+Télécharge récursivement `remotePath`, active le miroir local comme workspace, l'ajoute à l'historique et recharge le Knowledge System. La réponse est un flux SSE.
+
+### `POST /api/ftp/push` *(SSE)*
+
+Envoie les fichiers du miroir vers le serveur FTP. `files` est optionnel : s'il est vide, tout le workspace est envoyé ; sinon seuls les chemins relatifs listés sont traités.
+
+```json
+{
+  "config": { "host": "ftp.example.com", "port": 21, "user": "deploy", "password": "<SECRET>", "remotePath": "/public_html", "secure": false },
+  "localRoot": "C:/Users/Mayss/.Leanna/ftp-workspaces/ftp.example.com_21/public_html",
+  "files": ["index.html", "assets/app.js"]
+}
+```
+
+Les flux `download` et `push` émettent des événements `log` (`level`, `message`), puis `done` en cas de succès (`newRoot`/`uploaded`) ou `error` en cas d'échec (`error`).
+
+### `POST /api/ftp/list`
+
+Liste sans récursion un répertoire distant. Corps : `{ "config": { ... }, "remotePath": "/public_html/assets" }`. Retourne `entries[]` avec `name`, `type`, `size` et `date`.
+
+### `POST /api/ftp/local-path`
+
+Calcule le chemin du miroir sans connexion. Corps : configuration FTP. Retourne `{ "localPath": "..." }`.
+
+### `GET /api/ftp/servers`
+
+Retourne `{ "servers": [...] }`, la liste des serveurs enregistrés sans mot de passe.
+
+### `DELETE /api/ftp/servers/:id` et `PATCH /api/ftp/servers/:id`
+
+Supprime une entrée du registre sans supprimer le miroir local, ou modifie son nom d'affichage avec `{ "name": "Production" }`.
 
 ---
 

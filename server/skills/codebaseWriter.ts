@@ -143,7 +143,7 @@ export async function handleWriteProjectFile(args: any, toolContext: any) {
   toolContext.emitIdeAction?.({ type: "file-changed", path: requestedPath });
   if (!sandboxMode) {
     triggerRestartIfNeeded(requestedPath);
-    scheduleValidation();
+    scheduleValidation(true, toolContext?.supervisor);
   }
   return {
     status: "success",
@@ -278,7 +278,7 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
   toolContext.emitIdeAction?.({ type: "file-changed", path: requestedPath });
   if (!sandboxMode) {
     triggerRestartIfNeeded(requestedPath);
-    scheduleValidation();
+    scheduleValidation(true, toolContext?.supervisor);
   }
   return { status: "success", path: requestedPath, replacements: replaceAll ? occurrences : 1, critical, sandbox: sandboxMode, message: `File ${requestedPath} modified successfully.${sandboxMode ? ' 📦 (sandbox)' : ''}${critical ? ' ⚠️ Fichier critique modifié.' : ''}` };
 }
@@ -398,7 +398,7 @@ export async function handlePatchProjectFile(args: any, toolContext: any) {
   toolContext.emitIdeAction?.({ type: "file-changed", path: requestedPath });
   if (!sandboxMode_patch) {
     triggerRestartIfNeeded(requestedPath);
-    scheduleValidation();
+    scheduleValidation(true, toolContext?.supervisor);
   }
   return {
     status: "success",
@@ -516,7 +516,7 @@ export async function handleApplyPatch(args: any, toolContext: any) {
   toolContext.emitIdeAction?.({ type: "file-changed", path: requestedPath });
   if (!sandboxMode) {
     triggerRestartIfNeeded(requestedPath);
-    scheduleValidation();
+    scheduleValidation(true, toolContext?.supervisor);
   }
   return {
     status: "success",
@@ -568,7 +568,7 @@ export async function handleRenameProjectFile(args: any, toolContext: any) {
   if (!sandboxMode_ren) {
     triggerRestartIfNeeded(oldPath);
     triggerRestartIfNeeded(newPath);
-    scheduleValidation();
+    scheduleValidation(true, toolContext?.supervisor);
   }
   return { status: "success", oldPath, newPath, critical, sandbox: sandboxMode_ren, message: `Renamed ${oldPath} to ${newPath}.${sandboxMode_ren ? ' 📦 (sandbox)' : ''}${critical ? ' ⚠️ Fichier critique impliqué.' : ''}` };
 }
@@ -619,7 +619,7 @@ export async function handleDeleteProjectFile(args: any, toolContext: any) {
   });
   if (!sandboxMode_del) {
     triggerRestartIfNeeded(requestedPath);
-    scheduleValidation();
+    scheduleValidation(true, toolContext?.supervisor);
   }
   return { status: "success", path: requestedPath, critical, sandbox: sandboxMode_del, message: `File ${requestedPath} deleted.${sandboxMode_del ? ' 📦 (sandbox)' : ''}${critical ? ' ⚠️ Fichier critique supprimé.' : ''}` };
 }

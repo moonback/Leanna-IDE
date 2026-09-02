@@ -289,6 +289,23 @@ function lintFile(filePath) {
   return violations;
 }
 
+/** Applique uniquement les corrections de formatage sans modifier le contenu. */
+function formatFile(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, "utf-8");
+    const formatted = content
+      .split(/\r?\n/)
+      .map((line) => line.replace(/[ \t]+$/g, ""))
+      .join("\n");
+    const normalized = formatted.length > 0 && !formatted.endsWith("\n")
+      ? `${formatted}\n`
+      : formatted;
+    if (normalized !== content) fs.writeFileSync(filePath, normalized, "utf-8");
+  } catch {
+    // Les erreurs de lecture sont rapportées par lintFile.
+  }
+}
+
 // ─── Point d'entrée ──────────────────────────────────────────────────────────
 
 function main() {
@@ -297,6 +314,10 @@ function main() {
   const targets = args.filter((a) => a !== "--fix");
 
   const files = getFiles(targets);
+
+  if (fixMode) {
+    for (const file of files) formatFile(file);
+  }
 
   let allViolations = [];
   let fileCount = 0;

@@ -668,6 +668,86 @@ a[href] {
   animation: slide-in-fade 0.5s ease-out forwards;
 }
 
+.ide-splash-progress {
+  height: 8px;
+  pointer-events: none;
+}
+
+.ide-splash-progress__track {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.ide-splash-progress__aura,
+.ide-splash-progress__fill,
+.ide-splash-progress__scan {
+  position: absolute;
+  inset: 0;
+}
+
+.ide-splash-progress__aura {
+  background: var(--accent-primary);
+  filter: blur(7px);
+  opacity: 0.42;
+  transform: scaleY(0.55);
+  animation: ide-progress-breathe 1.8s ease-in-out infinite;
+}
+
+.ide-splash-progress__fill {
+  background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary) 32%, var(--accent-hover) 72%, var(--accent-secondary));
+  background-size: 220% 100%;
+  box-shadow: 0 0 10px var(--accent-primary), 0 0 22px var(--accent-glow);
+  animation: ide-progress-flow 2.2s linear infinite;
+}
+
+.ide-splash-progress__glint {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+  filter: blur(1px);
+  animation: ide-progress-glint 1.35s ease-in-out infinite;
+}
+
+.ide-splash-progress__scan {
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.55) 50%, rgba(255, 255, 255, 0.04) 58%, transparent 100%);
+  transform: translateX(-100%);
+  animation: ide-progress-scan 2s cubic-bezier(0.2, 0.65, 0.35, 1) infinite;
+}
+
+@keyframes ide-progress-flow {
+  from { background-position: 0% 0; }
+  to { background-position: 220% 0; }
+}
+
+@keyframes ide-progress-glint {
+  from { left: -20%; }
+  to { left: 105%; }
+}
+
+@keyframes ide-progress-scan {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+@keyframes ide-progress-breathe {
+  0%, 100% { opacity: 0.25; transform: scaleY(0.45); }
+  50% { opacity: 0.58; transform: scaleY(0.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ide-splash-progress__aura,
+  .ide-splash-progress__fill,
+  .ide-splash-progress__glint,
+  .ide-splash-progress__scan {
+    animation: none;
+  }
+}
+
 /* Delay variants */
 .delay-100 { animation-delay: 0.1s; }
 .delay-200 { animation-delay: 0.2s; }
@@ -1154,8 +1234,8 @@ button {
    CHAT MARKDOWN — Styles compacts pour les bulles de chat
 ═══════════════════════════════════════════════ */
 .chat-markdown {
-  font-size: 12px;
-  line-height: 1.65;
+  font-size: 0.875rem;
+  line-height: 1.625;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }

@@ -1,11 +1,11 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, animate } from 'motion/react';
 import {
-  Send, Mic, MicOff, User, Bot,
-  Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2,
+  Send, Mic, MicOff, User, Bot, Eye, X,
+  Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2, ChevronDown,
 } from 'lucide-react';
 import { marked } from 'marked';
-import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml';
+import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile, type UserProfile } from '../../context/UserProfileContext.js';
 import { ActivityFeed } from './ActivityFeed.js';
@@ -15,7 +15,7 @@ import { SlashCommandDropdown } from './SlashCommandDropdown.js';
 import { useFileMention } from '../../hooks/useFileMention.js';
 import { useSlashCommand } from '../../hooks/useSlashCommand.js';
 import { DocumentUpload, DropZoneOverlay, useDocumentDrop, type DocumentResult } from './DocumentUpload.js';
-import type { TranscriptEntry } from '../../hooks/useLiveAPI.js';
+import type { TranscriptEntry, ContextSource } from '../../hooks/useLiveAPI.js';
 
 // --- Styles Globaux améliorés ---
 const COLORS = {
@@ -126,8 +126,6 @@ const ChatMarkdown = memo(function ChatMarkdown({ text }: { text: string }) {
       // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with sanitizeMarkdownHtml
       dangerouslySetInnerHTML={{ __html: html }}
       style={{
-        fontSize: '0.9rem',
-        lineHeight: '1.6',
         color: 'var(--text-primary)',
       }}
     />
@@ -171,13 +169,18 @@ const ChatMessage = memo(function ChatMessage({
   entry,
   profile: _profile,
   reduceMotion,
+  onExcludeSource,
 }: {
   entry: TranscriptEntry;
   profile: UserProfile;
   reduceMotion: boolean;
+  onExcludeSource?: (source: ContextSource) => void;
 }) {
   const isAssistant = entry.role === 'assistant';
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
+  const [showSources, setShowSources] = useState(false);
   const bubbleStyle = isAssistant ? BUBBLE_STYLES.assistant : BUBBLE_STYLES.user;
+  const visibleSources = entry.sources?.filter(source => !excludedIds.has(source.id)) ?? [];
 
   return (
     <motion.div
@@ -218,6 +221,84 @@ const ChatMessage = memo(function ChatMessage({
         >
           {entry.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
         </span>
+        {isAssistant && visibleSources.length > 0 && (
+          <div className="mt-2 text-left">
+            <button
+              type="button"
+              className="flex w-full items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] transition-colors hover:bg-white/5"
+              style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)', backgroundColor: 'color-mix(in srgb, var(--bg-input) 55%, transparent)' }}
+              aria-expanded={showSources}
+              aria-controls={`sources-${entry.id}`}
+              onClick={() => setShowSources(value => !value)}
+            >
+              <span className="flex h-4 w-4 items-center justify-center rounded" style={{ backgroundColor: 'var(--accent-subtle)' }}>
+                <Eye size={10} style={{ color: 'var(--accent-primary)' }} />
+              </span>
+              <span className="font-medium">Sources utilisées</span>
+              <span className="rounded-full px-1.5 py-px font-mono text-[9px]" style={{ color: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)' }}>
+                {visibleSources.length}
+              </span>
+              <span className="ml-auto text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                {showSources ? 'Masquer' : 'Afficher'}
+              </span>
+              <ChevronDown
+                size={11}
+                style={{
+                  color: 'var(--text-dimmed)',
+                  transform: showSources ? 'rotate(180deg)' : undefined,
+                  transition: 'transform 0.2s ease',
+                }}
+              />
+            </button>
+
+            <AnimatePresence initial={false}>
+              {showSources && (
+                <motion.div
+                  id={`sources-${entry.id}`}
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: reduceMotion ? 0.1 : 0.2 }}
+                  className="mt-1 max-h-48 overflow-y-auto rounded-lg custom-scrollbar"
+                  style={{ border: '1px solid var(--border-base)', backgroundColor: 'var(--bg-input)' }}
+                >
+                  <div className="divide-y" style={{ borderColor: 'var(--border-base)' }}>
+                    {visibleSources.map(source => {
+                      return (
+                        <div key={source.id} className="group flex items-center gap-1.5 px-2 py-1.5 min-w-0 transition-colors hover:bg-white/5">
+                          <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded" style={{ backgroundColor: 'var(--accent-subtle)' }}>
+                            <Eye size={10} style={{ color: 'var(--accent-primary)' }} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-mono text-[11px] truncate" title={source.path} style={{ color: 'var(--text-primary)' }}>
+                              {source.path}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[9px] truncate" style={{ color: 'var(--text-dimmed)' }}>
+                              {source.lines && <span className="rounded px-1" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--text-muted)' }}>{source.lines}</span>}
+                              <span className="truncate">via {source.tool}</span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="p-1 rounded opacity-60 transition-opacity hover:bg-white/10 hover:opacity-100 flex-shrink-0"
+                            aria-label={`Exclure ${source.path} du contexte`}
+                            title="Exclure du contexte"
+                            onClick={() => {
+                              setExcludedIds(prev => new Set(prev).add(source.id));
+                              onExcludeSource?.(source);
+                            }}
+                          >
+                            <X size={10} style={{ color: 'var(--text-muted)' }} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -537,9 +618,10 @@ interface ChatPanelProps {
   pendingMessage?: PendingChatMessage | null;
   onPendingMessageConsumed?: () => void;
   onDockedChange?: (docked: boolean) => void;
+  initialDocked?: boolean;
 }
 
-export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedChange }: ChatPanelProps = {}) {
+export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedChange, initialDocked = false }: ChatPanelProps = {}) {
   const {
     connected, connecting, connect, disconnect,
     sendTextMessage, sendRawMessage, transcript, clearTranscript,
@@ -547,7 +629,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
   } = useLiveAPIContext();
   const { profile } = useProfile();
   const [minimized, setMinimized] = useState(false);
-  const [docked, setDocked] = useState(false);
+  const [docked, setDocked] = useState(initialDocked);
   const [fullscreen, setFullscreen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -906,7 +988,13 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
 
             <AnimatePresence initial={false}>
               {transcript.map((entry) => (
-                <ChatMessage key={entry.id} entry={entry} profile={profile!} reduceMotion={reduceMotion} />
+                <ChatMessage
+                  key={entry.id}
+                  entry={entry}
+                  profile={profile!}
+                  reduceMotion={reduceMotion}
+                  onExcludeSource={(source) => sendRawMessage({ context_exclude: source.path })}
+                />
               ))}
             </AnimatePresence>
 

@@ -9,6 +9,7 @@ import type {
   GoalResult,
   ReflectionResult,
   MissionConfig,
+  MissionPlan,
 } from "./types.js";
 import { DEFAULT_MISSION_CONFIG } from "./types.js";
 
@@ -120,7 +121,14 @@ export class Executor {
       this.config
     );
 
+    const plan = await this.preparePlan(mission, params.availableSkills);
+
     this.activeMissions.set(mission.id, mission);
+    this.emit("mission_plan", {
+      missionId: mission.id,
+      title: params.title,
+      plan,
+    });
     this.emit("mission_started", { missionId: mission.id, title: params.title });
 
     // Lancer l'exécution en arrière-plan
@@ -130,6 +138,46 @@ export class Executor {
     });
 
     return mission;
+  }
+
+  private async preparePlan(mission: Mission, availableSkills: string[]): Promise<MissionPlan> {
+    const rootGoal = mission.rootGoal;
+    const subGoals = await this.planner.decompose(mission, rootGoal.id, availableSkills);
+    const objectives = subGoals.length > 0 ? subGoals.map((goal) => goal.title) : [rootGoal.title];
+    const goals = subGoals.length > 0
+      ? this.createSubGoals(mission, rootGoal.id, subGoals)
+      : [rootGoal.id];
+    const plannedActions: PlannedAction[] = [];
+
+    for (const goalId of goals) {
+      const actions = await this.planner.planActions(mission, goalId, availableSkills);
+      mission.setPlanForGoal(goalId, actions);
+      plannedActions.push(...actions);
+    }
+
+    const text = `${mission.getState().title} ${mission.getState().description}`;
+    const targetedFiles = Array.from(new Set(
+      text.match(/[\w./\\-]+\.(?:ts|tsx|js|jsx|json|css|md|html|sql|cjs|mjs)/gi) ?? []
+    ));
+    const tools = Array.from(new Set(plannedActions.map((action) => action.skillName)));
+    const risks = [
+      "Une action peut échouer et déclencher une replanification.",
+      ...(targetedFiles.length === 0 ? ["Les fichiers ciblés seront confirmés pendant l'analyse."] : []),
+      ...(plannedActions.length === 0 ? ["Aucun outil n'a encore atteint le score minimum."] : []),
+    ];
+
+    return {
+      objectives,
+      targetedFiles: targetedFiles.length > 0 ? targetedFiles : ["À déterminer pendant l'analyse"],
+      tools: tools.length > 0 ? tools : ["Sélection automatique selon le contexte"],
+      risks,
+      estimatedTokens: 1200 + plannedActions.length * 800,
+      stopConditions: [
+        "Arrêt immédiat si un objectif critique échoue.",
+        `Arrêt après ${this.config.maxRetries} échecs d'une même action.`,
+        "Arrêt sur annulation explicite de l'utilisateur.",
+      ],
+    };
   }
 
   /**
@@ -180,8 +228,10 @@ export class Executor {
     console.log(`[Executor] 🚀 Mission démarrée: "${mission.getState().title}"`);
     console.log(`[Executor] ═══════════════════════════════════════════`);
 
-    // Étape 1: Décomposer l'objectif racine en sous-objectifs
-    const subGoals = await this.planner.decompose(mission, rootGoal.id, availableSkills);
+    // Le plan a été préparé avant l'événement mission_started.
+    const subGoals = Object.values(mission.getState().goals).filter(
+      (goal) => goal.parentId === rootGoal.id
+    );
 
     if (subGoals.length === 0) {
       // Pas de décomposition → exécuter directement
@@ -252,7 +302,9 @@ export class Executor {
     console.log(`[Executor] ── Objectif: "${goal.title}" ──`);
 
     // Planifier les actions
-    let actions = await this.planner.planActions(mission, goalId, availableSkills);
+    let actions = goal.plannedActions.length > 0
+      ? goal.plannedActions
+      : await this.planner.planActions(mission, goalId, availableSkills);
     mission.setPlan(actions);
 
     if (actions.length === 0) {

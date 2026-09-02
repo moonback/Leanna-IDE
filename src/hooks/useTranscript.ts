@@ -3,11 +3,20 @@ import { useChatPersistence } from './useChatPersistence.js';
 
 export type TranscriptRole = 'user' | 'assistant';
 
+export interface ContextSource {
+  id: string;
+  path: string;
+  tool: string;
+  lines?: string;
+  excluded?: boolean;
+}
+
 export interface TranscriptEntry {
   id: string;
   role: TranscriptRole;
   text: string;
   timestamp: Date;
+  sources?: ContextSource[];
 }
 
 export function useTranscript() {
@@ -33,17 +42,22 @@ export function useTranscript() {
     saveTranscript(transcript);
   }, [restored, transcript, saveTranscript, clearPersistedTranscript]);
 
-  const addTranscript = useCallback((role: TranscriptRole, text: string) => {
+  const addTranscript = useCallback((role: TranscriptRole, text: string, sources?: ContextSource[]) => {
     setTranscript(prev => {
       if (prev.length > 0 && prev[prev.length - 1].role === role) {
         const last = prev[prev.length - 1];
-        return [...prev.slice(0, -1), { ...last, text: last.text + text }];
+        return [...prev.slice(0, -1), {
+          ...last,
+          text: last.text + text,
+          sources: sources?.length ? [...(last.sources ?? []), ...sources] : last.sources,
+        }];
       }
       const entry: TranscriptEntry = {
         id: Date.now().toString() + Math.random(),
         role,
         text,
         timestamp: new Date(),
+        sources,
       };
       const next = [...prev, entry];
       return next.length > 200 ? next.slice(next.length - 200) : next;

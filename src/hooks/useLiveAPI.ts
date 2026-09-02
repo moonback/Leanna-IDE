@@ -6,7 +6,7 @@ import type { WorkflowViewModel } from '../components/panels/WorkflowsPanel.js';
 import { useAudio } from './useAudio.js';
 import { useWebSocket } from './useWebSocket.js';
 import { useToken, type TokenUsage, type TokenUsageSession, type PromptContextState, type ContextAlertLevel } from './useToken.js';
-import { useTranscript, type TranscriptRole, type TranscriptEntry } from './useTranscript.js';
+import { useTranscript, type TranscriptRole, type TranscriptEntry, type ContextSource } from './useTranscript.js';
 import { useActivity, type ActivityStep, type ModifiedFile, type ReasoningState, type ReasoningStep } from './useActivity.js';
 import { useProfile } from '../context/UserProfileContext.js';
 
@@ -21,7 +21,7 @@ export interface LogEntry {
   timestamp: Date;
 }
 
-export type { TranscriptRole, TranscriptEntry, ActivityStep, ModifiedFile, TokenUsage, TokenUsageSession, ReasoningState, ReasoningStep, PromptContextState, ContextAlertLevel };
+export type { TranscriptRole, TranscriptEntry, ContextSource, ActivityStep, ModifiedFile, TokenUsage, TokenUsageSession, ReasoningState, ReasoningStep, PromptContextState, ContextAlertLevel };
 
 export function useLiveAPI() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -78,6 +78,7 @@ export function useLiveAPI() {
 
   // Ref to track isBusy without creating stale closures in audio callbacks
   const isBusyRef = useRef(false);
+  const pendingSourcesRef = useRef<ContextSource[]>([]);
   useEffect(() => {
     isBusyRef.current = isBusy;
   }, [isBusy]);
@@ -110,6 +111,22 @@ export function useLiveAPI() {
 
   // Define onMessage handler for WS events
   const handleWebSocketMessage = useCallback((msg: any) => {
+    if (msg.tool_used) {
+      let args: Record<string, unknown> = {};
+      try { args = typeof msg.info === 'string' ? JSON.parse(msg.info) : (msg.info ?? {}); } catch { /* trace sans arguments structurés */ }
+      const path = [args.path, args.file, args.filePath, args.newPath, args.command]
+        .find(value => typeof value === 'string' && value.trim()) as string | undefined;
+      if (path) {
+        const lineStart = args.lineStart ?? args.startLine;
+        const lineEnd = args.lineEnd ?? args.endLine ?? lineStart;
+        pendingSourcesRef.current.push({
+          id: `${Date.now()}-${pendingSourcesRef.current.length}`,
+          path,
+          tool: msg.tool_used,
+          lines: lineStart !== undefined ? `L${lineStart}${lineEnd !== lineStart ? `-L${lineEnd}` : ''}` : undefined,
+        });
+      }
+    }
     if (msg.audio) {
       playAudioChunk(msg.audio);
     }
@@ -259,7 +276,9 @@ export function useLiveAPI() {
       window.dispatchEvent(new CustomEvent('Leanna-mission-event', { detail: msg }));
     }
     if (msg.text) {
-      addTranscript('assistant', msg.text);
+      const sources = pendingSourcesRef.current;
+      pendingSourcesRef.current = [];
+      addTranscript('assistant', msg.text, sources);
     }
     if (msg.user_text) {
       addTranscript('user', msg.user_text);

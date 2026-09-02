@@ -25,6 +25,7 @@ flowchart TB
             AgentsRouter["/api/agents & /api/custom-agents<br/>(Orchestration / Fleet / Builder)"]
             MarketplaceRouter["/api/marketplace<br/>(Registre / Install / Publish / Rate)"]
             MCPRouter["/api/mcp<br/>(Stdio & SSE Tool Bridge)"]
+            FTPRouter["/api/ftp<br/>(FTP/FTPS Workspace Sync)"]
             NotebooksRouter["/api/notebooks<br/>(RAG / Sources)"]
             OtherRouters["/api/workflows, /api/tts, /api/profile..."]
         end
@@ -37,6 +38,7 @@ flowchart TB
 
         subgraph CoreEngine ["Moteur Fondamental & Sécurité"]
             SelfRoot["Multi-Workspace & Path Security<br/>(SELF_ROOT & workspaces.json)"]
+            FtpSync["FTP Workspace Sync<br/>(local mirror & push)"]
             SandboxEngine["Sandbox Mirror Manager<br/>(.Leanna/sandbox)"]
             SkillRuntime["SkillManagerV2 & ToolRegistry"]
             AgentBus["AgentMessageBus & Orchestrator"]
@@ -49,6 +51,7 @@ flowchart TB
         SupabaseDB["Supabase Postgres<br/>(pgvector, Memories, History)"]
         OpenRouterAPI["OpenRouter API<br/>(LLMs alternatifs)"]
         MCPServers["Serveurs MCP Externes<br/>(stdio / SSE)"]
+        FTPServers["Serveurs FTP/FTPS Externes"]
     end
 
     UI --> Preload
@@ -68,6 +71,8 @@ flowchart TB
     SkillRuntime --> MCPServers
     
     Routers --> CoreEngine
+    FTPRouter --> FtpSync
+    FtpSync <--> FTPServers
     CoreEngine --> SupabaseDB
     Routers --> OpenRouterAPI
 ```
@@ -79,10 +84,11 @@ flowchart TB
 Leanna fonctionne selon les principes architecturaux suivants :
 
 1. **Mode Multi-Workspace & Périmètre Self-Root** : L'IDE gère dynamiquement plusieurs dépôts externes tout en confinant rigoureusement toutes les compétences IA, explorateurs et opérations au projet actif (`SELF_ROOT`). Les dépôts sont persistés dans `.Leanna/workspaces.json` et les chemins candidats sont pré-validés (rejet des racines disques et dossiers système). L'utilisateur peut cloner directement un dépôt distant via une URL (GitHub, GitLab, SSH…) depuis la modale Multi-Workspace — le flux SSE `POST /api/self-root/clone` transmet la progression git en temps réel et active le workspace automatiquement à la fin.
-2. **Isolation par Sandbox** : Par défaut, toute écriture effectuée par l'utilisateur ou par l'IA est appliquée dans un dossier miroir `.Leanna/sandbox` du workspace actif. Les modifications ne sont reportées dans le projet principal qu'après validation TypeScript (`tsc --noEmit`) et approbation explicite (`sync` ou `accept-file`).
-3. **Dialogue Multimodal Temps Réel** : L'interface échange des flux audio PCM 16kHz et des captures vidéo/écran directement avec l'API Gemini Live. Lorsque l'IA décide d'exécuter une action, elle invoque des outils (`functionDeclarations`) interceptés côté backend par le `LiveSocketHandler`.
-4. **Lecture & Indexation des documents PDF** : Les fichiers PDF du workspace sont détectés, lus via `pdf-parse`, indexés dans le `WorkspaceIndexer` et exposés à l’IDE avec un aperçu document et un texte extrait exploitable par le moteur de connaissances.
-5. **Coexistence Runtime V1 & V2** : Le système migre progressivement d'un `SkillManager` historique vers une architecture découplée `ToolRegistry` + `RuntimeV2` tout en conservant une compatibilité ascendante complète.
+2. **Synchronisation FTP par miroir local** : Un workspace FTP est téléchargé dans `~/.Leanna/ftp-workspaces/<hôte>_<port>/<chemin>/`, puis activé comme un workspace classique. Le téléchargement récursif ignore les dossiers système courants et continue malgré les erreurs par fichier. Les modifications peuvent être poussées vers le serveur via `POST /api/ftp/push`, en totalité ou sur une liste de chemins relatifs.
+3. **Isolation par Sandbox** : Par défaut, toute écriture effectuée par l'utilisateur ou par l'IA est appliquée dans un dossier miroir `.Leanna/sandbox` du workspace actif. Les modifications ne sont reportées dans le projet principal qu'après validation TypeScript (`tsc --noEmit`) et approbation explicite (`sync` ou `accept-file`).
+4. **Dialogue Multimodal Temps Réel** : L'interface échange des flux audio PCM 16kHz et des captures vidéo/écran directement avec l'API Gemini Live. Lorsque l'IA décide d'exécuter une action, elle invoque des outils (`functionDeclarations`) interceptés côté backend par le `LiveSocketHandler`.
+5. **Lecture & Indexation des documents PDF** : Les fichiers PDF du workspace sont détectés, lus via `pdf-parse`, indexés dans le `WorkspaceIndexer` et exposés à l’IDE avec un aperçu document et un texte extrait exploitable par le moteur de connaissances.
+6. **Coexistence Runtime V1 & V2** : Le système migre progressivement d'un `SkillManager` historique vers une architecture découplée `ToolRegistry` + `RuntimeV2` tout en conservant une compatibilité ascendante complète.
 
 ---
 
@@ -100,7 +106,7 @@ L'interface utilisateur est développée en **React 19** avec **TypeScript** et 
   - `IdeView` (`src/views/IdeView.tsx`) : Environnement de travail avec Monaco Editor, arborescence virtuelle, onglets et panneaux latéraux rétractables.
   - `UnifiedSidebar` : Barre latérale unique supportant les contextes `global` et `ide`.
   - `Panels` (`src/components/panels/`) : Panneaux spécialisés pour le Terminal, le Navigateur webview, les Métriques d'agents, la Flotte d'agents (`AgentFleetPanel`), le Constructeur visuel d'agents (`AgentBuilderPanel`), les Tâches planifiées, les Workflows, les MCP et l'Audit.
-  - `StartupProjectModal` : Modale de démarrage permettant de sélectionner ou changer le projet cible géré par `SELF_ROOT`. Comprend trois onglets : **Dépôts récents**, **Ouvrir local** (saisie de chemin + dialogue natif), et **Cloner** (URL Git → clone SSE en temps réel → activation automatique).
+  - `StartupProjectModal` : Modale de démarrage permettant de sélectionner ou changer le projet cible géré par `SELF_ROOT`. Comprend les onglets **Dépôts récents**, **Ouvrir local**, **Cloner** (URL Git → clone SSE) et **FTP** (test FTP/FTPS → téléchargement SSE → activation automatique).
 
 ---
 
@@ -145,7 +151,7 @@ server/
 ├── knowledge/          # Knowledge Graph, WorkspaceIndexer et mémoire projet
 ├── notebooks/          # Moteur RAG, découpage, extraction et file de traitement
 ├── mcp/                # Bridge de protocoles MCP (Stdio & SSE)
-└── utils/              # SelfRoot, Sandbox, Checkpoint Git, Cryptographie, RateLimiting
+└── utils/              # SelfRoot, Sandbox, FTP Sync, Checkpoint Git, Cryptographie
 ```
 
 ### Couche de Validation & Sécurité des Données Entrantes
@@ -155,6 +161,20 @@ server/
   - Renvoie un code `HTTP 400` structuré avec le détail des champs invalides avant d'atteindre la logique métier.
 * **Registre Dynamique d'Agents (`DynamicAgentRegistry`)** :
   - Permet l'enregistrement, l'activation, la désactivation et l'orchestration à chaud d'agents définis par l'utilisateur sans redémarrage du serveur.
+
+### Boucle qualité post-modification
+
+Le skill composite `quality_loop` (`server/autonomy/SmartSkills.ts`) fournit un point d'entrée unique pour les modifications assistées par agent. Il capture une validation de référence avant écriture, applique le changement, puis exécute séquentiellement le formatage ciblé, le typecheck et la vérification du fichier avec ses tests associés. La séquence s'arrête dès qu'une phase échoue.
+
+Le résultat contient une synthèse du diff (`changed`, lignes ajoutées et supprimées) ainsi que les snapshots `baseline` et `current`. `AgentValidation.compare` tolère les erreurs préexistantes stables, mais transforme toute augmentation des erreurs de typecheck, lint, sécurité ou tests en régression bloquante. Aucune nouvelle tentative automatique n'est lancée par cette boucle ; la correction suivante doit être explicitement demandée.
+
+### Contexte traçable
+
+Les réponses fondées sur le workspace doivent transporter un registre de preuves, et non seulement du texte : `sourceId`, chemin ou URL, lignes utilisées, tests exécutés et extrait ayant servi à la réponse. Le renderer présente ce registre dans le bouton **Inspecter le contexte**. Une exclusion est persistée pour la réponse courante, déclenche une nouvelle sélection de contexte et invalide les citations associées à la source retirée. Le serveur doit refuser ou marquer toute citation dont la preuve n'est pas présente dans ce registre.
+
+### Plan d'action avant mission
+
+Une mission comportant plusieurs étapes passe par un état `planned` avant `running`. Le plan affiché contient `objectives`, `targetFiles`, `tools`, `risks`, `estimatedCost` (tokens, appels et durée) et `stopConditions`. L'utilisateur peut confirmer, modifier ou annuler le plan ; les conditions d'arrêt restent actives pendant l'exécution et toute violation termine la mission avec un rapport explicite.
 
 ### Knowledge System & Analyse Syntaxique Tree-sitter
 Le sous-système `server/knowledge/` offre une compréhension sémantique et structurelle approfondie du projet :
@@ -265,9 +285,10 @@ flowchart TD
 
 1. **Path Traversal & Symlink Escapes** : Résolution centralisée dans `server/utils/selfRoot.ts` et `server/security.ts`. Les chemins sortant de `SELF_ROOT` ou contenant des symlinks externes sont immédiatement rejetés.
 2. **Fichiers critiques protégés** : Toute modification de `server.ts`, `server/security.ts`, `server/utils/selfRoot.ts`, `electron/main.cjs`, `electron/preload.cjs`, `.env`, `.env.local` nécessite une confirmation explicite de l'utilisateur via une modale bloquante avec timeout de 30 secondes.
-3. **Superviseur anti-régression** (`server/autonomy/Supervisor.ts`) : Analyse les erreurs TypeScript retournées après chaque édition. Si un fichier subit 3 échecs consécutifs, l'écriture sur ce fichier est verrouillée pour éviter les boucles infinies de correction.
-4. **Prompt Injection Guard** (`server/utils/promptInjectionGuard.ts`) : Filtre les entrées suspectes pouvant tenter de détourner les instructions système.
-5. **Isolation Electron** : `nodeIntegration: false`, `contextIsolation: true` et filtrage strict des canaux IPC.
+3. **Superviseur anti-régression** (`server/autonomy/Supervisor.ts`) : Analyse les résultats `verify_file` et du build global après les éditions. Chaque approche autorise 2 échecs ; une erreur répétée force immédiatement un pivot. Après 3 approches échouées, le fichier est verrouillé. Un coupe-circuit séparé suspend la session à la 10e correction cumulée. L'état et l'injecteur sont isolés pour chaque connexion WebSocket ; une reprise humaine réinitialise les blocages.
+4. **Context Gate pré-écriture** (`server/live/LiveSocketHandler.ts`) : Si `knowledge_build_context` retourne une confiance inférieure à 65 % ou un risque élevé, les écritures sont suspendues jusqu'à la lecture des fichiers pertinents recommandés. Cela empêche les patches spéculatifs tout en laissant l'IA explorer le projet.
+5. **Prompt Injection Guard** (`server/utils/promptInjectionGuard.ts`) : Filtre les entrées suspectes pouvant tenter de détourner les instructions système.
+6. **Isolation Electron** : `nodeIntegration: false`, `contextIsolation: true` et filtrage strict des canaux IPC.
 
 ---
 

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Tooltip } from '../ui/Tooltip.js';
+import { WorkspacePublishPanel } from '../github/WorkspacePublishPanel.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -598,6 +599,10 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
 
       {/* ════ LEFT — list ════════════════════════════════════════════════ */}
       <div className="flex flex-col min-h-0 overflow-hidden" style={listColStyle}>
+
+        <div className="flex-shrink-0 border-b p-3" style={{ borderColor: 'var(--border-base)' }}>
+          <WorkspacePublishPanel onPublished={fetchCommits} />
+        </div>
 
         {/* ── COMMITS list ── */}
         {tab === 'commits' && (

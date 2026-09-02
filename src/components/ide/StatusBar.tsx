@@ -13,6 +13,7 @@ import {
   Radio,
   ScrollText,
   DatabaseZap,
+  Github,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
@@ -35,6 +36,7 @@ interface StatusBarProps {
   onToggleAgents?: () => void;
   onToggleFleet?: () => void;
   onToggleLogs?: () => void;
+  onToggleGitHub?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -57,6 +59,7 @@ export const StatusBar = memo(function StatusBar({
   onToggleAgents,
   onToggleFleet,
   onToggleLogs,
+  onToggleGitHub,
 }: StatusBarProps) {
   const { tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
@@ -391,6 +394,17 @@ export const StatusBar = memo(function StatusBar({
             <span style={{ color: 'var(--text-muted)' }} className="font-medium">Logs</span>
           </button>
 
+          {/* GitHub — publication du workspace réel */}
+          <button
+            type="button"
+            onClick={onToggleGitHub}
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+            title="Ouvrir GitHub et publier les modifications"
+          >
+            <Github size={12} style={{ color: 'var(--accent-primary)' }} />
+            <span style={{ color: 'var(--text-muted)' }} className="font-medium">GitHub</span>
+          </button>
+
           {/* Séparateur */}
           <div className="w-px h-4" style={{ backgroundColor: 'var(--border-base)', opacity: 0.4 }} />
 
@@ -407,7 +421,7 @@ export const StatusBar = memo(function StatusBar({
               ? <LoaderCircle size={12} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
               : <DatabaseZap size={12} style={{ color: 'var(--accent-primary)' }} />
             }
-            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Index + Docs Extraits</span>
+            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Réindexer</span>
           </button>
         </div>
 

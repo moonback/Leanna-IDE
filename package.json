@@ -1,7 +1,7 @@
 {
   "name": "Leanna",
   "private": false,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "license": "BUSL 1.1",
   "author": "Maysson",
   "type": "module",
@@ -61,6 +61,7 @@
     "@tailwindcss/vite": "^4.1.14",
     "@types/react-window": "^1.8.8",
     "@vitejs/plugin-react": "^5.0.4",
+    "basic-ftp": "6.2.1",
     "clsx": "2.1.1",
     "compression": "^1.8.1",
     "cva": "1.0.0-beta.2",

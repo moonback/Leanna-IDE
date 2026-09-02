@@ -19,7 +19,7 @@ Un système d'agents autonomes orchestre les tâches complexes, tandis qu'un bac
 
 ## Badges
 
-[![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](package.json)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](package.json)
 [![License](https://img.shields.io/badge/license-Source--Available-orange.svg)](LICENSE)[![Runtime](https://img.shields.io/badge/node-%3E%3D22.0.0-green.svg)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0.0-3178C6.svg)](tsconfig.json)
 [![Framework](https://img.shields.io/badge/React-19.0.1-61DAFB.svg)](package.json)
@@ -48,6 +48,7 @@ Un système d'agents autonomes orchestre les tâches complexes, tandis qu'un bac
 | **Supabase JS** | Client de persistance distante (mémoires, historique, RAG, custom skills) | `^2.110.2` |
 | **Puppeteer** | Automatisation et navigation Web headless | `^25.3.0` |
 | **pdf-parse** | Extraction textuelle de documents PDF | `^2.4.5` |
+| **basic-ftp** | Connexion FTP/FTPS et synchronisation des workspaces | `6.2.1` |
 | **esbuild** | Compilation et bundling du bootstrap serveur (`dist/server.cjs`) | `^0.25.0` |
 | **electron-builder** | Packaging et création d'installateurs Windows (NSIS) | `^26.15.3` |
 
@@ -62,7 +63,7 @@ Un système d'agents autonomes orchestre les tâches complexes, tandis qu'un bac
 * **Agent Builder Visuel** : Interface de création, personnalisation (avatar, couleur, instructions système, presets d'outils, modèles) et test d'agents personnalisés avec import/export JSON.
 * **Optimiseur de contexte & Pool de clés Gemini** : Calcul automatique des tokens, compactage/résumé automatique des conversations, rotation dynamique des clés API Gemini sur erreur 429.
 
-### 🛒 Marketplace d'agents et de skills *(nouveau v0.9.0)*
+### 🛒 Marketplace d'agents et de skills *(nouveau v0.8.0)*
 
 Le Marketplace est accessible depuis la sidebar IDE : **Outils → Marketplace** (ou raccourci `Ctrl+K` dans le panel).
 
@@ -88,9 +89,10 @@ Le Marketplace est accessible depuis la sidebar IDE : **Outils → Marketplace**
 ### IDE & Workflow
 
 * **Mode Multi-Workspace Sécurisé** : Ouverture, enregistrement et bascule instantanée entre dépôts avec isolation stricte (`SELF_ROOT`), historique des workspaces, validation préventive et badges Git. Clonage direct depuis une URL GitHub/GitLab avec progression en temps réel (SSE) et activation automatique du workspace cloné.
+* **Synchronisation FTP/FTPS** : Connexion depuis la modale de démarrage, test d'accès, téléchargement récursif vers un miroir local `~/.Leanna/ftp-workspaces`, activation comme workspace et push complet ou ciblé vers le serveur avec progression SSE. Les mots de passe restent en mémoire et ne sont jamais enregistrés.
 * **Éditeur de code intelligent** : Monaco Editor, arborescence de fichiers, coloration syntaxique, recherche globale avec regex, onglets multiples et panneau de prévisualisation web.
 * **Prise en charge native des PDF** : Les fichiers PDF du workspace sont détectés, indexés et ouverts directement dans l’IDE avec aperçu document, extraction de texte et téléchargement.
-* **Intégration GitHub native** : Panneau GitHub avec 5 onglets (Commits locaux avec diff, Repos, Issues, PRs, Notifications), filtres et badges de compteurs.
+* **Intégration GitHub native** : Panneau GitHub avec 5 onglets (Commits locaux avec diff, Repos, Issues, PRs, Notifications), filtres et badges de compteurs. Le bouton **GitHub** de la status bar ouvre aussi `WorkspacePublishPanel` pour afficher les modifications du workspace réel, créer un commit et pousser vers `origin`. Le dossier `.Leanna/` est toujours exclu du statut et des commits.
 * **Terminal intégré** : Émulation PowerShell/Bash via WebSocket et PTY avec sessions multiples.
 * **Navigateur Web autonome** : Navigation, capture d'écran, extraction de texte et formulaires via webview + Puppeteer.
 
@@ -104,7 +106,7 @@ Le Marketplace est accessible depuis la sidebar IDE : **Outils → Marketplace**
 
 ### Sécurité & Administration
 
-* **Garde-fous & Checkpoints Git** : Snapshots avant chaque modification destructive, détection de boucles via le `Supervisor`, confirmation utilisateur pour fichiers critiques.
+* **Garde-fous & Checkpoints Git** : Snapshots avant chaque modification destructive, validation post-édition, détection de boucles via le `Supervisor` et confirmation utilisateur pour fichiers critiques. Le Supervisor est isolé par session, force un pivot après 2 échecs d'une approche, verrouille après 3 approches échouées et suspend la session à 10 corrections cumulées. Un Context Gate suspend aussi les écritures lorsque le contexte est faible ou à risque, jusqu'à lecture des fichiers pertinents.
 * **Périmètre Self-Root verrouillé** : Confinement de l'IA au dépôt actif, blocage des racines disques et détection des évasions par symlinks.
 * **Journalisation d'audit NDJSON** : Enregistrement structuré de chaque action dans `.Leanna-audit.log`.
 * **Protection par jeton d'accès** : Middleware `x-leanna-token` sur tous les endpoints HTTP et WebSocket.
@@ -119,7 +121,7 @@ Le Marketplace est accessible depuis la sidebar IDE : **Outils → Marketplace**
 * **Clé API Gemini** : Requise pour l'assistant Live et la génération de texte.
 * **Supabase** *(optionnel)* : URL + clé de service pour la persistance cloud des mémoires, historique, custom skills et RAG.
 * **OpenRouter** *(optionnel)* : Pour les modèles d'IA alternatifs.
-* **GitHub Token** *(optionnel)* : Pour l'intégration GitHub dans l'IDE.
+* **GitHub Token** *(optionnel)* : Pour l'intégration GitHub dans l'IDE (repos, issues et PRs). Le commit/push du workspace utilise la configuration Git locale (`origin`, gestionnaire d'identifiants ou clé SSH).
 
 ---
 
@@ -199,6 +201,25 @@ npm test
 # Linter de projet
 npm run lint
 ```
+
+### Boucle qualité automatique
+
+Les agents disposent de l'outil `quality_loop` pour sécuriser une modification de fichier en une seule passe bornée :
+
+1. capture de la baseline existante ;
+2. modification du fichier ;
+3. formatage ciblé (`verify_format`) ;
+4. typecheck TypeScript ;
+5. vérification des tests associés ;
+6. analyse du diff et comparaison de régression.
+
+La boucle s'arrête à la première phase en échec. Elle ne relance pas automatiquement une correction sans limite et retourne `stoppedAt`, `errors`, `diff`, `baseline`, `current` et `regression` pour permettre une reprise explicite.
+
+### Contexte traçable et plan d'action
+
+Chaque réponse issue d'une recherche, d'un notebook ou d'une mission doit exposer ses preuves : fichier ou source, plage de lignes, test exécuté et extrait réellement utilisé. Le bouton **Inspecter le contexte** ouvre la liste de ces éléments ; chaque source peut être exclue, puis le contexte et la réponse doivent être recalculés. Une citation ne doit jamais être générée pour une source qui n'a pas été effectivement consultée.
+
+Avant toute mission multi-étapes, l'interface doit afficher un plan d'action confirmable avec les objectifs, fichiers ciblés, outils autorisés, risques, coût estimé (tokens/appels) et conditions d'arrêt. La mission ne démarre pas tant que le plan n'est pas accepté ou explicitement ajusté par l'utilisateur.
 
 ---
 

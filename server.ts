@@ -48,6 +48,7 @@ import { createTokensOptimizationRouter } from "./server/routes/tokens-optimizat
 import { createSummarizeContextRouter } from "./server/routes/summarize-context.js";
 import { createWorkspaceRouter } from "./server/routes/workspace.js";
 import { createSelfRootRouter } from "./server/routes/self-root.js";
+import { createFtpRouter } from "./server/routes/ftp.js";
 import safeguardsRouter from "./server/routes/safeguards.js";
 import { createUploadDocumentRouter } from "./server/routes/upload-document.js";
 import { createDocumentsRouter } from "./server/routes/documents.js";
@@ -271,6 +272,7 @@ import { aiStudioDirectivesSkill } from "./server/skills/aiStudioDirectives.js";
 import { documentLinkerSkill } from "./server/skills/documentLinker.js";
 import { documentKnowledgeSkill } from "./server/skills/documentKnowledge.js";
 import { richDocumentSkill } from "./server/skills/richDocument.js";
+import { createSmartSkills } from "./server/autonomy/SmartSkills.js";
 
 const { runtime, skillManager } = bootstrapRuntimeSync({
   skills: [
@@ -280,6 +282,7 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
     verifySkill, weatherSkill, projectSkill, agentsSkill,
     missionSkill, aiStudioDirectivesSkill, documentLinkerSkill,
     documentKnowledgeSkill, richDocumentSkill,
+    createSmartSkills((name: string, args: any) => skillManager.handleToolCall(name, args)),
   ],
   onReady: async (r, sm) => {
     // Charger les custom skills après l'initialisation de base
@@ -485,6 +488,7 @@ async function startServer() {
   app.use("/api/tokens", createSummarizeContextRouter());
   app.use("/api", createWorkspaceRouter(getWorkspaceRoot));
   app.use("/api/self-root", createSelfRootRouter(() => wss));
+  app.use("/api/ftp", createFtpRouter());
   app.use("/api/safeguards", safeguardsRouter);
 
   app.use("/api/upload-document", createUploadDocumentRouter(() => currentProfile));

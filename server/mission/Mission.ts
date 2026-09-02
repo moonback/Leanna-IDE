@@ -253,6 +253,14 @@ export class Mission {
     this.state.updatedAt = new Date().toISOString();
   }
 
+  setPlanForGoal(goalId: string, actions: PlannedAction[]): void {
+    const goal = this.state.goals[goalId];
+    if (!goal) throw new Error(`Goal ${goalId} not found`);
+
+    goal.plannedActions = actions;
+    this.state.updatedAt = new Date().toISOString();
+  }
+
   /**
    * Marque une action comme démarrée.
    */

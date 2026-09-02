@@ -7,6 +7,7 @@
  */
 
 import { validateBuild } from "./checkpoint.js";
+import { supervisor } from "../autonomy/Supervisor.js";
 
 // ── State ───────────────────────────────────────────────────────────────────
 
@@ -33,7 +34,7 @@ export function subscribeToValidation(notify: NotifyFn): () => void {
  * Appelé après chaque écriture de fichier. Arme le debounce.
  * Si `enabled` est false (toggle dans safeguards), ne fait rien.
  */
-export function scheduleValidation(enabled = true): void {
+export function scheduleValidation(enabled = true, validationSupervisor = supervisor): void {
   if (!enabled) return;
   if (validationRunning) return; // ne pas interrompre une validation en cours
 
@@ -42,14 +43,14 @@ export function scheduleValidation(enabled = true): void {
 
   debounceTimer = setTimeout(async () => {
     debounceTimer = null;
-    await runValidation();
+    await runValidation(validationSupervisor);
   }, DEBOUNCE_MS);
 }
 
 /**
  * Force une validation immédiate (utile pour le bouton UI).
  */
-export async function runValidation(): Promise<{ valid: boolean; errors?: string }> {
+export async function runValidation(validationSupervisor = supervisor): Promise<{ valid: boolean; errors?: string }> {
   if (validationRunning) {
     return lastResult || { valid: true };
   }
@@ -60,6 +61,11 @@ export async function runValidation(): Promise<{ valid: boolean; errors?: string
   try {
     const result = await validateBuild();
     lastResult = { ...result, timestamp: Date.now() };
+
+    const evaluation = await validationSupervisor.evaluateBuildResult(result);
+    if (evaluation.needsCorrection && evaluation.directive) {
+      validationSupervisor.injectDirective(evaluation.directive);
+    }
 
     notifyAll({
       type: 'build-status',

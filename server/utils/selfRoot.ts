@@ -71,6 +71,15 @@ function getPersistedWorkspacesPath(): string {
   return path.join(Leanna_APP_ROOT, ".Leanna", "workspaces.json");
 }
 
+export interface FtpWorkspaceConfig {
+  host: string;
+  port: number;
+  user: string;
+  remotePath: string;
+  secure: boolean;
+  /** Le mot de passe n'est jamais persisté — uniquement conservé en mémoire de session. */
+}
+
 export interface WorkspaceEntry {
   id: string;
   name: string;
@@ -80,6 +89,9 @@ export interface WorkspaceEntry {
   createdAt: string;
   isGit: boolean;
   gitBranch?: string;
+  /** Présent uniquement pour les workspaces créés par connexion FTP. */
+  isFtp?: boolean;
+  ftpConfig?: FtpWorkspaceConfig;
 }
 
 export interface WorkspaceValidationResult {
@@ -670,4 +682,150 @@ async function scanForSymlinks(dir: string, results: string[], depth = 0): Promi
       }
     }
   } catch { /* permission denied or similar */ }
+}
+
+// ── FTP Server Registry ───────────────────────────────────────────────────────
+//
+// Persiste la liste des serveurs FTP connus dans .Leanna/ftp-servers.json.
+// Le mot de passe n'est JAMAIS persisté — l'utilisateur le resaisit à chaque
+// connexion. Seules les métadonnées de connexion (hôte, port, user, chemin,
+// secure) sont sauvegardées.
+
+export interface FtpServerEntry {
+  /** Identifiant unique dérivé de host+port+user+path */
+  id: string;
+  host: string;
+  port: number;
+  user: string;
+  remotePath: string;
+  secure: boolean;
+  /** Nom d'affichage libre (ex: "Mon site o2switch") */
+  name: string;
+  lastConnected: string;
+  createdAt: string;
+  /** Chemin du miroir local (si déjà téléchargé) */
+  localMirrorPath?: string;
+}
+
+function getFtpServersPath(): string {
+  return path.join(Leanna_APP_ROOT, ".Leanna", "ftp-servers.json");
+}
+
+function generateFtpServerId(host: string, port: number, user: string, remotePath: string): string {
+  const raw = `${host.toLowerCase()}:${port}:${user.toLowerCase()}:${remotePath}`;
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = (hash << 5) - hash + raw.charCodeAt(i);
+    hash |= 0;
+  }
+  const slug = host.toLowerCase().replace(/[^a-z0-9]/g, "_").slice(0, 20);
+  return `${slug}_${Math.abs(hash).toString(36)}`;
+}
+
+export function loadFtpServers(): FtpServerEntry[] {
+  try {
+    const p = getFtpServersPath();
+    if (!fs.existsSync(p)) return [];
+    const data = JSON.parse(fs.readFileSync(p, "utf-8"));
+    if (Array.isArray(data)) {
+      return data.filter(
+        (item): item is FtpServerEntry =>
+          Boolean(item && typeof item.host === "string" && typeof item.id === "string")
+      );
+    }
+  } catch (e) {
+    if (process.env.LOG_LEVEL === "debug") {
+      console.debug("[SelfRoot] loadFtpServers ignoré:", (e as Error).message);
+    }
+  }
+  return [];
+}
+
+function saveFtpServersList(servers: FtpServerEntry[]): void {
+  try {
+    const p = getFtpServersPath();
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, JSON.stringify(servers, null, 2), "utf-8");
+  } catch (e: any) {
+    console.warn("[SelfRoot] Impossible de sauvegarder les serveurs FTP:", e.message);
+  }
+}
+
+/**
+ * Ajoute ou met à jour un serveur FTP dans le registre persisté.
+ * Appelé automatiquement après une connexion réussie.
+ */
+export function saveFtpServer(
+  host: string,
+  port: number,
+  user: string,
+  remotePath: string,
+  secure: boolean,
+  options?: { name?: string; localMirrorPath?: string }
+): FtpServerEntry {
+  const servers = loadFtpServers();
+  const id = generateFtpServerId(host, port, user, remotePath);
+  const now = new Date().toISOString();
+
+  const existingIdx = servers.findIndex((s) => s.id === id);
+  const displayName =
+    options?.name?.trim() ||
+    (existingIdx >= 0 ? servers[existingIdx].name : undefined) ||
+    `${host}${remotePath !== "/" ? remotePath : ""}`;
+
+  const entry: FtpServerEntry = {
+    id,
+    host,
+    port,
+    user,
+    remotePath,
+    secure,
+    name: displayName,
+    lastConnected: now,
+    createdAt: existingIdx >= 0 ? servers[existingIdx].createdAt : now,
+    localMirrorPath: options?.localMirrorPath ?? (existingIdx >= 0 ? servers[existingIdx].localMirrorPath : undefined),
+  };
+
+  if (existingIdx >= 0) {
+    servers[existingIdx] = entry;
+  } else {
+    servers.unshift(entry);
+  }
+
+  saveFtpServersList(servers);
+  return entry;
+}
+
+/**
+ * Supprime un serveur FTP du registre (ne supprime pas le miroir local).
+ */
+export function removeFtpServer(id: string): boolean {
+  const servers = loadFtpServers();
+  const filtered = servers.filter((s) => s.id !== id);
+  if (filtered.length !== servers.length) {
+    saveFtpServersList(filtered);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Retourne la liste des serveurs FTP triés par date de dernière connexion.
+ */
+export function listFtpServers(): FtpServerEntry[] {
+  return loadFtpServers().sort(
+    (a, b) => new Date(b.lastConnected).getTime() - new Date(a.lastConnected).getTime()
+  );
+}
+
+/**
+ * Met à jour le nom d'affichage d'un serveur FTP.
+ */
+export function renameFtpServer(id: string, name: string): FtpServerEntry | null {
+  const servers = loadFtpServers();
+  const idx = servers.findIndex((s) => s.id === id);
+  if (idx < 0) return null;
+  servers[idx] = { ...servers[idx], name: name.trim() || servers[idx].name };
+  saveFtpServersList(servers);
+  return servers[idx];
 }
