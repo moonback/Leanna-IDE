@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { History, Search, Trash2, RefreshCw, MessageSquare, User, Cpu } from 'lucide-react';
+import { History, Search, Trash2, RefreshCw, MessageSquare, User, Cpu, ArrowRight } from 'lucide-react';
 import { useToast } from '../components/ui/Toast.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 
@@ -183,12 +183,12 @@ export default function HistoryView() {
                     }`}
                     style={{
                       backgroundColor: selectedId === conv.id ? 'var(--notebook-accent-surface)' : 'transparent',
-                      border: `1px solid ${selectedId === conv.id ? 'var(--notebook-accent)' : 'transparent'}`,
+                      border: `1px solid ${selectedId === conv.id ? 'var(--notebook-accent)' : 'var(--notebook-border)'}`,
                       ...(selectedId === conv.id ? { ringColor: 'var(--notebook-accent)' } : {}),
                     }}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                           {conv.title || 'Conversation sans titre'}
                         </p>
@@ -207,16 +207,34 @@ export default function HistoryView() {
                           </span>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={(e) => handleDelete(conv.id, e)}
-                        disabled={deleting === conv.id}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all active:scale-90"
-                        style={{ color: 'var(--color-error)' }}
-                        aria-label="Supprimer la conversation"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between border-t pt-2" style={{ borderColor: 'var(--notebook-border)' }}>
+                      <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                        {selectedId === conv.id ? 'Conversation ouverte' : 'Prête à être consultée'}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleSelect(conv.id); }}
+                          className="rounded-md p-1.5 transition hover:bg-[var(--notebook-accent-hover)]"
+                          style={{ color: 'var(--notebook-accent)' }}
+                          aria-label={`Sélectionner ${conv.title || 'la conversation'}`}
+                          title="Sélectionner"
+                        >
+                          <ArrowRight className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDelete(conv.id, e)}
+                          disabled={deleting === conv.id}
+                          className="rounded-md p-1.5 transition hover:bg-[var(--color-error-subtle)] disabled:opacity-50"
+                          style={{ color: 'var(--color-error)' }}
+                          aria-label={`Supprimer ${conv.title || 'la conversation'}`}
+                          title="Supprimer"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     </div>
                   </motion.div>
                 ))}
