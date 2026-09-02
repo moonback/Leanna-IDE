@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   FolderOpen, Upload, ShieldAlert, Loader2,
   FolderInput, Globe, X, Plus, Trash2, GitBranch,
   CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Clock,
-  Github, Terminal, FolderDown, Server, RefreshCw, Send,
+  Github, Terminal, FolderDown, Server, RefreshCw, Send, Settings,
 } from 'lucide-react';
 import { ideApi } from '../services/ideApi.js';
 import { useToast } from '../components/ui/Toast.js';
@@ -44,6 +45,8 @@ function formatDate(isoString: string): string {
 }
 
 export function StartupProjectModal() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
@@ -70,6 +73,7 @@ export function StartupProjectModal() {
   const [cloneLogs, setCloneLogs] = useState<Array<{ level: string; message: string }>>([]);
   const cloneLogsEndRef = useRef<HTMLDivElement>(null);
   const cloneAbortRef   = useRef<(() => void) | null>(null);
+  const returningFromSettingsRef = useRef(false);
 
   // Onglet "FTP"
   const [ftpHost, setFtpHost] = useState('');
@@ -150,6 +154,13 @@ export function StartupProjectModal() {
   useEffect(() => {
     checkProjectStatus();
   }, [checkProjectStatus]);
+
+  useEffect(() => {
+    if (pathname !== '/settings' && returningFromSettingsRef.current) {
+      returningFromSettingsRef.current = false;
+      setIsOpen(true);
+    }
+  }, [pathname]);
 
   // Écouteur global pour ouvrir le switcher depuis n'importe où dans l'application
   useEffect(() => {
@@ -494,6 +505,12 @@ export function StartupProjectModal() {
     }
   };
 
+  const handleOpenSettings = () => {
+    returningFromSettingsRef.current = true;
+    setIsOpen(false);
+    navigate('/settings');
+  };
+
   const canBrowse = !!getElectronAPI() || typeof (window as any).showDirectoryPicker === 'function';
 
   if (!isOpen) return null;
@@ -561,17 +578,31 @@ export function StartupProjectModal() {
                 </p>
               </div>
             </div>
-            <motion.button
-              type="button"
-              onClick={handleClose}
-              whileHover={shouldReduceMotion ? undefined : { opacity: 0.7 }}
-              whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
-              className="flex items-center justify-center w-8 h-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
-              title={currentPath ? "Fermer" : "Quitter"}
-            >
-              <X className="w-4 h-4" />
-            </motion.button>
+            <div className="flex items-center gap-2">
+              <motion.button
+                type="button"
+                onClick={handleOpenSettings}
+                whileHover={shouldReduceMotion ? undefined : { opacity: 0.7 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
+                className="flex items-center justify-center w-8 h-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
+                title="Ouvrir les paramètres"
+                aria-label="Ouvrir les paramètres"
+              >
+                <Settings className="w-4 h-4" />
+              </motion.button>
+              <motion.button
+                type="button"
+                onClick={handleClose}
+                whileHover={shouldReduceMotion ? undefined : { opacity: 0.7 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
+                className="flex items-center justify-center w-8 h-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
+                title={currentPath ? "Fermer" : "Quitter"}
+              >
+                <X className="w-4 h-4" />
+              </motion.button>
+            </div>
           </div>
 
           {/* Navigation Tabs */}
