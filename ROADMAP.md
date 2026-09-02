@@ -5,8 +5,6 @@ Cette feuille de route est le plan de référence produit et technique de **Lean
 ## État de référence — 2 septembre 2026
 
 * **Produit** : IDE desktop/web IA multimodal avec Monaco, terminal, sandbox, multi-workspace, GitHub, FTP/FTPS, agents, marketplace, notebooks/RAG et indexation AST.
-* **Code annoncé** : `package.json` indique `0.8.0`, tandis que `README.md` et certaines sections de cette roadmap annoncent `0.9.0`. Cette divergence doit être supprimée avant toute release publique.
-* **Lancement desktop** : `desktop:debug` a échoué récemment. Le diagnostic doit être conservé dans un rapport reproductible avant de considérer le desktop comme stable.
 * **Qualité** : la suite de tests serveur existe, mais aucun workflow `.github/workflows` n'est configuré. Le lint produit actuellement de nombreux avertissements historiques.
 * **Principe de priorité** : fiabilité et sécurité d'abord, expérience développeur ensuite, nouvelles capacités IA après validation des fondations.
 
@@ -66,8 +64,6 @@ Une fonctionnalité n'est considérée comme livrée que si elle possède :
 
 Objectif : rendre chaque installation reproductible avant d'ajouter de la puissance.
 
-* [ ] **Réparer et documenter `desktop:debug`** : capturer séparément la sortie du serveur, de `wait-on` et d'Electron ; afficher une erreur lisible si le port est occupé, si `git` est absent ou si le serveur s'arrête ; ajouter un timeout à l'attente et un code de sortie fiable.
-* [ ] **Aligner les versions** : choisir la version officielle (`0.9.0` ou suivante) et la synchroniser dans `package.json`, `README.md`, `metadata.json`, `ROADMAP.md`, le badge et les artefacts Electron.
 * [ ] **Ajouter une CI minimale** : installation propre, typecheck, lint, tests serveur, build Vite/esbuild et vérification de l'artefact desktop sur Windows.
 * [ ] **Créer un diagnostic support** : commande ou écran exportant version, OS, mode web/desktop, port, état des variables non secrètes, dernière erreur serveur et chemin du log.
 * [ ] **Traiter la dette lint par lots** : bloquer les nouvelles erreurs, puis réduire les avertissements par domaine sans reformater tout le dépôt.
