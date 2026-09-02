@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, animate } from 'motion/react';
 import {
-  Send, Mic, MicOff, User, Bot,
+  Send, Mic, MicOff, User, Bot, Eye, X,
   Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2,
 } from 'lucide-react';
 import { marked } from 'marked';
@@ -15,7 +15,7 @@ import { SlashCommandDropdown } from './SlashCommandDropdown.js';
 import { useFileMention } from '../../hooks/useFileMention.js';
 import { useSlashCommand } from '../../hooks/useSlashCommand.js';
 import { DocumentUpload, DropZoneOverlay, useDocumentDrop, type DocumentResult } from './DocumentUpload.js';
-import type { TranscriptEntry } from '../../hooks/useLiveAPI.js';
+import type { TranscriptEntry, ContextSource } from '../../hooks/useLiveAPI.js';
 
 // --- Styles Globaux améliorés ---
 const COLORS = {
@@ -171,12 +171,15 @@ const ChatMessage = memo(function ChatMessage({
   entry,
   profile: _profile,
   reduceMotion,
+  onExcludeSource,
 }: {
   entry: TranscriptEntry;
   profile: UserProfile;
   reduceMotion: boolean;
+  onExcludeSource?: (source: ContextSource) => void;
 }) {
   const isAssistant = entry.role === 'assistant';
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
   const bubbleStyle = isAssistant ? BUBBLE_STYLES.assistant : BUBBLE_STYLES.user;
 
   return (
@@ -218,6 +221,34 @@ const ChatMessage = memo(function ChatMessage({
         >
           {entry.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
         </span>
+        {isAssistant && entry.sources && entry.sources.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5 text-left">
+            {entry.sources.map(source => {
+              if (excludedIds.has(source.id)) return null;
+              return (
+                <span key={source.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs"
+                  style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)' }}>
+                  <Eye size={11} style={{ color: 'var(--accent-primary)' }} />
+                  <span className="font-mono max-w-44 truncate" title={source.path}>{source.path}</span>
+                  {source.lines && <span style={{ color: 'var(--text-dimmed)' }}>{source.lines}</span>}
+                  <span style={{ color: 'var(--text-dimmed)' }}>via {source.tool}</span>
+                  <button
+                    type="button"
+                    className="p-0.5 rounded hover:bg-white/10"
+                    aria-label={`Exclure ${source.path} du contexte`}
+                    title="Exclure du contexte"
+                    onClick={() => {
+                      setExcludedIds(prev => new Set(prev).add(source.id));
+                      onExcludeSource?.(source);
+                    }}
+                  >
+                    <X size={10} />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -906,7 +937,13 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
 
             <AnimatePresence initial={false}>
               {transcript.map((entry) => (
-                <ChatMessage key={entry.id} entry={entry} profile={profile!} reduceMotion={reduceMotion} />
+                <ChatMessage
+                  key={entry.id}
+                  entry={entry}
+                  profile={profile!}
+                  reduceMotion={reduceMotion}
+                  onExcludeSource={(source) => sendRawMessage({ context_exclude: source.path })}
+                />
               ))}
             </AnimatePresence>
 

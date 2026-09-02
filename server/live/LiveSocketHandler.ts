@@ -801,6 +801,14 @@ export function attachLiveWebSocket(
             }
           }
 
+          if (msg.context_exclude && typeof msg.context_exclude === 'string') {
+            const excludedPath = msg.context_exclude.trim();
+            if (excludedPath) {
+              session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: `[SYSTEM] Exclure la source du contexte pour les prochains tours: ${excludedPath}` }] }] });
+              clientWs.send(JSON.stringify({ type: 'context_source_excluded', path: excludedPath }));
+            }
+          }
+
           if (msg.text) {
             if (getBusyDescription()) {
               clientWs.send(JSON.stringify({ text: `Je suis actuellement en train de ${getBusyDescription()}. Je m'occupe de ta demande dès que j'ai terminé.` }));
