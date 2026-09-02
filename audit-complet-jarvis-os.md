@@ -1,4 +1,4 @@
-# Audit complet — Jarvis OS (Leanna IDE)
+# Audit complet —  (Leanna IDE)
 
 **Date :** 2 septembre 2026
 **Périmètre :** dump complet du dépôt fourni (`output.md`), 544 fichiers extraits et analysés individuellement (serveur Express/TypeScript ~86 800 lignes, frontend React/Vite ~65 800 lignes, Electron, scripts, schémas Supabase).
@@ -9,7 +9,7 @@
 
 ## 1. Résumé exécutif
 
-Jarvis OS / *Leanna* est un IDE piloté par des agents IA avec un **shell interactif complet**, accès système de fichiers, navigateur automatisé (Puppeteer), client FTP, client MCP, exécution `git`/`npm`, et — point notable — la **capacité de modifier son propre code source** (auto-édition, "SELF_IDE"). C'est une surface d'attaque native très élevée par construction ; l'important est de vérifier le cloisonnement, pas l'absence de pouvoir.
+ / *Leanna* est un IDE piloté par des agents IA avec un **shell interactif complet**, accès système de fichiers, navigateur automatisé (Puppeteer), client FTP, client MCP, exécution `git`/`npm`, et — point notable — la **capacité de modifier son propre code source** (auto-édition, "SELF_IDE"). C'est une surface d'attaque native très élevée par construction ; l'important est de vérifier le cloisonnement, pas l'absence de pouvoir.
 
 **Constat général :** le code montre une maturité sécurité réelle et supérieure à la moyenne pour ce type de projet — validation Zod systématique, sanitisation HTML par allowlist DOM, anti-SSRF avec résolution DNS, chiffrement authentifié AES-256-GCM, génération automatique de secrets forts au premier démarrage, redaction des secrets dans les logs, RLS Supabase avec policies restreintes au `service_role` uniquement, garde-fous d'auto-édition (checkpoints, confirmation sur fichiers critiques). Un audit de sécurité antérieur (v2) a déjà corrigé 9 des 11 constats qu'il avait soulevés ; **j'ai vérifié dans le code actuel que ces corrections sont bien en place** (section 4).
 

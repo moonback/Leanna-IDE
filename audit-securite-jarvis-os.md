@@ -1,8 +1,8 @@
-# Audit de sécurité — Jarvis OS (Leanna IDE)
+# Audit de sécurité —  (Leanna IDE)
 
 **Périmètre analysé :** dump complet du dépôt fourni (`output.md`, ~544 fichiers source extraits : serveur Express/TypeScript, frontend React/Vite, Electron).
 **Type d'audit :** revue de code statique manuelle (SAST) + relecture d'architecture. Aucun test dynamique (DAST), aucune exécution de l'application, et **aucun accès réseau** dans cet environnement — l'audit des dépendances tierces (`npm audit`) n'a donc pas pu être effectué et doit être fait séparément.
-**Contexte du produit :** Jarvis OS / *Leanna* est un IDE piloté par des agents IA, avec accès **terminal shell interactif**, **système de fichiers**, **navigateur automatisé (Puppeteer)**, **client FTP**, **client MCP**, et exécution de commandes `git`/`npm`. La surface d'attaque native de ce type d'outil est élevée par conception : l'enjeu de l'audit est de vérifier que cette puissance est correctement cloisonnée.
+**Contexte du produit :**  / *Leanna* est un IDE piloté par des agents IA, avec accès **terminal shell interactif**, **système de fichiers**, **navigateur automatisé (Puppeteer)**, **client FTP**, **client MCP**, et exécution de commandes `git`/`npm`. La surface d'attaque native de ce type d'outil est élevée par conception : l'enjeu de l'audit est de vérifier que cette puissance est correctement cloisonnée.
 
 ---
 
