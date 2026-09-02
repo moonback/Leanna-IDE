@@ -1016,7 +1016,10 @@ export default function IdeView() {
                                                   onCreateFolder={() => setModalState({ type: 'create-folder', dir: fileSystem.currentDir })}
                                                   onShowSettings={openSettings}
                                                   onOpenSearch={() => setShowGlobalSearch(true)}
-                                                  onOpenChat={() => setShowChat(true)}
+                                                  onOpenChat={() => {
+                                                    setChatDocked(true);
+                                                    setShowChat(true);
+                                                  }}
                                                   onOpenNotebooks={() => {
                                                     setShowNotebooks(true);
                                                     setShowExplorer(false);
@@ -1178,6 +1181,7 @@ export default function IdeView() {
           pendingMessage={pendingChatMessage}
           onPendingMessageConsumed={() => setPendingChatMessage(null)}
           onDockedChange={setChatDocked}
+          initialDocked={chatDocked}
         />
       )}
 

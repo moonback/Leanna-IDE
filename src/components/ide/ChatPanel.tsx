@@ -568,9 +568,10 @@ interface ChatPanelProps {
   pendingMessage?: PendingChatMessage | null;
   onPendingMessageConsumed?: () => void;
   onDockedChange?: (docked: boolean) => void;
+  initialDocked?: boolean;
 }
 
-export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedChange }: ChatPanelProps = {}) {
+export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedChange, initialDocked = false }: ChatPanelProps = {}) {
   const {
     connected, connecting, connect, disconnect,
     sendTextMessage, sendRawMessage, transcript, clearTranscript,
@@ -578,7 +579,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
   } = useLiveAPIContext();
   const { profile } = useProfile();
   const [minimized, setMinimized] = useState(false);
-  const [docked, setDocked] = useState(false);
+  const [docked, setDocked] = useState(initialDocked);
   const [fullscreen, setFullscreen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
