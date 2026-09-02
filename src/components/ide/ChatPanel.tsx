@@ -2,10 +2,10 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo, useMem
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, animate } from 'motion/react';
 import {
   Send, Mic, MicOff, User, Bot, Eye, X,
-  Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2,
+  Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2, ChevronDown,
 } from 'lucide-react';
 import { marked } from 'marked';
-import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml';
+import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile, type UserProfile } from '../../context/UserProfileContext.js';
 import { ActivityFeed } from './ActivityFeed.js';
@@ -180,7 +180,9 @@ const ChatMessage = memo(function ChatMessage({
 }) {
   const isAssistant = entry.role === 'assistant';
   const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
+  const [showSources, setShowSources] = useState(false);
   const bubbleStyle = isAssistant ? BUBBLE_STYLES.assistant : BUBBLE_STYLES.user;
+  const visibleSources = entry.sources?.filter(source => !excludedIds.has(source.id)) ?? [];
 
   return (
     <motion.div
@@ -221,32 +223,82 @@ const ChatMessage = memo(function ChatMessage({
         >
           {entry.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
         </span>
-        {isAssistant && entry.sources && entry.sources.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5 text-left">
-            {entry.sources.map(source => {
-              if (excludedIds.has(source.id)) return null;
-              return (
-                <span key={source.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs"
-                  style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)' }}>
-                  <Eye size={11} style={{ color: 'var(--accent-primary)' }} />
-                  <span className="font-mono max-w-44 truncate" title={source.path}>{source.path}</span>
-                  {source.lines && <span style={{ color: 'var(--text-dimmed)' }}>{source.lines}</span>}
-                  <span style={{ color: 'var(--text-dimmed)' }}>via {source.tool}</span>
-                  <button
-                    type="button"
-                    className="p-0.5 rounded hover:bg-white/10"
-                    aria-label={`Exclure ${source.path} du contexte`}
-                    title="Exclure du contexte"
-                    onClick={() => {
-                      setExcludedIds(prev => new Set(prev).add(source.id));
-                      onExcludeSource?.(source);
-                    }}
-                  >
-                    <X size={10} />
-                  </button>
-                </span>
-              );
-            })}
+        {isAssistant && visibleSources.length > 0 && (
+          <div className="mt-2 text-left">
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-2.5 py-2 rounded-lg text-xs transition-colors hover:bg-white/5"
+              style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)', backgroundColor: 'color-mix(in srgb, var(--bg-input) 55%, transparent)' }}
+              aria-expanded={showSources}
+              aria-controls={`sources-${entry.id}`}
+              onClick={() => setShowSources(value => !value)}
+            >
+              <span className="flex h-5 w-5 items-center justify-center rounded-md" style={{ backgroundColor: 'var(--accent-subtle)' }}>
+                <Eye size={12} style={{ color: 'var(--accent-primary)' }} />
+              </span>
+              <span className="font-medium">Sources utilisées</span>
+              <span className="rounded-full px-1.5 py-0.5 font-mono text-[10px]" style={{ color: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)' }}>
+                {visibleSources.length}
+              </span>
+              <span className="ml-auto text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                {showSources ? 'Masquer' : 'Afficher'}
+              </span>
+              <ChevronDown
+                size={13}
+                style={{
+                  color: 'var(--text-dimmed)',
+                  transform: showSources ? 'rotate(180deg)' : undefined,
+                  transition: 'transform 0.2s ease',
+                }}
+              />
+            </button>
+
+            <AnimatePresence initial={false}>
+              {showSources && (
+                <motion.div
+                  id={`sources-${entry.id}`}
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: reduceMotion ? 0.1 : 0.2 }}
+                  className="mt-1 max-h-48 overflow-y-auto rounded-lg custom-scrollbar"
+                  style={{ border: '1px solid var(--border-base)', backgroundColor: 'var(--bg-input)' }}
+                >
+                  <div className="divide-y" style={{ borderColor: 'var(--border-base)' }}>
+                    {visibleSources.map(source => {
+                      return (
+                        <div key={source.id} className="group flex items-center gap-2 px-2.5 py-2 min-w-0 transition-colors hover:bg-white/5">
+                          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded" style={{ backgroundColor: 'var(--accent-subtle)' }}>
+                            <Eye size={11} style={{ color: 'var(--accent-primary)' }} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-mono text-xs truncate" title={source.path} style={{ color: 'var(--text-primary)' }}>
+                              {source.path}
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] truncate" style={{ color: 'var(--text-dimmed)' }}>
+                              {source.lines && <span className="rounded px-1" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--text-muted)' }}>{source.lines}</span>}
+                              <span className="truncate">via {source.tool}</span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="p-1 rounded opacity-60 transition-opacity hover:bg-white/10 hover:opacity-100 flex-shrink-0"
+                            aria-label={`Exclure ${source.path} du contexte`}
+                            title="Exclure du contexte"
+                            onClick={() => {
+                              setExcludedIds(prev => new Set(prev).add(source.id));
+                              onExcludeSource?.(source);
+                            }}
+                          >
+                            <X size={11} style={{ color: 'var(--text-muted)' }} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
       </div>

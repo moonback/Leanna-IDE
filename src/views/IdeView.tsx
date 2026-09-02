@@ -870,14 +870,19 @@ export default function IdeView() {
 
         {/* Global Progress Bar */}
         {(fileSystem.loading || assistantWorking) && (
-          <div className="absolute top-[35px] left-0 right-0 h-[2px] z-50 overflow-hidden bg-white/5">
-            <div
-              className="h-full bg-[var(--accent-primary)] animate-shimmer"
-              style={{
-                width: '100%',
-                background: 'linear-gradient(90deg, transparent, var(--accent-primary), transparent)',
-              }}
-            />
+          <div
+            className="ide-splash-progress absolute top-[35px] left-0 right-0 z-50"
+            role="progressbar"
+            aria-label="Chargement en cours"
+            aria-valuetext="Traitement en cours"
+          >
+            <div className="ide-splash-progress__track">
+              <div className="ide-splash-progress__aura" />
+              <div className="ide-splash-progress__fill">
+                <span className="ide-splash-progress__glint" />
+              </div>
+              <div className="ide-splash-progress__scan" />
+            </div>
           </div>
         )}
 
