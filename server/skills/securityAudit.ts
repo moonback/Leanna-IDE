@@ -128,6 +128,19 @@ function parseNpmAuditOutput(rawStdout: string): Pick<DependencyAudit, "vulnerab
   };
 }
 
+/**
+ * Détermine si une erreur npm provient d'une inaccessibilité du registre
+ * (réseau coupé, proxy d'entreprise, DNS) plutôt que d'un problème local.
+ */
+function isRegistryUnreachable(error: any): boolean {
+  if (!error) return false;
+  const msg: string = (error.message ?? "") + (error.stderr ?? "") + (error.stdout ?? "");
+  return (
+    /ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|network timeout|unable to connect|getaddrinfo/i.test(msg) ||
+    /npm warn.*network|npm error.*network|Could not resolve host/i.test(msg)
+  );
+}
+
 async function runNpmAudit(root: string, mode: "offline" | "online") {
   const npmArgs = mode === "offline"
     ? ["audit", "--json", "--offline"]
@@ -171,6 +184,7 @@ async function auditDependencies(root: string, requestedMode: "auto" | "offline"
     ? ["offline", "online"]
     : [requestedMode];
   let lastError: any;
+  let offlineResult: DependencyAudit | null = null;
 
   for (const mode of modes) {
     try {
@@ -184,19 +198,43 @@ async function auditDependencies(root: string, requestedMode: "auto" | "offline"
       lastError = error;
       const parsed = parseNpmAuditOutput(error?.stdout || "");
       if (parsed) {
-        return {
+        const result: DependencyAudit = {
           status: "failed",
           packageManager,
           mode,
           ...parsed,
           message: "Des vulnérabilités de dépendances ont été détectées.",
         };
+        // En mode auto, conserver le résultat offline comme fallback
+        // au lieu de retourner immédiatement, pour tenter online ensuite.
+        if (mode === "offline" && requestedMode === "auto") {
+          offlineResult = result;
+          continue;
+        }
+        return result;
+      }
+      // Détecter une erreur réseau pour ne pas masquer un succès offline précédent.
+      const isNetworkError = isRegistryUnreachable(error);
+      if (mode === "online" && isNetworkError && offlineResult) {
+        return {
+          ...offlineResult,
+          message: offlineResult.message + " (registre npm inaccessible; résultat issu du cache local.)",
+        };
       }
     }
   }
 
+  // Si on a un résultat offline partiel et que online a échoué, l'utiliser.
+  if (offlineResult) {
+    return {
+      ...offlineResult,
+      message: offlineResult.message + " (registre npm inaccessible; résultat issu du cache local.)",
+    };
+  }
+
   const mode = requestedMode === "offline" ? "offline" : "online";
   const timedOut = lastError?.killed && lastError?.signal;
+  const isNetworkErr = isRegistryUnreachable(lastError);
   return {
     status: "unavailable",
     packageManager,
@@ -206,9 +244,11 @@ async function auditDependencies(root: string, requestedMode: "auto" | "offline"
     advisoriesTruncated: false,
     message: timedOut
       ? "Audit npm interrompu (délai dépassé); le scan statique reste exploitable."
-      : requestedMode === "auto"
-        ? "Audit npm indisponible après tentative hors ligne puis en ligne; le scan statique reste exploitable."
-        : `Audit npm indisponible en mode ${requestedMode}; le scan statique reste exploitable.`,
+      : isNetworkErr
+        ? "Registre npm inaccessible (pas de réseau ou proxy); le scan statique reste exploitable."
+        : requestedMode === "auto"
+          ? "Audit npm indisponible après tentative hors ligne puis en ligne; le scan statique reste exploitable."
+          : `Audit npm indisponible en mode ${requestedMode}; le scan statique reste exploitable.`,
   };
 }
 
@@ -266,7 +306,15 @@ export const securityAuditSkill: Skill = {
     const summary = summarizeIssues(issues);
     const dependencyHigh = Number(dependencies.vulnerabilities.high || 0)
       + Number(dependencies.vulnerabilities.critical || 0);
-    const dependenciesComplete = dependencies.status === "success" || dependencies.packageManager === "none";
+    // L'audit est considéré complet si :
+    //   - le scan a réussi
+    //   - pas de node_modules (pas de package.json)
+    //   - l'indisponibilité est due à un problème réseau/timeout (non bloquant),
+    //     le scan statique reste valide dans ce cas.
+    const dependenciesComplete =
+      dependencies.status === "success" ||
+      dependencies.packageManager === "none" ||
+      (dependencies.status === "unavailable" && dependencies.packageManager === "npm");
     const dependenciesBlocking = dependencies.status === "failed" && dependencyHigh > 0;
     const ok = summary.critical === 0 && summary.high === 0 && !dependenciesBlocking && dependenciesComplete;
     const issuesTruncated = issues.length > 500;
