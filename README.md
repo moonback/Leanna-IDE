@@ -106,7 +106,7 @@ Le Marketplace est accessible depuis la sidebar IDE : **Outils → Marketplace**
 
 ### Sécurité & Administration
 
-* **Garde-fous & Checkpoints Git** : Snapshots avant chaque modification destructive, détection de boucles via le `Supervisor`, confirmation utilisateur pour fichiers critiques.
+* **Garde-fous & Checkpoints Git** : Snapshots avant chaque modification destructive, validation post-édition, détection de boucles via le `Supervisor` et confirmation utilisateur pour fichiers critiques. Le Supervisor est isolé par session, force un pivot après 2 échecs d'une approche, verrouille après 3 approches échouées et suspend la session à 10 corrections cumulées. Un Context Gate suspend aussi les écritures lorsque le contexte est faible ou à risque, jusqu'à lecture des fichiers pertinents.
 * **Périmètre Self-Root verrouillé** : Confinement de l'IA au dépôt actif, blocage des racines disques et détection des évasions par symlinks.
 * **Journalisation d'audit NDJSON** : Enregistrement structuré de chaque action dans `.Leanna-audit.log`.
 * **Protection par jeton d'accès** : Middleware `x-leanna-token` sur tous les endpoints HTTP et WebSocket.

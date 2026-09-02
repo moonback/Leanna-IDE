@@ -287,6 +287,13 @@ export class Supervisor {
     const isBuild = key === GLOBAL_BUILD_KEY;
     const label = isBuild ? "build global" : key;
 
+    if (this.missionPaused) {
+      return {
+        needsCorrection: true,
+        directive: this.buildEscalationDirective(key, errors, /*sessionWide*/ true),
+      };
+    }
+
     // --- Fichier déjà bloqué : ne pas relancer de cycle, renvoyer directement l'escalade ---
     if (this.blockedFiles.has(key)) {
       return {
@@ -326,7 +333,7 @@ export class Supervisor {
     };
 
     // --- Coupe-circuit de session : trop de corrections tous fichiers confondus ---
-    if (this.totalCorrections >= Supervisor.MAX_TOTAL_CORRECTIONS) {
+    if (this.totalCorrections + 1 >= Supervisor.MAX_TOTAL_CORRECTIONS) {
       log.warn(`⚠️ Limite de corrections de session atteinte (${Supervisor.MAX_TOTAL_CORRECTIONS}). Mission mise en pause.`);
       this.missionPaused = true;
       this.blockedFiles.add(key);
@@ -367,7 +374,9 @@ export class Supervisor {
     log.info(`🔧 Correction #${history.attemptInApproach} (approche #${history.approachNumber}) pour ${label}`);
     return {
       needsCorrection: true,
-      directive: this.buildCorrectionDirective(key, errors, history.attemptInApproach),
+      directive: isBuild
+        ? this.buildGlobalBuildDirective(errors)
+        : this.buildCorrectionDirective(key, errors, history.attemptInApproach),
     };
   }
 
@@ -430,6 +439,9 @@ export class Supervisor {
   resumeMission(): void {
     this.missionPaused = false;
     this.totalCorrections = 0;
+    this.correctionHistory.clear();
+    this.blockedFiles.clear();
+    this.lastDirectiveAt.clear();
     log.info("▶️ Mission reprise après validation humaine.");
   }
 

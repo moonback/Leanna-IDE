@@ -285,9 +285,10 @@ flowchart TD
 
 1. **Path Traversal & Symlink Escapes** : Résolution centralisée dans `server/utils/selfRoot.ts` et `server/security.ts`. Les chemins sortant de `SELF_ROOT` ou contenant des symlinks externes sont immédiatement rejetés.
 2. **Fichiers critiques protégés** : Toute modification de `server.ts`, `server/security.ts`, `server/utils/selfRoot.ts`, `electron/main.cjs`, `electron/preload.cjs`, `.env`, `.env.local` nécessite une confirmation explicite de l'utilisateur via une modale bloquante avec timeout de 30 secondes.
-3. **Superviseur anti-régression** (`server/autonomy/Supervisor.ts`) : Analyse les erreurs TypeScript retournées après chaque édition. Si un fichier subit 3 échecs consécutifs, l'écriture sur ce fichier est verrouillée pour éviter les boucles infinies de correction.
-4. **Prompt Injection Guard** (`server/utils/promptInjectionGuard.ts`) : Filtre les entrées suspectes pouvant tenter de détourner les instructions système.
-5. **Isolation Electron** : `nodeIntegration: false`, `contextIsolation: true` et filtrage strict des canaux IPC.
+3. **Superviseur anti-régression** (`server/autonomy/Supervisor.ts`) : Analyse les résultats `verify_file` et du build global après les éditions. Chaque approche autorise 2 échecs ; une erreur répétée force immédiatement un pivot. Après 3 approches échouées, le fichier est verrouillé. Un coupe-circuit séparé suspend la session à la 10e correction cumulée. L'état et l'injecteur sont isolés pour chaque connexion WebSocket ; une reprise humaine réinitialise les blocages.
+4. **Context Gate pré-écriture** (`server/live/LiveSocketHandler.ts`) : Si `knowledge_build_context` retourne une confiance inférieure à 65 % ou un risque élevé, les écritures sont suspendues jusqu'à la lecture des fichiers pertinents recommandés. Cela empêche les patches spéculatifs tout en laissant l'IA explorer le projet.
+5. **Prompt Injection Guard** (`server/utils/promptInjectionGuard.ts`) : Filtre les entrées suspectes pouvant tenter de détourner les instructions système.
+6. **Isolation Electron** : `nodeIntegration: false`, `contextIsolation: true` et filtrage strict des canaux IPC.
 
 ---
 

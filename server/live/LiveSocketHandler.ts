@@ -24,12 +24,20 @@ import { subscribeToValidation } from '../utils/postEditValidator.js';
 import { estimateTokens, summarizeWithLLM } from '../utils/tokenOptimizer.js';
 import { knowledgeGraph, projectMemory, understandingEngine } from '../knowledge/index.js';
 import { notebookManager } from '../notebooks/index.js';
-import { supervisor } from '../autonomy/index.js';
+import { Supervisor } from '../autonomy/index.js';
 import { WORKSPACE_SITE_URL, SELF_ROOT } from '../utils/selfRoot.js';
 import type { BrowserPendingEntry, BrowserActionPendingEntry } from '../routes/browser.js';
 
 // Type compatible avec l'ancien SkillManager pour une migration progressive
 type SkillManager = SkillManagerV2;
+
+interface SessionContextGate {
+  active: boolean;
+  confidence: number | null;
+  risk: string | null;
+  requiredFiles: Set<string>;
+  readFiles: Set<string>;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -89,6 +97,14 @@ export function attachLiveWebSocket(
   // ── Gemini Live WebSocket ────────────────────────────────────────────────
   wss.on('connection', async (clientWs: WebSocket, req: any) => {
     console.log('Client connected to WebSocket');
+    const sessionSupervisor = new Supervisor();
+    const contextGate: SessionContextGate = {
+      active: false,
+      confidence: null,
+      risk: null,
+      requiredFiles: new Set(),
+      readFiles: new Set(),
+    };
 
     const unsubscribeValidation = subscribeToValidation((data) => {
       if (clientWs.readyState === WebSocket.OPEN) {
@@ -615,7 +631,7 @@ export function attachLiveWebSocket(
             if (message.serverContent?.interrupted) clientWs.send(JSON.stringify({ interrupted: true }));
 
             if (message.toolCall) {
-              handleToolCall(message.toolCall, session, clientWs, sessionMode, busyStateRef, voiceName, deps).catch(e =>
+              handleToolCall(message.toolCall, session, clientWs, sessionMode, busyStateRef, voiceName, deps, sessionSupervisor, contextGate).catch(e =>
                 console.error('[handleToolCall] Erreur non catchée:', e),
               );
             }
@@ -898,8 +914,7 @@ export function attachLiveWebSocket(
 
       // ── Lifecycle ──────────────────────────────────────────────────
       activeGeminiSessions.add(session);
-      supervisor.reset();
-      supervisor.setSessionInjector((message: string) => {
+      sessionSupervisor.setSessionInjector((message: string) => {
         try { session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: message }] }] }); } catch (e) { console.error('[Supervisor] Injection échouée:', e); }
       });
 
@@ -920,6 +935,37 @@ export function attachLiveWebSocket(
   });
 }
 
+function normalizeContextPath(value: unknown): string {
+  return String(value ?? '').replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase();
+}
+
+function updateContextGate(state: SessionContextGate, toolName: string, args: any, response: any): void {
+  if (toolName === 'read_project_file' && response && !(response as any).error) {
+    const path = normalizeContextPath(args?.path);
+    if (path) state.readFiles.add(path);
+    return;
+  }
+
+  if (toolName !== 'knowledge_build_context' || !response || response.status !== 'success') return;
+
+  const confidence = Number(response.summary?.confidence ?? response.score?.confidence);
+  const risk = String(response.summary?.global_risk ?? response.score?.risk ?? 'unknown');
+  state.confidence = Number.isFinite(confidence) ? confidence : null;
+  state.risk = risk;
+  state.requiredFiles = new Set([
+    ...(response.batch?.files ?? []).map((file: any) => normalizeContextPath(file.path)),
+    ...(response.missing_actions ?? [])
+      .filter((action: any) => action.kind === 'read_file' && (action.priority === 'high' || action.priority === 'critical'))
+      .map((action: any) => normalizeContextPath(action.target)),
+  ].filter(Boolean));
+  state.active = (state.confidence !== null && state.confidence < 65) || risk === 'high';
+}
+
+function isContextReady(state: SessionContextGate): boolean {
+  if (!state.active) return true;
+  return state.requiredFiles.size > 0 && Array.from(state.requiredFiles).every((file) => state.readFiles.has(file));
+}
+
 // ── handleToolCall ─────────────────────────────────────────────────────────────
 async function handleToolCall(
   toolCall: any,
@@ -929,6 +975,14 @@ async function handleToolCall(
   busyStateRef?: { activeDescription: string | null },
   voiceName = 'Aoede',
   deps?: LiveSocketDeps,
+  sessionSupervisor = new Supervisor(),
+  contextGate: SessionContextGate = {
+    active: false,
+    confidence: null,
+    risk: null,
+    requiredFiles: new Set(),
+    readFiles: new Set(),
+  },
 ): Promise<void> {
   const functionResponses: any[] = [];
   const skillManager = deps?.skillManager;
@@ -955,6 +1009,7 @@ async function handleToolCall(
     },
     browserReadPending,
     browserActionPending,
+    supervisor: sessionSupervisor,
   };
 
   try { clientWs.send(JSON.stringify({ busy: true })); } catch {}
@@ -981,9 +1036,29 @@ async function handleToolCall(
       // Supervisor guard
       if (WRITE_TOOLS.has(call.name)) {
         const blockedPath = (call.args?.path || call.args?.newPath || '') as string;
-        if (blockedPath && supervisor.isFileBlocked(blockedPath)) {
-          functionResponses.push({ id: call.id, name: call.name, response: { error: `[SUPERVISOR] Écriture bloquée sur "${blockedPath}". Ce fichier est en boucle de correction.` } });
-          clientWs.send(JSON.stringify({ tool_used: call.name, info: `[BLOQUÉ - Boucle Supervisor: ${blockedPath}]` }));
+        if (sessionSupervisor.isMissionPaused() || (blockedPath && sessionSupervisor.isFileBlocked(blockedPath))) {
+          const reason = sessionSupervisor.isMissionPaused()
+            ? 'La mission est en pause après escalade.'
+            : `Le fichier "${blockedPath}" est en boucle de correction.`;
+          functionResponses.push({ id: call.id, name: call.name, response: { error: `[SUPERVISOR] Écriture bloquée. ${reason}` } });
+          clientWs.send(JSON.stringify({ tool_used: call.name, info: `[BLOQUÉ - Supervisor] ${reason}` }));
+          continue;
+        }
+        if (contextGate.active && !isContextReady(contextGate)) {
+          const pending = Array.from(contextGate.requiredFiles)
+            .filter((file) => !contextGate.readFiles.has(file))
+            .slice(0, 4)
+            .join(', ');
+          const reason = pending
+            ? `Lis d'abord les fichiers pertinents: ${pending}.`
+            : 'Lis le contexte pertinent et relance knowledge_build_context avant de modifier.';
+          functionResponses.push({ id: call.id, name: call.name, response: {
+            error: `[CONTEXT GATE] Écriture suspendue: confiance ${contextGate.confidence ?? 0}% (${contextGate.risk ?? 'unknown'}). ${reason}`,
+            confidence: contextGate.confidence,
+            risk: contextGate.risk,
+            requiredFiles: Array.from(contextGate.requiredFiles),
+          } });
+          clientWs.send(JSON.stringify({ tool_used: call.name, info: `[BLOQUÉ - Contexte insuffisant] ${reason}` }));
           continue;
         }
       }
@@ -1035,6 +1110,8 @@ async function handleToolCall(
       const success = !(response && (response as any).error && !(response as any).status);
       try { skillManager.recordToolUsage(call.name, success); } catch {}
 
+      updateContextGate(contextGate, call.name, call.args, response);
+
       functionResponses.push({ id: call.id, name: call.name, response });
       clientWs.send(JSON.stringify({ tool_used: call.name, info: JSON.stringify(call.args) }));
 
@@ -1048,12 +1125,12 @@ async function handleToolCall(
           const verifyResult = await skillManager.handleToolCall('verify_file', { path: verifyPath }, context);
           functionResponses.push({ id: `${call.id}_verify`, name: 'verify_file', response: verifyResult });
           clientWs.send(JSON.stringify({ tool_used: 'verify_file', info: JSON.stringify({ path: verifyPath }) }));
-          const evaluation = await supervisor.evaluateVerifyResult(verifyPath, verifyResult);
+          const evaluation = await sessionSupervisor.evaluateVerifyResult(verifyPath, verifyResult);
           if (evaluation.needsCorrection && evaluation.directive) {
             setTimeout(() => {
               try {
-                session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: evaluation.directive! }] }] });
-                clientWs.send(JSON.stringify({ supervisor_action: 'correction_injected', file: verifyPath, attempt: supervisor.getStats().totalCorrections }));
+                sessionSupervisor.injectDirective(evaluation.directive!);
+                clientWs.send(JSON.stringify({ supervisor_action: 'correction_injected', file: verifyPath, attempt: sessionSupervisor.getStats().totalCorrections }));
               } catch (e) { console.error('[Supervisor] Injection échouée:', e); }
             }, 100);
           }
