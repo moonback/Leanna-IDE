@@ -466,20 +466,12 @@ export function initSelfRoot(): void {
     }
   }
 
-  const persisted = loadPersistedProject();
-  if (persisted) {
-    SELF_ROOT = persisted.projectRoot;
-    WORKSPACE_SITE_URL = persisted.siteUrl ?? "";
-    addOrUpdateWorkspace(SELF_ROOT, WORKSPACE_SITE_URL || undefined);
-    console.log(`[SelfRoot] Projet restauré: ${SELF_ROOT}`);
-    if (WORKSPACE_SITE_URL) {
-      console.log(`[SelfRoot] URL site: ${WORKSPACE_SITE_URL}`);
-    }
-  } else {
-    SELF_ROOT = "";
-    WORKSPACE_SITE_URL = "";
-    console.log("[SelfRoot] Aucun projet sélectionné — en attente d'un projet.");
-  }
+  // Toujours démarrer sans projet actif : l'utilisateur doit choisir un workspace
+  // via le sélecteur Multi-Workspace à chaque démarrage.
+  // La liste des workspaces récents (workspaces.json) est conservée pour la sélection rapide.
+  SELF_ROOT = "";
+  WORKSPACE_SITE_URL = "";
+  console.log("[SelfRoot] Démarrage sans projet — sélecteur Multi-Workspace requis.");
 }
 
 /**
