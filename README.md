@@ -19,7 +19,7 @@ Un système d'agents autonomes orchestre les tâches complexes, tandis qu'un bac
 
 ## Badges
 
-[![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](package.json)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](package.json)
 [![License](https://img.shields.io/badge/license-Source--Available-orange.svg)](LICENSE)[![Runtime](https://img.shields.io/badge/node-%3E%3D22.0.0-green.svg)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0.0-3178C6.svg)](tsconfig.json)
 [![Framework](https://img.shields.io/badge/React-19.0.1-61DAFB.svg)](package.json)
@@ -63,7 +63,7 @@ Un système d'agents autonomes orchestre les tâches complexes, tandis qu'un bac
 * **Agent Builder Visuel** : Interface de création, personnalisation (avatar, couleur, instructions système, presets d'outils, modèles) et test d'agents personnalisés avec import/export JSON.
 * **Optimiseur de contexte & Pool de clés Gemini** : Calcul automatique des tokens, compactage/résumé automatique des conversations, rotation dynamique des clés API Gemini sur erreur 429.
 
-### 🛒 Marketplace d'agents et de skills *(nouveau v0.9.0)*
+### 🛒 Marketplace d'agents et de skills *(nouveau v0.8.0)*
 
 Le Marketplace est accessible depuis la sidebar IDE : **Outils → Marketplace** (ou raccourci `Ctrl+K` dans le panel).
 
