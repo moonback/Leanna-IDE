@@ -305,21 +305,24 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
       className="border-t select-none"
       style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
     >
-      {/* ── 2px progress rail ── */}
-      <div className="relative h-[2px] w-full" style={{ backgroundColor: 'var(--border-base)' }}>
+      {/* ── Splash-style progress bar ── */}
+      <div
+        className="relative h-[5px] w-full overflow-hidden rounded"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--text-primary) 6%, transparent)' }}
+      >
         <motion.div
-          className="absolute inset-y-0 left-0"
-          style={{ backgroundColor: accentColor, opacity: 0.8 }}
+          className="absolute inset-y-0 left-0 rounded"
+          style={{ backgroundColor: accentColor }}
           animate={{ width: `${pct}%` }}
           transition={uiSpring}
         />
-        {/* Decorative shimmer sweep — motion-only, dropped entirely under reduced motion */}
+        {/* Splash-style shimmer sweep, omitted when motion is reduced. */}
         {isWorking && !reduceMotion && (
           <motion.div
-            className="absolute inset-y-0 w-8 opacity-50"
-            style={{ background: 'linear-gradient(90deg, transparent, var(--accent-primary), transparent)' }}
-            animate={{ left: ['-8%', '108%'] }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute inset-y-0 w-1/4"
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent)' }}
+            animate={{ left: ['-25%', '100%'] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: 'linear' }}
           />
         )}
       </div>

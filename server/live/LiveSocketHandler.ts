@@ -304,7 +304,7 @@ export function attachLiveWebSocket(
         'open_project_file', 'open_ide', 'get_workspace_info',
         'analyze_project_file',
         'run_project_command',
-        'verify_file', 'verify_syntax', 'verify_typecheck',
+        'verify_file', 'verify_syntax', 'verify_typecheck', 'security_audit',
         'save_memory', 'search_memory',
         'knowledge_build_context', 'knowledge_semantic_search',
         'knowledge_memory_search',
@@ -334,7 +334,7 @@ export function attachLiveWebSocket(
 
       const ASK_MODE_ALLOWED_TOOLS = new Set([
         'list_project_files', 'read_project_file', 'read_file_outline', 'search_in_files',
-        'analyze_project_file', 'get_workspace_info', 'open_project_file', 'open_ide',
+        'analyze_project_file', 'get_workspace_info', 'open_project_file', 'open_ide', 'security_audit',
         'save_memory', 'search_memory',
         'knowledge_build_context', 'knowledge_semantic_search',
         'knowledge_memory_search', 'knowledge_memory_list',
@@ -370,7 +370,7 @@ export function attachLiveWebSocket(
             filteredDeclarations = declarations.filter(d => TIER1_CORE_TOOLS.has(d.name) || d.name.startsWith('custom_'));
             filteredDeclarations.push({
               name: 'request_tools',
-              description: `Demande le chargement d'outils supplémentaires. Catégories: "git", "github", "automation", "lists", "weather", "reasoning", "history", "system", "knowledge", "verify", "guidelines", "selfImprovement", "all".`,
+              description: `Demande le chargement d'outils supplémentaires. Catégories: "git", "github", "automation", "lists", "weather", "reasoning", "history", "system", "knowledge", "verify", "security_audit", "guidelines", "selfImprovement", "all".`,
               parameters: {
                 type: 'OBJECT',
                 properties: {

@@ -15,6 +15,7 @@ router.get('/', (_req: Request, res: Response) => {
       { id: 'system', name: 'OS Control (Electron/Node)', icon: 'Monitor', status: 'active' },
       { id: 'reasoning', name: 'Background Tasks (Gemini Pro)', icon: 'Blocks', status: 'active' },
       { id: 'codebase', name: 'Codebase Editor', icon: 'Code', status: 'active' },
+      { id: 'security_audit', name: 'Autonomous Security Audit', icon: 'ShieldCheck', status: 'active' },
       { id: 'history', name: 'Conversation History (Supabase)', icon: 'History', status: process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY ? 'authenticated' : 'requires_auth' },
     ],
   });

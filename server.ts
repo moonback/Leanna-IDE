@@ -264,6 +264,7 @@ import { reasoningSkill } from "./server/skills/reasoning.js";
 import { systemSkill } from "./server/skills/system.js";
 import { timeSkill } from "./server/skills/time.js";
 import { verifySkill } from "./server/skills/verify.js";
+import { securityAuditSkill } from "./server/skills/securityAudit.js";
 import { weatherSkill } from "./server/skills/weather.js";
 import { projectSkill } from "./server/skills/project.js";
 import { agentsSkill } from "./server/skills/agents.js";
@@ -279,7 +280,7 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
     automationSkill, browserSkill, codebaseSkill, githubSkill,
     guidelinesSkill, historySkill, knowledgeSkill, listSkill,
     memorySkill, reasoningSkill, systemSkill, timeSkill,
-    verifySkill, weatherSkill, projectSkill, agentsSkill,
+    verifySkill, securityAuditSkill, weatherSkill, projectSkill, agentsSkill,
     missionSkill, aiStudioDirectivesSkill, documentLinkerSkill,
     documentKnowledgeSkill, richDocumentSkill,
     createSmartSkills((name: string, args: any) => skillManager.handleToolCall(name, args)),
