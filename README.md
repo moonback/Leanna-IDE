@@ -20,8 +20,7 @@ Un système d'agents autonomes orchestre les tâches complexes, tandis qu'un bac
 ## Badges
 
 [![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](package.json)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Runtime](https://img.shields.io/badge/node-%3E%3D22.0.0-green.svg)](package.json)
+[![License](https://img.shields.io/badge/license-Source--Available-orange.svg)](LICENSE)[![Runtime](https://img.shields.io/badge/node-%3E%3D22.0.0-green.svg)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0.0-3178C6.svg)](tsconfig.json)
 [![Framework](https://img.shields.io/badge/React-19.0.1-61DAFB.svg)](package.json)
 [![Desktop](https://img.shields.io/badge/Electron-43.1.0-47848F.svg)](package.json)
@@ -301,6 +300,12 @@ Dans la vue détail d'un paquet → icône **⬇** en haut à droite → téléc
 
 ---
 
-## Licence
+## License
 
-Ce projet est distribué sous licence **MIT**. Voir le fichier [LICENSE](LICENSE) pour les détails complets.
+Leanna is source-available under a custom Business Source License.
+
+Commercial use is restricted until September 2, 2031.
+On September 2, 2031, the applicable version will become open source
+under the GNU General Public License v3.0 or later.
+
+See [LICENSE](LICENSE) for the complete terms.
