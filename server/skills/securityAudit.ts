@@ -17,6 +17,7 @@ type PackageManager = "npm" | "yarn" | "pnpm" | "none";
 interface DependencyAudit {
   status: "success" | "failed" | "unavailable";
   packageManager: PackageManager;
+  mode: "offline" | "online" | "not-applicable";
   vulnerabilities: Record<string, number>;
   advisories: Array<{ name: string; severity: string; range?: string; fixAvailable?: boolean }>;
   advisoriesTruncated?: boolean;
@@ -127,13 +128,26 @@ function parseNpmAuditOutput(rawStdout: string): Pick<DependencyAudit, "vulnerab
   };
 }
 
-async function auditDependencies(root: string): Promise<DependencyAudit> {
+async function runNpmAudit(root: string, mode: "offline" | "online") {
+  const npmArgs = mode === "offline"
+    ? ["audit", "--json", "--offline"]
+    : ["audit", "--json"];
+  const { stdout } = await execFileAsync(
+    process.platform === "win32" ? "npm.cmd" : "npm",
+    npmArgs,
+    { cwd: root, timeout: AUDIT_TIMEOUT_MS, windowsHide: true, maxBuffer: 2_000_000 },
+  );
+  return parseNpmAuditOutput(stdout);
+}
+
+async function auditDependencies(root: string, requestedMode: "auto" | "offline" | "online"): Promise<DependencyAudit> {
   const packageManager = detectPackageManager(root);
 
   if (packageManager === "none") {
     return {
       status: "unavailable",
       packageManager,
+      mode: "not-applicable",
       vulnerabilities: {},
       advisories: [],
       advisoriesTruncated: false,
@@ -145,6 +159,7 @@ async function auditDependencies(root: string): Promise<DependencyAudit> {
     return {
       status: "unavailable",
       packageManager,
+      mode: requestedMode === "offline" ? "offline" : "online",
       vulnerabilities: {},
       advisories: [],
       advisoriesTruncated: false,
@@ -152,70 +167,79 @@ async function auditDependencies(root: string): Promise<DependencyAudit> {
     };
   }
 
-  try {
-    const { stdout } = await execFileAsync(
-      process.platform === "win32" ? "npm.cmd" : "npm",
-      ["audit", "--json", "--offline"],
-      { cwd: root, timeout: AUDIT_TIMEOUT_MS, windowsHide: true, maxBuffer: 2_000_000 },
-    );
-    const parsed = parseNpmAuditOutput(stdout);
-    if (!parsed) {
-      return {
-        status: "unavailable",
-        packageManager,
-        vulnerabilities: {},
-        advisories: [],
-        advisoriesTruncated: false,
-        message: "Réponse npm audit illisible; le scan statique reste exploitable.",
-      };
+  const modes: Array<"offline" | "online"> = requestedMode === "auto"
+    ? ["offline", "online"]
+    : [requestedMode];
+  let lastError: any;
+
+  for (const mode of modes) {
+    try {
+      const parsed = await runNpmAudit(root, mode);
+      if (!parsed) {
+        lastError = new Error("Réponse npm audit illisible");
+        continue;
+      }
+      return { status: "success", packageManager, mode, ...parsed, message: `Audit npm terminé en mode ${mode}.` };
+    } catch (error: any) {
+      lastError = error;
+      const parsed = parseNpmAuditOutput(error?.stdout || "");
+      if (parsed) {
+        return {
+          status: "failed",
+          packageManager,
+          mode,
+          ...parsed,
+          message: "Des vulnérabilités de dépendances ont été détectées.",
+        };
+      }
     }
-    return { status: "success", packageManager, ...parsed, message: "Audit npm terminé en mode hors ligne." };
-  } catch (error: any) {
-    const parsed = parseNpmAuditOutput(error?.stdout || "");
-    if (parsed) {
-      return {
-        status: "failed",
-        packageManager,
-        ...parsed,
-        message: "Des vulnérabilités de dépendances ont été détectées.",
-      };
-    }
-    const timedOut = error?.killed && error?.signal;
-    return {
-      status: "unavailable",
-      packageManager,
-      vulnerabilities: {},
-      advisories: [],
-      advisoriesTruncated: false,
-      message: timedOut
-        ? "Audit npm interrompu (délai dépassé); le scan statique reste exploitable."
-        : "Audit npm indisponible hors ligne; le scan statique reste exploitable.",
-    };
   }
+
+  const mode = requestedMode === "offline" ? "offline" : "online";
+  const timedOut = lastError?.killed && lastError?.signal;
+  return {
+    status: "unavailable",
+    packageManager,
+    mode,
+    vulnerabilities: {},
+    advisories: [],
+    advisoriesTruncated: false,
+    message: timedOut
+      ? "Audit npm interrompu (délai dépassé); le scan statique reste exploitable."
+      : requestedMode === "auto"
+        ? "Audit npm indisponible après tentative hors ligne puis en ligne; le scan statique reste exploitable."
+        : `Audit npm indisponible en mode ${requestedMode}; le scan statique reste exploitable.`,
+  };
 }
 
 export const securityAuditSkill: Skill = {
   name: "security_audit",
   metadata: {
-    version: "1.1.0",
+    version: "1.2.0",
     description: "Audit défensif autonome et non mutatif du workspace.",
     category: "security",
   },
   declarations: [{
     name: "security_audit",
-    description: "Audit complet en lecture seule: SAST, secrets, configuration et npm hors ligne. Aucune commande arbitraire ni mutation.",
+    description: "Audit complet en lecture seule: SAST, secrets, configuration et dépendances npm avec fallback en ligne contrôlé. Aucune commande arbitraire ni mutation.",
     parameters: {
       type: "OBJECT",
-      properties: { includeTests: { type: "BOOLEAN", description: "Inclure les fichiers de test dans le scan (défaut: false)." } },
+      properties: {
+        includeTests: { type: "BOOLEAN", description: "Inclure les fichiers de test dans le scan (défaut: false)." },
+        dependencyMode: { type: "STRING", enum: ["auto", "offline", "online"], description: "Mode d'audit des dépendances. auto tente le cache local puis npm en ligne (défaut: auto)." },
+      },
     },
     category: "security",
     mutating: false,
     timeoutMs: 120_000,
   }],
-  inputSchemas: { security_audit: z.object({ includeTests: z.boolean().optional().default(false) }) },
+  inputSchemas: { security_audit: z.object({
+    includeTests: z.boolean().optional().default(false),
+    dependencyMode: z.enum(["auto", "offline", "online"]).optional().default("auto"),
+  }) },
   handleToolCall: async (name, args) => {
     if (name !== "security_audit") throw new Error(`Unknown tool in security_audit: ${name}`);
-    const { includeTests } = validateArgs(securityAuditSkill.inputSchemas!.security_audit, args ?? {}, name);
+    const { includeTests, dependencyMode } = validateArgs(securityAuditSkill.inputSchemas!.security_audit, args ?? {}, name);
     const root = getProjectRoot();
     const auditStartedAt = Date.now();
 
@@ -238,7 +262,7 @@ export const securityAuditSkill: Skill = {
       }
     }
 
-    const dependencies = await auditDependencies(root);
+    const dependencies = await auditDependencies(root, dependencyMode);
     const summary = summarizeIssues(issues);
     const dependencyHigh = Number(dependencies.vulnerabilities.high || 0)
       + Number(dependencies.vulnerabilities.critical || 0);

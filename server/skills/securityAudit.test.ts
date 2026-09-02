@@ -21,5 +21,9 @@ test("security audit is bounded, read-only, and returns a consolidated report", 
   assert.ok(result.scope.filesScanned > 0);
   assert.ok(result.summary);
   assert.ok(result.dependencies);
+  assert.ok(["offline", "online", "not-applicable"].includes(result.dependencies.mode));
+  assert.equal(typeof result.summary.dependenciesComplete, "boolean");
+  assert.equal(typeof result.summary.issuesTruncated, "boolean");
+  assert.equal(typeof result.durationMs, "number");
   assert.ok(Array.isArray(result.issues));
 });
