@@ -511,11 +511,13 @@ async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = 
   const npxBin = isWin ? "npx.cmd" : "npx";
   const npmBin = isWin ? "npm.cmd" : "npm";
 
+  // shell:true n'est nécessaire que sur Windows pour .cmd/.bat
+  // Les arguments sont dans un tableau, donc Node les échappe correctement
   const opts = {
     cwd: root,
     timeout: TIMEOUT_MS,
     maxBuffer: 2 * 1024 * 1024,
-    shell: true,
+    shell: isWin, // Shell uniquement sur Windows pour les .cmd
     env: { ...process.env },
   };
 
@@ -635,7 +637,7 @@ async function runLintDirect(targets: string[] = []): Promise<ProcessResult & { 
       cwd: root,
       timeout: TIMEOUT_MS,
       maxBuffer: 2 * 1024 * 1024,
-      shell: true,
+      shell: false, // node est un binaire natif, pas besoin de shell
     });
     const stdout = truncate(result.stdout || "");
     const stderr = truncate(result.stderr || "");
@@ -657,7 +659,7 @@ async function runFormatDirect(target: string): Promise<ProcessResult> {
       cwd: root,
       timeout: TIMEOUT_MS,
       maxBuffer: 2 * 1024 * 1024,
-      shell: true,
+      shell: false, // node est un binaire natif, pas besoin de shell
     });
     return { ok: true, stdout: truncate(result.stdout || ""), stderr: truncate(result.stderr || ""), exitCode: 0 };
   } catch (error: any) {

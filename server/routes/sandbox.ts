@@ -7,6 +7,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import path from 'path';
 import {
   activateSandbox,
@@ -26,6 +27,92 @@ import {
 import { startWatching, stopWatching } from '../utils/sandboxWatcher.js';
 import { appendAuditEvent } from '../audit.js';
 import { SELF_ROOT } from '../utils/selfRoot.js';
+
+// Rate limiter for sandbox exit code verification
+// Stricter than global rate limit to prevent brute force attacks
+interface RateLimitEntry {
+  attempts: number;
+  resetAt: number;
+  blockedUntil?: number;
+}
+
+const exitCodeAttempts = new Map<string, RateLimitEntry>();
+const MAX_ATTEMPTS = 3; // Max attempts before temporary block
+const ATTEMPT_WINDOW_MS = 60 * 1000; // 1 minute window
+const BLOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes block after too many attempts
+
+/**
+ * Check if a client (by IP) can attempt to verify the exit code.
+ * Returns { allowed: true } or { allowed: false, error: string }
+ */
+function checkExitCodeRateLimit(clientIp: string): { allowed: true } | { allowed: false; error: string } {
+  const now = Date.now();
+  const entry = exitCodeAttempts.get(clientIp);
+
+  // Check if currently blocked
+  if (entry?.blockedUntil && entry.blockedUntil > now) {
+    const remainingMinutes = Math.ceil((entry.blockedUntil - now) / 60000);
+    return {
+      allowed: false,
+      error: `Trop de tentatives incorrectes. Réessayez dans ${remainingMinutes} minute(s).`
+    };
+  }
+
+  // Reset if window expired
+  if (!entry || entry.resetAt <= now) {
+    exitCodeAttempts.set(clientIp, {
+      attempts: 1,
+      resetAt: now + ATTEMPT_WINDOW_MS
+    });
+    return { allowed: true };
+  }
+
+  // Increment attempts
+  entry.attempts += 1;
+
+  // Block if too many attempts
+  if (entry.attempts > MAX_ATTEMPTS) {
+    entry.blockedUntil = now + BLOCK_DURATION_MS;
+    return {
+      allowed: false,
+      error: `Trop de tentatives incorrectes (${entry.attempts}/${MAX_ATTEMPTS}). Compte bloqué pendant 15 minutes.`
+    };
+  }
+
+  return { allowed: true };
+}
+
+/**
+ * Reset rate limit for a client (called on successful verification).
+ */
+function resetExitCodeRateLimit(clientIp: string): void {
+  exitCodeAttempts.delete(clientIp);
+}
+
+/**
+ * Compare exit code using constant-time comparison to prevent timing attacks.
+ */
+function verifyExitCode(providedCode: string | undefined, expectedCode: string): boolean {
+  if (!providedCode || providedCode.length !== 6) {
+    return false;
+  }
+
+  // Convert to buffers for constant-time comparison
+  const providedBuffer = Buffer.from(providedCode, 'utf8');
+  const expectedBuffer = Buffer.from(expectedCode, 'utf8');
+
+  // Ensure both buffers are same length (should be 6 bytes each)
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  try {
+    return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+  } catch {
+    // timingSafeEqual throws if buffers have different lengths
+    return false;
+  }
+}
 
 export function createSandboxRouter(): Router {
   const router = Router();
@@ -65,15 +152,27 @@ export function createSandboxRouter(): Router {
   router.post('/verify-exit-code', (req: Request, res: Response): void => {
     const { code } = req.body || {};
     const exitCode = process.env.SANDBOX_EXIT_CODE;
+    const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+
+    // Check rate limit first
+    const rateCheck = checkExitCodeRateLimit(clientIp);
+    if (!rateCheck.allowed) {
+      res.status(429).json({ status: 'error', error: rateCheck.error });
+      return;
+    }
 
     if (!exitCode || exitCode.length !== 6) {
       res.status(403).json({ status: 'error', error: 'Code non configuré' });
       return;
     }
-    if (!code || code !== exitCode) {
+
+    if (!verifyExitCode(code, exitCode)) {
       res.status(403).json({ status: 'error', error: 'Code incorrect' });
       return;
     }
+
+    // Success - reset rate limit
+    resetExitCodeRateLimit(clientIp);
     res.json({ status: 'success' });
   });
 
@@ -82,6 +181,14 @@ export function createSandboxRouter(): Router {
     try {
       const { code } = req.body || {};
       const exitCode = process.env.SANDBOX_EXIT_CODE;
+      const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+
+      // Check rate limit first
+      const rateCheck = checkExitCodeRateLimit(clientIp);
+      if (!rateCheck.allowed) {
+        res.status(429).json({ status: 'error', error: rateCheck.error });
+        return;
+      }
 
       if (!exitCode || exitCode.length !== 6) {
         res.status(403).json({
@@ -90,13 +197,17 @@ export function createSandboxRouter(): Router {
         });
         return;
       }
-      if (!code || code !== exitCode) {
+
+      if (!verifyExitCode(code, exitCode)) {
         res.status(403).json({
           status: 'error',
           error: 'Code de sécurité incorrect. 6 chiffres requis pour désactiver le sandbox.',
         });
         return;
       }
+
+      // Success - reset rate limit
+      resetExitCodeRateLimit(clientIp);
 
       deactivateSandbox();
       stopWatching();
@@ -248,6 +359,14 @@ export function createSandboxRouter(): Router {
     try {
       const { code } = req.body || {};
       const exitCode = process.env.SANDBOX_EXIT_CODE;
+      const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+
+      // Check rate limit first
+      const rateCheck = checkExitCodeRateLimit(clientIp);
+      if (!rateCheck.allowed) {
+        res.status(429).json({ status: 'error', error: rateCheck.error });
+        return;
+      }
 
       if (!exitCode || exitCode.length !== 6) {
         res.status(403).json({
@@ -256,13 +375,17 @@ export function createSandboxRouter(): Router {
         });
         return;
       }
-      if (!code || code !== exitCode) {
+
+      if (!verifyExitCode(code, exitCode)) {
         res.status(403).json({
           status: 'error',
           error: 'Code de sécurité incorrect. 6 chiffres requis pour réinitialiser le sandbox.',
         });
         return;
       }
+
+      // Success - reset rate limit
+      resetExitCodeRateLimit(clientIp);
 
       const result = await resetSandbox();
       await appendAuditEvent({
@@ -352,15 +475,27 @@ export function createVerifyExitCodeRouter(): Router {
   router.post('/verify-exit-code', (req: Request, res: Response): void => {
     const { code } = req.body || {};
     const exitCode = process.env.SANDBOX_EXIT_CODE;
+    const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+
+    // Rate limiting strict
+    const rateCheck = checkExitCodeRateLimit(clientIp);
+    if (!rateCheck.allowed) {
+      res.status(429).json({ status: 'error', error: rateCheck.error });
+      return;
+    }
 
     if (!exitCode || exitCode.length !== 6) {
       res.status(403).json({ status: 'error', error: 'Code non configuré' });
       return;
     }
-    if (!code || code !== exitCode) {
+
+    if (!verifyExitCode(code, exitCode)) {
       res.status(403).json({ status: 'error', error: 'Code incorrect' });
       return;
     }
+
+    // Succès — réinitialiser le rate limit
+    resetExitCodeRateLimit(clientIp);
     res.json({ status: 'success' });
   });
   return router;

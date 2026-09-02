@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo, useMem
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, animate } from 'motion/react';
 import {
   Send, Mic, MicOff, User, Bot, Eye, X,
-  Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2, ChevronDown,
+  Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2, ChevronDown, Download, MessageSquare,
 } from 'lucide-react';
 import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
@@ -324,9 +324,25 @@ interface InputAreaProps {
 function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed }: InputAreaProps) {
   const [input, setInput] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canSend = connected && !isBusy;
+
+  // Détection de la frappe pour les indicateurs
+  useEffect(() => {
+    if (input.length > 0) {
+      setIsTyping(true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 1000);
+    } else {
+      setIsTyping(false);
+    }
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, [input]);
 
   const {
     suggestions,
@@ -483,20 +499,33 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed }: InputAreaP
       </div>
 
       <div className="flex items-center justify-between mt-2 px-1">
-        <span
-          id="chat-input-hints"
-          className="text-xs tracking-wide"
-          style={{ color: 'var(--text-dimmed)' }}
-        >
-          Enter = Envoyer · @ = Fichier · / = Commande · 📎 = Document
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            id="chat-input-hints"
+            className="text-xs tracking-wide"
+            style={{ color: 'var(--text-dimmed)' }}
+          >
+            Enter = Envoyer · @ = Fichier · / = Commande · 📎 = Document
+          </span>
+          {input.length > 0 && (
+            <span
+              className="text-xs font-mono px-1.5 py-0.5 rounded"
+              style={{ 
+                color: input.length > 500 ? 'var(--color-warning)' : 'var(--text-dimmed)',
+                backgroundColor: 'var(--bg-secondary)'
+              }}
+            >
+              {input.length}
+            </span>
+          )}
+        </div>
         {connected && (
           <span
             className="text-xs tracking-wide flex items-center gap-2"
             style={{ color: isBusy ? 'var(--accent-primary)' : 'var(--color-success)' }}
           >
             <BreathingDots color={isBusy ? 'var(--accent-primary)' : 'var(--color-success)'} reduceMotion={false} />
-            {isBusy ? 'En cours...' : 'Connecté'}
+            {isBusy ? 'En cours...' : isTyping ? 'Frappe...' : 'Connecté'}
           </span>
         )}
       </div>
@@ -619,9 +648,10 @@ interface ChatPanelProps {
   onPendingMessageConsumed?: () => void;
   onDockedChange?: (docked: boolean) => void;
   initialDocked?: boolean;
+  onClose?: () => void;
 }
 
-export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedChange, initialDocked = false }: ChatPanelProps = {}) {
+export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedChange, initialDocked = false, onClose }: ChatPanelProps = {}) {
   const {
     connected, connecting, connect, disconnect,
     sendTextMessage, sendRawMessage, transcript, clearTranscript,
@@ -629,17 +659,74 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
   } = useLiveAPIContext();
   const { profile } = useProfile();
   const [minimized, setMinimized] = useState(false);
-  const [docked, setDocked] = useState(initialDocked);
+  const [docked, setDocked] = useState(() => {
+    try {
+      const saved = localStorage.getItem('Leanna_chat_docked');
+      return saved ? JSON.parse(saved) : initialDocked;
+    } catch {
+      return initialDocked;
+    }
+  });
   const [fullscreen, setFullscreen] = useState(false);
+  const [showInput, setShowInput] = useState(() => {
+    try {
+      const saved = localStorage.getItem('Leanna_chat_show_input');
+      return saved ? JSON.parse(saved) : false; // Caché par défaut
+    } catch {
+      return false;
+    }
+  });
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const reduceMotion = !!useReducedMotion();
 
+  // Sauvegarder l'état docké dans localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('Leanna_chat_docked', JSON.stringify(docked));
+    } catch (err) {
+      console.warn('[ChatPanel] Failed to save docked state:', err);
+    }
+  }, [docked]);
+
+  // Sauvegarder l'état de la zone d'input dans localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('Leanna_chat_show_input', JSON.stringify(showInput));
+    } catch (err) {
+      console.warn('[ChatPanel] Failed to save input state:', err);
+    }
+  }, [showInput]);
+
   useEffect(() => {
     onDockedChange?.(docked);
   }, [docked, onDockedChange]);
+
+  // Sauvegarde automatique de la conversation dans localStorage
+  useEffect(() => {
+    if (transcript.length > 0) {
+      try {
+        localStorage.setItem('Leanna_chat_history', JSON.stringify(transcript.slice(-50))); // Garder les 50 derniers messages
+      } catch (err) {
+        console.warn('[ChatPanel] Failed to save chat history:', err);
+      }
+    }
+  }, [transcript]);
+
+  // Restauration de l'historique au montage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('Leanna_chat_history');
+      if (saved) {
+        // Note: Cette fonctionnalité nécessiterait une méthode dans useLiveAPI pour restaurer l'historique
+        // Pour l'instant, on se contente de le sauvegarder pour référence future
+      }
+    } catch (err) {
+      console.warn('[ChatPanel] Failed to restore chat history:', err);
+    }
+  }, []);
 
   const { mx, my, isDragging: isDraggingPanel, resetPosition, dragHandlers } =
     useDraggablePanel(panelRef, docked || fullscreen, reduceMotion);
@@ -711,6 +798,34 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
   });
 
   const handleClear = useCallback(() => clearTranscript(), [clearTranscript]);
+  
+  const handleExport = useCallback(() => {
+    try {
+      const exportData = {
+        timestamp: new Date().toISOString(),
+        assistant: profile?.aiName || 'Leanna',
+        messages: transcript.map(entry => ({
+          role: entry.role,
+          content: entry.text,
+          timestamp: entry.timestamp.toISOString(),
+          sources: entry.sources?.map(s => ({ path: s.path, lines: s.lines, tool: s.tool }))
+        }))
+      };
+      
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `leanna-conversation-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[ChatPanel] Export failed:', err);
+    }
+  }, [transcript, profile]);
+  
   const handleToggleMute = useCallback(() => toggleMute(), [toggleMute]);
   const handleToggleConnect = useCallback(() => {
     if (connected) disconnect();
@@ -725,14 +840,14 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
         top: fullscreen ? '0' : docked ? '0' : '80px',
         right: fullscreen ? '0' : docked ? '0' : '24px',
         left: fullscreen ? '0' : undefined,
-        bottom: fullscreen ? '0' : undefined,
+        bottom: fullscreen ? '0' : docked ? '32px' : '40px', // Ajusté pour ne pas couvrir la StatusBar (32px + 8px marge)
         width: fullscreen ? '100vw' :
               minimized ? '400px' :
               docked ? '400px' : '400px',
         height: fullscreen ? '100vh' :
                minimized ? 'auto' :
-               docked ? '100vh' : 'calc(100vh - 120px)',
-        maxHeight: fullscreen ? '100vh' : minimized ? undefined : '100vh',
+               docked ? 'calc(100vh - 32px)' : 'calc(100vh - 152px)', // Ajusté : hauteur totale - 80px (top) - 40px (bottom) - 32px (statusbar)
+        maxHeight: fullscreen ? '100vh' : minimized ? undefined : docked ? 'calc(100vh - 32px)' : 'calc(100vh - 152px)',
         minWidth: fullscreen ? undefined : '280px',
         zIndex: fullscreen ? 99999 : 9990,
         backgroundColor: 'var(--bg-panel)',
@@ -754,7 +869,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
           ? 'box-shadow 0.15s'
           : isDraggingPanel
             ? 'box-shadow 0.15s'
-            : 'top 0.3s cubic-bezier(0.22, 1, 0.36, 1), right 0.3s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s cubic-bezier(0.22, 1, 0.36, 1), height 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s',
+            : 'top 0.3s cubic-bezier(0.22, 1, 0.36, 1), right 0.3s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s cubic-bezier(0.22, 1, 0.36, 1), height 0.3s cubic-bezier(0.22, 1, 0.36, 1), bottom 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s',
         backdropFilter: fullscreen ? 'none' : 'blur(20px)',
       }}
       {...dropHandlers}
@@ -849,16 +964,40 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
           )}
 
           {transcript.length > 0 && (
-            <motion.button
-              onClick={handleClear}
-              whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-              title="Effacer la conversation"
-              aria-label="Effacer la conversation"
-            >
-              <Trash2 size={16} style={{ color: 'var(--text-muted)' }} />
-            </motion.button>
+            <>
+              <motion.button
+                onClick={handleExport}
+                whileTap={reduceMotion ? undefined : { scale: 0.9 }}
+                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                title="Exporter la conversation"
+                aria-label="Exporter la conversation"
+              >
+                <Download size={16} style={{ color: 'var(--text-muted)' }} />
+              </motion.button>
+              <motion.button
+                onClick={handleClear}
+                whileTap={reduceMotion ? undefined : { scale: 0.9 }}
+                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                title="Effacer la conversation"
+                aria-label="Effacer la conversation"
+              >
+                <Trash2 size={16} style={{ color: 'var(--text-muted)' }} />
+              </motion.button>
+            </>
           )}
+
+          <motion.button
+            onClick={() => setShowInput((s: boolean) => !s)}
+            whileTap={reduceMotion ? undefined : { scale: 0.9 }}
+            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+            title={showInput ? 'Masquer la saisie de texte' : 'Afficher la saisie de texte'}
+            aria-label={showInput ? 'Masquer la saisie de texte' : 'Afficher la saisie de texte'}
+          >
+            <MessageSquare
+              size={16}
+              style={{ color: showInput ? 'var(--accent-primary)' : 'var(--text-muted)' }}
+            />
+          </motion.button>
 
           <motion.button
             onClick={() => {
@@ -880,7 +1019,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
           </motion.button>
 
           <motion.button
-            onClick={() => setDocked((d) => !d)}
+            onClick={() => setDocked((d: boolean) => !d)}
             whileTap={reduceMotion ? undefined : { scale: 0.9 }}
             className="p-2 rounded-lg hover:bg-white/10 transition-colors"
             title={docked ? 'Détacher' : 'Ancrer à droite'}
@@ -921,6 +1060,24 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
               style={{ color: connected ? 'var(--color-error)' : 'var(--accent-primary)' }}
             />
           </motion.button>
+
+          {onClose && (
+            <>
+              <div
+                className="w-px h-5 mx-0.5"
+                style={{ backgroundColor: 'var(--border-base)' }}
+              />
+              <motion.button
+                onClick={onClose}
+                whileTap={reduceMotion ? undefined : { scale: 0.9 }}
+                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                title="Fermer le panneau"
+                aria-label="Fermer le panneau"
+              >
+                <X size={16} style={{ color: 'var(--text-muted)' }} />
+              </motion.button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1047,12 +1204,14 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
 
           <ActivityFeed steps={activity} connected={connected} />
 
-          <InputArea
-            connected={connected}
-            isBusy={isBusy}
-            onSend={handleSend}
-            onDocumentAnalyzed={handleDocumentAnalyzed}
-          />
+          {showInput && (
+            <InputArea
+              connected={connected}
+              isBusy={isBusy}
+              onSend={handleSend}
+              onDocumentAnalyzed={handleDocumentAnalyzed}
+            />
+          )}
         </>
       )}
     </motion.div>

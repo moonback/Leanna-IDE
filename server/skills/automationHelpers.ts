@@ -1,3 +1,8 @@
+import { promisify } from 'util';
+import { lookup } from 'dns';
+
+const dnsLookup = promisify(lookup);
+
 const BLOCKED_HOSTS = new Set([
   '169.254.169.254',
   'metadata.google.internal',
@@ -52,12 +57,49 @@ function isPrivateIp(hostname: string): boolean {
   return false;
 }
 
+/**
+ * Resolve hostname to IP address and check if it's private.
+ * This prevents DNS rebinding attacks where a public domain resolves to a private IP.
+ */
+async function resolveAndCheckIp(hostname: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  // If already an IP literal, check it directly
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname) || hostname.includes(':')) {
+    if (isPrivateIp(hostname)) {
+      return { ok: false, error: `Adresse IP privée/locale interdite: ${hostname}` };
+    }
+    return { ok: true };
+  }
+
+  // Resolve DNS to get the actual IP(s)
+  try {
+    const resolved = await dnsLookup(hostname, { all: true });
+    
+    // Check all resolved IPs
+    for (const record of resolved) {
+      if (isPrivateIp(record.address)) {
+        return {
+          ok: false,
+          error: `Le domaine "${hostname}" résout vers une adresse privée/locale (${record.address}), ce qui est interdit pour des raisons de sécurité (protection DNS rebinding).`
+        };
+      }
+    }
+    
+    return { ok: true };
+  } catch (error) {
+    // DNS resolution failed
+    return {
+      ok: false,
+      error: `Impossible de résoudre le nom de domaine "${hostname}": ${error instanceof Error ? error.message : 'erreur DNS'}`
+    };
+  }
+}
+
 function matchesDomainList(hostname: string, list: string[]): boolean {
   const h = hostname.toLowerCase();
   return list.some((d) => h === d || h.endsWith('.' + d));
 }
 
-export function assertSafeUrl(rawUrl: string): { ok: true; url: string } | { ok: false; error: string } {
+export async function assertSafeUrl(rawUrl: string): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -73,8 +115,16 @@ export function assertSafeUrl(rawUrl: string): { ok: true; url: string } | { ok:
   if (BLOCKED_HOSTS.has(host)) {
     return { ok: false, error: `Hôte non autorisé: ${parsed.hostname}.` };
   }
+  
+  // Check hostname first (before DNS resolution)
   if (isPrivateIp(host)) {
     return { ok: false, error: `Navigation vers adresses privées/boucle locale interdite: ${parsed.hostname}.` };
+  }
+
+  // Resolve DNS and check the actual IP addresses (prevents DNS rebinding)
+  const ipCheck = await resolveAndCheckIp(host);
+  if (!ipCheck.ok) {
+    return ipCheck;
   }
 
   if (ALLOWED_DOMAINS.length > 0 && !matchesDomainList(host, ALLOWED_DOMAINS)) {

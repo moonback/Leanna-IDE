@@ -51,7 +51,8 @@ const getServerPort = (): number => {
 };
 
 // URL base pour le serveur WebSocket
-export function getTerminalWebSocketUrl(token: string | null = null): string {
+// Le token n'est plus transmis via l'URL pour éviter les fuites dans les logs
+export function getTerminalWebSocketUrl(): string {
   const port = getServerPort();
   
   // En mode Electron, si le protocole est file:, on force localhost
@@ -73,12 +74,8 @@ export function getTerminalWebSocketUrl(token: string | null = null): string {
     protocol = 'ws:';
   }
   
-  const baseUrl = `${protocol}//${host}:${port}`;
-  
-  if (token) {
-    return `${baseUrl}/terminal?token=${encodeURIComponent(token)}`;
-  }
-  return `${baseUrl}/terminal`;
+  // Plus de token dans l'URL - sera transmis via cookie ou en-tête
+  return `${protocol}//${host}:${port}/terminal`;
 }
 
 export interface TerminalState {
@@ -123,10 +120,14 @@ export function useTerminal(initialCols = 80, initialRows = 24): [TerminalState,
   // Gérer la connexion WebSocket
   const connect = useCallback(() => {
     const token = getAuthToken();
-    const wsUrl = getTerminalWebSocketUrl(token);
+    const wsUrl = getTerminalWebSocketUrl();
     
     try {
-      const ws = new WebSocket(wsUrl);
+      // Note: WebSocket API ne supporte pas les en-têtes personnalisés directement.
+      // Le token est envoyé via le protocole Sec-WebSocket-Protocol comme workaround.
+      // Le serveur lit d'abord le cookie Leanna_token, puis ce protocol en fallback.
+      const protocols = token ? ['token', token] : undefined;
+      const ws = new WebSocket(wsUrl, protocols);
       wsRef.current = ws;
       setIsConnecting(true);
       setError(null);

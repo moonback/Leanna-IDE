@@ -113,11 +113,46 @@ export function createTerminalRouter(authOptions?: AuthOptions) {
 // Configuration du WebSocket pour le terminal
 export function setupTerminalWebSocket(wss: WebSocketServer, apiToken: string | undefined) {
   wss.on('connection', (ws: WebSocket, req) => {
-    // Authentification basique via le token dans l'URL
-    const url = new URL(req.url || '', `http://${req.headers.host}`);
-    const token = url.searchParams.get('token');
+    // Authentification sécurisée via cookie httpOnly ou en-tête WebSocket
+    // Évite de transmettre le token via l'URL (risque de fuite dans les logs)
+    let token: string | null = null;
     
-    const authResult = authenticateToken(token || null, apiToken);
+    // 1. Tenter de lire depuis le cookie Leanna_token (déjà posé par server.ts)
+    const cookieHeader = req.headers.cookie;
+    if (cookieHeader) {
+      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, string>);
+      token = cookies['Leanna_token'] || null;
+    }
+    
+    // 2. Si pas de cookie, tenter de lire depuis l'en-tête Sec-WebSocket-Protocol
+    // (utilisé comme transport alternatif pour le token)
+    if (!token) {
+      const protocolHeader = req.headers['sec-websocket-protocol'];
+      if (protocolHeader) {
+        // Le format attendu est "token, <actual-token-value>"
+        const protocols = Array.isArray(protocolHeader) ? protocolHeader : [protocolHeader];
+        for (const protocol of protocols) {
+          const parts = protocol.split(',').map(p => p.trim());
+          const tokenIdx = parts.indexOf('token');
+          if (tokenIdx >= 0 && parts[tokenIdx + 1]) {
+            token = parts[tokenIdx + 1];
+            break;
+          }
+        }
+      }
+    }
+    
+    // 3. Fallback: lire depuis l'en-tête X-Leanna-Token (moins standard mais simple)
+    if (!token) {
+      const headerValue = req.headers['x-leanna-token'];
+      token = Array.isArray(headerValue) ? headerValue[0] : headerValue || null;
+    }
+    
+    const authResult = authenticateToken(token, apiToken);
     if (!authResult.ok) {
       ws.close(1008, 'Unauthorized');
       return;

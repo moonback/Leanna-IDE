@@ -150,7 +150,7 @@ export default function IdeView() {
   const [showBrowser, setShowBrowser] = useState(false);
   const [browserUrl, setBrowserUrl] = useState<string | undefined>(undefined);
   const [showSkillsMonitor, setShowSkillsMonitor] = useState(false);
-  const [showChat, setShowChat] = useState(false);
+  const [showChat, setShowChat] = useState(true); // Ouvert par défaut au démarrage
   const [chatDocked, setChatDocked] = useState(false);
   const [pendingChatMessage, setPendingChatMessage] = useState<{ text: string; displayText?: string } | null>(null);
   const [showAgents, setShowAgents] = useState(false);
@@ -784,7 +784,10 @@ export default function IdeView() {
           }
         }}
         onDisconnectAssistant={disconnect}
-        onConnectAssistant={() => connect([], mode)}
+        onConnectAssistant={() => {
+          connect([], mode);
+          setShowChat(true); // Ouvrir le ChatPanel après connexion
+        }}
         onMuteToggle={toggleMute}
         showHistory={showHistory}
         onToggleHistory={() => {
@@ -1201,6 +1204,7 @@ export default function IdeView() {
           onPendingMessageConsumed={() => setPendingChatMessage(null)}
           onDockedChange={setChatDocked}
           initialDocked={chatDocked}
+          onClose={() => setShowChat(false)}
         />
       )}
 

@@ -22,10 +22,12 @@ export const ALLOWED_TAGS = new Set([
 ]);
 
 // Allowed attributes per tag
+// NOTE: 'style' has been intentionally removed from <span> to prevent CSS-based
+// information exfiltration and misleading layout attacks (security audit L-1).
 export const ALLOWED_ATTRIBUTES: Record<string, Set<string>> = {
   a: new Set(['href', 'title']),
   code: new Set(['class']),
-  span: new Set(['style', 'class']),
+  span: new Set(['class']),
 };
 
 /**

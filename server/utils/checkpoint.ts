@@ -41,12 +41,16 @@ export async function listCheckpoints(_count = 10): Promise<Array<{ hash: string
  * Retourne { valid: true } ou { valid: false, errors: string }.
  */
 export async function validateBuild(): Promise<{ valid: boolean; errors?: string }> {
+  // shell:true nécessaire uniquement sur Windows pour npx.cmd
+  const isWin = process.platform === 'win32';
+  const npxBin = isWin ? 'npx.cmd' : 'npx';
+  
   try {
-    await execFileAsync("npx", ["tsc", "--noEmit"], {
+    await execFileAsync(npxBin, ["tsc", "--noEmit"], {
       cwd: SELF_ROOT,
       timeout: 60_000,
       maxBuffer: MAX_BUFFER,
-      shell: true,
+      shell: isWin, // Shell uniquement sur Windows pour les .cmd
       env: { ...process.env },
     });
     return { valid: true };

@@ -9,8 +9,6 @@ dotenv.config({ path: path.join(configRoot, ".env.local"), override: true });
 for (const key of [
   "Leanna_API_TOKEN",
   "GEMINI_API_KEY",
-  "SUPABASE_URL",
-  "SUPABASE_SERVICE_ROLE_KEY",
   "OPENROUTER_API_KEY",
   "GITHUB_TOKEN",
 ]) {

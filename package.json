@@ -1,7 +1,7 @@
 {
   "name": "Leanna",
   "private": false,
-  "version": "0.8.0",
+  "version": "0.9.0",
   "license": "BUSL 1.1",
   "author": "Maysson",
   "type": "module",
@@ -16,6 +16,8 @@
     "clean": "rm -rf dist server.js",
     "lint": "node scripts/lint.cjs",
     "test": "node --import tsx --test server/**/*.test.ts",
+    "audit:deps": "npm audit --production",
+    "audit:deps:full": "npm audit",
     "pack:win": "npm run build && electron-builder --win --dir",
     "dist:win": "npm run build && electron-builder --win"
   },

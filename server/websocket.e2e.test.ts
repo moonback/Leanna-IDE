@@ -191,7 +191,8 @@ test('terminal WebSocket: rejects unauthorized connection when token is required
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
   const port = (server.address() as any).port;
 
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/terminal?token=bad-token`);
+  // Envoyer un mauvais token via Sec-WebSocket-Protocol au lieu de l'URL
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/terminal`, ['token', 'bad-token']);
 
   try {
     const closeEvent = await new Promise<{ code: number; reason: string }>((resolve) => {
