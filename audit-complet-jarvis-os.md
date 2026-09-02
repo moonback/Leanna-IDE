@@ -59,19 +59,26 @@ Le dépôt contient déjà un audit de sécurité (`audit-securite-jarvis-os.md`
 
 ## 4. Nouveaux constats de sécurité (audit complet)
 
-### 🟠 M-5 — Jeton transmis en paramètre d'URL pour `/live` et `/sandbox-watch`
+### ✅ M-5 — Jeton transmis en paramètre d'URL pour `/live` et `/sandbox-watch` — **CORRIGÉ**
 
 **Fichier :** `server.ts` (gestionnaire `server.on('upgrade', ...)`, ~ligne 710-730)
 
-**Problème :** contrairement à `/terminal` (corrigé en H-2), les upgrades WebSocket vers `/live` (session vocale/vidéo Gemini Live) et `/sandbox-watch` (surveillance sandbox) lisent le token avec :
+**Problème initial :** contrairement à `/terminal` (corrigé en H-2), les upgrades WebSocket vers `/live` (session vocale/vidéo Gemini Live) et `/sandbox-watch` (surveillance sandbox) lisaient le token avec :
 ```ts
 const token = cookies['Leanna_token'] || url.searchParams.get('token');
 ```
-Le cookie httpOnly est prioritaire, mais le **fallback par paramètre d'URL reste actif**. Si le cookie n'est pas encore posé (première connexion, client tiers, ou Electron avec cookie-jar différent), le token peut se retrouver dans l'URL — donc potentiellement dans les logs du serveur/reverse proxy, l'historique de navigation, et l'en-tête `Referer` si une redirection JS mal formée l'expose.
+Le cookie httpOnly était prioritaire, mais le **fallback par paramètre d'URL restait actif**. Si le cookie n'était pas encore posé (première connexion, client tiers, ou Electron avec cookie-jar différent), le token pouvait se retrouver dans l'URL — donc potentiellement dans les logs du serveur/reverse proxy, l'historique de navigation, et l'en-tête `Referer` si une redirection JS mal formée l'exposait.
 
-**Impact :** faible en usage normal (application locale mono-utilisateur), mais devient pertinent dès que `Leanna_LISTEN_HOST` est exporté pour un accès LAN — configuration explicitement documentée comme possible dans le code (`server.ts` avertit déjà de ce cas).
+**Correction appliquée :**
+- **Serveur (`server.ts`)** : Le fallback `url.searchParams.get('token')` a été retiré pour `/live` et `/sandbox-watch`. Le token est maintenant lu **uniquement depuis le cookie** `Leanna_token`, aligné sur le pattern utilisé pour `/terminal`.
+- **Clients frontend** :
+  - `src/hooks/useWebSocket.ts` : Suppression de l'envoi du token par URL (2 occurrences corrigées)
+  - `src/hooks/useSandboxWatcher.ts` : Suppression de l'envoi du token par URL
+  - `src/services/realtimeCache.ts` : Suppression de l'envoi du token par URL
+- **Tests** (`server/websocket.e2e.test.ts`) : Mise à jour pour utiliser les cookies au lieu des paramètres d'URL
+- **Documentation** : Mise à jour de `API_DOCS.md` et `ARCHITECTURE.md` pour refléter la nouvelle politique de sécurité
 
-**Recommandation :** répliquer le pattern déjà utilisé pour `/terminal` — lire uniquement le cookie httpOnly ou l'en-tête `Sec-WebSocket-Protocol`, retirer le fallback `url.searchParams.get('token')` pour `/live` et `/sandbox-watch`.
+**Statut :** ✅ **Entièrement corrigé** — Tous les endpoints WebSocket (`/live`, `/terminal`, `/sandbox-watch`) utilisent maintenant exclusivement le cookie httpOnly pour l'authentification.
 
 ---
 
@@ -137,7 +144,7 @@ Ces constats n'ont pas d'impact sécurité direct mais affectent la maintenabili
 
 | Priorité | Action | Effort estimé |
 |---|---|---|
-| 1 | Aligner `/live` et `/sandbox-watch` sur le pattern déjà utilisé pour `/terminal` (retirer le fallback `?token=` dans l'URL) — M-5 | Faible (quelques lignes, pattern déjà écrit ailleurs dans le dépôt) |
+| ~~1~~ | ~~Aligner `/live` et `/sandbox-watch` sur le pattern déjà utilisé pour `/terminal` (retirer le fallback `?token=` dans l'URL) — M-5~~ | ✅ **FAIT** |
 | 2 | Passer `authenticateRequest`/`authenticateToken` sur `crypto.timingSafeEqual` — L-5 | Faible |
 | 3 | Exécuter `npm run audit:deps:full` en CI dès qu'un environnement avec accès réseau est disponible, et intégrer Semgrep / `eslint-plugin-security` pour réduire la dépendance au SAST maison (L-3, reporté depuis l'audit v2) | Moyen |
 | 4 | Réduire la dette `any` sur les frontières critiques (routes Express, réponses des skills/LLM) en priorité — pas besoin de traiter les 960 occurrences d'un coup | Élevé (à étaler) |

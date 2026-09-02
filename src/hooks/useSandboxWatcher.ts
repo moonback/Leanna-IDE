@@ -91,8 +91,7 @@ export function useSandboxWatcher({
     lastConnectStartTs.current = Date.now();
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const token = localStorage.getItem('Leanna_api_token');
-    const params = token ? `?token=${encodeURIComponent(token)}` : '';
+    // Le token est maintenant passé uniquement via cookie, plus par URL
 
     let host = window.location.host;
     try {
@@ -106,7 +105,7 @@ export function useSandboxWatcher({
       }
     } catch { /* fallback sur window.location.host en cas d'erreur */ }
 
-    const ws = new WebSocket(`${protocol}//${host}/sandbox-watch${params}`);
+    const ws = new WebSocket(`${protocol}//${host}/sandbox-watch`);
     wsRef.current = ws;
 
     ws.onopen = () => {

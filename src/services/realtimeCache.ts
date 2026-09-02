@@ -487,9 +487,8 @@ export const realtimeWs = {
     }
     
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const token = localStorage.getItem('Leanna_api_token');
-    const params = token ? `?token=${encodeURIComponent(token)}` : '';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/sandbox-watch${params}`);
+    // Le token est maintenant passé uniquement via cookie, plus par URL
+    const ws = new WebSocket(`${protocol}//${window.location.host}/sandbox-watch`);
     
     wsState.ws = ws;
     wsState.lastConnectAttempt = Date.now();

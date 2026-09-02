@@ -1173,7 +1173,8 @@ Toutes les routes équipées de la validation Zod renvoient un format uniforme e
 ## Interfaces Non-HTTP
 
 ### WebSocket `/live` (Gemini Live API Bridge)
-* **URL** : `ws://127.0.0.1:4000/live?token=<SECRET>&conversation_id=<ID>&mode=full`
+* **URL** : `ws://127.0.0.1:4000/live?conversation_id=<ID>&mode=full`
+* **Authentification** : Cookie httpOnly `Leanna_token` (le token n'est plus accepté en paramètre d'URL pour des raisons de sécurité)
 * **Direction** : Bidirectionnelle temps réel.
 * **Protocole de messages Client → Serveur** :
   - `{ "audio": "<base64_pcm_16khz>" }` : Envoi de flux microphone.

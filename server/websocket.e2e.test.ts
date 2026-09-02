@@ -257,7 +257,16 @@ test('live & sandbox WebSocket: upgrade auth verification (unauthorized vs autho
     const pathname = url.pathname;
 
     if (pathname === '/live' || pathname === '/sandbox-watch') {
-      const token = url.searchParams.get('token');
+      // Extraire le token depuis les cookies uniquement
+      const cookieHeader = request.headers.cookie || '';
+      const cookies: Record<string, string> = {};
+      cookieHeader.split(';').forEach(c => {
+        const parts = c.split('=');
+        if (parts.length >= 2) {
+          cookies[parts[0].trim()] = decodeURIComponent(parts.slice(1).join('='));
+        }
+      });
+      const token = cookies['Leanna_token'];
       const authResult = authenticateToken(token, apiToken);
       if (!authResult.ok) {
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -290,14 +299,18 @@ test('live & sandbox WebSocket: upgrade auth verification (unauthorized vs autho
   });
   assert.equal(liveRejected, true, 'Live WS connection without token should be rejected');
 
-  // 2. Connexion /live avec token valide -> Doit réussir
-  const goodLiveWs = new WebSocket(`ws://127.0.0.1:${port}/live?token=${apiToken}`);
+  // 2. Connexion /live avec token valide en cookie -> Doit réussir
+  const goodLiveWs = new WebSocket(`ws://127.0.0.1:${port}/live`, {
+    headers: { 'Cookie': `Leanna_token=${apiToken}` }
+  });
   await waitForWsOpen(goodLiveWs);
   assert.equal(goodLiveWs.readyState, WebSocket.OPEN);
   goodLiveWs.close();
 
-  // 3. Connexion /sandbox-watch avec token valide -> Doit réussir
-  const sandboxWs = new WebSocket(`ws://127.0.0.1:${port}/sandbox-watch?token=${apiToken}`);
+  // 3. Connexion /sandbox-watch avec token valide en cookie -> Doit réussir
+  const sandboxWs = new WebSocket(`ws://127.0.0.1:${port}/sandbox-watch`, {
+    headers: { 'Cookie': `Leanna_token=${apiToken}` }
+  });
   await waitForWsOpen(sandboxWs);
   assert.equal(sandboxWs.readyState, WebSocket.OPEN);
   sandboxWs.close();

@@ -113,8 +113,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
           params.set('context_resume', '1');
           contextOverflowPendingRef.current = false;
         }
-        const token = localStorage.getItem('Leanna_api_token');
-        if (token) params.set('token', token);
+        // Le token est maintenant passé uniquement via cookie, plus par URL
         const query = params.toString() ? `?${params.toString()}` : '';
         const ws = new WebSocket(`${protocol}//${window.location.host}/live${query}`);
         wsRef.current = ws;
@@ -242,8 +241,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
       const params = new URLSearchParams();
       if (activeSkills.length > 0) params.set('skills', activeSkills.join(','));
       if (mode) params.set('mode', mode);
-      const token = localStorage.getItem('Leanna_api_token');
-      if (token) params.set('token', token);
+      // Le token est maintenant passé uniquement via cookie, plus par URL
       const query = params.toString() ? `?${params.toString()}` : '';
       const ws = new WebSocket(`${protocol}//${window.location.host}/live${query}`);
       wsRef.current = ws;

@@ -712,8 +712,8 @@ async function startServer() {
     const pathname = url.pathname;
 
     // Sécurité : on exige le même jeton que pour les routes /api (passé en
-    // query string car les navigateurs ne permettent pas d'en-têtes
-    // personnalisés lors d'un upgrade WebSocket).
+    // cookie uniquement, plus de fallback par query string pour éviter
+    // l'exposition du token dans les logs).
     if (pathname === '/live' || pathname === '/sandbox-watch') {
       const cookieHeader = request.headers.cookie || '';
       const cookies: Record<string, string> = {};
@@ -724,7 +724,7 @@ async function startServer() {
         }
       });
 
-      const token = cookies['Leanna_token'] || url.searchParams.get('token');
+      const token = cookies['Leanna_token'];
       const authResult = authenticateToken(token, apiToken);
       if (!authResult.ok) {
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
