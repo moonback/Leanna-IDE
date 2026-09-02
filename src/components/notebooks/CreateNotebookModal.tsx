@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { BookOpen, Plus, X, Loader2, Sparkles } from 'lucide-react';
+import { BookOpen, Plus, X, Loader2 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 
 interface CreateNotebookModalProps {
@@ -84,9 +84,9 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
         }}
         transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl border p-6 shadow-2xl"
+        className="w-full max-w-md rounded-xl border p-5 shadow-2xl"
         style={{
-          backgroundColor: 'color-mix(in srgb, var(--notebook-surface-elevated) 85%, transparent)',
+          backgroundColor: 'var(--notebook-surface-elevated)',
           borderColor: 'var(--notebook-border)',
         }}
         role="dialog"
@@ -94,16 +94,11 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
         aria-label="Créer un notebook"
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
-            <div
-              className="w-11 h-11 rounded-full flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))' }}
-            >
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
+            <BookOpen className="w-5 h-5" style={{ color: 'var(--notebook-accent)' }} />
             <div>
-              <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
                 Créer un notebook
               </h2>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -134,9 +129,9 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              placeholder="Titre du notebook..."
+              placeholder="Nom du notebook"
               autoFocus
-              className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-colors duration-150 focus:ring-2"
+              className="w-full px-3 py-2.5 rounded-lg text-sm font-medium outline-none transition-colors duration-150 focus:ring-2"
               style={{
                 backgroundColor: 'var(--notebook-surface-muted)',
                 border: '1px solid var(--notebook-border)',
@@ -154,8 +149,8 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
               type="text"
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="Description du notebook..."
-              className="w-full px-4 py-2.5 rounded-full text-sm outline-none transition-colors duration-150 focus:ring-2"
+              placeholder="Ajoutez une description (optionnel)"
+              className="w-full px-3 py-2.5 rounded-lg text-sm outline-none transition-colors duration-150 focus:ring-2"
               style={{
                 backgroundColor: 'var(--notebook-surface-muted)',
                 border: '1px solid var(--notebook-border)',
@@ -171,8 +166,8 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
               type="button"
               onClick={onClose}
               whileTap={{ scale: 0.96 }}
-              className="px-4 py-2.5 rounded-full text-sm font-medium"
-              style={{ color: 'var(--text-muted)' }}
+              className="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-[var(--notebook-surface-muted)]"
+              style={{ color: 'var(--text-secondary)' }}
             >
               Annuler
             </motion.button>
@@ -182,10 +177,10 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
               whileHover={{ scale: title.trim() ? 1.02 : 1 }}
               whileTap={{ scale: title.trim() ? 0.97 : 1 }}
               transition={SPRING_MOMENTUM}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-40"
               style={{
-                background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
-                color: 'white',
+                backgroundColor: 'var(--notebook-accent)',
+                color: 'var(--notebook-accent-text)',
               }}
             >
               {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}

@@ -9,8 +9,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   BookOpen, Plus, Trash2, Clock, FileText, MessageSquare,
-  Search, SortAsc, SortDesc, Sparkles, X, Upload, Globe, Mic,
-  ArrowRight, Layers,
+  Search, SortAsc, SortDesc, X, ArrowRight,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { CreateNotebookModal } from './CreateNotebookModal.js';
@@ -124,33 +123,28 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
     <div className="notebook-workspace h-full flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg)' }}>
 
       {/* ─── Header ─────────────────────────────────────────── */}
-      <header className="flex-shrink-0 px-6 lg:px-10 pt-8 pb-3">
-        <div className="flex items-center justify-between gap-4">
+      <header className="flex-shrink-0 px-6 lg:px-12 pt-8 pb-6">
+        <div className="flex items-start justify-between gap-4 max-w-6xl mx-auto">
           {/* Title block */}
-          <div className="flex items-center gap-3.5">
+          <div>
             <div
-              className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+              className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-3"
               style={{
-                background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
-                boxShadow: '0 4px 12px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                color: 'var(--notebook-accent)',
               }}
             >
-              <Layers className="h-5 w-5 text-white" />
+              <BookOpen className="h-3.5 w-3.5" />
+              Espace de recherche
             </div>
-            <div>
-              <h1
-                className="text-xl font-bold tracking-tight notebook-heading"
-                style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}
-              >
-                Notebooks
-              </h1>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                {notebooks.length > 0
-                  ? `${notebooks.length} notebook${notebooks.length !== 1 ? 's' : ''} · ${notebooks.reduce((a, n) => a + n.sourcesCount, 0)} sources`
-                  : 'Recherche IA avec citations sur vos documents'
-                }
-              </p>
-            </div>
+            <h1
+              className="text-2xl font-bold tracking-tight notebook-heading"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Vos notebooks
+            </h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+              Retrouvez vos recherches et continuez là où vous vous êtes arrêté.
+            </p>
           </div>
 
           {/* Actions */}
@@ -160,11 +154,10 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.96 }}
               transition={SPRING_MOMENTUM}
-              className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
               style={{
-                background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
-                color: 'white',
-                boxShadow: '0 2px 12px color-mix(in srgb, var(--accent-primary) 35%, transparent)',
+                backgroundColor: 'var(--notebook-accent)',
+                color: 'var(--notebook-accent-text)',
               }}
             >
               <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
@@ -175,7 +168,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 onClick={onClose}
                 whileTap={{ scale: 0.92 }}
                 transition={{ duration: 0.1 }}
-                className="notebook-icon-button"
+                className="notebook-icon-button rounded-lg"
                 aria-label="Fermer"
                 title="Fermer"
               >
@@ -188,16 +181,16 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
       {/* ─── Divider ────────────────────────────────────────── */}
       {notebooks.length > 0 && (
-        <div className="flex-shrink-0 mx-6 lg:mx-10" style={{ height: 1, backgroundColor: 'var(--notebook-border)' }} />
+        <div className="flex-shrink-0 mx-6 lg:mx-12" style={{ height: 1, backgroundColor: 'var(--notebook-border)' }} />
       )}
 
       {/* ─── Search & Sort Bar ──────────────────────────────── */}
       {notebooks.length > 0 && (
-        <div className="flex-shrink-0 px-6 lg:px-10 py-3">
-          <div className="flex items-center gap-2.5">
+        <div className="flex-shrink-0 px-6 lg:px-12 py-4">
+          <div className="flex items-center gap-3 max-w-6xl mx-auto">
             {/* Search */}
             <div
-              className="flex items-center gap-2.5 flex-1 max-w-xs px-3.5 py-2 rounded-full transition-all duration-150 focus-within:ring-2"
+              className="flex items-center gap-2.5 flex-1 max-w-md px-3.5 py-2.5 rounded-lg transition-all duration-150 focus-within:ring-2"
               style={{
                 backgroundColor: 'var(--notebook-surface-muted)',
                 border: '1px solid var(--notebook-border)',
@@ -227,10 +220,11 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
             {/* Sort controls */}
             <div className="flex items-center gap-1.5 ml-auto">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Trier par</span>
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as SortBy)}
-                className="px-3 py-1.5 rounded-full text-xs font-medium outline-none cursor-pointer transition-colors duration-150"
+                className="px-3 py-2 rounded-lg text-xs font-medium outline-none cursor-pointer transition-colors duration-150"
                 style={{
                   backgroundColor: 'var(--notebook-surface-muted)',
                   border: '1px solid var(--notebook-border)',
@@ -257,14 +251,15 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
       )}
 
       {/* ─── Notebook Cards ─────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-6 lg:px-10 pb-8 pt-2">
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-6 lg:px-12 pb-10 pt-2">
+        <div className="max-w-6xl mx-auto">
         {loading ? (
           /* ─── Skeleton ─── */
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={`skeleton-${i}`}
-                className="rounded-2xl border overflow-hidden"
+                className="rounded-xl border overflow-hidden"
                 style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-card-bg)' }}
               >
                 <div className="h-1" style={{ background: 'var(--notebook-surface-muted)' }} />
@@ -287,21 +282,22 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             ))}
           </div>
         ) : notebooks.length === 0 ? (
-          /* ─── Empty state ─── */
+            /* ─── Empty state ─── */
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={SPRING_UI}
-            className="flex flex-col items-center justify-center text-center py-16 gap-6"
+            className="flex flex-col items-center justify-center text-center py-20 gap-5 border rounded-xl"
+            style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface)' }}
           >
             <div
-              className="w-20 h-20 rounded-3xl flex items-center justify-center"
+              className="w-14 h-14 rounded-2xl flex items-center justify-center"
               style={{
-                background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
-                boxShadow: '0 8px 32px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                backgroundColor: 'var(--notebook-accent-surface)',
+                color: 'var(--notebook-accent)',
               }}
             >
-              <BookOpen className="h-9 w-9 text-white" />
+              <BookOpen className="h-7 w-7" />
             </div>
             <div className="space-y-2">
               <h2
@@ -316,45 +312,15 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               </p>
             </div>
 
-            {/* Feature grid */}
-            <div className="grid grid-cols-3 gap-2.5 max-w-sm w-full">
-              {[
-                { icon: Upload, label: 'PDF & Docs', desc: 'Glissez-déposez', color: '#6366f1' },
-                { icon: Globe, label: 'Importer URL', desc: 'Articles & pages', color: '#0ea5e9' },
-                { icon: MessageSquare, label: 'Chat IA', desc: 'Avec citations', color: '#10b981' },
-                { icon: Sparkles, label: 'Résumés', desc: 'Auto-générés', color: '#f59e0b' },
-                { icon: Mic, label: 'Audio', desc: 'Transcription', color: '#ec4899' },
-                { icon: FileText, label: 'Notes', desc: 'Personnalisées', color: '#8b5cf6' },
-              ].map(({ icon: Icon, label, desc, color }) => (
-                <div
-                  key={label}
-                  className="flex flex-col items-center gap-2 p-3.5 rounded-2xl transition-colors duration-150"
-                  style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)' }}
-                >
-                  <div
-                    className="w-8 h-8 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: `${color}18` }}
-                  >
-                    <Icon className="h-3.5 w-3.5" style={{ color }} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
             <motion.button
               onClick={() => setShowCreateModal(true)}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.96 }}
               transition={SPRING_MOMENTUM}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-semibold"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold"
               style={{
-                background: 'linear-gradient(135deg, var(--accent-primary), var(--notebook-accent))',
-                color: 'white',
-                boxShadow: '0 4px 20px color-mix(in srgb, var(--accent-primary) 35%, transparent)',
+                backgroundColor: 'var(--notebook-accent)',
+                color: 'var(--notebook-accent-text)',
               }}
             >
               <Plus className="w-4 h-4" strokeWidth={2.5} />
@@ -397,7 +363,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
         ) : (
           /* ─── Grid View ─── */
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             <AnimatePresence initial={false}>
               {filteredNotebooks.map((nb, i) => (
                 <motion.div
@@ -413,29 +379,25 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                     delay: i < 12 ? i * 0.03 : 0,
                   }}
                   onClick={() => onSelectNotebook(nb.id)}
-                  className="group cursor-pointer rounded-2xl border overflow-hidden flex flex-col relative"
+                  className="group cursor-pointer rounded-xl border overflow-hidden flex flex-col relative transition-colors"
                   style={{
                     backgroundColor: 'var(--notebook-card-bg)',
                     borderColor: 'var(--notebook-border)',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                    transition: 'box-shadow 0.2s, border-color 0.2s',
+                    boxShadow: 'var(--shadow-xs, 0 1px 2px rgba(0,0,0,0.04))',
                   }}
-                  // Glow on hover via inline style on the element — achieved
-                  // with a CSS custom property override via whileHover trick
                 >
-                  {/* Color accent bar — thicker for more visual presence */}
                   <div
-                    className="h-[3px] w-full flex-shrink-0"
+                    className="h-1 w-full flex-shrink-0"
                     style={{ backgroundColor: nb.color || 'var(--accent-primary)' }}
                   />
 
-                  <div className="p-5 flex flex-col gap-3 flex-1">
+                  <div className="p-4 flex flex-col gap-4 flex-1">
                     {/* Card header */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3 min-w-0">
                         {/* Emoji icon with colored background */}
                         <div
-                          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg leading-none"
+                            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-lg leading-none"
                           style={{
                             backgroundColor: `${nb.color || 'var(--accent-primary)'}1a`,
                             border: `1px solid ${nb.color || 'var(--accent-primary)'}22`,
@@ -480,15 +442,15 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                     {/* Footer stats + open cta */}
                     <div className="flex items-center gap-2 mt-auto pt-1">
                       <span
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                        style={{ backgroundColor: 'var(--notebook-surface-muted)', color: 'var(--text-secondary)' }}
+                        className="flex items-center gap-1.5 text-xs"
+                        style={{ color: 'var(--text-muted)' }}
                       >
                         <FileText className="w-3 h-3 flex-shrink-0" />
                         {nb.sourcesCount} source{nb.sourcesCount !== 1 ? 's' : ''}
                       </span>
                       <span
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                        style={{ backgroundColor: 'var(--notebook-surface-muted)', color: 'var(--text-secondary)' }}
+                        className="flex items-center gap-1.5 text-xs"
+                        style={{ color: 'var(--text-muted)' }}
                       >
                         <MessageSquare className="w-3 h-3 flex-shrink-0" />
                         {nb.notesCount} note{nb.notesCount !== 1 ? 's' : ''}
@@ -597,6 +559,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }

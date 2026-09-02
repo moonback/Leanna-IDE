@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, BookOpen, Loader2, CheckCircle2, AlertCircle, FileCheck, Plus } from 'lucide-react';
+import { X, BookOpen, Loader2, CheckCircle2, AlertCircle, FileCheck, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 
 interface NotebookLight {
@@ -40,6 +40,7 @@ export function NotebookPickerModal({
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState<string | null>(null);
   const [creatingNotebook, setCreatingNotebook] = useState(false);
+  const [deletingNotebook, setDeletingNotebook] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newNotebookTitle, setNewNotebookTitle] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
@@ -196,6 +197,26 @@ export function NotebookPickerModal({
     }
   }, [filePath, fileName, onClose]);
 
+  const handleDeleteNotebook = useCallback(async (notebookId: string, title: string) => {
+    if (!window.confirm(`Supprimer le notebook « ${title} » et toutes ses sources ?`)) return;
+    setDeletingNotebook(notebookId);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      setNotebooks(prev => prev.filter(nb => nb.id !== notebookId));
+      setAlreadyIn(prev => {
+        const next = new Set(prev);
+        next.delete(notebookId);
+        return next;
+      });
+    } catch {
+      setFeedback({ type: 'error', msg: 'Impossible de supprimer le notebook' });
+    } finally {
+      setDeletingNotebook(null);
+    }
+  }, []);
+
   const handleBackdrop = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
   };
@@ -214,7 +235,7 @@ export function NotebookPickerModal({
     >
       <div
         className="w-full max-w-md rounded-xl border p-5 shadow-2xl"
-        style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+        style={{ backgroundColor: 'var(--notebook-surface-elevated)', borderColor: 'var(--notebook-border)', color: 'var(--text-primary)' }}
         role="dialog"
         aria-modal="true"
         aria-label="Choisir un notebook"
@@ -222,10 +243,10 @@ export function NotebookPickerModal({
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <BookOpen size={16} style={{ color: 'var(--accent-primary)' }} />
-            <span className="text-sm font-semibold">Importer dans un notebook</span>
+            <BookOpen size={17} style={{ color: 'var(--notebook-accent)' }} />
+            <span className="text-base font-semibold">Importer dans un notebook</span>
           </div>
-          <button onClick={onClose} className="rounded-md p-1 transition hover:bg-white/10" aria-label="Fermer">
+          <button onClick={onClose} className="rounded-lg p-1.5 transition hover:bg-[var(--notebook-surface-muted)]" aria-label="Fermer">
             <X size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
         </div>
@@ -269,13 +290,10 @@ export function NotebookPickerModal({
                 {notebooks.map(nb => {
                   const isPresent = alreadyIn.has(nb.id);
                   return (
-                    <button
+                    <div
                       key={nb.id}
-                      onClick={() => !isPresent && handleImport(nb.id)}
-                      disabled={importing !== null || isPresent}
-                      className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/10 disabled:opacity-60 disabled:cursor-default"
-                      style={{ borderColor: 'var(--border-base)' }}
-                      title={isPresent ? 'Ce fichier est déjà présent dans ce notebook' : `Importer dans ${nb.title}`}
+                      className="w-full flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition hover:bg-[var(--notebook-surface-muted)]"
+                      style={{ borderColor: 'var(--notebook-border)' }}
                     >
                       <span
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-base flex-shrink-0"
@@ -296,8 +314,8 @@ export function NotebookPickerModal({
                         <span
                           className="flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded-md flex-shrink-0"
                           style={{
-                            backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
-                            color: 'var(--accent-primary)',
+                            backgroundColor: 'var(--notebook-accent-surface)',
+                            color: 'var(--notebook-accent)',
                           }}
                         >
                           <FileCheck size={11} />
@@ -307,7 +325,30 @@ export function NotebookPickerModal({
                       {importing === nb.id && (
                         <Loader2 size={14} className="animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
                       )}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => handleImport(nb.id)}
+                        disabled={importing !== null || deletingNotebook !== null || isPresent}
+                        className="flex-shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-default disabled:opacity-40"
+                        style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
+                        title={isPresent ? 'Ce fichier est déjà présent dans ce notebook' : `Sélectionner ${nb.title}`}
+                      >
+                        {isPresent ? 'Déjà ajouté' : 'Sélectionner'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteNotebook(nb.id, nb.title)}
+                        disabled={importing !== null || deletingNotebook !== null}
+                        className="flex-shrink-0 rounded-lg p-1.5 transition hover:bg-[var(--color-error-subtle)] disabled:opacity-40"
+                        style={{ color: 'var(--color-error)' }}
+                        title={`Supprimer ${nb.title}`}
+                        aria-label={`Supprimer ${nb.title}`}
+                      >
+                        {deletingNotebook === nb.id
+                          ? <Loader2 size={14} className="animate-spin" />
+                          : <Trash2 size={14} />}
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -351,7 +392,7 @@ export function NotebookPickerModal({
                       setShowCreateForm(false);
                       setNewNotebookTitle('');
                     }}
-                    className="px-3 py-1.5 rounded-lg text-xs transition hover:bg-white/10"
+                    className="px-3 py-1.5 rounded-lg text-xs transition hover:bg-[var(--notebook-surface-muted)]"
                     style={{ color: 'var(--text-muted)' }}
                   >
                     Annuler
@@ -372,8 +413,8 @@ export function NotebookPickerModal({
                     disabled={!newNotebookTitle.trim() || creatingNotebook}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-50"
                     style={{
-                      backgroundColor: 'var(--accent-primary)',
-                      color: 'white'
+                      backgroundColor: 'var(--notebook-accent)',
+                      color: 'var(--notebook-accent-text)'
                     }}
                   >
                     {creatingNotebook ? <Loader2 size={12} className="animate-spin" /> : 'Créer'}
@@ -393,11 +434,11 @@ export function NotebookPickerModal({
                 setNewNotebookTitle(defaultNotebookTitle);
               }}
               disabled={creatingNotebook}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition hover:bg-white/10 disabled:opacity-60"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition hover:bg-[var(--notebook-accent-hover)] disabled:opacity-60"
               style={{
-                backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
-                color: 'var(--accent-primary)',
-                border: '1px solid var(--border-base)'
+                backgroundColor: 'var(--notebook-accent-surface)',
+                color: 'var(--notebook-accent)',
+                border: '1px solid var(--notebook-border)'
               }}
             >
               <Plus size={14} />
@@ -407,7 +448,7 @@ export function NotebookPickerModal({
           <button
             onClick={onClose}
             className="rounded-lg border px-3 py-1.5 text-sm transition hover:bg-white/10"
-            style={{ borderColor: 'var(--border-base)' }}
+            style={{ borderColor: 'var(--notebook-border)' }}
           >
             Fermer
           </button>

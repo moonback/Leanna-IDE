@@ -131,19 +131,19 @@ function NoteEditorCenter({
       {...motionProps}
       transition={spring}
       className="h-full flex flex-col"
-      style={{ backgroundColor: 'var(--bg-base)' }}
+      style={{ backgroundColor: 'var(--notebook-canvas)' }}
     >
       {/* Header */}
       <div
         className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+        style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface-elevated)' }}
       >
         <div className="flex items-center gap-3">
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: 'var(--accent-subtle)' }}
+            style={{ backgroundColor: 'var(--notebook-accent-surface)' }}
           >
-            <StickyNote className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+            <StickyNote className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
           </div>
           <div>
             <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
@@ -157,7 +157,7 @@ function NoteEditorCenter({
         <div className="flex items-center gap-2">
           <button
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-transform active:scale-95 hover:bg-white/5"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-transform active:scale-95 hover:bg-[var(--notebook-surface-muted)]"
             style={{ color: 'var(--text-muted)' }}
           >
             <X className="w-3.5 h-3.5" />
@@ -166,8 +166,8 @@ function NoteEditorCenter({
           <button
             onClick={handleSave}
             disabled={!title.trim() || saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold disabled:opacity-40 transition-transform active:scale-95 text-white"
-            style={{ backgroundColor: 'var(--accent-primary)' }}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40 transition-transform active:scale-95"
+            style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
           >
             <Save className="w-3.5 h-3.5" />
             {saving ? 'Sauvegarde...' : data.id ? 'Mettre à jour' : 'Enregistrer'}
@@ -187,7 +187,7 @@ function NoteEditorCenter({
           style={{ color: 'var(--text-primary)' }}
           onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
         />
-        <div className="h-px mt-3" style={{ backgroundColor: 'var(--border-base)' }} />
+        <div className="h-px mt-3" style={{ backgroundColor: 'var(--notebook-border)' }} />
       </div>
 
       {/* Content */}
