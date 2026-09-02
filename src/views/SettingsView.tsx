@@ -103,6 +103,9 @@ export default function SettingsView() {
         }),
       });
       success('Paramètres sauvegardés ✓');
+      // Notifier la session live de se reconnecter pour prendre en compte
+      // les changements qui affectent les déclarations d'outils (reasoning, agents, etc.)
+      window.dispatchEvent(new CustomEvent('Leanna-settings-saved', { detail: { requiresReconnect: true } }));
     } catch { toastError('Erreur lors de la sauvegarde'); }
     finally { setSaving(false); }
   }, [save, profile, success, toastError]);
