@@ -6,7 +6,11 @@
  *   card, list, text, code, progress, timeline, stat_grid
  */
 
+import fs from "fs";
+import path from "path";
 import { Skill } from "./base.js";
+import { resolveSandboxWriteTarget } from "./codebaseHelpers.js";
+import { markFileModified } from "../utils/sandbox.js";
 
 // ─── Types (miroir de RichDocumentViewer.tsx) ─────────────────────────────────
 
@@ -126,6 +130,15 @@ function validateBlock(block: any, index: number): { ok: boolean; error?: string
   }
 
   return { ok: true };
+}
+
+function buildDocumentPath(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9\u00C0-\u024F]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "document";
+  return `docs/${slug}.rich.json`;
 }
 
 // ─── Skill ────────────────────────────────────────────────────────────────────
@@ -272,9 +285,22 @@ export const richDocumentSkill: Skill = {
       blocks,
     };
 
+    const documentPath = buildDocumentPath(title);
+    const target = resolveSandboxWriteTarget(documentPath);
+    if (!target) {
+      return {
+        error: "Impossible d'enregistrer le document : sandbox inactive ou chemin invalide.",
+        hint: "Attends que le sandbox soit READY puis réessaie.",
+      };
+    }
+    const content = JSON.stringify(doc, null, 2);
+    await fs.promises.mkdir(path.dirname(target.sandboxPath), { recursive: true });
+    await fs.promises.writeFile(target.sandboxPath, content, "utf-8");
+    markFileModified(documentPath);
+
     // ── Émission vers le client ───────────────────────────────────────────────
     if (context?.emitIdeAction) {
-      context.emitIdeAction({ type: "open-rich-document", document: doc });
+      context.emitIdeAction({ type: "open-rich-document", document: doc, path: documentPath });
       console.log(
         `[RichDocument] "${title}" — ${blocks.length} bloc(s): ${blocks.map((b) => b.type).join(", ")}`
       );
@@ -285,9 +311,10 @@ export const richDocumentSkill: Skill = {
     return {
       status: "success",
       title,
+      path: documentPath,
       blocks_count: blocks.length,
       block_types: blocks.map((b) => b.type),
-      message: `Document "${title}" créé avec ${blocks.length} bloc(s) et affiché dans l'interface.`,
+      message: `Document "${title}" créé, enregistré dans ${documentPath} et affiché dans l'interface.`,
     };
   },
 };
