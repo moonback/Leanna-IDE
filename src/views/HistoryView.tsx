@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { History, Search, Trash2, RefreshCw, MessageSquare, User, Cpu } from 'lucide-react';
+import { History, Search, Trash2, RefreshCw, MessageSquare, User, Cpu, ArrowRight } from 'lucide-react';
 import { useToast } from '../components/ui/Toast.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 
@@ -103,7 +103,7 @@ export default function HistoryView() {
   }, [toastError]);
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--notebook-canvas, var(--bg-base))' }}>
       {/* Header */}
       <ViewHeader
         icon={History}
@@ -128,7 +128,7 @@ export default function HistoryView() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left — Conversations list */}
-        <div className="w-80 flex-shrink-0 border-r flex flex-col" style={{ borderColor: 'var(--border-base)' }}>
+        <div className="w-80 flex-shrink-0 border-r flex flex-col" style={{ borderColor: 'var(--notebook-border, var(--border-base))', backgroundColor: 'var(--notebook-surface)' }}>
           {/* Search */}
           <div className="px-4 py-3 flex-shrink-0">
             <div className="relative">
@@ -138,11 +138,12 @@ export default function HistoryView() {
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Rechercher une conversation..."
-                className="w-full pl-8 pr-3 py-2 rounded-xl text-xs outline-none"
+                className="w-full pl-8 pr-3 py-2.5 rounded-lg text-xs outline-none transition focus:ring-2"
                 style={{
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-base)',
+                  backgroundColor: 'var(--notebook-surface-muted)',
+                  border: '1px solid var(--notebook-border)',
                   color: 'var(--text-primary)',
+                  ['--tw-ring-color' as any]: 'var(--notebook-accent)',
                 }}
                 aria-label="Rechercher dans les conversations"
               />
@@ -177,17 +178,17 @@ export default function HistoryView() {
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSelect(conv.id); }}
-                    className={`w-full text-left p-3 rounded-xl mb-1.5 transition-all group cursor-pointer ${
+                    className={`w-full text-left p-3 rounded-lg mb-1.5 transition-all group cursor-pointer ${
                       selectedId === conv.id ? 'ring-1' : ''
                     }`}
                     style={{
-                      backgroundColor: selectedId === conv.id ? 'var(--accent-subtle)' : 'var(--bg-panel)',
-                      border: `1px solid ${selectedId === conv.id ? 'var(--border-focus)' : 'var(--border-base)'}`,
-                      ...(selectedId === conv.id ? { ringColor: 'var(--accent-primary)' } : {}),
+                      backgroundColor: selectedId === conv.id ? 'var(--notebook-accent-surface)' : 'transparent',
+                      border: `1px solid ${selectedId === conv.id ? 'var(--notebook-accent)' : 'var(--notebook-border)'}`,
+                      ...(selectedId === conv.id ? { ringColor: 'var(--notebook-accent)' } : {}),
                     }}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                           {conv.title || 'Conversation sans titre'}
                         </p>
@@ -206,16 +207,34 @@ export default function HistoryView() {
                           </span>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={(e) => handleDelete(conv.id, e)}
-                        disabled={deleting === conv.id}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all active:scale-90"
-                        style={{ color: 'var(--color-error)' }}
-                        aria-label="Supprimer la conversation"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between border-t pt-2" style={{ borderColor: 'var(--notebook-border)' }}>
+                      <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                        {selectedId === conv.id ? 'Conversation ouverte' : 'Prête à être consultée'}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleSelect(conv.id); }}
+                          className="rounded-md p-1.5 transition hover:bg-[var(--notebook-accent-hover)]"
+                          style={{ color: 'var(--notebook-accent)' }}
+                          aria-label={`Sélectionner ${conv.title || 'la conversation'}`}
+                          title="Sélectionner"
+                        >
+                          <ArrowRight className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDelete(conv.id, e)}
+                          disabled={deleting === conv.id}
+                          className="rounded-md p-1.5 transition hover:bg-[var(--color-error-subtle)] disabled:opacity-50"
+                          style={{ color: 'var(--color-error)' }}
+                          aria-label={`Supprimer ${conv.title || 'la conversation'}`}
+                          title="Supprimer"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     </div>
                   </motion.div>
                 ))}
@@ -229,10 +248,10 @@ export default function HistoryView() {
           {selectedId && messages.length > 0 ? (
             <>
               {/* Conversation header */}
-              <div className="flex-shrink-0 px-6 py-4 border-b" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
+              <div className="flex-shrink-0 px-6 py-4 border-b" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface-elevated)' }}>
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--accent-subtle)' }}>
-                    <MessageSquare className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--notebook-accent-surface)' }}>
+                    <MessageSquare className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
                   </div>
                   <div>
                     <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -349,18 +368,18 @@ function MessageList({ messages, loadingMessages }: { messages: ConversationMess
             {/* Date separator */}
             {showDateSeparator && (
               <div className="flex items-center gap-3 py-4">
-                <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
+                <div className="flex-1 h-px" style={{ backgroundColor: 'var(--notebook-border, var(--border-base))' }} />
                 <span className="text-[10px] font-medium uppercase tracking-wider px-2" style={{ color: 'var(--text-dimmed)' }}>
                   {dateLabel}
                 </span>
-                <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
+                <div className="flex-1 h-px" style={{ backgroundColor: 'var(--notebook-border, var(--border-base))' }} />
               </div>
             )}
 
             {/* Timestamp between message groups */}
             {showTime && !showDateSeparator && index > 0 && (
               <div className="flex justify-center py-2">
-                <span className="text-[9px] font-mono px-2 py-0.5 rounded-full" style={{ color: 'var(--text-dimmed)', backgroundColor: 'var(--bg-secondary)' }}>
+                <span className="text-[9px] font-mono px-2 py-0.5 rounded-md" style={{ color: 'var(--text-dimmed)', backgroundColor: 'var(--notebook-surface-muted)' }}>
                   {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
@@ -375,12 +394,12 @@ function MessageList({ messages, loadingMessages }: { messages: ConversationMess
                 <div
                   className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center shadow-sm"
                   style={{
-                    backgroundColor: isAssistant ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
-                    border: `1.5px solid ${isAssistant ? 'var(--border-focus)' : 'var(--border-base)'}`,
+                    backgroundColor: isAssistant ? 'var(--notebook-accent-surface)' : 'var(--notebook-surface-muted)',
+                    border: `1.5px solid ${isAssistant ? 'var(--notebook-accent)' : 'var(--notebook-border)'}`,
                   }}
                 >
                   {isAssistant
-                    ? <Cpu className="w-3 h-3" style={{ color: 'var(--accent-primary)' }} />
+                    ? <Cpu className="w-3 h-3" style={{ color: 'var(--notebook-accent)' }} />
                     : <User className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
                   }
                 </div>
@@ -401,9 +420,9 @@ function MessageList({ messages, loadingMessages }: { messages: ConversationMess
                 <div
                   className="px-4 py-2.5 text-[13px] leading-[1.6] whitespace-pre-wrap"
                   style={{
-                    backgroundColor: isAssistant ? 'var(--bg-secondary)' : 'var(--accent-subtle)',
-                    border: `1px solid ${isAssistant ? 'var(--border-base)' : 'var(--border-focus)'}`,
-                    color: isAssistant ? 'var(--text-primary)' : 'var(--accent-primary)',
+                    backgroundColor: isAssistant ? 'var(--notebook-surface)' : 'var(--notebook-accent-surface)',
+                    border: `1px solid ${isAssistant ? 'var(--notebook-border)' : 'var(--notebook-accent)'}`,
+                    color: isAssistant ? 'var(--text-primary)' : 'var(--notebook-accent)',
                     borderRadius: isAssistant
                       ? (isConsecutiveSameRole ? '12px 16px 16px 12px' : '4px 16px 16px 12px')
                       : (isConsecutiveSameRole ? '16px 12px 12px 16px' : '16px 4px 12px 16px'),
