@@ -90,9 +90,9 @@ Objectif : rendre les tâches quotidiennes rapides, prévisibles et réversibles
 
 Objectif : augmenter la qualité des décisions de l'IA sans sacrifier la compréhension humaine.
 
-* [ ] **Plan d'action explicite** : avant une mission multi-étapes, afficher objectifs, fichiers ciblés, outils, risques, coût estimé et conditions d'arrêt.
+* [x] **Plan d'action explicite** : avant une mission multi-étapes, afficher objectifs, fichiers ciblés, outils, risques, coût estimé et conditions d'arrêt.
 * [ ] **Autonomie par niveaux** : lecture seule, proposition, exécution surveillée et autonomie contrôlée ; permissions par outil, workspace et durée.
-* [ ] **Contexte traçable** : chaque réponse cite les fichiers, lignes, tests et sources réellement utilisés ; bouton pour inspecter ou exclure une source du contexte.
+* [x] **Contexte traçable** : chaque réponse cite les fichiers, lignes, tests et sources réellement utilisés ; bouton pour inspecter ou exclure une source du contexte.
 * [ ] **Boucle qualité automatique** : après modification, formatage ciblé, typecheck, tests concernés, analyse de diff et rapport de régression ; arrêt sur échec plutôt que nouvelle tentative infinie.
 * [ ] **Routing multi-modèles** : Gemini, OpenRouter et Ollama selon coût, latence, confidentialité et disponibilité ; affichage du modèle choisi et possibilité de forcer un fournisseur.
 * [ ] **Mémoire maîtrisée** : aperçu avant sauvegarde, TTL, suppression/export, séparation mémoire personnelle/projet et recherche vectorielle avec score de pertinence.
