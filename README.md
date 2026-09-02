@@ -48,6 +48,7 @@ Un système d'agents autonomes orchestre les tâches complexes, tandis qu'un bac
 | **Supabase JS** | Client de persistance distante (mémoires, historique, RAG, custom skills) | `^2.110.2` |
 | **Puppeteer** | Automatisation et navigation Web headless | `^25.3.0` |
 | **pdf-parse** | Extraction textuelle de documents PDF | `^2.4.5` |
+| **basic-ftp** | Connexion FTP/FTPS et synchronisation des workspaces | `6.2.1` |
 | **esbuild** | Compilation et bundling du bootstrap serveur (`dist/server.cjs`) | `^0.25.0` |
 | **electron-builder** | Packaging et création d'installateurs Windows (NSIS) | `^26.15.3` |
 
@@ -88,6 +89,7 @@ Le Marketplace est accessible depuis la sidebar IDE : **Outils → Marketplace**
 ### IDE & Workflow
 
 * **Mode Multi-Workspace Sécurisé** : Ouverture, enregistrement et bascule instantanée entre dépôts avec isolation stricte (`SELF_ROOT`), historique des workspaces, validation préventive et badges Git. Clonage direct depuis une URL GitHub/GitLab avec progression en temps réel (SSE) et activation automatique du workspace cloné.
+* **Synchronisation FTP/FTPS** : Connexion depuis la modale de démarrage, test d'accès, téléchargement récursif vers un miroir local `~/.Leanna/ftp-workspaces`, activation comme workspace et push complet ou ciblé vers le serveur avec progression SSE. Les mots de passe restent en mémoire et ne sont jamais enregistrés.
 * **Éditeur de code intelligent** : Monaco Editor, arborescence de fichiers, coloration syntaxique, recherche globale avec regex, onglets multiples et panneau de prévisualisation web.
 * **Prise en charge native des PDF** : Les fichiers PDF du workspace sont détectés, indexés et ouverts directement dans l’IDE avec aperçu document, extraction de texte et téléchargement.
 * **Intégration GitHub native** : Panneau GitHub avec 5 onglets (Commits locaux avec diff, Repos, Issues, PRs, Notifications), filtres et badges de compteurs.

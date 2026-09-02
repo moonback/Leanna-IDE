@@ -37,6 +37,22 @@ Cette contrainte est **structurelle**, pas cosmétique :
 | `isCriticalFile(absPath)` | `(string) => boolean` | `true` si le fichier nécessite une confirmation utilisateur (`server.ts`, `.env`…) |
 | `resolveRealPathWithinSelf(path)` | `(string) => Promise<string \| null>` | Résout les symlinks et vérifie le chemin réel (anti symlink-escape) |
 | `auditSymlinks()` | `() => Promise<string[]>` | Scanne le repo pour détecter les symlinks pointant hors du périmètre |
+| `listFtpServers()` | `() => FtpServerEntry[]` | Retourne les serveurs FTP connus, sans mot de passe |
+| `saveFtpServer(...)` | `(...) => FtpServerEntry` | Ajoute ou actualise un serveur FTP dans `.Leanna/ftp-servers.json` |
+| `removeFtpServer(id)` | `(string) => boolean` | Retire un serveur FTP du registre sans supprimer son miroir local |
+| `renameFtpServer(id, name)` | `(string, string) => FtpServerEntry \| null` | Modifie le nom d'affichage d'un serveur FTP |
+
+### Synchronisation FTP
+
+Le routeur `server/routes/ftp.ts` expose la connexion FTP/FTPS et utilise `server/utils/ftpSync.ts` pour travailler avec un miroir local. Le mot de passe est transmis uniquement dans la requête courante et n'est pas écrit dans le registre.
+
+- `POST /api/ftp/test` vérifie l'authentification et l'accès au chemin distant, puis enregistre les métadonnées du serveur si le test réussit.
+- `POST /api/ftp/download` ouvre un flux SSE, télécharge récursivement le répertoire distant et active le miroir comme workspace à la fin.
+- `POST /api/ftp/push` ouvre un flux SSE et envoie tous les fichiers du miroir, ou seulement les chemins relatifs fournis dans `files`.
+- `POST /api/ftp/list` liste un répertoire distant sans récursion ; `POST /api/ftp/local-path` calcule le chemin local du miroir.
+- `GET/DELETE/PATCH /api/ftp/servers` gère le registre des connexions connues.
+
+Les miroirs sont stockés sous `~/.Leanna/ftp-workspaces/<hôte>_<port>/<chemin>/`. Les dossiers système courants (`.ssh`, `.gnupg`, `logs`, `tmp`, etc.) et les liens symboliques sont ignorés pendant le téléchargement.
 
 ### Listes de protection
 

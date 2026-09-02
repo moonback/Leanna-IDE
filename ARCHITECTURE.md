@@ -25,6 +25,7 @@ flowchart TB
             AgentsRouter["/api/agents & /api/custom-agents<br/>(Orchestration / Fleet / Builder)"]
             MarketplaceRouter["/api/marketplace<br/>(Registre / Install / Publish / Rate)"]
             MCPRouter["/api/mcp<br/>(Stdio & SSE Tool Bridge)"]
+            FTPRouter["/api/ftp<br/>(FTP/FTPS Workspace Sync)"]
             NotebooksRouter["/api/notebooks<br/>(RAG / Sources)"]
             OtherRouters["/api/workflows, /api/tts, /api/profile..."]
         end
@@ -37,6 +38,7 @@ flowchart TB
 
         subgraph CoreEngine ["Moteur Fondamental & Sécurité"]
             SelfRoot["Multi-Workspace & Path Security<br/>(SELF_ROOT & workspaces.json)"]
+            FtpSync["FTP Workspace Sync<br/>(local mirror & push)"]
             SandboxEngine["Sandbox Mirror Manager<br/>(.Leanna/sandbox)"]
             SkillRuntime["SkillManagerV2 & ToolRegistry"]
             AgentBus["AgentMessageBus & Orchestrator"]
@@ -49,6 +51,7 @@ flowchart TB
         SupabaseDB["Supabase Postgres<br/>(pgvector, Memories, History)"]
         OpenRouterAPI["OpenRouter API<br/>(LLMs alternatifs)"]
         MCPServers["Serveurs MCP Externes<br/>(stdio / SSE)"]
+        FTPServers["Serveurs FTP/FTPS Externes"]
     end
 
     UI --> Preload
@@ -68,6 +71,8 @@ flowchart TB
     SkillRuntime --> MCPServers
     
     Routers --> CoreEngine
+    FTPRouter --> FtpSync
+    FtpSync <--> FTPServers
     CoreEngine --> SupabaseDB
     Routers --> OpenRouterAPI
 ```
@@ -79,10 +84,11 @@ flowchart TB
 Leanna fonctionne selon les principes architecturaux suivants :
 
 1. **Mode Multi-Workspace & Périmètre Self-Root** : L'IDE gère dynamiquement plusieurs dépôts externes tout en confinant rigoureusement toutes les compétences IA, explorateurs et opérations au projet actif (`SELF_ROOT`). Les dépôts sont persistés dans `.Leanna/workspaces.json` et les chemins candidats sont pré-validés (rejet des racines disques et dossiers système). L'utilisateur peut cloner directement un dépôt distant via une URL (GitHub, GitLab, SSH…) depuis la modale Multi-Workspace — le flux SSE `POST /api/self-root/clone` transmet la progression git en temps réel et active le workspace automatiquement à la fin.
-2. **Isolation par Sandbox** : Par défaut, toute écriture effectuée par l'utilisateur ou par l'IA est appliquée dans un dossier miroir `.Leanna/sandbox` du workspace actif. Les modifications ne sont reportées dans le projet principal qu'après validation TypeScript (`tsc --noEmit`) et approbation explicite (`sync` ou `accept-file`).
-3. **Dialogue Multimodal Temps Réel** : L'interface échange des flux audio PCM 16kHz et des captures vidéo/écran directement avec l'API Gemini Live. Lorsque l'IA décide d'exécuter une action, elle invoque des outils (`functionDeclarations`) interceptés côté backend par le `LiveSocketHandler`.
-4. **Lecture & Indexation des documents PDF** : Les fichiers PDF du workspace sont détectés, lus via `pdf-parse`, indexés dans le `WorkspaceIndexer` et exposés à l’IDE avec un aperçu document et un texte extrait exploitable par le moteur de connaissances.
-5. **Coexistence Runtime V1 & V2** : Le système migre progressivement d'un `SkillManager` historique vers une architecture découplée `ToolRegistry` + `RuntimeV2` tout en conservant une compatibilité ascendante complète.
+2. **Synchronisation FTP par miroir local** : Un workspace FTP est téléchargé dans `~/.Leanna/ftp-workspaces/<hôte>_<port>/<chemin>/`, puis activé comme un workspace classique. Le téléchargement récursif ignore les dossiers système courants et continue malgré les erreurs par fichier. Les modifications peuvent être poussées vers le serveur via `POST /api/ftp/push`, en totalité ou sur une liste de chemins relatifs.
+3. **Isolation par Sandbox** : Par défaut, toute écriture effectuée par l'utilisateur ou par l'IA est appliquée dans un dossier miroir `.Leanna/sandbox` du workspace actif. Les modifications ne sont reportées dans le projet principal qu'après validation TypeScript (`tsc --noEmit`) et approbation explicite (`sync` ou `accept-file`).
+4. **Dialogue Multimodal Temps Réel** : L'interface échange des flux audio PCM 16kHz et des captures vidéo/écran directement avec l'API Gemini Live. Lorsque l'IA décide d'exécuter une action, elle invoque des outils (`functionDeclarations`) interceptés côté backend par le `LiveSocketHandler`.
+5. **Lecture & Indexation des documents PDF** : Les fichiers PDF du workspace sont détectés, lus via `pdf-parse`, indexés dans le `WorkspaceIndexer` et exposés à l’IDE avec un aperçu document et un texte extrait exploitable par le moteur de connaissances.
+6. **Coexistence Runtime V1 & V2** : Le système migre progressivement d'un `SkillManager` historique vers une architecture découplée `ToolRegistry` + `RuntimeV2` tout en conservant une compatibilité ascendante complète.
 
 ---
 
@@ -100,7 +106,7 @@ L'interface utilisateur est développée en **React 19** avec **TypeScript** et 
   - `IdeView` (`src/views/IdeView.tsx`) : Environnement de travail avec Monaco Editor, arborescence virtuelle, onglets et panneaux latéraux rétractables.
   - `UnifiedSidebar` : Barre latérale unique supportant les contextes `global` et `ide`.
   - `Panels` (`src/components/panels/`) : Panneaux spécialisés pour le Terminal, le Navigateur webview, les Métriques d'agents, la Flotte d'agents (`AgentFleetPanel`), le Constructeur visuel d'agents (`AgentBuilderPanel`), les Tâches planifiées, les Workflows, les MCP et l'Audit.
-  - `StartupProjectModal` : Modale de démarrage permettant de sélectionner ou changer le projet cible géré par `SELF_ROOT`. Comprend trois onglets : **Dépôts récents**, **Ouvrir local** (saisie de chemin + dialogue natif), et **Cloner** (URL Git → clone SSE en temps réel → activation automatique).
+  - `StartupProjectModal` : Modale de démarrage permettant de sélectionner ou changer le projet cible géré par `SELF_ROOT`. Comprend les onglets **Dépôts récents**, **Ouvrir local**, **Cloner** (URL Git → clone SSE) et **FTP** (test FTP/FTPS → téléchargement SSE → activation automatique).
 
 ---
 
@@ -145,7 +151,7 @@ server/
 ├── knowledge/          # Knowledge Graph, WorkspaceIndexer et mémoire projet
 ├── notebooks/          # Moteur RAG, découpage, extraction et file de traitement
 ├── mcp/                # Bridge de protocoles MCP (Stdio & SSE)
-└── utils/              # SelfRoot, Sandbox, Checkpoint Git, Cryptographie, RateLimiting
+└── utils/              # SelfRoot, Sandbox, FTP Sync, Checkpoint Git, Cryptographie
 ```
 
 ### Couche de Validation & Sécurité des Données Entrantes
