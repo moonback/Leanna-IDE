@@ -168,6 +168,10 @@ export const projectSkill: Skill = {
           );
 
           // Exécuter le scaffolding
+          // Note: shell:true est nécessaire uniquement sur Windows pour les .cmd/.bat
+          // Sur Unix, execFile peut exécuter directement les binaires
+          const needsShell = process.platform === 'win32' && (bin === 'npm' || bin === 'npx');
+          
           let stdout = "";
           let stderr = "";
           try {
@@ -175,7 +179,7 @@ export const projectSkill: Skill = {
               cwd: parentDir,
               timeout: SCAFFOLD_TIMEOUT_MS,
               maxBuffer: MAX_BUFFER,
-              shell: true,
+              shell: needsShell, // Shell uniquement si nécessaire pour Windows .cmd
               env: {
                 ...process.env,
                 // Forcer le mode non-interactif pour les outils CLI

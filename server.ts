@@ -11,7 +11,7 @@ import { type ProfileConfig } from "./server/prompts/systemInstruction.js";
 import { loadScheduledTasks, stopAllScheduledTasks } from "./server/skills/automation.js";
 import { loadWorkflows, stopAllWorkflowTimers } from "./server/skills/workflow.js";
 import fs from "fs";
-import { authenticateRequest, authenticateToken } from "./server/security.js";
+import { authenticateRequest, authenticateToken, ensureApiToken } from "./server/security.js";
 import { SELF_ROOT, Leanna_APP_ROOT, initSelfRoot, hasProject } from "./server/utils/selfRoot.js";
 import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox.js";
 
@@ -342,7 +342,9 @@ const browserActionPending = new Map<string, {
   reject: (err: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 }>();
-const apiToken = process.env.Leanna_API_TOKEN;
+
+// ── Security: Ensure API token is always configured ──
+const apiToken = ensureApiToken();
 
 function getDefaultWorkspaceRoot(): string {
   return SELF_ROOT;
@@ -554,16 +556,16 @@ async function startServer() {
   // l'utilisateur exporte explicitement Leanna_LISTEN_HOST (ex: pour un accès
   // LAN volontaire, à combiner impérativement avec Leanna_API_TOKEN).
   const listenHost = process.env.Leanna_LISTEN_HOST?.trim() || "127.0.0.1";
-  if (!apiToken) {
+  
+  // Note: apiToken is now always guaranteed to exist via ensureApiToken()
+  console.log("[Security] ✓ API authentication is enabled and required for all requests");
+  
+  if (listenHost === "0.0.0.0") {
     console.warn(
-      "\n[Security] ⚠️  AVERTISSEMENT SÉCURITÉ : Aucun Leanna_API_TOKEN n'est configuré dans .env.\n" +
-      "          Les endpoints API (/api/*) et WebSocket (/live, /sandbox-watch) ne sont pas protégés par jeton.\n" +
-      "          Pour restreindre l'accès, définissez Leanna_API_TOKEN=<votre_jeton_secret> dans votre .env.\n"
+      "\n[Security] ⚠️  WARNING: Server is listening on 0.0.0.0 (all interfaces).\n" +
+      "          Ensure your firewall is properly configured and the API token is kept secure.\n" +
+      "          For local-only access, use Leanna_LISTEN_HOST=127.0.0.1 instead.\n"
     );
-  }
-  if (listenHost === "0.0.0.0" && !apiToken) {
-    console.error("[Security] ❌ REFUS DE DÉMARRAGE — Leanna_LISTEN_HOST=0.0.0.0 exposé sans Leanna_API_TOKEN. Définissez Leanna_API_TOKEN dans .env pour sécuriser l'accès.");
-    process.exit(1);
   }
 
   // ── Sandbox — activé SEULEMENT si un projet est sélectionné ──────────────

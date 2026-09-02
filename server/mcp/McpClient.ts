@@ -251,10 +251,20 @@ export class McpClient extends EventEmitter {
     
     const mergedEnv = { ...process.env, ...env };
 
+    // shell:true est nécessaire uniquement sur Windows pour les .cmd/.bat
+    // Pour les commandes comme uvx/npx qui peuvent être des wrappers Python/Node
+    const isWin = process.platform === 'win32';
+    const needsShell = isWin && (
+      resolvedCommand.endsWith('.cmd') || 
+      resolvedCommand.endsWith('.bat') ||
+      resolvedCommand === 'npx' ||
+      resolvedCommand === 'uvx'
+    );
+
     this.process = spawn(resolvedCommand, args, {
       env: mergedEnv,
       stdio: ['pipe', 'pipe', 'pipe'],
-      shell: true, // Permet l'exécution de commandes comme npx/uvx
+      shell: needsShell, // Shell uniquement si nécessaire pour Windows .cmd
       windowsHide: true,
     });
 

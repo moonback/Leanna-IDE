@@ -1,4 +1,6 @@
 import path from 'path';
+import crypto from 'crypto';
+import fs from 'fs';
 import { SELF_ROOT } from './utils/selfRoot.js';
 
 export interface AuthOptions {
@@ -85,4 +87,113 @@ export function authenticateToken(token: string | null | undefined, apiToken: st
     return { ok: true };
   }
   return { ok: false, status: 401, error: 'Unauthorized' };
+}
+
+/**
+ * Generate a cryptographically secure random API token.
+ * Returns a URL-safe base64 string of 32 bytes (256 bits).
+ */
+export function generateSecureToken(): string {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+/**
+ * Ensure an API token exists. If not found in environment, generates one
+ * and saves it to .env file (or .env.local if .env doesn't exist).
+ * Returns the token (existing or newly generated).
+ */
+export function ensureApiToken(): string {
+  const existingToken = process.env.Leanna_API_TOKEN?.trim();
+  
+  if (existingToken && existingToken.length > 0) {
+    return existingToken;
+  }
+
+  // Generate a new secure token
+  const newToken = generateSecureToken();
+  
+  // Determine which .env file to update
+  const envPath = path.join(SELF_ROOT, '.env');
+  const envLocalPath = path.join(SELF_ROOT, '.env.local');
+  
+  let targetPath = envPath;
+  if (!fs.existsSync(envPath) && fs.existsSync(envLocalPath)) {
+    targetPath = envLocalPath;
+  }
+
+  // Append or update the token in the file
+  try {
+    let envContent = '';
+    if (fs.existsSync(targetPath)) {
+      envContent = fs.readFileSync(targetPath, 'utf-8');
+    }
+
+    // Check if Leanna_API_TOKEN line already exists (empty or commented)
+    const tokenLineRegex = /^#?\s*Leanna_API_TOKEN\s*=.*$/m;
+    
+    if (tokenLineRegex.test(envContent)) {
+      // Replace existing line
+      envContent = envContent.replace(
+        tokenLineRegex,
+        `Leanna_API_TOKEN="${newToken}"`
+      );
+    } else {
+      // Append new line
+      if (envContent && !envContent.endsWith('\n')) {
+        envContent += '\n';
+      }
+      envContent += `\n# Auto-generated secure API token for Leanna authentication\nLeanna_API_TOKEN="${newToken}"\n`;
+    }
+
+    fs.writeFileSync(targetPath, envContent, 'utf-8');
+    
+    // Update process.env for current session
+    process.env.Leanna_API_TOKEN = newToken;
+    
+    console.log(`[Security] ✓ Generated new API token and saved to ${path.basename(targetPath)}`);
+    console.log(`[Security] ⚠️  IMPORTANT: Save this token securely. It will be required for all API access.`);
+    console.log(`[Security] Token: ${newToken}`);
+    
+    return newToken;
+  } catch (error) {
+    console.error('[Security] Failed to write token to .env file:', error);
+    throw new Error('Unable to generate and persist API token. Please set Leanna_API_TOKEN manually in your .env file.');
+  }
+}
+
+/**
+ * Sanitize command arguments to prevent shell injection.
+ * Applies an allowlist of safe characters, similar to the filter in project.ts.
+ * Returns sanitized string with dangerous characters replaced by dashes.
+ * 
+ * Safe characters: alphanumeric, underscore, hyphen, dot, forward slash, colon, equals, comma
+ * All other characters are replaced with '-' to prevent shell metacharacter injection.
+ */
+export function sanitizeCommandArgument(arg: string): string {
+  // Allowlist of safe characters: a-z A-Z 0-9 _ - . / : = ,
+  // Replace anything else with '-' to prevent shell injection
+  return arg.replace(/[^a-zA-Z0-9_.\-/:=,]/g, '-');
+}
+
+/**
+ * Sanitize an array of command arguments.
+ * Each argument is individually sanitized using sanitizeCommandArgument.
+ */
+export function sanitizeCommandArguments(args: string[]): string[] {
+  return args.map(sanitizeCommandArgument);
+}
+
+/**
+ * Validate that a file path doesn't contain dangerous shell metacharacters.
+ * Returns the original path if safe, or throws an error if dangerous.
+ */
+export function validateSafePath(filePath: string): string {
+  // Check for common shell metacharacters that could be dangerous
+  const dangerousPatterns = /[;|&$`<>(){}[\]!*?'"\\\n\r]/;
+  
+  if (dangerousPatterns.test(filePath)) {
+    throw new Error(`Path contains potentially dangerous characters: ${filePath}`);
+  }
+  
+  return filePath;
 }

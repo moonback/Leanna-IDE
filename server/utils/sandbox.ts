@@ -620,7 +620,7 @@ export async function validateSandbox(): Promise<SandboxValidationResult> {
       cwd: SELF_ROOT,
       timeout: 120_000,
       maxBuffer: 10 * 1024 * 1024,
-      shell: true,
+      shell: isWin, // Shell uniquement sur Windows pour npx.cmd
     });
     stdout = result.stdout || "";
     stderr = result.stderr || "";

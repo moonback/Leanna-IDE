@@ -3,6 +3,14 @@
  * 
  * Gère la configuration persistante des serveurs MCP (Model Context Protocol).
  * Les configurations sont stockées dans .Leanna/mcp.json à la racine du workspace.
+ * 
+ * SECURITY NOTE:
+ * MCP server commands are executed as subprocesses with the same privileges as the
+ * Leanna server. Only configure MCP servers from trusted sources. The command and
+ * args are passed to child_process.spawn() with shell enabled on Windows for .cmd
+ * files. While arguments are passed as an array (which Node.js escapes properly),
+ * malicious command values could still be dangerous. Always validate MCP server
+ * configurations before adding them.
  */
 import * as fs from 'fs';
 import * as path from 'path';

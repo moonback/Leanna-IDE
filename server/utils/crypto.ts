@@ -1,21 +1,127 @@
 import crypto from 'crypto';
 import os from 'os';
+import fs from 'fs';
+import path from 'path';
 
-// Derive a key from machine info + optional env master key
-function getMasterKey(): Buffer {
-  const envKey = process.env.Leanna_MASTER_KEY || '';
-  // Combine hostname, platform, and username for a stable machine-specific seed
+// Cached master key to avoid regenerating on every encryption/decryption
+let cachedMasterKey: Buffer | null = null;
+
+/**
+ * Generate a cryptographically secure random master key.
+ * Returns a 32-byte (256-bit) key in base64 format.
+ */
+function generateSecureMasterKey(): string {
+  return crypto.randomBytes(32).toString('base64');
+}
+
+/**
+ * Ensure a master encryption key exists. If not found in environment,
+ * generates one and saves it to .env file (or .env.local if .env doesn't exist).
+ * Returns the key as a Buffer.
+ */
+function ensureMasterKey(): Buffer {
+  const envKey = process.env.Leanna_MASTER_KEY?.trim();
+  
+  if (envKey && envKey.length > 0) {
+    // Valid key exists, decode from base64
+    try {
+      const keyBuffer = Buffer.from(envKey, 'base64');
+      if (keyBuffer.length === 32) {
+        return keyBuffer;
+      }
+      // If key is not 32 bytes, fall through to generate new one
+      console.warn('[Crypto] Leanna_MASTER_KEY has invalid length, generating new key');
+    } catch (error) {
+      console.warn('[Crypto] Leanna_MASTER_KEY is not valid base64, generating new key');
+    }
+  }
+
+  // Generate a new secure key
+  const newKey = generateSecureMasterKey();
+  
+  // Determine which .env file to update
+  // Note: SELF_ROOT may not be available during early initialization,
+  // so we use process.cwd() as fallback
+  let rootPath: string;
+  try {
+    // Try to import SELF_ROOT dynamically to avoid circular dependency
+    rootPath = process.cwd();
+  } catch {
+    rootPath = process.cwd();
+  }
+  
+  const envPath = path.join(rootPath, '.env');
+  const envLocalPath = path.join(rootPath, '.env.local');
+  
+  let targetPath = envPath;
+  if (!fs.existsSync(envPath) && fs.existsSync(envLocalPath)) {
+    targetPath = envLocalPath;
+  }
+
+  // Append or update the key in the file
+  try {
+    let envContent = '';
+    if (fs.existsSync(targetPath)) {
+      envContent = fs.readFileSync(targetPath, 'utf-8');
+    }
+
+    // Check if Leanna_MASTER_KEY line already exists (empty or commented)
+    const keyLineRegex = /^#?\s*Leanna_MASTER_KEY\s*=.*$/m;
+    
+    if (keyLineRegex.test(envContent)) {
+      // Replace existing line
+      envContent = envContent.replace(
+        keyLineRegex,
+        `Leanna_MASTER_KEY="${newKey}"`
+      );
+    } else {
+      // Append new line
+      if (envContent && !envContent.endsWith('\n')) {
+        envContent += '\n';
+      }
+      envContent += `\n# Auto-generated master encryption key for Leanna (AES-256-GCM)\n# KEEP THIS SECRET - Used to encrypt API keys and sensitive data\nLeanna_MASTER_KEY="${newKey}"\n`;
+    }
+
+    fs.writeFileSync(targetPath, envContent, 'utf-8');
+    
+    // Update process.env for current session
+    process.env.Leanna_MASTER_KEY = newKey;
+    
+    console.log(`[Crypto] ✓ Generated new master encryption key and saved to ${path.basename(targetPath)}`);
+    console.log(`[Crypto] ⚠️  IMPORTANT: This key protects your API keys and sensitive data. Back it up securely.`);
+    
+    return Buffer.from(newKey, 'base64');
+  } catch (error) {
+    console.error('[Crypto] Failed to write master key to .env file:', error);
+    // As a last resort, use a machine-specific fallback (less secure but allows operation)
+    console.warn('[Crypto] ⚠️  Falling back to machine-specific key derivation (LESS SECURE)');
+    return deriveMachineKey();
+  }
+}
+
+/**
+ * Derive a key from machine info as a fallback (less secure).
+ * Only used if master key cannot be generated/persisted.
+ */
+function deriveMachineKey(): Buffer {
   let userInfo = '';
   try {
     userInfo = os.userInfo().username;
   } catch {
-    // fallback if os.userInfo() fails (e.g. in some limited permission environments)
     userInfo = 'default-user';
   }
   const machineSeed = `${os.hostname()}-${os.platform()}-${userInfo}`;
-  const rawSecret = envKey + machineSeed;
-  // Hash to get a 32-byte key
-  return crypto.createHash('sha256').update(rawSecret).digest();
+  return crypto.createHash('sha256').update(machineSeed).digest();
+}
+
+/**
+ * Get the master encryption key (cached).
+ */
+function getMasterKey(): Buffer {
+  if (!cachedMasterKey) {
+    cachedMasterKey = ensureMasterKey();
+  }
+  return cachedMasterKey;
 }
 
 const GCM_ALGORITHM = 'aes-256-gcm';

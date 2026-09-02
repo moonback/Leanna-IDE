@@ -258,7 +258,7 @@ async function extractResultsFromDuckDuckGo(p: Page): Promise<Array<{ title: str
 // ─── Browser handlers ──────────────────────────────────────────────────────────
 
 export async function handleNavigate(validated: { url: string }) {
-    const check = assertSafeUrl(validated.url);
+    const check = await assertSafeUrl(validated.url);
     if (!check.ok) return { error: (check as { ok: false; error: string }).error };
 
     console.log(`[Automation] Navigation vers: ${check.url}`);

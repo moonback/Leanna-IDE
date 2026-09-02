@@ -14,6 +14,8 @@
 
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { promisify } from 'util';
+import { lookup } from 'dns';
 import {
   testFtpConnection,
   downloadFtpWorkspace,
@@ -28,6 +30,84 @@ import {
   removeFtpServer,
   renameFtpServer,
 } from "../utils/selfRoot.js";
+
+const dnsLookup = promisify(lookup);
+
+// Private IP ranges that should be blocked for FTP connections
+const BLOCKED_IP_PREFIXES = [
+  '127.',
+  '0.',
+  '10.',
+  '192.168.',
+  '172.16.', '172.17.', '172.18.', '172.19.', '172.20.',
+  '172.21.', '172.22.', '172.23.', '172.24.', '172.25.',
+  '172.26.', '172.27.', '172.28.', '172.29.', '172.30.', '172.31.',
+  '169.254.',
+  '::1',
+  'fc',
+  'fd',
+  'fe80',
+];
+
+/**
+ * Check if an IP address is in a private/loopback range.
+ */
+function isPrivateIp(hostname: string): boolean {
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+    return BLOCKED_IP_PREFIXES.some((p) => hostname.startsWith(p));
+  }
+  if (hostname.includes(':')) {
+    const lower = hostname.toLowerCase();
+    return BLOCKED_IP_PREFIXES.slice(-3).some((p) => lower.startsWith(p));
+  }
+  return false;
+}
+
+/**
+ * Validate that an FTP host is not a private/loopback IP.
+ * Resolves DNS to prevent DNS rebinding attacks.
+ * 
+ * SECURITY NOTE: This prevents using the FTP client as a proxy to scan internal networks.
+ * Set ALLOW_FTP_PRIVATE_IPS=true in .env to bypass this check for legitimate internal FTP servers.
+ */
+async function validateFtpHost(host: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Allow bypass for legitimate internal FTP servers
+  if (process.env.ALLOW_FTP_PRIVATE_IPS === 'true') {
+    return { ok: true };
+  }
+
+  // Check if host is already an IP literal
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host) || host.includes(':')) {
+    if (isPrivateIp(host)) {
+      return {
+        ok: false,
+        error: `Connexion FTP vers des adresses privées/locales interdite pour des raisons de sécurité: ${host}. Pour se connecter à un serveur FTP interne légitime, définissez ALLOW_FTP_PRIVATE_IPS=true dans votre .env.`
+      };
+    }
+    return { ok: true };
+  }
+
+  // Resolve DNS and check the actual IP
+  try {
+    const resolved = await dnsLookup(host, { all: true });
+    
+    for (const record of resolved) {
+      if (isPrivateIp(record.address)) {
+        return {
+          ok: false,
+          error: `Le serveur FTP "${host}" résout vers une adresse privée/locale (${record.address}), ce qui est interdit pour des raisons de sécurité (prévention DNS rebinding et scan de réseau interne). Pour se connecter à un serveur FTP interne légitime, définissez ALLOW_FTP_PRIVATE_IPS=true dans votre .env.`
+        };
+      }
+    }
+    
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Impossible de résoudre le nom de domaine "${host}": ${error instanceof Error ? error.message : 'erreur DNS'}`
+    };
+  }
+}
 
 export function createFtpRouter(): Router {
   const router = Router();
@@ -53,6 +133,13 @@ export function createFtpRouter(): Router {
     }
 
     const config: FtpConfig = parsed.data;
+    
+    // Validate host is not a private IP (security check)
+    const hostCheck = await validateFtpHost(config.host);
+    if (!hostCheck.ok) {
+      return res.status(403).json({ ok: false, error: hostCheck.error });
+    }
+
     const result = await testFtpConnection(config);
 
     if (result.ok) {
@@ -80,6 +167,12 @@ export function createFtpRouter(): Router {
     }
 
     const config: FtpConfig = parsed.data;
+
+    // Validate host is not a private IP (security check)
+    const hostCheck = await validateFtpHost(config.host);
+    if (!hostCheck.ok) {
+      return res.status(403).json({ error: hostCheck.error });
+    }
 
     // Setup SSE
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -158,6 +251,12 @@ export function createFtpRouter(): Router {
 
     const { config, localRoot, files } = parsed.data;
 
+    // Validate host is not a private IP (security check)
+    const hostCheck = await validateFtpHost(config.host);
+    if (!hostCheck.ok) {
+      return res.status(403).json({ error: hostCheck.error });
+    }
+
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
@@ -193,6 +292,12 @@ export function createFtpRouter(): Router {
     const parsed = BodySchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Paramètres invalides." });
+    }
+
+    // Validate host is not a private IP (security check)
+    const hostCheck = await validateFtpHost(parsed.data.config.host);
+    if (!hostCheck.ok) {
+      return res.status(403).json({ error: hostCheck.error });
     }
 
     try {
