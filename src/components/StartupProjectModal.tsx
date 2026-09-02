@@ -515,22 +515,35 @@ export function StartupProjectModal() {
         <motion.div
           {...cardMotionProps}
           transition={MODAL_SPRING}
-          className="w-full h-screen rounded-none p-6 shadow-2xl overflow-hidden flex flex-col"
-          style={{ backgroundColor: 'var(--bg-panel)', border: 'none' }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="workspace-modal-title"
+          className="w-[calc(100%-24px)] max-w-5xl h-[min(780px,calc(100vh-32px))] rounded-2xl p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col"
+          style={{
+            backgroundColor: 'var(--bg-panel)',
+            border: '1px solid var(--border-base)',
+            boxShadow: '0 24px 80px rgba(0, 0, 0, 0.4)',
+          }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between mb-4 flex-shrink-0">
+          <div className="flex items-start justify-between gap-4 mb-5 flex-shrink-0">
             <div className="flex items-center gap-3">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)' }}
+                className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--accent-primary) 24%, transparent)',
+                }}
               >
                 <FolderOpen className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-                    Multi-Workspace
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] mb-1" style={{ color: 'var(--accent-primary)' }}>
+                  Workspace manager
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 id="workspace-modal-title" className="text-lg font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                    Choisir un workspace
                   </h2>
                   <span
                     className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
@@ -543,8 +556,8 @@ export function StartupProjectModal() {
                     Périmètre sécurisé
                   </span>
                 </div>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Sélectionnez un dépôt ou ouvrez un dossier externe en mode isolé.
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  Sélectionnez un dépôt, connectez un serveur ou ouvrez un dossier externe.
                 </p>
               </div>
             </div>
@@ -562,11 +575,11 @@ export function StartupProjectModal() {
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex items-center gap-1 p-1 rounded-xl mb-4 flex-shrink-0" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+          <div className="grid grid-cols-2 sm:grid-cols-5 items-center gap-1 p-1 rounded-xl mb-5 flex-shrink-0" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
             <button
               type="button"
               onClick={() => setActiveTab('recent')}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
+              className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'recent' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
               }`}
               style={{
@@ -579,7 +592,7 @@ export function StartupProjectModal() {
             <button
               type="button"
               onClick={() => setActiveTab('open')}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
+              className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'open' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
               }`}
               style={{
@@ -592,7 +605,7 @@ export function StartupProjectModal() {
             <button
               type="button"
               onClick={() => { setActiveTab('clone'); setCloneStatus('idle'); setCloneLogs([]); setCloneUrlError(null); }}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
+              className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
                 activeTab === 'clone' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
               }`}
               style={{
@@ -606,7 +619,7 @@ export function StartupProjectModal() {
             <button
               type="button"
               onClick={() => { setActiveTab('ftp'); setFtpStatus('idle'); setFtpLogs([]); setFtpTestResult(null); fetchFtpServers(); }}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
+              className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
                 activeTab === 'ftp' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
               }`}
               style={{
@@ -620,7 +633,7 @@ export function StartupProjectModal() {
           </div>
 
           {/* ── Tab Content ── */}
-          <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3">
             {activeTab === 'recent' && (
               <div className="space-y-2">
                 {workspaces.length === 0 ? (
@@ -1280,7 +1293,7 @@ export function StartupProjectModal() {
           </div>
 
           {/* Footer Action */}
-          <div className="flex items-center justify-between pt-4 mt-2 border-t flex-shrink-0" style={{ borderColor: 'var(--border-base)' }}>
+          <div className="flex items-center justify-between gap-3 pt-4 mt-3 border-t flex-shrink-0" style={{ borderColor: 'var(--border-base)' }}>
             <span className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
               {currentPath ? `Actif: ${currentPath.split(/[\\/]/).pop()}` : 'Aucun projet sélectionné'}
             </span>
