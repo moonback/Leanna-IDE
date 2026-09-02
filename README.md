@@ -92,7 +92,7 @@ Le Marketplace est accessible depuis la sidebar IDE : **Outils → Marketplace**
 * **Synchronisation FTP/FTPS** : Connexion depuis la modale de démarrage, test d'accès, téléchargement récursif vers un miroir local `~/.Leanna/ftp-workspaces`, activation comme workspace et push complet ou ciblé vers le serveur avec progression SSE. Les mots de passe restent en mémoire et ne sont jamais enregistrés.
 * **Éditeur de code intelligent** : Monaco Editor, arborescence de fichiers, coloration syntaxique, recherche globale avec regex, onglets multiples et panneau de prévisualisation web.
 * **Prise en charge native des PDF** : Les fichiers PDF du workspace sont détectés, indexés et ouverts directement dans l’IDE avec aperçu document, extraction de texte et téléchargement.
-* **Intégration GitHub native** : Panneau GitHub avec 5 onglets (Commits locaux avec diff, Repos, Issues, PRs, Notifications), filtres et badges de compteurs.
+* **Intégration GitHub native** : Panneau GitHub avec 5 onglets (Commits locaux avec diff, Repos, Issues, PRs, Notifications), filtres et badges de compteurs. Le bouton **GitHub** de la status bar ouvre aussi `WorkspacePublishPanel` pour afficher les modifications du workspace réel, créer un commit et pousser vers `origin`. Le dossier `.Leanna/` est toujours exclu du statut et des commits.
 * **Terminal intégré** : Émulation PowerShell/Bash via WebSocket et PTY avec sessions multiples.
 * **Navigateur Web autonome** : Navigation, capture d'écran, extraction de texte et formulaires via webview + Puppeteer.
 
@@ -121,7 +121,7 @@ Le Marketplace est accessible depuis la sidebar IDE : **Outils → Marketplace**
 * **Clé API Gemini** : Requise pour l'assistant Live et la génération de texte.
 * **Supabase** *(optionnel)* : URL + clé de service pour la persistance cloud des mémoires, historique, custom skills et RAG.
 * **OpenRouter** *(optionnel)* : Pour les modèles d'IA alternatifs.
-* **GitHub Token** *(optionnel)* : Pour l'intégration GitHub dans l'IDE.
+* **GitHub Token** *(optionnel)* : Pour l'intégration GitHub dans l'IDE (repos, issues et PRs). Le commit/push du workspace utilise la configuration Git locale (`origin`, gestionnaire d'identifiants ou clé SSH).
 
 ---
 

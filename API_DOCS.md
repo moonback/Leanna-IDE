@@ -309,6 +309,44 @@ data: {"type":"done","status":"success","newRoot":"C:/Users/Mayss/Documents/Lean
 - En cas d'échec partiel, le dossier partiellement cloné est nettoyé automatiquement.
 - Après succès, le sandbox est réinitialisé et le Knowledge System est réindexé exactement comme après `POST /api/self-root/change`.
 
+## Publication GitHub du workspace réel
+
+Le composant `WorkspacePublishPanel` (`src/components/github/WorkspacePublishPanel.tsx`) est accessible depuis le bouton **GitHub** de la status bar de l'IDE. Il agit sur le workspace actif, défini par `SELF_ROOT`.
+
+### `GET /api/github/status`
+
+Retourne la branche courante et les fichiers modifiés du workspace. Le dossier `.Leanna/` est explicitement exclu du résultat.
+
+Réponse :
+
+```json
+{
+  "branch": "main",
+  "clean": false,
+  "files": [
+    { "index": " ", "worktree": "M", "path": "src/example.ts" }
+  ]
+}
+```
+
+### `POST /api/github/commit`
+
+Ajoute et commit toutes les modifications du workspace, à l'exception de `.Leanna/`.
+
+Corps :
+
+```json
+{ "message": "Mise à jour du workspace" }
+```
+
+Le message est obligatoire et limité à 200 caractères. Aucun commit n'est créé si le workspace ne contient pas de modification suivie par Git.
+
+### `POST /api/github/push`
+
+Pousse le commit courant vers le remote Git configuré (`origin`). L'authentification Git doit être configurée localement, par exemple via le gestionnaire d'identifiants Git ou une clé SSH.
+
+Les opérations utilisent des arguments Git séparés, sans shell, et désactivent les prompts interactifs. `.Leanna/` est également déclaré dans `.gitignore` afin que ses fichiers locaux ne soient jamais ajoutés au dépôt.
+
 ### Synchronisation FTP/FTPS
 
 Les endpoints FTP utilisent le schéma commun suivant. Le mot de passe est requis dans la requête mais n'est jamais persisté.
