@@ -156,6 +156,16 @@ export interface MissionMetrics {
   estimatedTokens: number;
 }
 
+/** Plan explicite présenté avant le lancement d'une mission multi-étapes. */
+export interface MissionPlan {
+  objectives: string[];
+  targetedFiles: string[];
+  tools: string[];
+  risks: string[];
+  estimatedTokens: number;
+  stopConditions: string[];
+}
+
 /** Score calculé pour un skill */
 export interface SkillScore {
   skillName: string;

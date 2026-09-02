@@ -29,6 +29,16 @@ interface MissionEvent {
   durationMs?: number;
   error?: string;
   timestamp: string;
+  plan?: MissionPlan;
+}
+
+interface MissionPlan {
+  objectives: string[];
+  targetedFiles: string[];
+  tools: string[];
+  risks: string[];
+  estimatedTokens: number;
+  stopConditions: string[];
 }
 
 interface MissionEntry {
@@ -45,6 +55,7 @@ interface MissionEntry {
     failedActions: number;
   };
   createdAt: Date;
+  plan?: MissionPlan;
 }
 
 interface GoalEntry {
@@ -137,8 +148,25 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
         const existing = prev.find(m => m.id === detail.missionId);
 
         switch (detail.event) {
+          case 'mission_plan':
+            if (existing) {
+              return prev.map(m => m.id === detail.missionId ? { ...m, plan: detail.plan } : m);
+            }
+            return [...prev, {
+              id: detail.missionId,
+              title: detail.title ?? 'Mission',
+              status: 'pending',
+              priority: 'medium',
+              goals: [],
+              activeGoalId: null,
+              confidence: 0.5,
+              metrics: { totalActions: 0, successfulActions: 0, failedActions: 0 },
+              createdAt: new Date(detail.timestamp),
+              plan: detail.plan,
+            }];
+
           case 'mission_started':
-            if (existing) return prev;
+            if (existing) return prev.map(m => m.id === detail.missionId ? { ...m, status: 'in_progress' as const } : m);
             return [...prev, {
               id: detail.missionId,
               title: detail.title ?? 'Mission',
@@ -412,6 +440,8 @@ function MissionCard({
             className="overflow-hidden"
           >
             <div className="px-3 pb-3 space-y-1.5" style={{ borderTop: '1px solid var(--border-base)' }}>
+              {mission.plan && <MissionPlanSummary plan={mission.plan} />}
+
               {/* Metrics row */}
               <div className="flex items-center gap-3 pt-2 pb-1">
                 <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
@@ -442,6 +472,37 @@ function MissionCard({
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+function MissionPlanSummary({ plan }: { plan: MissionPlan }) {
+  const sections: Array<{ label: string; items: string[] }> = [
+    { label: 'Objectifs', items: plan.objectives },
+    { label: 'Fichiers ciblés', items: plan.targetedFiles },
+    { label: 'Outils', items: plan.tools },
+    { label: 'Risques', items: plan.risks },
+    { label: "Conditions d'arrêt", items: plan.stopConditions },
+  ];
+
+  return (
+    <div className="pt-2 pb-1 space-y-2" style={{ borderBottom: '1px solid var(--border-base)' }}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-info)' }}>
+          Plan d'action
+        </span>
+        <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
+          ~{plan.estimatedTokens.toLocaleString('fr-FR')} tokens
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-1.5">
+        {sections.map(section => (
+          <div key={section.label} className="text-xs">
+            <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>{section.label}: </span>
+            <span style={{ color: 'var(--text-dimmed)' }}>{section.items.join(' · ')}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
