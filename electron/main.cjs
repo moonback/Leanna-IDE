@@ -40,7 +40,9 @@ function startBackendServer() {
     process.env.Leanna_CONFIG_PATH = configDir;
     log('Config directory:', configDir);
 
-    // Initialiser le fichier .env utilisateur dans userData à partir du template .env.example si absent
+    // Initialiser le fichier .env utilisateur dans userData à partir du template .env.example si absent.
+    // Si le fichier existe déjà, on s'assure que les clés présentes dans .env.example
+    // mais absentes du fichier utilisateur sont ajoutées (migration forward-only).
     const destEnv = path.join(configDir, '.env');
     const exampleEnv = path.join(app.getAppPath(), '.env.example');
     if (!fs.existsSync(destEnv) && fs.existsSync(exampleEnv)) {
@@ -49,6 +51,30 @@ function startBackendServer() {
         log('Initialized user .env from .env.example in userData');
       } catch (e) {
         log('Failed to initialize .env from .env.example:', e.message);
+      }
+    } else if (fs.existsSync(destEnv) && fs.existsSync(exampleEnv)) {
+      // Migration : ajouter les clés manquantes sans écraser les valeurs existantes
+      try {
+        const existing = fs.readFileSync(destEnv, 'utf-8');
+        const example = fs.readFileSync(exampleEnv, 'utf-8');
+        // Extraire les noms de clés déjà présents dans le fichier utilisateur
+        const existingKeys = new Set(
+          existing.split('\n')
+            .map(l => l.match(/^([A-Z_][A-Z0-9_]*)=/)?.[1])
+            .filter(Boolean)
+        );
+        // Collecter les lignes de .env.example dont la clé est absente
+        const linesToAdd = example.split('\n').filter(line => {
+          const key = line.match(/^([A-Z_][A-Z0-9_]*)=/)?.[1];
+          return key && !existingKeys.has(key);
+        });
+        if (linesToAdd.length > 0) {
+          const appendContent = '\n# --- Added by auto-migration ---\n' + linesToAdd.join('\n') + '\n';
+          fs.appendFileSync(destEnv, appendContent, 'utf-8');
+          log('Migrated', linesToAdd.length, 'missing keys into user .env');
+        }
+      } catch (e) {
+        log('Failed to migrate user .env:', e.message);
       }
     }
 
