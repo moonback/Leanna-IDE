@@ -1,6 +1,24 @@
 # Feuille de route (Roadmap)
 
-La présente feuille de route est établie sur la base de l'analyse réelle du code source du projet **Leanna** (version 0.6.0).
+Cette feuille de route est le plan de référence produit et technique de **Leanna**. Elle est volontairement organisée par résultats vérifiables plutôt que par accumulation de fonctionnalités.
+
+## État de référence — 2 septembre 2026
+
+* **Produit** : IDE desktop/web IA multimodal avec Monaco, terminal, sandbox, multi-workspace, GitHub, FTP/FTPS, agents, marketplace, notebooks/RAG et indexation AST.
+* **Code annoncé** : `package.json` indique `0.8.0`, tandis que `README.md` et certaines sections de cette roadmap annoncent `0.9.0`. Cette divergence doit être supprimée avant toute release publique.
+* **Lancement desktop** : `desktop:debug` a échoué récemment. Le diagnostic doit être conservé dans un rapport reproductible avant de considérer le desktop comme stable.
+* **Qualité** : la suite de tests serveur existe, mais aucun workflow `.github/workflows` n'est configuré. Le lint produit actuellement de nombreux avertissements historiques.
+* **Principe de priorité** : fiabilité et sécurité d'abord, expérience développeur ensuite, nouvelles capacités IA après validation des fondations.
+
+### Définition de « prêt »
+
+Une fonctionnalité n'est considérée comme livrée que si elle possède :
+
+1. un parcours utilisateur complet avec états vide, chargement, succès, erreur et annulation ;
+2. une validation serveur, une journalisation d'audit et une permission adaptée à son niveau de risque ;
+3. un test automatisé pertinent et une documentation courte ;
+4. une vérification web et Electron sur Windows, avec un comportement dégradé explicite hors ligne ;
+5. un indicateur de succès mesurable et un plan de retour arrière.
 
 ---
 
