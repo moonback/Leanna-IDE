@@ -251,22 +251,34 @@ export class McpClient extends EventEmitter {
     
     const mergedEnv = { ...process.env, ...env };
 
-    // shell:true est nécessaire uniquement sur Windows pour les .cmd/.bat
-    // Pour les commandes comme uvx/npx qui peuvent être des wrappers Python/Node
+    // Node.js 21+ déconseille de mélanger shell:true avec args[]
+    // Node.js 20+ gère automatiquement les .cmd/.bat sur Windows
+    // Il suffit de passer le nom sans extension ; Node résoudra npx.cmd, uvx.cmd etc. via PATH.
     const isWin = process.platform === 'win32';
-    const needsShell = isWin && (
-      resolvedCommand.endsWith('.cmd') || 
-      resolvedCommand.endsWith('.bat') ||
-      resolvedCommand === 'npx' ||
-      resolvedCommand === 'uvx'
-    );
 
-    this.process = spawn(resolvedCommand, args, {
+    // Sur Windows, si la commande est un wrapper connu livré en .cmd, on spécifie
+    // l'extension explicitement pour que CreateProcess le trouve sans shell.
+    // On ne couvre que les commandes sans extension et sans chemin absolu/relatif.
+    const CMD_WRAPPERS = ['npx', 'uvx', 'npm', 'node', 'yarn', 'pnpm'];
+    let finalCommand = resolvedCommand;
+    if (
+      isWin &&
+      !resolvedCommand.includes('/') &&
+      !resolvedCommand.includes('\\') &&
+      !resolvedCommand.includes('.') &&
+      CMD_WRAPPERS.includes(resolvedCommand)
+    ) {
+      finalCommand = resolvedCommand + '.cmd';
+    }
+
+    const spawnOptions: import('child_process').SpawnOptions = {
       env: mergedEnv,
       stdio: ['pipe', 'pipe', 'pipe'],
-      shell: needsShell, // Shell uniquement si nécessaire pour Windows .cmd
       windowsHide: true,
-    });
+      shell: false, // shell:true avec args[] génère DEP0190 sur Node.js 21+
+    };
+
+    this.process = spawn(finalCommand, args, spawnOptions);
 
     if (!this.process.stdout || !this.process.stdin) {
       throw new Error('Impossible de créer les pipes stdio');

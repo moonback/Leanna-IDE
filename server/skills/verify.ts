@@ -511,13 +511,13 @@ async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = 
   const npxBin = isWin ? "npx.cmd" : "npx";
   const npmBin = isWin ? "npm.cmd" : "npm";
 
-  // shell:true n'est nécessaire que sur Windows pour .cmd/.bat
-  // Les arguments sont dans un tableau, donc Node les échappe correctement
+  // Sur Node.js 20+, execFile trouve automatiquement les .cmd sur Windows
+  // sans avoir besoin de shell:true (qui génère un avertissement de dépréciation)
   const opts = {
     cwd: root,
     timeout: TIMEOUT_MS,
     maxBuffer: 2 * 1024 * 1024,
-    shell: isWin, // Shell uniquement sur Windows pour les .cmd
+    // Pas de shell: true - Node.js 20+ gère .cmd directement
     env: { ...process.env },
   };
 

@@ -422,9 +422,10 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
 
     let child: import('child_process').ChildProcess;
     try {
-      child = spawn(fwConfig.bin, args, {
+      // Node.js 20+ gère automatiquement les .cmd sur Windows
+      // Il suffit de spécifier l'extension dans le nom de la commande
+      const spawnOptions: import('child_process').SpawnOptions = {
         cwd: parentDir,
-        shell: isWin,
         env: {
           ...process.env,
           CI: 'true',
@@ -432,7 +433,16 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
           FORCE_COLOR: '0',
           NO_COLOR: '1',
         },
-      });
+        // Pas de shell:true - évite l'avertissement de dépréciation
+      };
+      
+      let command = fwConfig.bin;
+      // Sur Windows, ajouter .cmd si c'est npm/npx et que l'extension n'est pas déjà présente
+      if (isWin && !command.includes('.') && (command === 'npm' || command === 'npx')) {
+        command += '.cmd';
+      }
+      
+      child = spawn(command, args, spawnOptions);
     } catch (spawnErr: any) {
       sendLog(`❌ Impossible de lancer ${fwConfig.bin}: ${spawnErr.message}`, 'error');
       sendEvent('error', { error: spawnErr.message });
@@ -617,8 +627,10 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
 
     let child: import('child_process').ChildProcess;
     try {
+      // git est un binaire natif, pas besoin de shell même sur Windows
+      // Node.js 21+ émet un avertissement si on combine shell:true avec args[]
       child = spawn('git', ['clone', '--progress', repoUrl, clonePath], {
-        shell: isWin,
+        shell: false, // Pas besoin de shell pour git
         env: { ...process.env },
       });
     } catch (spawnErr: any) {

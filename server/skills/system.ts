@@ -98,28 +98,12 @@ function spawnDetached(npmBin: string, args: string[], cwd: string): { pid: numb
         cwd,
         detached: true,
         stdio: "ignore",
-        shell: needsShellWrapper(npmBin),
+        shell: false, // Node.js 20+ gère .cmd directement, shell:true génère DEP0190
         env: { ...process.env },
         windowsHide: false,
     });
     child.unref(); // Ne pas bloquer le process Node parent
     return { pid: child.pid };
-}
-
-/**
- * BUGFIX (spawn EINVAL sur Windows) : npm.cmd / npx.cmd sont des scripts batch,
- * pas des exécutables natifs. CreateProcess ne peut pas les lancer directement,
- * et depuis le correctif Node pour CVE-2024-27980 (Node ≥ 18.20.2 / 20.12.2 /
- * 21.7.3), spawn/execFile en shell:false refuse désormais de le faire et lève
- * EINVAL au lieu de risquer l'injection de commande.
- *
- * On active shell:true uniquement pour ces binaires .cmd sur Windows — avec un
- * tableau d'arguments, Node échappe alors correctement chaque argument pour
- * cmd.exe, donc pas de régression côté injection (contrairement à une
- * concaténation manuelle en string, qui elle serait vulnérable).
- */
-function needsShellWrapper(bin: string): boolean {
-    return os.platform() === "win32" && /\.cmd$/i.test(bin);
 }
 
 /**
@@ -191,13 +175,11 @@ function splitCommandLine(cmd: string): string[] {
 // commande arbitraire. On bloque désormais tout caractère de contrôle et les
 // métacaractères shell usuels (guillemets, glob, sous-shell, chemin parent).
 //
-// NOTE (revue) : la plupart des exécutions passent par execFile(..., { shell: true }),
-// donc l'essentiel de ces caractères n'est pas interprété par un shell — sauf
-// pour npm.cmd/npx.cmd sur Windows (voir needsShellWrapper), où shell:true est
-// utilisé avec un tableau d'arguments correctement échappé par Node. Ce filtre
-// reste une défense en profondeur. Le caractère '@' a été retiré du blocklist :
-// nécessaire pour les paquets scopés (ex: "@types/node") et le pin de version
-// (ex: "lodash@4.17.21"), sans risque réel ici.
+// NOTE : toutes les exécutions passent par execFile(..., { shell: false }) —
+// les arguments ne sont jamais interprétés par un shell. Ce filtre reste une
+// défense en profondeur pour éviter les caractères inattendus. Le caractère
+// '@' a été retiré du blocklist : nécessaire pour les paquets scopés
+// (ex: "@types/node") et le pin de version (ex: "lodash@4.17.21").
 function isSafeShellCommand(command: string): boolean {
     if (/[\x00-\x1f\x7f]/.test(command)) return false; // \n \r \t et autres contrôles
     return !/[;&|`$<>(){}[\]"'*?~!\\^%,]/.test(command) && !command.includes("..");
@@ -275,7 +257,7 @@ async function runNpmSubcommand(
             cwd,
             timeout: timeoutMs,
             maxBuffer: MAX_BUFFER,
-            shell: needsShellWrapper(npmBin),
+            shell: false, // Node.js 20+ gère .cmd directement, shell:true génère DEP0190
             env: { ...process.env },
         });
         return {
@@ -422,7 +404,7 @@ export const systemSkill: Skill = {
                             cwd: cwdPath,
                             timeout: RUN_TIMEOUT_MS,
                             maxBuffer: MAX_BUFFER,
-                            shell: needsShellWrapper(bin),
+                            shell: false, // Node.js 20+ gère .cmd directement, shell:true génère DEP0190
                             env: { ...process.env },
                         });
                         return {

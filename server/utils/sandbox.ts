@@ -613,14 +613,15 @@ export async function validateSandbox(): Promise<SandboxValidationResult> {
     // Lancer tsc depuis la racine du projet principal avec un tsconfig projetant
     // sur le sandbox. Cela garantit que l'on utilise toujours les node_modules du
     // projet principal (pas ceux potentiellement présents dans le sandbox) et
-    // donc les mêmes versions de typescript/types que le projet racine.
+    // Sur Node.js 20+, execFile trouve automatiquement npx.cmd sur Windows
+    // sans avoir besoin de shell:true (qui génère un avertissement de dépréciation)
     const isWin = process.platform === "win32";
     const npxBin = isWin ? "npx.cmd" : "npx";
     const result = await execFileAsync(npxBin, ["tsc", "--noEmit", "--project", sandboxBase], {
       cwd: SELF_ROOT,
       timeout: 120_000,
       maxBuffer: 10 * 1024 * 1024,
-      shell: isWin, // Shell uniquement sur Windows pour npx.cmd
+      // Pas de shell: true - Node.js 20+ gère .cmd directement
     });
     stdout = result.stdout || "";
     stderr = result.stderr || "";

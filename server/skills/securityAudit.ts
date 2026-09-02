@@ -135,7 +135,7 @@ async function runNpmAudit(root: string, mode: "offline" | "online") {
   const { stdout } = await execFileAsync(
     process.platform === "win32" ? "npm.cmd" : "npm",
     npmArgs,
-    { cwd: root, timeout: AUDIT_TIMEOUT_MS, windowsHide: true, maxBuffer: 2_000_000 },
+    { cwd: root, timeout: AUDIT_TIMEOUT_MS, windowsHide: true, maxBuffer: 2_000_000, shell: false },
   );
   return parseNpmAuditOutput(stdout);
 }

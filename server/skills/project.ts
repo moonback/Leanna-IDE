@@ -168,9 +168,8 @@ export const projectSkill: Skill = {
           );
 
           // Exécuter le scaffolding
-          // Note: shell:true est nécessaire uniquement sur Windows pour les .cmd/.bat
-          // Sur Unix, execFile peut exécuter directement les binaires
-          const needsShell = process.platform === 'win32' && (bin === 'npm' || bin === 'npx');
+          // Sur Node.js 20+, execFile trouve automatiquement les .cmd sur Windows
+          // sans avoir besoin de shell:true (qui génère un avertissement de dépréciation)
           
           let stdout = "";
           let stderr = "";
@@ -179,7 +178,7 @@ export const projectSkill: Skill = {
               cwd: parentDir,
               timeout: SCAFFOLD_TIMEOUT_MS,
               maxBuffer: MAX_BUFFER,
-              shell: needsShell, // Shell uniquement si nécessaire pour Windows .cmd
+              // Pas de shell: true - Node.js 20+ gère .cmd directement
               env: {
                 ...process.env,
                 // Forcer le mode non-interactif pour les outils CLI

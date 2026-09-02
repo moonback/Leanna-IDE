@@ -41,7 +41,8 @@ export async function listCheckpoints(_count = 10): Promise<Array<{ hash: string
  * Retourne { valid: true } ou { valid: false, errors: string }.
  */
 export async function validateBuild(): Promise<{ valid: boolean; errors?: string }> {
-  // shell:true nécessaire uniquement sur Windows pour npx.cmd
+  // Sur Node.js 20+, execFile trouve automatiquement npx.cmd sur Windows
+  // sans avoir besoin de shell:true (qui génère un avertissement de dépréciation)
   const isWin = process.platform === 'win32';
   const npxBin = isWin ? 'npx.cmd' : 'npx';
   
@@ -50,7 +51,7 @@ export async function validateBuild(): Promise<{ valid: boolean; errors?: string
       cwd: SELF_ROOT,
       timeout: 60_000,
       maxBuffer: MAX_BUFFER,
-      shell: isWin, // Shell uniquement sur Windows pour les .cmd
+      // Pas de shell: true - Node.js 20+ gère .cmd directement
       env: { ...process.env },
     });
     return { valid: true };
