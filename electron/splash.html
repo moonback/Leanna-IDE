@@ -4,345 +4,102 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Leanna — Démarrage</title>
-  <style>
-    :root {
-      --bg-surface: rgba(12, 14, 24, 0.94);
-      --border-glow: rgba(0, 194, 255, 0.25);
-      --accent-cyan: #00c2ff;
-      --accent-purple: #9d4edd;
-      --accent-emerald: #10b981;
-      --text-main: #f8fafc;
-      --text-dim: #94a3b8;
-      --card-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.85);
-      --track-bg: rgba(255, 255, 255, 0.07);
-    }
-
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg-surface: rgba(248, 250, 252, 0.96);
-        --border-glow: rgba(0, 194, 255, 0.35);
-        --text-main: #0f172a;
-        --text-dim: #475569;
-        --card-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.15);
-        --track-bg: rgba(0, 0, 0, 0.08);
-      }
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      user-select: none;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: transparent;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .splash-card {
-      width: 640px;
-      height: 380px;
-      background: var(--bg-surface);
-      backdrop-filter: blur(28px);
-      -webkit-backdrop-filter: blur(28px);
-      border-radius: 28px;
-      border: 1px solid var(--border-glow);
-      box-shadow: 
-        var(--card-shadow),
-        0 0 45px 0 rgba(0, 194, 255, 0.18),
-        inset 0 1px 1px 0 rgba(255, 255, 255, 0.15);
-      padding: 36px 42px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      position: relative;
-      overflow: hidden;
-      animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-
-    /* Ambient Background Glow */
-    .ambient-glow {
-      position: absolute;
-      top: -120px;
-      right: -120px;
-      width: 320px;
-      height: 320px;
-      background: radial-gradient(circle, rgba(0, 194, 255, 0.22) 0%, rgba(157, 78, 221, 0.12) 50%, transparent 70%);
-      pointer-events: none;
-      filter: blur(40px);
-    }
-    .ambient-glow-bottom {
-      position: absolute;
-      bottom: -100px;
-      left: -100px;
-      width: 280px;
-      height: 280px;
-      background: radial-gradient(circle, rgba(157, 78, 221, 0.2) 0%, rgba(0, 194, 255, 0.08) 50%, transparent 70%);
-      pointer-events: none;
-      filter: blur(40px);
-    }
-
-    /* Header Section with Official Brand Logo */
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      z-index: 10;
-    }
-
-    .logo-container {
-      position: relative;
-      width: 72px;
-      height: 72px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .app-logo-img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      border-radius: 18px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-      animation: floatLogo 4s ease-in-out infinite alternate;
-      z-index: 2;
-    }
-
-    .logo-glow {
-      position: absolute;
-      inset: -4px;
-      border-radius: 22px;
-      background: linear-gradient(135deg, rgba(0, 194, 255, 0.5) 0%, rgba(249, 115, 22, 0.4) 100%);
-      filter: blur(12px);
-      opacity: 0.75;
-      animation: pulseGlow 3s ease-in-out infinite alternate;
-      z-index: 1;
-    }
-
-    .title-group {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .title-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .app-name {
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      background: linear-gradient(135deg, #ffffff 30%, #a5f3fc 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    @media (prefers-color-scheme: light) {
-      .app-name {
-        background: linear-gradient(135deg, #0f172a 30%, #0284c7 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-    }
-
-    .badge-version {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 9px;
-      border-radius: 20px;
-      background: rgba(0, 194, 255, 0.12);
-      border: 1px solid rgba(0, 194, 255, 0.3);
-      color: #38bdf8;
-      letter-spacing: 0.3px;
-    }
-
-    .app-tagline {
-      font-size: 13px;
-      color: var(--text-dim);
-      font-weight: 400;
-    }
-
-    /* Progress & Status Section */
-    .progress-section {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      z-index: 10;
-    }
-
-    .status-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 13px;
-    }
-
-    .status-text {
-      color: var(--text-main);
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      min-height: 20px;
-    }
-
-    .status-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--accent-cyan);
-      box-shadow: 0 0 10px var(--accent-cyan);
-      animation: blink 1.2s ease-in-out infinite;
-    }
-
-    .percent-text {
-      font-family: "SF Mono", Consolas, Monaco, monospace;
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--accent-cyan);
-      letter-spacing: 0.5px;
-    }
-
-    /* Progress Track */
-    .progress-track {
-      width: 100%;
-      height: 8px;
-      background: var(--track-bg);
-      border-radius: 12px;
-      overflow: hidden;
-      position: relative;
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .progress-bar {
-      height: 100%;
-      width: 0%;
-      border-radius: 12px;
-      background: linear-gradient(90deg, #00c2ff 0%, #7928ca 50%, #f97316 100%);
-      background-size: 200% 100%;
-      box-shadow: 0 0 16px rgba(0, 194, 255, 0.6);
-      transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      animation: gradientShift 3s ease infinite;
-      position: relative;
-    }
-
-    .progress-bar::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
-      animation: shimmer 1.6s infinite;
-    }
-
-    /* Footer Telemetry Tags */
-    .footer-tags {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      padding-top: 16px;
-      z-index: 10;
-    }
-
-    .tag-list {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .tag-item {
-      font-size: 11px;
-      color: var(--text-dim);
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-weight: 500;
-    }
-
-    .tag-item span.indicator {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.3);
-    }
-    .tag-item.active span.indicator {
-      background: var(--accent-emerald);
-      box-shadow: 0 0 6px var(--accent-emerald);
-    }
-
-    .security-badge {
-      font-size: 11px;
-      color: var(--text-dim);
-      opacity: 0.6;
-      font-family: "SF Mono", Consolas, Monaco, monospace;
-    }
-
-    /* Keyframes */
-    @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.97); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    @keyframes floatLogo {
-      0% { transform: translateY(0px) rotate(0deg); }
-      100% { transform: translateY(-4px) rotate(-1deg); }
-    }
-    @keyframes pulseGlow {
-      0% { opacity: 0.5; filter: blur(8px); }
-      100% { opacity: 0.9; filter: blur(14px); }
-    }
-    @keyframes blink {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
-    }
-    @keyframes gradientShift {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-    @keyframes shimmer {
-      0% { transform: translateX(-100%); }
-      100% { transform: translateX(100%); }
-    }
-  </style>
+  <link rel="stylesheet" href="splash.css" />
 </head>
 <body>
-  <div class="splash-card">
-    <div class="ambient-glow"></div>
-    <div class="ambient-glow-bottom"></div>
 
-    <!-- Header with Official Brand Logo (Light / Sombre) -->
+  <!-- Animated grid background -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Ambient orbs -->
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="splash-card">
+
+    <!-- ── Header ── -->
     <div class="header">
-      <div class="logo-container">
-        <div class="logo-glow"></div>
-        <img id="appLogo" src="../assets/images/icon-sombre.png" alt="Logo Leanna" class="app-logo-img" />
+      <div class="header-left">
+        <div class="logo-container">
+          <div class="logo-glow"></div>
+          <img id="appLogo" src="../assets/images/icon-sombre.png" alt="Logo Leanna" class="app-logo-img" />
+        </div>
+        <div class="title-group">
+          <div class="title-row">
+            <h1 class="app-name">Leanna</h1>
+            <span class="badge-version">v0.7.0</span>
+          </div>
+          <p class="app-tagline">Système d'Exploitation & IDE Augmenté par l'IA</p>
+        </div>
       </div>
 
-      <div class="title-group">
-        <div class="title-row">
-          <h1 class="app-name">Leanna</h1>
-          <span class="badge-version">v0.6.0</span>
+      <div class="header-right">
+        <div class="sys-stat">
+          <span class="sys-stat-label">Environnement</span>
+          <span class="sys-stat-value" id="statEnv">Electron</span>
         </div>
-        <p class="app-tagline">Système d'Exploitation & IDE Augmenté par l'IA</p>
+        <div class="sys-stat">
+          <span class="sys-stat-label">Build</span>
+          <span class="sys-stat-value">Stable</span>
+        </div>
+        <div class="sys-stat">
+          <span class="sys-stat-label">Heure</span>
+          <span class="sys-stat-value" id="statTime">--:--</span>
+        </div>
       </div>
     </div>
 
-    <!-- Real Progress Bar & Status Tracker -->
+    <!-- ── Hero ── -->
+    <div class="hero">
+      <div class="hero-logo-wrap">
+        <div class="hero-logo-rings">
+          <div class="ring"></div>
+          <div class="ring"></div>
+          <div class="ring"></div>
+        </div>
+        <!-- <img id="heroLogo" src="../assets/images/icon-sombre.png" alt="Leanna" class="hero-logo-img" /> -->
+      </div>
+
+      <div class="hero-text">
+        <h2 class="hero-title">Leanna</h2>
+        <p class="hero-sub">
+          L'IDE de nouvelle génération propulsé par une flotte d'agents autonomes.
+          Analyse de code, génération, refactoring — pensé pour les développeurs exigeants.
+        </p>
+      </div>
+
+      <!-- Feature cards -->
+      <!-- <div class="features">
+        <div class="feat-card" style="--card-accent: #00c2ff;">
+          <div class="feat-icon">🤖</div>
+          <div class="feat-name">Agent Fleet</div>
+          <div class="feat-desc">Flotte d'agents IA autonomes orchestrés en temps réel</div>
+        </div>
+        <div class="feat-card" style="--card-accent: #9d4edd;">
+          <div class="feat-icon">🧠</div>
+          <div class="feat-name">Knowledge Graph</div>
+          <div class="feat-desc">Mémoire persistante & base de connaissances vectorielle</div>
+        </div>
+        <div class="feat-card" style="--card-accent: #10b981;">
+          <div class="feat-icon">🌳</div>
+          <div class="feat-name">AST Engine</div>
+          <div class="feat-desc">Analyse syntaxique avancée via Tree-sitter & Call-Graph</div>
+        </div>
+        <div class="feat-card" style="--card-accent: #f97316;">
+          <div class="feat-icon">🔒</div>
+          <div class="feat-name">Self-Root</div>
+          <div class="feat-desc">Architecture sécurisée, exécution locale & souveraine</div>
+        </div>
+        <div class="feat-card" style="--card-accent: #38bdf8;">
+          <div class="feat-icon">⚡</div>
+          <div class="feat-name">Live Server</div>
+          <div class="feat-desc">Backend local instantané avec hot-reload sur :4000</div>
+        </div>
+      </div> -->
+    </div>
+
+    <!-- ── Progress ── -->
     <div class="progress-section">
       <div class="status-row">
         <div class="status-text">
@@ -351,13 +108,12 @@
         </div>
         <span class="percent-text" id="percentLabel">0%</span>
       </div>
-
       <div class="progress-track">
         <div class="progress-bar" id="progressBar"></div>
       </div>
     </div>
 
-    <!-- Footer System Badges -->
+    <!-- ── Footer ── -->
     <div class="footer-tags">
       <div class="tag-list">
         <div class="tag-item active" id="tagKernel">
@@ -377,65 +133,122 @@
           <span>Agent Fleet</span>
         </div>
       </div>
-
-      <div class="security-badge">
-        <span>SELF_ROOT • SECURED</span>
+      <div class="footer-right">
+        <span class="build-info" id="buildDate"></span>
+        <span class="security-badge">SELF_ROOT • SECURED</span>
       </div>
     </div>
+
   </div>
 
   <script>
-    const appLogo = document.getElementById('appLogo');
-    const progressBar = document.getElementById('progressBar');
+    // ── Refs ──────────────────────────────────────────────
+    const appLogo      = document.getElementById('appLogo');
+    const heroLogo     = document.getElementById('heroLogo');
+    const progressBar  = document.getElementById('progressBar');
     const percentLabel = document.getElementById('percentLabel');
-    const statusLabel = document.getElementById('statusLabel');
-    
-    const tagKernel = document.getElementById('tagKernel');
-    const tagServer = document.getElementById('tagServer');
-    const tagAST = document.getElementById('tagAST');
-    const tagAgents = document.getElementById('tagAgents');
+    const statusLabel  = document.getElementById('statusLabel');
+    const tagKernel    = document.getElementById('tagKernel');
+    const tagServer    = document.getElementById('tagServer');
+    const tagAST       = document.getElementById('tagAST');
+    const tagAgents    = document.getElementById('tagAgents');
+    const statTime     = document.getElementById('statTime');
+    const buildDate    = document.getElementById('buildDate');
 
-    // Détection et bascule automatique du logo selon le thème OS
+    // ── Theme ─────────────────────────────────────────────
     function updateLogoTheme() {
-      const isLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-      if (appLogo) {
-        appLogo.src = isLight ? '../assets/images/icon-light.png' : '../assets/images/icon-sombre.png';
-      }
+      const isLight = window.matchMedia?.('(prefers-color-scheme: light)').matches;
+      const icon = isLight ? '../assets/images/icon-light.png'  : '../assets/images/icon-sombre.png';
+      const logo = isLight ? '../assets/images/logo.png'        : '../assets/images/logo-sombre.png';
+      if (appLogo)  appLogo.src  = icon;
+      if (heroLogo) heroLogo.src = logo;
     }
-
-    if (window.matchMedia) {
-      window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', updateLogoTheme);
-    }
+    window.matchMedia?.('(prefers-color-scheme: light)').addEventListener('change', updateLogoTheme);
     updateLogoTheme();
 
-    // Échelons réels d'initialisation
+    // ── Clock ─────────────────────────────────────────────
+    function updateClock() {
+      statTime.textContent = new Date().toLocaleTimeString('fr-FR', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // ── Build date ────────────────────────────────────────
+    buildDate.textContent = 'BUILD ' + new Date().toLocaleDateString('fr-FR', {
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+
+    // ── Animated grid canvas ──────────────────────────────
+    const canvas = document.getElementById('bg-canvas');
+    const ctx    = canvas.getContext('2d');
+    const GRID   = 52;
+    let W, H, cols, rows, dots = [];
+
+    function resizeCanvas() {
+      W = canvas.width  = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+      cols = Math.ceil(W / GRID) + 1;
+      rows = Math.ceil(H / GRID) + 1;
+      dots = [];
+      for (let x = 0; x < cols; x++) {
+        for (let y = 0; y < rows; y++) {
+          dots.push({ x, y, phase: Math.random() * Math.PI * 2, speed: 0.003 + Math.random() * 0.006 });
+        }
+      }
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    let t = 0;
+    function drawGrid() {
+      ctx.clearRect(0, 0, W, H);
+      t += 0.012;
+
+      ctx.strokeStyle = 'rgba(0, 194, 255, 0.04)';
+      ctx.lineWidth   = 1;
+      for (let x = 0; x < cols; x++) {
+        ctx.beginPath(); ctx.moveTo(x * GRID, 0); ctx.lineTo(x * GRID, H); ctx.stroke();
+      }
+      for (let y = 0; y < rows; y++) {
+        ctx.beginPath(); ctx.moveTo(0, y * GRID); ctx.lineTo(W, y * GRID); ctx.stroke();
+      }
+
+      for (const d of dots) {
+        const alpha = (Math.sin(t * d.speed * 120 + d.phase) + 1) / 2 * 0.45;
+        ctx.beginPath();
+        ctx.arc(d.x * GRID, d.y * GRID, 1.2, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0, 194, 255, ${alpha})`;
+        ctx.fill();
+      }
+
+      requestAnimationFrame(drawGrid);
+    }
+    drawGrid();
+
+    // ── Progress logic ────────────────────────────────────
     const STEPS = [
-      { pct: 15, label: "Initialisation de l'environnement sécurisé...", tag: tagKernel },
-      { pct: 35, label: "Démarrage du serveur local (port 4000)...", tag: tagServer },
-      { pct: 58, label: "Vérification des connexions & Knowledge System...", tag: tagServer },
-      { pct: 78, label: "Chargement du moteur AST Tree-sitter & Call-Graph...", tag: tagAST },
-      { pct: 92, label: "Initialisation de la flotte d'agents autonomes...", tag: tagAgents },
-      { pct: 100, label: "Système opérationnel • Lancement de l'IDE...", tag: tagAgents }
+      { pct: 15,  label: "Initialisation de l'environnement sécurisé...",       tag: tagKernel },
+      { pct: 35,  label: "Démarrage du serveur local (port 4000)...",             tag: tagServer },
+      { pct: 58,  label: "Vérification des connexions & Knowledge System...",     tag: tagServer },
+      { pct: 78,  label: "Chargement du moteur AST Tree-sitter & Call-Graph...",  tag: tagAST    },
+      { pct: 92,  label: "Initialisation de la flotte d'agents autonomes...",     tag: tagAgents },
+      { pct: 100, label: "Système opérationnel • Lancement de l'IDE...",          tag: tagAgents },
     ];
 
-    let currentPct = 0;
-    let targetPct = 10;
-    let stepIndex = 0;
-    let serverHealthy = false;
+    let currentPct = 0, targetPct = 10, stepIndex = 0, serverHealthy = false;
 
     function updateProgressUI(pct, text) {
       currentPct = Math.min(100, Math.max(currentPct, pct));
       progressBar.style.width = currentPct + '%';
       percentLabel.textContent = Math.round(currentPct) + '%';
-      if (text) {
-        statusLabel.textContent = text;
-      }
+      if (text) statusLabel.textContent = text;
     }
 
-    // Ping continu du serveur backend pour synchroniser avec l'état réel
     async function checkServerHealth() {
       try {
-        const res = await fetch('http://127.0.0.1:4000/api/health', { method: 'GET' });
+        const res = await fetch('http://127.0.0.1:4000/api/health');
         if (res.ok) {
           const json = await res.json();
           if (json.status === 'ok' || json.status === 'success') {
@@ -443,43 +256,29 @@
             tagServer.classList.add('active');
           }
         }
-      } catch {
-        // En cours de démarrage...
-      }
+      } catch { /* en cours de démarrage */ }
     }
 
-    // Intervalle régulier d'animation de la progression
     const progressTimer = setInterval(() => {
       if (currentPct < targetPct) {
         currentPct += 1.5;
         updateProgressUI(currentPct);
       }
-
-      // Transition progressive des étapes
       if (stepIndex < STEPS.length) {
         const step = STEPS[stepIndex];
         targetPct = step.pct;
         statusLabel.textContent = step.label;
         if (step.tag) step.tag.classList.add('active');
-
-        // Accélération si le serveur a répondu
-        if (serverHealthy && currentPct >= 60 && stepIndex < STEPS.length - 1) {
-          stepIndex++;
-        }
+        if (serverHealthy && currentPct >= 60 && stepIndex < STEPS.length - 1) stepIndex++;
       }
     }, 50);
 
-    // Évolution planifiée des étapes
     const stepInterval = setInterval(() => {
       checkServerHealth();
-      if (stepIndex < STEPS.length - 1) {
-        stepIndex++;
-      } else {
-        clearInterval(stepInterval);
-      }
+      if (stepIndex < STEPS.length - 1) stepIndex++;
+      else clearInterval(stepInterval);
     }, 700);
 
-    // Notification quand l'initialisation est complète
     window.setLoadingProgress = function(pct, text) {
       targetPct = pct;
       updateProgressUI(pct, text);

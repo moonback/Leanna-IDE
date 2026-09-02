@@ -66,13 +66,11 @@ function startBackendServer() {
 
 function createSplashWindow() {
   const splash = new BrowserWindow({
-    width: 680,
-    height: 420,
+    fullscreen: true,
     frame: false,
     transparent: true,
     resizable: false,
-    movable: true,
-    center: true,
+    movable: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     icon: getWindowIcon(),
@@ -240,6 +238,65 @@ app.whenReady().then(() => {
 
   ipcMain.handle('electron/quit', function () {
     app.quit();
+  });
+
+  // ── Git Clone ────────────────────────────────────────────────────────────────
+  // Clone un dépôt GitHub (ou tout dépôt git) dans un dossier local,
+  // puis retourne le chemin du dossier cloné pour activation comme workspace.
+  ipcMain.handle('electron/git-clone', async function (_event, repoUrl, targetDir) {
+    const { execFile } = require('child_process');
+    const { promisify } = require('util');
+    const os = require('os');
+
+    const execFileAsync = promisify(execFile);
+
+    // Sanitize: s'assurer que repoUrl est une string et commence par https://
+    if (typeof repoUrl !== 'string' || !repoUrl.trim()) {
+      return { success: false, error: 'URL de dépôt invalide.' };
+    }
+    const url = repoUrl.trim();
+    if (!/^https?:\/\//i.test(url) && !/^git@/i.test(url)) {
+      return { success: false, error: 'Seules les URLs HTTPS et SSH (git@) sont autorisées.' };
+    }
+
+    // Dériver le nom du dépôt depuis l'URL (ex: https://github.com/user/my-repo.git → my-repo)
+    const repoName = url.split('/').pop()?.replace(/\.git$/i, '').replace(/[^a-zA-Z0-9_\-. ]/g, '_') || 'repo';
+
+    // Dossier de destination : soit fourni par l'utilisateur, soit ~/Documents/Leanna-Projects/<repo>
+    let clonePath;
+    if (targetDir && typeof targetDir === 'string' && targetDir.trim()) {
+      clonePath = path.resolve(targetDir.trim(), repoName);
+    } else {
+      clonePath = path.join(os.homedir(), 'Documents', 'Leanna-Projects', repoName);
+    }
+
+    // S'assurer que le dossier parent existe
+    try {
+      await fs.promises.mkdir(path.dirname(clonePath), { recursive: true });
+    } catch (mkErr) {
+      return { success: false, error: `Impossible de créer le dossier parent: ${mkErr.message}` };
+    }
+
+    // Vérifier que le dossier de destination n'existe pas déjà
+    if (fs.existsSync(clonePath)) {
+      return { success: false, error: `Le dossier de destination existe déjà: ${clonePath}`, clonePath };
+    }
+
+    try {
+      await execFileAsync('git', ['clone', '--progress', url, clonePath], {
+        timeout: 300000, // 5 minutes max
+        windowsHide: true,
+      });
+      log(`[git-clone] Clone réussi: ${url} → ${clonePath}`);
+      return { success: true, path: clonePath, repoName };
+    } catch (err) {
+      // execFile rejette avec l'objet Error qui contient stderr dans err.stderr
+      const errMsg = (err.stderr || err.message || String(err)).trim();
+      log(`[git-clone] Erreur: ${errMsg}`);
+      // Nettoyer le dossier partiellement cloné si présent
+      try { if (fs.existsSync(clonePath)) await fs.promises.rm(clonePath, { recursive: true, force: true }); } catch (_) {}
+      return { success: false, error: errMsg };
+    }
   });
 
   ipcMain.handle('electron/get-screen-sources', async function () {

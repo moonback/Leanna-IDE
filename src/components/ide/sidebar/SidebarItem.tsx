@@ -44,14 +44,14 @@ export function SidebarItem({ icon: Icon, active, onClick, title, dot, hasSubmen
       onMouseLeave={() => setHovered(false)}
     >
       {/* Active indicator bar — calm left edge */}
-      {active && (
+      {/* {active && (
         <motion.div
           layoutId="sidebar-indicator"
           className="absolute left-0 rounded-r-full"
           style={{ width: '3px', height: '24px', backgroundColor: 'var(--accent-primary)' }}
           transition={{ type: 'spring', stiffness: 500, damping: 34 }}
         />
-      )}
+      )} */}
 
       {/* Hover background glow */}
       <AnimatePresence>

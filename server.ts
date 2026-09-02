@@ -114,6 +114,8 @@ process.on('uncaughtException', (error) => {
   setTimeout(() => process.exit(1), 1000);
 });
 
+import { setKnowledgeBroadcaster, broadcastKnowledgeProgress } from "./server/utils/knowledgeBroadcaster.js";
+
 // ─── Séquence de démarrage async ──────────────────────────────────────────────
 // IMPORTANT: loadWorkflows() DOIT être awaité avant ensureAuditWorkflow().
 // Sans await, listWorkflows() retourne [] et ensureAuditWorkflow() crée un
@@ -149,7 +151,14 @@ process.on('uncaughtException', (error) => {
 
     // 5. Indexation du Knowledge Graph — seulement si un projet est actif
     if (hasProject()) {
-      projectIndexer.scanAll().then((stats: any) => {
+      projectIndexer.scanAll({
+        onProgress: (p) => broadcastKnowledgeProgress(p.phase, p.current, p.total, { file: p.file }),
+      }).then((stats: any) => {
+        broadcastKnowledgeProgress('done', stats.totalFiles, stats.totalFiles, {
+          totalEntities: stats.totalEntities,
+          durationMs: stats.durationMs,
+          cached: stats.cached ?? false,
+        });
         if (stats.cached) {
           console.log(`[KnowledgeGraph] ⚡ Projet inchangé: ${stats.totalFiles} fichiers, ${stats.totalEntities} entités (chargé depuis le cache en ${stats.durationMs}ms)`);
         } else {
@@ -458,12 +467,9 @@ async function startServer() {
   app.use("/api/automation", automationRouter);
   app.use("/api/workflows", workflowsRouter);
   app.use("/api/custom-skills", createCustomSkillsRouter(skillManager));
-  // Git désactivé — toutes les routes retournent 404
-  // app.use("/api/git", createGitRouter(skillManager, () => currentProfile));
-  app.use("/api/git", (_req, res) => {
-    res.status(404).json({ status: "disabled", error: "Git est entièrement désactivé." });
-  });
-  app.use("/api/github", createGithubRouter(skillManager));
+  const githubRouter = createGithubRouter(skillManager);
+  app.use("/api/git", githubRouter);
+  app.use("/api/github", githubRouter);
   app.use("/api/agents", createAgentsRouter(skillManager));
 
   // ─── Routes Runtime V2 (nouveau système, coexistence) ────────────────────
@@ -505,6 +511,10 @@ async function startServer() {
   app.use("/api/agent-builder", createAgentBuilderRouter());
   app.use("/api/agent-registration", createAgentRegistrationRouter());
   app.use("/api/custom-agents", createCustomAgentsRouter());
+
+  // ── Marketplace d'agents et de skills ────────────────────────────────────
+  const { createMarketplaceRouter } = await import("./server/routes/marketplace.js");
+  app.use("/api/marketplace", createMarketplaceRouter());
   app.use("/api/gemini-keys", createGeminiKeysRouter());
   app.use("/api/sandbox", createSandboxRouter());
   app.use("/api/checkpoint", createCheckpointRouter());
@@ -640,6 +650,16 @@ async function startServer() {
 
   // WebSocket server for Live API
   const wss = new WebSocketServer({ noServer: true });
+
+  // Register knowledge progress broadcaster so the startup IIFE and routes can send scan events
+  setKnowledgeBroadcaster((msg: object) => {
+    const payload = JSON.stringify(msg);
+    for (const client of wss.clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        try { client.send(payload); } catch { /* ignore */ }
+      }
+    }
+  });
 
   // WebSocket server for Sandbox file watching (real-time)
   const sandboxWss = new WebSocketServer({ noServer: true });

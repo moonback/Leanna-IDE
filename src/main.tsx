@@ -175,12 +175,14 @@ try {
         ...(_token ? { 'x-Leanna-token': _token } : {}),
       },
       body: JSON.stringify({
-        aiName:        p.aiName        || 'Leanna',
-        aiVoice:       p.aiVoice       || 'Aoede',
-        userName:      p.userName      || '',
-        userRole:      p.userRole      || '',
-        language:      p.language      || 'fr',
-        responseStyle: p.responseStyle || 'balanced',
+        aiName:               p.aiName               || 'Leanna',
+        aiVoice:              p.aiVoice              || 'Aoede',
+        userName:             p.userName             || '',
+        userRole:             p.userRole             || '',
+        language:             p.language             || 'fr',
+        responseStyle:        p.responseStyle        || 'balanced',
+        reasoningEnabled:     p.reasoningEnabled     ?? true,
+        reasoningVoiceEnabled: p.reasoningVoiceEnabled ?? true,
       }),
     }).catch(() => { /* server may not be up yet — silently ignore */ });
   }
@@ -491,6 +493,20 @@ function AnimatedRoutes() {
 function Layout() {
   const liveAPI = useLiveAPI();
   const { profile } = useProfile();
+
+  // Reconnect the live session when settings that affect tool declarations are saved
+  // (e.g. reasoningEnabled, agents). The session is rebuilt with fresh tool declarations.
+  useEffect(() => {
+    const handleSettingsSaved = () => {
+      if (liveAPI.connected) {
+        liveAPI.disconnect();
+        // Small delay to let the WS close cleanly before reopening
+        setTimeout(() => liveAPI.connect([], 'full'), 300);
+      }
+    };
+    window.addEventListener('Leanna-settings-saved', handleSettingsSaved);
+    return () => window.removeEventListener('Leanna-settings-saved', handleSettingsSaved);
+  }, [liveAPI.connected, liveAPI.disconnect, liveAPI.connect]);
 
   const handleScreenShareChange = useCallback((active: boolean) => {
     // Notify AI about screen share state changes

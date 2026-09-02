@@ -1,7 +1,9 @@
 {
   "name": "Leanna",
-  "private": true,
-  "version": "0.6.0",
+  "private": false,
+  "version": "0.7.0",
+  "license": "BUSL 1.1",
+  "author": "Maysson",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {

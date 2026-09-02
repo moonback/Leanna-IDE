@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, memo } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 import {
   LoaderCircle,
@@ -12,6 +12,7 @@ import {
   Users,
   Radio,
   ScrollText,
+  DatabaseZap,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
@@ -173,12 +174,124 @@ export const StatusBar = memo(function StatusBar({
     }
   }, [showResetConfirm]);
 
+  // ── Indexing progress ─────────────────────────────────────────────────────
+
+  const [indexing, setIndexing] = useState<{
+    active: boolean;
+    phase: string;
+    current: number;
+    total: number;
+    file?: string;
+  }>({ active: false, phase: '', current: 0, total: 0 });
+
+  // Auto-dismiss 2s after phase=done
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail as {
+        phase: string;
+        current: number;
+        total: number;
+        file?: string;
+      };
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+
+      if (d.phase === 'done') {
+        setIndexing(prev => ({ ...prev, active: true, phase: 'done', current: d.current ?? prev.current, total: d.total ?? prev.total }));
+        dismissTimerRef.current = setTimeout(() => {
+          setIndexing(prev => ({ ...prev, active: false }));
+          dismissTimerRef.current = null;
+        }, 2000);
+      } else {
+        setIndexing({ active: true, phase: d.phase, current: d.current, total: d.total, file: d.file });
+      }
+    };
+    window.addEventListener('Leanna-knowledge-progress', handler);
+    return () => {
+      window.removeEventListener('Leanna-knowledge-progress', handler);
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    };
+  }, []);
+
+  // ── Manual reindex ────────────────────────────────────────────────────────
+
+  const [reindexing, setReindexing] = useState(false);
+
+  const handleReindex = useCallback(async () => {
+    if (reindexing || indexing.active) return;
+    setReindexing(true);
+    try {
+      const token = localStorage.getItem('Leanna_api_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'x-Leanna-token': token } : {}),
+      };
+      await fetch('/api/knowledge/reindex', { method: 'POST', headers });
+    } catch { /* silent — progress bar will not appear, that's fine */ }
+    finally {
+      setReindexing(false);
+    }
+  }, [reindexing, indexing.active]);
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   const { suggestion } = promptContext;
 
   return (
     <>
+      {/* ─── Knowledge Indexing Progress Bar ──────────────────────────────── */}
+      <AnimatePresence>
+        {indexing.active && (
+          <motion.div
+            key="indexing-bar"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+            style={{ backgroundColor: 'var(--bg-secondary)', borderTop: '1px solid var(--border-base)' }}
+          >
+            {/* Progress track */}
+            <div className="h-0.5 w-full" style={{ backgroundColor: 'var(--bg-hover)' }}>
+              <motion.div
+                className="h-full"
+                style={{ backgroundColor: 'var(--accent-primary)', originX: 0 }}
+                animate={{
+                  width: indexing.phase === 'done' || indexing.total === 0
+                    ? '100%'
+                    : `${Math.max(2, Math.round((indexing.current / indexing.total) * 100))}%`,
+                }}
+                transition={{ type: 'spring', stiffness: 80, damping: 18 }}
+              />
+            </div>
+            {/* Label row */}
+            <div className="flex items-center gap-2 px-4 py-0.5 text-xs select-none" style={{ color: 'var(--text-muted)' }}>
+              {indexing.phase !== 'done' && (
+                <LoaderCircle size={10} className="animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+              )}
+              <span className="font-medium" style={{ color: 'var(--accent-primary)' }}>
+                {indexing.phase === 'done'
+                  ? `✓ Indexation terminée (${indexing.total} fichiers)`
+                  : indexing.phase === 'relations'
+                  ? 'Extraction des relations…'
+                  : indexing.phase === 'incremental'
+                  ? `Mise à jour incrémentale — ${indexing.current} / ${indexing.total}`
+                  : `Indexation — ${indexing.current} / ${indexing.total}`}
+              </span>
+              {indexing.phase === 'parse' && indexing.file && (
+                <span className="truncate opacity-60 max-w-[300px]">{indexing.file}</span>
+              )}
+              {indexing.phase !== 'done' && indexing.total > 0 && (
+                <span className="ml-auto tabular-nums opacity-70">
+                  {Math.round((indexing.current / indexing.total) * 100)}%
+                </span>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div
         className="group/bar flex items-center gap-3 px-4 h-8 border-t select-none text-sm"
         style={{
@@ -276,6 +389,25 @@ export const StatusBar = memo(function StatusBar({
           >
             <ScrollText size={12} style={{ color: 'var(--accent-secondary)' }} />
             <span style={{ color: 'var(--text-muted)' }} className="font-medium">Logs</span>
+          </button>
+
+          {/* Séparateur */}
+          <div className="w-px h-4" style={{ backgroundColor: 'var(--border-base)', opacity: 0.4 }} />
+
+          {/* Reindex — déclenche un scan complet du KnowledgeGraph */}
+          <button
+            type="button"
+            onClick={handleReindex}
+            disabled={reindexing || indexing.active}
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Réindexer le projet, les documents et les documents extraits"
+            aria-label="Réindexer le projet, les documents et les documents extraits"
+          >
+            {reindexing || (indexing.active && indexing.phase !== 'done')
+              ? <LoaderCircle size={12} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
+              : <DatabaseZap size={12} style={{ color: 'var(--accent-primary)' }} />
+            }
+            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Index + Docs Extraits</span>
           </button>
         </div>
 

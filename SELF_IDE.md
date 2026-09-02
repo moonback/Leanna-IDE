@@ -15,6 +15,7 @@ Cette contrainte est **structurelle**, pas cosmétique :
 - Tous les accès filesystem passent par une validation de chemin centralisée et un suivi anti-symlink escape.
 - Les fichiers critiques nécessitent une confirmation explicite avant modification.
 - Chaque écriture crée un checkpoint git automatique (rollback trivial).
+- Les documents PDF du workspace sont lus et indexés dans le périmètre autorisé, puis rendus dans l’IDE pour lecture et analyse documentaire.
 
 ---
 
@@ -138,9 +139,9 @@ scheduleValidation();
 
 ---
 
-## 5. Moteur AST Tree-sitter & Call-Graph
+## 5. Moteur AST Tree-sitter, Call-Graph & Documents PDF
 
-Leanna analyse le codebase en profondeur grâce au moteur **Tree-sitter WASM** (`server/knowledge/ASTParser.ts`) et au graphe d'appels bidirectionnel (`server/knowledge/ASTCallGraph.ts`).
+Leanna analyse le codebase en profondeur grâce au moteur **Tree-sitter WASM** (`server/knowledge/ASTParser.ts`) et au graphe d'appels bidirectionnel (`server/knowledge/ASTCallGraph.ts`). En complément, le système inclut un mécanisme d'extraction documentaire pour les PDF du workspace, avec lecture du texte via `pdf-parse`, indexation dans le `DocumentStore` et ouverture dans l’IDE.
 
 ### Outils disponibles pour l'assistant :
 

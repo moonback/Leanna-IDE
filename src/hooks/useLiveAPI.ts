@@ -243,6 +243,9 @@ export function useLiveAPI() {
     if (msg.type === 'build-status') {
       window.dispatchEvent(new CustomEvent('Leanna-build-status', { detail: msg }));
     }
+    if (msg.type === 'knowledge_progress') {
+      window.dispatchEvent(new CustomEvent('Leanna-knowledge-progress', { detail: msg }));
+    }
     if (msg.type === 'mission_event') {
       const emoji = msg.event === 'mission_started' ? '🎯'
         : msg.event === 'mission_completed' ? '🏆'

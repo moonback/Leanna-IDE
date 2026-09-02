@@ -23,6 +23,7 @@ flowchart TB
             IDERouter["/api/ide<br/>(Filesystem / Search)"]
             SandboxRouter["/api/sandbox<br/>(Isolation / Diffs)"]
             AgentsRouter["/api/agents & /api/custom-agents<br/>(Orchestration / Fleet / Builder)"]
+            MarketplaceRouter["/api/marketplace<br/>(Registre / Install / Publish / Rate)"]
             MCPRouter["/api/mcp<br/>(Stdio & SSE Tool Bridge)"]
             NotebooksRouter["/api/notebooks<br/>(RAG / Sources)"]
             OtherRouters["/api/workflows, /api/tts, /api/profile..."]
@@ -77,10 +78,11 @@ flowchart TB
 
 Leanna fonctionne selon les principes architecturaux suivants :
 
-1. **Mode Multi-Workspace & Périmètre Self-Root** : L'IDE gère dynamiquement plusieurs dépôts externes tout en confinant rigoureusement toutes les compétences IA, explorateurs et opérations au projet actif (`SELF_ROOT`). Les dépôts sont persistés dans `.Leanna/workspaces.json` et les chemins candidats sont pré-validés (rejet des racines disques et dossiers système).
+1. **Mode Multi-Workspace & Périmètre Self-Root** : L'IDE gère dynamiquement plusieurs dépôts externes tout en confinant rigoureusement toutes les compétences IA, explorateurs et opérations au projet actif (`SELF_ROOT`). Les dépôts sont persistés dans `.Leanna/workspaces.json` et les chemins candidats sont pré-validés (rejet des racines disques et dossiers système). L'utilisateur peut cloner directement un dépôt distant via une URL (GitHub, GitLab, SSH…) depuis la modale Multi-Workspace — le flux SSE `POST /api/self-root/clone` transmet la progression git en temps réel et active le workspace automatiquement à la fin.
 2. **Isolation par Sandbox** : Par défaut, toute écriture effectuée par l'utilisateur ou par l'IA est appliquée dans un dossier miroir `.Leanna/sandbox` du workspace actif. Les modifications ne sont reportées dans le projet principal qu'après validation TypeScript (`tsc --noEmit`) et approbation explicite (`sync` ou `accept-file`).
 3. **Dialogue Multimodal Temps Réel** : L'interface échange des flux audio PCM 16kHz et des captures vidéo/écran directement avec l'API Gemini Live. Lorsque l'IA décide d'exécuter une action, elle invoque des outils (`functionDeclarations`) interceptés côté backend par le `LiveSocketHandler`.
-4. **Coexistence Runtime V1 & V2** : Le système migre progressivement d'un `SkillManager` historique vers une architecture découplée `ToolRegistry` + `RuntimeV2` tout en conservant une compatibilité ascendante complète.
+4. **Lecture & Indexation des documents PDF** : Les fichiers PDF du workspace sont détectés, lus via `pdf-parse`, indexés dans le `WorkspaceIndexer` et exposés à l’IDE avec un aperçu document et un texte extrait exploitable par le moteur de connaissances.
+5. **Coexistence Runtime V1 & V2** : Le système migre progressivement d'un `SkillManager` historique vers une architecture découplée `ToolRegistry` + `RuntimeV2` tout en conservant une compatibilité ascendante complète.
 
 ---
 
@@ -98,7 +100,7 @@ L'interface utilisateur est développée en **React 19** avec **TypeScript** et 
   - `IdeView` (`src/views/IdeView.tsx`) : Environnement de travail avec Monaco Editor, arborescence virtuelle, onglets et panneaux latéraux rétractables.
   - `UnifiedSidebar` : Barre latérale unique supportant les contextes `global` et `ide`.
   - `Panels` (`src/components/panels/`) : Panneaux spécialisés pour le Terminal, le Navigateur webview, les Métriques d'agents, la Flotte d'agents (`AgentFleetPanel`), le Constructeur visuel d'agents (`AgentBuilderPanel`), les Tâches planifiées, les Workflows, les MCP et l'Audit.
-  - `StartupProjectModal` : Modale de démarrage permettant de sélectionner ou changer le projet cible géré par `SELF_ROOT`.
+  - `StartupProjectModal` : Modale de démarrage permettant de sélectionner ou changer le projet cible géré par `SELF_ROOT`. Comprend trois onglets : **Dépôts récents**, **Ouvrir local** (saisie de chemin + dialogue natif), et **Cloner** (URL Git → clone SSE en temps réel → activation automatique).
 
 ---
 
@@ -123,6 +125,7 @@ En mode Desktop, Leanna encapsule l'application dans **Electron 43** :
   - `electron/get-project-root` : racine courante de l'exécutable.
   - `electron/select-folder` : dialogue natif de sélection de répertoire.
   - `electron/get-screen-sources` : capture des flux d'écrans/fenêtres pour le partage multimodal.
+  - `electron/git-clone` : clone un dépôt git distant (`url`, `targetDir?`) via `child_process.execFile('git', ['clone', …])` avec timeout 5 min et nettoyage automatique en cas d'échec. Retourne `{ success, path?, repoName?, error? }`.
   - `electron/quit` : fermeture propre de l'application.
 
 ---
@@ -175,6 +178,10 @@ server/knowledge/
   - Utilise `web-tree-sitter` (WASM) avec les grammaires TypeScript, TSX et JavaScript sans nécessiter de compilation native.
   - Extrait les positions de code exactes (`lineStart` à `lineEnd`), les paramètres typés et les annotations de retour.
   - Détecte les appels de fonctions directs, chaînés, en contexte `await` ainsi que les appels de méthodes intra-classe (`this.method()`).
+* **Extraction documentaire PDF** :
+  - `WorkspaceIndexer` inclut désormais les fichiers `.pdf` dans le scan documentaire du workspace.
+  - `pdf-parse` extrait le texte encodé des PDF pour le stocker dans le `DocumentStore` et l’exposer aux outils de connaissance, recherche et analyse documentaire.
+  - `IdeView` et `PdfPreview` affichent ensuite le document pour une consultation directe dans l’IDE.
 * **Graphe d'Appels Bidirectionnel (`ASTCallGraph`)** :
   - Maintient en mémoire la cartographie des appelants (`getCallers`), des fonctions appelées (`getCallees`) et des chaînes d'exécution récursives (`getCallChain`).
   - Mis à jour instantanément à chaque modification de fichier via le `FileWatcher`.
@@ -189,7 +196,9 @@ L'application utilise une architecture de persistance hybride (fichiers locaux +
 * `.env` / `.env.local` : Configuration chiffrée (AES-256-CBC via `server/utils/crypto.ts` pour les clés sensibles).
 * `.Leanna-profile.json` : Profil utilisateur et préférences d'assistant (chargé et surveillé en temps réel via `fs.watchFile`).
 * `.gemini-keys.json` : Pool de clés Google Gemini avec priorités, compteurs d'usage et état d'activation.
-* `.Leanna/custom-agents.json` : Définitions persistées des agents créés dans l'Agent Builder.
+* `.Leanna/custom-agents.json` : Définitions persistées des agents créés dans l'Agent Builder ou installés depuis le Marketplace.
+* `.Leanna/marketplace-registry.json` : Paquets publiés localement dans le Marketplace (les paquets du catalogue communautaire sont seedés en mémoire).
+* `.Leanna/marketplace-installs.json` : Liste des IDs de paquets Marketplace installés sur cette instance.
 * `.Leanna/workspaces.json` : Historique ordonné et métadonnées des espaces de travail configurés.
 * `.Leanna-audit.log` : Journal d'audit au format NDJSON consignant les actions système et modifications de code.
 
@@ -212,8 +221,7 @@ Lorsque `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` sont renseignés, les tabl
 
 ## Services externes
 
-| Service | Rôle | Intégration | Configuration |
-| :--- | :--- | :--- | :--- |
+| Service | Rôle | Intégration | Configuration || :--- | :--- | :--- | :--- |
 | **Google Gemini Live API** | Modèle LLM multimodal temps réel (voix, vision, outils) | `@google/genai` (modèle `gemini-3.1-flash-live-preview`) | `GEMINI_API_KEY` ou `.gemini-keys.json` |
 | **Supabase** | Base de données relationnelle, pgvector et RLS | `@supabase/supabase-js` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
 | **OpenRouter** | Passerelle vers modèles LLM alternatifs | Requêtes HTTP REST (`https://openrouter.ai/api/v1`) | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` |

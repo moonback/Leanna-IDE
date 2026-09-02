@@ -75,6 +75,13 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
   useEffect(() => { loadNotebooks(); }, [loadNotebooks]);
 
+  // Re-charger la liste quand l'utilisateur change de workspace
+  useEffect(() => {
+    const handleWorkspaceChange = () => { loadNotebooks(); };
+    window.addEventListener('Leanna-workspace-changed', handleWorkspaceChange);
+    return () => window.removeEventListener('Leanna-workspace-changed', handleWorkspaceChange);
+  }, [loadNotebooks]);
+
   const filteredNotebooks = useMemo(() => {
     let result = notebooks;
     if (searchQuery.trim()) {

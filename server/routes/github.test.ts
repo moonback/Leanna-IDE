@@ -39,7 +39,9 @@ test('github routes: GET /repos delegates to skillManager', async () => {
 
   const app = express();
   app.use(express.json());
-  app.use('/api/github', createGithubRouter(mockSkillManager));
+  const router = createGithubRouter(mockSkillManager);
+  app.use('/api/git', router);
+  app.use('/api/github', router);
 
   const server: Server = await new Promise((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve(s));
@@ -47,12 +49,19 @@ test('github routes: GET /repos delegates to skillManager', async () => {
   const port = (server.address() as any).port;
 
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/api/github/repos`);
-    assert.equal(res.status, 200);
-    const body = await res.json() as any;
+    const resGithub = await fetch(`http://127.0.0.1:${port}/api/github/repos`);
+    assert.equal(resGithub.status, 200);
+    const bodyGithub = await resGithub.json() as any;
     assert.equal(calledTool, 'list_github_repos');
-    assert.equal(body.repos[0].name, 'Leanna');
+    assert.equal(bodyGithub.repos[0].name, 'Leanna');
+
+    // Test /api/git alias
+    const resGit = await fetch(`http://127.0.0.1:${port}/api/git/repos`);
+    assert.equal(resGit.status, 200);
+    const bodyGit = await resGit.json() as any;
+    assert.equal(bodyGit.repos[0].name, 'Leanna');
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+

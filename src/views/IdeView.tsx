@@ -6,6 +6,7 @@ const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ defa
 const DocumentPanel = lazy(() => import('../components/panels/DocumentPanel.js').then(m => ({ default: m.DocumentPanel })));
 const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel.js').then(m => ({ default: m.SandboxPanel })));
 const VisionPanel = lazy(() => import('../components/panels/VisionPanel.js').then(m => ({ default: m.VisionPanel })));
+const GitHubPanel = lazy(() => import('../components/ide/GitHubPanel.js').then(m => ({ default: m.GitHubPanel })));
 const DocumentsView = lazy(() => import('./DocumentsView.js'));
 const NotebooksView = lazy(() => import('./NotebooksView.js'));
 const RichDocumentViewerLazy = lazy(() => import('../components/ide/RichDocumentViewer.js').then(m => ({ default: m.RichDocumentViewer })));
@@ -40,11 +41,13 @@ import { McpPanel } from '../components/panels/McpPanel.js';
 import { BrowserPanel, BROWSER_HOME_URL } from '../components/panels/BrowserPanel.js';
 import { MarkdownPreview } from '../components/ide/MarkdownPreview.js';
 import { ImagePreview } from '../components/ide/ImagePreview.js';
+import { PdfPreview } from '../components/ide/PdfPreview.js';
 import { EmptyEditorState } from '../components/ide/EmptyEditorState.js';
 import { SelfEditBanner } from '../components/ide/SelfEditBanner.js';
 import { SandboxDiffViewer } from '../components/sandbox/SandboxDiffViewer.js';
 import { AgentPanel } from '../components/panels/AgentPanel.js';
 import { AgentBuilderPanel } from '../components/panels/AgentBuilderPanel.js';
+import { MarketplacePanel } from '../components/panels/MarketplacePanel.js';
 import { initActivityStore, destroyActivityStore } from '../stores/agentActivityStore.js';
 import { MissionPanel } from '../components/panels/MissionPanel.js';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard.js';
@@ -141,6 +144,7 @@ export default function IdeView() {
   const [showRunMenu, setShowRunMenu] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
+  const [showGitHub, setShowGitHub] = useState(false);
   const [showMcp, setShowMcp] = useState(false);
   const [showBrowser, setShowBrowser] = useState(false);
   const [browserUrl, setBrowserUrl] = useState<string | undefined>(undefined);
@@ -150,6 +154,7 @@ export default function IdeView() {
   const [pendingChatMessage, setPendingChatMessage] = useState<{ text: string; displayText?: string } | null>(null);
   const [showAgents, setShowAgents] = useState(false);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
+  const [showMarketplace, setShowMarketplace] = useState(false);
   const [showFleet, setShowFleet] = useState(false);
   const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
@@ -700,11 +705,13 @@ export default function IdeView() {
         showGlobalSearch={showGlobalSearch}
         showRunMenu={showRunMenu}
         showSandbox={showSandbox}
+        showGitHub={showGitHub}
         showWorkflow={showWorkflow}
         showSkillsMonitor={showSkillsMonitor}
         showChat={showChat}
         showAgents={showAgents}
         showAgentBuilder={showAgentBuilder}
+        showMarketplace={showMarketplace}
         showFleet={showFleet}
         showMissions={showMissions}
         showKnowledge={showKnowledge}
@@ -723,11 +730,13 @@ export default function IdeView() {
         onToggleSearch={() => setShowGlobalSearch(v => !v)}
         onToggleRunMenu={() => setShowRunMenu(v => !v)}
         onToggleSandbox={toggleSandbox}
+        onToggleGitHub={() => setShowGitHub(v => !v)}
         onToggleWorkflow={() => setShowWorkflow(v => !v)}
         onToggleSkillsMonitor={() => setShowSkillsMonitor(v => !v)}
         onToggleChat={() => setShowChat(v => !v)}
         onToggleAgents={() => setShowAgents(v => !v)}
         onToggleAgentBuilder={() => setShowAgentBuilder(v => !v)}
+        onToggleMarketplace={() => setShowMarketplace(v => !v)}
         onToggleFleet={() => setShowFleet(v => !v)}
         onToggleMissions={() => setShowMissions(v => !v)}
         onToggleKnowledge={() => {
@@ -958,6 +967,10 @@ export default function IdeView() {
                         <AutomationPanel onClose={() => setShowAutomation(false)} />
                       ) : showMemory ? (
                         <MemoryPanel onClose={() => setShowMemory(false)} />
+                      ) : showGitHub ? (
+                        <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement GitHub…</div></div>}>
+                          <GitHubPanel onClose={() => setShowGitHub(false)} fullWidth />
+                        </Suspense>
                       ) : activeFile ? (
                                               // Onglet navigateur
                                               activeFile.type === 'browser' && activeFile.browserUrl ? (
@@ -978,6 +991,8 @@ export default function IdeView() {
                                                   onOpenExternal={handleBrowserExternalOpen}
                                                   fullWidth
                                                 />
+                                              ) : /\.(pdf)$/i.test(activeFile.path) ? (
+                                                <PdfPreview filePath={activeFile.path} />
                                               ) : /\.(png|jpg|jpeg|gif|webp|bmp|ico)$/i.test(activeFile.path) ? (
                                                 <ImagePreview filePath={activeFile.path} />
                                               ) : (
@@ -1179,6 +1194,11 @@ export default function IdeView() {
       {/* Agent Builder Panel — modal overlay */}
       {showAgentBuilder && (
         <AgentBuilderPanel inline onClose={() => setShowAgentBuilder(false)} />
+      )}
+
+      {/* Marketplace Panel — modal overlay */}
+      {showMarketplace && (
+        <MarketplacePanel onClose={() => setShowMarketplace(false)} />
       )}
 
       {/* Fleet Panel — modal overlay */}

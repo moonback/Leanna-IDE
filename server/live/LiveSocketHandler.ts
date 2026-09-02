@@ -25,7 +25,7 @@ import { estimateTokens, summarizeWithLLM } from '../utils/tokenOptimizer.js';
 import { knowledgeGraph, projectMemory, understandingEngine } from '../knowledge/index.js';
 import { notebookManager } from '../notebooks/index.js';
 import { supervisor } from '../autonomy/index.js';
-import { WORKSPACE_SITE_URL } from '../utils/selfRoot.js';
+import { WORKSPACE_SITE_URL, SELF_ROOT } from '../utils/selfRoot.js';
 import type { BrowserPendingEntry, BrowserActionPendingEntry } from '../routes/browser.js';
 
 // Type compatible avec l'ancien SkillManager pour une migration progressive
@@ -488,7 +488,7 @@ export function attachLiveWebSocket(
       const MAX_CHARS_PER_SOURCE = 5_000;
       const notebookBudgetChars = notebookBudgetTokens * 4;
       try {
-        const allNotebooks = notebookManager.getAllNotebooks();
+        const allNotebooks = notebookManager.getAllNotebooks(SELF_ROOT || undefined);
         if (allNotebooks.length > 0) {
           const sections: string[] = [];
           const selectedNotebooks = allNotebooks.slice(0, MAX_NOTEBOOKS_TOTAL);

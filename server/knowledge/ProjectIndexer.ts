@@ -119,7 +119,15 @@ export class ProjectIndexer {
    *
    * @param options.force Force la ré-indexation complète même si le cache est à jour
    */
-  async scanAll(options: { force?: boolean } = {}): Promise<{
+  async scanAll(options: {
+    force?: boolean;
+    onProgress?: (p: {
+      phase: 'incremental' | 'parse' | 'ast' | 'relations' | 'done';
+      current: number;
+      total: number;
+      file?: string;
+    }) => void;
+  } = {}): Promise<{
     totalFiles: number;
     totalEntities: number;
     durationMs: number;
@@ -209,7 +217,10 @@ export class ProjectIndexer {
           }
 
           // Scanner et enrichir les fichiers ajoutés/modifiés
-          for (const changedPath of [...addedFiles, ...modifiedFiles]) {
+          const changedFiles = [...addedFiles, ...modifiedFiles];
+          for (let i = 0; i < changedFiles.length; i++) {
+            const changedPath = changedFiles[i];
+            options.onProgress?.({ phase: 'incremental', current: i + 1, total: changedFiles.length, file: changedPath });
             await this.scanFile(changedPath);
           }
 
@@ -243,7 +254,9 @@ export class ProjectIndexer {
     const parsedFiles: FileNode[] = [];
     const astResults = new Map<string, ASTFileResult>();
     let totalEntities = 0;
-    for (const relativePath of files) {
+    for (let i = 0; i < files.length; i++) {
+      const relativePath = files[i];
+      options.onProgress?.({ phase: 'parse', current: i + 1, total: files.length, file: relativePath });
       try {
         const absPath = path.join(root, relativePath);
         const content = this._readContent(absPath);
@@ -271,6 +284,7 @@ export class ProjectIndexer {
     knowledgeGraph.update(parsedFiles);
 
     // Extraire les relations sémantiques (regex) + relations AST (calls précis)
+    options.onProgress?.({ phase: 'relations', current: 0, total: parsedFiles.length });
     const allRelations = this.extractAllRelations(parsedFiles, root);
 
     // Relations d'appels inter-fichiers depuis l'AST
@@ -296,6 +310,8 @@ export class ProjectIndexer {
 
     const durationMs = Date.now() - startTime;
     log.info(`✅ Scan complet terminé: ${parsedFiles.length} fichiers, ${totalEntities} entités, ${allRelations.length} relations (${(durationMs / 1000).toFixed(1)}s)`);
+
+    options.onProgress?.({ phase: 'done', current: parsedFiles.length, total: parsedFiles.length });
 
     return {
       totalFiles: parsedFiles.length,

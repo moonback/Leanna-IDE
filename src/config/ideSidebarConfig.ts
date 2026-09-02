@@ -13,11 +13,11 @@
 
 import {
   Search,
-  GitBranch, Camera, Monitor,
-  MessageCircle, FolderTree, ChartNoAxesColumnIncreasing, Workflow,
-  Cable, Container, Bot, Crosshair, Database,
+  GitBranch, Github, Camera, Monitor,
+  FolderTree, ChartNoAxesColumnIncreasing, Workflow,
+  Container, Bot, Crosshair, Database,
   Activity, Wrench, Users, FileStack,
-  Wand2, BookOpen, Globe, Terminal, Eye,
+  Wand2, BookOpen, Globe, Terminal, Store,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -125,6 +125,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
         label: 'Git & CI/CD',
         children: [
           {
+            id: 'github',
+            type: 'button',
+            icon: Github,
+            label: 'GitHub',
+            stateKey: 'showGitHub',
+            actionKey: 'onToggleGitHub',
+          },
+          {
             id: 'sandbox',
             type: 'button',
             icon: Container,
@@ -219,6 +227,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Agent Builder',
             stateKey: 'showAgentBuilder',
             actionKey: 'onToggleAgentBuilder',
+          },
+          {
+            id: 'marketplace',
+            type: 'button',
+            icon: Store,
+            label: 'Marketplace',
+            stateKey: 'showMarketplace',
+            actionKey: 'onToggleMarketplace',
           },
           {
             id: 'vision',

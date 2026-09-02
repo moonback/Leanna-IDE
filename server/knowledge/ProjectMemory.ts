@@ -78,6 +78,7 @@ const BM25_K1 = 1.5;
 export class ProjectMemory {
   private facts: Map<string, ProjectFact> = new Map();
   private dirty: boolean = false;
+  private lastRootSeen: string = "";
 
   // ─── Index inversé ──────────────────────────────────────────────────────
   /** token → Map(factId → tf normalisé) */
@@ -98,12 +99,20 @@ export class ProjectMemory {
     }
   }
 
-  // ─── Persistance ──────────────────────────────────────────────────────────
+  private syncToCurrentWorkspace(): void {
+    if (this.lastRootSeen === SELF_ROOT) return;
 
-  /**
-   * Charge la mémoire depuis le disque.
-   */
-  load(): void {
+    this.lastRootSeen = SELF_ROOT;
+    this.facts.clear();
+    this.dirty = false;
+    this._indexDirty = true;
+
+    if (SELF_ROOT) {
+      this.loadFromDisk();
+    }
+  }
+
+  private loadFromDisk(): void {
     try {
       const storePath = getStorePath();
       if (fs.existsSync(storePath)) {
@@ -120,11 +129,22 @@ export class ProjectMemory {
     }
   }
 
+  // ─── Persistance ──────────────────────────────────────────────────────────
+
+  /**
+   * Charge la mémoire depuis le disque.
+   */
+  load(): void {
+    this.syncToCurrentWorkspace();
+    this.loadFromDisk();
+  }
+
   /**
    * Persiste la mémoire sur le disque si des modifications ont été faites.
    * Utilise une écriture atomique (tmp + rename) pour éviter EBUSY sur Windows.
    */
   save(): void {
+    this.syncToCurrentWorkspace();
     if (!this.dirty) return;
     try {
       const storePath = getStorePath();
@@ -152,6 +172,7 @@ export class ProjectMemory {
    * Applique un filtre de qualité : rejette les faits trop vagues ou bruyants.
    */
   addFact(fact: Omit<ProjectFact, "id" | "createdAt" | "updatedAt" | "usageCount">): string {
+    this.syncToCurrentWorkspace();
     // ─── Filtre qualité (v2) ─────────────────────────────────────────────
     if (this.isLowQualityFact(fact)) {
       log.debug(`🚫 Fait rejeté (qualité insuffisante): ${fact.content.slice(0, 80)}`);
@@ -245,6 +266,7 @@ export class ProjectMemory {
    * Récupère un fait par son ID.
    */
   getFact(id: string): ProjectFact | undefined {
+    this.syncToCurrentWorkspace();
     const fact = this.facts.get(id);
     if (fact) {
       // Incrémenter le compteur d'usage
@@ -258,6 +280,7 @@ export class ProjectMemory {
    * Met à jour un fait existant.
    */
   updateFact(id: string, updates: Partial<Omit<ProjectFact, "id" | "createdAt">>): boolean {
+    this.syncToCurrentWorkspace();
     const fact = this.facts.get(id);
     if (!fact) return false;
 
@@ -279,6 +302,7 @@ export class ProjectMemory {
    * Supprime un fait par son ID.
    */
   deleteFact(id: string): boolean {
+    this.syncToCurrentWorkspace();
     const existed = this.facts.delete(id);
     if (existed) {
       this.dirty = true;
@@ -292,6 +316,7 @@ export class ProjectMemory {
    * Récupère tous les faits, optionnellement filtrés par catégorie.
    */
   getAllFacts(category?: ProjectKnowledgeCategory): ProjectFact[] {
+    this.syncToCurrentWorkspace();
     const all = Array.from(this.facts.values());
     if (category) {
       return all.filter((f) => f.category === category);
@@ -312,6 +337,7 @@ export class ProjectMemory {
    * Cas spécial : query vide → retourne tous les faits triés par importance.
    */
   searchFacts(query: string, maxResults: number = 10): ProjectFact[] {
+    this.syncToCurrentWorkspace();
     // Cas spécial : query vide (ex: UnderstandingEngine.searchFacts("", 9999))
     if (!query || !query.trim()) {
       return Array.from(this.facts.values())

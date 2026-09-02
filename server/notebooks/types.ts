@@ -57,6 +57,8 @@ export interface Source {
 
 export interface Notebook {
   id: string;
+  /** Chemin absolu du workspace auquel appartient ce notebook. Undefined = global (rétrocompatibilité). */
+  workspaceId?: string;
   title: string;
   description: string;
   /** Sources attachées */

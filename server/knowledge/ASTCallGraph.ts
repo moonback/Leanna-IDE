@@ -17,6 +17,7 @@
  */
 
 import path from "path";
+import { SELF_ROOT } from "../utils/selfRoot.js";
 import { createLogger } from "../utils/logger.js";
 import type { ASTFileResult, ASTCall } from "./types.js";
 
@@ -77,6 +78,13 @@ export class ASTCallGraph {
   private inEdges = new Map<CallNodeId, CallEdge[]>();
   /** Map nom de fonction → node IDs possibles (pour résolution) */
   private nameIndex = new Map<string, CallNodeId[]>();
+  private lastRootSeen: string = "";
+
+  private syncToCurrentWorkspace(): void {
+    if (this.lastRootSeen === SELF_ROOT) return;
+    this.lastRootSeen = SELF_ROOT;
+    this.clear();
+  }
 
   /**
    * Vide l'ensemble du graphe d'appels.
@@ -95,6 +103,7 @@ export class ASTCallGraph {
    * Appelé après chaque `ASTParser.parseFile()`.
    */
   updateFile(astResult: ASTFileResult, allAstResults: Map<string, ASTFileResult>): void {
+    this.syncToCurrentWorkspace();
     if (astResult.usedFallback) return; // Données trop imprécises
 
     const filePath = astResult.filePath;
@@ -167,6 +176,7 @@ export class ASTCallGraph {
    * Supprime tous les nœuds/arêtes d'un fichier supprimé.
    */
   removeFile(filePath: string): void {
+    this.syncToCurrentWorkspace();
     this._removeFile(filePath);
     log.debug(`🗑️ ASTCallGraph: nœuds de ${filePath} supprimés`);
   }
@@ -184,6 +194,7 @@ export class ASTCallGraph {
     filePath: string,
     className?: string
   ): CallEdge[] {
+    this.syncToCurrentWorkspace();
     const id = this._makeId(filePath, functionName, className);
     return this.inEdges.get(id) ?? [];
   }
@@ -196,6 +207,7 @@ export class ASTCallGraph {
     filePath: string,
     className?: string
   ): CallEdge[] {
+    this.syncToCurrentWorkspace();
     const id = this._makeId(filePath, functionName, className);
     return this.outEdges.get(id) ?? [];
   }
@@ -205,6 +217,7 @@ export class ASTCallGraph {
    * (call-graph complet du fichier).
    */
   getFileCallGraph(filePath: string): { nodes: CallNode[]; edges: CallEdge[] } {
+    this.syncToCurrentWorkspace();
     const fileNodes: CallNode[] = [];
     const fileEdges: CallEdge[] = [];
 
@@ -229,6 +242,7 @@ export class ASTCallGraph {
     className?: string,
     maxDepth = 5
   ): CallChain {
+    this.syncToCurrentWorkspace();
     const rootId = this._makeId(filePath, functionName, className);
     const visitedNodes = new Map<CallNodeId, CallNode>();
     const visitedEdges: CallEdge[] = [];
@@ -268,6 +282,7 @@ export class ASTCallGraph {
    * d'un autre fichier (dépendances inter-fichiers au niveau fonction).
    */
   getCrossFileCallEdges(filePath: string): CallEdge[] {
+    this.syncToCurrentWorkspace();
     const fileNodes = [...this.nodes.values()].filter(n => n.filePath === filePath);
     const edges: CallEdge[] = [];
 
@@ -292,6 +307,7 @@ export class ASTCallGraph {
     resolvedEdges: number;
     crossFileEdges: number;
   } {
+    this.syncToCurrentWorkspace();
     let totalEdges = 0;
     let resolvedEdges = 0;
 

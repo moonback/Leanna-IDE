@@ -13,12 +13,14 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 * [x] **Éditeur de code Monaco Editor** (`src/views/IdeView.tsx`) : Navigation dans l'arborescence, recherche globale et modifications avec garde-fous.
 * [x] **Système d'Agents & Bus de Messages** (`server/agents/`) : Découplage des rôles, matrice de délégation et bus de communication inter-agents.
 * [x] **Gestionnaire de Notebooks & RAG** (`server/notebooks/`) : Ingestion multi-formats (PDF, TXT, MD, DOCX), chunking, recherche sémantique et génération de résumés/slides.
-* [x] **Validation Stricte Zod des Requêtes API** (`server/middleware/validateBody.ts`, `server/routes/`) : Middleware réutilisable de validation de schémas et typage strict sur les endpoints critiques (`/api/custom-agents`, `/api/mcp`, `/api/agents`, `/api/tts`).
-* [x] **Agent Builder & Registre d'Agents Personnalisés** (`server/routes/custom-agents.ts`, `src/components/panels/AgentBuilderPanel.tsx`) : Création visuelle d'agents, import/export JSON, enregistrement dynamique dans le runtime et persistance locale.
-* [x] **Indexation AST Incrémentale par Tree-sitter & Call-Graph** (`server/knowledge/ASTParser.ts`, `server/knowledge/ASTCallGraph.ts`) : Analyse syntaxique WASM fine des fonctions, signatures typées, dépendances intra/inter-fichiers et chaîne d'appels récursive.
-* [x] **Mode Multi-Workspace Sécurisé** (`server/utils/selfRoot.ts`, `server/routes/self-root.ts`) : Gestion multi-projets avec isolation stricte, persistance dans `workspaces.json` et garde-fous sandbox.
+* [x] **Lecture & indexation des PDF dans le workspace** (`server/knowledge/WorkspaceIndexer.ts`, `src/views/IdeView.tsx`, `src/components/ide/PdfPreview.tsx`) : détection des fichiers `.pdf`, extraction de texte via `pdf-parse`, ouverture directe dans l’IDE et disponibilité pour l’analyse documentaire.
+* [x] **Validation Stricte Zod des Requêtes API** (`server/middleware/validateBody.ts`, `server/routes/`) : Middleware réutilisable de validation de schémas et typage strict.
+* [x] **Agent Builder & Registre d'Agents Personnalisés** (`server/routes/custom-agents.ts`, `src/components/panels/AgentBuilderPanel.tsx`) : Création visuelle d'agents, import/export JSON, enregistrement dynamique.
+* [x] **Marketplace d'Agents et de Skills** (`server/marketplace/`, `server/routes/marketplace.ts`, `src/components/panels/MarketplacePanel.tsx`) : Registre communautaire, installation en un clic, notation, publication avec validation sécurité automatisée, import/export JSON, accessible depuis `Outils → Marketplace` dans la sidebar IDE.
+* [x] **Indexation AST Incrémentale par Tree-sitter & Call-Graph** (`server/knowledge/ASTParser.ts`, `server/knowledge/ASTCallGraph.ts`) : Analyse syntaxique WASM fine, signatures typées, dépendances et chaîne d'appels.
+* [x] **Mode Multi-Workspace Sécurisé** (`server/utils/selfRoot.ts`, `server/routes/self-root.ts`) : Gestion multi-projets avec isolation stricte et persistance dans `workspaces.json`. **Clone depuis une URL Git** (`POST /api/self-root/clone`) avec flux SSE temps réel, terminal de progression intégré dans la modale et activation automatique du workspace cloné. IPC Electron `electron/git-clone` + `window.electronAPI.gitClone()` dans le preload.
 * [x] **Journalisation d'Audit NDJSON** (`server/audit.ts`) : Enregistrement de chaque action avec horodatage et détails.
-* [x] **Circuit Breaker HTTP Frontend** (`src/main.tsx`) : Protection contre la saturation de sockets TCP en cas d'indisponibilité backend.
+* [x] **Circuit Breaker HTTP Frontend** (`src/main.tsx`) : Protection contre la saturation de sockets TCP.
 * [x] **Intégration Electron Desktop** (`electron/main.cjs`, `electron/preload.cjs`) : Packaging Windows NSIS, splash screen et bridge IPC.
 
 ---
@@ -29,21 +31,66 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 
 | Priorité | Élément | Statut | Justification technique |
 | :--- | :--- | :--- | :--- |
-| **P0** | Sécurisation et fiabilisation des endpoints sans validation de schéma | ✅ Livré (Sprint 1) | Middleware `validateBody` et schémas Zod déployés sur les routeurs critiques (`custom-agents`, `mcp`, `agents`, `tts`). Extension progressive aux autres routeurs secondaires. |
+| **P0** | Sécurisation et fiabilisation des endpoints sans validation de schéma | ✅ Livré | Middleware `validateBody` et schémas Zod déployés sur les routeurs critiques. |
 | **P0** | Définition d'un pipeline CI/CD automatisé | 📋 Planifié | Aucun workflow de test ou de build automatique n'est configuré dans `.github/workflows`. |
-| **P1** | Finalisation de la migration Runtime V2 | 🚧 En cours | Coexistence actuelle entre `SkillManager` V1 et `SkillManagerV2` / `ToolRegistry` nécessitant une unification définitive. |
-| **P1** | Couverture de tests e2e pour les WebSockets | 📋 Planifié | Les tests actuels couvrent principalement les utilitaires unitaires (`server/**/*.test.ts`) mais manquent d'intégration sur `/live` et `/terminal`. |
-| **P2** | Nettoyage des routes Git désactivées | 📋 Planifié | Le routeur `/api/git` retourne actuellement un code 404 hardcodé ; il doit être soit supprimé, soit réintégré proprement via l'API GitHub. |
+| **P1** | Finalisation de la migration Runtime V2 | ✅ Livré | Unification complète sur `SkillManagerV2` / `ToolRegistry` et suppression de l'ancien V1. |
+| **P1** | Couverture de tests e2e pour les WebSockets | ✅ Livré | Suite de tests d'intégration e2e complète validant l'authentification handshake, `/terminal`, `/live` et `/sandbox-watch`. |
+| **P1** | **Intégration GitHub complète dans l'IDE** | ✅ Livré (v0.8.0) | Panneau GitHub natif (`src/components/ide/GitHubPanel.tsx`) avec 5 onglets : Commits locaux (avec détail diff par fichier), Repos (filtre live + recherche GitHub), Issues (filtres open/closed/all), PRs (filtres + draft), Notifications (badges non-lus). Accès via la sidebar Git & CI/CD. |
+| **P2** | Nettoyage des routes Git désactivées | ✅ Livré | `/api/git` et `/api/github` unifiés sur `createGithubRouter` avec support complet. |
 | **P2** | Optimisation du cache d'embeddings Notebooks | 🚧 En cours | Réduction de la latence lors de la réindexation de gros volumes documentaires. |
 
 ---
 
 ## V2+ — Long terme (Évolutions structurelles)
 
-* 💡 **Idée : Support natif de conteneurs Docker pour le Sandbox** : Remplacer l'isolation par dossier miroir `.Leanna/sandbox` par des conteneurs éphémères légers pour isoler également l'exécution des commandes shell `run_project_command`.
-* 💡 **Idée : Support multi-fournisseurs voix locale** : Intégration de modèles vocaux locaux (ex: Whisper / Piper) pour réduire la dépendance au cloud en mode hors-ligne.
+> Ces évolutions représentent la vision à 6–18 mois du projet. Elles sont classées par domaine fonctionnel, de l'isolation système aux capacités IA avancées.
 
+---
 
+### 🐳 Infrastructure & Isolation
+
+* 💡 **Conteneurs Docker pour le Sandbox** : Remplacer l'isolation par dossier miroir `.Leanna/sandbox` par des conteneurs éphémères Docker (ou Podman) pour isoler également l'exécution des commandes shell. Chaque session sandbox obtiendrait un réseau, un système de fichiers et un PID namespace dédiés, éliminant tout risque d'évasion vers le système hôte.
+
+* 💡 **Sandboxing WebAssembly pour les outils IA** : Faire tourner certains outils de traitement (analyse AST, exécution de scripts Python légers) dans un runtime WASM (Wasmtime / WASI) directement dans le processus Node.js, sans overhead Docker et sans accès au système de fichiers hôte.
+
+---
+
+### 🤖 IA & Modèles
+
+* 💡 **Support multi-fournisseurs voix locale** : Intégration de Whisper (STT) et Piper (TTS) en mode local pour fonctionner hors-ligne et réduire la dépendance à Gemini Live. La sélection du moteur serait configurable par profil utilisateur.
+
+* 💡 **Routing intelligent entre modèles IA** : Ajouter un orchestrateur de modèles qui choisit automatiquement entre Gemini, OpenRouter et les modèles locaux (Ollama) selon la nature de la tâche (coût, latence, confidentialité des données). Les décisions de routing seraient traçables dans l'audit log.
+
+* 💡 **Mémoire long-terme sémantique persistante** : Enrichir le système de mémoire Supabase avec une indexation vectorielle pgvector complète sur l'historique des conversations, les décisions prises et les artefacts générés. L'assistant se souviendrait de contextes de sessions antérieures avec un score de pertinence.
+
+---
+
+### � IDE & Workflow Développeur
+
+* 💡 **GitHub Actions depuis l'IDE** : Déclenchement et visualisation des workflows CI/CD directement depuis le panneau GitHub — logs en streaming temps réel, statut des jobs, re-run de pipelines et visualisation de l'arbre des steps sans quitter l'éditeur.
+
+* 💡 **Création d'issues et PRs inline** : Formulaires de création intégrés à l'IDE pour issues et pull requests, avec sélection de labels, assignees, milestone, et pré-remplissage intelligent du titre et de la description à partir du code sélectionné ou des erreurs console.
+
+* 💡 **Diff visuel Monaco avec revue de code IA** : Intégrer un diff-editor Monaco côte à côte pour la revue de PR, avec annotations IA inline (suggestions, détection de régressions, commentaires de revue automatisés) déposés directement sur les lignes modifiées.
+
+---
+
+### 🌐 Collaboration & Partage
+
+* 💡 **Mode collaboratif multi-curseurs (CRDT)** : Permettre à plusieurs développeurs de co-éditer le même fichier en temps réel via un protocole CRDT (Yjs / Automerge) synchronisé par WebSocket, avec présence de curseurs colorés et résolution automatique des conflits.
+
+* ✅ **Marketplace d'agents et de skills** *(livré v0.9.0)* : Registre communautaire de 10 paquets seedés (6 agents, 2 skills, 2 bundles) avec persistence locale dans `.Leanna/marketplace-registry.json`. Interface `SidePanel` overlay (côté droit, fond IDE visible). Fonctionnalités complètes :
+  - **Catalogue** : recherche plein-texte, filtres type/catégorie/tri, pagination, raccourci `Ctrl+K`
+  - **Installation en un clic** : agent → `DynamicAgentRegistry` + `custom-agents.json` ; skill → Supabase `custom_skills`
+  - **Désinstallation** : suppression du registre dynamique et du fichier JSON
+  - **Détail paquet** : 4 onglets (Aperçu, Contenu, Avis, Sécurité), stats live, partage par lien
+  - **Notation communautaire** : formulaire inline (1-5 étoiles + commentaire), recalcul de moyenne
+  - **Validation sécurité automatisée** : 12 patterns OWASP/injection sur prompts/instructions avant publication
+  - **Publication** : formulaire avec scan sécurité live, blocage si flags critiques
+  - **Import glisser-déposer** : fichiers `.leanna.json` (paquets exportés ou partagés)
+  - **Export JSON** : téléchargement `{id}-v{version}.leanna.json`
+  - **Copie de lien** : partage URL dans le presse-papier
+  - **API REST** : 9 endpoints `GET/POST /api/marketplace/*` (search, featured, installed, stats, package/:id, install, uninstall, publish, rate, validate-security, export/:id)
 ---
 
 ## Backlog technique & Qualité
@@ -56,14 +103,3 @@ La présente feuille de route est établie sur la base de l'analyse réelle du c
 * Réduire la taille du bundle de production en améliorant le code-splitting des dépendances lourdes (`monaco-editor`, `mermaid`, `recharts`).
 * Ajouter un linter automatisé ESLint/Prettier dans les hooks Husky pré-commit.
 
-### Détection des problèmes observés lors de l'audit
-
-1. **Absence de licence explicite**
-   - *Impact* : Incertitude juridique sur la distribution et l'usage open-source.
-   - *Action recommandée* : Ajouter un fichier `LICENSE` (ex: Apache-2.0 ou MIT) à la racine du dépôt.
-2. **Coexistence de deux systèmes de runtime (`server/skills/SkillManager.ts` vs `server/runtime/`)**
-   - *Impact* : Complexité de maintenance et surcharge mémoire lors du chargement des modules.
-   - *Action recommandée* : Achever la dépréciation de `SkillManager` V1 au profit exclusif de `bootstrapRuntimeSync`.
-3. **Routeur `/api/git` désactivé de manière abrupte**
-   - *Impact* : Incohérence dans l'API REST retournant une erreur 404 statique.
-   - *Action recommandée* : Nettoyer les routes mortes ou documenter formellement la bascule vers `/api/github`.

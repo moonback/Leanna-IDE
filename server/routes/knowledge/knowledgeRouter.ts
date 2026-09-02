@@ -241,7 +241,29 @@ router.get('/dashboard', (_req: Request, res: Response) => {
 // POST /api/knowledge/reindex
 router.post('/reindex', async (_req: Request, res: Response) => {
   try {
-    const stats = await projectIndexer.scanAll({ force: true });
+    const { broadcastKnowledgeProgress } = await import('../../utils/knowledgeBroadcaster.js');
+    const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
+
+    const stats = await projectIndexer.scanAll({
+      force: true,
+      onProgress: (p) => broadcastKnowledgeProgress(p.phase, p.current, p.total, { file: p.file }),
+    });
+
+    const { workspaceIndexer } = await import('../../knowledge/WorkspaceIndexer.js');
+    const documentStats = root ? await workspaceIndexer.extractAll() : { totalFiles: 0, totalExtracted: 0, totalSections: 0, totalWords: 0, skipped: 0, errors: 0, durationMs: 0 };
+
+    const { getDocumentStore } = await import('../../knowledge/DocumentStore.js');
+    const store = root ? getDocumentStore(root) : getDocumentStore();
+    const linksDetected = store.detectAllLinks();
+
+    broadcastKnowledgeProgress('done', stats.totalFiles, stats.totalFiles, {
+      totalEntities: stats.totalEntities,
+      durationMs: stats.durationMs,
+      cached: false,
+      documents: documentStats.totalExtracted,
+      linksDetected,
+    });
+
     await projectIndexer.buildASTIndex();
     res.json({
       status: 'success',
@@ -249,6 +271,13 @@ router.post('/reindex', async (_req: Request, res: Response) => {
         totalFiles: stats.totalFiles,
         totalEntities: stats.totalEntities,
         durationMs: stats.durationMs,
+      },
+      documents: {
+        totalFiles: documentStats.totalFiles,
+        totalExtracted: documentStats.totalExtracted,
+        totalSections: documentStats.totalSections,
+        totalWords: documentStats.totalWords,
+        linksDetected,
       },
     });
   } catch (e: any) {
@@ -609,4 +638,4 @@ router.get('/ast/functions', async (req: Request, res: Response): Promise<void> 
   }
 });
 
-export default router;
+export default router;

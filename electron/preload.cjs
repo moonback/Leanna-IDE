@@ -32,4 +32,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   quit: () =>
     ipcRenderer.invoke('electron/quit'),
+
+  // Clone un dépôt git distant dans un dossier local.
+  // repoUrl  : URL HTTPS ou SSH du dépôt (ex: https://github.com/user/repo.git)
+  // targetDir: dossier parent optionnel (défaut: ~/Documents/Leanna-Projects)
+  // Retourne : { success: boolean, path?: string, repoName?: string, error?: string }
+  gitClone: (repoUrl, targetDir) =>
+    ipcRenderer.invoke('electron/git-clone', repoUrl, targetDir),
 });

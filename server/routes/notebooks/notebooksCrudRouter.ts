@@ -1,12 +1,15 @@
 import { Router, Request, Response } from "express";
 import { notebookManager, contentGenerator } from "../../notebooks/index.js";
+import { SELF_ROOT } from "../../utils/selfRoot.js";
 
 export function createNotebooksCrudRouter(): Router {
   const router = Router();
 
   router.get("/", (_req: Request, res: Response): void => {
     try {
-      const notebooks = notebookManager.getAllNotebooks();
+      // Filtrer par workspace actif — SELF_ROOT est lu dynamiquement à chaque requête
+      const workspaceId = SELF_ROOT || undefined;
+      const notebooks = notebookManager.getAllNotebooks(workspaceId);
       const light = notebooks.map(nb => ({
         id: nb.id,
         title: nb.title,
@@ -31,7 +34,7 @@ export function createNotebooksCrudRouter(): Router {
         res.status(400).json({ error: "Le champ 'title' est requis." });
         return;
       }
-      const notebook = notebookManager.createNotebook(title.trim(), description || "");
+      const notebook = notebookManager.createNotebook(title.trim(), description || "", SELF_ROOT || undefined);
 
       contentGenerator.generateRoadmap(notebook.id, title.trim(), description || "").catch(() => {});
 

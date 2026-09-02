@@ -52,6 +52,7 @@ function getStorePath(): string {
 export class KnowledgeGraph {
   private state: KnowledgeGraphState;
   private dirty: boolean = false;
+  private lastRootSeen: string = "";
   private updateListeners: Set<() => void> = new Set();
   /**
    * Index AST en mémoire — non persisté, reconstruit à chaque démarrage.
@@ -64,6 +65,37 @@ export class KnowledgeGraph {
     // Charger immédiatement les données persistées pour éviter un état vide
     // entre le démarrage du serveur et la fin du premier scanAll().
     this.load();
+  }
+
+  private syncToCurrentWorkspace(): void {
+    if (this.lastRootSeen === SELF_ROOT) return;
+
+    this.lastRootSeen = SELF_ROOT;
+    this.state = this.createEmptyState();
+    this.astIndex.clear();
+    this.dirty = false;
+
+    if (SELF_ROOT) {
+      this.loadFromDisk();
+    }
+  }
+
+  private loadFromDisk(): void {
+    try {
+      const storePath = getStorePath();
+      if (fs.existsSync(storePath)) {
+        const raw = fs.readFileSync(storePath, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && parsed.files) {
+          this.state = this.validateState(parsed);
+          log.info(`📂 Graphe de connaissances chargé: ${Object.keys(this.state.files).length} fichiers`);
+          return;
+        }
+      }
+    } catch (err) {
+      log.warn(`⚠️ Échec du chargement du KnowledgeGraph: ${(err as Error).message}`);
+    }
+    this.state = this.createEmptyState();
   }
 
   onUpdate(listener: () => void): () => void {
@@ -85,27 +117,15 @@ export class KnowledgeGraph {
    * Charge le graphe depuis le disque.
    */
   load(): void {
-    try {
-      const storePath = getStorePath();
-      if (fs.existsSync(storePath)) {
-        const raw = fs.readFileSync(storePath, "utf-8");
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object" && parsed.files) {
-          this.state = this.validateState(parsed);
-          log.info(`📂 Graphe de connaissances chargé: ${Object.keys(this.state.files).length} fichiers`);
-          return;
-        }
-      }
-    } catch (err) {
-      log.warn(`⚠️ Échec du chargement du KnowledgeGraph: ${(err as Error).message}`);
-    }
-    this.state = this.createEmptyState();
+    this.syncToCurrentWorkspace();
+    this.loadFromDisk();
   }
 
   /**
    * Sauvegarde le graphe sur disque.
    */
   save(): void {
+    this.syncToCurrentWorkspace();
     if (!this.dirty) return;
     try {
       const storePath = getStorePath();
@@ -128,6 +148,7 @@ export class KnowledgeGraph {
    * Appelé par ProjectIndexer après un scan complet ou partiel.
    */
   update(files: FileNode[]): void {
+    this.syncToCurrentWorkspace();
     log.info(`🔄 Mise à jour du graphe avec ${files.length} fichier(s)`);
 
     // Un scan complet est une photographie autoritaire : supprimer aussi les
@@ -159,6 +180,7 @@ export class KnowledgeGraph {
    * Supprime un fichier du graphe (quand un fichier est supprimé).
    */
   removeFile(filePath: string): void {
+    this.syncToCurrentWorkspace();
     delete this.state.files[filePath];
     this.rebuildEntityIndex();
     this.rebuildDependencyGraph();
@@ -174,6 +196,7 @@ export class KnowledgeGraph {
    * Réindexe un seul fichier (après modification).
    */
   updateFile(file: FileNode): void {
+    this.syncToCurrentWorkspace();
     this.state.files[file.path] = file;
     this.rebuildEntityIndex();
     this.rebuildDependencyGraph();
@@ -189,11 +212,13 @@ export class KnowledgeGraph {
 
   /** Retourne tous les fichiers indexés */
   getAllFiles(): FileNode[] {
+    this.syncToCurrentWorkspace();
     return Object.values(this.state.files);
   }
 
   /** Retourne un fichier par son chemin */
   getFile(filePath: string): FileNode | undefined {
+    this.syncToCurrentWorkspace();
     return this.state.files[filePath];
   }
 
@@ -219,16 +244,19 @@ export class KnowledgeGraph {
 
   /** Retourne les statistiques */
   getStats(): KnowledgeStats {
+    this.syncToCurrentWorkspace();
     return this.state.stats;
   }
 
   /** Retourne la date du dernier indexage */
   getLastIndexed(): string {
+    this.syncToCurrentWorkspace();
     return this.state.lastIndexed;
   }
 
   /** Vérifie si le graphe a été initialisé (au moins un fichier indexé) */
   isInitialized(): boolean {
+    this.syncToCurrentWorkspace();
     return this.state.stats.totalFiles > 0;
   }
 
@@ -238,6 +266,7 @@ export class KnowledgeGraph {
    * Recherche des entités par nom (recherche partielle insensible à la casse).
    */
   searchEntities(query: string): CodeEntity[] {
+    this.syncToCurrentWorkspace();
     const lower = query.toLowerCase();
     const results: CodeEntity[] = [];
     for (const [, entities] of Object.entries(this.state.entities)) {
@@ -254,6 +283,7 @@ export class KnowledgeGraph {
    * Recherche des fichiers par nom ou chemin.
    */
   searchFiles(query: string): FileNode[] {
+    this.syncToCurrentWorkspace();
     const lower = query.toLowerCase();
     return Object.values(this.state.files).filter(
       (f) => f.path.toLowerCase().includes(lower) || f.name.toLowerCase().includes(lower)

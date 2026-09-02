@@ -103,6 +103,9 @@ export default function SettingsView() {
         }),
       });
       success('Paramètres sauvegardés ✓');
+      // Notifier la session live de se reconnecter pour prendre en compte
+      // les changements qui affectent les déclarations d'outils (reasoning, agents, etc.)
+      window.dispatchEvent(new CustomEvent('Leanna-settings-saved', { detail: { requiresReconnect: true } }));
     } catch { toastError('Erreur lors de la sauvegarde'); }
     finally { setSaving(false); }
   }, [save, profile, success, toastError]);
@@ -269,14 +272,14 @@ export default function SettingsView() {
         </div>
 
         {/* Bottom info */}
-        <div className="px-3 py-3 flex-shrink-0" style={{ borderTop: '1px solid var(--border-base)' }}>
+        {/* <div className="px-3 py-3 flex-shrink-0" style={{ borderTop: '1px solid var(--border-base)' }}>
           <div className="rounded-lg p-2.5"
             style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 5%, transparent)' }}>
             <p className="text-[9px] leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
               💡 Leanna ne modifie que son propre code source. Toute écriture crée un checkpoint automatique.
             </p>
           </div>
-        </div>
+        </div> */}
       </nav>
 
       {/* ── Main content area ── */}

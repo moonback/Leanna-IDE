@@ -32,6 +32,7 @@ const log = createLogger("WorkspaceIndexer");
 
 /** Extensions de documents reconnus */
 const DOCUMENT_EXTENSIONS = new Set([
+  ".pdf",
   ".md",
   ".txt",
   ".rst",
@@ -253,17 +254,20 @@ export class WorkspaceIndexer {
     const stats = fs.statSync(absolutePath);
     if (!stats.isFile() || stats.size > MAX_DOC_SIZE || stats.size === 0) return null;
 
+    const ext = path.extname(relativePath).toLowerCase();
+
     let content: string;
     try {
-      content = fs.readFileSync(absolutePath, "utf-8");
+      if (ext === ".pdf") {
+        content = await this.extractPdfText(fs.readFileSync(absolutePath));
+      } else {
+        content = fs.readFileSync(absolutePath, "utf-8");
+        if (this.isBinaryContent(content)) return null;
+      }
     } catch {
       return null; // Fichier binaire ou illisible
     }
 
-    // Valider que le contenu est bien du texte
-    if (this.isBinaryContent(content)) return null;
-
-    const ext = path.extname(relativePath).toLowerCase();
     const fileName = relativePath;
     const lines = content.split(/\r?\n/);
 
@@ -557,8 +561,17 @@ export class WorkspaceIndexer {
     };
   }
 
+  private async extractPdfText(buffer: Buffer): Promise<string> {
+    const { PDFParse } = await import("pdf-parse");
+    const parser = new PDFParse({ data: buffer });
+    const pdfData = await parser.getText();
+    await parser.destroy();
+    return typeof pdfData?.text === "string" ? pdfData.text : "";
+  }
+
   private getMimeType(ext: string): string {
     const mimeTypes: Record<string, string> = {
+      ".pdf": "application/pdf",
       ".md": "text/markdown",
       ".txt": "text/plain",
       ".rst": "text/x-rst",
