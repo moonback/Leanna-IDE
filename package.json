@@ -2,8 +2,8 @@
   "name": "Leanna",
   "private": false,
   "version": "0.7.0",
-  "license": "MIT",
-  "author": "Mayss",
+  "license": "BUSL 1.1",
+  "author": "Maysson",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
