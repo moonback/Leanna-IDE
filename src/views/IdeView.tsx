@@ -33,6 +33,7 @@ import { useEditorActions } from '../hooks/useEditorActions.js';
 import { useLiveAPIContext } from '../context/LiveAPIContext.js';
 import { useScreenShare } from '../context/ScreenShareContext.js';
 import { useSandboxWatcher } from '../hooks/useSandboxWatcher.js';
+import { ideApi } from '../services/ideApi.js';
 import { AgentProgressBar } from '../components/ide/AgentProgressBar.js';
 import { ChatPanel } from '../components/ide/ChatPanel.js';
 import { LiveSkillsMonitor } from '../components/ide/LiveSkillsMonitor.js';
@@ -249,6 +250,18 @@ export default function IdeView() {
 
     // Toujours fermer showBrowser quand on ouvre un fichier/onglet
     setShowBrowser(false);
+
+    if (/\.rich\.json$/i.test(filePath)) {
+      try {
+        const parsed = JSON.parse(await ideApi.readFile(filePath));
+        if (parsed && typeof parsed.title === 'string' && Array.isArray(parsed.blocks)) {
+          setRichDocument(parsed as RichDocument);
+          return;
+        }
+      } catch {
+        // Fallback to the regular editor for invalid or unreadable rich JSON.
+      }
+    }
 
     await fileSystem.openFile(filePath);
     if (typeof line === 'number') {

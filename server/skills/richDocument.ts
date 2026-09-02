@@ -301,6 +301,7 @@ export const richDocumentSkill: Skill = {
     // ── Émission vers le client ───────────────────────────────────────────────
     if (context?.emitIdeAction) {
       context.emitIdeAction({ type: "open-rich-document", document: doc, path: documentPath });
+      context.emitIdeAction({ type: "file-changed", path: documentPath });
       console.log(
         `[RichDocument] "${title}" — ${blocks.length} bloc(s): ${blocks.map((b) => b.type).join(", ")}`
       );
