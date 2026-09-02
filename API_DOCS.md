@@ -33,11 +33,16 @@ Le résultat contient `success`, `stoppedAt`, `file`, `testFile`, `diff`, `basel
 Formate uniquement le fichier indiqué. Il supprime les espaces blancs en fin de ligne et garantit une nouvelle ligne finale, sans modifier les autres fichiers.
 
 ### Format d'authentification
-Sauf mention contraire (notamment `/api/health`), tous les endpoints nécessitent un jeton secret si `Leanna_API_TOKEN` est défini dans l'environnement.
 
-* **En-tête HTTP** : `x-leanna-token: <SECRET>`
-* **Cookie HTTP** : `Leanna_token=<SECRET>`
-* **Paramètre de requête (WebSockets)** : `?token=<SECRET>`
+Sauf mention contraire (notamment `/api/health`), tous les endpoints nécessitent un jeton secret. Ce jeton est **toujours configuré** depuis la v2 — il est généré automatiquement au premier démarrage si `Leanna_API_TOKEN` est absent dans `.env`.
+
+* **En-tête HTTP** : `x-leanna-token: <SECRET>` *(recommandé)*
+* **Cookie HTTP** : `Leanna_token=<SECRET>` *(posé automatiquement après la première requête authentifiée)*
+
+> **WebSocket `/terminal`** : Le token n'est **plus** accepté en paramètre d'URL (`?token=`) depuis la v2. Il doit être transmis via :
+> - le cookie `Leanna_token` (automatique si déjà authentifié),
+> - l'en-tête `Sec-WebSocket-Protocol` (format : `['token', '<SECRET>']`),
+> - ou l'en-tête `X-Leanna-Token`.
 
 ## Contrats de transparence IA
 
@@ -742,6 +747,7 @@ curl -X POST http://127.0.0.1:4000/api/sandbox/deactivate \
 | 200 | Sandbox désactivé |
 | 401 | Non autorisé |
 | 403 | Code de sécurité incorrect ou non configuré |
+| 429 | Trop de tentatives — réessayez dans N minutes |
 
 ---
 
@@ -1184,7 +1190,8 @@ Toutes les routes équipées de la validation Zod renvoient un format uniforme e
   - `{ "ide-action": { "type": "open-file", "path": "src/main.tsx" } }` : Commande de pilotage UI.
 
 ### WebSocket `/terminal` (Console PTY-like)
-* **URL** : `ws://127.0.0.1:4000/terminal?token=<SECRET>`
+* **URL** : `ws://127.0.0.1:4000/terminal`
+* **Authentification** : Token transmis via cookie `Leanna_token` (posé automatiquement) **ou** via le sous-protocole WebSocket `['token', '<SECRET>']`. Le paramètre d'URL `?token=` n'est plus supporté depuis la v2 (audit sécurité H-2).
 * **Direction** : Bidirectionnelle.
 * **Messages Client → Serveur** :
   - `{ "type": "input", "data": "ls -la\r" }`

@@ -283,12 +283,20 @@ flowchart TD
     SupervisorCheck -- Non --> End[Modification terminée]
 ```
 
-1. **Path Traversal & Symlink Escapes** : Résolution centralisée dans `server/utils/selfRoot.ts` et `server/security.ts`. Les chemins sortant de `SELF_ROOT` ou contenant des symlinks externes sont immédiatement rejetés.
-2. **Fichiers critiques protégés** : Toute modification de `server.ts`, `server/security.ts`, `server/utils/selfRoot.ts`, `electron/main.cjs`, `electron/preload.cjs`, `.env`, `.env.local` nécessite une confirmation explicite de l'utilisateur via une modale bloquante avec timeout de 30 secondes.
-3. **Superviseur anti-régression** (`server/autonomy/Supervisor.ts`) : Analyse les résultats `verify_file` et du build global après les éditions. Chaque approche autorise 2 échecs ; une erreur répétée force immédiatement un pivot. Après 3 approches échouées, le fichier est verrouillé. Un coupe-circuit séparé suspend la session à la 10e correction cumulée. L'état et l'injecteur sont isolés pour chaque connexion WebSocket ; une reprise humaine réinitialise les blocages.
-4. **Context Gate pré-écriture** (`server/live/LiveSocketHandler.ts`) : Si `knowledge_build_context` retourne une confiance inférieure à 65 % ou un risque élevé, les écritures sont suspendues jusqu'à la lecture des fichiers pertinents recommandés. Cela empêche les patches spéculatifs tout en laissant l'IA explorer le projet.
-5. **Prompt Injection Guard** (`server/utils/promptInjectionGuard.ts`) : Filtre les entrées suspectes pouvant tenter de détourner les instructions système.
-6. **Isolation Electron** : `nodeIntegration: false`, `contextIsolation: true` et filtrage strict des canaux IPC.
+1. **Authentification obligatoire** (`server/security.ts`) : `Leanna_API_TOKEN` est toujours défini au démarrage — généré automatiquement (32 octets, base64url) si absent, persisté dans `.env`. Toutes les routes `/api/*` et WebSockets (`/live`, `/terminal`, `/sandbox-watch`) exigent ce token.
+2. **Token WebSocket sécurisé** (`server/routes/terminal.ts`) : le token du terminal n'est plus transmis en paramètre d'URL (fuite logs/historique). Il est lu depuis le cookie httpOnly `Leanna_token`, l'en-tête `Sec-WebSocket-Protocol`, ou `X-Leanna-Token`.
+3. **Exécution de commandes sans shell** (`server/skills/`, `server/utils/`, `server/mcp/`) : `shell: true` est conditionnel et limité aux environnements Windows pour les fichiers `.cmd`/`.bat`. Sur Unix, `execFile` s'exécute directement sans interprétation shell. Les fonctions `sanitizeCommandArgument()` et `validateSafePath()` dans `security.ts` fournissent une validation par allowlist.
+4. **Chiffrement des secrets avec clé forte** (`server/utils/crypto.ts`) : `Leanna_MASTER_KEY` est désormais généré automatiquement (256 bits aléatoires) s'il est absent. La clé est mise en cache en mémoire et persistée dans `.env`. Le chiffrement AES-256-GCM est ainsi toujours basé sur un secret réel, pas sur des attributs machine devinables.
+5. **Protection SSRF avec anti-DNS rebinding** (`server/skills/automationHelpers.ts`) : `assertSafeUrl()` effectue désormais une résolution DNS réelle et vérifie toutes les adresses IP résolues contre la liste de blocage. Empêche les attaques DNS rebinding sur la navigation Puppeteer.
+6. **Client FTP avec blocage des IP privées** (`server/routes/ftp.ts`) : `validateFtpHost()` applique la même protection DNS rebinding aux connexions FTP. Variable `ALLOW_FTP_PRIVATE_IPS=true` pour les usages internes légitimes.
+7. **Code sandbox à temps constant** (`server/routes/sandbox.ts`) : `verifyExitCode()` utilise `crypto.timingSafeEqual`. Rate limiter dédié : 3 tentatives/minute par IP, blocage 15 minutes après dépassement.
+8. **Sanitisation HTML durcie** (`src/utils/sanitizeMarkdownHtml.ts`) : l'attribut `style` a été retiré de la liste blanche de `<span>` pour éliminer la surface d'attaque CSS (exfiltration, mise en page trompeuse).
+9. **Path Traversal & Symlink Escapes** : Résolution centralisée dans `server/utils/selfRoot.ts` et `server/security.ts`. Les chemins sortant de `SELF_ROOT` sont immédiatement rejetés.
+10. **Fichiers critiques protégés** : Toute modification de `server.ts`, `server/security.ts`, `.env`, `.env.local`, etc. nécessite une confirmation explicite de l'utilisateur via une modale bloquante (timeout 30 s).
+11. **Superviseur anti-régression** (`server/autonomy/Supervisor.ts`) : Analyse les résultats `verify_file` et du build global après les éditions. Chaque approche autorise 2 échecs ; une erreur répétée force un pivot. Après 3 approches échouées, le fichier est verrouillé.
+12. **Context Gate pré-écriture** (`server/live/LiveSocketHandler.ts`) : Si `knowledge_build_context` retourne une confiance < 65 % ou un risque élevé, les écritures sont suspendues.
+13. **Prompt Injection Guard** (`server/utils/promptInjectionGuard.ts`) : Filtre les entrées suspectes pouvant détourner les instructions système.
+14. **Isolation Electron** : `nodeIntegration: false`, `contextIsolation: true` et filtrage strict des canaux IPC.
 
 ---
 
