@@ -535,7 +535,7 @@ export function StartupProjectModal() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="workspace-modal-title"
-          className="w-[calc(100%-24px)] max-w-5xl h-[min(780px,calc(100vh-32px))] rounded-2xl p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col"
+          className="w-[calc(100%-24px)] max-w-7xl h-[min(780px,calc(100vh-32px))] rounded-2xl p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col"
           style={{
             backgroundColor: 'var(--bg-panel)',
             border: '1px solid var(--border-base)',
