@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, memo } from 'react';
+import { useState, useCallback, useEffect, useRef, memo, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import {
@@ -20,6 +20,7 @@ import { useProfile } from '../../context/UserProfileContext.js';
 import { TokenDetailModal } from './TokenDetailModal.js';
 import { ModelPickerModal } from './ModelPickerModal.js';
 import { formatExactTokenCount, formatTokenCount } from '../../utils/tokenFormatting.js';
+import { getAgentTasks, getToolActivities, subscribe as subscribeActivity } from '../../stores/agentActivityStore.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,15 @@ export const StatusBar = memo(function StatusBar({
   
   const [mcpStatus, setMcpStatus] = useState<'ok' | 'error' | 'loading'>('loading');
   const [sandboxActive, setSandboxActive] = useState(false);
+
+  // ── Agent activity ─────────────────────────────────────────────────────────
+
+  const delegatedTasks  = useSyncExternalStore(subscribeActivity, getAgentTasks);
+  const liveActivities  = useSyncExternalStore(subscribeActivity, getToolActivities);
+
+  const activeAgentCount =
+    delegatedTasks.filter(t => t.status === 'running' || t.status === 'pending').length +
+    liveActivities.filter(a => a.status === 'running').length;
 
   const modifierKey = getModifierKey();
   const sandboxLabel = sandboxActive ? 'Sandbox' : 'Sandbox';
@@ -362,11 +372,24 @@ export const StatusBar = memo(function StatusBar({
             <button
               type="button"
               onClick={onToggleAgents}
-              className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+              className="relative flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
               title="Ouvrir le panneau Agents"
             >
               <Users size={12} style={{ color: 'var(--accent-primary)' }} />
               <span style={{ color: 'var(--text-muted)' }} className="font-medium">Agents</span>
+              {activeAgentCount > 0 && (
+                <motion.span
+                  key={activeAgentCount}
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.6, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+                  className="absolute -top-1 -right-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full text-[9px] font-bold tabular-nums leading-none px-0.5"
+                  style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--bg-primary)' }}
+                >
+                  {activeAgentCount > 99 ? '99+' : activeAgentCount}
+                </motion.span>
+              )}
             </button>
           )}
 

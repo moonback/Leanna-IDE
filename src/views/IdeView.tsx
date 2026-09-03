@@ -1249,6 +1249,7 @@ export default function IdeView() {
       <AgentActivityOverlay
         onOpenAgents={() => setShowAgents(true)}
         onOpenMissions={() => setShowMissions(true)}
+        isChatOpen={showChat}
       />
 
       {/* Chat Panel — floating overlay above everything */}

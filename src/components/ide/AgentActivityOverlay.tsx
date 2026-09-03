@@ -46,9 +46,11 @@ interface AgentActivityOverlayProps {
   onOpenAgents?: () => void;
   /** Callback to open the full Missions panel */
   onOpenMissions?: () => void;
+  /** Hide the pill when the chat panel is open */
+  isChatOpen?: boolean;
 }
 
-export function AgentActivityOverlay({ onOpenAgents, onOpenMissions }: AgentActivityOverlayProps) {
+export function AgentActivityOverlay({ onOpenAgents, onOpenMissions, isChatOpen }: AgentActivityOverlayProps) {
   const [agents, setAgents] = useState<AgentActivity[]>([]);
   const [missions, setMissions] = useState<MissionActivity[]>([]);
   const [expanded, setExpanded] = useState(false);
@@ -167,8 +169,9 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions }: AgentActi
     });
   }, [tick]);
 
-  // Ne rien afficher si rien d'actif
+  // Ne rien afficher si rien d'actif ou si le chat panel est ouvert
   if (activeAgents.length === 0 && activeMissions.length === 0) return null;
+  if (isChatOpen) return null;
 
   return (
     <motion.div
