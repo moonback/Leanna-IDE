@@ -94,11 +94,13 @@ function isLongRunningNpmScript(parts: string[]): boolean {
  * même après la réponse de l'assistant.
  */
 function spawnDetached(npmBin: string, args: string[], cwd: string): { pid: number | undefined } {
+    // Sur Windows, les fichiers .cmd nécessitent shell: true pour éviter EINVAL
+    const isWindows = os.platform() === "win32";
     const child = spawn(npmBin, args, {
         cwd,
         detached: true,
         stdio: "ignore",
-        shell: false, // Node.js 20+ gère .cmd directement, shell:true génère DEP0190
+        shell: isWindows, // Windows nécessite shell pour les .cmd
         env: { ...process.env },
         windowsHide: false,
     });
@@ -235,7 +237,8 @@ async function runNpmSubcommand(
     console.log(`[System] Exécution npm: ${parts.join(" ")} (cwd: ${cwd})`);
 
     try {
-        const npmBin = os.platform() === "win32" ? "npm.cmd" : "npm";
+        const isWindows = os.platform() === "win32";
+        const npmBin = isWindows ? "npm.cmd" : "npm";
 
         // Commandes longue durée : lancer en arrière-plan et répondre immédiatement.
         if (isLongRunningNpmScript(parts)) {
@@ -257,7 +260,7 @@ async function runNpmSubcommand(
             cwd,
             timeout: timeoutMs,
             maxBuffer: MAX_BUFFER,
-            shell: false, // Node.js 20+ gère .cmd directement, shell:true génère DEP0190
+            shell: isWindows, // Windows nécessite shell pour les .cmd
             env: { ...process.env },
         });
         return {
@@ -404,7 +407,7 @@ export const systemSkill: Skill = {
                             cwd: cwdPath,
                             timeout: RUN_TIMEOUT_MS,
                             maxBuffer: MAX_BUFFER,
-                            shell: false, // Node.js 20+ gère .cmd directement, shell:true génère DEP0190
+                            shell: isWin && verb === "npx", // Windows nécessite shell pour npx.cmd
                             env: { ...process.env },
                         });
                         return {

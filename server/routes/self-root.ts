@@ -433,7 +433,8 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
           FORCE_COLOR: '0',
           NO_COLOR: '1',
         },
-        // Pas de shell:true - évite l'avertissement de dépréciation
+        // Sur Windows, les .cmd nécessitent shell: true pour éviter EINVAL
+        shell: isWin,
       };
       
       let command = fwConfig.bin;
