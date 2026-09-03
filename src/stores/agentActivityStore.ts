@@ -210,6 +210,92 @@ function cleanup() {
   if (toolActivities.length !== beforeLen) notify();
 }
 
+// ─── Role → Agent name mapping (mirrors AgentPanel.tsx / AgentsSection.tsx) ──
+
+const ROLE_TO_AGENT_NAME: Record<string, string> = {
+  coder:      'Développeur',
+  refactor:   'Refactorisation',
+  debugger:   'Débogueur',
+  reviewer:   'Revue de Code',
+  tester:     'QA & Tests',
+  security:   'Sécurité & Audit',
+  architect:  'Architecte',
+  writer:     'Rédacteur',
+  formatter:  'Mise en forme',
+  researcher: 'Recherche',
+  proofreader:'Correcteur',
+  translator: 'Traducteur',
+  summarizer: 'Synthèse',
+  planner:    'Planificateur',
+};
+
+// ─── Server sync ─────────────────────────────────────────────────────────────
+
+/**
+ * Récupère les tâches actives (running/pending) depuis le serveur et les
+ * injecte dans le store. Appelé à chaque reconnexion WebSocket pour restaurer
+ * le suivi des agents qui tournaient pendant la déconnexion.
+ * 
+ * Idempotent : les tâches déjà présentes dans le store sont mises à jour,
+ * les nouvelles sont ajoutées, les terminées ne sont pas modifiées.
+ */
+export async function syncActiveTasksFromServer(): Promise<void> {
+  try {
+    const res = await fetch('/api/agents/tasks');
+    if (!res.ok) return;
+
+    const data: { count: number; tasks: Array<{
+      id: string;
+      role: string;
+      title: string;
+      status: string;
+      priority: string;
+      createdAt: string;
+      completedAt?: string | null;
+      hasResult: boolean;
+    }> } = await res.json();
+
+    if (!data?.tasks?.length) return;
+
+    // Ne garder que les tâches actives (running ou pending)
+    const activeTasks = data.tasks.filter(t => t.status === 'running' || t.status === 'pending');
+    if (activeTasks.length === 0) return;
+
+    let changed = false;
+
+    for (const serverTask of activeTasks) {
+      const existing = agentTasks.find(t => t.id === serverTask.id);
+      const agentName = ROLE_TO_AGENT_NAME[serverTask.role] ?? serverTask.role;
+      const status = mapStatus(serverTask.status);
+
+      if (existing) {
+        // Mettre à jour le statut si différent
+        if (existing.status !== status) {
+          agentTasks = agentTasks.map(t => t.id === serverTask.id ? { ...t, status } : t);
+          changed = true;
+        }
+      } else {
+        // Nouvelle tâche inconnue du store — l'ajouter
+        agentTasks = [...agentTasks, {
+          id: serverTask.id,
+          role: serverTask.role,
+          title: serverTask.title,
+          status,
+          agentName,
+          detail: `Repris après reconnexion`,
+          timestamp: new Date(serverTask.createdAt).getTime(),
+          steps: [],
+        }];
+        changed = true;
+      }
+    }
+
+    if (changed) notify();
+  } catch {
+    // Silencieux — la sync est best-effort, elle ne doit jamais casser l'UI
+  }
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export function initActivityStore() {

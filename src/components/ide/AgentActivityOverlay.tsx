@@ -41,6 +41,15 @@ interface MissionActivity {
   lastDecision?: string;
 }
 
+// Role → display name (mirrors agentActivityStore / AgentPanel)
+const ROLE_TO_NAME: Record<string, string> = {
+  coder: 'Développeur', refactor: 'Refactorisation', debugger: 'Débogueur',
+  reviewer: 'Revue de Code', tester: 'QA & Tests', security: 'Sécurité & Audit',
+  architect: 'Architecte', writer: 'Rédacteur', formatter: 'Mise en forme',
+  researcher: 'Recherche', proofreader: 'Correcteur', translator: 'Traducteur',
+  summarizer: 'Synthèse', planner: 'Planificateur',
+};
+
 interface AgentActivityOverlayProps {
   /** Callback to open the full Agents panel */
   onOpenAgents?: () => void;
@@ -62,6 +71,45 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions, isChatOpen 
     const interval = setInterval(() => setTick(t => t + 1), 2000);
     return () => clearInterval(interval);
   }, []);
+
+  // ── Re-sync active agents on WebSocket reconnect ──
+  // The overlay's local state is ephemeral; after a disconnect it shows nothing.
+  // On every reconnect we fetch the server's current running/pending tasks and
+  // inject them so the overlay immediately reflects the real agent state.
+  useEffect(() => {
+    const handleReconnected = async () => {
+      try {
+        const res = await fetch('/api/agents/tasks');
+        if (!res.ok) return;
+        const data: { tasks: Array<{ id: string; role: string; title: string; status: string; createdAt: string }> } = await res.json();
+        const active = (data.tasks ?? []).filter(t => t.status === 'running' || t.status === 'pending');
+        if (active.length === 0) return;
+
+        setAgents(prev => {
+          const existingIds = new Set(prev.map(a => a.taskId));
+          const incoming: AgentActivity[] = active
+            .filter(t => !existingIds.has(t.id))
+            .map(t => ({
+              taskId: t.id,
+              role: t.role,
+              agentName: ROLE_TO_NAME[t.role] ?? t.role,
+              title: t.title,
+              status: t.status,
+              timestamp: new Date(t.createdAt),
+            }));
+          return incoming.length > 0 ? [...prev, ...incoming] : prev;
+        });
+
+        setLastEvent(`${active.length} agent(s) en cours repris`);
+      } catch {
+        // best-effort — ne pas bloquer l'UI
+      }
+    };
+
+    window.addEventListener('Leanna-session-reconnected', handleReconnected);
+    return () => window.removeEventListener('Leanna-session-reconnected', handleReconnected);
+  }, []);
+
   // Listen for agent events
   useEffect(() => {
     const handler = (e: Event) => {

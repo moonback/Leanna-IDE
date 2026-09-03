@@ -122,7 +122,12 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
           reconnectCountRef.current = 0; // reset après reconnexion réussie
           goAwayPendingRef.current = false;
           setStatus('connected');
-          onLog(conversationId ? (pendingContextSummaryRef.current ? 'Session reprise après dépassement de tokens (avec résumé de contexte)' : 'Session reprise après expiration GoAway') : 'Connected to Core', 'info');          // Injecter le résumé de contexte si disponible (fallback client-side pour context_overflow)
+          onLog(conversationId ? (pendingContextSummaryRef.current ? 'Session reprise après dépassement de tokens (avec résumé de contexte)' : 'Session reprise après expiration GoAway') : 'Connected to Core', 'info');
+          // Notifier les composants qu'une reconnexion vient d'avoir lieu
+          // (GoAway, context_overflow ou reconnexion réseau) pour qu'ils re-synchronisent
+          // l'état des agents actifs depuis le serveur.
+          window.dispatchEvent(new CustomEvent('Leanna-session-reconnected'));
+          // Injecter le résumé de contexte si disponible (fallback client-side pour context_overflow)
           // Le serveur l'injecte aussi via context_resume=1, mais ce message garantit
           // que le contexte est disponible même si Supabase est indisponible.
           if (pendingContextSummaryRef.current) {
@@ -259,6 +264,9 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
         reconnectCountRef.current = 0;
         setStatus('connected');
         onLog('Connected to Core', 'info');
+        // Notifier les composants d'une connexion établie pour qu'ils chargent l'état
+        // des agents actifs depuis le serveur (premier connect ou reconnexion manuelle).
+        window.dispatchEvent(new CustomEvent('Leanna-session-reconnected'));
         // Injecter le résumé de contexte si disponible (cas de reconnexion context_overflow
         // déclenchée avant que goAwayPendingRef ait pu router vers connectWithConversationId)
         if (pendingContextSummaryRef.current) {

@@ -49,7 +49,7 @@ import { SandboxDiffViewer } from '../components/sandbox/SandboxDiffViewer.js';
 import { AgentPanel } from '../components/panels/AgentPanel.js';
 import { AgentBuilderPanel } from '../components/panels/AgentBuilderPanel.js';
 import { MarketplacePanel } from '../components/panels/MarketplacePanel.js';
-import { initActivityStore, destroyActivityStore } from '../stores/agentActivityStore.js';
+import { initActivityStore, destroyActivityStore, syncActiveTasksFromServer } from '../stores/agentActivityStore.js';
 import { MissionPanel } from '../components/panels/MissionPanel.js';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard.js';
 import { AgentFleetPanel } from '../components/panels/AgentFleetPanel.js';
@@ -81,6 +81,15 @@ export default function IdeView() {
   useEffect(() => {
     initActivityStore();
     return () => destroyActivityStore();
+  }, []);
+
+  // Re-sync active agent tasks from the server whenever the WebSocket reconnects.
+  // Without this, the store (and all agent UI) would show 0 active agents after
+  // a disconnect/reconnect even though tasks are still running server-side.
+  useEffect(() => {
+    const handleReconnected = () => { syncActiveTasksFromServer(); };
+    window.addEventListener('Leanna-session-reconnected', handleReconnected);
+    return () => window.removeEventListener('Leanna-session-reconnected', handleReconnected);
   }, []);
 
   // Check if assistant is currently working
