@@ -69,7 +69,7 @@ const SERVER_PORT = Number(_importMeta.env?.VITE_SERVER_PORT) || 5000;
 
 export default function IdeView() {
   const { profile } = useProfile();
-  const { activity, clearActivity, connected, disconnect, connect, muted, toggleMute, isBusy, reasoning, sendVideoFrame, sendRawMessage } = useLiveAPIContext();
+  const { activity, clearActivity, connected, disconnect, connect, muted, toggleMute, isBusy, reasoning, sendVideoFrame, sendRawMessage, sendEditorContext } = useLiveAPIContext();
   const { isSharing: screenShareEnabled, toggleScreenShare } = useScreenShare();
   const navigate = useNavigate();
   const { info: toastInfo } = useToast();
@@ -411,10 +411,36 @@ export default function IdeView() {
     const trimmedMessage = message.trim();
     if (!trimmedMessage) return;
 
+    // ── Injection automatique du contexte éditeur ──────────────────────────
+    // Avant d'envoyer le message, on informe l'assistant du fichier ouvert,
+    // de la sélection active et de la position du curseur. Cela permet à Gemini
+    // de répondre avec précision sans que l'utilisateur ait à redécrire le contexte.
+    if (connected) {
+      const editor = editorRef.current;
+      let selection: string | null = null;
+      if (editor) {
+        try {
+          const sel = editor.getSelection();
+          const model = editor.getModel();
+          if (sel && model && !sel.isEmpty()) {
+            selection = model.getValueInRange(sel).slice(0, 2000) || null;
+          }
+        } catch { /* ignore si l'éditeur n'est pas prêt */ }
+      }
+      const activeFile = fileSystem.openFiles.find(f => f.path === fileSystem.activePath);
+      sendEditorContext({
+        openFile: fileSystem.activePath ?? null,
+        language: activeFile?.language ?? null,
+        selection,
+        cursorLine: cursorPosition?.line ?? null,
+        cursorColumn: cursorPosition?.column ?? null,
+      });
+    }
+
     setPendingChatMessage({ text: trimmedMessage, displayText });
     setShowSkillsMonitor(false);
     setShowChat(true);
-  }, []);
+  }, [connected, sendEditorContext, fileSystem.activePath, fileSystem.openFiles, editorRef, cursorPosition]);
 
   // ── Context menu actions ───────────────────────────────────────────────────
 

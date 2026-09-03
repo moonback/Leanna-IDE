@@ -222,16 +222,25 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
           }
 
           const isClean = evt.wasClean && evt.code === 1000;
-          onLog(isClean ? 'Connection lost' : 'Connection lost', 'system');
+          onLog(isClean ? 'Connexion fermée proprement' : `Connexion perdue (code WS: ${evt.code}${evt.reason ? `, raison: ${evt.reason}` : ''})`, isClean ? 'system' : 'error');
           if (!isClean) scheduleReconnect(null);
         };
 
-        ws.onerror = () => {
-          onLog('Connection error', 'error');
+        ws.onerror = (event) => {
+          // L'API WebSocket ne fournit pas de détails sur l'erreur dans l'objet Event
+          // (sécurité navigateur), mais on peut distinguer les états de la connexion.
+          const readyState = ws.readyState;
+          const stateLabel = readyState === WebSocket.CONNECTING ? 'CONNECTING'
+            : readyState === WebSocket.CLOSING ? 'CLOSING'
+            : readyState === WebSocket.CLOSED ? 'CLOSED'
+            : 'OPEN';
+          const detail = `WebSocket error (état: ${stateLabel})`;
+          console.error('[WebSocket] onerror:', event, detail);
+          onLog(`Erreur de connexion — ${detail}`, 'error');
         };
       }).catch(err => {
         console.error('Failed to initialize audio', err);
-        onLog('Failed to start audio / WebSocket', 'error');
+        onLog(`Échec démarrage audio / WebSocket : ${err instanceof Error ? err.message : String(err)}`, 'error');
         setStatus('idle');
       });
     };
@@ -341,16 +350,23 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
         }
 
         const isClean = evt.wasClean && evt.code === 1000;
-        onLog('Connection lost', 'system');
+        onLog(isClean ? 'Connexion fermée proprement' : `Connexion perdue (code WS: ${evt.code}${evt.reason ? `, raison: ${evt.reason}` : ''})`, isClean ? 'system' : 'error');
         if (!isClean) scheduleReconnect(null);
       };
 
-      ws.onerror = () => {
-        onLog('Connection error', 'error');
+      ws.onerror = (event) => {
+        const readyState = ws.readyState;
+        const stateLabel = readyState === WebSocket.CONNECTING ? 'CONNECTING'
+          : readyState === WebSocket.CLOSING ? 'CLOSING'
+          : readyState === WebSocket.CLOSED ? 'CLOSED'
+          : 'OPEN';
+        const detail = `WebSocket error (état: ${stateLabel})`;
+        console.error('[WebSocket] onerror:', event, detail);
+        onLog(`Erreur de connexion — ${detail}`, 'error');
       };
     }).catch(err => {
       console.error('Failed to initialize audio', err);
-      onLog('Failed to start audio / WebSocket', 'error');
+      onLog(`Échec démarrage audio / WebSocket : ${err instanceof Error ? err.message : String(err)}`, 'error');
       setStatus('idle');
     });
   }, [onLog, disconnect]);

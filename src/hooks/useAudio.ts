@@ -152,7 +152,23 @@ export function useAudio({ onAudioData, autoMuteEnabled = false, autoMuteTimeout
 
   const initAudio = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // ── Capture avec contraintes de qualité audio ──────────────────────
+      // noiseSuppression, echoCancellation et autoGainControl sont supportées
+      // nativement par Chrome/Edge et réduisent les bruits de fond sans latence.
+      // On demande également le sampleRate cible directement dans les contraintes
+      // (hint pour le driver, pas garanti sur tous les navigateurs).
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          noiseSuppression: true,
+          echoCancellation: true,
+          autoGainControl: true,
+          channelCount: 1,
+          sampleRate: 16000,
+        },
+      }).catch(() =>
+        // Fallback sans contraintes si le navigateur les refuse
+        navigator.mediaDevices.getUserMedia({ audio: true })
+      );
       mediaStreamRef.current = stream;
 
       const AC = window.AudioContext || (window as any).webkitAudioContext;
@@ -163,14 +179,41 @@ export function useAudio({ onAudioData, autoMuteEnabled = false, autoMuteTimeout
       nextStartTimeRef.current = 0;
 
       const source = inputCtx.createMediaStreamSource(stream);
-      const processor = inputCtx.createScriptProcessor(4096, 1, 1);
+
+      // ── Filtre passe-haut (≥80 Hz) ─────────────────────────────────────
+      // Élimine les grondements basses fréquences (ventilateurs, vibrations)
+      // qui ne font pas partie de la voix humaine.
+      const highpassFilter = inputCtx.createBiquadFilter();
+      highpassFilter.type = 'highpass';
+      highpassFilter.frequency.value = 80;
+      highpassFilter.Q.value = 0.7;
+
+      // ── Compresseur dynamique ───────────────────────────────────────────
+      // Normalise le niveau de la voix (parole douce vs forte) et réduit
+      // les pics soudains (bruits de bouche, claquements).
+      const compressor = inputCtx.createDynamicsCompressor();
+      compressor.threshold.value = -24; // dB — commence à compresser à -24 dB
+      compressor.knee.value = 10;       // transition douce
+      compressor.ratio.value = 4;       // ratio 4:1
+      compressor.attack.value = 0.003;  // 3ms — réactif
+      compressor.release.value = 0.25;  // 250ms — relâchement naturel
+
+      // ── Buffer réduit à 2048 samples (128ms) pour moins de latence ─────
+      // Valeur précédente : 4096 (256ms). 2048 est le meilleur compromis
+      // latence/stabilité sur ScriptProcessorNode (déprécié mais encore
+      // universellement supporté).
+      const processor = inputCtx.createScriptProcessor(2048, 1, 1);
       processorRef.current = processor;
 
       const inputAnalyser = inputCtx.createAnalyser();
       inputAnalyser.fftSize = 256;
       inputAnalyser.smoothingTimeConstant = 0.8;
       inputAnalyserRef.current = inputAnalyser;
-      source.connect(inputAnalyser);
+
+      // Chaîne : source → highpass → compressor → analyser → processor → destination
+      source.connect(highpassFilter);
+      highpassFilter.connect(compressor);
+      compressor.connect(inputAnalyser);
       inputAnalyser.connect(processor);
       processor.connect(inputCtx.destination);
 

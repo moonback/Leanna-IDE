@@ -83,11 +83,45 @@ export function useLiveAPI() {
     isBusyRef.current = isBusy;
   }, [isBusy]);
 
-  // Define onAudioData to send recorded raw chunks via WS
-  // Block microphone transmission while the assistant is processing (isBusy),
-  // otherwise Gemini Live treats incoming audio as user speech and won't speak.
+  // ── Latency monitoring ─────────────────────────────────────────────────────
+  // Timestamp du premier chunk audio envoyé (début d'utterance détecté par VAD)
+  const utteranceStartRef = useRef<number | null>(null);
+  // Indique si on est en attente du premier chunk audio de la réponse
+  const waitingFirstResponseChunkRef = useRef(false);
+  const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
+  const latencyHistoryRef = useRef<number[]>([]);
+
+  const recordLatency = useCallback((ms: number) => {
+    setLastLatencyMs(ms);
+    latencyHistoryRef.current = [...latencyHistoryRef.current.slice(-19), ms];
+    console.debug(`[VoiceLatency] ${ms}ms`);
+  }, []);
+
+  const getLatencyStats = useCallback(() => {
+    const history = latencyHistoryRef.current;
+    if (history.length === 0) return null;
+    const avg = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
+    const min = Math.min(...history);
+    const max = Math.max(...history);
+    return { avg, min, max, samples: history.length, last: history[history.length - 1] };
+  }, []);
+
+  // ── Barge-in : envoi audio continu, interruption gérée côté serveur ────────
+  // Gemini Live supporte nativement le barge-in — envoyer de l'audio pendant
+  // que le modèle parle interrompt la génération. On ne bloque donc plus
+  // l'envoi pendant isBusy, sauf pendant l'exécution d'outils (tool calls)
+  // où Gemini n'écoute pas et où l'audio serait ignoré de toute façon.
+  // On mesure également la latence entre le début d'utterance et le premier chunk.
   const handleAudioData = useCallback((base64Data: string) => {
+    // Bloquer uniquement pendant l'exécution d'outils côté serveur
     if (isBusyRef.current) return;
+
+    // Mesure de latence : détecter début d'utterance (amplitude non nulle)
+    if (utteranceStartRef.current === null) {
+      utteranceStartRef.current = performance.now();
+      waitingFirstResponseChunkRef.current = true;
+    }
+
     sendAudioData(base64Data);
   }, []);
 
@@ -128,9 +162,19 @@ export function useLiveAPI() {
       }
     }
     if (msg.audio) {
+      // ── Mesure latence : premier chunk audio de la réponse ────────────
+      if (waitingFirstResponseChunkRef.current && utteranceStartRef.current !== null) {
+        const latency = Math.round(performance.now() - utteranceStartRef.current);
+        recordLatency(latency);
+        waitingFirstResponseChunkRef.current = false;
+        utteranceStartRef.current = null;
+      }
       playAudioChunk(msg.audio);
     }
     if (msg.interrupted) {
+      // Réinitialiser le tracking de latence si l'assistant est interrompu
+      utteranceStartRef.current = null;
+      waitingFirstResponseChunkRef.current = false;
       handleInterrupt();
       addLog('Interrupted', 'system');
     }
@@ -283,6 +327,9 @@ export function useLiveAPI() {
       window.dispatchEvent(new CustomEvent('Leanna-mission-event', { detail: msg }));
     }
     if (msg.text) {
+      // Réinitialiser le tracking de latence à chaque nouveau texte reçu
+      utteranceStartRef.current = null;
+      waitingFirstResponseChunkRef.current = false;
       const sources = pendingSourcesRef.current;
       pendingSourcesRef.current = [];
       addTranscript('assistant', msg.text, sources);
@@ -333,6 +380,7 @@ export function useLiveAPI() {
     addTokenUsage,
     updatePromptContext,
     clearTokenUsage,
+    recordLatency,
   ]);
 
   const {
@@ -369,6 +417,22 @@ export function useLiveAPI() {
     sendWSMessage(text);
     addTranscript('user', displayText);
   }, [sendWSMessage, addTranscript]);
+
+  // ── Injection de contexte éditeur ──────────────────────────────────────────
+  // Envoie le contexte de l'éditeur (fichier actif, sélection, position curseur)
+  // au serveur pour enrichir les requêtes vocales. Appelé par IdeView juste avant
+  // ou après l'envoi d'un message vocal, sans bloquer le flux audio.
+  const sendEditorContext = useCallback((ctx: {
+    openFile?: string | null;
+    language?: string | null;
+    selection?: string | null;
+    cursorLine?: number | null;
+    cursorColumn?: number | null;
+  }) => {
+    // Ne rien envoyer si tout est vide
+    if (!ctx.openFile && !ctx.selection) return;
+    sendRawMessage({ type: 'voice_context', ...ctx });
+  }, [sendRawMessage]);
 
   // ── Résumé automatique du contexte ─────────────────────────────────────────
   const summarizeContext = useCallback(async (keepTurns: number = 8) => {
@@ -571,13 +635,16 @@ export function useLiveAPI() {
       refreshWorkflows,
       startAuditFlow,
       getInputAmplitude, getOutputAmplitude,
-      sendVideoFrame, sendTextMessage, sendRawMessage,
+      sendVideoFrame, sendTextMessage, sendRawMessage, sendEditorContext,
       activity, clearActivity,
       isBusy,
       reasoning,
       tokenUsage,
       promptContext,
       summarizeContext,
+      // ── Monitoring latence vocale ────────────────────────────────────────
+      lastLatencyMs,
+      getLatencyStats,
       // ── Contrôle résumé automatique ─────────────────────────────────────
       autoSummarizeEnabled,
       autoSummarizeThreshold,

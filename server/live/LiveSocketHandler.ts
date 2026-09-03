@@ -807,6 +807,27 @@ export function attachLiveWebSocket(
             session.sendRealtimeInput({ video: { data: msg.video.data, mimeType: msg.video.mimeType } });
           }
 
+          // ── Contexte éditeur (fichier actif, sélection, curseur) ─────────
+          // Envoyé par le client avant/pendant une requête vocale pour que Gemini
+          // dispose du contexte IDE de l'utilisateur sans qu'il ait à le décrire.
+          if (msg.type === 'voice_context') {
+            const parts: string[] = [];
+            if (msg.openFile) parts.push(`Fichier actif : ${msg.openFile}${msg.language ? ` (${msg.language})` : ''}`);
+            if (msg.cursorLine != null) parts.push(`Curseur : ligne ${msg.cursorLine}${msg.cursorColumn != null ? `, colonne ${msg.cursorColumn}` : ''}`);
+            if (msg.selection && String(msg.selection).trim().length > 0) {
+              const sel = String(msg.selection).slice(0, 2000); // cap à 2000 chars
+              parts.push(`Sélection en cours :\n\`\`\`\n${sel}\n\`\`\``);
+            }
+            if (parts.length > 0) {
+              const contextText = `[CONTEXTE IDE]\n${parts.join('\n')}`;
+              try {
+                session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: contextText }] }] });
+              } catch (e) {
+                console.error('[VoiceContext] Erreur injection contexte éditeur:', e);
+              }
+            }
+          }
+
           if (msg.type === 'context_resume_summary' && msg.summary && !contextResumeSummary) {
             const resumeText = `[CONTEXTE DE LA CONVERSATION PRÉCÉDENTE]\n\n${msg.summary}\n\nContinue en tenant compte de ce résumé.`;
             try {
