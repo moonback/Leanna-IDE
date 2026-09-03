@@ -4,7 +4,7 @@
 </p>
 
 # Leanna
-
+L’Environnement d’Assistance Numérique pour le Développement Augmenté
 ## Pitch
 
 Leanna est un IDE augmenté par l'IA et un système d'exploitation pour développeurs, pensé pour transformer la manière dont on écrit, teste et audite du code. Grâce à une connexion vocale et multimodale bidirectionnelle avec Google Gemini Live, Leanna permet d'explorer, éditer, tester et sécuriser un codebase en temps réel — comme si un ingénieur senior travaillait à vos côtés, en continu.
