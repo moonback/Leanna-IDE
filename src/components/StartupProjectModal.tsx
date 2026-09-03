@@ -549,10 +549,10 @@ export function StartupProjectModal() {
                 className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{
                   backgroundColor: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
-                  border: '1px solid color-mix(in srgb, var(--accent-primary) 24%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--accent-secondary) 30%, transparent)',
                 }}
               >
-                <FolderOpen className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+                <FolderOpen className="w-5 h-5" style={{ color: 'var(--accent-secondary)' }} />
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] mb-1" style={{ color: 'var(--accent-primary)' }}>
@@ -611,7 +611,7 @@ export function StartupProjectModal() {
               type="button"
               onClick={() => setActiveTab('recent')}
               className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === 'recent' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
+                activeTab === 'recent' ? 'shadow-sm' : 'opacity-70 hover:opacity-100 '
               }`}
               style={{
                 backgroundColor: activeTab === 'recent' ? 'var(--bg-panel)' : 'transparent',
@@ -767,13 +767,13 @@ export function StartupProjectModal() {
                           <button
                             type="button"
                             onClick={(e) => handleDeleteWorkspace(e, ws.id)}
-                            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-400 transition-all"
+                            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/50 hover:text-red-400 transition-all"
                             style={{ color: 'var(--text-muted)' }}
                             title="Retirer de l'historique"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                          <div className="p-1.5 rounded-lg text-primary opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">
+                          <div className="p-1.5 rounded-lg text-primary opacity-60 group-hover:opacity-100 hover:text-green-400 group-hover:translate-x-0.5 transition-all">
                             <ArrowRight className="w-3.5 h-3.5" />
                           </div>
                         </div>
