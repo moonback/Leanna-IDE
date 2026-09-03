@@ -5,6 +5,8 @@ import type { Observability } from "./runtime/Observability.js";
 import type { ProjectMemory } from "./knowledge/ProjectMemory.js";
 import type { KnowledgeGraph } from "./knowledge/KnowledgeGraph.js";
 import type { McpBridge } from "./mcp/McpBridge.js";
+import type { NotebookManager } from "./notebooks/NotebookManager.js";
+import type { EmbeddingStore } from "./notebooks/EmbeddingStore.js";
 
 export interface GracefulShutdownDeps {
   server: HttpServer;
@@ -15,6 +17,8 @@ export interface GracefulShutdownDeps {
   projectMemory: ProjectMemory;
   knowledgeGraph: KnowledgeGraph;
   mcpBridge: McpBridge;
+  notebookManager: NotebookManager;
+  embeddingStore: EmbeddingStore;
   stopAllWorkflowTimers: () => void;
   stopAllScheduledTasks: () => void;
 }
@@ -50,9 +54,11 @@ export function setupGracefulShutdown(deps: GracefulShutdownDeps): GracefulShutd
     await deps.mcpBridge.shutdown();
     console.log('[Lifecycle] Serveurs MCP déconnectés.');
 
-    // 3c. Flush persistance : ProjectMemory et KnowledgeGraph
+    // 3c. Flush persistance : ProjectMemory, KnowledgeGraph, NotebookManager et EmbeddingStore
     try { deps.projectMemory.save(); console.log('[Lifecycle] ProjectMemory flushé.'); } catch {}
-    try { (deps.knowledgeGraph as any).save?.(); console.log('[Lifecycle] KnowledgeGraph flushé.'); } catch {}
+    try { deps.knowledgeGraph.flushAll(); console.log('[Lifecycle] KnowledgeGraph flushé.'); } catch {}
+    try { (deps.notebookManager as any).flushAll?.(); console.log('[Lifecycle] NotebookManager flushé.'); } catch {}
+    try { deps.embeddingStore.flushAll(); console.log('[Lifecycle] EmbeddingStore flushé.'); } catch {}
 
     // 3d. Arrêter le runtime V2
     try { await deps.runtimeV2.stop(); deps.observability.detach(); console.log('[Lifecycle] RuntimeV2 arrêté.'); } catch {}

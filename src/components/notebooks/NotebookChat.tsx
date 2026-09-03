@@ -684,7 +684,17 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       }
 
       const data = await res.json();
-      toastSuccess(`Sauvegardé : ${data.filePath}`);
+      
+      // Import ideApi dynamiquement pour éviter les dépendances circulaires
+      const { ideApi } = await import('../../services/ideApi.js');
+      
+      // Invalider le cache de l'arborescence pour forcer le rafraîchissement
+      ideApi.invalidateCache();
+      
+      // Déclencher l'événement standard pour rafraîchir l'arborescence du sandbox
+      window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+      
+      toastSuccess(`✓ Sauvegardé : ${data.filePath}`);
       setFolderPickerMsg(null);
     } catch (e: any) {
       toastError(`Erreur : ${e.message}`);
@@ -919,6 +929,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               } else if (parsed.message) {
                 setStreamingText('');
                 setMessages(prev => [...prev, parsed.message]);
+                
+                // Notification de fin de génération (visible même si l'utilisateur a changé d'onglet)
+                if (!document.hidden) {
+                  toastSuccess('✓ Réponse générée avec succès');
+                }
                 // Follow-ups ne se mettent plus à jour automatiquement
               } else if (parsed.error) {
                 throw new Error(parsed.error);
@@ -930,7 +945,9 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         }
       }
     } catch (e: any) {
-      toastError(e.message);
+      if (e.name !== 'AbortError') {
+        toastError(e.message);
+      }
       setStreamingText('');
       setMessages(prev => [...prev, {
         id: `error-${Date.now()}`,
@@ -944,7 +961,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       setStreamingText('');
       inputRef.current?.focus();
     }
-  }, [input, loading, notebookId, toastError]);
+  }, [input, loading, notebookId, toastError, toastSuccess, selectedSources, personality, activeThreadId]);
 
   // ─── Retry / Regenerate (must be after handleSend) ─────────────────────────
 
@@ -1033,6 +1050,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               } else if (parsed.message) {
                 setDeepDiveProgress('');
                 setMessages(prev => [...prev, parsed.message]);
+                
+                // Notification de fin de génération
+                if (!document.hidden) {
+                  toastSuccess('✓ Deep Dive terminé avec succès');
+                }
                 // Follow-ups ne se mettent plus à jour automatiquement
               } else if (parsed.error) {
                 throw new Error(parsed.error);
@@ -1044,7 +1066,9 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         }
       }
     } catch (e: any) {
-      toastError(e.message);
+      if (e.name !== 'AbortError') {
+        toastError(e.message);
+      }
       setMessages(prev => [...prev, {
         id: `error-${Date.now()}`,
         role: 'assistant',
@@ -1057,7 +1081,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       setDeepDiveProgress('');
       inputRef.current?.focus();
     }
-  }, [input, loading, notebookId, toastError]);
+  }, [input, loading, notebookId, toastError, toastSuccess]);
 
   const handleClear = useCallback(async () => {
     try {
@@ -1123,6 +1147,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               } else if (parsed.message) {
                 setStreamingText('');
                 setMessages(prev => [...prev, parsed.message]);
+                
+                // Notification de fin de génération
+                if (!document.hidden) {
+                  toastSuccess('✓ Comparaison terminée avec succès');
+                }
                 // Follow-ups ne se mettent plus à jour automatiquement
               }
             } catch { /* skip */ }
@@ -1130,13 +1159,15 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         }
       }
     } catch (e: any) {
-      toastError(e.message);
+      if (e.name !== 'AbortError') {
+        toastError(e.message);
+      }
       setStreamingText('');
     } finally {
       setLoading(false);
       setStreamingText('');
     }
-  }, [loading, notebookId, sources, toastError]);
+  }, [loading, notebookId, sources, toastError, toastSuccess]);
 
   // ─── Extract Insights ──────────────────────────────────────────────────────
 
@@ -1193,6 +1224,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
               } else if (parsed.message) {
                 setStreamingText('');
                 setMessages(prev => [...prev, parsed.message]);
+                
+                // Notification de fin de génération
+                if (!document.hidden) {
+                  toastSuccess('✓ Extraction d\'insights terminée avec succès');
+                }
                 // Follow-ups ne se mettent plus à jour automatiquement
               }
             } catch { /* skip */ }
@@ -1200,13 +1236,15 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
         }
       }
     } catch (e: any) {
-      toastError(e.message);
+      if (e.name !== 'AbortError') {
+        toastError(e.message);
+      }
       setStreamingText('');
     } finally {
       setLoading(false);
       setStreamingText('');
     }
-  }, [loading, notebookId, toastError]);
+  }, [loading, notebookId, toastError, toastSuccess]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

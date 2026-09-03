@@ -82,13 +82,19 @@ export class RAGEngine {
     // ── Étape 1 : Recherche sémantique via embeddings (toutes les queries) ─
     let semanticResults: Map<string, number> = new Map();
     try {
-      for (const q of queries) {
-        const embeddingResults = await embeddingStore.search(q, {
+      // Paralléliser les recherches d'embeddings pour toutes les sous-requêtes
+      const embeddingSearches = queries.map(q => 
+        embeddingStore.search(q, {
           sourceIds: options.sourceIds,
           maxResults: RERANK_TOP_K * 2,
           minSimilarity: 0.2,
-        });
+        })
+      );
+      
+      const allEmbeddingResults = await Promise.all(embeddingSearches);
 
+      // Fusionner les résultats de toutes les sous-requêtes
+      for (const embeddingResults of allEmbeddingResults) {
         for (const result of embeddingResults) {
           if (chunkMap.has(result.chunkId)) {
             // Garder le meilleur score parmi toutes les sous-queries

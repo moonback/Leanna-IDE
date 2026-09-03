@@ -45,6 +45,11 @@ function getStorePath(): string {
   return path.join(SELF_ROOT, ".Leanna", "ProjectKnowledge.json");
 }
 
+// ─── Constantes de debounce ──────────────────────────────────────────────────
+
+/** Délai de debounce pour les écritures du graphe (ms) */
+const PERSIST_DEBOUNCE_MS = 1500;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // KnowledgeGraph
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -54,6 +59,8 @@ export class KnowledgeGraph {
   private dirty: boolean = false;
   private lastRootSeen: string = "";
   private updateListeners: Set<() => void> = new Set();
+  /** Timer de debounce pour la persistence asynchrone */
+  private persistTimer: NodeJS.Timeout | null = null;
   /**
    * Index AST en mémoire — non persisté, reconstruit à chaque démarrage.
    * Contient les résultats Tree-sitter bruts par chemin de fichier.
@@ -122,22 +129,69 @@ export class KnowledgeGraph {
   }
 
   /**
-   * Sauvegarde le graphe sur disque.
+   * Planifie l'écriture asynchrone et débouncée du graphe sur disque.
+   * Évite de bloquer l'event loop lors des mises à jour fréquentes (watcher de fichiers).
    */
   save(): void {
     this.syncToCurrentWorkspace();
     if (!this.dirty) return;
+
+    // Annuler le timer précédent s'il existe
+    if (this.persistTimer) clearTimeout(this.persistTimer);
+
+    this.persistTimer = setTimeout(() => {
+      this.persistTimer = null;
+      this.flush();
+    }, PERSIST_DEBOUNCE_MS);
+  }
+
+  /** Écrit immédiatement le graphe sur disque (async, non-bloquant). */
+  private flush(): void {
+    if (!this.dirty) return;
+    
     try {
       const storePath = getStorePath();
       const dir = path.dirname(storePath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      fs.writeFileSync(storePath, JSON.stringify(this.state, null, 2), "utf-8");
+      
+      const data = JSON.stringify(this.state, null, 2);
+      fs.writeFile(storePath, data, "utf-8", (err) => {
+        if (err) log.error(`❌ Échec sauvegarde graphe: ${err.message}`);
+        else log.info(`💾 Graphe sauvegardé: ${storePath}`);
+      });
+      
       this.dirty = false;
-      log.info(`💾 Graphe sauvegardé: ${storePath}`);
     } catch (err) {
       log.error(`❌ Échec sauvegarde graphe: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * Force l'écriture immédiate du graphe si des changements sont en attente.
+   * À appeler avant la fermeture de l'application.
+   */
+  flushAll(): void {
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer);
+      this.persistTimer = null;
+    }
+    
+    if (this.dirty) {
+      // Utiliser writeFileSync pour le shutdown (garantit l'écriture avant la sortie)
+      try {
+        const storePath = getStorePath();
+        const dir = path.dirname(storePath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(storePath, JSON.stringify(this.state, null, 2), "utf-8");
+        this.dirty = false;
+        log.info(`💾 Graphe flushé (shutdown): ${storePath}`);
+      } catch (err) {
+        log.error(`❌ Échec flush graphe: ${(err as Error).message}`);
+      }
     }
   }
 
