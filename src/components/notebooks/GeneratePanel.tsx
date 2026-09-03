@@ -1142,12 +1142,11 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
           </span>
         </div>
 
-        {/* Barre de progression et file d'attente - VISIBLE UNIQUEMENT PENDANT LA GENERATION */}
-        {activeGenerationIds.size > 0 || generationQueue.length > 0 ? (
-          <div
-            className="p-3 rounded-xl border"
-            style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
-          >
+        {/* Barre de progression et file d'attente - TOUJOURS VISIBLE */}
+        <div
+          className="p-3 rounded-xl border"
+          style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+        >
           {/* Barre de progression pour la génération en cours */}
           {activeGenerationIds.size > 0 ? (
             <div className="notebooklm-prose max-w-none space-y-5">
@@ -1313,7 +1312,6 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
             </div>
           )}
         </div>
-        ) : null}
 
         {/* Source filter dropdown */}
         <AnimatePresence>
