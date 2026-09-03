@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo, useMem
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, animate } from 'motion/react';
 import {
   Send, Mic, MicOff, User, Bot, Eye, X,
-  Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2, ChevronDown, Download, MessageSquare,
+  Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2, ChevronDown, Download, MessageSquare, MoreVertical,
 } from 'lucide-react';
 import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
