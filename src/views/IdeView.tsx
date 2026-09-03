@@ -152,6 +152,7 @@ export default function IdeView() {
   const [showSkillsMonitor, setShowSkillsMonitor] = useState(false);
   const [showChat, setShowChat] = useState(true); // Ouvert par défaut au démarrage
   const [chatDocked, setChatDocked] = useState(false);
+  const [chatWidth, setChatWidth] = useState(400); // Largeur du ChatPanel
   const [pendingChatMessage, setPendingChatMessage] = useState<{ text: string; displayText?: string } | null>(null);
   const [showAgents, setShowAgents] = useState(false);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
@@ -709,7 +710,7 @@ export default function IdeView() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="Leanna-ide-shell flex h-full" style={{ backgroundColor: 'var(--ide-shell-bg)', color: 'var(--text-primary)', width: showChat && chatDocked ? 'calc(100% - 420px)' : '100%', transition: 'width 0.25s ease' }}>
+    <div className="Leanna-ide-shell flex h-full" style={{ backgroundColor: 'var(--ide-shell-bg)', color: 'var(--text-primary)', width: showChat && chatDocked ? `calc(100% - ${chatWidth}px)` : '100%', transition: 'width 0.3s cubic-bezier(0.22, 1, 0.36, 1)' }}>
 
       {/* Sidebar Unifiée */}
       <UnifiedSidebar
@@ -1203,6 +1204,7 @@ export default function IdeView() {
           pendingMessage={pendingChatMessage}
           onPendingMessageConsumed={() => setPendingChatMessage(null)}
           onDockedChange={setChatDocked}
+          onWidthChange={setChatWidth}
           initialDocked={chatDocked}
           onClose={() => setShowChat(false)}
         />

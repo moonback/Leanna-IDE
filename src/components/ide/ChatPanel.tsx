@@ -642,16 +642,75 @@ function useDraggablePanel(panelRef: React.RefObject<HTMLDivElement | null>, dis
   };
 }
 
+// --- Hook pour le redimensionnement horizontal ---
+interface ResizeSession {
+  pointerId: number;
+  startClientX: number;
+  startWidth: number;
+}
+
+const MIN_WIDTH = 280;
+const MAX_WIDTH = 800;
+
+function useResizablePanel(disabled: boolean, initialWidth: number, onWidthChange: (width: number) => void) {
+  const [width, setWidth] = useState(initialWidth);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeSession = useRef<ResizeSession | null>(null);
+
+  const handleResizeStart = useCallback((e: React.PointerEvent) => {
+    if (disabled) return;
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    resizeSession.current = {
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startWidth: width,
+    };
+    setIsResizing(true);
+  }, [disabled, width]);
+
+  const handleResizeMove = useCallback((e: React.PointerEvent) => {
+    const s = resizeSession.current;
+    if (!s || e.pointerId !== s.pointerId) return;
+    
+    // Le delta est négatif car on tire vers la gauche pour agrandir
+    const dx = s.startClientX - e.clientX;
+    const newWidth = Math.min(Math.max(s.startWidth + dx, MIN_WIDTH), MAX_WIDTH);
+    setWidth(newWidth);
+  }, []);
+
+  const handleResizeEnd = useCallback((e: React.PointerEvent) => {
+    const s = resizeSession.current;
+    if (!s || e.pointerId !== s.pointerId) return;
+    setIsResizing(false);
+    resizeSession.current = null;
+    onWidthChange(width);
+  }, [width, onWidthChange]);
+
+  return {
+    width,
+    isResizing,
+    setWidth,
+    resizeHandlers: {
+      onPointerDown: handleResizeStart,
+      onPointerMove: handleResizeMove,
+      onPointerUp: handleResizeEnd,
+      onPointerCancel: handleResizeEnd,
+    },
+  };
+}
+
 // --- Composant principal amélioré ---
 interface ChatPanelProps {
   pendingMessage?: PendingChatMessage | null;
   onPendingMessageConsumed?: () => void;
   onDockedChange?: (docked: boolean) => void;
+  onWidthChange?: (width: number) => void;
   initialDocked?: boolean;
   onClose?: () => void;
 }
 
-export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedChange, initialDocked = false, onClose }: ChatPanelProps = {}) {
+export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedChange, onWidthChange, initialDocked = false, onClose }: ChatPanelProps = {}) {
   const {
     connected, connecting, connect, disconnect,
     sendTextMessage, sendRawMessage, transcript, clearTranscript,
@@ -682,6 +741,32 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
   const shouldAutoScrollRef = useRef(true);
   const reduceMotion = !!useReducedMotion();
 
+  // État et handlers pour le redimensionnement
+  const handleWidthChange = useCallback((newWidth: number) => {
+    try {
+      localStorage.setItem('Leanna_chat_width', JSON.stringify(newWidth));
+    } catch (err) {
+      console.warn('[ChatPanel] Failed to save width:', err);
+    }
+    // Notifier le parent (IdeView) de la nouvelle largeur
+    onWidthChange?.(newWidth);
+  }, [onWidthChange]);
+
+  const initialWidth = useMemo(() => {
+    try {
+      const saved = localStorage.getItem('Leanna_chat_width');
+      return saved ? JSON.parse(saved) : 400;
+    } catch {
+      return 400;
+    }
+  }, []);
+
+  const { width, isResizing, resizeHandlers } = useResizablePanel(
+    !docked || fullscreen,
+    initialWidth,
+    handleWidthChange
+  );
+
   // Sauvegarder l'état docké dans localStorage
   useEffect(() => {
     try {
@@ -703,6 +788,11 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
   useEffect(() => {
     onDockedChange?.(docked);
   }, [docked, onDockedChange]);
+
+  // Notifier le parent de la largeur initiale au montage
+  useEffect(() => {
+    onWidthChange?.(width);
+  }, []);  // Seulement au montage
 
   // Sauvegarde automatique de la conversation dans localStorage
   useEffect(() => {
@@ -842,13 +932,13 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
         left: fullscreen ? '0' : undefined,
         bottom: fullscreen ? '0' : docked ? '32px' : '40px', // Ajusté pour ne pas couvrir la StatusBar (32px + 8px marge)
         width: fullscreen ? '100vw' :
-              minimized ? '400px' :
-              docked ? '400px' : '400px',
+              minimized ? `${width}px` :
+              docked ? `${width}px` : `${width}px`,
         height: fullscreen ? '100vh' :
                minimized ? 'auto' :
                docked ? 'calc(100vh - 32px)' : 'calc(100vh - 152px)', // Ajusté : hauteur totale - 80px (top) - 40px (bottom) - 32px (statusbar)
         maxHeight: fullscreen ? '100vh' : minimized ? undefined : docked ? 'calc(100vh - 32px)' : 'calc(100vh - 152px)',
-        minWidth: fullscreen ? undefined : '280px',
+        minWidth: fullscreen ? undefined : `${MIN_WIDTH}px`,
         zIndex: fullscreen ? 99999 : 9990,
         backgroundColor: 'var(--bg-panel)',
         border: fullscreen || docked ? 'none' : `1px solid var(--border-base)`,
@@ -856,8 +946,8 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
         borderRadius: fullscreen ? '0' : docked ? '0' : RADII.xl,
         x: fullscreen || docked ? 0 : mx,
         y: fullscreen || docked ? 0 : my,
-        cursor: isDraggingPanel && !docked && !fullscreen ? 'grabbing' : 'default',
-        userSelect: isDraggingPanel ? 'none' : 'auto',
+        cursor: isDraggingPanel && !docked && !fullscreen ? 'grabbing' : isResizing ? 'ew-resize' : 'default',
+        userSelect: isDraggingPanel || isResizing ? 'none' : 'auto',
         boxShadow: fullscreen
           ? 'none'
           : docked
@@ -867,7 +957,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
               : `0 12px 50px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05)`,
         transition: reduceMotion
           ? 'box-shadow 0.15s'
-          : isDraggingPanel
+          : isDraggingPanel || isResizing
             ? 'box-shadow 0.15s'
             : 'top 0.3s cubic-bezier(0.22, 1, 0.36, 1), right 0.3s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s cubic-bezier(0.22, 1, 0.36, 1), height 0.3s cubic-bezier(0.22, 1, 0.36, 1), bottom 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s',
         backdropFilter: fullscreen ? 'none' : 'blur(20px)',
@@ -875,6 +965,42 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
       {...dropHandlers}
     >
       <DropZoneOverlay isDragging={isDragging} />
+
+      {/* Resize Handle - Bord gauche */}
+      {docked && !fullscreen && (
+        <div
+          {...resizeHandlers}
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize group z-50"
+          style={{
+            touchAction: 'none',
+          }}
+        >
+          {/* Zone de hover invisible pour agrandir la zone de clic */}
+          <div
+            className="absolute left-0 top-0 bottom-0 w-4 -translate-x-1/2"
+            style={{
+              backgroundColor: 'transparent',
+            }}
+          />
+          {/* Barre visuelle */}
+          <div
+            className="absolute left-0 top-0 bottom-0 w-1 transition-colors"
+            style={{
+              backgroundColor: isResizing
+                ? 'var(--accent-primary)'
+                : 'transparent',
+            }}
+          />
+          {/* Indicateur au hover */}
+          <div
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-12 rounded-r-full opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{
+              backgroundColor: 'var(--accent-primary)',
+              boxShadow: '0 0 8px rgba(14, 165, 233, 0.4)',
+            }}
+          />
+        </div>
+      )}
 
       {/* Header amélioré */}
       <div
