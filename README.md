@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="assets/images/icon-light.png" alt="Leanna IA" width="20%" />
+  <img src="assets/images/header2.png" alt="Leanna IA" width="20%" />
 </p>
 
 # Leanna
