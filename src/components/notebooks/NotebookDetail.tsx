@@ -208,10 +208,10 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const { error: toastError } = useToast();
   const [notebook, setNotebook] = useState<NotebookData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>('chat');
-  const [studioTab, setStudioTab] = useState<StudioTab>('notes');
+  const [activeTab, setActiveTab] = useState<Tab>('sources');
+  const [studioTab, setStudioTab] = useState<StudioTab>('generate');
   const [studioOpen, setStudioOpen] = useState(true);
-  const [sourceRailOpen, setSourceRailOpen] = useState(false);
+  const [sourceRailOpen, setSourceRailOpen] = useState(true);
   const [indexingProgress, setIndexingProgress] = useState<{ total: number; done: number; active: boolean }>({ total: 0, done: 0, active: false });
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [viewingGeneratedDoc, setViewingGeneratedDoc] = useState<{ id: string; title: string; type: string; content: string; createdAt: string } | null>(null);
