@@ -838,11 +838,32 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
     // Ajouter à la liste des générations actives
     setActiveGenerationIds(prev => new Set(prev).add(task.id));
     setStreamingTexts(prev => ({ ...prev, [task.id]: '' }));
-    setGenerationProgresses(prev => ({ ...prev, [task.id]: 0 }));
+    setGenerationProgresses(prev => ({ ...prev, [task.id]: 1 })); // démarre à 1% pour confirmer le début
+    
+    // Progression basée sur le temps en fallback : avance régulièrement vers 90%
+    // même si les chunks SSE arrivent groupés ou rarement.
+    const startTime = Date.now();
+    const ESTIMATED_MS = 30_000; // estimation 30s pour un doc moyen
+    let timerId: ReturnType<typeof setInterval> | undefined;
+    timerId = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const timeProgress = Math.min(90, Math.round((elapsed / ESTIMATED_MS) * 100));
+      setGenerationProgresses(prev => {
+        const current = prev[task.id] ?? 0;
+        // N'avance que si le timer est en avance sur les chunks
+        if (timeProgress > current) {
+          setGenerationQueue(q => q.map(t =>
+            t.id === task.id ? { ...t, progress: timeProgress } : t
+          ));
+          return { ...prev, [task.id]: timeProgress };
+        }
+        return prev;
+      });
+    }, 500);
     
     // Mettre à jour le statut de la tâche
     setGenerationQueue(prev => prev.map(t => 
-      t.id === task.id ? { ...t, status: 'generating', progress: 0 } : t
+      t.id === task.id ? { ...t, status: 'generating', progress: 1 } : t
     ));
     
     // Réinitialiser le document sélectionné si on génère un nouveau
@@ -871,8 +892,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
       const decoder = new TextDecoder();
       let buffer = "";
       let accumulated = "";
-      let receivedTokens = 0;
-      let totalTokens = 100; // Estimation initiale
+      // Estimation cible : ~12 000 caractères pour un document moyen.
+      // On plafonne à 95 % pour que le passage à 100 % soit déclenché
+      // uniquement par l'événement "document" final du serveur.
+      const ESTIMATED_TOTAL_CHARS = 12_000;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -890,12 +913,11 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
               const parsed = JSON.parse(data);
               if (parsed.text) {
                 accumulated += parsed.text;
-                receivedTokens += parsed.text.length;
-                
-                // Mettre à jour la progression estimée
-                const progress = Math.min(95, Math.round((receivedTokens / Math.max(totalTokens, receivedTokens + 100)) * 100));
+
+                // Progression linéaire bornée à 95 % jusqu'à réception du doc final
+                const progress = Math.min(95, Math.round((accumulated.length / ESTIMATED_TOTAL_CHARS) * 100));
                 setGenerationProgresses(prev => ({ ...prev, [task.id]: progress }));
-                setGenerationQueue(prev => prev.map(t => 
+                setGenerationQueue(prev => prev.map(t =>
                   t.id === task.id ? { ...t, progress } : t
                 ));
                 setStreamingTexts(prev => ({ ...prev, [task.id]: accumulated }));
@@ -927,6 +949,8 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
       toastError(e.message);
       setStreamingTexts(prev => ({ ...prev, [task.id]: '' }));
     } finally {
+      // Arrêter le timer de progression
+      clearInterval(timerId);
       // Retirer de la liste des générations actives
       setActiveGenerationIds(prev => {
         const newSet = new Set(prev);
@@ -1142,12 +1166,11 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
           </span>
         </div>
 
-        {/* Barre de progression et file d'attente - VISIBLE UNIQUEMENT PENDANT LA GENERATION */}
-        {activeGenerationIds.size > 0 || generationQueue.length > 0 ? (
-          <div
-            className="p-3 rounded-xl border"
-            style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
-          >
+        {/* Barre de progression et file d'attente - TOUJOURS VISIBLE */}
+        <div
+          className="p-3 rounded-xl border"
+          style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+        >
           {/* Barre de progression pour la génération en cours */}
           {activeGenerationIds.size > 0 ? (
             <div className="notebooklm-prose max-w-none space-y-5">
@@ -1313,7 +1336,6 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
             </div>
           )}
         </div>
-        ) : null}
 
         {/* Source filter dropdown */}
         <AnimatePresence>

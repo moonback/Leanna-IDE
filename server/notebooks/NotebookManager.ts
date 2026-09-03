@@ -38,10 +38,17 @@ function getNotebookPath(id: string): string {
 const COLORS = ["#60a5fa", "#34d399", "#fbbf24", "#a78bfa", "#f87171", "#06b6d4", "#f472b6", "#818cf8"];
 const ICONS = ["📓", "📚", "🔬", "💡", "📊", "🎯", "🧪", "📖"];
 
+// ─── Constantes de debounce ──────────────────────────────────────────────────
+
+/** Délai de debounce pour les écritures de notebooks (ms) — même valeur que EmbeddingStore */
+const PERSIST_DEBOUNCE_MS = 1500;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export class NotebookManager {
   private notebooks: Map<string, Notebook> = new Map();
+  /** Timers de debounce pour la persistence asynchrone */
+  private persistTimers: Map<string, NodeJS.Timeout> = new Map();
 
   constructor() {
     this.loadAll();
@@ -68,10 +75,31 @@ export class NotebookManager {
     }
   }
 
+  /** 
+   * Planifie l'écriture asynchrone et débouncée d'un notebook sur disque.
+   * Pattern identique à EmbeddingStore pour éviter de bloquer l'event loop.
+   */
   private persist(notebook: Notebook): void {
+    // Annuler le timer précédent s'il existe
+    const existing = this.persistTimers.get(notebook.id);
+    if (existing) clearTimeout(existing);
+
+    const timer = setTimeout(() => {
+      this.persistTimers.delete(notebook.id);
+      this.flushNotebook(notebook);
+    }, PERSIST_DEBOUNCE_MS);
+
+    this.persistTimers.set(notebook.id, timer);
+  }
+
+  /** Écrit immédiatement le notebook sur disque (async, non-bloquant). */
+  private flushNotebook(notebook: Notebook): void {
     ensureDataDir();
     const filePath = getNotebookPath(notebook.id);
-    fs.writeFileSync(filePath, JSON.stringify(notebook, null, 2), "utf-8");
+    fs.writeFile(filePath, JSON.stringify(notebook, null, 2), "utf-8", (err) => {
+      if (err) log.warn(`Erreur persistence notebook ${notebook.id.slice(0, 8)}: ${err.message}`);
+      else log.debug(`💾 Notebook "${notebook.title}" (${notebook.id.slice(0, 8)}) persisté`);
+    });
   }
 
   /** Public persist — save a notebook to disk (used by routes for direct mutations) */
@@ -80,10 +108,32 @@ export class NotebookManager {
     if (notebook) this.persist(notebook);
   }
 
+  /** 
+   * Force l'écriture immédiate de tous les notebooks en attente.
+   * À appeler avant la fermeture de l'application.
+   */
+  flushAll(): void {
+    for (const [notebookId, timer] of this.persistTimers) {
+      clearTimeout(timer);
+      this.persistTimers.delete(notebookId);
+      const notebook = this.notebooks.get(notebookId);
+      if (notebook) this.flushNotebook(notebook);
+    }
+  }
+
   private remove(id: string): void {
+    // Annuler le flush en attente avant de supprimer
+    const timer = this.persistTimers.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      this.persistTimers.delete(id);
+    }
+
     const filePath = getNotebookPath(id);
     if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+      fs.unlink(filePath, (err) => {
+        if (err) log.warn(`Erreur suppression notebook ${id.slice(0, 8)}: ${err.message}`);
+      });
     }
   }
 

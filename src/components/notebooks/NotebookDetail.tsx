@@ -304,25 +304,28 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const studioTabs: { key: StudioTab; icon: typeof StickyNote; label: string; badge?: number }[] = [
     { key: 'generate', icon: Sparkles, label: 'Générer', badge: notebook.generatedDocuments.length },
     { key: 'notes', icon: StickyNote, label: 'Notes', badge: notebook.notes.length },
-    { key: 'history', icon: Clock, label: 'Historique', badge: notebook.chatHistory.length },
+    { key: 'history', icon: Clock, label: 'Historique', badge: notebook.generatedDocuments.length },
     { key: 'audio', icon: Mic, label: 'Audio', badge: notebook.audioOverviews.length },
   ];
 
-  /** Renders the studio panel content */
-  const renderStudioContent = (tab: StudioTab) => {
-    switch (tab) {
-      case 'notes':
-        return <NotesPanel notebookId={notebookId} notes={notebook.notes} onRefresh={loadNotebook} onOpenNoteEditor={(data) => { setNoteEditorData(data); setSelectedSourceId(null); setViewingGeneratedDoc(null); }} />;
-      case 'generate':
-        return <GeneratePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />;
-      case 'history':
-        return <GeneratedDocsPanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />;
-      case 'audio':
-        return <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />;
-      default:
-        return <div className="p-4 text-center text-[var(--text-muted)]">Onglet non trouvé</div>;
-    }
-  };
+  /** Renders all studio panels simultaneously — active one is visible, others are hidden.
+   *  This preserves component state (e.g. GeneratePanel queue) across tab switches. */
+  const renderStudioPanels = () => (
+    <>
+      <div className="h-full transition-opacity duration-150" style={{ display: studioTab === 'notes' ? 'block' : 'none' }}>
+        <NotesPanel notebookId={notebookId} notes={notebook.notes} onRefresh={loadNotebook} onOpenNoteEditor={(data) => { setNoteEditorData(data); setSelectedSourceId(null); setViewingGeneratedDoc(null); }} />
+      </div>
+      <div className="h-full transition-opacity duration-150" style={{ display: studioTab === 'generate' ? 'block' : 'none' }}>
+        <GeneratePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />
+      </div>
+      <div className="h-full transition-opacity duration-150" style={{ display: studioTab === 'history' ? 'block' : 'none' }}>
+        <GeneratedDocsPanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />
+      </div>
+      <div className="h-full transition-opacity duration-150" style={{ display: studioTab === 'audio' ? 'block' : 'none' }}>
+        <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />
+      </div>
+    </>
+  );
 
   /** Renders the main center content */
   const renderMainContent = () => {
@@ -372,6 +375,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         notebookId={notebookId}
         hasSources={notebook.sources.length > 0}
         sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))}
+        onRefresh={loadNotebook}
       />
     );
   };
@@ -380,8 +384,6 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   // "pairs" sans ordre spatial entre elles — un simple crossfade évite de
   // suggérer une navigation avant/arrière qui n'existe pas.
   const centerMotion = fadeOnly({});
-  // Onglets Studio : même logique, pairs non ordonnées → crossfade pur.
-  const studioMotion = fadeOnly({});
 
   return (
     <div className="notebook-workspace h-full flex flex-col overflow-hidden">
@@ -560,18 +562,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
               </button>
             </div>
 
-            {/* Studio content */}
+            {/* Studio content — all panels always mounted, inactive ones hidden via display:none */}
             <div className="min-h-0 flex-1 overflow-hidden">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={studioTab}
-                  {...studioMotion}
-                  transition={spring}
-                  className="h-full"
-                >
-                  {renderStudioContent(studioTab)}
-                </motion.div>
-              </AnimatePresence>
+              {renderStudioPanels()}
             </div>
           </aside>
         )}

@@ -61,7 +61,7 @@ import listsRouter from "./server/routes/lists.js";
 import automationRouter from "./server/routes/automation.js";
 import { createNotebooksRouter } from "./server/routes/notebooks/index.js";
 import { createTTSRouter } from "./server/routes/tts.js";
-import { notebookManager } from "./server/notebooks/index.js";
+import { notebookManager, embeddingStore } from "./server/notebooks/index.js";
 import { backupService } from "./server/notebooks/BackupService.js";
 import { sourceProcessingQueue } from "./server/notebooks/ProcessingQueue.js";
 import { chatResponseCache, ragSearchCache } from "./server/notebooks/ResponseCache.js";
@@ -778,6 +778,8 @@ async function startServer() {
     projectMemory,
     knowledgeGraph,
     mcpBridge,
+    notebookManager,
+    embeddingStore,
     stopAllWorkflowTimers,
     stopAllScheduledTasks,
   });

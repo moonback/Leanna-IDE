@@ -109,8 +109,16 @@ export function applyStaticAndCompression(
 ): void {
   const { getElectronAppRoot, getWorkspaceRoot } = deps;
 
-  app.use(express.json({ limit: "50mb" }));
-  app.use("/api/ide", compression());
+  // Limite par défaut pour les routes générales (10mb suffit pour la plupart des requêtes API)
+  // Les routes d'upload (upload-document, notebooks sources, documents) utilisent multer
+  // avec leurs propres limites élevées (50mb) et ne sont pas affectées par cette limite
+  app.use(express.json({ limit: "10mb" }));
+  app.use(express.urlencoded({ limit: "10mb", extended: true }));
+  
+  // Compression gzip/brotli pour toutes les routes API (pas seulement /api/ide)
+  // Améliore les temps de chargement pour les payloads volumineux (graphe de connaissances,
+  // résultats RAG, historiques de chat, listes d'entités)
+  app.use("/api", compression());
 
   const monacoPath = path.join(getElectronAppRoot(), "node_modules", "monaco-editor");
   app.use("/monaco-editor", express.static(monacoPath));
