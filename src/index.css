@@ -1932,9 +1932,16 @@ button {
   grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
   background: var(--notebook-canvas);
 }
+/* Source rail collapsed → narrow icon column */
+.notebook-shell[data-source-open="false"] {
+  grid-template-columns: 48px minmax(0, 1fr);
+}
 @media (min-width: 1280px) {
   .notebook-shell[data-studio-open="true"] {
     grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(260px, 320px);
+  }
+  .notebook-shell[data-studio-open="true"][data-source-open="false"] {
+    grid-template-columns: 48px minmax(0, 1fr) minmax(260px, 320px);
   }
 }
 
@@ -1944,6 +1951,10 @@ button {
   flex-direction: column;
   background: var(--notebook-surface);
   border-right: 1px solid var(--notebook-border);
+  transition: width 0.25s ease;
+}
+.notebook-source-rail[data-collapsed="true"] {
+  overflow: hidden;
 }
 .notebook-context-rail {
   border-right: 0;

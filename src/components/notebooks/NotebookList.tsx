@@ -124,7 +124,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
       {/* ─── Header ─────────────────────────────────────────── */}
       <header className="flex-shrink-0 px-6 lg:px-12 pt-8 pb-6">
-        <div className="flex items-start justify-between gap-4 max-w-6xl mx-auto">
+        <div className="flex items-start justify-between gap-4 max-w-8xl mx-auto">
           {/* Title block */}
           <div>
             <div
@@ -187,7 +187,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
       {/* ─── Search & Sort Bar ──────────────────────────────── */}
       {notebooks.length > 0 && (
         <div className="flex-shrink-0 px-6 lg:px-12 py-4">
-          <div className="flex items-center gap-3 max-w-6xl mx-auto">
+          <div className="flex items-center gap-3 max-w-8xl mx-auto">
             {/* Search */}
             <div
               className="flex items-center gap-2.5 flex-1 max-w-md px-3.5 py-2.5 rounded-lg transition-all duration-150 focus-within:ring-2"
@@ -252,7 +252,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
       {/* ─── Notebook Cards ─────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto custom-scrollbar px-6 lg:px-12 pb-10 pt-2">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-8xl mx-auto">
         {loading ? (
           /* ─── Skeleton ─── */
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">

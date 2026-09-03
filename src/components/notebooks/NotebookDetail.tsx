@@ -13,7 +13,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   ArrowLeft, FileText, MessageSquare, StickyNote, Sparkles, Mic, Clock,
-  Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose,
+  Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose, PanelLeftOpen, PanelLeftClose,
   Save,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
@@ -211,6 +211,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('chat');
   const [studioTab, setStudioTab] = useState<StudioTab>('notes');
   const [studioOpen, setStudioOpen] = useState(true);
+  const [sourceRailOpen, setSourceRailOpen] = useState(false);
   const [indexingProgress, setIndexingProgress] = useState<{ total: number; done: number; active: boolean }>({ total: 0, done: 0, active: false });
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [viewingGeneratedDoc, setViewingGeneratedDoc] = useState<{ id: string; title: string; type: string; content: string; createdAt: string } | null>(null);
@@ -268,8 +269,8 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     const handleKeyDown = (e: KeyboardEvent) => {
       const modifier = e.metaKey || e.ctrlKey;
       if (modifier && !e.shiftKey && !e.altKey) {
-        if (e.key === '1') { e.preventDefault(); setActiveTab('sources'); }
-        if (e.key === '2') { e.preventDefault(); setActiveTab('chat'); }
+        if (e.key === '1') { e.preventDefault(); setActiveTab('sources'); setSourceRailOpen(true); }
+        if (e.key === '2') { e.preventDefault(); setActiveTab('chat'); setSourceRailOpen(false); }
         if (e.key === '3') { e.preventDefault(); setStudioTab('notes'); setStudioOpen(true); }
         if (e.key === '4') { e.preventDefault(); setStudioTab('generate'); setStudioOpen(true); }
         if (e.key === '5') { e.preventDefault(); setStudioTab('audio'); setStudioOpen(true); }
@@ -429,7 +430,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         {/* Center navigation */}
         <nav className="notebook-segmented hidden md:flex" aria-label="Notebook navigation">
           <button
-            onClick={() => { setActiveTab('sources'); setSelectedSourceId(null); }}
+            onClick={() => { setActiveTab('sources'); setSelectedSourceId(null); setSourceRailOpen(true); }}
             className="notebook-segment transition-transform active:scale-95"
             data-active={activeTab === 'sources'}
             title="Sources (Ctrl+1 / ⌘1)"
@@ -439,7 +440,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             <span className="notebook-count">{notebook.sources.length}</span>
           </button>
           <button
-            onClick={() => { setActiveTab('chat'); setSelectedSourceId(null); }}
+            onClick={() => { setActiveTab('chat'); setSelectedSourceId(null); setSourceRailOpen(false); }}
             className="notebook-segment transition-transform active:scale-95"
             data-active={activeTab === 'chat'}
             title="Chat (Ctrl+2 / ⌘2)"
@@ -499,18 +500,63 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       </AnimatePresence>
 
       {/* ─── 3-Column Layout ──────────────────────────────── */}
-      <div className="notebook-shell flex-1 overflow-hidden" data-studio-open={studioOpen}>
+      <div className="notebook-shell flex-1 overflow-hidden" data-studio-open={studioOpen} data-source-open={sourceRailOpen}>
         {/* Left: Sources Rail */}
-        <aside className="notebook-source-rail hidden min-w-0 h-full lg:flex overflow-y-auto">
-          <SourcePanel
-            notebookId={notebookId}
-            sources={notebook.sources}
-            onRefresh={loadNotebook}
-            onUploadProgress={setIndexingProgress}
-            compact
-            onSelectSource={(id) => setSelectedSourceId(id === selectedSourceId ? null : id)}
-            selectedSourceId={selectedSourceId}
-          />
+        <aside
+          className="notebook-source-rail hidden min-w-0 h-full lg:flex overflow-hidden flex-col"
+          data-collapsed={!sourceRailOpen}
+        >
+          {sourceRailOpen ? (
+            <SourcePanel
+              notebookId={notebookId}
+              sources={notebook.sources}
+              onRefresh={loadNotebook}
+              onUploadProgress={setIndexingProgress}
+              compact
+              onSelectSource={(id) => setSelectedSourceId(id === selectedSourceId ? null : id)}
+              selectedSourceId={selectedSourceId}
+            />
+          ) : (
+            /* Collapsed rail — just the toggle button */
+            <div className="flex flex-col items-center pt-4 gap-3 w-full">
+              <button
+                onClick={() => setSourceRailOpen(true)}
+                className="p-2 rounded-lg transition-colors hover:bg-[var(--notebook-surface-muted)]"
+                title="Afficher les sources"
+                aria-label="Afficher les sources"
+              >
+                <PanelLeftOpen className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
+              </button>
+              <span
+                className="text-xs font-semibold"
+                style={{
+                  writingMode: 'vertical-rl',
+                  textOrientation: 'mixed',
+                  color: 'var(--text-dimmed)',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  transform: 'rotate(180deg)',
+                }}
+              >
+                Sources {notebook.sources.length > 0 ? `(${notebook.sources.length})` : ''}
+              </span>
+            </div>
+          )}
+          {/* Toggle button at bottom when open */}
+          {sourceRailOpen && (
+            <div className="flex-shrink-0 px-3 py-2 border-t border-[var(--notebook-border)]">
+              <button
+                onClick={() => setSourceRailOpen(false)}
+                className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-lg text-xs transition-colors hover:bg-[var(--notebook-surface-muted)]"
+                title="Réduire le panneau sources"
+                aria-label="Réduire le panneau sources"
+                style={{ color: 'var(--text-dimmed)' }}
+              >
+                <PanelLeftClose className="h-3.5 w-3.5 flex-shrink-0" />
+                <span>Réduire</span>
+              </button>
+            </div>
+          )}
         </aside>
 
         {/* Center: Main Content (Chat or Sources full view) */}
