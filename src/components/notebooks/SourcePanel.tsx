@@ -725,7 +725,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
   return (
     <div
-      className="h-full overflow-y-auto custom-scrollbar p-6 lg:p-8 space-y-5 relative"
+      className="h-full flex flex-col overflow-hidden relative"
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -765,73 +765,78 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         )}
       </AnimatePresence>
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-            Sources
-          </h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            {sources.length === 0
-              ? 'Aucun document pour le moment'
-              : `${sources.length} source${sources.length !== 1 ? 's' : ''} · ${totalWords.toLocaleString()} mots · ${totalChunks} chunks`}
-          </p>
+      {/* ── Sticky header + actions ─────────────────────────── */}
+      <div
+        className="flex-shrink-0 px-6 lg:px-8 pt-6 pb-4 space-y-4"
+        style={{ backgroundColor: 'var(--notebook-canvas, var(--bg-base))', borderBottom: '1px solid var(--notebook-border)' }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+              Sources
+            </h1>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {sources.length === 0
+                ? 'Aucun document pour le moment'
+                : `${sources.length} source${sources.length !== 1 ? 's' : ''} · ${totalWords.toLocaleString()} mots · ${totalChunks} chunks`}
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Upload progress queue */}
-      <AnimatePresence>
-        {uploadQueue.length > 0 && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={spring}
-            className="overflow-hidden"
-          >
-            <div
-              className="p-4 rounded-xl border space-y-2"
-              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--accent-primary)' }}
+        {/* Upload progress queue */}
+        <AnimatePresence>
+          {uploadQueue.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={spring}
+              className="overflow-hidden"
             >
-              <div className="flex items-center gap-2">
-                {uploadDone === uploadQueue.length ? (
-                  <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
-                ) : (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
-                )}
-                <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Upload {uploadDone}/{uploadQueue.length}
-                  {uploadErrors > 0 && <span style={{ color: 'var(--color-error)' }}> · {uploadErrors} erreur{uploadErrors > 1 ? 's' : ''}</span>}
-                </p>
+              <div
+                className="p-4 rounded-xl border space-y-2"
+                style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--accent-primary)' }}
+              >
+                <div className="flex items-center gap-2">
+                  {uploadDone === uploadQueue.length ? (
+                    <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
+                  ) : (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+                  )}
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Upload {uploadDone}/{uploadQueue.length}
+                    {uploadErrors > 0 && <span style={{ color: 'var(--color-error)' }}> · {uploadErrors} erreur{uploadErrors > 1 ? 's' : ''}</span>}
+                  </p>
+                </div>
+                {/* Progress bar */}
+                <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ backgroundColor: 'var(--accent-primary)' }}
+                    initial={{ width: '0%' }}
+                    animate={{ width: `${(uploadDone / uploadQueue.length) * 100}%` }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                  />
+                </div>
+                <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+                  {uploadQueue.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      {f.status === 'pending' && <Loader2 className="w-3 h-3 opacity-30 flex-shrink-0" />}
+                      {f.status === 'uploading' && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
+                      {f.status === 'success' && <CheckCircle2 className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-success)' }} />}
+                      {f.status === 'error' && <XCircle className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-error)' }} />}
+                      <span className="truncate flex-1" style={{ color: f.status === 'error' ? 'var(--color-error)' : 'var(--text-primary)' }}>
+                        {f.name}
+                      </span>
+                      {f.error && <span className="text-xs opacity-60 truncate max-w-[150px]" title={f.error}>{f.error}</span>}
+                    </div>
+                  ))}
+                </div>
               </div>
-              {/* Progress bar */}
-              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ backgroundColor: 'var(--accent-primary)' }}
-                  initial={{ width: '0%' }}
-                  animate={{ width: `${(uploadDone / uploadQueue.length) * 100}%` }}
-                  transition={{ duration: 0.3, ease: 'easeOut' }}
-                />
-              </div>
-              <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
-                {uploadQueue.map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs">
-                    {f.status === 'pending' && <Loader2 className="w-3 h-3 opacity-30 flex-shrink-0" />}
-                    {f.status === 'uploading' && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
-                    {f.status === 'success' && <CheckCircle2 className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-success)' }} />}
-                    {f.status === 'error' && <XCircle className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-error)' }} />}
-                    <span className="truncate flex-1" style={{ color: f.status === 'error' ? 'var(--color-error)' : 'var(--text-primary)' }}>
-                      {f.name}
-                    </span>
-                    {f.error && <span className="text-xs opacity-60 truncate max-w-[150px]" title={f.error}>{f.error}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       {/* Actions row */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -1181,6 +1186,10 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       </AnimatePresence>
 
       {/* Résumé global des sources */}
+      </div>{/* end sticky header */}
+
+      {/* ── Scrollable content ─────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-6 lg:px-8 py-5 space-y-5">
       <SourcesSummaryCard
         notebookId={notebookId}
         sourcesCount={sources.length}
@@ -1406,6 +1415,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
           )}
         </div>
       )}
+      </div>{/* end scrollable content */}
     </div>
   );
 }
