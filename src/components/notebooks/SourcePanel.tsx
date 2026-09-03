@@ -767,16 +767,16 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
       {/* ── Sticky header + actions ─────────────────────────── */}
       <div
-        className="flex-shrink-0 px-6 lg:px-8 pt-6 pb-4 space-y-4"
+        className="flex-shrink-0 px-4 pt-3 pb-2 space-y-2"
         style={{ backgroundColor: 'var(--notebook-canvas, var(--bg-base))', borderBottom: '1px solid var(--notebook-border)' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+            <h1 className="text-sm font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
               Sources
             </h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               {sources.length === 0
                 ? 'Aucun document pour le moment'
                 : `${sources.length} source${sources.length !== 1 ? 's' : ''} · ${totalWords.toLocaleString()} mots · ${totalChunks} chunks`}
@@ -845,7 +845,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
           className="notebook-fab disabled:opacity-50"
-          style={{ padding: '10px 18px', fontSize: '13px' }}
+          style={{ padding: '7px 12px', fontSize: '12px' }}
         >
           {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
           Uploader
@@ -1189,7 +1189,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       </div>{/* end sticky header */}
 
       {/* ── Scrollable content ─────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-6 lg:px-8 py-5 space-y-5">
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3 space-y-3">
       <SourcesSummaryCard
         notebookId={notebookId}
         sourcesCount={sources.length}
@@ -1230,7 +1230,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.97 }}
                   transition={spring}
-                  className="group p-4 rounded-2xl border flex gap-3"
+                  className="group p-3 rounded-xl border flex gap-2"
                   style={{
                     backgroundColor: 'var(--notebook-card-bg)',
                     borderColor: isSelected ? 'var(--accent-primary)' : 'var(--notebook-border)',
@@ -1256,10 +1256,10 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
                   {/* Type icon with color indicator */}
                   <div
-                    className="flex flex-col items-center gap-1 flex-shrink-0 w-9 h-9 rounded-full justify-center"
+                    className="flex flex-col items-center gap-1 flex-shrink-0 w-7 h-7 rounded-full justify-center"
                     style={{ backgroundColor: `${TYPE_COLORS[source.type] || 'var(--text-muted)'}14` }}
                   >
-                    <span className="text-base leading-none">{TYPE_ICONS[source.type] || '📎'}</span>
+                    <span className="text-sm leading-none">{TYPE_ICONS[source.type] || '📎'}</span>
                   </div>
 
                   <div className="min-w-0 flex-1">
@@ -1275,7 +1275,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                       </span>
                     </div>
 
-                    <p className="text-xs mt-1 leading-relaxed line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-xs mt-0.5 leading-relaxed line-clamp-1" style={{ color: 'var(--text-muted)' }}>
                       {source.summary}
                     </p>
 
@@ -1307,7 +1307,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                     </AnimatePresence>
 
                     {/* Meta row */}
-                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-xs font-medium" style={{ color: 'var(--text-dimmed)' }}>
                         {source.wordCount.toLocaleString()} mots
                       </span>
