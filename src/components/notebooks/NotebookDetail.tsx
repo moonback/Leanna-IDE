@@ -304,7 +304,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const studioTabs: { key: StudioTab; icon: typeof StickyNote; label: string; badge?: number }[] = [
     { key: 'generate', icon: Sparkles, label: 'Générer', badge: notebook.generatedDocuments.length },
     { key: 'notes', icon: StickyNote, label: 'Notes', badge: notebook.notes.length },
-    { key: 'history', icon: Clock, label: 'Historique', badge: notebook.chatHistory.length },
+    { key: 'history', icon: Clock, label: 'Historique', badge: notebook.generatedDocuments.length },
     { key: 'audio', icon: Mic, label: 'Audio', badge: notebook.audioOverviews.length },
   ];
 
@@ -372,6 +372,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         notebookId={notebookId}
         hasSources={notebook.sources.length > 0}
         sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))}
+        onRefresh={loadNotebook}
       />
     );
   };

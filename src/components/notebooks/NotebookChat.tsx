@@ -37,6 +37,7 @@ interface Props {
   notebookId: string;
   hasSources: boolean;
   sources?: { id: string; title: string }[];
+  onRefresh?: () => void;
 }
 
 interface SandboxFolder {
@@ -364,7 +365,7 @@ function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
   return tokens.length > 0 ? tokens : [text];
 }
 
-export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
+export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }: Props) {
   const { error: toastError, success: toastSuccess } = useToast();
   const prefersReducedMotion = useReducedMotion();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -1469,10 +1470,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       }
 
       toastSuccess('Sauvegardé dans les notes');
+      onRefresh?.();
     } catch (e: any) {
       toastError(`Erreur : ${e.message}`);
     }
-  }, [messages, notebookId, toastError, toastSuccess]);
+  }, [messages, notebookId, onRefresh, toastError, toastSuccess]);
 
   // ─── Empty state: no sources ───────────────────────────────────────────────
 
