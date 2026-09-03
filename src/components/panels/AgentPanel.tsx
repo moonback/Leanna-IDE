@@ -243,8 +243,13 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
   const allowedCount = profile.agents.allowedRoles.length;
   const totalAgents = AGENT_ROSTER.length;
 
+  // scrollable area height differs between modal and panel mode
+  const scrollAreaStyle: React.CSSProperties = inline
+    ? { minHeight: 0 }          // inside modal flex container — flex-1 handles it
+    : { maxHeight: '60vh' };    // standalone Panel — need an explicit cap
+
   const content = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col min-h-0 flex-1">
       {/* Tab switcher + stats bar */}
       <div className="flex flex-col flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)' }}>
         <div className="flex items-center gap-1 px-3 py-2">
@@ -285,8 +290,8 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 custom-scrollbar">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 custom-scrollbar" style={scrollAreaStyle}>
         {tab === 'roster' ? (
           <RosterTab allowedRoles={profile.agents.allowedRoles} activeRoles={activeRoles} />
         ) : tab === 'live' ? (
@@ -313,6 +318,7 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
           className="relative flex flex-col w-full max-w-lg overflow-hidden"
           style={{
             maxHeight: '75vh',
+            height: '75vh',
             background: 'var(--bg-panel)',
             border: '1px solid var(--border-base)',
             borderRadius: 'var(--radius-xl)',
