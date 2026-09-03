@@ -735,6 +735,8 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
       return false;
     }
   });
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -793,6 +795,18 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
   useEffect(() => {
     onWidthChange?.(width);
   }, []);  // Seulement au montage
+
+  // Fermer le menu quand on clique à l'extérieur
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showMenu && menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
 
   // Sauvegarde automatique de la conversation dans localStorage
   useEffect(() => {
@@ -1073,6 +1087,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
         </div>
 
         <div className="flex items-center gap-0.5">
+          {/* Micro toggle (si connecté) */}
           {connected && (
             <motion.button
               onClick={handleToggleMute}
@@ -1089,35 +1104,13 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
             </motion.button>
           )}
 
-          {transcript.length > 0 && (
-            <>
-              <motion.button
-                onClick={handleExport}
-                whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-                title="Exporter la conversation"
-                aria-label="Exporter la conversation"
-              >
-                <Download size={16} style={{ color: 'var(--text-muted)' }} />
-              </motion.button>
-              <motion.button
-                onClick={handleClear}
-                whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-                title="Effacer la conversation"
-                aria-label="Effacer la conversation"
-              >
-                <Trash2 size={16} style={{ color: 'var(--text-muted)' }} />
-              </motion.button>
-            </>
-          )}
-
+          {/* Toggle input texte */}
           <motion.button
             onClick={() => setShowInput((s: boolean) => !s)}
             whileTap={reduceMotion ? undefined : { scale: 0.9 }}
             className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-            title={showInput ? 'Masquer la saisie de texte' : 'Afficher la saisie de texte'}
-            aria-label={showInput ? 'Masquer la saisie de texte' : 'Afficher la saisie de texte'}
+            title={showInput ? 'Masquer la saisie' : 'Afficher la saisie'}
+            aria-label={showInput ? 'Masquer la saisie' : 'Afficher la saisie'}
           >
             <MessageSquare
               size={16}
@@ -1125,55 +1118,132 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
             />
           </motion.button>
 
-          <motion.button
-            onClick={() => {
-              setFullscreen((f) => {
-                if (!f) { setDocked(false); setMinimized(false); }
-                return !f;
-              });
-            }}
-            whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-            title={fullscreen ? 'Quitter le plein écran' : 'Plein écran'}
-            aria-label={fullscreen ? 'Quitter le plein écran' : 'Plein écran'}
-          >
-            {fullscreen ? (
-              <Minimize2 size={16} style={{ color: 'var(--accent-primary)' }} />
-            ) : (
-              <Maximize2 size={16} style={{ color: 'var(--text-muted)' }} />
-            )}
-          </motion.button>
-
-          <motion.button
-            onClick={() => setDocked((d: boolean) => !d)}
-            whileTap={reduceMotion ? undefined : { scale: 0.9 }}
-            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-            title={docked ? 'Détacher' : 'Ancrer à droite'}
-            aria-label={docked ? 'Détacher' : 'Ancrer à droite'}
-          >
-            <PanelRight
-              size={16}
-              style={{ color: docked ? 'var(--accent-primary)' : 'var(--text-muted)' }}
-            />
-          </motion.button>
-
-          {!docked && (
+          {/* Menu déroulant */}
+          <div className="relative" ref={menuRef}>
             <motion.button
-              onClick={() => setMinimized((m) => !m)}
+              onClick={() => setShowMenu(!showMenu)}
               whileTap={reduceMotion ? undefined : { scale: 0.9 }}
               className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-              title={minimized ? 'Agrandir' : 'Réduire'}
-              aria-label={minimized ? 'Agrandir' : 'Réduire'}
+              title="Plus d'options"
+              aria-label="Plus d'options"
+              aria-expanded={showMenu}
             >
-              <Minus size={16} style={{ color: 'var(--text-muted)' }} />
+              <MoreVertical
+                size={16}
+                style={{ color: showMenu ? 'var(--accent-primary)' : 'var(--text-muted)' }}
+              />
             </motion.button>
-          )}
+
+            {/* Dropdown menu */}
+            <AnimatePresence>
+              {showMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-full mt-1 w-48 rounded-lg overflow-hidden shadow-lg z-50"
+                  style={{
+                    backgroundColor: 'var(--bg-panel)',
+                    border: '1px solid var(--border-base)',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
+                  }}
+                >
+                  {/* Export (si des messages existent) */}
+                  {transcript.length > 0 && (
+                    <>
+                      <button
+                        onClick={() => {
+                          handleExport();
+                          setShowMenu(false);
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm hover:bg-white/10 transition-colors text-left"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        <Download size={14} style={{ color: 'var(--text-muted)' }} />
+                        Exporter
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleClear();
+                          setShowMenu(false);
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm hover:bg-white/10 transition-colors text-left"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        <Trash2 size={14} style={{ color: 'var(--color-error)' }} />
+                        Effacer
+                      </button>
+                      <div className="h-px mx-2 my-1" style={{ backgroundColor: 'var(--border-base)' }} />
+                    </>
+                  )}
+
+                  {/* Plein écran */}
+                  <button
+                    onClick={() => {
+                      setFullscreen((f) => {
+                        if (!f) { setDocked(false); setMinimized(false); }
+                        return !f;
+                      });
+                      setShowMenu(false);
+                    }}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm hover:bg-white/10 transition-colors text-left"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    {fullscreen ? (
+                      <>
+                        <Minimize2 size={14} style={{ color: 'var(--accent-primary)' }} />
+                        Quitter plein écran
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 size={14} style={{ color: 'var(--text-muted)' }} />
+                        Plein écran
+                      </>
+                    )}
+                  </button>
+
+                  {/* Docker/Détacher */}
+                  <button
+                    onClick={() => {
+                      setDocked((d: boolean) => !d);
+                      setShowMenu(false);
+                    }}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm hover:bg-white/10 transition-colors text-left"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    <PanelRight
+                      size={14}
+                      style={{ color: docked ? 'var(--accent-primary)' : 'var(--text-muted)' }}
+                    />
+                    {docked ? 'Détacher' : 'Ancrer'}
+                  </button>
+
+                  {/* Minimiser (si non docké) */}
+                  {!docked && (
+                    <button
+                      onClick={() => {
+                        setMinimized((m) => !m);
+                        setShowMenu(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-2.5 text-sm hover:bg-white/10 transition-colors text-left"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      <Minus size={14} style={{ color: 'var(--text-muted)' }} />
+                      {minimized ? 'Agrandir' : 'Réduire'}
+                    </button>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           <div
             className="w-px h-5 mx-0.5"
             style={{ backgroundColor: 'var(--border-base)' }}
           />
 
+          {/* Power button */}
           <motion.button
             onClick={handleToggleConnect}
             whileTap={reduceMotion ? undefined : { scale: 0.9 }}
@@ -1187,6 +1257,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
             />
           </motion.button>
 
+          {/* Close button */}
           {onClose && (
             <>
               <div
