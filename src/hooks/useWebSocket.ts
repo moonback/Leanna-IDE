@@ -371,10 +371,35 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
     });
   }, [onLog, disconnect]);
 
+  // ── Rate limiter audio côté client ──────────────────────────────────────────
+  // Fenêtre glissante 1s / 100 KB — miroir côté client de la protection serveur.
+  // Évite d'envoyer des rafales inutiles qui seront de toute façon rejetées.
+  const audioRateRef = useRef({ windowStart: 0, bytesInWindow: 0, clientViolations: 0 });
+  const AUDIO_CLIENT_LIMIT_BYTES = 100 * 1024; // 100 KB/s
+
   const sendAudioData = useCallback((base64Data: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ audio: base64Data }));
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+
+    const now = Date.now();
+    const rate = audioRateRef.current;
+
+    // Reset fenêtre si > 1s
+    if (now - rate.windowStart >= 1000) {
+      rate.windowStart = now;
+      rate.bytesInWindow = 0;
     }
+
+    // Taille approximative du chunk (base64 → bytes réels ≈ length * 0.75)
+    const chunkBytes = Math.ceil(base64Data.length * 0.75);
+
+    if (rate.bytesInWindow + chunkBytes > AUDIO_CLIENT_LIMIT_BYTES) {
+      // Throttle côté client — abandonner ce chunk silencieusement
+      rate.clientViolations++;
+      return;
+    }
+
+    rate.bytesInWindow += chunkBytes;
+    wsRef.current.send(JSON.stringify({ audio: base64Data }));
   }, []);
 
   const sendVideoFrame = useCallback((base64Data: string, mimeType = 'image/jpeg') => {

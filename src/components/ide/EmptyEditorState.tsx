@@ -417,8 +417,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const [ctaHovered, setCtaHovered] = useState(false);
 
   const ctaText = connected
-    ? 'Session vocale en cours'
-    : 'Parlez, demandez quelque chose à votre assistant IA sur votre Projet';
+    ? 'Session vocale et texte en cours'
+    : 'Parlez, écrivez ou demandez quelque chose à votre assistant IA';
   const { displayed: ctaDisplayed, isTyping: ctaIsTyping } = useTypewriter(ctaText, ctaHovered);
 
   const [recentFiles, setRecentFiles, clearRecentFiles, removeRecentFile] = useRecentFiles();

@@ -407,7 +407,7 @@ export default function IdeView() {
     fileSystem.closeTab(filePath);
   }, [fileSystem]);
 
-  const queueMessageToAI = useCallback((message: string, displayText?: string) => {
+  const queueMessageToAI = useCallback(async (message: string, displayText?: string) => {
     const trimmedMessage = message.trim();
     if (!trimmedMessage) return;
 
@@ -428,12 +428,39 @@ export default function IdeView() {
         } catch { /* ignore si l'éditeur n'est pas prêt */ }
       }
       const activeFile = fileSystem.openFiles.find(f => f.path === fileSystem.activePath);
+      
+      // Récupérer les erreurs TypeScript (async, non-bloquant)
+      let tsErrors: Array<{ file: string; line: number; column: number; message: string }> = [];
+      try {
+        const res = await fetch('/api/sandbox/validate', { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.diagnostics && Array.isArray(data.diagnostics)) {
+            // Ne garder que les erreurs (pas les warnings) et limiter à 20 pour éviter surcharge
+            tsErrors = data.diagnostics
+              .filter((d: any) => d.severity === 'error' && d.file && d.line)
+              .slice(0, 20)
+              .map((d: any) => ({
+                file: d.file,
+                line: d.line,
+                column: d.col ?? 1,
+                message: d.msg ?? 'Erreur TypeScript'
+              }));
+          }
+        }
+      } catch (err) {
+        // Silent fail - ne pas bloquer l'envoi du message si validation échoue
+        console.warn('[IdeView] Impossible de récupérer les erreurs TypeScript:', err);
+      }
+
       sendEditorContext({
         openFile: fileSystem.activePath ?? null,
         language: activeFile?.language ?? null,
         selection,
         cursorLine: cursorPosition?.line ?? null,
         cursorColumn: cursorPosition?.column ?? null,
+        openFiles: fileSystem.openFiles.map(f => f.path),
+        tsErrors: tsErrors.length > 0 ? tsErrors : undefined,
       });
     }
 

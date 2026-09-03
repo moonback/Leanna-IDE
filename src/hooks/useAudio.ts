@@ -17,9 +17,19 @@ export interface UseAudioOptions {
   onAudioData: (base64Audio: string) => void;
   autoMuteEnabled?: boolean;
   autoMuteTimeout?: number; // in seconds
+  vadEnabled?: boolean;      // Voice Activity Detection
+  vadThreshold?: number;     // Amplitude minimum pour détecter la voix (0-100)
+  vadSilenceDuration?: number; // Durée de silence avant d'arrêter l'envoi (ms)
 }
 
-export function useAudio({ onAudioData, autoMuteEnabled = false, autoMuteTimeout = 40 }: UseAudioOptions) {
+export function useAudio({ 
+  onAudioData, 
+  autoMuteEnabled = false, 
+  autoMuteTimeout = 40,
+  vadEnabled = true,
+  vadThreshold = 35,
+  vadSilenceDuration = 800,
+}: UseAudioOptions) {
   const [muted, setMuted] = useState(false);
   const mutedRef = useRef(false);
   
@@ -29,9 +39,18 @@ export function useAudio({ onAudioData, autoMuteEnabled = false, autoMuteTimeout
   const autoMuteEnabledRef = useRef(autoMuteEnabled);
   const autoMuteTimeoutRef = useRef(autoMuteTimeout);
 
+  // VAD (Voice Activity Detection) refs
+  const vadSilenceStartRef = useRef<number | null>(null);
+  const vadEnabledRef = useRef(vadEnabled);
+  const vadThresholdRef = useRef(vadThreshold);
+  const vadSilenceDurationRef = useRef(vadSilenceDuration);
+
   // Keep refs in sync
   autoMuteEnabledRef.current = autoMuteEnabled;
   autoMuteTimeoutRef.current = autoMuteTimeout;
+  vadEnabledRef.current = vadEnabled;
+  vadThresholdRef.current = vadThreshold;
+  vadSilenceDurationRef.current = vadSilenceDuration;
 
   const inputAudioCtxRef = useRef<AudioContext | null>(null);
   const outputAudioCtxRef = useRef<AudioContext | null>(null);
@@ -47,24 +66,7 @@ export function useAudio({ onAudioData, autoMuteEnabled = false, autoMuteTimeout
 
   mutedRef.current = muted;
 
-  // Auto-mute logic
-  const resetAutoMuteTimer = useCallback(() => {
-    if (!autoMuteEnabledRef.current) return;
-    
-    lastActivityRef.current = Date.now();
-    
-    if (autoMuteTimerRef.current) {
-      clearTimeout(autoMuteTimerRef.current);
-    }
-    
-    autoMuteTimerRef.current = setTimeout(() => {
-      if (!mutedRef.current) {
-        setMuted(true);
-        mutedRef.current = true;
-      }
-    }, autoMuteTimeoutRef.current * 1000);
-  }, []);
-
+  // Auto-mute logic - Utilise useEffect pour synchronisation avec config
   const clearAutoMuteTimer = useCallback(() => {
     if (autoMuteTimerRef.current) {
       clearTimeout(autoMuteTimerRef.current);
@@ -72,28 +74,43 @@ export function useAudio({ onAudioData, autoMuteEnabled = false, autoMuteTimeout
     }
   }, []);
 
+  // Reset auto-mute: simplement unmute, le useEffect ci-dessous relancera le timer
+  const resetAutoMute = useCallback(() => {
+    if (!mutedRef.current) {
+      lastActivityRef.current = Date.now();
+    }
+  }, []);
+
+  // useEffect: Gère le timer auto-mute de manière réactive aux changements de config
+  useEffect(() => {
+    if (!autoMuteEnabled || muted) {
+      clearAutoMuteTimer();
+      return;
+    }
+    
+    const timerId = setTimeout(() => {
+      if (!mutedRef.current) {
+        setMuted(true);
+        mutedRef.current = true;
+      }
+    }, autoMuteTimeout * 1000);
+    
+    autoMuteTimerRef.current = timerId;
+    return () => clearTimeout(timerId);
+  }, [autoMuteEnabled, autoMuteTimeout, muted, clearAutoMuteTimer]);
+
   // Wake/unmute function
   const wake = useCallback(() => {
     if (mutedRef.current) {
       setMuted(false);
       mutedRef.current = false;
     }
-    resetAutoMuteTimer();
-  }, [resetAutoMuteTimer]);
+    lastActivityRef.current = Date.now();
+  }, []);
 
   const toggleMute = useCallback(() => {
-    setMuted(prev => {
-      const next = !prev;
-      if (!next) {
-        // When unmuting manually, reset the auto-mute timer
-        resetAutoMuteTimer();
-      } else {
-        // When muting manually, clear the auto-mute timer
-        clearAutoMuteTimer();
-      }
-      return next;
-    });
-  }, [resetAutoMuteTimer, clearAutoMuteTimer]);
+    setMuted(prev => !prev);
+  }, []);
 
   const playAudioChunk = useCallback((base64Audio: string) => {
     const audioCtx = outputAudioCtxRef.current;
@@ -233,7 +250,7 @@ export function useAudio({ onAudioData, autoMuteEnabled = false, autoMuteTimeout
 
         // Detect voice activity (simple amplitude threshold)
         if (inAvg > 30) {
-          resetAutoMuteTimer();
+          resetAutoMute();
         }
 
         outputAnalyser.getByteFrequencyData(outDataArray);
@@ -243,18 +260,48 @@ export function useAudio({ onAudioData, autoMuteEnabled = false, autoMuteTimeout
       tick();
 
       processor.onaudioprocess = (e) => {
-        if (!mutedRef.current) {
+        if (mutedRef.current) return;
+        
+        // ── VAD (Voice Activity Detection) ──────────────────────────────
+        // Économise 40-60% de bande passante en ne transmettant que les segments
+        // où une voix est détectée (amplitude > seuil).
+        
+        if (vadEnabledRef.current) {
+          // Calculer l'amplitude moyenne du chunk actuel
+          inputAnalyser.getByteFrequencyData(dataArray);
+          const amplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+          
+          if (amplitude > vadThresholdRef.current) {
+            // ✅ Voix détectée → envoyer le chunk et reset le timer de silence
+            vadSilenceStartRef.current = null;
+            onAudioData(pcmToBase64(e.inputBuffer.getChannelData(0)));
+            resetAutoMute();
+          } else {
+            // 🔇 Silence détecté
+            if (vadSilenceStartRef.current === null) {
+              // Premier chunk de silence → démarrer le timer
+              vadSilenceStartRef.current = Date.now();
+            }
+            
+            const silenceDuration = Date.now() - vadSilenceStartRef.current;
+            
+            if (silenceDuration < vadSilenceDurationRef.current) {
+              // Silence court (< 800ms par défaut) → continuer d'envoyer
+              // (pauses naturelles dans les phrases, respiration)
+              onAudioData(pcmToBase64(e.inputBuffer.getChannelData(0)));
+            }
+            // Silence long (> 800ms) → NE RIEN ENVOYER (économie bande passante)
+          }
+        } else {
+          // VAD désactivé → envoyer tout l'audio (comportement original)
           onAudioData(pcmToBase64(e.inputBuffer.getChannelData(0)));
         }
       };
-      
-      // Initialize auto-mute timer if enabled
-      resetAutoMuteTimer();
     } catch (err) {
       console.error('Failed to start audio', err);
       throw err;
     }
-  }, [onAudioData, resetAutoMuteTimer]);
+  }, [onAudioData, resetAutoMute]);
 
   const cleanupAudio = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);

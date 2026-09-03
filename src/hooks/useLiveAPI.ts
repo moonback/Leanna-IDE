@@ -141,6 +141,9 @@ export function useLiveAPI() {
       onAudioData: handleAudioData,
       autoMuteEnabled: profile.autoMuteEnabled,
       autoMuteTimeout: profile.autoMuteTimeout,
+      vadEnabled: profile.vadEnabled,
+      vadThreshold: profile.vadThreshold,
+      vadSilenceDuration: profile.vadSilenceDuration,
     });
 
   // Define onMessage handler for WS events
@@ -162,7 +165,8 @@ export function useLiveAPI() {
       }
     }
     if (msg.audio) {
-      // ── Mesure latence : premier chunk audio de la réponse ────────────
+      // ✅ Mesure latence : UNIQUEMENT lors du premier chunk audio de la réponse
+      // Le texte arrive souvent 50-100ms avant l'audio, donc on ne mesure que l'audio
       if (waitingFirstResponseChunkRef.current && utteranceStartRef.current !== null) {
         const latency = Math.round(performance.now() - utteranceStartRef.current);
         recordLatency(latency);
@@ -288,6 +292,14 @@ export function useLiveAPI() {
     if (msg.error) {
       addLog(msg.error, 'error');
     }
+    // ── Retry tool call notification ─────────────────────────────────────────
+    if (msg.tool_retry) {
+      addLog(`⟳ ${msg.tool_retry} — tentative ${msg.attempt}/${msg.maxRetries} (retry dans ${msg.retryIn}ms)`, 'info');
+    }
+    // ── Rate limiting audio ───────────────────────────────────────────────────
+    if (msg.type === 'audio_rate_limited') {
+      addLog(`⚠️ Débit audio limité (violation #${msg.violations}, max ${msg.limitKBs} KB/s) — certains chunks ignorés`, 'error');
+    }
     if (msg.busy !== undefined) {
       setIsBusy(!!msg.busy);
     }
@@ -327,9 +339,8 @@ export function useLiveAPI() {
       window.dispatchEvent(new CustomEvent('Leanna-mission-event', { detail: msg }));
     }
     if (msg.text) {
-      // Réinitialiser le tracking de latence à chaque nouveau texte reçu
-      utteranceStartRef.current = null;
-      waitingFirstResponseChunkRef.current = false;
+      // ⚠️ NE PAS réinitialiser la latence ici - le texte arrive AVANT l'audio (50-100ms)
+      // La latence est mesurée uniquement sur le premier chunk audio (voir msg.audio ci-dessus)
       const sources = pendingSourcesRef.current;
       pendingSourcesRef.current = [];
       addTranscript('assistant', msg.text, sources);
@@ -428,9 +439,11 @@ export function useLiveAPI() {
     selection?: string | null;
     cursorLine?: number | null;
     cursorColumn?: number | null;
+    openFiles?: string[];
+    tsErrors?: Array<{ file: string; line: number; column: number; message: string }>;
   }) => {
     // Ne rien envoyer si tout est vide
-    if (!ctx.openFile && !ctx.selection) return;
+    if (!ctx.openFile && !ctx.selection && (!ctx.openFiles || ctx.openFiles.length === 0) && (!ctx.tsErrors || ctx.tsErrors.length === 0)) return;
     sendRawMessage({ type: 'voice_context', ...ctx });
   }, [sendRawMessage]);
 

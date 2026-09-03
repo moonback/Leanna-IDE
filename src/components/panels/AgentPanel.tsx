@@ -11,6 +11,7 @@ import {
 import { Panel } from '../ui/Panel.js';
 import { IconButton } from '../ui/IconButton.js';
 import { useProfile } from '../../context/UserProfileContext.js';
+import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import type { AgentRole } from '../../context/UserProfileContext.js';
 import {
   getToolActivities, getAgentTasks, subscribe,
@@ -144,6 +145,41 @@ function formatArgs(args: any): string {
   return firstVal.length > 60 ? firstVal.slice(0, 57) + '…' : firstVal;
 }
 
+/** Badge de latence vocale avec code couleur */
+function VoiceLatencyBadge({ getLatencyStats }: { getLatencyStats: () => { avg: number; min: number; max: number; samples: number; last: number } | null }) {
+  const stats = getLatencyStats();
+  
+  if (!stats) return null;
+  
+  // Fonction helper pour déterminer la couleur selon la latence
+  const getLatencyColor = (ms: number): string => {
+    if (ms < 400) return '#10b981';  // vert (excellente)
+    if (ms < 800) return '#f59e0b';  // orange (acceptable)
+    return '#ef4444';                // rouge (élevée)
+  };
+  
+  const color = getLatencyColor(stats.last);
+  
+  return (
+    <div 
+      className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-mono group cursor-help"
+      style={{ 
+        backgroundColor: `${color}10`,
+        border: `1px solid ${color}30`,
+      }}
+      title={`Latence vocale\nDernière: ${stats.last}ms\nMoyenne: ${stats.avg}ms\nMin/Max: ${stats.min}/${stats.max}ms\nÉchantillons: ${stats.samples}`}
+    >
+      <Activity size={8} style={{ color }} />
+      <span className="font-bold" style={{ color }}>
+        {stats.last}ms
+      </span>
+      <span className="opacity-60 text-[10px]" style={{ color }}>
+        (⌀{stats.avg}ms)
+      </span>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Main Component
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -158,6 +194,7 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
   const toolActivities = useSyncExternalStore(subscribe, getToolActivities);
   const delegatedTasks = useSyncExternalStore(subscribe, getAgentTasks);
   const { profile } = useProfile();
+  const { connected, getLatencyStats } = useLiveAPIContext();
 
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [tab, setTab] = useState<'roster' | 'live' | 'delegated'>('roster');
@@ -243,6 +280,8 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
           <StatPill icon={<Loader2 size={8} className="animate-spin" />} value={liveRunning + delegatedRunning} label="actifs" color="var(--accent-secondary)" />
           <StatPill icon={<CheckCircle2 size={8} />} value={totalDone + delegatedDone} label="terminés" color="var(--color-success)" />
           {delegatedFailed > 0 && <StatPill icon={<XCircle size={8} />} value={delegatedFailed} label="erreurs" color="var(--color-error)" />}
+          {/* Badge de latence vocale */}
+          {connected && <VoiceLatencyBadge getLatencyStats={getLatencyStats} />}
         </div>
       </div>
 

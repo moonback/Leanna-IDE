@@ -224,8 +224,8 @@ export class ToolRegistry {
       } catch (err) {
         lastError = err as Error;
         if (attempt < maxRetries) {
-          // Backoff exponentiel simple
-          await this.sleep(Math.min(500 * Math.pow(2, attempt), 4000));
+          // Backoff exponentiel : 1s → 2s → 4s (max)
+          await this.sleep(Math.min(1000 * Math.pow(2, attempt), 4000));
         }
       }
     }

@@ -74,6 +74,10 @@ export interface UserProfile {
   // Auto Mute
   autoMuteEnabled: boolean;   // Activer le mode muet automatique
   autoMuteTimeout: number;    // Délai en secondes avant muet auto (5-300)
+  // VAD (Voice Activity Detection)
+  vadEnabled: boolean;        // Activer la détection de voix (économie bande passante)
+  vadThreshold: number;       // Seuil d'amplitude pour détecter la voix (0-100)
+  vadSilenceDuration: number; // Durée de silence en ms avant d'arrêter l'envoi (300-2000)
   // Model hyperparameters
   temperature:      number;  // 0.0–2.0, contrôle la créativité
   topP:             number;  // 0.0–1.0, nucleus sampling
@@ -110,6 +114,10 @@ const DEFAULT_PROFILE: UserProfile = {
   // Auto Mute
   autoMuteEnabled: true,   // Activé par défaut
   autoMuteTimeout: 40,     // 40 secondes par défaut
+  // VAD (Voice Activity Detection)
+  vadEnabled: true,        // Activé par défaut (économie bande passante)
+  vadThreshold: 35,        // Seuil d'amplitude optimal pour la voix humaine
+  vadSilenceDuration: 800, // 800ms de silence avant d'arrêter l'envoi
   // Model hyperparameters
   temperature:      0.9,
   topP:             0.95,
