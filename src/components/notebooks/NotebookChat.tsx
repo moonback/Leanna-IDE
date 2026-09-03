@@ -45,6 +45,14 @@ interface SandboxFolder {
   depth: number;
 }
 
+interface QueuedChatRequest {
+  id: string;
+  question: string;
+  sourceIds?: string[];
+  personality?: string;
+  threadId?: string;
+}
+
 // Critically damped default — graceful settle, no overshoot. Used for
 // anything not triggered by a physical gesture (menus, message entrance,
 // panel reveals).
@@ -361,13 +369,51 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const prefersReducedMotion = useReducedMotion();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
+  
+  // Clé pour persister l'état de génération dans localStorage (partagé entre onglets)
+  const generationStateKey = `notebook-chat-generation-${notebookId}`;
+  
+  // Fonction pour charger l'état de génération depuis localStorage
+  const loadGenerationState = useCallback(() => {
+    try {
+      const saved = localStorage.getItem(generationStateKey);
+      if (saved) {
+        const state = JSON.parse(saved);
+        // Ignorer les états trop anciens (plus de 5 minutes)
+        if (state.timestamp && Date.now() - state.timestamp < 5 * 60 * 1000) {
+          return state;
+        }
+      }
+    } catch (e) {
+      console.warn('[NotebookChat] Erreur chargement état génération:', e);
+    }
+    return { loading: false, streamingText: '', deepDiveProgress: '' };
+  }, [generationStateKey]);
+  
+  // Fonction pour sauvegarder l'état de génération dans localStorage
+  const saveGenerationState = useCallback((loading: boolean, streamingText: string, deepDiveProgress: string) => {
+    try {
+      localStorage.setItem(generationStateKey, JSON.stringify({ loading, streamingText, deepDiveProgress, timestamp: Date.now() }));
+      // Déclencher un événement pour notifier les autres onglets
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: generationStateKey,
+        newValue: JSON.stringify({ loading, streamingText, deepDiveProgress, timestamp: Date.now() }),
+        storageArea: localStorage,
+      }));
+    } catch (e) {
+      console.warn('[NotebookChat] Erreur sauvegarde état génération:', e);
+    }
+  }, [generationStateKey]);
+  
+  // Initialiser les états avec les valeurs persistées
+  const [loading, setLoading] = useState(() => loadGenerationState().loading);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [suggestionOffset, setSuggestionOffset] = useState(0);
   const [followUps, setFollowUps] = useState<string[]>([]);
-  const [followUpOffset, setFollowUpOffset] = useState(0);  const [streamingText, setStreamingText] = useState('');
-  const [deepDiveProgress, setDeepDiveProgress] = useState('');
+  const [followUpOffset, setFollowUpOffset] = useState(0);
+  const [streamingText, setStreamingText] = useState(() => loadGenerationState().streamingText);
+  const [deepDiveProgress, setDeepDiveProgress] = useState(() => loadGenerationState().deepDiveProgress);
   const [showCitations, setShowCitations] = useState<string | null>(null);
   const [hoveredCitation, setHoveredCitation] = useState<{ citation: Citation; fullContent: string; x: number; y: number } | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -396,7 +442,54 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // FIFO queue for chat generations. Only one request streams at a time.
+  const requestQueueRef = useRef<QueuedChatRequest[]>([]);
+  const processingQueueRef = useRef(false);
+  const [queuedCount, setQueuedCount] = useState(0);
 
+  // Persister l'état de génération dans localStorage
+  useEffect(() => {
+    saveGenerationState(loading, streamingText, deepDiveProgress);
+  }, [loading, streamingText, deepDiveProgress, saveGenerationState]);
+  
+  // Nettoyer localStorage quand la génération est terminée
+  useEffect(() => {
+    if (!loading && !streamingText && !deepDiveProgress) {
+      try {
+        localStorage.removeItem(generationStateKey);
+      } catch (e) {
+        console.warn('[NotebookChat] Erreur suppression état génération:', e);
+      }
+    }
+  }, [loading, streamingText, deepDiveProgress, generationStateKey]);
+  
+  // Écouter les changements de localStorage pour synchroniser avec les autres onglets
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === generationStateKey && e.newValue) {
+        try {
+          const state = JSON.parse(e.newValue);
+          // Vérifier que l'état n'est pas trop ancien
+          if (state.timestamp && Date.now() - state.timestamp < 5 * 60 * 1000) {
+            setLoading(state.loading || false);
+            setStreamingText(state.streamingText || '');
+            setDeepDiveProgress(state.deepDiveProgress || '');
+          }
+        } catch (err) {
+          console.warn('[NotebookChat] Erreur parsing storage event:', err);
+        }
+      } else if (e.key === generationStateKey && !e.newValue) {
+        // L'état a été supprimé (génération terminée dans un autre onglet)
+        setLoading(false);
+        setStreamingText('');
+        setDeepDiveProgress('');
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [generationStateKey]);
+  
   // Charger la liste des threads (une seule fois)
   useEffect(() => {
     (async () => {
@@ -722,7 +815,6 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
       abortRef.current.abort();
       abortRef.current = null;
     }
-    setLoading(false);
     if (streamingText) {
       // Save the partial response as a message
       setMessages(prev => [...prev, {
@@ -868,100 +960,143 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, []);
 
-  // ─── Streaming Send ────────────────────────────────────────────────────────
+  // ─── Streaming Send / FIFO queue ───────────────────────────────────────────
 
-  const handleSend = useCallback(async (question?: string) => {
-    const q = (question || input).trim();
-    if (!q || loading) return;
+  const processChatQueue = useCallback(async () => {
+    // Prevent two queue workers from running at the same time.
+    if (processingQueueRef.current) return;
+
+    processingQueueRef.current = true;
+    setLoading(true);
+
+    try {
+      while (requestQueueRef.current.length > 0) {
+        const request = requestQueueRef.current.shift()!;
+        setQueuedCount(requestQueueRef.current.length);
+        setStreamingText('');
+
+        try {
+          abortRef.current = new AbortController();
+
+          const res = await fetch(`/api/notebooks/${notebookId}/chat/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              question: request.question,
+              sourceIds: request.sourceIds,
+              personality: request.personality,
+              threadId: request.threadId,
+            }),
+            signal: abortRef.current.signal,
+          });
+
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({ error: 'Erreur' }));
+            throw new Error(d.error || `HTTP ${res.status}`);
+          }
+
+          const reader = res.body?.getReader();
+          if (!reader) throw new Error('Pas de body stream');
+
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let accumulated = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+
+              const data = line.slice(6);
+              try {
+                const parsed = JSON.parse(data);
+
+                if (parsed.text) {
+                  accumulated += parsed.text;
+                  setStreamingText(accumulated);
+                } else if (parsed.message) {
+                  setStreamingText('');
+                  setMessages(prev => [...prev, parsed.message]);
+
+                  if (!document.hidden) {
+                    toastSuccess('✓ Réponse générée avec succès');
+                  }
+                } else if (parsed.error) {
+                  throw new Error(parsed.error);
+                }
+              } catch (e: unknown) {
+                if (e instanceof Error && !e.message.includes('JSON')) {
+                  throw e;
+                }
+              }
+            }
+          }
+        } catch (e: unknown) {
+          if (e instanceof DOMException && e.name === 'AbortError') {
+            // Stop only the current request. Pending requests remain in the FIFO queue.
+            continue;
+          }
+
+          const message = e instanceof Error ? e.message : 'Erreur inconnue';
+          toastError(message);
+          setStreamingText('');
+          setMessages(prev => [...prev, {
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            content: `❌ Erreur: ${message}`,
+            citations: [],
+            timestamp: new Date().toISOString(),
+          }]);
+        } finally {
+          abortRef.current = null;
+          setStreamingText('');
+        }
+      }
+    } finally {
+      processingQueueRef.current = false;
+      setQueuedCount(requestQueueRef.current.length);
+      setLoading(false);
+      inputRef.current?.focus();
+    }
+  }, [notebookId, toastError, toastSuccess]);
+
+  const handleSend = useCallback((question?: string) => {
+    const q = (question ?? input).trim();
+    if (!q) return;
 
     setInput('');
     if (inputRef.current) inputRef.current.style.height = 'auto';
-    setLoading(true);
-    setStreamingText('');
+
+    const request: QueuedChatRequest = {
+      id: `request-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      question: q,
+      sourceIds: selectedSources.length > 0 ? [...selectedSources] : undefined,
+      personality: personality !== 'default' ? personality : undefined,
+      threadId: activeThreadId || undefined,
+    };
 
     const tempUserMsg: ChatMessage = {
-      id: `temp-${Date.now()}`,
+      id: `temp-${request.id}`,
       role: 'user',
       content: q,
       citations: [],
       timestamp: new Date().toISOString(),
     };
+
+    // Add the user message immediately, then process requests strictly FIFO.
     setMessages(prev => [...prev, tempUserMsg]);
+    requestQueueRef.current.push(request);
+    setQueuedCount(requestQueueRef.current.length);
 
-    try {
-      abortRef.current = new AbortController();
-      const res = await fetch(`/api/notebooks/${notebookId}/chat/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q, sourceIds: selectedSources.length > 0 ? selectedSources : undefined, personality: personality !== 'default' ? personality : undefined, threadId: activeThreadId || undefined }),
-        signal: abortRef.current.signal,
-      });
-
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Erreur' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("Pas de body stream");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let accumulated = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("event: ")) continue;
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.text) {
-                accumulated += parsed.text;
-                setStreamingText(accumulated);
-              } else if (parsed.message) {
-                setStreamingText('');
-                setMessages(prev => [...prev, parsed.message]);
-                
-                // Notification de fin de génération (visible même si l'utilisateur a changé d'onglet)
-                if (!document.hidden) {
-                  toastSuccess('✓ Réponse générée avec succès');
-                }
-                // Follow-ups ne se mettent plus à jour automatiquement
-              } else if (parsed.error) {
-                throw new Error(parsed.error);
-              }
-            } catch (e: any) {
-              if (e.message && !e.message.includes('JSON')) throw e;
-            }
-          }
-        }
-      }
-    } catch (e: any) {
-      if (e.name !== 'AbortError') {
-        toastError(e.message);
-      }
-      setStreamingText('');
-      setMessages(prev => [...prev, {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: `❌ Erreur: ${e.message}`,
-        citations: [],
-        timestamp: new Date().toISOString(),
-      }]);
-    } finally {
-      setLoading(false);
-      setStreamingText('');
-      inputRef.current?.focus();
-    }
-  }, [input, loading, notebookId, toastError, toastSuccess, selectedSources, personality, activeThreadId]);
+    // Do not await here: this keeps UI interactions responsive while the queue runs.
+    void processChatQueue();
+  }, [input, selectedSources, personality, activeThreadId, processChatQueue]);
 
   // ─── Retry / Regenerate (must be after handleSend) ─────────────────────────
 
@@ -2295,6 +2430,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [] }: Props) {
           <div className="flex items-center gap-2">
             <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
               Entrée pour envoyer • / commandes
+              {queuedCount > 0 && (
+                <span style={{ color: 'var(--accent-primary)' }}>
+                  {' '}• {queuedCount} en attente
+                </span>
+              )}
               {selectedSources.length > 0 && (
                 <span style={{ color: 'var(--accent-primary)' }}> • {selectedSources.length} source{selectedSources.length > 1 ? 's' : ''}</span>
               )}
