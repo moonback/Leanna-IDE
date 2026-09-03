@@ -150,15 +150,8 @@
     const buildDate    = document.getElementById('buildDate');
 
     // ── Theme ─────────────────────────────────────────────
-    function updateLogoTheme() {
-      const isLight = window.matchMedia?.('(prefers-color-scheme: light)').matches;
-      const icon = isLight ? '../assets/images/icon-light.png'  : '../assets/images/icon-sombre.png';
-      const logo = isLight ? '../assets/images/logo.png'        : '../assets/images/logo-sombre.png';
-      if (appLogo)  appLogo.src  = icon;
-      if (heroLogo) heroLogo.src = logo;
-    }
-    window.matchMedia?.('(prefers-color-scheme: light)').addEventListener('change', updateLogoTheme);
-    updateLogoTheme();
+    if (appLogo)  appLogo.src  = '../assets/images/icon-sombre.png';
+    if (heroLogo) heroLogo.src = '../assets/images/header2.png';
 
     // ── Clock ─────────────────────────────────────────────
     function updateClock() {

@@ -197,8 +197,8 @@ html, body {
 }
 
 .hero-logo-img {
-  width: 92px;
-  height: 92px;
+  width: 192px;
+  height: 192px;
   object-fit: contain;
   border-radius: 20px;
   border: 1px solid var(--border-glow);

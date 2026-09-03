@@ -900,56 +900,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
           Codebase
         </motion.button>
 
-        {/* Sélection en masse */}
-        {sources.length > 1 && (
-          <motion.button
-            {...tapScale}
-            onClick={handleSelectAll}
-            className="notebook-chip ml-auto sm:ml-0"
-            title={allFilteredSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
-          >
-            {allFilteredSelected ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
-            {selectedSources.length > 0 ? `${selectedSources.length} sélectionnée${selectedSources.length > 1 ? 's' : ''}` : 'Sélectionner'}
-          </motion.button>
-        )}
       </div>
-
-      {/* Barre d'actions groupées */}
-      <AnimatePresence>
-        {selectedSources.length > 0 && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={springSnappy}
-            className="overflow-hidden"
-          >
-            <div
-              className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl"
-              style={{ backgroundColor: 'var(--accent-subtle, rgba(59,130,246,0.08))', border: '1px solid var(--accent-primary)' }}
-            >
-              <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                {selectedSources.length} source{selectedSources.length > 1 ? 's' : ''} sélectionnée{selectedSources.length > 1 ? 's' : ''}
-              </span>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setSelectedSources([])} className="notebook-chip" style={{ padding: '5px 10px', fontSize: '12px' }}>
-                  Annuler
-                </button>
-                <motion.button
-                  {...tapScale}
-                  onClick={handleDeleteSelected}
-                  disabled={uploading}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium disabled:opacity-50"
-                  style={{ backgroundColor: 'var(--red-500)', color: 'var(--color-error)' }}
-                >
-                  {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                  Supprimer
-                </motion.button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Search (when >3 sources) */}
       {sources.length > 3 && (
