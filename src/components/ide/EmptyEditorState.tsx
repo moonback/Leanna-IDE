@@ -1,5 +1,5 @@
 import React, {
-  useState, useEffect, useMemo, useCallback,
+  useState, useEffect, useMemo, useCallback, useRef,
 } from 'react';
 import {
   Plus, FolderOpen, FileText,
@@ -30,6 +30,43 @@ const MOD = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navi
 
 const MAX_RECENT_FILES = 2;
 const ENTRANCE_SPRING = { type: 'spring' as const, bounce: 0, duration: 0.4 };
+
+// ─── Hook animation lettre par lettre ────────────────────────────────────
+
+function useTypewriter(text: string, active: boolean) {
+  const [displayed, setDisplayed] = useState(text);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeRef = useRef(active);
+  activeRef.current = active;
+
+  useEffect(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    if (!active) {
+      setDisplayed(text);
+      return;
+    }
+
+    // Démarre l'animation depuis zéro
+    let index = 0;
+    setDisplayed('');
+    intervalRef.current = setInterval(() => {
+      index += 1;
+      setDisplayed(text.slice(0, index));
+      if (index >= text.length) {
+        clearInterval(intervalRef.current!);
+        intervalRef.current = null;
+      }
+    }, 28);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [active, text]);
+
+  const isTyping = active && displayed.length < text.length;
+  return { displayed, isTyping };
+}
 
 // ─── Validation des fichiers récents ────────────────────────────────────
 
@@ -253,6 +290,11 @@ function GlobalStyles() {
         50% { opacity: 0.6; }
       }
 
+      @keyframes blink-cursor {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         .ai-interactive:active,
         .ai-recent-row:active { transform: none; }
@@ -372,6 +414,12 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSystem, setShowSystem] = useState(false);
   const [loadingFile, setLoadingFile] = useState<string | null>(null);
+  const [ctaHovered, setCtaHovered] = useState(false);
+
+  const ctaText = connected
+    ? 'Session vocale en cours'
+    : 'Parlez, demandez quelque chose à votre assistant IA sur votre Projet';
+  const { displayed: ctaDisplayed, isTyping: ctaIsTyping } = useTypewriter(ctaText, ctaHovered);
 
   const [recentFiles, setRecentFiles, clearRecentFiles, removeRecentFile] = useRecentFiles();
   const gitInfo = useGitInfo();
@@ -544,6 +592,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
           <motion.button
             type="button"
             onClick={handleConnect}
+            onMouseEnter={() => setCtaHovered(true)}
+            onMouseLeave={() => setCtaHovered(false)}
             className="ai-interactive ai-hero group w-full mx-auto flex items-center gap-4 p-6 mb-5 text-left rounded-[22px]"
             style={{
               backgroundColor: 'var(--surface)',
@@ -611,7 +661,20 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.15, duration: 0.3 }}
               >
-                {connected ? 'Session vocale et texte en cours' : 'Parlez, écrivez ou demandez quelque chose à votre assistant IA'}
+                {ctaDisplayed}
+                {ctaIsTyping && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '1px',
+                      height: '0.9em',
+                      backgroundColor: 'var(--text-muted)',
+                      marginLeft: '1px',
+                      verticalAlign: 'text-bottom',
+                      animation: 'blink-cursor 0.6s step-end infinite',
+                    }}
+                  />
+                )}
               </motion.div>
             </div>
 
