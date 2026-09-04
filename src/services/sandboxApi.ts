@@ -116,18 +116,47 @@ function invalidateAll() {
  * Quand ce CustomEvent est émis, on invalide les caches de façon debouncée
  * pour éviter une rafale d'appels si l'événement est émis 30x/s.
  */
-(function installSandboxListener() {
-  if (typeof window === 'undefined') return;
-  let debounce: ReturnType<typeof setTimeout> | null = null;
-  window.addEventListener('Leanna-sandbox-changed', () => {
-    if (debounce) clearTimeout(debounce);
-    debounce = setTimeout(() => invalidateAll(), 200);
-  });
-  window.addEventListener('Leanna-sandbox-file-changed', () => {
-    if (debounce) clearTimeout(debounce);
-    debounce = setTimeout(() => invalidateAll(), 200);
-  });
-})();
+let sandboxListenersInstalled = false;
+let sandboxDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function handleSandboxChanged() {
+  if (sandboxDebounceTimer) clearTimeout(sandboxDebounceTimer);
+  sandboxDebounceTimer = setTimeout(() => invalidateAll(), 200);
+}
+
+function handleSandboxFileChanged() {
+  if (sandboxDebounceTimer) clearTimeout(sandboxDebounceTimer);
+  sandboxDebounceTimer = setTimeout(() => invalidateAll(), 200);
+}
+
+function installSandboxListeners() {
+  if (typeof window === 'undefined' || sandboxListenersInstalled) return;
+  
+  window.addEventListener('Leanna-sandbox-changed', handleSandboxChanged);
+  window.addEventListener('Leanna-sandbox-file-changed', handleSandboxFileChanged);
+  sandboxListenersInstalled = true;
+}
+
+/**
+ * Nettoie les event listeners du sandboxApi.
+ * À appeler lors du reload ou de la fermeture de l'application.
+ */
+export function cleanupSandboxListeners() {
+  if (typeof window === 'undefined' || !sandboxListenersInstalled) return;
+  
+  window.removeEventListener('Leanna-sandbox-changed', handleSandboxChanged);
+  window.removeEventListener('Leanna-sandbox-file-changed', handleSandboxFileChanged);
+  
+  if (sandboxDebounceTimer) {
+    clearTimeout(sandboxDebounceTimer);
+    sandboxDebounceTimer = null;
+  }
+  
+  sandboxListenersInstalled = false;
+}
+
+// Auto-installer au chargement du module
+installSandboxListeners();
 
 export type SandboxStatus = {
   status: 'success' | 'error';

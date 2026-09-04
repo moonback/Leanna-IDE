@@ -431,7 +431,16 @@ export async function summarizeWithLLM(
   if (!apiKey || messages.length < 4) {
     logWarn('summarizeWithLLM: fallback local', { reason: !apiKey ? 'pas de clé API' : 'conversation trop courte (<4 messages)' });
     const summary = summarizeLocal(messages);
-    logInfo('summarizeWithLLM: résumé local généré', { summaryTokens: estimateTokens(summary) });
+    const summaryTokens = estimateTokens(summary);
+    
+    // Validation : le résumé ne doit jamais être vide
+    if (!summary || summary.trim().length === 0 || summaryTokens === 0) {
+      const fallback = `Résumé de ${messages.length} messages de conversation.`;
+      logWarn('summarizeWithLLM: résumé local vide, utilisation du fallback minimal');
+      return { summary: fallback, method: 'local', tokensUsed: 0 };
+    }
+    
+    logInfo('summarizeWithLLM: résumé local généré', { summaryTokens });
     return { summary, method: 'local', tokensUsed: 0 };
   }
 
@@ -472,7 +481,15 @@ export async function summarizeWithLLM(
     } else {
       logWarn('summarizeWithLLM: erreur réseau, fallback local', { error: (err as Error).message });
     }
-    return { summary: summarizeLocal(messages), method: 'local', tokensUsed: 0 };
+    const summary = summarizeLocal(messages);
+    
+    // Validation : le résumé ne doit jamais être vide
+    if (!summary || summary.trim().length === 0 || estimateTokens(summary) === 0) {
+      const fallback = `Résumé de ${messages.length} messages de conversation (erreur LLM).`;
+      return { summary: fallback, method: 'local', tokensUsed: 0 };
+    }
+    
+    return { summary, method: 'local', tokensUsed: 0 };
   }
 }
 
@@ -499,7 +516,18 @@ function summarizeLocal(messages: ChatMessage[]): string {
     }
   }
 
-  // Max 10 paires Q/R
+  // Si aucun point n'a été extrait (messages mal formés), créer un résumé minimal
+  if (points.length === 0) {
+    const fallbackSummary = messages
+      .filter(m => m.content.trim().length > 0)
+      .slice(0, 5)
+      .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 80).replace(/\n/g, ' ')}...`)
+      .join('\n');
+    
+    return fallbackSummary || `Conversation de ${messages.length} message(s) sans contenu exploitable.`;
+  }
+
+  // Max 10 paires Q/R (20 lignes)
   return points.slice(0, 20).join('\n');
 }
 

@@ -1,10 +1,10 @@
 import React, {
-  useState, useEffect, useMemo, useCallback,
+  useState, useEffect, useMemo, useCallback, useRef,
 } from 'react';
 import {
-  Plus, FolderOpen, FileText,
-  MessageSquare, Search, ChevronRight,
-  Trash2, BookOpen, Sparkles,
+  Plus, FolderOpen,
+  MessageSquare, Search,
+  BookOpen, Sparkles,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState.js';
@@ -16,34 +16,52 @@ import { useTheme } from '../../context/ThemeContext.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
-interface RecentFile {
-  path: string;
-  language: string;
-  openedAt: number;
-}
-
 // ─── Constantes ──────────────────────────────────────────────────────────
 
 const MOD = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
   ? '⌘'
   : 'Ctrl';
 
-const MAX_RECENT_FILES = 2;
 const ENTRANCE_SPRING = { type: 'spring' as const, bounce: 0, duration: 0.4 };
 
-// ─── Validation des fichiers récents ────────────────────────────────────
+// ─── Hook animation lettre par lettre ────────────────────────────────────
 
-function isValidRecentFiles(data: unknown): data is RecentFile[] {
-  if (!Array.isArray(data)) return false;
-  return data.every(
-    (item) =>
-      typeof item === 'object' &&
-      item !== null &&
-      typeof (item as RecentFile).path === 'string' &&
-      typeof (item as RecentFile).language === 'string' &&
-      typeof (item as RecentFile).openedAt === 'number'
-  );
+function useTypewriter(text: string, active: boolean) {
+  const [displayed, setDisplayed] = useState(text);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeRef = useRef(active);
+  activeRef.current = active;
+
+  useEffect(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    if (!active) {
+      setDisplayed(text);
+      return;
+    }
+
+    // Démarre l'animation depuis zéro
+    let index = 0;
+    setDisplayed('');
+    intervalRef.current = setInterval(() => {
+      index += 1;
+      setDisplayed(text.slice(0, index));
+      if (index >= text.length) {
+        clearInterval(intervalRef.current!);
+        intervalRef.current = null;
+      }
+    }, 28);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [active, text]);
+
+  const isTyping = active && displayed.length < text.length;
+  return { displayed, isTyping };
 }
+
+// ─── Validation des fichiers récents ────────────────────────────────────
 
 // ─── Sous‑composants (extraits et memoïsés) ────────────────────────────
 
@@ -225,22 +243,8 @@ function GlobalStyles() {
         transform: translateY(0);
       }
 
-      .ai-recent-row:hover {
-        background-color: var(--surface-soft);
-      }
-
-      .ai-recent-row:hover .ai-recent-chevron,
-      .ai-recent-row:hover .ai-recent-lang {
-        opacity: 1;
-      }
-
       .ai-quicklink:hover {
         color: var(--primary);
-        background-color: var(--surface-soft);
-      }
-
-      .ai-clear-btn:hover {
-        color: var(--text-muted);
         background-color: var(--surface-soft);
       }
 
@@ -253,9 +257,13 @@ function GlobalStyles() {
         50% { opacity: 0.6; }
       }
 
+      @keyframes blink-cursor {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+
       @media (prefers-reduced-motion: reduce) {
-        .ai-interactive:active,
-        .ai-recent-row:active { transform: none; }
+        .ai-interactive:active { transform: none; }
         .ai-status-dot { animation: none; }
       }
     `}</style>
@@ -263,51 +271,6 @@ function GlobalStyles() {
 }
 
 // ─── Hook personnalisé pour les fichiers récents ───────────────────────
-
-function useRecentFiles(): [
-  RecentFile[],
-  (files: RecentFile[]) => void,
-  () => void,
-  (path: string) => void
-] {
-  const [files, setFiles] = useState<RecentFile[]>([]);
-
-  // Chargement initial
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('Leanna_recent_files');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (isValidRecentFiles(parsed)) {
-          setFiles(parsed.slice(0, MAX_RECENT_FILES));
-        }
-      }
-    } catch {
-      // Données invalides, on ignore
-    }
-  }, []);
-
-  const updateFiles = useCallback((newFiles: RecentFile[]) => {
-    const sliced = newFiles.slice(0, MAX_RECENT_FILES);
-    setFiles(sliced);
-    localStorage.setItem('Leanna_recent_files', JSON.stringify(sliced));
-  }, []);
-
-  const clearFiles = useCallback(() => {
-    setFiles([]);
-    localStorage.removeItem('Leanna_recent_files');
-  }, []);
-
-  const removeFile = useCallback((path: string) => {
-    setFiles((prev) => {
-      const updated = prev.filter((f) => f.path !== path);
-      localStorage.setItem('Leanna_recent_files', JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
-
-  return [files, updateFiles, clearFiles, removeFile];
-}
 
 function useGitInfo() {
   return null; // À remplacer par une vraie implémentation
@@ -371,9 +334,13 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSystem, setShowSystem] = useState(false);
-  const [loadingFile, setLoadingFile] = useState<string | null>(null);
+  const [ctaHovered, setCtaHovered] = useState(false);
 
-  const [recentFiles, setRecentFiles, clearRecentFiles, removeRecentFile] = useRecentFiles();
+  const ctaText = connected
+    ? 'Session vocale et texte en cours'
+    : 'Parlez, écrivez ou demandez quelque chose à votre assistant IA';
+  const { displayed: ctaDisplayed, isTyping: ctaIsTyping } = useTypewriter(ctaText, ctaHovered);
+
   const gitInfo = useGitInfo();
 
   // Piège de focus pour les modales
@@ -430,34 +397,6 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   }, [onCreateFile, onShowSettings]);
 
   // Ouverture d'un fichier récent avec gestion d'erreur et chargement
-  const handleOpenRecent = useCallback(
-    async (filePath: string) => {
-      if (loadingFile) return; // Évite les doubles clics
-      setLoadingFile(filePath);
-      try {
-        const token = localStorage.getItem('Leanna_api_token');
-        const headers: Record<string, string> = token ? { 'x-Leanna-token': token } : {};
-        const response = await fetch(
-          `/api/ide/file?${new URLSearchParams({ path: filePath })}`,
-          { headers }
-        );
-        if (!response.ok) {
-          // Fichier introuvable ou erreur, on le retire de la liste
-          removeRecentFile(filePath);
-          console.warn(`Fichier ${filePath} introuvable (${response.status})`);
-          return;
-        }
-        onOpenFile(filePath);
-      } catch (error) {
-        console.error('Erreur lors de l\'ouverture du fichier :', error);
-        onOpenFile(filePath);
-      } finally {
-        setLoadingFile(null);
-      }
-    },
-    [loadingFile, removeRecentFile, onOpenFile]
-  );
-
   const handleConnect = useCallback(() => {
     onOpenChat?.();
     if (!connected) connect([], 'full');
@@ -544,6 +483,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
           <motion.button
             type="button"
             onClick={handleConnect}
+            onMouseEnter={() => setCtaHovered(true)}
+            onMouseLeave={() => setCtaHovered(false)}
             className="ai-interactive ai-hero group w-full mx-auto flex items-center gap-4 p-6 mb-5 text-left rounded-[22px]"
             style={{
               backgroundColor: 'var(--surface)',
@@ -611,7 +552,20 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.15, duration: 0.3 }}
               >
-                {connected ? 'Session vocale et texte en cours' : 'Parlez, écrivez ou demandez quelque chose à votre assistant IA'}
+                {ctaDisplayed}
+                {ctaIsTyping && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '1px',
+                      height: '0.9em',
+                      backgroundColor: 'var(--text-muted)',
+                      marginLeft: '1px',
+                      verticalAlign: 'text-bottom',
+                      animation: 'blink-cursor 0.6s step-end infinite',
+                    }}
+                  />
+                )}
               </motion.div>
             </div>
 
@@ -648,125 +602,6 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               onClick={onOpenNotebooks}
             />
           </motion.div>
-
-          {/* ── Fichiers récents (NIVEAU 4-5) ── */}
-          {recentFiles.length > 0 && (
-            <motion.div {...makeEntranceProps(0.16)}>
-              <div className="flex items-center justify-between mb-4">
-                <h2
-                  className="text-xs font-semibold uppercase tracking-[0.08em]"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Fichiers récents
-                </h2>
-                <motion.button
-                  onClick={clearRecentFiles}
-                  className="ai-interactive ai-clear-btn flex items-center gap-1 text-sm px-2 py-1 rounded-md"
-                  style={{ color: 'var(--text-muted)' }}
-                  aria-label="Effacer la liste des fichiers récents"
-                  whileHover={{ scale: 1.05, color: 'var(--primary)' }}
-                  whileTap={{ scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Trash2 size={12} />
-                  Effacer
-                </motion.button>
-              </div>
-
-              <div
-                className="rounded-xl overflow-hidden"
-                style={{
-                  border: '1px solid var(--border)',
-                  backgroundColor: 'var(--surface)',
-                  boxShadow: '0 2px 8px rgba(0, 194, 255, 0.03)',
-                }}
-                role="list"
-              >
-                {recentFiles.map(({ path, language }, index) => {
-                  const fileName = path.split(/[/\\]/).pop() || path;
-                  const dirPath = path.split(/[/\\]/).slice(-3, -1).join('/');
-                  const isDisabled = loadingFile === path;
-                  const fileExtension = fileName.split('.').pop()?.toLowerCase();
-                  
-                  // Map common extensions to specific icons (simplified for now)
-                  const getFileIconColor = () => {
-                    if (['js', 'ts', 'jsx', 'tsx'].includes(fileExtension || '')) return '#f7df1e';
-                    if (['html', 'xml'].includes(fileExtension || '')) return '#e34f26';
-                    if (['css', 'scss'].includes(fileExtension || '')) return '#1572b6';
-                    if (['py'].includes(fileExtension || '')) return '#3572a5';
-                    if (['json'].includes(fileExtension || '')) return '#2b91af';
-                    if (['md'].includes(fileExtension || '')) return '#087fbd';
-                    return 'var(--text-muted)';
-                  };
-
-                  return (
-                    <motion.button
-                      key={path}
-                      onClick={() => handleOpenRecent(path)}
-                      disabled={isDisabled}
-                      className="ai-interactive ai-recent-row w-full flex items-center gap-3 px-5 py-3 text-left group"
-                      style={{
-                        borderTop: index > 0 ? '1px solid var(--border)' : undefined,
-                        opacity: isDisabled ? 0.6 : 1,
-                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      }}
-                      role="listitem"
-                      aria-label={`Ouvrir ${fileName} (${path})`}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05, duration: 0.3 }}
-                      whileHover={{
-                        x: 4,
-                        backgroundColor: 'rgba(0, 194, 255, 0.02)',
-                      }}
-                    >
-                      <motion.div
-                        className="w-6 h-6 flex items-center justify-center rounded-md flex-shrink-0"
-                        style={{
-                          backgroundColor: 'var(--surface-soft)',
-                          border: '1px solid rgba(0, 194, 255, 0.1)',
-                        }}
-                        whileHover={{ scale: 1.1 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <FileText size={14} style={{ color: getFileIconColor() }} />
-                      </motion.div>
-                      
-                      <div className="flex-1 min-w-0 flex flex-col">
-                        <span className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
-                          {fileName}
-                        </span>
-                        <span className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>
-                          {dirPath}
-                        </span>
-                      </div>
-                      
-                      {language && (
-                        <span
-                          className="ai-recent-lang ml-auto text-xs font-mono px-2 py-0.5 rounded-full opacity-0 transition-opacity flex-shrink-0"
-                          style={{
-                            backgroundColor: 'var(--surface-soft)',
-                            color: 'var(--primary)',
-                            border: '1px solid rgba(0, 194, 255, 0.15)',
-                          }}
-                        >
-                          {language}
-                        </span>
-                      )}
-                      
-                      <motion.div
-                        className="flex-shrink-0 opacity-0 transition-opacity"
-                        style={{ color: 'var(--text-muted)' }}
-                        whileHover={{ opacity: 1, x: 4 }}
-                      >
-                        <ChevronRight size={12} />
-                      </motion.div>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
 
           {/* ── NIVEAU 5 : Barre d'info bas ── */}
           <motion.div

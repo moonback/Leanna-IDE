@@ -49,7 +49,7 @@ import { SandboxDiffViewer } from '../components/sandbox/SandboxDiffViewer.js';
 import { AgentPanel } from '../components/panels/AgentPanel.js';
 import { AgentBuilderPanel } from '../components/panels/AgentBuilderPanel.js';
 import { MarketplacePanel } from '../components/panels/MarketplacePanel.js';
-import { initActivityStore, destroyActivityStore } from '../stores/agentActivityStore.js';
+import { initActivityStore, destroyActivityStore, syncActiveTasksFromServer } from '../stores/agentActivityStore.js';
 import { MissionPanel } from '../components/panels/MissionPanel.js';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard.js';
 import { AgentFleetPanel } from '../components/panels/AgentFleetPanel.js';
@@ -69,7 +69,7 @@ const SERVER_PORT = Number(_importMeta.env?.VITE_SERVER_PORT) || 5000;
 
 export default function IdeView() {
   const { profile } = useProfile();
-  const { activity, clearActivity, connected, disconnect, connect, muted, toggleMute, isBusy, reasoning, sendVideoFrame, sendRawMessage } = useLiveAPIContext();
+  const { activity, clearActivity, connected, disconnect, connect, muted, toggleMute, isBusy, reasoning, sendVideoFrame, sendRawMessage, sendEditorContext } = useLiveAPIContext();
   const { isSharing: screenShareEnabled, toggleScreenShare } = useScreenShare();
   const navigate = useNavigate();
   const { info: toastInfo } = useToast();
@@ -81,6 +81,15 @@ export default function IdeView() {
   useEffect(() => {
     initActivityStore();
     return () => destroyActivityStore();
+  }, []);
+
+  // Re-sync active agent tasks from the server whenever the WebSocket reconnects.
+  // Without this, the store (and all agent UI) would show 0 active agents after
+  // a disconnect/reconnect even though tasks are still running server-side.
+  useEffect(() => {
+    const handleReconnected = () => { syncActiveTasksFromServer(); };
+    window.addEventListener('Leanna-session-reconnected', handleReconnected);
+    return () => window.removeEventListener('Leanna-session-reconnected', handleReconnected);
   }, []);
 
   // Check if assistant is currently working
@@ -317,18 +326,49 @@ export default function IdeView() {
       }
     };
 
-    const handleWorkspaceChanged = () => {
+    const handleWorkspaceChanged = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      const workspace = detail?.workspace;
+      
+      console.log('[IdeView] Workspace changed:', workspace);
+      
+      // Fermer tous les onglets
       fileSystem.openFiles.forEach(f => fileSystem.closeTab(f.path));
-      fileSystem.loadTree();
+      
+      if (workspace === null || workspace === undefined) {
+        // Pas de workspace - vider l'arbre
+        console.log('[IdeView] No workspace - clearing tree');
+        fileSystem.setTree([]);
+        fileSystem.setWorkspaceTree([]);
+      } else {
+        // Nouveau workspace - recharger l'arbre
+        console.log('[IdeView] New workspace - reloading tree');
+        fileSystem.loadTree();
+        fileSystem.loadWorkspaceTree();
+      }
+      
+      console.log('[IdeView] All tabs closed and tree updated');
+    };
+
+    const handleNoWorkspace = () => {
+      console.log('[IdeView] No workspace mode - closing all tabs and clearing tree');
+      fileSystem.openFiles.forEach(f => fileSystem.closeTab(f.path));
+      // Vider l'arbre des fichiers en passant un tableau vide
+      fileSystem.setTree([]);
+      fileSystem.setWorkspaceTree([]);
+      fileSystem.setCurrentDir('.');
+      console.log('[IdeView] Tree cleared for no-workspace mode');
     };
 
     window.addEventListener('Leanna-ide-open-file', handleOpenFile);
     window.addEventListener('Leanna-ide-file-changed', handleFileChanged);
     window.addEventListener('Leanna-workspace-changed', handleWorkspaceChanged);
+    window.addEventListener('Leanna-no-workspace-mode', handleNoWorkspace);
     return () => {
       window.removeEventListener('Leanna-ide-open-file', handleOpenFile);
       window.removeEventListener('Leanna-ide-file-changed', handleFileChanged);
       window.removeEventListener('Leanna-workspace-changed', handleWorkspaceChanged);
+      window.removeEventListener('Leanna-no-workspace-mode', handleNoWorkspace);
     };
   }, [openFileAt, fileSystem]);
 
@@ -407,14 +447,67 @@ export default function IdeView() {
     fileSystem.closeTab(filePath);
   }, [fileSystem]);
 
-  const queueMessageToAI = useCallback((message: string, displayText?: string) => {
+  const queueMessageToAI = useCallback(async (message: string, displayText?: string) => {
     const trimmedMessage = message.trim();
     if (!trimmedMessage) return;
+
+    // ── Injection automatique du contexte éditeur ──────────────────────────
+    // Avant d'envoyer le message, on informe l'assistant du fichier ouvert,
+    // de la sélection active et de la position du curseur. Cela permet à Gemini
+    // de répondre avec précision sans que l'utilisateur ait à redécrire le contexte.
+    if (connected) {
+      const editor = editorRef.current;
+      let selection: string | null = null;
+      if (editor) {
+        try {
+          const sel = editor.getSelection();
+          const model = editor.getModel();
+          if (sel && model && !sel.isEmpty()) {
+            selection = model.getValueInRange(sel).slice(0, 2000) || null;
+          }
+        } catch { /* ignore si l'éditeur n'est pas prêt */ }
+      }
+      const activeFile = fileSystem.openFiles.find(f => f.path === fileSystem.activePath);
+      
+      // Récupérer les erreurs TypeScript (async, non-bloquant)
+      let tsErrors: Array<{ file: string; line: number; column: number; message: string }> = [];
+      try {
+        const res = await fetch('/api/sandbox/validate', { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.diagnostics && Array.isArray(data.diagnostics)) {
+            // Ne garder que les erreurs (pas les warnings) et limiter à 20 pour éviter surcharge
+            tsErrors = data.diagnostics
+              .filter((d: any) => d.severity === 'error' && d.file && d.line)
+              .slice(0, 20)
+              .map((d: any) => ({
+                file: d.file,
+                line: d.line,
+                column: d.col ?? 1,
+                message: d.msg ?? 'Erreur TypeScript'
+              }));
+          }
+        }
+      } catch (err) {
+        // Silent fail - ne pas bloquer l'envoi du message si validation échoue
+        console.warn('[IdeView] Impossible de récupérer les erreurs TypeScript:', err);
+      }
+
+      sendEditorContext({
+        openFile: fileSystem.activePath ?? null,
+        language: activeFile?.language ?? null,
+        selection,
+        cursorLine: cursorPosition?.line ?? null,
+        cursorColumn: cursorPosition?.column ?? null,
+        openFiles: fileSystem.openFiles.map(f => f.path),
+        tsErrors: tsErrors.length > 0 ? tsErrors : undefined,
+      });
+    }
 
     setPendingChatMessage({ text: trimmedMessage, displayText });
     setShowSkillsMonitor(false);
     setShowChat(true);
-  }, []);
+  }, [connected, sendEditorContext, fileSystem.activePath, fileSystem.openFiles, editorRef, cursorPosition]);
 
   // ── Context menu actions ───────────────────────────────────────────────────
 
@@ -1196,6 +1289,7 @@ export default function IdeView() {
       <AgentActivityOverlay
         onOpenAgents={() => setShowAgents(true)}
         onOpenMissions={() => setShowMissions(true)}
+        isChatOpen={showChat}
       />
 
       {/* Chat Panel — floating overlay above everything */}

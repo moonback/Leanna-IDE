@@ -589,24 +589,49 @@ realtimeCache.handleWsMessage = (data: FileEvent): void => {
 // ─── Backward-compatible Event Listeners ──────────────────────────────────
 
 // Listen for legacy events and forward to unified system
-if (typeof window !== 'undefined') {
-  window.addEventListener('Leanna-sandbox-changed', () => {
-    realtimeCache.invalidateAll();
-  });
-  
-  window.addEventListener('Leanna-sandbox-file-changed', (e: Event) => {
-    const detail = (e as CustomEvent).detail;
-    if (detail?.path) {
-      realtimeCache.invalidateForFileChange(detail.path);
-    }
-  });
-  
-  window.addEventListener('Leanna-sandbox-file-deleted', (e: Event) => {
-    const detail = (e as CustomEvent).detail;
-    if (detail?.path) {
-      realtimeCache.invalidateForFileDelete(detail.path);
-    }
-  });
+let legacyListenersInstalled = false;
+
+function handleLegacySandboxChanged() {
+  realtimeCache.invalidateAll();
 }
+
+function handleLegacySandboxFileChanged(e: Event) {
+  const detail = (e as CustomEvent).detail;
+  if (detail?.path) {
+    realtimeCache.invalidateForFileChange(detail.path);
+  }
+}
+
+function handleLegacySandboxFileDeleted(e: Event) {
+  const detail = (e as CustomEvent).detail;
+  if (detail?.path) {
+    realtimeCache.invalidateForFileDelete(detail.path);
+  }
+}
+
+function installLegacyListeners() {
+  if (typeof window === 'undefined' || legacyListenersInstalled) return;
+  
+  window.addEventListener('Leanna-sandbox-changed', handleLegacySandboxChanged);
+  window.addEventListener('Leanna-sandbox-file-changed', handleLegacySandboxFileChanged);
+  window.addEventListener('Leanna-sandbox-file-deleted', handleLegacySandboxFileDeleted);
+  legacyListenersInstalled = true;
+}
+
+/**
+ * Nettoie les event listeners legacy du realtimeCache.
+ * À appeler lors du reload ou de la fermeture de l'application.
+ */
+export function cleanupRealtimeCacheListeners() {
+  if (typeof window === 'undefined' || !legacyListenersInstalled) return;
+  
+  window.removeEventListener('Leanna-sandbox-changed', handleLegacySandboxChanged);
+  window.removeEventListener('Leanna-sandbox-file-changed', handleLegacySandboxFileChanged);
+  window.removeEventListener('Leanna-sandbox-file-deleted', handleLegacySandboxFileDeleted);
+  legacyListenersInstalled = false;
+}
+
+// Auto-installer au chargement du module
+installLegacyListeners();
 
 export default realtimeCache;

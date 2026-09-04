@@ -51,6 +51,57 @@ export interface LiveSocketDeps {
   browserActionPending: Map<string, BrowserActionPendingEntry>;
 }
 
+// ─── Constantes retry tool calls ─────────────────────────────────────────────
+
+/** Nombre maximum de tentatives supplémentaires pour les erreurs transientes. */
+const TOOL_MAX_RETRIES = 2;
+/** Délai de base en ms entre les tentatives (backoff exponentiel : 1s, 2s). */
+const TOOL_RETRY_DELAY_MS = 1000;
+
+// ─── Constantes rate limiting audio ──────────────────────────────────────────
+
+/** Débit audio maximum autorisé par connexion WebSocket, en octets/seconde. */
+const AUDIO_RATE_LIMIT_BYTES_PER_SEC = 100 * 1024; // 100 KB/s
+/** Durée de la fenêtre glissante pour mesurer le débit audio, en ms. */
+const AUDIO_RATE_WINDOW_MS = 1000;
+/** Nombre de violations avant de logguer un avertissement groupé. */
+const AUDIO_RATE_VIOLATION_LOG_INTERVAL = 10;
+
+/**
+ * Détermine si une erreur sur un tool call mérite d'être retentée.
+ * Seules les erreurs transientes (réseau, IO, timeout) sont retryables.
+ * Les erreurs métier (validation, permission, outil introuvable) ne le sont pas.
+ */
+function isRetryableToolError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  const name = (err as any).name ?? '';
+
+  // Erreurs non-retryables : logique métier, permission, validation
+  if (name === 'ToolNotFoundError') return false;
+  if (name === 'ToolPermissionError') return false;
+  if (msg.includes('mode ask') || msg.includes('interdit') || msg.includes('bloqué')) return false;
+  if (msg.includes('validation') || msg.includes('invalid') || msg.includes('zod')) return false;
+  if (msg.includes('supervisor') || msg.includes('context gate')) return false;
+
+  // Erreurs retryables : timeout, réseau, IO, erreurs génériques d'exécution
+  if (name === 'ToolTimeoutError') return true;
+  if (msg.includes('timeout') || msg.includes('timed out')) return true;
+  if (msg.includes('econnrefused') || msg.includes('enotfound') || msg.includes('econnreset')) return true;
+  if (msg.includes('network') || msg.includes('fetch failed') || msg.includes('socket')) return true;
+  if (msg.includes('enoent') || msg.includes('eperm') || msg.includes('ebusy')) return true;
+
+  // Par défaut, réessayer pour les erreurs inconnues (conservative retry)
+  return true;
+}
+
+/**
+ * Attend `ms` millisecondes (pour le backoff entre retries).
+ */
+function sleepMs(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // ─── Helpers internes ─────────────────────────────────────────────────────────
 
 function estimateToolTokens(declaration: any): number {
@@ -129,6 +180,16 @@ export function attachLiveWebSocket(
 
     const busyStateRef = { activeDescription: null as string | null };
     const getBusyDescription = () => busyStateRef.activeDescription;
+
+    // ── Rate limiter audio WebSocket ─────────────────────────────────────────
+    // Fenêtre glissante : on accumule les bytes envoyés dans la dernière seconde.
+    // Si le débit dépasse AUDIO_RATE_LIMIT_BYTES_PER_SEC, le chunk est ignoré.
+    const audioRateState = {
+      windowStart: Date.now(),  // début de la fenêtre courante
+      bytesInWindow: 0,         // bytes reçus dans la fenêtre
+      violations: 0,            // compteur total de violations (ignoré pour reset)
+      droppedChunks: 0,         // chunks abandonnés dans la fenêtre courante
+    };
 
     // ── Context window monitoring ────────────────────────────────────────
     const CONTEXT_WINDOW_TOKENS = 1_000_000;
@@ -801,10 +862,83 @@ export function attachLiveWebSocket(
           const msg = JSON.parse(data.toString());
 
           if (msg.audio) {
-            session.sendRealtimeInput({ audio: { data: msg.audio, mimeType: 'audio/pcm;rate=16000' } });
+            // ── Rate limiting audio (100 KB/s) ──────────────────────────────
+            const now = Date.now();
+            const elapsed = now - audioRateState.windowStart;
+
+            // Reset de la fenêtre si > 1s
+            if (elapsed >= AUDIO_RATE_WINDOW_MS) {
+              if (audioRateState.droppedChunks > 0) {
+                console.warn(`[AudioRateLimit] ${audioRateState.droppedChunks} chunk(s) abandonnés dans la fenêtre précédente (${Math.round(audioRateState.bytesInWindow / 1024)} KB/s)`);
+              }
+              audioRateState.windowStart = now;
+              audioRateState.bytesInWindow = 0;
+              audioRateState.droppedChunks = 0;
+            }
+
+            // Taille du chunk audio (base64 → bytes réels ≈ length * 0.75)
+            const chunkBytes = Math.ceil((msg.audio as string).length * 0.75);
+
+            if (audioRateState.bytesInWindow + chunkBytes > AUDIO_RATE_LIMIT_BYTES_PER_SEC) {
+              // Débit dépassé — ignorer ce chunk
+              audioRateState.violations++;
+              audioRateState.droppedChunks++;
+
+              // Notifier le client tous les N violations pour éviter le spam
+              if (audioRateState.violations % AUDIO_RATE_VIOLATION_LOG_INTERVAL === 1) {
+                console.warn(`[AudioRateLimit] Violation #${audioRateState.violations} — débit > ${AUDIO_RATE_LIMIT_BYTES_PER_SEC / 1024} KB/s`);
+                try {
+                  clientWs.send(JSON.stringify({
+                    type: 'audio_rate_limited',
+                    violations: audioRateState.violations,
+                    limitKBs: Math.round(AUDIO_RATE_LIMIT_BYTES_PER_SEC / 1024),
+                  }));
+                } catch { /* ignore si WS fermé */ }
+              }
+            } else {
+              // Dans les limites — transmettre à Gemini
+              audioRateState.bytesInWindow += chunkBytes;
+              session.sendRealtimeInput({ audio: { data: msg.audio, mimeType: 'audio/pcm;rate=16000' } });
+            }
           }
           if (msg.video) {
             session.sendRealtimeInput({ video: { data: msg.video.data, mimeType: msg.video.mimeType } });
+          }
+
+          // ── Contexte éditeur (fichier actif, sélection, curseur) ─────────
+          // Envoyé par le client avant/pendant une requête vocale pour que Gemini
+          // dispose du contexte IDE de l'utilisateur sans qu'il ait à le décrire.
+          if (msg.type === 'voice_context') {
+            const parts: string[] = [];
+            if (msg.openFile) parts.push(`Fichier actif : ${msg.openFile}${msg.language ? ` (${msg.language})` : ''}`);
+            if (msg.cursorLine != null) parts.push(`Curseur : ligne ${msg.cursorLine}${msg.cursorColumn != null ? `, colonne ${msg.cursorColumn}` : ''}`);
+            if (msg.selection && String(msg.selection).trim().length > 0) {
+              const sel = String(msg.selection).slice(0, 2000); // cap à 2000 chars
+              parts.push(`Sélection en cours :\n\`\`\`\n${sel}\n\`\`\``);
+            }
+            
+            // Fichiers ouverts (contexte élargi)
+            if (msg.openFiles && Array.isArray(msg.openFiles) && msg.openFiles.length > 0) {
+              const fileList = msg.openFiles.slice(0, 30).join(', '); // limiter à 30 fichiers
+              parts.push(`Fichiers ouverts (${msg.openFiles.length}) : ${fileList}`);
+            }
+            
+            // Erreurs TypeScript actives
+            if (msg.tsErrors && Array.isArray(msg.tsErrors) && msg.tsErrors.length > 0) {
+              const errorLines = msg.tsErrors.slice(0, 15).map((err: any) => 
+                `  • ${err.file}:${err.line}:${err.column} - ${err.message}`
+              ).join('\n');
+              parts.push(`Erreurs TypeScript détectées (${msg.tsErrors.length}) :\n${errorLines}`);
+            }
+            
+            if (parts.length > 0) {
+              const contextText = `[CONTEXTE IDE]\n${parts.join('\n')}`;
+              try {
+                session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: contextText }] }] });
+              } catch (e) {
+                console.error('[VoiceContext] Erreur injection contexte éditeur:', e);
+              }
+            }
           }
 
           if (msg.type === 'context_resume_summary' && msg.summary && !contextResumeSummary) {
@@ -935,35 +1069,102 @@ export function attachLiveWebSocket(
   });
 }
 
+/**
+ * Normalise un chemin de fichier pour une comparaison case-insensitive.
+ * Convertit les backslashes en slashes, supprime le préfixe './' et met en lowercase.
+ * Essentiel pour Windows où les chemins peuvent être Src/App.tsx ou src/app.tsx.
+ */
 function normalizeContextPath(value: unknown): string {
   return String(value ?? '').replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase();
 }
 
+/**
+ * Met à jour l'état du Context Gate après l'exécution d'un outil.
+ * Tous les chemins sont normalisés en lowercase pour éviter les problèmes
+ * de case-sensitivity sur Windows.
+ */
 function updateContextGate(state: SessionContextGate, toolName: string, args: any, response: any): void {
+  // Enregistrer les fichiers lus (tous normalisés en lowercase)
   if (toolName === 'read_project_file' && response && !(response as any).error) {
     const path = normalizeContextPath(args?.path);
     if (path) state.readFiles.add(path);
     return;
   }
 
+  // knowledge_build_context active le gate et définit les fichiers requis
   if (toolName !== 'knowledge_build_context' || !response || response.status !== 'success') return;
 
   const confidence = Number(response.summary?.confidence ?? response.score?.confidence);
   const risk = String(response.summary?.global_risk ?? response.score?.risk ?? 'unknown');
   state.confidence = Number.isFinite(confidence) ? confidence : null;
   state.risk = risk;
+  
+  // Normaliser TOUS les fichiers requis en lowercase
   state.requiredFiles = new Set([
     ...(response.batch?.files ?? []).map((file: any) => normalizeContextPath(file.path)),
     ...(response.missing_actions ?? [])
       .filter((action: any) => action.kind === 'read_file' && (action.priority === 'high' || action.priority === 'critical'))
       .map((action: any) => normalizeContextPath(action.target)),
+    // ✅ NOUVEAU : Support pour response.requiredFiles (si présent)
+    ...(response.requiredFiles ?? []).map((file: any) => normalizeContextPath(file)),
   ].filter(Boolean));
+  
   state.active = (state.confidence !== null && state.confidence < 65) || risk === 'high';
 }
 
-function isContextReady(state: SessionContextGate): boolean {
+/**
+ * Vérifie si le contexte requis est complet (tous les fichiers requis ont été lus).
+ * Tous les chemins sont normalisés en lowercase, donc la comparaison est case-insensitive.
+ *
+ * Optimisations :
+ * - SAFE_TOOLS bypass : certains outils (création, renommage) passent toujours.
+ * - Small edits tolérance : modifications < 50 lignes → seuil de confiance abaissé à 55%.
+ */
+function isContextReady(state: SessionContextGate, toolName?: string, args?: any): boolean {
   if (!state.active) return true;
-  return state.requiredFiles.size > 0 && Array.from(state.requiredFiles).every((file) => state.readFiles.has(file));
+
+  // ── SAFE_TOOLS bypass ────────────────────────────────────────────────────
+  // Ces outils créent ou renomment des fichiers — ils n'ont pas besoin d'un
+  // contexte complet car ils n'écrasent pas de contenu existant critique.
+  const SAFE_TOOLS = new Set([
+    'write_project_file',       // Création d'un nouveau fichier
+    'create_project_directory', // Création de dossier
+    'rename_project_file',      // Renommage (pas de modification du contenu)
+  ]);
+
+  if (toolName && SAFE_TOOLS.has(toolName)) {
+    return true;
+  }
+
+  // ── Small edits tolérance +10% ───────────────────────────────────────────
+  // Un patch < 50 lignes est moins risqué : on tolère une confiance plus basse.
+  const isSmallEdit = toolName === 'patch_project_file' &&
+    args?.lineStart != null && args?.lineEnd != null &&
+    (Number(args.lineEnd) - Number(args.lineStart)) < 50;
+
+  // Seuil normal : 65% ; seuil "small edit" : 55% (tolérance +10%)
+  const confidenceThreshold = isSmallEdit ? 55 : 65;
+
+  // Autoriser si :
+  //   - la confiance est suffisante (selon le seuil adapté), OU
+  //   - le risque n'est pas "high" ET aucun fichier requis n'est défini
+  const confidentEnough = state.confidence !== null && state.confidence >= confidenceThreshold;
+  const noHighRisk = state.risk !== 'high' && state.requiredFiles.size === 0;
+
+  if (confidentEnough || noHighRisk) return true;
+
+  // Sinon, vérifier que tous les fichiers requis ont été lus
+  const allRead = state.requiredFiles.size > 0 &&
+    Array.from(state.requiredFiles).every((file) => state.readFiles.has(file));
+
+  // Debug log pour Windows (case-sensitivity)
+  if (!allRead && state.requiredFiles.size > 0) {
+    const missing = Array.from(state.requiredFiles).filter(f => !state.readFiles.has(f));
+    console.log('[ContextGate] Fichiers manquants:', missing);
+    console.log('[ContextGate] Fichiers lus:', Array.from(state.readFiles));
+  }
+
+  return allRead;
 }
 
 // ── handleToolCall ─────────────────────────────────────────────────────────────
@@ -1044,7 +1245,7 @@ async function handleToolCall(
           clientWs.send(JSON.stringify({ tool_used: call.name, info: `[BLOQUÉ - Supervisor] ${reason}` }));
           continue;
         }
-        if (contextGate.active && !isContextReady(contextGate)) {
+        if (contextGate.active && !isContextReady(contextGate, call.name, call.args)) {
           const pending = Array.from(contextGate.requiredFiles)
             .filter((file) => !contextGate.readFiles.has(file))
             .slice(0, 4)
@@ -1106,7 +1307,42 @@ async function handleToolCall(
         continue;
       }
 
-      const response = await skillManager.handleToolCall(call.name, call.args, context);
+      // ── Retry logic pour erreurs transientes ─────────────────────────────
+      // MAX_RETRIES=2, délai initial RETRY_DELAY_MS=1000ms, backoff exponentiel.
+      // Seules les erreurs réseau/IO/timeout sont retentées (pas les erreurs métier).
+      let response: unknown = undefined;
+      let lastToolError: Error | undefined;
+      for (let attempt = 0; attempt <= TOOL_MAX_RETRIES; attempt++) {
+        try {
+          response = await skillManager.handleToolCall(call.name, call.args, context);
+          lastToolError = undefined;
+          break; // Succès — sortir de la boucle
+        } catch (toolErr: any) {
+          lastToolError = toolErr;
+          const retryable = isRetryableToolError(toolErr);
+          const remaining = TOOL_MAX_RETRIES - attempt;
+
+          if (!retryable || remaining === 0) {
+            // Erreur non-retryable ou plus de tentatives — propager
+            throw toolErr;
+          }
+
+          // Backoff exponentiel : 1s → 2s
+          const delay = Math.min(TOOL_RETRY_DELAY_MS * Math.pow(2, attempt), 8000);
+          console.warn(`[ToolRetry] ${call.name} — tentative ${attempt + 1}/${TOOL_MAX_RETRIES + 1} échouée (${toolErr.message}). Retry dans ${delay}ms...`);
+          try {
+            clientWs.send(JSON.stringify({
+              tool_retry: call.name,
+              attempt: attempt + 1,
+              maxRetries: TOOL_MAX_RETRIES,
+              error: toolErr.message,
+              retryIn: delay,
+            }));
+          } catch { /* ignore si WS fermé */ }
+          await sleepMs(delay);
+        }
+      }
+
       const success = !(response && (response as any).error && !(response as any).status);
       try { skillManager.recordToolUsage(call.name, success); } catch {}
 

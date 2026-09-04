@@ -138,6 +138,22 @@ export function isStaticAgentRole(role: string): boolean {
 /** Statuts possibles d'une tâche déléguée */
 export type TaskStatus = "pending" | "running" | "completed" | "incomplete" | "failed" | "cancelled";
 
+/**
+ * Résultat qualitatif d'une tâche — distinct du statut d'exécution.
+ *
+ * | Outcome   | Signification                                                       |
+ * |-----------|---------------------------------------------------------------------|
+ * | success   | Modifications demandées effectuées + validations passées            |
+ * | partial   | Modifications partielles (certains fichiers OK, d'autres en erreur) |
+ * | blocked   | Erreur externe (préexistante ou hors périmètre) empêche la finition |
+ * | no_change | Agent terminé sans modifier aucun fichier (pour une tâche de modif) |
+ * | failed    | Exception agent / outil / timeout                                   |
+ *
+ * Pour les tâches purement analytiques (researcher, planner, summarizer),
+ * `success` est valide sans modification de fichiers.
+ */
+export type TaskOutcome = "success" | "partial" | "blocked" | "no_change" | "failed";
+
 /** Priorité d'une tâche */
 export type TaskPriority = "low" | "medium" | "high" | "critical";
 
@@ -193,6 +209,17 @@ export interface TaskContext {
 /** Résultat de l'exécution d'une tâche */
 export interface TaskResult {
   success: boolean;
+  /**
+   * Résultat qualitatif de l'exécution.
+   * Fournit une sémantique fine au-delà du booléen success/failed.
+   * Toujours présent après l'exécution.
+   */
+  outcome: TaskOutcome;
+  /**
+   * Cause du blocage (uniquement quand outcome === "blocked").
+   * Ex: "compile_error_preexisting", "missing_dependency", "out_of_scope"
+   */
+  blockReason?: string;
   /** Résumé court de ce qui a été fait */
   summary: string;
   /** Détails complets */
@@ -326,12 +353,25 @@ export const orchestrateSchema = z.object({
   title: z.string().min(1).trim(),
   description: z.string().min(1).trim(),
   tasks: z.array(z.object({
+    /**
+     * ID stable optionnel de la tâche.
+     * Permet de référencer cette tâche dans `dependsOn` d'autres tâches
+     * sans dépendre du titre (ex: "task-analysis", "task-refactor").
+     * Si absent, un UUID est généré automatiquement.
+     */
+    id: z.string().min(1).optional(),
     role: agentRoleSchema,
     title: z.string().min(1).trim(),
     description: z.string().min(1).trim(),
     files: z.array(z.string()).optional().default([]),
     instructions: z.string().optional(),
     priority: taskPrioritySchema.optional().default("medium"),
+    /**
+     * IDs ou titres des tâches dont celle-ci dépend.
+     * Résolution : ID stable fourni via le champ `id` > UUID interne > titre de tâche.
+     * Le scheduler ne lance la tâche que lorsque toutes ses dépendances
+     * sont au statut "completed".
+     */
     dependsOn: z.array(z.string()).optional().default([]),
   })).min(1, "Au moins une tâche requise"),
 });

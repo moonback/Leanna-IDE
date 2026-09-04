@@ -21,6 +21,7 @@ import {
   FileText,
   BookOpen,
   Menu,
+  FolderOpen,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -226,6 +227,7 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
       >
         {/* ═══ BRAND LOGO ═══ */}
         <BrandLogo theme={theme} onNavigate={() => { navigate('/ide'); setMobileOpen(false); }} />
+        <NoWorkspaceBadge />
 
       {/* ═══ IDE TOOLS ═══ */}
       <div className="flex-1 w-full flex flex-col min-h-0">
@@ -328,6 +330,85 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
     </>
   );
 });
+
+// ─── NoWorkspaceBadge ───────────────────────────────────────────────────────
+/**
+ * Indicateur compact affiché dans la sidebar quand l'utilisateur utilise Leanna
+ * sans workspace actif (mode web / questions générales).
+ * Cliquer dessus ouvre le sélecteur de workspace.
+ */
+function NoWorkspaceBadge() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    // Vérifier l'état initial au montage
+    setVisible(sessionStorage.getItem('Leanna-no-workspace-mode') === '1');
+
+    const onNoWorkspace = () => setVisible(true);
+    const onWorkspaceChanged = () => {
+      setVisible(false);
+    };
+
+    window.addEventListener('Leanna-no-workspace-mode', onNoWorkspace);
+    window.addEventListener('Leanna-workspace-changed', onWorkspaceChanged);
+    window.addEventListener('Leanna-sandbox-changed', onWorkspaceChanged);
+
+    return () => {
+      window.removeEventListener('Leanna-no-workspace-mode', onNoWorkspace);
+      window.removeEventListener('Leanna-workspace-changed', onWorkspaceChanged);
+      window.removeEventListener('Leanna-sandbox-changed', onWorkspaceChanged);
+    };
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.7 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.7 }}
+      transition={{ type: 'spring', bounce: 0.3, duration: 0.4 }}
+      className="w-full flex items-center justify-center pb-1 group relative"
+    >
+      <motion.button
+        type="button"
+        onClick={async () => {
+          // Fermer tous les onglets et désactiver le workspace actuel
+          window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: null } }));
+          
+          // Désactiver le workspace côté serveur
+          try {
+            await fetch('/api/self-root/clear', { method: 'POST' });
+          } catch (e) {
+            console.error('[UnifiedSidebar] Failed to clear workspace:', e);
+          }
+          
+          // Ouvrir la modale de sélection
+          window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher'));
+        }}
+        className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2"
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--color-warning, #f59e0b) 12%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 30%, transparent)',
+          color: 'var(--color-warning, #f59e0b)',
+        }}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
+        aria-label="Aucun projet — ouvrir le sélecteur de workspace"
+        title="Mode sans projet — cliquer pour ouvrir un workspace"
+      >
+        <FolderOpen className="w-4 h-4" />
+        {/* Pulsing dot */}
+        <span
+          className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full animate-pulse"
+          style={{ backgroundColor: 'var(--color-warning, #f59e0b)' }}
+        />
+      </motion.button>
+      {/* Tooltip */}
+      <div className="sidebar-tooltip">Sans projet — ouvrir workspace</div>
+    </motion.div>
+  );
+}
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 

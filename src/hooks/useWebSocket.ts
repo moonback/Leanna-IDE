@@ -122,7 +122,12 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
           reconnectCountRef.current = 0; // reset après reconnexion réussie
           goAwayPendingRef.current = false;
           setStatus('connected');
-          onLog(conversationId ? (pendingContextSummaryRef.current ? 'Session reprise après dépassement de tokens (avec résumé de contexte)' : 'Session reprise après expiration GoAway') : 'Connected to Core', 'info');          // Injecter le résumé de contexte si disponible (fallback client-side pour context_overflow)
+          onLog(conversationId ? (pendingContextSummaryRef.current ? 'Session reprise après dépassement de tokens (avec résumé de contexte)' : 'Session reprise après expiration GoAway') : 'Connected to Core', 'info');
+          // Notifier les composants qu'une reconnexion vient d'avoir lieu
+          // (GoAway, context_overflow ou reconnexion réseau) pour qu'ils re-synchronisent
+          // l'état des agents actifs depuis le serveur.
+          window.dispatchEvent(new CustomEvent('Leanna-session-reconnected'));
+          // Injecter le résumé de contexte si disponible (fallback client-side pour context_overflow)
           // Le serveur l'injecte aussi via context_resume=1, mais ce message garantit
           // que le contexte est disponible même si Supabase est indisponible.
           if (pendingContextSummaryRef.current) {
@@ -222,16 +227,25 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
           }
 
           const isClean = evt.wasClean && evt.code === 1000;
-          onLog(isClean ? 'Connection lost' : 'Connection lost', 'system');
+          onLog(isClean ? 'Connexion fermée proprement' : `Connexion perdue (code WS: ${evt.code}${evt.reason ? `, raison: ${evt.reason}` : ''})`, isClean ? 'system' : 'error');
           if (!isClean) scheduleReconnect(null);
         };
 
-        ws.onerror = () => {
-          onLog('Connection error', 'error');
+        ws.onerror = (event) => {
+          // L'API WebSocket ne fournit pas de détails sur l'erreur dans l'objet Event
+          // (sécurité navigateur), mais on peut distinguer les états de la connexion.
+          const readyState = ws.readyState;
+          const stateLabel = readyState === WebSocket.CONNECTING ? 'CONNECTING'
+            : readyState === WebSocket.CLOSING ? 'CLOSING'
+            : readyState === WebSocket.CLOSED ? 'CLOSED'
+            : 'OPEN';
+          const detail = `WebSocket error (état: ${stateLabel})`;
+          console.error('[WebSocket] onerror:', event, detail);
+          onLog(`Erreur de connexion — ${detail}`, 'error');
         };
       }).catch(err => {
         console.error('Failed to initialize audio', err);
-        onLog('Failed to start audio / WebSocket', 'error');
+        onLog(`Échec démarrage audio / WebSocket : ${err instanceof Error ? err.message : String(err)}`, 'error');
         setStatus('idle');
       });
     };
@@ -250,6 +264,9 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
         reconnectCountRef.current = 0;
         setStatus('connected');
         onLog('Connected to Core', 'info');
+        // Notifier les composants d'une connexion établie pour qu'ils chargent l'état
+        // des agents actifs depuis le serveur (premier connect ou reconnexion manuelle).
+        window.dispatchEvent(new CustomEvent('Leanna-session-reconnected'));
         // Injecter le résumé de contexte si disponible (cas de reconnexion context_overflow
         // déclenchée avant que goAwayPendingRef ait pu router vers connectWithConversationId)
         if (pendingContextSummaryRef.current) {
@@ -341,24 +358,56 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
         }
 
         const isClean = evt.wasClean && evt.code === 1000;
-        onLog('Connection lost', 'system');
+        onLog(isClean ? 'Connexion fermée proprement' : `Connexion perdue (code WS: ${evt.code}${evt.reason ? `, raison: ${evt.reason}` : ''})`, isClean ? 'system' : 'error');
         if (!isClean) scheduleReconnect(null);
       };
 
-      ws.onerror = () => {
-        onLog('Connection error', 'error');
+      ws.onerror = (event) => {
+        const readyState = ws.readyState;
+        const stateLabel = readyState === WebSocket.CONNECTING ? 'CONNECTING'
+          : readyState === WebSocket.CLOSING ? 'CLOSING'
+          : readyState === WebSocket.CLOSED ? 'CLOSED'
+          : 'OPEN';
+        const detail = `WebSocket error (état: ${stateLabel})`;
+        console.error('[WebSocket] onerror:', event, detail);
+        onLog(`Erreur de connexion — ${detail}`, 'error');
       };
     }).catch(err => {
       console.error('Failed to initialize audio', err);
-      onLog('Failed to start audio / WebSocket', 'error');
+      onLog(`Échec démarrage audio / WebSocket : ${err instanceof Error ? err.message : String(err)}`, 'error');
       setStatus('idle');
     });
   }, [onLog, disconnect]);
 
+  // ── Rate limiter audio côté client ──────────────────────────────────────────
+  // Fenêtre glissante 1s / 100 KB — miroir côté client de la protection serveur.
+  // Évite d'envoyer des rafales inutiles qui seront de toute façon rejetées.
+  const audioRateRef = useRef({ windowStart: 0, bytesInWindow: 0, clientViolations: 0 });
+  const AUDIO_CLIENT_LIMIT_BYTES = 100 * 1024; // 100 KB/s
+
   const sendAudioData = useCallback((base64Data: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ audio: base64Data }));
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+
+    const now = Date.now();
+    const rate = audioRateRef.current;
+
+    // Reset fenêtre si > 1s
+    if (now - rate.windowStart >= 1000) {
+      rate.windowStart = now;
+      rate.bytesInWindow = 0;
     }
+
+    // Taille approximative du chunk (base64 → bytes réels ≈ length * 0.75)
+    const chunkBytes = Math.ceil(base64Data.length * 0.75);
+
+    if (rate.bytesInWindow + chunkBytes > AUDIO_CLIENT_LIMIT_BYTES) {
+      // Throttle côté client — abandonner ce chunk silencieusement
+      rate.clientViolations++;
+      return;
+    }
+
+    rate.bytesInWindow += chunkBytes;
+    wsRef.current.send(JSON.stringify({ audio: base64Data }));
   }, []);
 
   const sendVideoFrame = useCallback((base64Data: string, mimeType = 'image/jpeg') => {

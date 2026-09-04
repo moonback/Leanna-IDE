@@ -405,6 +405,8 @@ export function useFileSystem() {
     // Setters
     setActivePath,
     setCurrentDir,
+    setTree,
+    setWorkspaceTree,
     
     // Actions
     loadTree,

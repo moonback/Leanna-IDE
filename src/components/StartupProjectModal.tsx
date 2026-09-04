@@ -6,9 +6,13 @@ import {
   FolderInput, Globe, X, Plus, Trash2, GitBranch,
   CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Clock,
   Github, Terminal, FolderDown, Server, RefreshCw, Send, Settings,
+  MessageSquare,
 } from 'lucide-react';
 import { ideApi } from '../services/ideApi.js';
 import { useToast } from '../components/ui/Toast.js';
+
+/** Clé sessionStorage pour le mode "sans projet" (réinitialisée à chaque fermeture du navigateur) */
+const NO_WORKSPACE_KEY = 'Leanna-no-workspace-mode';
 
 interface WorkspaceItem {
   id: string;
@@ -136,6 +140,11 @@ export function StartupProjectModal() {
     try {
       const wsData = await fetchWorkspaces();
       if (!wsData?.activeRoot) {
+        // Si l'utilisateur a choisi "sans projet" pour cette session, ne pas rouvrir la modale
+        if (sessionStorage.getItem(NO_WORKSPACE_KEY) === '1') {
+          setIsOpen(false);
+          return;
+        }
         setIsOpen(true);
         if ((wsData?.workspaces?.length ?? 0) > 0) {
           setActiveTab('recent');
@@ -164,8 +173,10 @@ export function StartupProjectModal() {
 
   // Écouteur global pour ouvrir le switcher depuis n'importe où dans l'application
   useEffect(() => {
-    const handleOpenModal = () => {
-      fetchWorkspaces();
+    const handleOpenModal = async () => {
+      // Attendre un peu pour que le workspace soit fermé côté serveur
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await fetchWorkspaces();
       setIsOpen(true);
       setError(null);
     };
@@ -202,7 +213,11 @@ export function StartupProjectModal() {
   }, [inputPath]);
 
   const activate = useCallback(async (newRoot: string) => {
+    // Quitter le mode "sans projet" si l'utilisateur ouvre finalement un projet
+    console.log('[StartupProjectModal] Activating new workspace:', newRoot);
+    sessionStorage.removeItem(NO_WORKSPACE_KEY);
     ideApi.invalidateCache();
+    console.log('[StartupProjectModal] Dispatching workspace-changed event');
     window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
     window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: newRoot } }));
     setCurrentPath(newRoot);
@@ -500,10 +515,20 @@ export function StartupProjectModal() {
   const handleClose = () => {
     if (currentPath) {
       setIsOpen(false);
+    } else if (sessionStorage.getItem(NO_WORKSPACE_KEY) === '1') {
+      // Déjà en mode sans projet — fermer simplement la modale
+      setIsOpen(false);
     } else {
       window.close();
     }
   };
+
+  /** Continuer sans projet — mode web / questions générales uniquement */
+  const handleNoWorkspace = useCallback(() => {
+    sessionStorage.setItem(NO_WORKSPACE_KEY, '1');
+    window.dispatchEvent(new CustomEvent('Leanna-no-workspace-mode'));
+    setIsOpen(false);
+  }, []);
 
   const handleOpenSettings = () => {
     returningFromSettingsRef.current = true;
@@ -1330,6 +1355,25 @@ export function StartupProjectModal() {
             </span>
 
             <div className="flex items-center gap-2">
+              {/* Continuer sans projet — visible uniquement quand aucun projet n'est actif */}
+              {!currentPath && (
+                <motion.button
+                  type="button"
+                  onClick={handleNoWorkspace}
+                  whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
+                  whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: '1px solid var(--border-base)',
+                    color: 'var(--text-muted)',
+                  }}
+                  title="Utiliser Leanna sans projet (web & questions générales)"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  Continuer sans projet
+                </motion.button>
+              )}
               {currentPath && (
                 <button
                   type="button"

@@ -873,6 +873,10 @@ export const verifySkill: Skill = {
         const hashAfter = computeFileHash(abs);
         const stale = hashBefore !== hashAfter;
         const verificationOk = ok && !stale;
+        // fileChanged = le contenu du fichier a réellement changé depuis le début de verify_file.
+        // Utilisé par l'AgentExecutor pour distinguer "patch appliqué avec erreurs préexistantes"
+        // de "vérification bloquée sans aucune modification".
+        const fileChanged = hashBefore !== hashAfter;
         const verificationRecord: VerificationRecord = {
           file: validated.path,
           contentHash: hashAfter,
@@ -889,6 +893,10 @@ export const verifySkill: Skill = {
         const report: any = {
           status: verificationOk ? "success" : "failed",
           ok: verificationOk,
+          // fileChanged est vrai dès que le fichier a été modifié sur disque, indépendamment
+          // du résultat du typecheck/lint. L'AgentExecutor l'utilise pour comptabiliser
+          // le patch même quand des erreurs préexistantes font échouer la vérification.
+          fileChanged,
           exitCode: resultExitCode([typecheck, lintResult, testResult]),
           stdout: [typecheck.stdout, lintResult.stdout, testResult?.stdout].filter(Boolean).join("\n"),
           stderr: [typecheck.stderr, lintResult.stderr, testResult?.stderr].filter(Boolean).join("\n"),

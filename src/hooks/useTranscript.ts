@@ -78,13 +78,24 @@ export function useTranscript() {
         summarizedTurns: number;
         retained: TranscriptEntry[];
       };
+      
+      // Validation défensive : s'assurer que summary est bien une string
+      const summaryText = typeof summary === 'string' 
+        ? summary 
+        : (typeof summary === 'object' ? JSON.stringify(summary) : String(summary));
+      
       const summaryEntry: TranscriptEntry = {
         id: Date.now().toString() + Math.random(),
         role: 'assistant',
-        text: `[Résumé automatique du contexte — ${summarizedTurns} messages condensés]\n${summary}`,
+        text: `[Résumé automatique du contexte — ${summarizedTurns} messages condensés]\n${summaryText}`,
         timestamp: new Date(),
       };
-      console.log('[useTranscript] Résumé appliqué:', { summarizedTurns, retainedCount: retained.length, summaryLength: summary.length });
+      console.log('[useTranscript] Résumé appliqué:', { 
+        summarizedTurns, 
+        retainedCount: retained.length, 
+        summaryLength: summaryText.length,
+        summaryType: typeof summary,
+      });
       setTranscript([summaryEntry, ...retained]);
     };
     window.addEventListener('Leanna-summarize-context', handler as EventListener);

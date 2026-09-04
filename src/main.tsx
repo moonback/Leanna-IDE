@@ -8,6 +8,7 @@ import { UserProfileProvider } from './context/UserProfileContext.js';
 import { ToastProvider } from './components/ui/Toast.js';
 import { ConfirmDialogProvider } from './components/ui/ConfirmDialog.js';
 import { patchConsole } from './utils/logger.js';
+import { cleanupGlobalResources, installBeforeUnloadCleanup } from './utils/cleanup.js';
 import { LiveAPIContext } from './context/LiveAPIContext.js';
 import { ScreenShareProvider, useScreenShare } from './context/ScreenShareContext.js';
 import { useLiveAPI } from './hooks/useLiveAPI.js';
@@ -493,6 +494,18 @@ function AnimatedRoutes() {
 function Layout() {
   const liveAPI = useLiveAPI();
   const { profile } = useProfile();
+
+  // ── Cleanup global resources on unmount ─────────────────────────────────
+  useEffect(() => {
+    // Install beforeunload cleanup (only once)
+    const removeBeforeUnload = installBeforeUnloadCleanup();
+    
+    return () => {
+      // Cleanup when component unmounts
+      cleanupGlobalResources();
+      removeBeforeUnload();
+    };
+  }, []);
 
   // Reconnect the live session when settings that affect tool declarations are saved
   // (e.g. reasoningEnabled, agents). The session is rebuilt with fresh tool declarations.

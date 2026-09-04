@@ -83,11 +83,52 @@ export function useLiveAPI() {
     isBusyRef.current = isBusy;
   }, [isBusy]);
 
-  // Define onAudioData to send recorded raw chunks via WS
-  // Block microphone transmission while the assistant is processing (isBusy),
-  // otherwise Gemini Live treats incoming audio as user speech and won't speak.
+  // ── Latency monitoring ─────────────────────────────────────────────────────
+  // Timestamp du premier chunk audio envoyé (début d'utterance détecté par VAD)
+  const utteranceStartRef = useRef<number | null>(null);
+  // Indique si on est en attente du premier chunk audio de la réponse
+  const waitingFirstResponseChunkRef = useRef(false);
+  const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
+  const latencyHistoryRef = useRef<number[]>([]);
+
+  const recordLatency = useCallback((ms: number) => {
+    // Validation : rejeter les latences manifestement incorrectes (> 30 secondes)
+    if (ms > 30_000) {
+      console.warn(`[VoiceLatency] Latence anormale rejetée: ${ms}ms (probable bug de timestamp)`);
+      return;
+    }
+    
+    setLastLatencyMs(ms);
+    latencyHistoryRef.current = [...latencyHistoryRef.current.slice(-19), ms];
+    console.debug(`[VoiceLatency] ${ms}ms`);
+  }, []);
+
+  const getLatencyStats = useCallback(() => {
+    const history = latencyHistoryRef.current;
+    if (history.length === 0) return null;
+    const avg = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
+    const min = Math.min(...history);
+    const max = Math.max(...history);
+    return { avg, min, max, samples: history.length, last: history[history.length - 1] };
+  }, []);
+
+  // ── Barge-in : envoi audio continu, interruption gérée côté serveur ────────
+  // Gemini Live supporte nativement le barge-in — envoyer de l'audio pendant
+  // que le modèle parle interrompt la génération. On ne bloque donc plus
+  // l'envoi pendant isBusy, sauf pendant l'exécution d'outils (tool calls)
+  // où Gemini n'écoute pas et où l'audio serait ignoré de toute façon.
+  // On mesure également la latence entre le début d'utterance et le premier chunk.
   const handleAudioData = useCallback((base64Data: string) => {
+    // Bloquer uniquement pendant l'exécution d'outils côté serveur
     if (isBusyRef.current) return;
+
+    // Mesure de latence : détecter début d'utterance UNIQUEMENT si aucune utterance en cours
+    // Cela évite de réinitialiser le timestamp au milieu d'une utterance existante
+    if (utteranceStartRef.current === null && !waitingFirstResponseChunkRef.current) {
+      utteranceStartRef.current = performance.now();
+      waitingFirstResponseChunkRef.current = true;
+    }
+
     sendAudioData(base64Data);
   }, []);
 
@@ -107,6 +148,9 @@ export function useLiveAPI() {
       onAudioData: handleAudioData,
       autoMuteEnabled: profile.autoMuteEnabled,
       autoMuteTimeout: profile.autoMuteTimeout,
+      vadEnabled: profile.vadEnabled,
+      vadThreshold: profile.vadThreshold,
+      vadSilenceDuration: profile.vadSilenceDuration,
     });
 
   // Define onMessage handler for WS events
@@ -128,9 +172,22 @@ export function useLiveAPI() {
       }
     }
     if (msg.audio) {
+      // ✅ Mesure latence : UNIQUEMENT lors du premier chunk audio de la réponse
+      // Le texte arrive souvent 50-100ms avant l'audio, donc on ne mesure que l'audio
+      if (waitingFirstResponseChunkRef.current && utteranceStartRef.current !== null) {
+        const now = performance.now();
+        const latency = Math.round(now - utteranceStartRef.current);
+        console.debug(`[VoiceLatency] Calcul: now=${Math.round(now)}, start=${Math.round(utteranceStartRef.current)}, latency=${latency}ms`);
+        recordLatency(latency);
+        waitingFirstResponseChunkRef.current = false;
+        utteranceStartRef.current = null;
+      }
       playAudioChunk(msg.audio);
     }
     if (msg.interrupted) {
+      // Réinitialiser le tracking de latence si l'assistant est interrompu
+      utteranceStartRef.current = null;
+      waitingFirstResponseChunkRef.current = false;
       handleInterrupt();
       addLog('Interrupted', 'system');
     }
@@ -244,6 +301,14 @@ export function useLiveAPI() {
     if (msg.error) {
       addLog(msg.error, 'error');
     }
+    // ── Retry tool call notification ─────────────────────────────────────────
+    if (msg.tool_retry) {
+      addLog(`⟳ ${msg.tool_retry} — tentative ${msg.attempt}/${msg.maxRetries} (retry dans ${msg.retryIn}ms)`, 'info');
+    }
+    // ── Rate limiting audio ───────────────────────────────────────────────────
+    if (msg.type === 'audio_rate_limited') {
+      addLog(`⚠️ Débit audio limité (violation #${msg.violations}, max ${msg.limitKBs} KB/s) — certains chunks ignorés`, 'error');
+    }
     if (msg.busy !== undefined) {
       setIsBusy(!!msg.busy);
     }
@@ -283,6 +348,8 @@ export function useLiveAPI() {
       window.dispatchEvent(new CustomEvent('Leanna-mission-event', { detail: msg }));
     }
     if (msg.text) {
+      // ⚠️ NE PAS réinitialiser la latence ici - le texte arrive AVANT l'audio (50-100ms)
+      // La latence est mesurée uniquement sur le premier chunk audio (voir msg.audio ci-dessus)
       const sources = pendingSourcesRef.current;
       pendingSourcesRef.current = [];
       addTranscript('assistant', msg.text, sources);
@@ -309,9 +376,14 @@ export function useLiveAPI() {
 
       // Remplacer le transcript par le résumé + indication de redémarrage
       if (summary) {
+        // Validation défensive : s'assurer que summary est bien une string
+        const summaryText = typeof summary === 'string' 
+          ? summary 
+          : (typeof summary === 'object' ? JSON.stringify(summary, null, 2) : String(summary));
+        
         window.dispatchEvent(new CustomEvent('Leanna-summarize-context', {
           detail: {
-            summary: `[Redémarrage automatique — ${messagesSummarized} messages de la conversation précédente résumés]\n\n${summary}`,
+            summary: `[Redémarrage automatique — ${messagesSummarized} messages de la conversation précédente résumés]\n\n${summaryText}`,
             summarizedTurns: messagesSummarized,
             retained: [], // On ne garde rien de l'ancien transcript, tout est dans le résumé
           },
@@ -333,6 +405,7 @@ export function useLiveAPI() {
     addTokenUsage,
     updatePromptContext,
     clearTokenUsage,
+    recordLatency,
   ]);
 
   const {
@@ -369,6 +442,24 @@ export function useLiveAPI() {
     sendWSMessage(text);
     addTranscript('user', displayText);
   }, [sendWSMessage, addTranscript]);
+
+  // ── Injection de contexte éditeur ──────────────────────────────────────────
+  // Envoie le contexte de l'éditeur (fichier actif, sélection, position curseur)
+  // au serveur pour enrichir les requêtes vocales. Appelé par IdeView juste avant
+  // ou après l'envoi d'un message vocal, sans bloquer le flux audio.
+  const sendEditorContext = useCallback((ctx: {
+    openFile?: string | null;
+    language?: string | null;
+    selection?: string | null;
+    cursorLine?: number | null;
+    cursorColumn?: number | null;
+    openFiles?: string[];
+    tsErrors?: Array<{ file: string; line: number; column: number; message: string }>;
+  }) => {
+    // Ne rien envoyer si tout est vide
+    if (!ctx.openFile && !ctx.selection && (!ctx.openFiles || ctx.openFiles.length === 0) && (!ctx.tsErrors || ctx.tsErrors.length === 0)) return;
+    sendRawMessage({ type: 'voice_context', ...ctx });
+  }, [sendRawMessage]);
 
   // ── Résumé automatique du contexte ─────────────────────────────────────────
   const summarizeContext = useCallback(async (keepTurns: number = 8) => {
@@ -571,13 +662,16 @@ export function useLiveAPI() {
       refreshWorkflows,
       startAuditFlow,
       getInputAmplitude, getOutputAmplitude,
-      sendVideoFrame, sendTextMessage, sendRawMessage,
+      sendVideoFrame, sendTextMessage, sendRawMessage, sendEditorContext,
       activity, clearActivity,
       isBusy,
       reasoning,
       tokenUsage,
       promptContext,
       summarizeContext,
+      // ── Monitoring latence vocale ────────────────────────────────────────
+      lastLatencyMs,
+      getLatencyStats,
       // ── Contrôle résumé automatique ─────────────────────────────────────
       autoSummarizeEnabled,
       autoSummarizeThreshold,
