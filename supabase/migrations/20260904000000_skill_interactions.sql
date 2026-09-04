@@ -45,3 +45,25 @@ alter table public.skill_interaction_feedback enable row level security;
 create policy "Service role full access on skill_interaction_feedback"
 on public.skill_interaction_feedback for all to service_role
 using (true) with check (true);
+
+create table if not exists public.skill_tuning_proposals (
+    id uuid default gen_random_uuid() primary key,
+    tool_name text not null,
+    status text not null default 'proposed' check (status in ('proposed', 'approved', 'rejected')),
+    hypothesis text not null,
+    evidence jsonb not null default '{}'::jsonb,
+    proposed_change jsonb not null default '{}'::jsonb,
+    expected_metric text not null,
+    confidence numeric(4,3) not null check (confidence >= 0 and confidence <= 1),
+    created_at timestamptz not null default now(),
+    reviewed_at timestamptz
+);
+
+create index if not exists idx_skill_tuning_proposals_status_created
+on public.skill_tuning_proposals(status, created_at desc);
+
+alter table public.skill_tuning_proposals enable row level security;
+
+create policy "Service role full access on skill_tuning_proposals"
+on public.skill_tuning_proposals for all to service_role
+using (true) with check (true);

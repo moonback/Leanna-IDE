@@ -28,10 +28,28 @@ export interface SkillMetrics {
   };
 }
 
+export type SkillProposalStatus = "proposed" | "approved" | "rejected";
+
+export interface SkillTuningProposal {
+  id: string;
+  toolName: string;
+  status: SkillProposalStatus;
+  hypothesis: string;
+  evidence: Record<string, unknown>;
+  proposedChange: Record<string, unknown>;
+  expectedMetric: string;
+  confidence: number;
+  createdAt: string;
+  reviewedAt?: string;
+}
+
 export interface SkillTuningStore extends SkillTraceObserver {
   listRecent(options?: { toolName?: string; limit?: number }): Promise<SkillInteractionRecord[]>;
   getMetrics(options?: { toolName?: string; limit?: number }): Promise<SkillMetrics[]>;
   recordFeedback(feedback: SkillInteractionFeedback): Promise<void>;
+  listProposals(options?: { status?: SkillProposalStatus; limit?: number }): Promise<SkillTuningProposal[]>;
+  createProposal(proposal: Omit<SkillTuningProposal, "id" | "createdAt" | "reviewedAt">): Promise<SkillTuningProposal>;
+  updateProposalStatus(id: string, status: Exclude<SkillProposalStatus, "proposed">): Promise<SkillTuningProposal>;
 }
 
 export class SupabaseSkillTraceStore implements SkillTuningStore {
@@ -136,6 +154,81 @@ export class SupabaseSkillTraceStore implements SkillTuningStore {
       comment: feedback.comment ?? null,
     });
     if (error) throw new Error(error.message);
+  }
+
+  async listProposals(options: { status?: SkillProposalStatus; limit?: number } = {}): Promise<SkillTuningProposal[]> {
+    const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
+    let query = this.supabase
+      .from("skill_tuning_proposals")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (options.status) query = query.eq("status", options.status);
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row: any) => ({
+      id: row.id,
+      toolName: row.tool_name,
+      status: row.status,
+      hypothesis: row.hypothesis,
+      evidence: row.evidence ?? {},
+      proposedChange: row.proposed_change ?? {},
+      expectedMetric: row.expected_metric,
+      confidence: Number(row.confidence),
+      createdAt: row.created_at,
+      reviewedAt: row.reviewed_at ?? undefined,
+    }));
+  }
+
+  async createProposal(proposal: Omit<SkillTuningProposal, "id" | "createdAt" | "reviewedAt">): Promise<SkillTuningProposal> {
+    const { data, error } = await this.supabase
+      .from("skill_tuning_proposals")
+      .insert({
+        tool_name: proposal.toolName,
+        status: proposal.status,
+        hypothesis: proposal.hypothesis,
+        evidence: proposal.evidence,
+        proposed_change: proposal.proposedChange,
+        expected_metric: proposal.expectedMetric,
+        confidence: proposal.confidence,
+      })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return {
+      id: data.id,
+      toolName: data.tool_name,
+      status: data.status,
+      hypothesis: data.hypothesis,
+      evidence: data.evidence ?? {},
+      proposedChange: data.proposed_change ?? {},
+      expectedMetric: data.expected_metric,
+      confidence: Number(data.confidence),
+      createdAt: data.created_at,
+    };
+  }
+
+  async updateProposalStatus(id: string, status: Exclude<SkillProposalStatus, "proposed">): Promise<SkillTuningProposal> {
+    const { data, error } = await this.supabase
+      .from("skill_tuning_proposals")
+      .update({ status, reviewed_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return {
+      id: data.id,
+      toolName: data.tool_name,
+      status: data.status,
+      hypothesis: data.hypothesis,
+      evidence: data.evidence ?? {},
+      proposedChange: data.proposed_change ?? {},
+      expectedMetric: data.expected_metric,
+      confidence: Number(data.confidence),
+      createdAt: data.created_at,
+      reviewedAt: data.reviewed_at ?? undefined,
+    };
   }
 }
 

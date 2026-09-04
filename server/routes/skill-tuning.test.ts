@@ -36,6 +36,9 @@ const store: SkillTuningStore = {
     feedback: { correct: 0, incorrect: 0, needsImprovement: 0 },
   }],
   recordFeedback: async () => {},
+  listProposals: async () => [],
+  createProposal: async (proposal: any) => ({ id: "proposal-1", createdAt: "2026-09-04T00:00:00.000Z", ...proposal }),
+  updateProposalStatus: async (id: string, status: any) => ({ id, createdAt: "2026-09-04T00:00:00.000Z", toolName: "security_audit", status, hypothesis: "", evidence: {}, proposedChange: {}, expectedMetric: "", confidence: 0.8 }),
 };
 
 test("skill tuning routes: returns aggregated metrics", async () => {
@@ -76,6 +79,40 @@ test("skill tuning routes: rejects invalid feedback", async () => {
       body: JSON.stringify({ callId: "call-1", label: "unknown" }),
     });
     assert.equal(response.status, 400);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("skill tuning routes: generates and reviews a proposal", async () => {
+  let reviewed: any;
+  const proposalStore: SkillTuningStore = {
+    ...store,
+    getMetrics: async () => [{
+      toolName: "security_audit",
+      calls: 6,
+      failures: 2,
+      successRate: 0.67,
+      averageDurationMs: 30,
+      feedback: { correct: 1, incorrect: 1, needsImprovement: 1 },
+    }],
+    createProposal: async (proposal: any) => ({ id: "proposal-1", createdAt: "2026-09-04T00:00:00.000Z", ...proposal }),
+    updateProposalStatus: async (id: string, status: any) => {
+      reviewed = { id, status };
+      return { ...reviewed, toolName: "security_audit", hypothesis: "", evidence: {}, proposedChange: {}, expectedMetric: "", confidence: 0.8, createdAt: "2026-09-04T00:00:00.000Z" };
+    },
+  };
+  const { server, port } = await createTestServer(proposalStore);
+  try {
+    const generated = await fetch(`http://127.0.0.1:${port}/api/skill-tuning/proposals/generate`, { method: "POST" });
+    assert.equal(generated.status, 201);
+    const reviewedResponse = await fetch(`http://127.0.0.1:${port}/api/skill-tuning/proposals/proposal-1`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "approved" }),
+    });
+    assert.equal(reviewedResponse.status, 200);
+    assert.equal(reviewed.status, "approved");
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
