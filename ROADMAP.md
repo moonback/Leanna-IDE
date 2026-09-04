@@ -137,8 +137,8 @@ Améliorations de qualité, performance et DX ciblées sur les frictions identif
 ### Performance
 | Fonctionnalité | Statut |
 |---|---|
-| Pagination côté serveur pour `GET /api/ide/tree` (workspaces > 10k fichiers) | 📋 Planifié |
-| Lazy loading des chunks Monaco workers (réduction temps de premier chargement) | 📋 Planifié |
+| Pagination côté serveur pour `GET /api/ide/tree` (workspaces > 10k fichiers) | ✅ Fait  |
+| Lazy loading des chunks Monaco workers (réduction temps de premier chargement) | ✅ Fait |
 | Cache Redis/mémoire partagé pour le Knowledge Graph (multi-instances) | 📋 Planifié |
 | Streaming des réponses agents via SSE (Server-Sent Events) | 📋 Planifié |
 
