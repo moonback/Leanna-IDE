@@ -4,7 +4,7 @@ Leanna est un environnement de développement augmenté par IA, conçu pour les 
 
 Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un assistant IA local, sécurisé, capable de lire, écrire et exécuter du code dans leur propre workspace, sans envoyer leurs fichiers vers des services tiers non contrôlés.
 
-![Build](https://img.shields.io/badge/build-passing-brightgreen) ![Version](https://img.shields.io/badge/version-0.9.0-blue) ![License](https://img.shields.io/badge/license-BUSL--1.1-orange) ![Node](https://img.shields.io/badge/node-%3E%3D20-green) ![Electron](https://img.shields.io/badge/electron-43-blueviolet)
+![Build](https://img.shields.io/badge/build-passing-brightgreen) ![Version](https://img.shields.io/badge/version-1.0.0-blue) ![License](https://img.shields.io/badge/license-BUSL--1.1-orange) ![Node](https://img.shields.io/badge/node-%3E%3D20-green) ![Electron](https://img.shields.io/badge/electron-43-blueviolet)
 
 ---
 
