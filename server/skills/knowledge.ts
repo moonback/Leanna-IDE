@@ -155,7 +155,7 @@ export const knowledgeSkill: Skill = {
     {
       name: "knowledge_memory_add",
       description:
-        "📝 Ajoute un FAIT dans la MÉMOIRE PROJET locale (ProjectMemory.json). " +
+        "📝 Ajoute un FAIT dans la MÉMOIRE PROJET locale (.project-memory.json). " +
         "Utilise ceci quand tu apprends quelque chose de durable sur le projet : une convention à respecter, " +
         "une décision d'architecture, un bug/workaround connu, un pattern de code récurrent. " +
         "Ces faits seront automatiquement réinjectés aux prochaines sessions via knowledge_build_context.",

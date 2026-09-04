@@ -72,8 +72,8 @@ const EXCLUDED_FILES = new Set([
   ".env.local",
   ".env.example",
   ".gemini-keys.json",
-  "ProjectKnowledge.json",
-  "ProjectMemory.json",
+  ".project-knowledge.json",
+  ".project-memory.json",
   "documents.json",
 ]);
 

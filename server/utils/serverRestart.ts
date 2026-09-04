@@ -15,8 +15,8 @@ const SERVER_CODE_EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".cjs", ".mjs"])
 const SERVER_DIRS = ["server/", "electron/"];
 const DATA_FILE_SUFFIXES = [".json", ".db", ".log", ".sqlite", ".sqlite3"];
 const DATA_FILE_BASENAMES = new Set([
-  "ProjectKnowledge.json",
-  "ProjectMemory.json",
+  ".project-knowledge.json",
+  ".project-memory.json",
 ]);
 const DATA_DIR_PREFIXES = [".Leanna/", "node_modules/"];
 

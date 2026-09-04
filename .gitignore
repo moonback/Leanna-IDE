@@ -20,5 +20,5 @@ Leanna-prompt.md
 
 # Fichiers de persistance Knowledge System (générés automatiquement au démarrage)
 # Ne jamais commiter ces fichiers — ils sont recréés par l'indexeur
-server/knowledge/ProjectKnowledge.json
-server/knowledge/ProjectMemory.json
+.project-knowledge.json
+.project-memory.json

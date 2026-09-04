@@ -9,7 +9,7 @@
  * - Patterns (solutions réutilisables)
  * - API (interfaces, endpoints, signatures)
  *
- * La mémoire est persistée dans ProjectMemory.json et mise à jour
+ * La mémoire est persistée dans .project-memory.json et mise à jour
  * automatiquement après chaque mission ou découverte importante.
  *
  * Architecture :
@@ -33,9 +33,12 @@ import type {
 
 const log = createLogger("ProjectMemory");
 
-/** Chemin du fichier de persistance calculé dynamiquement depuis SELF_ROOT */
+/** 
+ * Chemin du fichier de persistance calculé dynamiquement depuis SELF_ROOT.
+ * Stocke les données localement dans le projet actif pour isoler chaque projet.
+ */
 function getStorePath(): string {
-  return path.join(SELF_ROOT, ".Leanna", "ProjectMemory.json");
+  return path.join(SELF_ROOT, ".project-memory.json");
 }
 
 /** Seuil absolu — déclenche élagage si dépassé */

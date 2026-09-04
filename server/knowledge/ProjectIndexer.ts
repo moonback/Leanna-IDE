@@ -68,8 +68,8 @@ const EXCLUDED_FILES = new Set([
   ".npmrc",
   // Fichiers de persistance du Knowledge System — exclus pour éviter l'auto-indexation
   // (sinon le scan crée des copies parasites de 1-2 MB dans server/knowledge/)
-  "ProjectKnowledge.json",
-  "ProjectMemory.json",
+  ".project-knowledge.json",
+  ".project-memory.json",
 ]);
 
 /** Extensions de fichiers analysables */
