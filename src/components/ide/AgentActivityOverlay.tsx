@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Bot, Target, Loader2, CheckCircle2, XCircle,
-  Brain, ChevronUp, ChevronDown, Zap, AlertTriangle,
+  Bot, Target, Loader2, ChevronUp, ChevronDown, Zap,
 } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import { getAgentTasks, subscribe, type AgentTaskEntry } from '../../stores/agentActivityStore.js';
@@ -44,15 +43,6 @@ interface MissionActivity {
   lastAction?: string;
   lastDecision?: string;
 }
-
-// Role → display name (mirrors agentActivityStore / AgentPanel)
-const ROLE_TO_NAME: Record<string, string> = {
-  coder: 'Développeur', refactor: 'Refactorisation', debugger: 'Débogueur',
-  reviewer: 'Revue de Code', tester: 'QA & Tests', security: 'Sécurité & Audit',
-  architect: 'Architecte', writer: 'Rédacteur', formatter: 'Mise en forme',
-  researcher: 'Recherche', proofreader: 'Correcteur', translator: 'Traducteur',
-  summarizer: 'Synthèse', planner: 'Planificateur',
-};
 
 interface AgentActivityOverlayProps {
   /** Callback to open the full Agents panel */
@@ -187,9 +177,6 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions, isChatOpen 
 
   // ── Cleanup stale entries (completed/failed for > 5s) via ticker ──
   useEffect(() => {
-    const now = Date.now();
-    const staleThreshold = 5000;
-
     setMissions(prev => {
       const cleaned = prev.filter(m => m.status === 'in_progress');
       return cleaned.length !== prev.length ? cleaned : prev;
