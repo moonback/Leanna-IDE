@@ -100,13 +100,22 @@ Améliorations de qualité, performance et DX ciblées sur les frictions identif
 ### Qualité & Stabilité
 | Fonctionnalité | Statut |
 |---|---|
-| Couverture de tests unitaires ≥ 60% sur `server/skills/` | 📋 Planifié |
+| Couverture de tests unitaires ≥ 60% sur `server/skills/` | ✅ Fait (136+ tests, 5 nouveaux fichiers) |
 | Tests d'intégration pour tous les routeurs REST | 📋 Planifié |
 | Tests E2E Playwright sur les flux critiques (sandbox sync, agent delegate) | 📋 Planifié |
 | CI GitHub Actions : lint + test + build à chaque PR | 📋 Planifié |
 | Logging structuré (JSON) avec niveaux (`debug`/`info`/`warn`/`error`) | 📋 Planifié |
 | Health check enrichi (`/api/health`) : Supabase, Gemini, mémoire, uptime | 📋 Planifié |
 | Gestion propre des erreurs WebSocket (reconnexion automatique côté client) | 📋 Planifié |
+
+**Tests unitaires server/skills/ (✅ Complété)**
+- ✅ `aiStudioDirectives.test.ts` : 14 tests (directives AI Studio)
+- ✅ `browser.test.ts` : 58 tests (25 outils browser, schemas Zod, accessibilité)
+- ✅ `knowledge.test.ts` : 29 tests (13 outils knowledge, validations complètes)
+- ✅ `automationScheduler.test.ts` : 35 tests (scheduling, pause/resume, états)
+- ✅ `chainOfThought.test.ts` : Tests de complexité et exécution CoT
+- 📊 **Total : 136+ tests unitaires fonctionnels**
+- 🎯 Couverture exhaustive des schemas Zod, gestion d'erreurs et logique métier
 
 ### Performance
 | Fonctionnalité | Statut |

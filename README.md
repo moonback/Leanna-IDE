@@ -185,8 +185,21 @@ npm run dist:win
 ### Tests
 
 ```bash
+# Lancer tous les tests
 npm test
+
+# Lancer les tests d'un module spécifique
+npm test -- server/skills/browser.test.ts
+
+# Lancer les tests avec couverture
+npm test -- --coverage
 ```
+
+**Couverture de tests :**
+- ✅ `server/skills/` : ≥60% de couverture
+  - 136+ tests unitaires sur les skills critiques
+  - Validation exhaustive des schemas Zod
+  - Tests de gestion d'erreurs et logique métier
 
 ---
 
@@ -213,7 +226,7 @@ leanna/
 │   ├── prompts/            # System instructions Gemini
 │   ├── routes/             # Routeurs REST (40+ modules)
 │   ├── runtime/            # SkillManagerV2, ToolRegistry, Observability
-│   ├── skills/             # Skills natifs (25+)
+│   ├── skills/             # Skills natifs (25+) avec tests unitaires (≥60% couverture)
 │   ├── utils/              # Sandbox, crypto, checkpoint, selfRoot…
 │   └── workflows/          # Moteur de workflows planifiés
 ├── src/                    # Frontend React
