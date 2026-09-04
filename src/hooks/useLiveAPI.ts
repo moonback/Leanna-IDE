@@ -92,6 +92,12 @@ export function useLiveAPI() {
   const latencyHistoryRef = useRef<number[]>([]);
 
   const recordLatency = useCallback((ms: number) => {
+    // Validation : rejeter les latences manifestement incorrectes (> 30 secondes)
+    if (ms > 30_000) {
+      console.warn(`[VoiceLatency] Latence anormale rejetée: ${ms}ms (probable bug de timestamp)`);
+      return;
+    }
+    
     setLastLatencyMs(ms);
     latencyHistoryRef.current = [...latencyHistoryRef.current.slice(-19), ms];
     console.debug(`[VoiceLatency] ${ms}ms`);
@@ -116,8 +122,9 @@ export function useLiveAPI() {
     // Bloquer uniquement pendant l'exécution d'outils côté serveur
     if (isBusyRef.current) return;
 
-    // Mesure de latence : détecter début d'utterance (amplitude non nulle)
-    if (utteranceStartRef.current === null) {
+    // Mesure de latence : détecter début d'utterance UNIQUEMENT si aucune utterance en cours
+    // Cela évite de réinitialiser le timestamp au milieu d'une utterance existante
+    if (utteranceStartRef.current === null && !waitingFirstResponseChunkRef.current) {
       utteranceStartRef.current = performance.now();
       waitingFirstResponseChunkRef.current = true;
     }
@@ -168,7 +175,9 @@ export function useLiveAPI() {
       // ✅ Mesure latence : UNIQUEMENT lors du premier chunk audio de la réponse
       // Le texte arrive souvent 50-100ms avant l'audio, donc on ne mesure que l'audio
       if (waitingFirstResponseChunkRef.current && utteranceStartRef.current !== null) {
-        const latency = Math.round(performance.now() - utteranceStartRef.current);
+        const now = performance.now();
+        const latency = Math.round(now - utteranceStartRef.current);
+        console.debug(`[VoiceLatency] Calcul: now=${Math.round(now)}, start=${Math.round(utteranceStartRef.current)}, latency=${latency}ms`);
         recordLatency(latency);
         waitingFirstResponseChunkRef.current = false;
         utteranceStartRef.current = null;
@@ -367,9 +376,14 @@ export function useLiveAPI() {
 
       // Remplacer le transcript par le résumé + indication de redémarrage
       if (summary) {
+        // Validation défensive : s'assurer que summary est bien une string
+        const summaryText = typeof summary === 'string' 
+          ? summary 
+          : (typeof summary === 'object' ? JSON.stringify(summary, null, 2) : String(summary));
+        
         window.dispatchEvent(new CustomEvent('Leanna-summarize-context', {
           detail: {
-            summary: `[Redémarrage automatique — ${messagesSummarized} messages de la conversation précédente résumés]\n\n${summary}`,
+            summary: `[Redémarrage automatique — ${messagesSummarized} messages de la conversation précédente résumés]\n\n${summaryText}`,
             summarizedTurns: messagesSummarized,
             retained: [], // On ne garde rien de l'ancien transcript, tout est dans le résumé
           },

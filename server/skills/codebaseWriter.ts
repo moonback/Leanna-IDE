@@ -7,6 +7,7 @@ import { scheduleValidation } from "../utils/postEditValidator.js";
 import { appendAuditEvent, generateDiffSummary } from "../audit.js";
 import { isSandboxActive, markFileModified } from "../utils/sandbox.js";
 import { createLogger } from "../utils/logger.js";
+import { supervisor } from "../autonomy/Supervisor.js";
 import {
   getProjectRoot,
   resolveWritePath,
@@ -131,6 +132,12 @@ export async function handleWriteProjectFile(args: any, toolContext: any) {
       await createCheckpoint(`avant écriture: ${requestedPath}`);
     } catch { /* non bloquant */ }
   }
+  
+  // Enregistrer le hash du fichier avant écriture pour détection de boucle
+  if (beforeContent !== null) {
+    supervisor.recordFileHashBefore(target.logicalPath, beforeContent);
+  }
+  
   if (!resolveCurrentSandboxPath(requestedPath, writePath)) return { error: "Sandbox indisponible ou chemin modifié — écriture refusée." };
   await fs.promises.mkdir(path.dirname(writePath), { recursive: true });
   await fs.promises.writeFile(writePath, finalContent, "utf-8");
@@ -267,6 +274,10 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
       await createCheckpoint(`avant modification: ${requestedPath}`);
     } catch { /* non bloquant */ }
   }
+  
+  // Enregistrer le hash du fichier avant modification pour détection de boucle
+  supervisor.recordFileHashBefore(target.logicalPath, content);
+  
   if (!resolveCurrentSandboxPath(requestedPath, normalized)) return { error: "Sandbox indisponible ou chemin modifié — écriture refusée." };
   await fs.promises.writeFile(normalized, newContent, "utf-8");
   if (sandboxMode) markFileModified(requestedPath);
@@ -386,6 +397,9 @@ export async function handlePatchProjectFile(args: any, toolContext: any) {
       await createCheckpoint(`avant patch: ${requestedPath}`);
     } catch { /* non bloquant */ }
   }
+
+  // Enregistrer le hash du fichier avant patch pour détection de boucle
+  supervisor.recordFileHashBefore(target.logicalPath, raw);
 
   if (!resolveCurrentSandboxPath(requestedPath, normalized)) return { error: "Sandbox indisponible ou chemin modifié — écriture refusée." };
   await fs.promises.writeFile(normalized, newContent, "utf-8");

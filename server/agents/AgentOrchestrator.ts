@@ -159,12 +159,23 @@ export class AgentOrchestrator {
     title: string;
     description: string;
     tasks: Array<{
+      /** ID stable optionnel — permet d'être référencé dans dependsOn d'autres tâches */
+      id?: string;
       role: AgentRole;
       title: string;
       description: string;
       files?: string[];
       instructions?: string;
       priority?: TaskPriority;
+      /**
+       * IDs stables ou titres de tâches dont celle-ci dépend.
+       * Résolution (par ordre de priorité) :
+       *   1. ID stable fourni via le champ `id`
+       *   2. UUID interne généré automatiquement
+       *   3. Titre de tâche dans le même plan
+       * Le scheduler ne lance la tâche que lorsque toutes ses dépendances
+       * sont au statut "completed".
+       */
       dependsOn?: string[];
     }>;
   }): Promise<OrchestrationPlan> {
@@ -175,14 +186,50 @@ export class AgentOrchestrator {
     const agentTasks: AgentTask[] = [];
     const dependencies: Record<string, string[]> = {};
 
-    // Première passe : les IDs doivent exister avant de pouvoir résoudre les dépendances.
+    // Première passe : attribuer un UUID interne à chaque tâche et construire
+    // les tables de résolution (ID stable → UUID interne, titre → UUID interne).
     const taskIds = params.tasks.map(() => randomUUID());
-    const idByTitle = new Map<string, string>();
+    const idByStableId = new Map<string, string>(); // "task-analysis" → UUID interne
+    const idByTitle = new Map<string, string>();     // "Analyse du code" → UUID interne
     params.tasks.forEach((taskDef, index) => {
+      if (taskDef.id) {
+        if (idByStableId.has(taskDef.id)) {
+          log.warn(`⚠️ ID de tâche dupliqué "${taskDef.id}" — seule la première occurrence est prise en compte`);
+        } else {
+          idByStableId.set(taskDef.id, taskIds[index]);
+        }
+      }
       idByTitle.set(taskDef.title, taskIds[index]);
     });
 
-    // Seconde passe : créer les tâches et traduire les titres du même plan en IDs réels.
+    /**
+     * Résout une référence de dépendance vers l'UUID interne de la tâche.
+     * Ordre de résolution :
+     *   1. ID stable (champ `id` de la définition de tâche)
+     *   2. Titre de tâche dans le même plan
+     *   3. Passage direct (assume que la référence est déjà un UUID valide,
+     *      ex: dépendance vers une tâche d'un plan précédent)
+     */
+    const knownInternalIds = new Set<string>(taskIds);
+    const resolveRef = (reference: string, fromTitle: string): string => {
+      const resolved = idByStableId.get(reference) ?? idByTitle.get(reference) ?? reference;
+      if (resolved === reference && !knownInternalIds.has(reference)) {
+        log.warn(
+          `⚠️ Dépendance non résolue: tâche "${fromTitle}" référence "${reference}" — ` +
+          `IDs stables connus: [${[...idByStableId.keys()].join(", ")}], ` +
+          `titres connus: [${[...idByTitle.keys()].join(", ")}]`
+        );
+      }
+      return resolved;
+    };
+
+    // Log de la table de résolution (aide au débogage)
+    log.debug(
+      `Table de résolution — IDs stables: {${[...idByStableId.entries()].map(([k, v]) => `"${k}"→${v.slice(0, 8)}`).join(", ")}} ` +
+      `| Titres: {${[...idByTitle.entries()].map(([k, v]) => `"${k}"→${v.slice(0, 8)}`).join(", ")}}`
+    );
+
+    // Seconde passe : créer les tâches et résoudre toutes les dépendances.
     for (let i = 0; i < params.tasks.length; i++) {
       const taskDef = params.tasks[i];
       const agent = getAgentDefinitionOrThrow(taskDef.role);
@@ -206,8 +253,14 @@ export class AgentOrchestrator {
 
       agentTasks.push(task);
       this.tasks.set(task.id, task);
-      dependencies[taskId] = (taskDef.dependsOn ?? []).map(
-        (reference) => idByTitle.get(reference) ?? reference
+
+      const rawDeps = taskDef.dependsOn ?? [];
+      const resolvedDeps = rawDeps.map((ref) => resolveRef(ref, taskDef.title));
+      dependencies[taskId] = resolvedDeps;
+
+      log.info(
+        `  [plan] "${taskDef.title}"${taskDef.id ? ` (id: ${taskDef.id})` : ""} → UUID ${taskId.slice(0, 8)} | ` +
+        `dependsOn raw: [${rawDeps.join(", ") || "aucune"}] → resolved: [${resolvedDeps.map(d => d.slice(0, 8)).join(", ") || "aucune"}]`
       );
     }
 

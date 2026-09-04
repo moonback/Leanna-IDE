@@ -34,6 +34,7 @@
  */
 
 import { createLogger } from "../utils/logger.js";
+import { createHash } from "crypto";
 
 const log = createLogger("Supervisor");
 
@@ -137,6 +138,10 @@ interface FileHistory {
   approachNumber: number;
   /** Historique glissant des erreurs (la plus récente en dernier) */
   lastErrors: string[];
+  /** Historique des hashes de contenu de fichier (pour détecter A→B→A) */
+  contentHashes: string[];
+  /** Timestamp de la dernière modification */
+  lastModifiedAt?: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -187,6 +192,50 @@ export class Supervisor {
    */
   setSessionInjector(injector: SessionInjector): void {
     this.injector = injector;
+  }
+
+  /**
+   * Calcule le hash MD5 d'un contenu de fichier.
+   */
+  private hashContent(content: string): string {
+    return createHash("md5").update(content, "utf8").digest("hex");
+  }
+
+  /**
+   * Enregistre le hash d'un fichier avant modification.
+   * À appeler depuis les skills d'écriture (write/modify/patch).
+   */
+  recordFileHashBefore(filePath: string, content: string): void {
+    const hash = this.hashContent(content);
+    const history = this.correctionHistory.get(filePath) || {
+      attemptInApproach: 0,
+      approachNumber: 1,
+      lastErrors: [],
+      contentHashes: [],
+    };
+    
+    // Ne pas dupliquer si c'est déjà le dernier hash enregistré
+    if (history.contentHashes.length === 0 || history.contentHashes[history.contentHashes.length - 1] !== hash) {
+      history.contentHashes.push(hash);
+      // Garder les 6 derniers hashes (2 tentatives × 3 approches)
+      if (history.contentHashes.length > 6) {
+        history.contentHashes.shift();
+      }
+    }
+    
+    this.correctionHistory.set(filePath, history);
+  }
+
+  /**
+   * Vérifie si un hash a déjà été vu (détection A→B→A).
+   */
+  private detectContentLoop(filePath: string, newHash: string): boolean {
+    const history = this.correctionHistory.get(filePath);
+    if (!history || history.contentHashes.length === 0) return false;
+    
+    // Vérifier si ce hash existe déjà dans l'historique (excluant le dernier qui est l'avant-modification)
+    const previousHashes = history.contentHashes.slice(0, -1);
+    return previousHashes.includes(newHash);
   }
 
   /**
@@ -306,15 +355,25 @@ export class Supervisor {
       attemptInApproach: 0,
       approachNumber: 1,
       lastErrors: [],
+      contentHashes: [],
     };
     history.attemptInApproach++;
     history.lastErrors.push(errors);
+    history.lastModifiedAt = Date.now();
     if (history.lastErrors.length > ERROR_HISTORY_SIZE) history.lastErrors.shift();
     this.correctionHistory.set(key, history);
 
-    // Boucle : erreur identique à une des tentatives précédentes (hors la courante)
+    // Détection de boucle d'erreurs : erreur identique à une des tentatives précédentes
     const recentErrors = history.lastErrors.slice(0, -1);
-    const isLoop = recentErrors.some((prev) => prev === errors);
+    const isErrorLoop = recentErrors.some((prev) => prev === errors);
+    
+    // Détection de boucle de contenu : le fichier revient à un état déjà vu
+    // (cette information sera vérifiée au moment du patch via recordFileHashBefore)
+    const isContentLoop = history.contentHashes.length >= 2 && 
+      history.contentHashes[history.contentHashes.length - 1] === 
+      history.contentHashes[history.contentHashes.length - 2];
+
+    const isLoop = isErrorLoop || isContentLoop;
 
     const recordFailure = (attemptNumber: number, approachNumber: number) => {
       this.totalCorrections++;
@@ -346,7 +405,8 @@ export class Supervisor {
 
     // --- Boucle détectée → pivot immédiat, quel que soit le compte de tentatives ---
     if (isLoop) {
-      log.warn(`🔄 Boucle détectée sur ${label} (approche #${history.approachNumber}, tentative #${history.attemptInApproach}).`);
+      const loopType = isContentLoop ? "contenu" : "erreurs";
+      log.warn(`🔄 Boucle détectée (${loopType}) sur ${label} (approche #${history.approachNumber}, tentative #${history.attemptInApproach}).`);
       recordFailure(history.attemptInApproach, history.approachNumber);
       return this.advanceApproachOrEscalate(key, errors, history, /*forcedByLoop*/ true);
     }

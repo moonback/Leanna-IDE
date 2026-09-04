@@ -101,146 +101,132 @@ CRITÈRES DE QUALITÉ :
 ${criteria.map(c => `- ${c}`).join('\n')}
 `;
 
-// ─── Capacités communes ─────────────────────────────────────────────────────
-// Factorisées pour éviter les oublis lors de l'ajout d'une capacité transverse
-// (ex: nouvel outil de raisonnement ou de mémoire disponible pour tous les agents).
-
-const CAP_REASONING = ["reasoning_think"] as const;
-const CAP_MEMORY_RW = ["knowledge_memory_search", "knowledge_memory_add"] as const;
-const CAP_MEMORY_ADD_ONLY = ["knowledge_memory_add"] as const;
-
-const CAP_FILE_READ = [
-  "read_project_file",
-  "list_project_files",
-  "search_in_files",
-  "read_file_outline",
-  "analyze_project_file",
-] as const;
-
-const CAP_FILE_WRITE = [
-  "write_project_file",
-  "modify_project_file",
-  "patch_project_file",
-] as const;
-
-const CAP_VERIFY_FULL = [
-  "verify_file",
-  "verify_typecheck",
-  "verify_lint",
-  "verify_full",
-] as const;
-
-// ─── Factory de définition d'agent ─────────────────────────────────────────
-// Garantit que `systemPrompt` est TOUJOURS dérivé du même `role` que celui
-// déclaré dans la définition — élimine tout risque de désynchronisation
-// (ex: role: "refactor" mais systemPrompt construit pour "coder").
-
-interface AgentSpec {
-  role: AgentRole;
-  name: string;
-  description: string;
-  capabilities: readonly string[];
-  maxConcurrency: number;
-  defaultTimeoutMs: number;
-}
-
-function defineAgent(spec: AgentSpec): AgentDefinition {
-  return {
-    role: spec.role,
-    name: spec.name,
-    description: spec.description,
-    capabilities: [...spec.capabilities],
-    systemPrompt: buildAgentPrompt(spec.role),
-    maxConcurrency: spec.maxConcurrency,
-    defaultTimeoutMs: spec.defaultTimeoutMs,
-  };
-}
-
 // ─── Définitions spécifiques par agent ──────────────────────────────────────
 
 // 1. Agents de Code & Ingénierie
 
-const coderAgent = defineAgent({
+const coderAgent: AgentDefinition = {
   role: "coder",
   name: "Agent Développeur",
   description: "Implémentation de fonctionnalités, écriture et modification de code propre et typé avec vérification rigoureuse.",
   capabilities: [
-    ...CAP_FILE_READ,
-    ...CAP_FILE_WRITE,
+    "read_project_file",
+    "write_project_file",
+    "modify_project_file",
+    "patch_project_file",
     "rename_project_file",
     "delete_project_file",
     "create_project_directory",
-    ...CAP_VERIFY_FULL,
+    "list_project_files",
+    "search_in_files",
+    "read_file_outline",
+    "analyze_project_file",
+    "verify_file",
+    "verify_typecheck",
+    "verify_lint",
+    "verify_full",
     "knowledge_build_context",
     "knowledge_semantic_search",
-    ...CAP_MEMORY_RW,
-    ...CAP_REASONING,
+    "knowledge_memory_search",
+    "knowledge_memory_add",
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("coder"),
   maxConcurrency: 3,
   defaultTimeoutMs: 120_000,
-});
+};
 
-const refactorAgent = defineAgent({
+const refactorAgent: AgentDefinition = {
   role: "refactor",
   name: "Agent Refactorisation",
   description: "Restructuration de code, réduction de dette technique, optimisation de lisibilité et respect des patterns SOLID/DRY sans altérer le comportement externe.",
   capabilities: [
-    ...CAP_FILE_READ,
-    ...CAP_FILE_WRITE,
+    "read_project_file",
+    "write_project_file",
+    "modify_project_file",
+    "patch_project_file",
     "rename_project_file",
     "create_project_directory",
-    ...CAP_VERIFY_FULL,
+    "list_project_files",
+    "search_in_files",
+    "read_file_outline",
+    "analyze_project_file",
+    "verify_file",
+    "verify_typecheck",
+    "verify_lint",
+    "verify_full",
     "knowledge_build_context",
-    ...CAP_MEMORY_RW,
+    "knowledge_memory_search",
+    "knowledge_memory_add",
     "knowledge_impact_analyze",
-    ...CAP_REASONING,
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("refactor"),
   maxConcurrency: 2,
   defaultTimeoutMs: 120_000,
-});
+};
 
-const debuggerAgent = defineAgent({
+const debuggerAgent: AgentDefinition = {
   role: "debugger",
   name: "Agent Débogueur",
   description: "Diagnostic de bugs, analyse de stacktraces et root-causes, application de correctifs ciblés et vérification de non-régression.",
   capabilities: [
-    ...CAP_FILE_READ,
-    ...CAP_FILE_WRITE,
-    ...CAP_VERIFY_FULL,
+    "read_project_file",
+    "write_project_file",
+    "modify_project_file",
+    "patch_project_file",
+    "list_project_files",
+    "search_in_files",
+    "read_file_outline",
+    "analyze_project_file",
+    "verify_file",
+    "verify_typecheck",
+    "verify_lint",
+    "verify_full",
     "knowledge_build_context",
-    ...CAP_MEMORY_RW,
-    ...CAP_REASONING,
+    "knowledge_memory_search",
+    "knowledge_memory_add",
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("debugger"),
   maxConcurrency: 2,
   defaultTimeoutMs: 90_000,
-});
+};
 
-const reviewerAgent = defineAgent({
+const reviewerAgent: AgentDefinition = {
   role: "reviewer",
   name: "Agent Revue de Code",
   description: "Audit de qualité de code, détection d'anti-patterns, vérification de la maintenabilité, lisibilité et conformité aux standards.",
   capabilities: [
-    ...CAP_FILE_READ,
+    "read_project_file",
+    "list_project_files",
+    "search_in_files",
+    "read_file_outline",
+    "analyze_project_file",
     "verify_file",
     "verify_lint",
     "verify_typecheck",
     "verify_full",
     "knowledge_build_context",
-    ...CAP_MEMORY_RW,
+    "knowledge_memory_search",
+    "knowledge_memory_add",
     "knowledge_impact_analyze",
-    ...CAP_REASONING,
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("reviewer"),
   maxConcurrency: 2,
   defaultTimeoutMs: 60_000,
-});
+};
 
-const testerAgent = defineAgent({
+const testerAgent: AgentDefinition = {
   role: "tester",
   name: "Agent QA & Tests",
   description: "Écriture et maintenance de tests automatisés (unitaires, intégration, e2e), validation des cas limites et de la couverture.",
   capabilities: [
     "read_project_file",
-    ...CAP_FILE_WRITE,
+    "write_project_file",
+    "modify_project_file",
+    "patch_project_file",
     "list_project_files",
     "search_in_files",
     "analyze_project_file",
@@ -249,14 +235,16 @@ const testerAgent = defineAgent({
     "verify_typecheck",
     "verify_full",
     "knowledge_build_context",
-    ...CAP_MEMORY_RW,
-    ...CAP_REASONING,
+    "knowledge_memory_search",
+    "knowledge_memory_add",
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("tester"),
   maxConcurrency: 2,
   defaultTimeoutMs: 90_000,
-});
+};
 
-const securityAgent = defineAgent({
+const securityAgent: AgentDefinition = {
   role: "security",
   name: "Agent Sécurité & Audit",
   description: "Audit de sécurité du code, détection de failles OWASP, fuites de tokens/secrets, validation des entrées et analyse des dépendances.",
@@ -269,14 +257,16 @@ const securityAgent = defineAgent({
     "verify_lint",
     "verify_typecheck",
     "knowledge_build_context",
-    ...CAP_MEMORY_RW,
-    ...CAP_REASONING,
+    "knowledge_memory_search",
+    "knowledge_memory_add",
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("security"),
   maxConcurrency: 2,
   defaultTimeoutMs: 60_000,
-});
+};
 
-const architectAgent = defineAgent({
+const architectAgent: AgentDefinition = {
   role: "architect",
   name: "Agent Architecte Logiciel",
   description: "Conception logicielle de haut niveau, définition de structures de modules, contrats d'interfaces, schémas de données et choix de patterns.",
@@ -292,54 +282,72 @@ const architectAgent = defineAgent({
     "knowledge_build_context",
     "knowledge_semantic_search",
     "knowledge_search_entities",
-    ...CAP_MEMORY_RW,
+    "knowledge_memory_search",
+    "knowledge_memory_add",
     "knowledge_impact_analyze",
     "knowledge_graph_query",
-    ...CAP_REASONING,
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("architect"),
   maxConcurrency: 1,
   defaultTimeoutMs: 90_000,
-});
+};
 
 // 2. Agents de Rédaction & Documents
 
-const writerAgent = defineAgent({
+const writerAgent: AgentDefinition = {
   role: "writer",
   name: "Agent Rédacteur",
   description: "Rédacteur généraliste : README, guides, articles, rapports, notes. Produit du contenu clair et structuré.",
   capabilities: [
-    ...CAP_FILE_READ,
-    ...CAP_FILE_WRITE,
+    "read_project_file",
+    "write_project_file",
+    "modify_project_file",
+    "patch_project_file",
     "apply_patch",
     "rename_project_file",
     "delete_project_file",
     "create_project_directory",
+    "list_project_files",
+    "search_in_files",
+    "read_file_outline",
+    "analyze_project_file",
     "verify_file",
-    ...CAP_MEMORY_RW,
-    ...CAP_REASONING,
+    "knowledge_memory_search",
+    "knowledge_memory_add",
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("writer"),
   maxConcurrency: 3,
   defaultTimeoutMs: 90_000,
-});
+};
 
-const formatterAgent = defineAgent({
+const formatterAgent: AgentDefinition = {
   role: "formatter",
   name: "Agent Mise en Forme",
   description: "Spécialiste du formatage : structure Markdown, tables, TOC, titres, listes, blocs de code.",
   capabilities: [
-    ...CAP_FILE_READ,
-    ...CAP_FILE_WRITE,
+    "read_project_file",
+    "write_project_file",
+    "modify_project_file",
+    "patch_project_file",
     "apply_patch",
+    "rename_project_file",
     "create_project_directory",
+    "list_project_files",
+    "search_in_files",
+    "read_file_outline",
+    "analyze_project_file",
     "verify_file",
-    ...CAP_MEMORY_ADD_ONLY,
-    ...CAP_REASONING,
+    "knowledge_memory_add",
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("formatter"),
   maxConcurrency: 2,
   defaultTimeoutMs: 45_000,
-});
+};
 
-const researcherAgent = defineAgent({
+const researcherAgent: AgentDefinition = {
   role: "researcher",
   name: "Agent Recherche",
   description: "Collecte d'informations, analyse d'impact, résumé de sources, vérification de faits et persistance dans ProjectMemory.",
@@ -357,48 +365,55 @@ const researcherAgent = defineAgent({
     "knowledge_memory_list",
     "knowledge_impact_analyze",
     "knowledge_graph_query",
-    ...CAP_REASONING,
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("researcher"),
   maxConcurrency: 2,
   defaultTimeoutMs: 60_000,
-});
+};
 
-const proofreaderAgent = defineAgent({
+const proofreaderAgent: AgentDefinition = {
   role: "proofreader",
   name: "Agent Correcteur",
   description: "Correcteur orthographique, grammatical et stylistique. Vérifie la cohérence et la clarté.",
   capabilities: [
     "read_project_file",
-    ...CAP_FILE_WRITE,
+    "write_project_file",
+    "modify_project_file",
+    "patch_project_file",
     "apply_patch",
     "create_project_directory",
     "list_project_files",
     "search_in_files",
     "verify_file",
-    ...CAP_MEMORY_ADD_ONLY,
-    ...CAP_REASONING,
+    "knowledge_memory_add",
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("proofreader"),
   maxConcurrency: 2,
   defaultTimeoutMs: 45_000,
-});
+};
 
-const translatorAgent = defineAgent({
+const translatorAgent: AgentDefinition = {
   role: "translator",
   name: "Agent Traducteur",
   description: "Traduction et localisation de documents (FR, EN, ES, DE, AR, etc.).",
   capabilities: [
     "read_project_file",
-    ...CAP_FILE_WRITE,
+    "write_project_file",
+    "modify_project_file",
+    "patch_project_file",
     "list_project_files",
     "search_in_files",
-    ...CAP_MEMORY_ADD_ONLY,
-    ...CAP_REASONING,
+    "knowledge_memory_add",
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("translator"),
   maxConcurrency: 2,
   defaultTimeoutMs: 90_000,
-});
+};
 
-const summarizerAgent = defineAgent({
+const summarizerAgent: AgentDefinition = {
   role: "summarizer",
   name: "Agent Synthèse",
   description: "Résumés exécutifs, abstracts, condensés, points clés à partir de documents longs.",
@@ -409,20 +424,24 @@ const summarizerAgent = defineAgent({
     "list_project_files",
     "search_in_files",
     "read_file_outline",
-    ...CAP_MEMORY_RW,
-    ...CAP_REASONING,
+    "knowledge_memory_search",
+    "knowledge_memory_add",
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("summarizer"),
   maxConcurrency: 2,
   defaultTimeoutMs: 60_000,
-});
+};
 
-const plannerAgent = defineAgent({
+const plannerAgent: AgentDefinition = {
   role: "planner",
   name: "Agent Planificateur",
   description: "Création de plans d'ingénierie et de documents, structuration d'architecture, alimentation de la mémoire projet et préparation des délégations.",
   capabilities: [
     "read_project_file",
-    ...CAP_FILE_WRITE,
+    "write_project_file",
+    "modify_project_file",
+    "patch_project_file",
     "rename_project_file",
     "delete_project_file",
     "create_project_directory",
@@ -437,15 +456,16 @@ const plannerAgent = defineAgent({
     "knowledge_memory_add",
     "knowledge_memory_list",
     "knowledge_impact_analyze",
-    ...CAP_REASONING,
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("planner"),
   maxConcurrency: 1,
   defaultTimeoutMs: 90_000,
-});
+};
 
 // ─── Agent Vision (Section 3.1 - Spécialisation Vision) ──────────────────────
 
-const visionAgent = defineAgent({
+const visionAgent: AgentDefinition = {
   role: "vision",
   name: "Agent Vision",
   description: "Expert en analyse visuelle et perception d'interfaces. Spécialisé dans l'interprétation de captures d'écran, l'identification d'éléments UI, la détection de patterns visuels et le support à la navigation web avancée.",
@@ -458,12 +478,14 @@ const visionAgent = defineAgent({
     "automation_click",
     "automation_type",
     "automation_scroll",
-    ...CAP_MEMORY_RW,
-    ...CAP_REASONING,
+    "knowledge_memory_add",
+    "knowledge_memory_search",
+    "reasoning_think",
   ],
+  systemPrompt: buildAgentPrompt("vision"),
   maxConcurrency: 2,
   defaultTimeoutMs: 60_000,
-});
+};
 
 // ─── Fonction de construction du prompt final ──────────────────────────────
 
@@ -1162,65 +1184,26 @@ export const STATIC_AGENT_REGISTRY: Record<string, AgentDefinition> = {
 };
 
 /**
- * Garde-fou de type pour valider la forme d'un agent récupéré depuis le
- * registre dynamique avant de le renvoyer comme `AgentDefinition`. Évite
- * qu'un agent mal formé créé via l'Agent Builder ne fasse crasher
- * l'orchestrateur plus tard, loin de la source du problème.
- */
-function isAgentDefinition(x: unknown): x is AgentDefinition {
-  if (!x || typeof x !== "object") return false;
-  const candidate = x as Record<string, unknown>;
-  return (
-    typeof candidate.role === "string" &&
-    typeof candidate.name === "string" &&
-    typeof candidate.systemPrompt === "string" &&
-    Array.isArray(candidate.capabilities)
-  );
-}
-
-/**
- * Normalise un rôle fourni (par un LLM ou un utilisateur) pour la résolution :
- * trim + minuscule. La casse/les espaces superflus ne doivent jamais faire
- * échouer une résolution qui aurait autrement réussi.
- */
-function normalizeRole(role: string): string {
-  return role?.trim?.().toLowerCase?.() ?? role;
-}
-
-/**
  * Récupère la définition d'un agent, en regardant d'abord dans le registre dynamique,
  * puis dans le registre statique.
- *
+ * 
  * @param role - Rôle de l'agent à récupérer
  * @returns La définition de l'agent ou undefined si non trouvé
  */
 export function getAgentDefinition(role: string): AgentDefinition | undefined {
-  const normalized = normalizeRole(role);
-
   // D'abord vérifier le registre dynamique
-  const dynamicAgent = dynamicAgentRegistry.getAgent(normalized) ?? dynamicAgentRegistry.getAgent(role);
+  const dynamicAgent = dynamicAgentRegistry.getAgent(role);
   if (dynamicAgent) {
-    if (!isAgentDefinition(dynamicAgent)) {
-      console.warn(`[AgentOrchestrator] Agent dynamique "${role}" ignoré : forme invalide (champs manquants).`);
-      return undefined;
-    }
-    return dynamicAgent;
+    return dynamicAgent as AgentDefinition;
   }
-
+  
   // Puis vérifier le registre statique
-  return (
-    STATIC_AGENT_REGISTRY[normalized as keyof typeof STATIC_AGENT_REGISTRY] ??
-    STATIC_AGENT_REGISTRY[role as keyof typeof STATIC_AGENT_REGISTRY]
-  );
+  return STATIC_AGENT_REGISTRY[role as keyof typeof STATIC_AGENT_REGISTRY];
 }
 
 /**
  * Aliases de rôles pour rattraper les erreurs fréquentes du LLM
  * (ex: "verifier" → "tester", "developer" → "coder").
- *
- * NB : n'y mettre QUE des rôles qui n'existent pas déjà tels quels dans
- * STATIC_AGENT_REGISTRY — un alias "x": "x" ne sert à rien puisque
- * getAgentDefinition trouve "x" directement avant de consulter cette table.
  */
 const ROLE_ALIASES: Record<string, string> = {
   verifier: "tester",
@@ -1229,24 +1212,25 @@ const ROLE_ALIASES: Record<string, string> = {
   "code-reviewer": "reviewer",
   "code-review": "reviewer",
   auditor: "reviewer",
-  qa: "tester",
+  "qa": "tester",
   "qa-tester": "tester",
-  test: "tester",
-  debuger: "debugger",
-  debug: "debugger",
-  refactorer: "refactor",
-  refactoring: "refactor",
+  "test": "tester",
+  "debuger": "debugger",
+  "debug": "debugger",
+  "architect": "architect",
+  "refactorer": "refactor",
+  "refactoring": "refactor",
   "security-audit": "security",
   "proof-reader": "proofreader",
-  proof_reader: "proofreader",
-  translate: "translator",
-  summarize: "summarizer",
-  summary: "summarizer",
-  plan: "planner",
-  planning: "planner",
-  research: "researcher",
-  format: "formatter",
-  write: "writer",
+  "proof_reader": "proofreader",
+  "translate": "translator",
+  "summarize": "summarizer",
+  "summary": "summarizer",
+  "plan": "planner",
+  "planning": "planner",
+  "research": "researcher",
+  "format": "formatter",
+  "write": "writer",
 };
 
 /**
@@ -1259,7 +1243,8 @@ const ROLE_ALIASES: Record<string, string> = {
 export function getAgentDefinitionOrThrow(role: string): AgentDefinition {
   let definition = getAgentDefinition(role);
   if (!definition) {
-    const normalized = normalizeRole(role);
+    // Tenter un alias (insensible à la casse)
+    const normalized = role?.toLowerCase?.() ?? role;
     const aliased = ROLE_ALIASES[normalized];
     if (aliased) {
       definition = getAgentDefinition(aliased);
@@ -1298,11 +1283,6 @@ export function listAgentRoles(): string[] {
  * Vérifie si un agent existe (statique ou dynamique).
  */
 export function hasAgent(role: string): boolean {
-  const normalized = normalizeRole(role);
-  return (
-    dynamicAgentRegistry.hasAgent(role) ||
-    dynamicAgentRegistry.hasAgent(normalized) ||
-    normalized in STATIC_AGENT_REGISTRY ||
-    role in STATIC_AGENT_REGISTRY
-  );
+  return dynamicAgentRegistry.hasAgent(role) || 
+         (role in STATIC_AGENT_REGISTRY);
 }

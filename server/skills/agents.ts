@@ -97,7 +97,11 @@ export const agentsSkill: Skill = {
     {
       name: "agent_orchestrate",
       description:
-        "Orchestre plusieurs agents en parallèle ou en séquence. Utilise dependsOn pour les dépendances. Retourne un orchestrationId pour suivre avec agent_status.",
+        "Orchestre plusieurs agents en séquence ou en parallèle avec gestion stricte des dépendances. " +
+        "RÈGLE CRITIQUE : si une tâche B doit attendre la fin de A, tu DOIS mettre l'id de A dans dependsOn de B. " +
+        "Sans dependsOn, toutes les tâches démarrent simultanément. " +
+        "Exemple séquentiel : reviewer → coder → tester nécessite que coder.dependsOn=[\"task-review\"] et tester.dependsOn=[\"task-impl\"]. " +
+        "Retourne un orchestrationId pour suivre avec agent_status.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -108,17 +112,18 @@ export const agentsSkill: Skill = {
             items: {
               type: "OBJECT",
               properties: {
+                id:           { type: "STRING", description: "Identifiant stable de la tâche, utilisé dans dependsOn des autres tâches. Utilise des slugs courts et lisibles (ex: 'task-review', 'task-impl', 'task-qa'). OBLIGATOIRE si d'autres tâches en dépendent." },
                 role:         { type: "STRING", description: "Rôle : coder, refactor, debugger, reviewer, tester, security, architect, writer, formatter, researcher, proofreader, translator, summarizer ou planner." },
                 title:        { type: "STRING", description: "Titre de la sous-tâche" },
                 description:  { type: "STRING", description: "Description détaillée" },
                 files:        { type: "ARRAY", items: { type: "STRING" }, description: "Fichiers pertinents" },
                 instructions: { type: "STRING", description: "Instructions supplémentaires" },
                 priority:     { type: "STRING", description: "Priorité" },
-                dependsOn:    { type: "ARRAY", items: { type: "STRING" }, description: "Titres exacts des tâches prérequises du même plan (ou IDs de tâches existantes)" },
+                dependsOn:    { type: "ARRAY", items: { type: "STRING" }, description: "IDs (champ id) des tâches prérequises du même plan. La tâche ne démarre que lorsque toutes les tâches listées ici ont le statut 'completed'. Laisse vide pour un démarrage immédiat en parallèle." },
               },
               required: ["role", "title", "description"],
             },
-            description: "Liste des tâches",
+            description: "Liste des tâches. L'ordre d'exécution est contrôlé exclusivement par dependsOn — pas par l'ordre dans ce tableau.",
           },
         },
         required: ["title", "description", "tasks"],
@@ -297,6 +302,7 @@ export const agentsSkill: Skill = {
         const plan = await agentOrchestrator.orchestrate({
           title: v.title!, description: v.description!,
           tasks: v.tasks!.map((t) => ({
+            id: t.id,
             role: t.role as AgentRole, title: t.title!, description: t.description!,
             files: t.files, instructions: t.instructions,
             priority: t.priority, dependsOn: t.dependsOn,

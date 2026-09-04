@@ -54,6 +54,22 @@ interface ToolExecutionState {
   previousFileSnapshots: Map<string, string>;
   /** Fichiers nouvellement lus ou modifiés dans ce tour */
   newlyTouchedFiles: Set<string>;
+  /**
+   * Nombre de tours consécutifs où l'agent a lu des fichiers sans en modifier aucun.
+   * Réinitialisé à 0 dès qu'une écriture est confirmée.
+   * Utilisé par le no-progress guard.
+   */
+  consecutiveReadOnlyTurns: number;
+  /**
+   * Vrai si la boucle a été interrompue par le no-progress guard.
+   * Permet à collectEvidence de produire outcome="no_change" ou outcome="blocked".
+   */
+  noProgressAbort: boolean;
+  /**
+   * Erreurs de compilation/vérification préexistantes (détectées avant tout write).
+   * Permet de distinguer une erreur introduite par l'agent d'une erreur préexistante.
+   */
+  preexistingErrors: string[];
 }
 
 // Seuls les appels structurés correspondant à des skills du workspace sont
@@ -225,6 +241,7 @@ export class AgentExecutor {
       task.status = "failed";
       task.result = {
         success: false,
+        outcome: "failed",
         summary: `Agent "${role}" introuvable`,
         error: `Agent "${role}" non enregistré. Utilisez l'Agent Builder pour créer et enregistrer cet agent d'abord.`,
         durationMs: 0,
@@ -242,6 +259,7 @@ export class AgentExecutor {
       task.status = "failed";
       task.result = {
         success: false,
+        outcome: "failed",
         summary: "Aucun handler de skills configuré.",
         error: "SkillHandler non initialisé",
         durationMs: 0,
@@ -274,15 +292,25 @@ export class AgentExecutor {
 
       // ── Étape 3: Exécution directe par l'agent ──
       log.info(`[task:${taskShortId}] [${agent.name}] 🤖 Étape 3/5 — Exécution agent_execute (LLM)...`);
+      log.debug(`[task:${taskShortId}] [${agent.name}] 📊 Budget: max ${AgentExecutor.EXECUTION_BUDGET.maxToolCalls} appels outils, ${AgentExecutor.EXECUTION_BUDGET.maxFilesRead} fichiers lus, ${Math.round(AgentExecutor.EXECUTION_BUDGET.maxContextChars / 1000)}k chars contexte`);
       const thinkResult = await this.callToolWithTimeout("agent_execute", {
         prompt: executionPrompt,
       });
 
       const initialResultText = this.resultParser.normalizeResult(thinkResult);
       log.debug(`[task:${taskShortId}] [${agent.name}] 🤖 Réponse initiale: ${initialResultText.length} chars`);
-      const toolExecution = await this.executeToolLoop(agent, executionPrompt, initialResultText);
+      const toolExecution = await this.executeToolLoop(agent, executionPrompt, initialResultText, task);
       const resultText = toolExecution.resultText;
-      log.info(`[task:${taskShortId}] [${agent.name}] 🔧 Boucle outils terminée — ${toolExecution.toolsExecuted.length} outil(s) exécuté(s), ${toolExecution.filesRead.length} fichier(s) lu(s), ${toolExecution.filesModified.length} fichier(s) modifié(s), ${toolExecution.errors.length} erreur(s)`);
+      
+      // Logs de consommation des ressources
+      const budgetUsage = {
+        toolCalls: `${toolExecution.toolsExecuted.length}/${AgentExecutor.EXECUTION_BUDGET.maxToolCalls}`,
+        filesRead: `${toolExecution.filesRead.length}/${AgentExecutor.EXECUTION_BUDGET.maxFilesRead}`,
+        filesModified: toolExecution.filesModified.length,
+        errors: toolExecution.errors.length,
+      };
+      log.info(`[task:${taskShortId}] [${agent.name}] 🔧 Boucle outils terminée — Outils: ${budgetUsage.toolCalls}, Fichiers lus: ${budgetUsage.filesRead}, Fichiers modifiés: ${budgetUsage.filesModified}, Erreurs: ${budgetUsage.errors}`);
+
 
       // ── Étape 4: Matérialisation et vérification des modifications ──
       log.debug(`[task:${taskShortId}] [${agent.name}] 💾 Étape 4/5 — Écriture et vérification des fichiers...`);
@@ -311,10 +339,18 @@ export class AgentExecutor {
 
       // Un texte non exceptionnel ne suffit jamais : completed nécessite des preuves
       // observables collectées par l'exécuteur, pas seulement déclarée par le modèle.
+      // outcome="blocked" → "failed" avec cause externe clairement identifiée
+      // outcome="no_change" → "failed" (tâche write-required sans aucune modification)
+      // outcome="success"/"partial" → "completed"
+      const outcome = evidence.outcome;
+      const isBlocked = outcome === "blocked";
+      const isNoChange = outcome === "no_change";
       task.status = success ? "completed" : "failed";
       task.completedAt = new Date().toISOString();
       task.result = {
         success,
+        outcome,
+        ...(evidence.blockReason !== undefined && { blockReason: evidence.blockReason }),
         summary: this.resultParser.extractSummary(resultText),
         details: resultText,
         filesModified: writeResult.written,
@@ -327,7 +363,13 @@ export class AgentExecutor {
       };
 
       if (!success) {
-        log.warn(`[task:${taskShortId}] ⚠️ [${agent.name}] Résultat incomplet après ${(durationMs / 1000).toFixed(1)}s — Cause: ${incompleteReason}`);
+        if (isBlocked) {
+          log.warn(`[task:${taskShortId}] 🔶 [${agent.name}] Bloqué par erreur préexistante après ${(durationMs / 1000).toFixed(1)}s — ${evidence.blockReason ?? incompleteReason}`);
+        } else if (isNoChange) {
+          log.warn(`[task:${taskShortId}] 🟡 [${agent.name}] Aucune modification produite après ${(durationMs / 1000).toFixed(1)}s (${toolExecution.filesRead.length} fichier(s) lu(s), 0 modifié) — Cause: ${incompleteReason}`);
+        } else {
+          log.warn(`[task:${taskShortId}] ⚠️ [${agent.name}] Résultat incomplet après ${(durationMs / 1000).toFixed(1)}s — Cause: ${incompleteReason}`);
+        }
         if (toolExecution.errors.length > 0) {
           log.warn(`[task:${taskShortId}] [${agent.name}] Erreurs outils: ${toolExecution.errors.slice(0, 3).join(" | ")}`);
         }
@@ -342,11 +384,11 @@ export class AgentExecutor {
       // ── Étape 5: Les délégations ne partent qu'après une exécution vérifiée ──
       const subTaskIds = await this.dispatchDelegations(task, resultText);
       if (subTaskIds.length > 0) {
-        task.result.delegatedSubTasks = subTaskIds;
+        task.result!.delegatedSubTasks = subTaskIds;
         log.info(`[task:${taskShortId}] [${agent.name}] 🔀 ${subTaskIds.length} sous-tâche(s) déléguée(s): [${subTaskIds.map(id => id.slice(0, 8)).join(", ")}]`);
       }
 
-      log.info(`[task:${taskShortId}] ✅ [${agent.name}] Terminé en ${(durationMs / 1000).toFixed(1)}s — ${writeResult.written.length} fichier(s) modifié(s) — ${task.result.summary}`);
+      log.info(`[task:${taskShortId}] ✅ [${agent.name}] Terminé en ${(durationMs / 1000).toFixed(1)}s — ${writeResult.written.length} fichier(s) modifié(s) — ${task.result!.summary}`);
       this.notifier.notify(task, "completed");
     } catch (error) {
       const durationMs = Date.now() - startTime;
@@ -354,6 +396,7 @@ export class AgentExecutor {
       task.completedAt = new Date().toISOString();
       task.result = {
         success: false,
+        outcome: "failed",
         summary: `Échec de l'agent ${agent.name}`,
         error: (error as Error).message,
         durationMs,
@@ -379,11 +422,22 @@ export class AgentExecutor {
   private static readonly MAX_FILE_CONTEXT_CHARS = 50_000;
   /** Limite maximale de fichiers dans le contexte incrémental */
   private static readonly MAX_FILES_IN_CONTEXT = 10;
+  
+  /** Budget de contraintes pour éviter la surconsommation de ressources */
+  private static readonly EXECUTION_BUDGET = {
+    /** Nombre maximum d'appels d'outils au total */
+    maxToolCalls: 30,
+    /** Nombre maximum de fichiers lus */
+    maxFilesRead: 20,
+    /** Caractères maximum pour le contexte cumulé (approximation de ~60k tokens) */
+    maxContextChars: 240_000,
+  };
 
   private async executeToolLoop(
     agent: { name: string; capabilities: string[] },
     executionPrompt: string,
-    initialResultText: string
+    initialResultText: string,
+    task: AgentTask
   ): Promise<ToolExecutionState> {
     const state: ToolExecutionState = {
       resultText: initialResultText,
@@ -405,6 +459,9 @@ export class AgentExecutor {
       fileSnapshots: new Map(),
       previousFileSnapshots: new Map(),
       newlyTouchedFiles: new Set(),
+      consecutiveReadOnlyTurns: 0,
+      noProgressAbort: false,
+      preexistingErrors: [],
     };
 
     for (let turn = 0; turn < AgentExecutor.MAX_TOOL_TURNS; turn++) {
@@ -460,10 +517,133 @@ export class AgentExecutor {
         }
       }
 
-      // ── Compter les lectures répétées sans écriture ──────────────────────
-      const readsSinceWrite = state.filesRead.length - state.filesModified.length;
-      const stallNote = (readsSinceWrite >= 1 && state.filesModified.length === 0)
-        ? `\n💡 Tu as lu ${readsSinceWrite} fichier(s). Si cette tâche requiert une modification de code, émets MAINTENANT un modify_project_file, patch_project_file ou write_project_file.`
+      // ── Budget enforcement ──────────────────────────────────────────────
+      // Vérifier que l'agent ne dépasse pas les limites budgétaires
+      const totalToolCalls = state.toolsExecuted.length;
+      const totalFilesRead = state.filesRead.length;
+      const totalContextChars = executionPrompt.length + fileContextSection.length + observations.length;
+      
+      const budgetViolations: string[] = [];
+      if (totalToolCalls >= AgentExecutor.EXECUTION_BUDGET.maxToolCalls) {
+        budgetViolations.push(`${totalToolCalls} appels d'outils (max: ${AgentExecutor.EXECUTION_BUDGET.maxToolCalls})`);
+      }
+      if (totalFilesRead >= AgentExecutor.EXECUTION_BUDGET.maxFilesRead) {
+        budgetViolations.push(`${totalFilesRead} fichiers lus (max: ${AgentExecutor.EXECUTION_BUDGET.maxFilesRead})`);
+      }
+      if (totalContextChars >= AgentExecutor.EXECUTION_BUDGET.maxContextChars) {
+        budgetViolations.push(`${Math.round(totalContextChars / 1000)}k caractères de contexte (max: ${Math.round(AgentExecutor.EXECUTION_BUDGET.maxContextChars / 1000)}k)`);
+      }
+
+      if (budgetViolations.length > 0) {
+        log.warn(
+          `[${agent.name}] ⚠️ Budget d'exécution dépassé au tour ${turn + 1}: ${budgetViolations.join(", ")}. ` +
+          `L'agent doit conclure avec les informations disponibles.`
+        );
+        
+        // Forcer un tour de synthèse finale
+        const budgetPrompt = [
+          executionPrompt.slice(0, 10_000), // Contexte initial réduit
+          "",
+          "## Budget d'exécution dépassé",
+          `Après ${turn + 1} tours, tu as atteint les limites budgétaires :`,
+          ...budgetViolations.map(v => `- ${v}`),
+          "",
+          "Tu DOIS maintenant conclure avec ce que tu as découvert.",
+          "NE fais PLUS d'appels d'outils (read_project_file, search_in_files, etc.).",
+          "Fournis un résumé de tes découvertes et recommandations.",
+        ].join("\n");
+        
+        const budgetFollowUp = await this.callToolWithTimeout("agent_execute", { prompt: budgetPrompt });
+        state.resultText = this.resultParser.normalizeResult(budgetFollowUp);
+        break;
+      }
+
+      // ── No-progress guard ───────────────────────────────────────────────
+      // Mettre à jour le compteur de tours sans écriture.
+      // Les tours purement verify_*/analyze_* ne comptent PAS — c'est du travail légitime
+      // (l'agent analyse la situation avant d'écrire, pas une boucle infinie de lecture).
+      // Les tours contenant une tentative d'écriture (isWriteCall) ne comptent PAS non plus,
+      // même si la vérification a échoué — l'agent a progressé structurellement.
+      const isVerifyOnlyTurn = calls.every(c =>
+        c.name.startsWith("verify_") || c.name.startsWith("analyze_") || c.name === "reasoning_think"
+      );
+      const hadWriteAttemptThisTurn = calls.some(c =>
+        ["write_project_file", "apply_patch", "patch_project_file", "modify_project_file"].includes(c.name)
+      );
+      if (state.filesModified.length === 0 && !isVerifyOnlyTurn && !hadWriteAttemptThisTurn) {
+        state.consecutiveReadOnlyTurns++;
+      } else if (state.filesModified.length > 0 || hadWriteAttemptThisTurn) {
+        state.consecutiveReadOnlyTurns = 0;
+      }
+
+      // Seuil : 5 tours consécutifs sans écriture → interrompre.
+      // Seuil relevé de 3 à 5 pour laisser le temps d'analyser avant d'agir.
+      // Ne s'applique QUE pour les rôles qui doivent produire des modifications.
+      const NO_PROGRESS_THRESHOLD = 5;
+      const isWriteRequiredForGuard = ["coder", "refactor", "debugger", "writer", "formatter", "proofreader", "translator"].includes(task.role)
+        && !this.isAnalysisOnlyTask(task);
+      if (
+        isWriteRequiredForGuard &&
+        !isLastAllowedTurn &&
+        state.consecutiveReadOnlyTurns >= NO_PROGRESS_THRESHOLD &&
+        state.filesModified.length === 0
+      ) {
+        log.warn(
+          `[${agent.name}] 🚫 No-progress guard déclenché après ${state.consecutiveReadOnlyTurns} tours sans écriture ` +
+          `(${state.filesRead.length} fichier(s) lu(s), 0 modifié). Interruption de la boucle.`
+        );
+        // Pattern restreint aux vraies erreurs TypeScript/import — exclut "introuvable" générique
+        // qui peut venir d'un list_project_files sur un dossier inexistant (erreur outil, pas compile).
+        const compileErrorPattern = /(?:cannot find module|module not found|error ts\d{3,4}:?|ts\d{4,}:)/i;
+        const modifiedOrAttempted = state.touchedFiles.size > 0;
+        if (modifiedOrAttempted && (compileErrorPattern.test(state.observations.join("\n")) || compileErrorPattern.test(state.resultText))) {
+          state.noProgressAbort = true;
+          const blockedObs = state.observations.find(o => compileErrorPattern.test(o));
+          if (blockedObs) state.preexistingErrors.push(blockedObs.slice(0, 300));
+        } else {
+          state.noProgressAbort = true;
+        }
+        // Forcer un dernier tour de synthèse
+        const forcePrompt = [
+          executionPrompt,
+          fileContextSection,
+          "",
+          "## Observations d'exécution (tour " + (turn + 1) + ")",
+          observations,
+          "",
+          `⛔ INTERRUPTION FORCÉE : Après ${state.consecutiveReadOnlyTurns} tours de lecture sans aucune modification, ` +
+          `l'exécution est interrompue. Tu DOIS maintenant soit :\n` +
+          `1. Émettre immédiatement un modify_project_file / patch_project_file / write_project_file si tu peux modifier des fichiers.\n` +
+          `2. Déclarer explicitement pourquoi tu es bloqué avec "## Blocage\nCause: <raison précise>" si une erreur externe t'en empêche.\n` +
+          `N'émet plus de tool_calls de lecture (read_project_file, search_in_files, list_project_files).`,
+        ].join("\n");
+        const forcedFollowUp = await this.callToolWithTimeout("agent_execute", { prompt: forcePrompt });
+        state.resultText = this.resultParser.normalizeResult(forcedFollowUp);
+
+        // ── Exécuter les tool_calls d'écriture présents dans la réponse forcée ──
+        // L'agent répond souvent avec un write_project_file après le forçage.
+        // Sans cette étape, le tool_call reste en texte brut et n'est jamais appliqué.
+        const pendingWriteCalls = this.extractToolCalls(state.resultText).filter(c =>
+          ["write_project_file", "modify_project_file", "patch_project_file", "apply_patch"].includes(c.name)
+        );
+        if (pendingWriteCalls.length > 0) {
+          log.info(`[${agent.name}] ⚡ Exécution de ${pendingWriteCalls.length} outil(s) d'écriture issus de la réponse forcée`);
+          await this.executeRequestedTools(agent, pendingWriteCalls, state);
+          if (state.filesModified.length > 0) {
+            state.noProgressAbort = false;
+            log.info(`[${agent.name}] ✅ ${state.filesModified.length} fichier(s) modifié(s) après exécution forcée`);
+          }
+        }
+        break;
+      }
+
+      // ── Stall note progressive (write-required uniquement) ──────────────
+      const readsSinceWrite = state.filesRead.length;
+      const stallNote = (isWriteRequiredForGuard && state.consecutiveReadOnlyTurns >= 2 && state.filesModified.length === 0)
+        ? `\n💡 Tour ${state.consecutiveReadOnlyTurns}/${NO_PROGRESS_THRESHOLD} sans modification. ` +
+          `Tu as lu ${readsSinceWrite} fichier(s). Si cette tâche requiert une modification, ` +
+          `émets MAINTENANT un modify_project_file, patch_project_file ou write_project_file. ` +
+          `Après ${NO_PROGRESS_THRESHOLD} tours sans écriture, l'exécution sera interrompue.`
         : "";
 
       const synthesisInstruction = isLastAllowedTurn
@@ -918,12 +1098,41 @@ ${truncated}
           const file = state.workspace.get(requestedPath);
           const verified = Boolean(record && this.isVerificationRecord(record) && verification?.status === "success" && verification?.ok === true && file?.status === "verified" && file.verifiedHash === file.contentHash);
           if (!verified) {
-            const error = this.formatToolFailure(verification);
-            const instruction = this.repairInstruction(state, requestedPath, verification?.allIssues ?? record?.allIssues, JSON.stringify(call.parameters));
-            state.observations.push(`- ${call.name} ${requestedPath}: écrit mais vérification non courante/échouée — ${error}\n${instruction}`);
-            continue;
+            // ── Fallback : erreurs préexistantes ─────────────────────────────────
+            // Si le fichier a physiquement changé (hashBefore !== hashAfter dans le record
+            // ou fileChanged === true retourné par verify_file), le patch a bien été appliqué.
+            // Les erreurs de vérification peuvent être dues à des erreurs TypeScript/lint
+            // préexistantes qui n'ont pas été introduites par ce patch.
+            // Dans ce cas : on comptabilise le fichier comme modifié, mais on propage
+            // les issues comme avertissements pour que l'agent puisse les corriger.
+            const patchActuallyApplied = Boolean(
+              verification?.fileChanged === true ||
+              (this.isVerificationRecord(record) && record.hashBefore !== record.hashAfter)
+            );
+            if (patchActuallyApplied) {
+              // Enregistrer les erreurs détectées comme potentiellement préexistantes
+              const allIssues = verification?.allIssues ?? record?.allIssues ?? [];
+              const issuesSummary = allIssues
+                .filter((i: any) => i.severity === "error" || i.severity === "critical")
+                .map((i: any) => `${i.rule ?? i.type}: ${i.message}`)
+                .slice(0, 3)
+                .join("; ");
+              const warningNote = issuesSummary
+                ? `⚠️ Patch appliqué (fichier modifié sur disque) mais des erreurs subsistent — probablement préexistantes : ${issuesSummary}. Corrige-les ou déclare un blocage si elles sont hors périmètre.`
+                : `⚠️ Patch appliqué (fichier modifié sur disque) mais la vérification a échoué. Vérifie les erreurs et corrige-les si elles sont dans le périmètre de la tâche.`;
+              state.observations.push(`- ${call.name} ${requestedPath}: ${warningNote}`);
+              state.preexistingErrors.push(`${requestedPath}: ${issuesSummary || "vérification échouée après patch"}`);
+              state.filesModified.push(requestedPath);
+              // Ne pas continue : le patch compte, l'observation est déjà poussée
+            } else {
+              const error = this.formatToolFailure(verification);
+              const instruction = this.repairInstruction(state, requestedPath, verification?.allIssues ?? record?.allIssues, JSON.stringify(call.parameters));
+              state.observations.push(`- ${call.name} ${requestedPath}: écrit mais vérification non courante/échouée — ${error}\n${instruction}`);
+              continue;
+            }
+          } else {
+            state.filesModified.push(requestedPath);
           }
-          state.filesModified.push(requestedPath);
         }
 
         state.observations.push(this.formatToolObservation(call.name, result));
@@ -959,20 +1168,75 @@ ${truncated}
     const findings = this.extractFindings(resultText);
     const completion = toolExecution.workspace.completionReport(writeResult.written);
     const writeRequired = ["writer", "formatter", "proofreader", "translator", "coder", "refactor", "debugger"].includes(task.role)
-      // Une sous-tâche explicitement orientée lecture/analyse n'exige pas d'écriture.
-      // On détecte cela par l'absence totale de mot-clé d'écriture dans le titre/description
-      // ET par la présence de mots-clés d'analyse.
-      // Note: summarizer est exclu car il produit des résumés, pas des fichiers modificateurs
       && !this.isAnalysisOnlyTask(task);
     const readEvidenceRequired = ["researcher", "planner"].includes(task.role);
     const planningOnly = this.isPlanningOnly(resultText);
     const declaredFailure = this.resultParser.detectFailure(resultText);
+
+    // ── Détection d'erreur préexistante (P1) ────────────────────────────────
+    // Une erreur est considérée préexistante si :
+    // (a) elle a été détectée avant tout write (enregistrée dans preexistingErrors), OU
+    // (b) le no-progress guard a été déclenché ET la sortie mentionne un module/import manquant, OU
+    // (c) l'agent a lui-même déclaré un "## Blocage partiel" dans sa réponse finale
+    //
+    // IMPORTANT : une erreur préexistante n'est pertinente QUE pour les tâches write-required.
+    // Pour une tâche d'analyse/lecture, voir une erreur de compilation est normal et attendu
+    // (l'agent lit le fichier, voit l'erreur, la signale dans son rapport — c'est un succès).
+    const compileErrorPattern = /(?:cannot find module|module not found|error ts\d{3,4}:?|ts\d{4,}:)/i;
+    const agentDeclaredPartialBlock = /##\s*blocage\s*partiel/i.test(resultText);
+    const hasPreexistingError = writeRequired && (
+      toolExecution.preexistingErrors.length > 0 ||
+      agentDeclaredPartialBlock ||
+      (toolExecution.noProgressAbort && compileErrorPattern.test(
+        toolExecution.observations.join("\n") + " " + resultText
+      ))
+    );
+
+    // ── Détermination de l'outcome ───────────────────────────────────────────
+    // Logique de classification :
+    //   1. Agent a modifié des fichiers avec validations OK → success ou partial
+    //   2. Agent bloqué par une erreur préexistante → blocked
+    //   3. Agent write-required, 0 modification, no-progress abort → no_change
+    //   4. Agent write-required, 0 modification, pas de no-progress (tâche analyse?) → géré par errors
+    //   5. Erreur outil/exception → failed (géré par le catch dans execute())
+    let outcome: import("./types.js").TaskOutcome;
+    let blockReason: string | undefined;
+
+    if (writeResult.written.length > 0 && writeResult.errors.length === 0) {
+      outcome = "success";
+    } else if (writeResult.written.length > 0 && writeResult.errors.length > 0) {
+      outcome = "partial";
+    } else if (hasPreexistingError) {
+      outcome = "blocked";
+      // Extraire la cause depuis la section ## Blocage partiel si disponible
+      const blockSection = resultText.match(/##\s*blocage\s*partiel\s*\n([\s\S]*?)(?=\n##|$)/i)?.[1]?.trim();
+      blockReason = blockSection?.slice(0, 300) ??
+        toolExecution.preexistingErrors[0] ??
+        toolExecution.observations.find(o => compileErrorPattern.test(o))?.slice(0, 200) ??
+        "Erreur de compilation préexistante détectée";
+    } else if (writeRequired && writeResult.written.length === 0 && toolExecution.noProgressAbort) {
+      outcome = "no_change";
+    } else if (writeRequired && writeResult.written.length === 0) {
+      outcome = "no_change";
+    } else {
+      // Tâche analytique sans écriture requise (researcher, planner, etc.)
+      outcome = findings.length > 0 || filesRead.length > 0 ? "success" : "no_change";
+    }
+
     const errors = [
       ...writeResult.errors.map((error) => `${error.path}: ${error.error}`),
       ...completion.errors,
       ...(declaredFailure ? [`Le rapport final déclare un échec : ${declaredFailure}`] : []),
       ...(planningOnly ? ["La sortie décrit un plan sans résultat d'exécution."] : []),
-      ...(writeRequired && writeResult.written.length === 0 ? ["Aucun fichier confirmé par write_project_file, modify_project_file ou patch_project_file puis verify_file."] : []),
+      // no_change pour une tâche write-required → erreur (empêche le faux succès)
+      ...(writeRequired && writeResult.written.length === 0 && outcome !== "blocked"
+        ? [toolExecution.noProgressAbort
+            ? `Agent interrompu après ${toolExecution.consecutiveReadOnlyTurns} tours sans modification (${toolExecution.filesRead.length} fichier(s) lu(s), 0 modifié).`
+            : "Aucun fichier confirmé par write_project_file, modify_project_file ou patch_project_file puis verify_file."
+          ]
+        : []),
+      // blocked : avertissement non-bloquant — la tâche n'est pas un succès mais le problème est externe
+      ...(outcome === "blocked" ? [`Bloqué par erreur préexistante : ${blockReason ?? "inconnue"}`] : []),
       ...(readEvidenceRequired && filesRead.length === 0 ? ["Aucun fichier lu : audit impossible à vérifier."] : []),
       ...(readEvidenceRequired && findings.length === 0 ? ["Aucun constat concret fourni."] : []),
     ];
@@ -984,6 +1248,8 @@ ${truncated}
       commandsExecuted: [],
       findings,
       workspaceCompletion: completion,
+      outcome,
+      blockReason,
       verification: {
         passed: errors.length === 0,
         checks: [
