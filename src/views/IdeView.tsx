@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 // Monaco Editor - lazy loaded to reduce initial bundle
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.Editor })));
 // Panels - lazy loaded
-const DocumentPanel = lazy(() => import('../components/panels/DocumentPanel.js').then(m => ({ default: m.DocumentPanel })));
 const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel.js').then(m => ({ default: m.SandboxPanel })));
 const VisionPanel = lazy(() => import('../components/panels/VisionPanel.js').then(m => ({ default: m.VisionPanel })));
 const GitHubPanel = lazy(() => import('../components/ide/GitHubPanel.js').then(m => ({ default: m.GitHubPanel })));
@@ -170,7 +169,6 @@ export default function IdeView() {
   const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
   const [showKnowledge, setShowKnowledge] = useState(false);
-  const [showDocuments, setShowDocuments] = useState(false);
   const [showNotebooks, setShowNotebooks] = useState(false);
   const [showSandbox, setShowSandbox] = useState(false);
   const [sandboxView, setSandboxView] = useState<'controls' | 'diff'>('controls');
@@ -335,7 +333,6 @@ export default function IdeView() {
       // Fermer tous les onglets et tous les panneaux plein-écran
       fileSystem.openFiles.forEach(f => fileSystem.closeTab(f.path));
       setShowKnowledge(false);
-      setShowDocuments(false);
       setShowNotebooks(false);
       setShowHistory(false);
       setShowAutomation(false);
@@ -363,7 +360,6 @@ export default function IdeView() {
       console.log('[IdeView] No workspace mode - closing all tabs and clearing tree');
       fileSystem.openFiles.forEach(f => fileSystem.closeTab(f.path));
       setShowKnowledge(false);
-      setShowDocuments(false);
       setShowNotebooks(false);
       setShowHistory(false);
       setShowAutomation(false);
@@ -429,7 +425,6 @@ export default function IdeView() {
       setRichDocument(detail.document);
       // Fermer les autres panneaux principaux pour donner de la place
       setShowBrowser(false);
-      setShowDocuments(false);
       setShowKnowledge(false);
       setShowNotebooks(false);
     };
@@ -840,7 +835,6 @@ export default function IdeView() {
         showFleet={showFleet}
         showMissions={showMissions}
         showKnowledge={showKnowledge}
-        showDocuments={showDocuments}
         showNotebooks={showNotebooks}
         showSystemHealth={showSystemHealth}
         showMcp={showMcp}
@@ -881,7 +875,6 @@ export default function IdeView() {
             return !v;
           });
         }}
-        onToggleDocuments={() => setShowDocuments(v => !v)}
         onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
         onToggleMcp={() => setShowMcp(v => !v)}
         onToggleBrowser={() => openUrlInNewTab(BROWSER_HOME_URL)}
@@ -1089,10 +1082,6 @@ export default function IdeView() {
                               });
                             }}
                           />
-                        </Suspense>
-                      ) : showDocuments ? (
-                        <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement…</div></div>}>
-                          <DocumentPanel />
                         </Suspense>
                       ) : showHistory ? (
                         <HistoryPanel onClose={() => setShowHistory(false)} />
