@@ -76,26 +76,49 @@ Toutes les opérations de lecture/écriture sont contraintes au workspace actif 
 
 ### `GET /api/ide/tree`
 
-Retourne l'arborescence du workspace actif (sandbox si actif, sinon workspace principal). Exclut `node_modules`, `.git`, `dist`, `build`, `out`.
+Retourne l'arborescence du workspace actif (sandbox si actif, sinon workspace principal). Exclut `node_modules`, `.git`, `dist`, `build`, `out`. **Supporte la pagination côté serveur pour les workspaces avec > 10k fichiers.**
 
 **Authentification :** Oui
+
+**Query Parameters :**
+| Paramètre | Type | Description | Obligatoire |
+|---|---|---|---|
+| `path` | string | Chemin relatif du répertoire à lister (par défaut : racine du workspace) | Non |
+| `page` | number | Numéro de la page (début à 1) | Non |
+| `pageSize` | number | Nombre d'entrées par page (0 = pas de pagination) | Non |
 
 **Réponse 200 :**
 ```json
 {
-  "path": "/absolute/path/to/workspace",
+  "path": "/absolute/path/to/directory",
   "entries": [
     {
       "name": "src",
       "path": "src",
       "type": "directory",
-      "children": [
-        { "name": "main.tsx", "path": "src/main.tsx", "type": "file" }
-      ]
+      "children": []
+    },
+    {
+      "name": "package.json",
+      "path": "package.json",
+      "type": "file"
     }
-  ]
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 100,
+    "total": 150,
+    "totalPages": 2,
+    "hasMore": true
+  }
 }
 ```
+
+**Notes :**
+- Lorsque `pageSize` > 0, seul le niveau de répertoire spécifié est retourné (les dossiers ont `children: []`)
+- Pour accéder aux sous-éléments, faites des requêtes supplémentaires avec le paramètre `path`
+- Si aucun paramètre de pagination n'est fourni et que le répertoire contient > 10 000 entrées, une limite de sécurité de 10 000 est appliquée automatiquement
+- Le champ `pagination` n'est présent que lorsque la pagination est active
 
 ---
 

@@ -339,6 +339,24 @@ export function useFileSystem() {
     });
   }, []);
 
+  const loadDirectory = useCallback(async (dirPath: string) => {
+    try {
+      const entries = await ideApi.loadTree(true, dirPath);
+      setTree((currentTree) => replaceDirectoryChildren(currentTree, dirPath, entries));
+    } catch (error) {
+      console.error('Erreur lors du chargement du dossier:', error);
+    }
+  }, []);
+
+  const loadWorkspaceDirectory = useCallback(async (dirPath: string) => {
+    try {
+      const entries = await ideApi.loadWorkspaceTree(true, dirPath);
+      setWorkspaceTree((currentTree) => replaceDirectoryChildren(currentTree, dirPath, entries));
+    } catch (error) {
+      console.error('Erreur lors du chargement du dossier workspace:', error);
+    }
+  }, []);
+
   // Duplicate a file/folder (creates a copy with _copy suffix)
   const duplicateEntry = useCallback(async (srcPath: string) => {
     const name = srcPath.split('/').pop() ?? srcPath;
@@ -423,8 +441,24 @@ export function useFileSystem() {
     renameEntry,
     deleteEntry,
     toggleDirectory,
+    loadDirectory,
+    loadWorkspaceDirectory,
     duplicateEntry,
     moveEntry,
     pasteEntry,
   };
+}
+
+function replaceDirectoryChildren(tree: TreeEntry[], directoryPath: string, children: TreeEntry[]): TreeEntry[] {
+  if (directoryPath === '.' || directoryPath === '') return children;
+
+  return tree.map((entry) => {
+    if (entry.path === directoryPath && entry.type === 'directory') {
+      return { ...entry, children };
+    }
+    if (entry.type === 'directory' && entry.children) {
+      return { ...entry, children: replaceDirectoryChildren(entry.children, directoryPath, children) };
+    }
+    return entry;
+  });
 }

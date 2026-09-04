@@ -925,6 +925,8 @@ export default function IdeView() {
           onOpenFile={openFileAt}
           onOpenFileDiff={(path) => openSandboxDiff(path)}
           onToggleDirectory={fileSystem.toggleDirectory}
+          onLoadDirectory={fileSystem.loadDirectory}
+          onLoadWorkspaceDirectory={fileSystem.loadWorkspaceDirectory}
           onContextMenu={(e, entry) => {
             e.preventDefault();
             setContextMenu({
