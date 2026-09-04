@@ -49,6 +49,7 @@ Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un as
 - **Listes intelligentes** créées et gérées par l'IA
 - **Workflows automatisés** planifiables (ex : toutes les 24h, 30m…)
 - **Tâches planifiées** (automation) avec intervalles configurables
+- **Optimisation adaptative des skills** : traces, métriques, feedback, propositions périodiques et snapshots restaurables
 - **Intégration GitHub** : statut Git, commits, push, issues, PRs depuis l'interface
 - **Gestion de documents** : upload de PDF/DOCX, extraction et indexation
 - **Thème dark/light** et couleur d'accent personnalisable
@@ -76,7 +77,7 @@ Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un as
 | npm | 10.x |
 | Git | 2.x |
 | Compte Google AI Studio | Pour obtenir `GEMINI_API_KEY` |
-| Compte Supabase (optionnel) | Pour la persistance (mémoire, historique, workflows) |
+| Compte Supabase (optionnel) | Pour la persistance (mémoire, historique, workflows, custom skills et tuning adaptatif) |
 | Compte OpenRouter (optionnel) | Pour les modèles alternatifs |
 | Compte GitHub (optionnel) | Pour les fonctionnalités Git/GitHub |
 
@@ -103,6 +104,12 @@ npm install
 
 ```bash
 cp .env.example .env
+```
+
+Sous PowerShell :
+
+```powershell
+Copy-Item .env.example .env
 ```
 
 Ouvrez `.env` et renseignez au minimum `GEMINI_API_KEY` (obligatoire). Les autres variables sont optionnelles au premier démarrage — un token API sera généré automatiquement si `Leanna_API_TOKEN` est vide.
@@ -147,6 +154,8 @@ Toutes les variables sont lues depuis `.env` (ou `.env.local` s'il existe, avec 
 | `SELF_HEAL_READONLY` | Mode auto-correction lecture seule | `false` | ❌ |
 | `SANDBOX_EXIT_CODE` | Code à 6 chiffres pour sortir du sandbox | `123456` | ❌ |
 | `ALLOW_FTP_PRIVATE_IPS` | Autorise les connexions FTP vers IPs privées | `false` | ❌ |
+| `LEANNA_CUSTOM_SKILLS_RELOAD_INTERVAL_MS` | Intervalle de hot-reload des custom skills | `30000` | ❌ |
+| `LEANNA_SKILL_TUNING_INTERVAL_MS` | Intervalle de génération des propositions de tuning ; `0` désactive | `0` | ❌ |
 | `Leanna_LISTEN_HOST` | Interface d'écoute du serveur | `127.0.0.1` | ❌ |
 | `NODE_ENV` | Environnement d'exécution | `development` | ❌ |
 
@@ -181,6 +190,20 @@ npm run desktop:debug
 # Build installateur Windows (.exe)
 npm run dist:win
 ```
+
+### Activer le tuning adaptatif
+
+Le tuning adaptatif nécessite Supabase et la migration
+`supabase/migrations/20260904000000_skill_interactions.sql`. Après exécution de
+la migration, définissez par exemple :
+
+```env
+LEANNA_SKILL_TUNING_INTERVAL_MS="3600000"
+```
+
+Le système analyse périodiquement les interactions et crée des propositions
+dans l'interface **Tuning des skills**. Les changements restent soumis à
+approbation et peuvent être restaurés depuis leur snapshot.
 
 ### Tests
 
@@ -250,7 +273,6 @@ leanna/
 │   └── main.tsx            # Point d'entrée React
 ├── supabase/               # Schémas SQL et migrations Supabase
 ├── assets/                 # Images, icônes
-├── docs/                   # Documentation complémentaire
 ├── scripts/                # Scripts de build et lint
 ├── server.ts               # Point d'entrée du serveur Express
 ├── server-bootstrap.ts     # Bootstrap (env, déchiffrement, démarrage)

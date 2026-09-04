@@ -2,6 +2,13 @@
 
 > Dernière mise à jour : Septembre 2026 · Version courante : **1.0.0**
 
+## Lecture rapide de l'état
+
+- **Livré** : socle desktop/web, agents, skills, mémoire/RAG, intégrations, tests REST et outillage IDE.
+- **En cours** : tuning adaptatif des skills. Les traces, métriques, feedbacks, propositions périodiques et snapshots restaurables sont disponibles; l'application automatique des changements reste volontairement soumise à une politique de sécurité à définir.
+- **Priorité immédiate** : stabiliser le démarrage desktop, ajouter la CI, enrichir le health check et couvrir les flux E2E critiques.
+- **Règle de statut** : `✅ Fait` signifie présent et testé dans le dépôt; `📋 Planifié` signifie non livré; `🚧 En cours` signifie partiellement livré avec un reste identifié; `💡 Idée` signifie sans engagement.
+
 ---
 
 ## V1.0 — Stabilité et tests (Septembre 2026) ✅
@@ -118,7 +125,7 @@ Améliorations de qualité, performance et DX ciblées sur les frictions identif
 | Fonctionnalité | Statut |
 |---|---|
 | Couverture de tests unitaires ≥ 60% sur `server/skills/` | ✅ Fait (136+ tests, 5 nouveaux fichiers) |
-| Tests d'intégration pour tous les routeurs REST | 📋 Planifié |
+| Tests d'intégration pour tous les routeurs REST | ✅ Fait (74 tests) |
 | Tests E2E Playwright sur les flux critiques (sandbox sync, agent delegate) | 📋 Planifié |
 | CI GitHub Actions : lint + test + build à chaque PR | 📋 Planifié |
 | Logging structuré (JSON) avec niveaux (`debug`/`info`/`warn`/`error`) | 📋 Planifié |
@@ -162,10 +169,10 @@ Améliorations de qualité, performance et DX ciblées sur les frictions identif
 | Fonctionnalité | Statut |
 |---|---|
 | Indicateur de progression des agents en temps réel (barre + log) | ✅ Fait |
-| Notifications desktop (OS) pour les événements agents importants | 📋 Planifié |
+| Notifications desktop (OS) pour les événements agents importants | ✅ Fait (notifications natives navigateur/Electron) |
 | Raccourcis clavier configurables (remapping) | 📋 Planifié |
 | Diff viewer intégré côté UI (sandbox file-diff) | ✅ Fait |
-| Recherche globale (fichiers + mémoires + historique) via `Cmd+K` | 📋 Planifié |
+| Recherche globale dans le workspace via `Ctrl/Cmd+Shift+F` | ✅ Fait |
 
 ---
 
