@@ -178,6 +178,10 @@ export function useLiveAPI() {
       handleInterrupt();
       addLog('Interrupted', 'system');
     }
+    if (typeof msg.audio === 'string') {
+      // Les annonces TTS des outils arrivent en JSON base64, contrairement à l'audio Live binaire.
+      playAudioChunk(msg.audio);
+    }
     if (msg.type === 'ide-action' && msg.action) {
       const a = msg.action;
       window.dispatchEvent(new CustomEvent('Leanna-ide-action', { detail: a }));

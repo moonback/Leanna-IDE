@@ -728,20 +728,21 @@ export const reasoningSkill: Skill = {
         });
       }
 
-      // 2. TTS audio (avec cooldown pour éviter spam) — on ATTEND l'audio avant de continuer
+      // 2. TTS audio (avec cooldown pour éviter spam) — fire-and-forget pour ne pas bloquer le raisonnement
       const now = Date.now();
       const ttsEnabled = context?.reasoningVoiceEnabled !== false;
       if (context?.emitToClient && ttsEnabled && (now - _lastTTSAnnouncementTime > TTS_ANNOUNCEMENT_COOLDOWN_MS)) {
         _lastTTSAnnouncementTime = now;
-        try {
-          const audioBase64 = await generateSpeech(announcementText, { voiceName: context.voiceName || "Aoede" });
-          if (audioBase64 && context.emitToClient) {
-            context.emitToClient({ audio: audioBase64 });
-          }
-        } catch (ttsErr) {
-          // TTS échouée — pas grave, l'annonce texte est déjà envoyée
-          console.warn(`[ReasoningSkill] TTS annonce échouée (non bloquant): ${(ttsErr as Error).message}`);
-        }
+        generateSpeech(announcementText, { voiceName: context.voiceName || "Aoede" })
+          .then((audioBase64) => {
+            if (audioBase64 && context.emitToClient) {
+              context.emitToClient({ audio: audioBase64 });
+            }
+          })
+          .catch((ttsErr) => {
+            // TTS échouée — pas grave, l'annonce texte est déjà envoyée
+            console.warn(`[ReasoningSkill] TTS annonce échouée (non bloquant): ${(ttsErr as Error).message}`);
+          });
       }
 
       let cotContext = "";
