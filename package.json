@@ -85,6 +85,7 @@
     "react-window": "^2.3.0",
     "react-window-tree": "^1.0.4",
     "recharts": "3.10.1",
+    "redis": "^6.2.1",
     "tree-sitter-javascript": "^0.25.0",
     "tree-sitter-typescript": "^0.23.2",
     "typescript": "^5.0.0",
