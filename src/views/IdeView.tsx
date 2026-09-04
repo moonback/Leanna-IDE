@@ -332,8 +332,17 @@ export default function IdeView() {
       
       console.log('[IdeView] Workspace changed:', workspace);
       
-      // Fermer tous les onglets
+      // Fermer tous les onglets et tous les panneaux plein-écran
       fileSystem.openFiles.forEach(f => fileSystem.closeTab(f.path));
+      setShowKnowledge(false);
+      setShowDocuments(false);
+      setShowNotebooks(false);
+      setShowHistory(false);
+      setShowAutomation(false);
+      setShowMemory(false);
+      setShowSandbox(false);
+      setShowGitHub(false);
+      setRichDocument(null);
       
       if (workspace === null || workspace === undefined) {
         // Pas de workspace - vider l'arbre
@@ -353,6 +362,15 @@ export default function IdeView() {
     const handleNoWorkspace = () => {
       console.log('[IdeView] No workspace mode - closing all tabs and clearing tree');
       fileSystem.openFiles.forEach(f => fileSystem.closeTab(f.path));
+      setShowKnowledge(false);
+      setShowDocuments(false);
+      setShowNotebooks(false);
+      setShowHistory(false);
+      setShowAutomation(false);
+      setShowMemory(false);
+      setShowSandbox(false);
+      setShowGitHub(false);
+      setRichDocument(null);
       // Vider l'arbre des fichiers en passant un tableau vide
       fileSystem.setTree([]);
       fileSystem.setWorkspaceTree([]);
