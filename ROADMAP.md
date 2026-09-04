@@ -1,6 +1,23 @@
 # Roadmap — Leanna AI Operating System
 
-> Dernière mise à jour : Septembre 2026 · Version courante : **0.9.0**
+> Dernière mise à jour : Septembre 2026 · Version courante : **1.0.0**
+
+---
+
+## V1.0 — Stabilité et tests (Septembre 2026) ✅
+
+### Qualité et tests
+| Fonctionnalité | Statut |
+|---|---|
+| Suite complète de tests d'intégration REST (74 tests) | ✅ Fait |
+| Tests unitaires des skills (136+ tests, ≥60% couverture) | ✅ Fait |
+| Documentation complète des tests (TESTING.md) | ✅ Fait |
+| Patterns de test standardisés pour tous les routeurs | ✅ Fait |
+| Validation des schémas Zod dans tous les endpoints | ✅ Fait |
+| Tests de rate limiting et authentification | ✅ Fait |
+| Tests de gestion d'erreurs (400/404/500/503) | ✅ Fait |
+| Guide de contribution avec templates de tests | ✅ Fait |
+| Changelog structuré (CHANGELOG.md) | ✅ Fait |
 
 ---
 
