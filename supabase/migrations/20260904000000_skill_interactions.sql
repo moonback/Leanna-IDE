@@ -67,3 +67,25 @@ alter table public.skill_tuning_proposals enable row level security;
 create policy "Service role full access on skill_tuning_proposals"
 on public.skill_tuning_proposals for all to service_role
 using (true) with check (true);
+
+create table if not exists public.custom_skill_revisions (
+        id uuid default gen_random_uuid() primary key,
+        skill_id uuid not null references public.custom_skills(id) on delete cascade,
+        skill_name text not null,
+        snapshot jsonb not null,
+        source_proposal_id uuid references public.skill_tuning_proposals(id) on delete set null,
+        created_at timestamptz not null default now(),
+        rolled_back_at timestamptz
+);
+
+create index if not exists idx_custom_skill_revisions_skill_created
+on public.custom_skill_revisions(skill_id, created_at desc);
+
+alter table public.custom_skill_revisions enable row level security;
+
+create policy "Service role full access on custom_skill_revisions"
+on public.custom_skill_revisions for all to service_role
+using (true) with check (true);
+
+alter table public.skill_tuning_proposals
+    add column if not exists applied_revision_id uuid references public.custom_skill_revisions(id) on delete set null;

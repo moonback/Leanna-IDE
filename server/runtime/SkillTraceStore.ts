@@ -50,6 +50,7 @@ export interface SkillTuningStore extends SkillTraceObserver {
   listProposals(options?: { status?: SkillProposalStatus; limit?: number }): Promise<SkillTuningProposal[]>;
   createProposal(proposal: Omit<SkillTuningProposal, "id" | "createdAt" | "reviewedAt">): Promise<SkillTuningProposal>;
   updateProposalStatus(id: string, status: Exclude<SkillProposalStatus, "proposed">): Promise<SkillTuningProposal>;
+  markProposalApplied(id: string, revisionId: string): Promise<void>;
 }
 
 export class SupabaseSkillTraceStore implements SkillTuningStore {
@@ -229,6 +230,14 @@ export class SupabaseSkillTraceStore implements SkillTuningStore {
       createdAt: data.created_at,
       reviewedAt: data.reviewed_at ?? undefined,
     };
+  }
+
+  async markProposalApplied(id: string, revisionId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from("skill_tuning_proposals")
+      .update({ applied_revision_id: revisionId })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
   }
 }
 

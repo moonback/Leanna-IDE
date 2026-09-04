@@ -5,10 +5,10 @@ import type { Server } from "http";
 import { createSkillTuningRouter } from "./skill-tuning.js";
 import type { SkillTuningStore } from "../runtime/SkillTraceStore.js";
 
-function createTestServer(store: SkillTuningStore): Promise<{ server: Server; port: number }> {
+function createTestServer(store: SkillTuningStore, versionStore?: any): Promise<{ server: Server; port: number }> {
   const app = express();
   app.use(express.json());
-  app.use("/api/skill-tuning", createSkillTuningRouter(store));
+  app.use("/api/skill-tuning", createSkillTuningRouter(store, versionStore));
   return new Promise((resolve) => {
     const server = app.listen(0, "127.0.0.1", () => resolve({ server, port: (server.address() as any).port }));
   });
@@ -39,6 +39,7 @@ const store: SkillTuningStore = {
   listProposals: async () => [],
   createProposal: async (proposal: any) => ({ id: "proposal-1", createdAt: "2026-09-04T00:00:00.000Z", ...proposal }),
   updateProposalStatus: async (id: string, status: any) => ({ id, createdAt: "2026-09-04T00:00:00.000Z", toolName: "security_audit", status, hypothesis: "", evidence: {}, proposedChange: {}, expectedMetric: "", confidence: 0.8 }),
+  markProposalApplied: async () => {},
 };
 
 test("skill tuning routes: returns aggregated metrics", async () => {
@@ -101,6 +102,7 @@ test("skill tuning routes: generates and reviews a proposal", async () => {
       reviewed = { id, status };
       return { ...reviewed, toolName: "security_audit", hypothesis: "", evidence: {}, proposedChange: {}, expectedMetric: "", confidence: 0.8, createdAt: "2026-09-04T00:00:00.000Z" };
     },
+    markProposalApplied: async () => {},
   };
   const { server, port } = await createTestServer(proposalStore);
   try {
@@ -113,6 +115,30 @@ test("skill tuning routes: generates and reviews a proposal", async () => {
     });
     assert.equal(reviewedResponse.status, 200);
     assert.equal(reviewed.status, "approved");
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("skill tuning routes: requires approval before applying a revision", async () => {
+  let applied = false;
+  const versionStore = {
+    applyUpdate: async () => {
+      applied = true;
+      return { skill: {}, revision: { id: "revision-1" } };
+    },
+    rollback: async () => ({ skill: {}, revision: { id: "revision-1" } }),
+    listRevisions: async () => [],
+  };
+  const { server, port } = await createTestServer(store, versionStore);
+  try {
+    const response = await fetch("http://127.0.0.1:" + port + "/api/skill-tuning/proposals/proposal-1/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ skillId: "00000000-0000-0000-0000-000000000001", updates: { enabled: false } }),
+    });
+    assert.equal(response.status, 404);
+    assert.equal(applied, false);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
