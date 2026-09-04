@@ -164,7 +164,7 @@ Améliorations de qualité, performance et DX ciblées sur les frictions identif
 | Indicateur de progression des agents en temps réel (barre + log) | ✅ Fait |
 | Notifications desktop (OS) pour les événements agents importants | 📋 Planifié |
 | Raccourcis clavier configurables (remapping) | 📋 Planifié |
-| Diff viewer intégré côté UI (sandbox file-diff) | 📋 Planifié |
+| Diff viewer intégré côté UI (sandbox file-diff) | ✅ Fait |
 | Recherche globale (fichiers + mémoires + historique) via `Cmd+K` | 📋 Planifié |
 
 ---
