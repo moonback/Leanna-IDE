@@ -865,13 +865,8 @@ Liste les custom skills créés par l'utilisateur.
 
 ### `POST /api/custom-skills`
 
-Crée un nouveau custom skill.
-
-**Authentification :** Oui
-
-**Body :**
-
-| Champ | Type | Requis | Description |
+Gère les custom skills via le champ `action` : `list`, `create`, `update` ou
+`delete`.
 |---|---|---|---|
 | `name` | `string` | ✅ | Nom unique du skill |
 | `description` | `string` | ✅ | Description pour l'IA |
@@ -882,11 +877,79 @@ Crée un nouveau custom skill.
 
 ---
 
-### `PUT /api/custom-skills/:id` · `DELETE /api/custom-skills/:id`
-
-Met à jour ou supprime un custom skill.
-
 **Authentification :** Oui
+
+Pour une mise à jour ou une suppression, le body contient également `action`
+et `id`.
+
+### `GET /api/skill-tuning/metrics`
+
+Retourne les métriques agrégées des appels de skills: volume, échecs, taux de
+succès, durée moyenne et feedback utilisateur.
+
+**Authentification :** Oui · **Supabase requis**
+
+**Query params :** `toolName` (optionnel) · `limit` (1 à 500, défaut 100)
+
+**Réponse 200 :** `{ "status": "success", "metrics": [{ "toolName": "security_audit", "calls": 12, "failures": 2, "successRate": 0.83, "averageDurationMs": 420, "feedback": { "correct": 8, "incorrect": 1, "needsImprovement": 1 } }] }`
+
+### `GET /api/skill-tuning/interactions`
+
+Retourne les traces récentes des appels de skills. Les arguments sont
+redactés avant persistance.
+
+**Authentification :** Oui · **Supabase requis**
+
+**Query params :** `toolName` (optionnel) · `limit` (1 à 500, défaut 100)
+
+### `POST /api/skill-tuning/feedback`
+
+Associe un feedback à une interaction.
+
+**Body :**
+
+```json
+{
+  "callId": "call-uuid",
+  "label": "correct",
+  "correction": "Optionnel",
+  "comment": "Optionnel"
+}
+```
+
+`label` vaut `correct`, `incorrect` ou `needs_improvement`.
+
+### `GET /api/skill-tuning/proposals`
+
+Liste les propositions de tuning. Filtre optionnel `status` : `proposed`,
+`approved` ou `rejected`.
+
+### `POST /api/skill-tuning/proposals/generate`
+
+Analyse l’historique et génère les propositions justifiées par au moins cinq
+appels et un taux de succès inférieur à 80 %, ou par au moins deux feedbacks
+négatifs. Les propositions ouvertes ne sont pas dupliquées.
+
+### `PATCH /api/skill-tuning/proposals/:id`
+
+Approuve ou rejette une proposition.
+
+**Body :** `{ "status": "approved" }` ou `{ "status": "rejected" }`
+
+### `GET /api/skill-tuning/revisions`
+
+Liste les snapshots de custom skills créés avant application d’une proposition.
+
+### `POST /api/skill-tuning/proposals/:id/apply`
+
+Applique une modification approuvée à un custom skill et crée un snapshot
+restaurable.
+
+**Body :** `{ "skillId": "uuid", "expectedUpdatedAt": "ISO-8601", "updates": { "instruction": "..." } }`
+
+### `POST /api/skill-tuning/revisions/:id/rollback`
+
+Restaure le custom skill depuis le snapshot indiqué.
 
 ---
 

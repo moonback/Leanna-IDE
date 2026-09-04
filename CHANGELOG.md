@@ -7,6 +7,21 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [Unreleased] - 2026-09-04
+
+### Ajouté
+
+- Documentation du tuning adaptatif des skills dans le README et la référence API.
+- Génération périodique des propositions de tuning via `LEANNA_SKILL_TUNING_INTERVAL_MS`.
+- Déduplication des propositions ouvertes et conservation de l’identifiant de révision appliquée.
+- Tests du scheduler et du cycle métriques → proposition → approbation → rollback.
+
+### Modifié
+
+- Roadmap synchronisée avec les fonctionnalités effectivement livrées: tests REST, notifications agents, recherche globale et diff viewer.
+
+---
+
 ## [1.0.0] - 2026-09-04
 
 ### Ajouté
