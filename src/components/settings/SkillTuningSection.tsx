@@ -53,7 +53,7 @@ export function SkillTuningSection() {
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [skills, setSkills] = useState<CustomSkill[]>([]);
   const [selectedSkill, setSelectedSkill] = useState('');
-  const [updates, setUpdates] = useState('{\n  "instruction": ""\n}');
+  const [updates, setUpdates] = useState('{}');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -90,6 +90,14 @@ export function SkillTuningSection() {
     } catch (reviewError: any) { toastError(reviewError.message); }
   };
 
+  const generateProposals = async () => {
+    try {
+      await requestJson('/api/skill-tuning/proposals/generate', { method: 'POST' });
+      success('Analyse terminée.');
+      await load();
+    } catch (generationError: any) { toastError(generationError.message); }
+  };
+
   const applyProposal = async (proposalId: string) => {
     if (!selectedSkill) return toastError('Sélectionnez un custom skill.');
     try {
@@ -115,9 +123,7 @@ export function SkillTuningSection() {
     <Section icon={BarChart3} title="Tuning des skills" description="Analysez les interactions et contrôlez les améliorations proposées." badge={`${proposals.filter(p => p.status === 'proposed').length} à revoir`}>
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Aucune modification n'est appliquée sans approbation.</p>
-        <button type="button" onClick={() => void load()} disabled={busy} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)' }}>
-          <RefreshCw className={`h-3 w-3 ${busy ? 'animate-spin' : ''}`} /> Actualiser
-        </button>
+        <div className="flex items-center gap-2"><button type="button" onClick={() => void generateProposals()} disabled={busy} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs" style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}><BarChart3 className="h-3 w-3" /> Analyser</button><button type="button" onClick={() => void load()} disabled={busy} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)' }}><RefreshCw className={`h-3 w-3 ${busy ? 'animate-spin' : ''}`} /> Actualiser</button></div>
       </div>
 
       <Field label="Performance observée">
