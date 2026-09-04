@@ -148,6 +148,40 @@ describe("ToolRegistry", () => {
       (err: Error) => err.message.includes("timeout")
     );
   });
+
+  it("devrait enregistrer une trace redacted et corrélable", async () => {
+    const traces: any[] = [];
+    const registry = new ToolRegistry({ traceObserver: { record: (trace) => traces.push(trace) } });
+    registry.register({
+      declaration: { name: "secure_echo", description: "", parameters: {} },
+      handler: async () => ({ ok: true }),
+    });
+
+    await registry.call("secure_echo", { token: "secret-value", input: "hello" }, {
+      agentId: "agent-1",
+      conversationId: "conversation-1",
+      messageId: "message-1",
+    });
+
+    assert.equal(traces.length, 1);
+    assert.equal(traces[0].success, true);
+    assert.equal(traces[0].conversationId, "conversation-1");
+    assert.equal(traces[0].arguments.token, "[redacted]");
+    assert.equal(traces[0].arguments.input, "hello");
+  });
+
+  it("devrait tracer les erreurs sans bloquer leur propagation", async () => {
+    const traces: any[] = [];
+    const registry = new ToolRegistry({ traceObserver: { record: (trace) => traces.push(trace) } });
+    registry.register({
+      declaration: { name: "fails", description: "", parameters: {} },
+      handler: async () => { throw new Error("expected failure"); },
+    });
+
+    await assert.rejects(() => registry.call("fails", {}), /expected failure/);
+    assert.equal(traces[0].success, false);
+    assert.equal(traces[0].error, "expected failure");
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

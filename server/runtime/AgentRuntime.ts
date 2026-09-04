@@ -87,6 +87,7 @@ export class AgentRuntime {
       enableMetrics: this.config.enableMetrics,
       eventBus: this.events,
       defaultTimeoutMs: 180_000, // 3 minutes pour les tâches agent (aligné avec AgentExecutor)
+      traceObserver: this.config.skillTraceObserver,
     });
     this.memory = new Memory({ eventBus: this.events });
     this.fsm = new StateMachine({ eventBus: this.events });

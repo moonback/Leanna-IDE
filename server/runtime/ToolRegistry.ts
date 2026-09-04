@@ -19,6 +19,8 @@ import type {
   ToolHandler,
   ToolPermission,
   ToolCallMetrics,
+  SkillInteractionTrace,
+  SkillTraceObserver,
 } from "./types.js";
 import type { EventBus } from "./EventBus.js";
 
@@ -42,6 +44,9 @@ export interface ToolCallOptions {
   callerPermissions?: ToolPermission[];
   /** Contexte à passer au handler (pour compatibilité avec les skills legacy) */
   context?: any;
+  /** Identifiants de corrélation pour l'analyse historique */
+  conversationId?: string;
+  messageId?: string;
 }
 
 export interface ToolRegistryConfig {
@@ -51,6 +56,8 @@ export interface ToolRegistryConfig {
   enableMetrics?: boolean;
   /** EventBus pour les notifications */
   eventBus?: EventBus;
+  /** Observateur de traces, appelé sans bloquer l'exécution de l'outil */
+  traceObserver?: SkillTraceObserver;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -62,6 +69,7 @@ export class ToolRegistry {
   private defaultTimeoutMs: number;
   private enableMetrics: boolean;
   private eventBus?: EventBus;
+  private traceObserver?: SkillTraceObserver;
   private callHistory: ToolCallMetrics[] = [];
   private static readonly MAX_HISTORY = 500;
   private readCache = new Map<string, { value: any; expires: number }>();
@@ -70,6 +78,7 @@ export class ToolRegistry {
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 120_000;
     this.enableMetrics = config.enableMetrics ?? true;
     this.eventBus = config.eventBus;
+    this.traceObserver = config.traceObserver;
   }
 
   // ─── Enregistrement ────────────────────────────────────────────────────────
@@ -174,6 +183,11 @@ export class ToolRegistry {
     args: Record<string, unknown>,
     options: ToolCallOptions = {}
   ): Promise<unknown> {
+    const callId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const startedAt = new Date().toISOString();
+    const startTime = Date.now();
+    const safeArguments = redactTraceValue(args) as Record<string, unknown>;
+
     // Cache pour read_project_file et list_project_files
     if (name === 'read_project_file' || name === 'list_project_files') {
       const key = `${name}:${JSON.stringify(args)}`;
@@ -185,21 +199,36 @@ export class ToolRegistry {
 
     const entry = this.tools.get(name);
     if (!entry) {
+      this.recordTrace({
+        callId, toolName: name, startedAt, durationMs: Date.now() - startTime,
+        success: false, attemptCount: 0, agentId: options.agentId,
+        conversationId: options.conversationId, messageId: options.messageId,
+        arguments: safeArguments, error: `Outil "${name}" introuvable`,
+      });
       throw new ToolNotFoundError(name, this.getSuggestions(name));
     }
 
     // Vérification des permissions
     if (entry.definition.permissions?.length) {
-      this.checkPermissions(name, entry.definition.permissions, options.callerPermissions);
+      try {
+        this.checkPermissions(name, entry.definition.permissions, options.callerPermissions);
+      } catch (error) {
+        this.recordTrace({
+          callId, toolName: name, startedAt, durationMs: Date.now() - startTime,
+          success: false, attemptCount: 0, agentId: options.agentId,
+          conversationId: options.conversationId, messageId: options.messageId,
+          arguments: safeArguments, error: (error as Error).message,
+        });
+        throw error;
+      }
     }
 
     const timeoutMs = options.timeoutMs ?? entry.definition.timeoutMs ?? this.defaultTimeoutMs;
     const maxRetries = options.retries ?? 0;
 
-    this.eventBus?.emit({ type: "tool:called", toolName: name, agentId: options.agentId });
+    this.eventBus?.emit({ type: "tool:called", toolName: name, agentId: options.agentId, conversationId: options.conversationId, messageId: options.messageId, callId });
 
     let lastError: Error | undefined;
-    const startTime = Date.now();
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -218,7 +247,13 @@ export class ToolRegistry {
 
         const durationMs = Date.now() - startTime;
         this.recordMetrics(entry, name, durationMs, true, options.agentId);
-        this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs, success: true });
+        this.recordTrace({
+          callId, toolName: name, startedAt, durationMs, success: true,
+          attemptCount: attempt + 1, agentId: options.agentId,
+          conversationId: options.conversationId, messageId: options.messageId,
+          arguments: safeArguments, resultSummary: summarizeTraceValue(result),
+        });
+        this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs, success: true, agentId: options.agentId, conversationId: options.conversationId, messageId: options.messageId, callId });
 
         return result;
       } catch (err) {
@@ -232,7 +267,13 @@ export class ToolRegistry {
 
     const durationMs = Date.now() - startTime;
     this.recordMetrics(entry, name, durationMs, false, options.agentId, lastError?.message);
-    this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs, success: false });
+    this.recordTrace({
+      callId, toolName: name, startedAt, durationMs, success: false,
+      attemptCount: maxRetries + 1, agentId: options.agentId,
+      conversationId: options.conversationId, messageId: options.messageId,
+      arguments: safeArguments, error: lastError?.message,
+    });
+    this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs, success: false, agentId: options.agentId, conversationId: options.conversationId, messageId: options.messageId, callId, error: lastError?.message });
 
     throw lastError!;
   }
@@ -360,6 +401,40 @@ export class ToolRegistry {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private recordTrace(trace: SkillInteractionTrace): void {
+    if (!this.traceObserver) return;
+    try {
+      Promise.resolve(this.traceObserver.record(trace)).catch((error) => {
+        console.warn("[ToolRegistry] Échec de persistance de trace:", error);
+      });
+    } catch (error) {
+      console.warn("[ToolRegistry] Échec de création de trace:", error);
+    }
+  }
+}
+
+const SENSITIVE_TRACE_KEYS = /password|secret|token|api[_-]?key|authorization|cookie/i;
+
+function redactTraceValue(value: unknown, depth = 0): unknown {
+  if (depth > 4) return "[profondeur limitée]";
+  if (typeof value === "string") return value.length > 2000 ? `${value.slice(0, 2000)}…[tronqué]` : value;
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.slice(0, 50).map((item) => redactTraceValue(item, depth + 1));
+  return Object.fromEntries(Object.entries(value).slice(0, 100).map(([key, item]) => [
+    key,
+    SENSITIVE_TRACE_KEYS.test(key) ? "[redacted]" : redactTraceValue(item, depth + 1),
+  ]));
+}
+
+function summarizeTraceValue(value: unknown): string {
+  const redacted = redactTraceValue(value);
+  if (typeof redacted === "string") return redacted.slice(0, 1000);
+  try {
+    return JSON.stringify(redacted).slice(0, 1000);
+  } catch {
+    return `[${typeof value}]`;
   }
 }
 

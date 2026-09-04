@@ -105,19 +105,11 @@ export class SkillManagerV2 {
       }
     }
 
-    // Si un contexte est fourni, chercher la skill correspondante et appeler son handler
-    // directement pour préserver le contexte (nécessaire pour emitIdeAction, etc.)
-    if (context) {
-      for (const skill of this.skills) {
-        const tool = skill.declarations.find(d => d.name === normalizedName);
-        if (tool) {
-          return skill.handleToolCall(normalizedName, args, context);
-        }
-      }
-    }
-
-    // Sinon, utiliser le ToolRegistry normal
-    return this.registry.call(normalizedName, args ?? {}, { context });
+    return this.registry.call(normalizedName, args ?? {}, {
+      context,
+      conversationId: context?.conversationId,
+      messageId: context?.messageId,
+    });
   }
 
   /**

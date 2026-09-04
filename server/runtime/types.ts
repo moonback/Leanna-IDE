@@ -122,6 +122,25 @@ export interface ToolCallMetrics {
   error?: string;
 }
 
+export interface SkillInteractionTrace {
+  callId: string;
+  toolName: string;
+  startedAt: string;
+  durationMs: number;
+  success: boolean;
+  attemptCount: number;
+  agentId?: string;
+  conversationId?: string;
+  messageId?: string;
+  arguments: Record<string, unknown>;
+  resultSummary?: string;
+  error?: string;
+}
+
+export interface SkillTraceObserver {
+  record(trace: SkillInteractionTrace): void | Promise<void>;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Event Bus
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -131,8 +150,8 @@ export type RuntimeEvent =
   | { type: "task:stateChanged"; taskId: string; from: TaskState; to: TaskState }
   | { type: "task:completed"; taskId: string; result: TaskResult }
   | { type: "task:failed"; taskId: string; error: string }
-  | { type: "tool:called"; toolName: string; agentId?: string }
-  | { type: "tool:completed"; toolName: string; durationMs: number; success: boolean }
+  | { type: "tool:called"; toolName: string; agentId?: string; conversationId?: string; messageId?: string; callId?: string }
+  | { type: "tool:completed"; toolName: string; durationMs: number; success: boolean; agentId?: string; conversationId?: string; messageId?: string; callId?: string; error?: string }
   | { type: "agent:registered"; agentId: string }
   | { type: "agent:busy"; agentId: string; taskId: string }
   | { type: "agent:idle"; agentId: string }
@@ -226,6 +245,7 @@ export interface RuntimeConfig {
   enableMetrics: boolean;
   enablePersistence: boolean;
   logLevel: "debug" | "info" | "warn" | "error";
+  skillTraceObserver?: SkillTraceObserver;
 }
 
 export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {

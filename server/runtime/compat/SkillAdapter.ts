@@ -66,8 +66,8 @@ function adaptDeclaration(
 
   return {
     declaration,
-    handler: async (args: Record<string, unknown>) => {
-      return skill.handleToolCall(decl.name, args, options.context);
+    handler: async (args: Record<string, unknown>, context?: any) => {
+      return skill.handleToolCall(decl.name, args, context ?? options.context);
     },
     category: options.category ?? skill.name,
     timeoutMs: options.timeoutMs ?? inferTimeout(decl.name),

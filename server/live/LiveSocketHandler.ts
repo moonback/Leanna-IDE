@@ -692,7 +692,7 @@ export function attachLiveWebSocket(
             if (message.serverContent?.interrupted) clientWs.send(JSON.stringify({ interrupted: true }));
 
             if (message.toolCall) {
-              handleToolCall(message.toolCall, session, clientWs, sessionMode, busyStateRef, voiceName, deps, sessionSupervisor, contextGate).catch(e =>
+              handleToolCall(message.toolCall, session, clientWs, sessionMode, busyStateRef, voiceName, deps, sessionSupervisor, contextGate, conversationId).catch(e =>
                 console.error('[handleToolCall] Erreur non catchée:', e),
               );
             }
@@ -1184,6 +1184,7 @@ async function handleToolCall(
     requiredFiles: new Set(),
     readFiles: new Set(),
   },
+  conversationId?: string,
 ): Promise<void> {
   const functionResponses: any[] = [];
   const skillManager = deps?.skillManager;
@@ -1197,6 +1198,8 @@ async function handleToolCall(
   ]);
 
   const context = {
+    conversationId,
+    messageId: undefined as string | undefined,
     voiceName,
     reasoningVoiceEnabled: (currentProfile as any).reasoningVoiceEnabled !== false,
     notifyLiveAPI: (message: string) => {
@@ -1221,6 +1224,7 @@ async function handleToolCall(
 
   for (const call of toolCall.functionCalls) {
     try {
+      context.messageId = call.id;
       // Ask mode guard
       if (mode === 'ask' && WRITE_TOOLS.has(call.name)) {
         const filePath = (call.args?.path || call.args?.newPath || '') as string;

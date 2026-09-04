@@ -19,6 +19,7 @@ import { loadPromptTemplates } from "./prompts/loader.js";
 import { defaultAgents } from "./agents/index.js";
 import type { RuntimeConfig } from "./types.js";
 import type { LegacySkill } from "./compat/SkillAdapter.js";
+import { createSupabaseSkillTraceStore } from "./SkillTraceStore.js";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
@@ -68,7 +69,10 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   const startTime = Date.now();
 
   // 1. Créer le runtime
-  const runtime = new AgentRuntime(config.runtime);
+  const runtime = new AgentRuntime({
+    ...config.runtime,
+    skillTraceObserver: config.runtime?.skillTraceObserver ?? createSupabaseSkillTraceStore(),
+  });
 
   // 1.5. Configurer l'AgentOrchestrator pour utiliser le ToolRegistry du runtime (timeout corrigé)
   // Import dynamique pour éviter la dépendance circulaire
@@ -122,7 +126,10 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
  * Retourne les instances immédiatement, l'initialisation async se fait en arrière-plan.
  */
 export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapResult {
-  const runtime = new AgentRuntime(config.runtime);
+  const runtime = new AgentRuntime({
+    ...config.runtime,
+    skillTraceObserver: config.runtime?.skillTraceObserver ?? createSupabaseSkillTraceStore(),
+  });
   const skillManager = new SkillManagerV2({
     eventBus: runtime.events,
     registry: runtime.tools,

@@ -21,6 +21,7 @@ export { WorkflowEngine } from "./WorkflowEngine.js";
 export { PromptRegistry } from "./PromptRegistry.js";
 export { AgentLoader } from "./AgentLoader.js";
 export { Observability } from "./Observability.js";
+export { SupabaseSkillTraceStore, createSupabaseSkillTraceStore } from "./SkillTraceStore.js";
 
 // Types
 export type {
@@ -35,6 +36,8 @@ export type {
   ToolHandler,
   ToolPermission,
   ToolCallMetrics,
+  SkillInteractionTrace,
+  SkillTraceObserver,
   RuntimeEvent,
   RuntimeEventType,
   RuntimeEventHandler,
