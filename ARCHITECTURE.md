@@ -310,3 +310,87 @@ Le serveur n'écoute que sur la loopback pour éviter l'exposition du terminal s
 ### TypeScript strict end-to-end
 
 `tsconfig.json` active `strict`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`. Le build esbuild du serveur est séparé du build Vite du frontend pour permettre un bundle CJS compatible Electron.
+
+---
+
+## Tests
+
+### Stratégie de test
+
+Leanna utilise le **Node.js test runner natif** (`node:test`) pour tous les tests unitaires et d'intégration. Pas de framework externe (Jest, Mocha) : les tests sont simples, rapides et portables.
+
+**Couverture actuelle :**
+- ✅ **Skills** : ≥60% de couverture (136+ tests unitaires)
+- ✅ **Routes REST** : 74 tests d'intégration
+
+### Tests unitaires (Skills)
+
+Fichiers : `server/skills/*.test.ts`
+
+**Objectif** : valider la logique métier de chaque skill isolément
+- Validation des schémas Zod
+- Gestion d'erreurs
+- Cas nominaux et cas limites
+- Aucune dépendance réseau (mocks)
+
+Exemple : `server/skills/browser.test.ts` valide que les appels Puppeteer sont correctement formatés sans lancer un navigateur réel.
+
+### Tests d'intégration (Routes REST)
+
+Fichiers : `server/routes/*.test.ts`
+
+**Objectif** : valider le comportement end-to-end des endpoints HTTP
+- Création d'un serveur Express isolé par test
+- Tests sur un port aléatoire (évite les conflits)
+- Validation des codes HTTP (200, 400, 404, 500, 503)
+- Validation des schémas de réponse JSON
+- Tests d'authentification et rate limiting
+
+**Couverture complète des domaines fonctionnels :**
+
+| Domaine | Tests | Couverture |
+|---|---|---|
+| Agents | 15 | Statut, tâches, rôles, flotte, bus de messages, collaboration, persistance, tool-mapping, tool-categories |
+| Marketplace | 13 | Recherche, featured, installed, stats, installation, publication, rating, sécurité, export |
+| Workflows | 7 | Liste, création, exécution, toggle, suppression |
+| Browser | 7 | Validation requêtes, résolution promesses, actions |
+| Upload Document | 7 | Validation types fichiers, rate limiting, contexte |
+| Conversations | 7 | Liste, recherche, messages, mise à jour titre, suppression |
+| Skills | 6 | Liste, propriétés requises, core skills, statut Supabase |
+| Profile & Tokens | 6 | GET/POST profile, GET/POST tokens, validation clés |
+| Terminal | 5 | Configuration, sessions actives, authentification |
+| Memories | 3 | Liste, suppression globale, suppression par ID |
+| Workspace | 3 | Info workspace, verrouillage POST |
+| Health | 1 | Health check |
+
+### Exécution des tests
+
+```bash
+# Tous les tests (skills + routes)
+npm test
+
+# Tests d'intégration seulement
+npm test -- server/routes/*.test.ts
+
+# Tests unitaires seulement
+npm test -- server/skills/*.test.ts
+
+# Un fichier spécifique
+npm test -- server/routes/agents.test.ts
+
+# Mode watch (relance sur changement)
+npm test -- --watch
+
+# Coverage (expérimental)
+npm test -- --coverage
+```
+
+### CI/CD
+
+Les tests sont automatiquement exécutés sur chaque push et pull request via GitHub Actions. Un build échoué ou des tests en erreur bloquent le merge.
+
+**Seuils de qualité :**
+- Build TypeScript doit passer (`tsc --noEmit`)
+- Lint doit passer (`npm run lint`)
+- Tous les tests doivent passer (`npm test`)
+- Coverage skills ≥60%

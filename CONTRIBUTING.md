@@ -158,6 +158,12 @@ Courte description du changement et du problème résolu.
 # Tous les tests (Node test runner)
 npm test
 
+# Tests d'intégration des routes REST seulement
+npm test -- server/routes/*.test.ts
+
+# Tests des skills seulement
+npm test -- server/skills/*.test.ts
+
 # Un fichier spécifique
 node --import tsx --test server/routes/ide.test.ts
 
@@ -167,16 +173,60 @@ npm run lint
 
 Les tests sont dans `server/**/*.test.ts`. Ils utilisent le **test runner natif Node.js** (`node:test`).
 
+**Couverture actuelle :**
+- ✅ **Skills** : ≥60% de couverture (136+ tests unitaires)
+- ✅ **Routes REST** : 74 tests d'intégration couvrant tous les endpoints API
+  - `agents.test.ts` : 15 tests (statut, tâches, collaboration, persistance)
+  - `marketplace.test.ts` : 13 tests (recherche, installation, publication)
+  - `workflows.test.ts` : 7 tests (CRUD et exécution)
+  - `browser.test.ts` : 7 tests (actions navigateur)
+  - `upload-document.test.ts` : 7 tests (validation fichiers, rate limiting)
+  - `conversations.test.ts` : 7 tests (historique et recherche)
+  - `skills.test.ts` : 6 tests (liste et configuration)
+  - `profile.test.ts` : 6 tests (profil et tokens)
+  - `terminal.test.ts` : 5 tests (configuration et sessions)
+  - `memories.test.ts` : 3 tests (mémoire long-terme)
+  - `workspace.test.ts` : 3 tests (info workspace)
+  - `health.test.ts` : 1 test (health check)
+
 Pour ajouter un test :
 
 ```typescript
-import { describe, it } from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 
-describe('myFunction', () => {
-  it('should return expected value', () => {
-    assert.equal(myFunction('input'), 'expected');
+test('myFunction should return expected value', () => {
+  assert.equal(myFunction('input'), 'expected');
+});
+```
+
+Pour ajouter un test d'intégration de route :
+
+```typescript
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import type { Server } from 'http';
+import myRouter from './my-route.js';
+
+test('GET /my-endpoint returns data', async () => {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/my-route', myRouter);
+
+  const server: Server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
   });
+  const port = (server.address() as any).port;
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/my-route/my-endpoint`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(body.data);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });
 ```
 

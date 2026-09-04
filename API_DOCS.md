@@ -1386,3 +1386,74 @@ Terminal PTY interactif.
 **Messages entrants :** Commandes shell en texte brut ou JSON `{ "type": "resize", "cols": 80, "rows": 24 }`
 
 **Messages sortants :** Sortie du terminal en texte brut (stdout + stderr du PTY)
+
+
+---
+
+## Tests d'intégration
+
+Tous les endpoints REST disposent de tests d'intégration dans `server/routes/*.test.ts`.
+
+**Couverture actuelle : 74 tests d'intégration**
+
+### Tests par routeur
+
+| Routeur | Fichier de test | Nombre de tests | Couverture |
+|---|---|---|---|
+| Agents | `agents.test.ts` | 15 | Statut, tâches, rôles, flotte, bus, collaboration, persistance, mapping |
+| Marketplace | `marketplace.test.ts` | 13 | Recherche, featured, installation, publication, sécurité |
+| Workflows | `workflows.test.ts` | 7 | CRUD, exécution, toggle |
+| Browser | `browser.test.ts` | 7 | Content requests, actions, promesses |
+| Upload Document | `upload-document.test.ts` | 7 | Validation fichiers, types supportés, rate limiting |
+| Conversations | `conversations.test.ts` | 7 | Liste, recherche, messages, CRUD |
+| Skills | `skills.test.ts` | 6 | Liste, propriétés, statut Supabase |
+| Profile | `profile.test.ts` | 6 | GET/POST profile, GET/POST tokens |
+| Terminal | `terminal.test.ts` | 5 | Configuration, sessions, authentification |
+| Memories | `memories.test.ts` | 3 | GET, DELETE (Supabase) |
+| Workspace | `workspace.test.ts` | 3 | GET info, POST interdit |
+| Health | `health.test.ts` | 1 | Health check |
+
+### Exécuter les tests d'intégration
+
+```bash
+# Tous les tests d'intégration des routes
+npm test -- server/routes/*.test.ts
+
+# Un routeur spécifique
+npm test -- server/routes/agents.test.ts
+
+# Voir les résultats détaillés
+npm test 2>&1 | grep -E "(✔|✖)"
+```
+
+### Ajouter des tests pour une nouvelle route
+
+Voir le guide complet dans [CONTRIBUTING.md](CONTRIBUTING.md#ajouter-une-route-api).
+
+Template minimal :
+
+```typescript
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import type { Server } from 'http';
+import myRouter from './my-route.js';
+
+test('GET /my-endpoint returns 200', async () => {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/my-route', myRouter);
+
+  const server: Server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const port = (server.address() as any).port;
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/my-route/my-endpoint`);
+    assert.equal(res.status, 200);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+```

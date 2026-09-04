@@ -191,6 +191,9 @@ npm test
 # Lancer les tests d'un module spécifique
 npm test -- server/skills/browser.test.ts
 
+# Lancer uniquement les tests d'intégration des routes
+npm test -- server/routes/*.test.ts
+
 # Lancer les tests avec couverture
 npm test -- --coverage
 ```
@@ -200,6 +203,12 @@ npm test -- --coverage
   - 136+ tests unitaires sur les skills critiques
   - Validation exhaustive des schemas Zod
   - Tests de gestion d'erreurs et logique métier
+- ✅ `server/routes/` : **74 tests d'intégration REST**
+  - Tests complets de tous les endpoints API
+  - Validation des schémas de requêtes/réponses
+  - Gestion des erreurs 400/404/500/503
+  - Tests d'authentification et autorisation
+  - Tests de rate limiting et validation de fichiers
 
 ---
 
@@ -249,6 +258,19 @@ leanna/
 ├── tsconfig.json           # Configuration TypeScript
 └── package.json            # Dépendances et scripts npm
 ```
+
+---
+
+## Documentation
+
+- [README.md](README.md) — Vue d'ensemble et installation
+- [API_DOCS.md](API_DOCS.md) — Référence complète de l'API REST et WebSockets
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Architecture technique détaillée
+- [CONTRIBUTING.md](CONTRIBUTING.md) — Guide de contribution et conventions
+- [TESTING.md](TESTING.md) — Stratégie de test, patterns et couverture
+- [DB_SCHEMA.md](DB_SCHEMA.md) — Schéma de base de données Supabase
+- [ROADMAP.md](ROADMAP.md) — Feuille de route du projet
+- [SELF_IDE.md](SELF_IDE.md) — Auto-hébergement et développement de Leanna avec Leanna
 
 ---
 
