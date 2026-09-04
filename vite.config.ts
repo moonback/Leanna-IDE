@@ -39,8 +39,8 @@ export default defineConfig(({ mode }) => {
         ignored: [
           '**/.Leanna-profile.json',
           '**/.Leanna/sandbox/**',
-          '**/ProjectMemory.json',
-          '**/ProjectKnowledge.json',
+          '**/.project-memory.json',
+          '**/.project-knowledge.json',
         ],
       },
       proxy: {},

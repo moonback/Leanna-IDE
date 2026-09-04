@@ -45,7 +45,7 @@ const IGNORED_DIRS = new Set([
 /** Fichiers ignorés */
 const IGNORED_FILES = new Set([
   "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
-  "ProjectKnowledge.json", "ProjectMemory.json",
+  ".project-knowledge.json", ".project-memory.json",
 ]);
 
 // ═══════════════════════════════════════════════════════════════════════════════

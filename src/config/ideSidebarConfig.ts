@@ -6,7 +6,7 @@
  * 1. Explorateur (accès direct)
  * 2. Code (sous-menu : Recherche, Terminal, Prévisualisation)
  * 3. Git & CI/CD (sous-menu : Sandbox, Workflow)
- * 4. Données (sous-menu : Knowledge, Notebooks, Documents, Santé système)
+ * 4. Données (sous-menu : Knowledge, Notebooks, Santé système)
  * 5. Outils (sous-menu : Agent Builder, Caméra, Partage écran)
  * (IA via le menu agent en bas — inchangé)
  */
@@ -16,7 +16,7 @@ import {
   GitBranch, Github, Camera, Monitor,
   FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Container, Bot, Crosshair, Database,
-  Activity, Wrench, Users, FileStack,
+  Activity, Wrench, Users,
   Wand2, BookOpen, Globe, Terminal, Store,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -179,14 +179,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Notebooks',
             stateKey: 'showNotebooks',
             actionKey: 'onToggleNotebooks',
-          },
-          {
-            id: 'documents',
-            type: 'button',
-            icon: FileStack,
-            label: 'Documents',
-            stateKey: 'showDocuments',
-            actionKey: 'onToggleDocuments',
           },
           {
             id: 'system-health',

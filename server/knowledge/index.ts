@@ -12,7 +12,7 @@
  *
  * Architecture :
  *   ProjectIndexer → ASTParser (Tree-sitter) → ASTCallGraph
- *                  → KnowledgeGraph → ProjectKnowledge.json
+ *                  → KnowledgeGraph → .project-knowledge.json
  *                                      ↓
  *   DependencyGraph ← KnowledgeGraph  ↓
  *   ImpactAnalyzer  ← DependencyGraph ↓

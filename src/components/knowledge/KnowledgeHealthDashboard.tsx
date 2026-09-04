@@ -457,12 +457,12 @@ export function KnowledgeHealthDashboard() {
               </h3>
               <div className="space-y-2 text-xs" style={{ color: 'var(--text-muted)' }}>
                 <div className="flex justify-between p-2 rounded-lg" style={{ backgroundColor: 'var(--bg-base)' }}>
-                  <span>Fichier de Graphe (.Leanna) :</span>
-                  <code className="font-mono text-emerald-400">ProjectKnowledge.json</code>
+                  <span>Fichier de Graphe (local au projet) :</span>
+                  <code className="font-mono text-emerald-400">.project-knowledge.json</code>
                 </div>
                 <div className="flex justify-between p-2 rounded-lg" style={{ backgroundColor: 'var(--bg-base)' }}>
-                  <span>Mémoire Métier (.Leanna) :</span>
-                  <code className="font-mono text-purple-400">ProjectMemory.json</code>
+                  <span>Mémoire Métier (local au projet) :</span>
+                  <code className="font-mono text-purple-400">.project-memory.json</code>
                 </div>
                 <div className="flex justify-between p-2 rounded-lg" style={{ backgroundColor: 'var(--bg-base)' }}>
                   <span>Statut Auto-Indexation :</span>

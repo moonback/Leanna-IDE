@@ -7,13 +7,13 @@
  * - Graphe de dépendances (qui importe qui)
  * - Graphe inverse (qui dépend de qui)
  *
- * Le graphe est persisté dans ProjectKnowledge.json et mis à jour
+ * Le graphe est persisté dans .project-knowledge.json et mis à jour
  * automatiquement après chaque modification de fichier.
  *
  * Architecture :
  *   ProjectIndexer.scanAll() → KnowledgeGraph.update()
  *     ↓
- *   ProjectKnowledge.json (persistance disque)
+ *   .project-knowledge.json (persistance disque)
  *     ↓
  *   Interrogé par : DependencyGraph, ImpactAnalyzer, SemanticSearch, etc.
  */
@@ -40,9 +40,12 @@ async function getASTCallGraph() {
 
 const log = createLogger("KnowledgeGraph");
 
-/** Chemin du fichier de persistance calculé dynamiquement depuis SELF_ROOT */
+/** 
+ * Chemin du fichier de persistance calculé dynamiquement depuis SELF_ROOT.
+ * Stocke les données localement dans le projet actif pour isoler chaque projet.
+ */
 function getStorePath(): string {
-  return path.join(SELF_ROOT, ".Leanna", "ProjectKnowledge.json");
+  return path.join(SELF_ROOT, ".project-knowledge.json");
 }
 
 // ─── Constantes de debounce ──────────────────────────────────────────────────
