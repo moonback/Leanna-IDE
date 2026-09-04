@@ -1,686 +1,382 @@
-# Référence API
+# API Reference — Leanna
 
-Toutes les routes de l'API REST sont préfixées par `/api`.
+## Authentification
 
-## Outils agent de qualité
+Toutes les routes `/api/*` (sauf `GET /api/health`) requièrent le header suivant :
 
-Les outils suivants sont exposés au runtime des agents, en complément des routes REST.
-
-### `quality_loop`
-
-Applique une modification puis exécute une boucle qualité bornée. L'outil ne prend aucune nouvelle tentative automatique après un échec.
-
-#### Paramètres
-
-```json
-{
-  "path": "server/example.ts",
-  "search": "const value = 1;",
-  "replace": "const value = 2;"
-}
+```
+x-leanna-token: <Leanna_API_TOKEN>
 ```
 
-#### Phases
+Le token est défini dans `.env` (ou auto-généré au premier démarrage). La comparaison est effectuée en temps constant (`crypto.timingSafeEqual`) pour prévenir les timing attacks.
 
-`read_project_file` → baseline `verify_file` → `modify_project_file` → `verify_format` → `verify_typecheck` → `verify_file` (lint et test associé) → diff/régression.
+Les WebSockets `/live` et `/sandbox-watch` valident le token via le **cookie** `Leanna_token`, posé automatiquement par le premier appel REST authentifié.
 
-#### Réponse
+**Codes HTTP communs :**
 
-Le résultat contient `success`, `stoppedAt`, `file`, `testFile`, `diff`, `baseline`, `current`, `regression` et `errors`. Les valeurs possibles de `stoppedAt` sont `modify`, `format`, `typecheck`, `tests`, `regression` et `complete`.
-
-### `verify_format`
-
-Formate uniquement le fichier indiqué. Il supprime les espaces blancs en fin de ligne et garantit une nouvelle ligne finale, sans modifier les autres fichiers.
-
-### Format d'authentification
-
-Sauf mention contraire (notamment `/api/health`), tous les endpoints nécessitent un jeton secret. Ce jeton est **toujours configuré** depuis la v2 — il est généré automatiquement au premier démarrage si `Leanna_API_TOKEN` est absent dans `.env`.
-
-* **En-tête HTTP** : `x-leanna-token: <SECRET>` *(recommandé)*
-* **Cookie HTTP** : `Leanna_token=<SECRET>` *(posé automatiquement après la première requête authentifiée)*
-
-> **WebSocket `/terminal`** : Le token n'est **plus** accepté en paramètre d'URL (`?token=`) depuis la v2. Il doit être transmis via :
-> - le cookie `Leanna_token` (automatique si déjà authentifié),
-> - l'en-tête `Sec-WebSocket-Protocol` (format : `['token', '<SECRET>']`),
-> - ou l'en-tête `X-Leanna-Token`.
-
-## Contrats de transparence IA
-
-Ces contrats décrivent les métadonnées attendues par les réponses Live, les missions et les notebooks. Ils ne constituent pas une route REST autonome.
-
-### Contexte traçable
-
-Une réponse qui utilise le workspace doit inclure un tableau `evidence` contenant uniquement les éléments effectivement consultés :
-
-```json
-{
-  "evidence": [
-    {
-      "sourceId": "server-skills-verify",
-      "kind": "file",
-      "path": "server/skills/verify.ts",
-      "lines": { "start": 740, "end": 812 },
-      "tests": ["server/skills/verify.test.ts"],
-      "excerpt": "..."
-    }
-  ]
-}
-```
-
-Le bouton **Inspecter le contexte** affiche cette liste. L'action **Exclure** retire une source du contexte de la réponse courante et déclenche un recalcul ; ses citations ne peuvent alors plus être utilisées.
-
-### Plan d'action explicite
-
-Avant le démarrage d'une mission multi-étapes, le client affiche puis fait confirmer un plan contenant : `objectives`, `targetFiles`, `tools`, `risks`, `estimatedCost` et `stopConditions`. Une annulation, un dépassement du coût estimé ou une condition d'arrêt satisfaite doit produire un état terminal explicite et empêcher l'étape suivante.
+| Code | Signification |
+|---|---|
+| `200` | Succès |
+| `202` | Accepté (tâche asynchrone démarrée) |
+| `400` | Requête invalide (paramètre manquant ou malformé) |
+| `401` | Non authentifié |
+| `403` | Accès refusé (chemin hors workspace, code sandbox incorrect) |
+| `404` | Ressource introuvable |
+| `409` | Conflit (fichier déjà existant) |
+| `429` | Trop de requêtes (rate limit) |
+| `500` | Erreur interne serveur |
+| `503` | Service indisponible (sandbox non prêt, Supabase non configuré) |
 
 ---
 
-## Santé & Système
+## Domaines fonctionnels
+
+- [Santé](#santé)
+- [IDE — Système de fichiers](#ide--système-de-fichiers)
+- [Sandbox](#sandbox)
+- [Agents](#agents)
+- [Workflows](#workflows)
+- [Conversations](#conversations)
+- [Mémoires](#mémoires)
+- [Compétences (Skills)](#compétences-skills)
+- [Git / GitHub](#git--github)
+- [Profil & Tokens](#profil--tokens)
+- [Notebooks (RAG)](#notebooks-rag)
+- [Documents](#documents)
+- [Automatisation](#automatisation)
+- [Terminal](#terminal)
+- [Knowledge Graph](#knowledge-graph)
+- [Audit](#audit)
+- [MCP](#mcp)
+- [Export](#export)
+- [FTP](#ftp)
+- [Marketplace](#marketplace)
+- [WebSockets](#websockets)
+
+---
+
+## Santé
 
 ### `GET /api/health`
 
-#### Description
-Vérifie l'état de santé du serveur backend et retourne son temps de fonctionnement.
+Vérifie que le serveur est opérationnel. Seule route ne nécessitant **pas** d'authentification.
 
-#### Authentification
-Non
+**Authentification :** Non
 
-#### Paramètres
-Aucun.
-
-#### Exemple de requête
-```bash
-curl -X GET http://127.0.0.1:4000/api/health
-```
-
-#### Réponse succès (200 OK)
+**Réponse 200 :**
 ```json
-{
-  "status": "ok",
-  "uptime": 142.5,
-  "timestamp": "2026-08-31T17:30:00.000Z"
-}
-```
-
-#### Codes HTTP
-| Code | Signification |
-| :--- | :--- |
-| 200 | Serveur opérationnel |
-
----
-
-## Multi-Workspace & Périmètre Self-Root
-
-### `GET /api/self-root/status`
-
-#### Description
-Retourne l'état actuel du périmètre `SELF_ROOT`, les métadonnées Git du workspace actif et l'état de synchronisation.
-
-#### Authentification
-Non (ou `x-leanna-token` si configuré)
-
-#### Réponse succès (200 OK)
-```json
-{
-  "rootPath": "C:/Users/Mayss/Desktop/mon-projet",
-  "locked": true,
-  "siteUrl": "https://mon-site.com",
-  "gitBranch": "main",
-  "gitStatus": "clean",
-  "lastCommit": "feat: init project",
-  "lastCommitDate": "il y a 2 heures",
-  "aheadBehind": { "ahead": 0, "behind": 0 }
-}
+{ "status": "ok" }
 ```
 
 ---
 
-### `GET /api/self-root/workspaces`
+## IDE — Système de fichiers
 
-#### Description
-Retourne la liste de tous les dépôts enregistrés dans `.Leanna/workspaces.json`, triés par date de dernier accès, ainsi que le workspace actif.
-
-#### Authentification
-Non (ou `x-leanna-token` si configuré)
-
-#### Réponse succès (200 OK)
-```json
-{
-  "workspaces": [
-    {
-      "id": "mon_projet_1a2b3c",
-      "name": "Mon Projet",
-      "path": "C:/Users/Mayss/Desktop/mon-projet",
-      "siteUrl": "https://mon-site.com",
-      "lastOpened": "2026-08-31T17:40:00.000Z",
-      "createdAt": "2026-08-31T12:00:00.000Z",
-      "isGit": true,
-      "gitBranch": "main"
-    }
-  ],
-  "activeRoot": "C:/Users/Mayss/Desktop/mon-projet",
-  "siteUrl": "https://mon-site.com"
-}
-```
-
----
-
-### `POST /api/self-root/workspaces/validate`
-
-#### Description
-Pré-valide la sécurité d'un chemin de dépôt externe avant tentative d'ouverture (vérification d'existence, interdiction des racines systèmes, inspection Git).
-
-#### Authentification
-Non (ou `x-leanna-token` si configuré)
-
-#### Corps de la requête (JSON)
-```json
-{
-  "path": "C:/Users/Mayss/Desktop/mon-projet"
-}
-```
-
-#### Réponse succès (200 OK)
-```json
-{
-  "valid": true,
-  "resolvedPath": "C:/Users/Mayss/Desktop/mon-projet",
-  "isGit": true,
-  "gitBranch": "main",
-  "hasPackageJson": true,
-  "hasTsConfig": true,
-  "suspiciousSymlinksCount": 0
-}
-```
-
----
-
-### `POST /api/self-root/change`
-
-#### Description
-Bascule le workspace actif vers un nouveau dépôt de manière atomique. Réinitialise le sandbox, recharge le graphe de connaissances et la mémoire projet.
-
-#### Authentification
-Oui / Confirmation interactive (sauf si `userConfirmed: true` depuis l'UI)
-
-#### Corps de la requête (JSON)
-```json
-{
-  "path": "C:/Users/Mayss/Desktop/mon-projet",
-  "userConfirmed": true,
-  "name": "Mon Projet",
-  "siteUrl": "https://mon-site.com"
-}
-```
-
-#### Réponse succès (200 OK)
-```json
-{
-  "status": "success",
-  "newRoot": "C:/Users/Mayss/Desktop/mon-projet",
-  "siteUrl": "https://mon-site.com"
-}
-```
-
----
-
-### `DELETE /api/self-root/workspaces/:id`
-
-#### Description
-Retire un workspace du registre de l'historique `.Leanna/workspaces.json` sans supprimer les fichiers sur le disque.
-
-#### Authentification
-Non (ou `x-leanna-token` si configuré)
-
-#### Réponse succès (200 OK)
-```json
-{
-  "success": true,
-  "id": "mon_projet_1a2b3c"
-}
-```
-
----
-
-### `PATCH /api/self-root/workspaces/:id`
-
-#### Description
-Met à jour le nom personnalisé ou l'URL du site associé à un workspace enregistré.
-
-#### Corps de la requête (JSON)
-```json
-{
-  "name": "Nouveau Nom",
-  "siteUrl": "https://doc.mon-site.com"
-}
-```
-
----
-
-### `POST /api/self-root/clear`
-
-#### Description
-Réinitialise le workspace actif (`SELF_ROOT` remis à vide) et désactive le Sandbox.
-
----
-
-### `POST /api/self-root/clone` *(SSE)*
-
-#### Description
-Clone un dépôt Git distant (GitHub, GitLab, Bitbucket, SSH…) dans un dossier local, puis l'active automatiquement comme workspace. La réponse est un flux **Server-Sent Events** qui transmet la progression ligne par ligne en temps réel.
-
-#### Authentification
-Non (ou `x-leanna-token` si configuré)
-
-#### Corps de la requête (JSON)
-```json
-{
-  "url": "https://github.com/user/repository",
-  "targetDir": "C:/Users/Mayss/Documents/mes-projets"
-}
-```
-
-| Champ | Type | Requis | Description |
-| :--- | :--- | :--- | :--- |
-| `url` | string | Oui | URL HTTPS (`https://…`) ou SSH (`git@…`) du dépôt |
-| `targetDir` | string | Non | Dossier parent de destination. Défaut : `~/Documents/Leanna-Projects` |
-
-#### Format des événements SSE
-
-Chaque ligne reçue est un objet JSON préfixé `data:` :
-
-```
-data: {"type":"log","level":"info","message":"🔗 Clonage de https://github.com/user/repo…"}
-
-data: {"type":"log","level":"info","message":"Receiving objects:  45% (120/265)"}
-
-data: {"type":"done","status":"success","newRoot":"C:/Users/Mayss/Documents/Leanna-Projects/repo","repoName":"repo"}
-```
-
-| `type` | Champs supplémentaires | Signification |
-| :--- | :--- | :--- |
-| `log` | `level` (`info`/`warn`/`error`), `message` | Ligne de progression ou erreur git |
-| `done` | `status: "success"`, `newRoot`, `repoName` | Clone terminé, workspace activé |
-| `error` | `error` (message), `clonePath?` | Échec du clone (code git non-zero, URL invalide…) |
-
-#### Codes HTTP
-| Code | Signification |
-| :--- | :--- |
-| 200 | Flux SSE ouvert (résultat final dans l'événement `done` ou `error`) |
-| 400 | Corps invalide (URL manquante ou format non autorisé) |
-
-#### Notes
-- Le dossier de destination ne doit pas exister avant le clonage ; si c'est le cas, l'événement `error` est immédiatement émis avec le `clonePath`.
-- En cas d'échec partiel, le dossier partiellement cloné est nettoyé automatiquement.
-- Après succès, le sandbox est réinitialisé et le Knowledge System est réindexé exactement comme après `POST /api/self-root/change`.
-
-## Publication GitHub du workspace réel
-
-Le composant `WorkspacePublishPanel` (`src/components/github/WorkspacePublishPanel.tsx`) est accessible depuis le bouton **GitHub** de la status bar de l'IDE. Il agit sur le workspace actif, défini par `SELF_ROOT`.
-
-### `GET /api/github/status`
-
-Retourne la branche courante et les fichiers modifiés du workspace. Le dossier `.Leanna/` est explicitement exclu du résultat.
-
-Réponse :
-
-```json
-{
-  "branch": "main",
-  "clean": false,
-  "files": [
-    { "index": " ", "worktree": "M", "path": "src/example.ts" }
-  ]
-}
-```
-
-### `POST /api/github/commit`
-
-Ajoute et commit toutes les modifications du workspace, à l'exception de `.Leanna/`.
-
-Corps :
-
-```json
-{ "message": "Mise à jour du workspace" }
-```
-
-Le message est obligatoire et limité à 200 caractères. Aucun commit n'est créé si le workspace ne contient pas de modification suivie par Git.
-
-### `POST /api/github/push`
-
-Pousse le commit courant vers le remote Git configuré (`origin`). L'authentification Git doit être configurée localement, par exemple via le gestionnaire d'identifiants Git ou une clé SSH.
-
-Les opérations utilisent des arguments Git séparés, sans shell, et désactivent les prompts interactifs. `.Leanna/` est également déclaré dans `.gitignore` afin que ses fichiers locaux ne soient jamais ajoutés au dépôt.
-
-### Synchronisation FTP/FTPS
-
-Les endpoints FTP utilisent le schéma commun suivant. Le mot de passe est requis dans la requête mais n'est jamais persisté.
-
-```json
-{
-  "host": "ftp.example.com",
-  "port": 21,
-  "user": "deploy",
-  "password": "<SECRET>",
-  "remotePath": "/public_html",
-  "secure": false
-}
-```
-
-Le miroir local est créé sous `~/.Leanna/ftp-workspaces/<host>_<port>/<remotePath>/`. Les dossiers système courants et les liens symboliques sont ignorés pendant le téléchargement.
-
-### `POST /api/ftp/test`
-
-Teste la connexion, l'authentification et l'accès à `remotePath`. En cas de succès, les métadonnées de connexion sont enregistrées dans `.Leanna/ftp-servers.json` sans le mot de passe.
-
-Réponse succès :
-
-```json
-{
-  "ok": true,
-  "serverInfo": "12 entrée(s) visible(s) dans /public_html",
-  "saved": { "id": "...", "host": "ftp.example.com", "port": 21, "user": "deploy" }
-}
-```
-
-### `POST /api/ftp/download` *(SSE)*
-
-Télécharge récursivement `remotePath`, active le miroir local comme workspace, l'ajoute à l'historique et recharge le Knowledge System. La réponse est un flux SSE.
-
-### `POST /api/ftp/push` *(SSE)*
-
-Envoie les fichiers du miroir vers le serveur FTP. `files` est optionnel : s'il est vide, tout le workspace est envoyé ; sinon seuls les chemins relatifs listés sont traités.
-
-```json
-{
-  "config": { "host": "ftp.example.com", "port": 21, "user": "deploy", "password": "<SECRET>", "remotePath": "/public_html", "secure": false },
-  "localRoot": "C:/Users/Mayss/.Leanna/ftp-workspaces/ftp.example.com_21/public_html",
-  "files": ["index.html", "assets/app.js"]
-}
-```
-
-Les flux `download` et `push` émettent des événements `log` (`level`, `message`), puis `done` en cas de succès (`newRoot`/`uploaded`) ou `error` en cas d'échec (`error`).
-
-### `POST /api/ftp/list`
-
-Liste sans récursion un répertoire distant. Corps : `{ "config": { ... }, "remotePath": "/public_html/assets" }`. Retourne `entries[]` avec `name`, `type`, `size` et `date`.
-
-### `POST /api/ftp/local-path`
-
-Calcule le chemin du miroir sans connexion. Corps : configuration FTP. Retourne `{ "localPath": "..." }`.
-
-### `GET /api/ftp/servers`
-
-Retourne `{ "servers": [...] }`, la liste des serveurs enregistrés sans mot de passe.
-
-### `DELETE /api/ftp/servers/:id` et `PATCH /api/ftp/servers/:id`
-
-Supprime une entrée du registre sans supprimer le miroir local, ou modifie son nom d'affichage avec `{ "name": "Production" }`.
-
----
-
-## Système de Fichiers & IDE
+Toutes les opérations de lecture/écriture sont contraintes au workspace actif (sandbox ou workspace principal). Toute tentative d'accès hors de la racine retourne `403`.
 
 ### `GET /api/ide/tree`
 
-#### Description
-Retourne l'arborescence complète des fichiers et dossiers du projet actif (prend en compte le miroir sandbox si actif).
+Retourne l'arborescence du workspace actif (sandbox si actif, sinon workspace principal). Exclut `node_modules`, `.git`, `dist`, `build`, `out`.
 
-#### Authentification
-Oui — `x-leanna-token`
+**Authentification :** Oui
 
-#### Paramètres
-Aucun.
-
-#### Exemple de requête
-```bash
-curl -X GET http://127.0.0.1:4000/api/ide/tree \
-  -H "x-leanna-token: <SECRET>"
-```
-
-#### Réponse succès (200 OK)
+**Réponse 200 :**
 ```json
 {
-  "path": "c:/Users/Mayss/Desktop/Jarvis-os-ori",
+  "path": "/absolute/path/to/workspace",
   "entries": [
     {
       "name": "src",
       "path": "src",
       "type": "directory",
       "children": [
-        {
-          "name": "main.tsx",
-          "path": "src/main.tsx",
-          "type": "file"
-        }
+        { "name": "main.tsx", "path": "src/main.tsx", "type": "file" }
       ]
     }
   ]
 }
 ```
 
-#### Codes HTTP
-| Code | Signification |
-| :--- | :--- |
-| 200 | Arborescence générée |
-| 401 | Authentification invalide |
-| 500 | Erreur lors de la lecture du système de fichiers |
+---
+
+### `GET /api/ide/tree-workspace`
+
+Retourne l'arborescence du workspace **principal** (ignore le sandbox). Exclut également `.Leanna`.
+
+**Authentification :** Oui
+
+**Réponse 200 :** Même format que `/api/ide/tree`.
 
 ---
 
 ### `GET /api/ide/file`
 
-#### Description
-Lit le contenu textuel UTF-8 d'un fichier du workspace.
+Lit le contenu d'un fichier texte.
 
-#### Authentification
-Oui — `x-leanna-token`
+**Authentification :** Oui
 
-#### Paramètres
-| Emplacement | Nom | Type | Requis | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| query | `path` | string | Oui | Chemin relatif du fichier à lire |
+**Query params :**
 
-#### Exemple de requête
-```bash
-curl -X GET "http://127.0.0.1:4000/api/ide/file?path=package.json" \
-  -H "x-leanna-token: <SECRET>"
-```
+| Nom | Type | Requis | Description |
+|---|---|---|---|
+| `path` | `string` | ✅ | Chemin relatif au workspace |
 
-#### Réponse succès (200 OK)
+**Réponse 200 :**
 ```json
-{
-  "path": "package.json",
-  "content": "{\n  \"name\": \"Leanna\",\n  \"version\": \"0.7.0\"\n}"
-}
+{ "path": "src/main.tsx", "content": "import React..." }
 ```
 
-#### Réponse erreur (403 / 404)
-```json
-{
-  "error": "Chemin hors du workspace."
-}
-```
+**Erreurs :** `400` si `path` absent · `403` hors workspace · `404` fichier introuvable
 
-#### Codes HTTP
-| Code | Signification |
-| :--- | :--- |
-| 200 | Contenu retourné avec succès |
-| 400 | Paramètre `path` manquant |
-| 401 | Non autorisé |
-| 403 | Chemin en dehors du périmètre autorisé |
-| 404 | Fichier introuvable |
+---
+
+### `GET /api/ide/file-raw`
+
+Sert un fichier **binaire** (image, PDF…) avec le bon `Content-Type`. Cache `public, max-age=3600`.
+
+**Authentification :** Oui
+
+**Query params :** Même que `/api/ide/file`.
+
+**Réponse 200 :** Contenu binaire avec header `Content-Type` adapté à l'extension.
 
 ---
 
 ### `POST /api/ide/file`
 
-#### Description
-Crée ou met à jour le contenu d'un fichier (redirigé vers le Sandbox si actif).
+Sauvegarde le contenu d'un fichier (crée les dossiers parents si nécessaire). Enregistre un événement d'audit.
 
-#### Authentification
-Oui — `x-leanna-token`
+**Authentification :** Oui
 
-#### Paramètres
-| Emplacement | Nom | Type | Requis | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| body | `path` | string | Oui | Chemin relatif du fichier cible |
-| body | `content` | string | Oui | Nouveau contenu texte du fichier |
-
-#### Exemple de requête
-```bash
-curl -X POST http://127.0.0.1:4000/api/ide/file \
-  -H "Content-Type: application/json" \
-  -H "x-leanna-token: <SECRET>" \
-  -d '{
-    "path": "src/test.txt",
-    "content": "Hello Leanna"
-  }'
-```
-
-#### Réponse succès (200 OK)
+**Body :**
 ```json
-{
-  "status": "success",
-  "path": "src/test.txt",
-  "sandbox": true
-}
+{ "path": "src/utils/helper.ts", "content": "export const foo = () => {};" }
 ```
 
-#### Codes HTTP
-| Code | Signification |
-| :--- | :--- |
-| 200 | Fichier enregistré |
-| 400 | Paramètre `path` manquant |
-| 401 | Non autorisé |
-| 403 | Écriture hors sandbox ou sur cible interdite |
-| 503 | Sandbox non prêt |
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `path` | `string` | ✅ | Chemin relatif au workspace |
+| `content` | `string` | ❌ | Contenu du fichier (vide si absent) |
+
+**Réponse 200 :**
+```json
+{ "status": "success", "path": "src/utils/helper.ts", "sandbox": true }
+```
+
+---
+
+### `POST /api/ide/create-file`
+
+Crée un fichier vide.
+
+**Authentification :** Oui
+
+**Body :**
+```json
+{ "path": "src/new-file.ts" }
+```
+
+**Réponse 200 :**
+```json
+{ "status": "success", "path": "src/new-file.ts" }
+```
+
+---
+
+### `POST /api/ide/create-directory`
+
+Crée un dossier (récursif).
+
+**Authentification :** Oui
+
+**Body :**
+```json
+{ "path": "src/components/new-feature" }
+```
+
+**Réponse 200 :**
+```json
+{ "status": "success", "path": "src/components/new-feature" }
+```
+
+---
+
+### `POST /api/ide/rename`
+
+Renomme ou déplace un fichier/dossier.
+
+**Authentification :** Oui
+
+**Body :**
+
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `oldPath` | `string` | ✅ | Chemin source relatif |
+| `newPath` | `string` | ✅ | Chemin destination relatif |
+
+**Réponse 200 :**
+```json
+{ "status": "success", "oldPath": "src/old.ts", "newPath": "src/new.ts" }
+```
+
+**Erreurs :** `404` source introuvable · `409` destination déjà existante
+
+---
+
+### `POST /api/ide/copy`
+
+Copie un fichier ou dossier (récursif). Génère un nom unique si la destination existe déjà. Les liens symboliques sont refusés (sécurité sandbox).
+
+**Authentification :** Oui
+
+**Body :**
+
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `srcPath` | `string` | ✅ | Chemin source relatif |
+| `destPath` | `string` | ✅ | Chemin destination relatif |
+
+**Réponse 200 :**
+```json
+{ "status": "success", "srcPath": "src/foo.ts", "destPath": "src/foo_copy.ts" }
+```
 
 ---
 
 ### `POST /api/ide/search`
 
-#### Description
-Recherche du texte ou une expression régulière à travers tous les fichiers du projet.
+Recherche plein-texte ou regex dans les fichiers du workspace.
 
-#### Authentification
-Oui — `x-leanna-token`
+**Authentification :** Oui
 
-#### Paramètres
-| Emplacement | Nom | Type | Requis | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| body | `query` | string | Oui | Chaîne ou motif recherché |
-| body | `caseSensitive`| boolean| Non | Sensibilité à la casse (défaut: false) |
-| body | `regex` | boolean| Non | Recherche par expression régulière |
-| body | `filePattern` | string | Non | Filtre sur le nom de fichier |
+**Body :**
 
-#### Exemple de requête
-```bash
-curl -X POST http://127.0.0.1:4000/api/ide/search \
-  -H "Content-Type: application/json" \
-  -H "x-leanna-token: <SECRET>" \
-  -d '{
-    "query": "startServer",
-    "caseSensitive": true,
-    "regex": false
-  }'
-```
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `query` | `string` | ✅ | Texte ou pattern regex à rechercher |
+| `caseSensitive` | `boolean` | ❌ | Sensible à la casse (défaut: `false`) |
+| `regex` | `boolean` | ❌ | Interprète `query` comme une regex (défaut: `false`) |
+| `filePattern` | `string` | ❌ | Filtre sur le nom de fichier |
 
-#### Réponse succès (200 OK)
+**Réponse 200 :**
 ```json
 {
   "results": [
-    {
-      "file": "server.ts",
-      "line": 391,
-      "column": 16,
-      "preview": "async function startServer() {"
-    }
-  ]
+    { "file": "src/main.tsx", "line": 42, "column": 3, "preview": "  const foo = ..." }
+  ],
+  "truncated": false
 }
 ```
 
-#### Codes HTTP
-| Code | Signification |
-| :--- | :--- |
-| 200 | Recherche complétée |
-| 400 | Paramètre `query` manquant |
-| 401 | Non autorisé |
-| 500 | Erreur interne lors du parcours |
+Limité à 1000 résultats. `truncated: true` si la limite est atteinte.
 
 ---
 
-## Bac à Sable (Sandbox)
+### `DELETE /api/ide/file`
+
+Supprime un fichier ou dossier (récursif pour les dossiers).
+
+**Authentification :** Oui
+
+**Query params :**
+
+| Nom | Type | Requis | Description |
+|---|---|---|---|
+| `path` | `string` | ✅ | Chemin relatif à supprimer |
+
+**Réponse 200 :**
+```json
+{ "status": "success", "path": "src/old.ts" }
+```
+
+---
+
+## Sandbox
+
+Le sandbox isole les modifications de l'IA dans `.Leanna/sandbox/` avant application sur le workspace principal.
 
 ### `GET /api/sandbox/status`
 
-#### Description
-Retourne le statut actuel du bac à sable (actif/inactif, racine, fichiers modifiés).
+Retourne l'état courant du sandbox.
 
-#### Authentification
-Oui — `x-leanna-token`
+**Authentification :** Oui
 
-#### Exemple de requête
-```bash
-curl -X GET http://127.0.0.1:4000/api/sandbox/status \
-  -H "x-leanna-token: <SECRET>"
-```
-
-#### Réponse succès (200 OK)
+**Réponse 200 :**
 ```json
 {
   "status": "success",
   "sandbox": {
     "active": true,
-    "root": "c:/Users/Mayss/Desktop/Jarvis-os-ori/.Leanna/sandbox",
-    "modifiedFiles": ["src/main.tsx"]
+    "path": "/workspace/.Leanna/sandbox",
+    "modifiedFiles": ["src/app.ts"]
   }
 }
 ```
 
 ---
 
-### `POST /api/sandbox/validate`
+### `POST /api/sandbox/init`
 
-#### Description
-Exécute une vérification TypeScript (`tsc --noEmit`) au sein du bac à sable pour détecter d'éventuelles erreurs de compilation.
+Initialise le sandbox (copie miroir du workspace).
 
-#### Authentification
-Oui — `x-leanna-token`
+**Authentification :** Oui · **Body :** vide
 
-#### Exemple de requête
-```bash
-curl -X POST http://127.0.0.1:4000/api/sandbox/validate \
-  -H "x-leanna-token: <SECRET>"
+**Réponse 200 :** `{ "status": "success", "filesCopied": 142 }`
+
+---
+
+### `POST /api/sandbox/activate`
+
+Active le mode sandbox (les écritures IA sont redirigées vers le sandbox).
+
+**Authentification :** Oui · **Body :** vide
+
+**Réponse 200 :** `{ "status": "success", "active": true, "path": "..." }`
+
+---
+
+### `POST /api/sandbox/deactivate`
+
+Désactive le mode sandbox. Nécessite le code de sécurité à 6 chiffres.
+
+**Authentification :** Oui
+
+**Body :**
+```json
+{ "code": "123456" }
 ```
 
-#### Réponse succès (200 OK)
+**Erreurs :** `403` code incorrect · `429` trop de tentatives (bloqué 15 min)
+
+---
+
+### `POST /api/verify-exit-code`
+
+Vérifie le code sandbox sans changer son état. Utile pour l'UI de confirmation.
+
+**Authentification :** Oui
+
+**Body :** `{ "code": "123456" }`
+
+**Réponse 200 :** `{ "status": "success" }` · **403 :** code incorrect
+
+---
+
+### `POST /api/sandbox/validate`
+
+Lance une validation TypeScript (`tsc --noEmit`) sur le sandbox.
+
+**Authentification :** Oui · **Body :** vide
+
+**Réponse 200 :**
 ```json
 {
   "status": "success",
   "valid": true,
   "errorCount": 0,
-  "warningCount": 0,
+  "warningCount": 2,
   "diagnostics": [],
-  "errorsByFile": {},
-  "exitCode": 0,
-  "stdout": "",
-  "stderr": ""
-}
-```
-
-#### Réponse échec de validation (200 OK)
-```json
-{
-  "status": "validation_failed",
-  "valid": false,
-  "errorCount": 1,
-  "warningCount": 0,
-  "diagnostics": ["src/main.tsx:42:5 - error TS2304: Cannot find name 'foo'."],
-  "errorsByFile": {
-    "src/main.tsx": ["Line 42: Cannot find name 'foo'."]
-  },
-  "exitCode": 2
+  "errorsByFile": {}
 }
 ```
 
@@ -688,139 +384,650 @@ curl -X POST http://127.0.0.1:4000/api/sandbox/validate \
 
 ### `POST /api/sandbox/sync`
 
-#### Description
-Synchronise l'ensemble des fichiers modifiés du bac à sable vers le projet principal (bloqué si la validation TypeScript échoue).
+Valide TypeScript puis copie le sandbox → workspace principal si valide.
 
-#### Authentification
-Oui — `x-leanna-token`
+**Authentification :** Oui · **Body :** vide
 
-#### Exemple de requête
-```bash
-curl -X POST http://127.0.0.1:4000/api/sandbox/sync \
-  -H "x-leanna-token: <SECRET>"
-```
+**Réponse 200 :** `{ "status": "success", "filesSynced": 3 }`
 
-#### Réponse succès (200 OK)
+**Réponse si erreurs TS :** `{ "status": "validation_failed", "errorCount": 2, "diagnostics": [...] }`
+
+---
+
+### `GET /api/sandbox/diff`
+
+Retourne la liste des fichiers modifiés dans le sandbox (comparaison avec le workspace principal).
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "status": "success", "diffs": [{ "path": "src/app.ts", "status": "modified" }] }`
+
+---
+
+### `GET /api/sandbox/file-diff`
+
+Retourne le contenu avant/après d'un fichier spécifique.
+
+**Authentification :** Oui
+
+**Query params :** `path` (string, requis)
+
+**Réponse 200 :**
 ```json
 {
   "status": "success",
-  "applied": true,
-  "filesCount": 2,
-  "files": ["src/main.tsx", "server.ts"]
+  "path": "src/app.ts",
+  "original": "// ancien contenu",
+  "modified": "// nouveau contenu"
 }
 ```
 
 ---
 
-### `POST /api/sandbox/deactivate`
+### `POST /api/sandbox/accept-file`
 
-#### Description
-Désactive le mode bac à sable. Requiert le code de sécurité configuré dans `SANDBOX_EXIT_CODE`.
+Applique un fichier individuel du sandbox vers le workspace principal.
 
-#### Authentification
-Oui — `x-leanna-token`
+**Authentification :** Oui · **Body :** `{ "path": "src/app.ts" }`
 
-#### Paramètres
-| Emplacement | Nom | Type | Requis | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| body | `code` | string | Oui | Code à 6 chiffres |
-
-#### Exemple de requête
-```bash
-curl -X POST http://127.0.0.1:4000/api/sandbox/deactivate \
-  -H "Content-Type: application/json" \
-  -H "x-leanna-token: <SECRET>" \
-  -d '{"code": "123456"}'
-```
-
-#### Réponse succès (200 OK)
-```json
-{
-  "status": "success",
-  "active": false
-}
-```
-
-#### Codes HTTP
-| Code | Signification |
-| :--- | :--- |
-| 200 | Sandbox désactivé |
-| 401 | Non autorisé |
-| 403 | Code de sécurité incorrect ou non configuré |
-| 429 | Trop de tentatives — réessayez dans N minutes |
+**Réponse 200 :** `{ "status": "success", "applied": true, "postValidation": { "valid": true, ... } }`
 
 ---
 
-## Flotte d'Agents & Orchestration
+### `POST /api/sandbox/reject-file`
+
+Restaure un fichier à sa version originale (annule la modification dans le sandbox).
+
+**Authentification :** Oui · **Body :** `{ "path": "src/app.ts" }`
+
+**Réponse 200 :** `{ "status": "success", "reverted": true }`
+
+---
+
+### `POST /api/sandbox/discard`
+
+Abandonne toutes les modifications du sandbox (restore complet).
+
+**Authentification :** Oui · **Body :** vide
+
+**Réponse 200 :** `{ "status": "success" }`
+
+---
+
+### `POST /api/sandbox/reset`
+
+Réinitialise le sandbox (re-copie complète depuis le workspace). Nécessite le code de sécurité.
+
+**Authentification :** Oui · **Body :** `{ "code": "123456" }`
+
+**Réponse 200 :** `{ "status": "success", "filesCopied": 145 }`
+
+---
+
+## Agents
+
+### `GET /api/agents/status`
+
+Statistiques de l'orchestrateur et liste des outils agents enregistrés.
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "registered": true, "tools": ["agent_delegate", ...], "stats": { ... } }`
+
+---
+
+### `GET /api/agents/tasks`
+
+Liste les 50 dernières tâches agents (en cours et terminées).
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "tasks": [{ "id": "uuid", "role": "coder", "status": "completed", ... }] }`
+
+---
+
+### `GET /api/agents/roles`
+
+Liste tous les rôles d'agents disponibles.
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "roles": ["coder", "architect", "refactor", "test", "docs", "security", "review"] }`
+
+---
 
 ### `GET /api/agents/fleet`
 
-#### Description
-Retourne l'état complet de la flotte d'agents autonomes, leurs statuts et charges de travail.
+Statut complet de la flotte d'agents (registry + orchestrateur).
 
-#### Authentification
-Oui — `x-leanna-token`
+**Authentification :** Oui
 
-#### Exemple de requête
-```bash
-curl -X GET http://127.0.0.1:4000/api/agents/fleet \
-  -H "x-leanna-token: <SECRET>"
-```
+---
 
-#### Réponse succès (200 OK)
-```json
-{
-  "totalAgents": 6,
-  "activeAgents": 1,
-  "agents": [
-    {
-      "role": "architect",
-      "status": "idle",
-      "currentTask": null,
-      "capabilities": ["design", "architecture_review"]
-    },
-    {
-      "role": "coder",
-      "status": "busy",
-      "currentTask": "task-891",
-      "capabilities": ["code_generation", "refactoring"]
-    }
-  ]
-}
-```
+### `GET /api/agents/bus/metrics`
+
+Métriques du bus de messages inter-agents (messages envoyés, reçus, erreurs).
+
+**Authentification :** Oui
 
 ---
 
 ### `GET /api/agents/bus/history`
 
-#### Description
-Récupère l'historique des messages échangés entre agents via le bus interne.
+Historique des messages entre agents.
 
-#### Authentification
-Oui — `x-leanna-token`
+**Authentification :** Oui
 
-#### Paramètres
-| Emplacement | Nom | Type | Requis | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| query | `limit` | number | Non | Nombre max de messages (défaut: 50, max: 200) |
+**Query params :** `limit` (number, max 200, défaut 50)
 
-#### Exemple de requête
-```bash
-curl -X GET "http://127.0.0.1:4000/api/agents/bus/history?limit=10" \
-  -H "x-leanna-token: <SECRET>"
-```
+**Réponse 200 :** `{ "messages": [{ "from": "coder", "to": "architect", "content": "...", "ts": "..." }] }`
 
-#### Réponse succès (200 OK)
+---
+
+### `GET /api/agents/collaboration/patterns`
+
+Liste les patterns de collaboration disponibles (ex : `code-review`, `full-stack-feature`).
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/agents/collaborate`
+
+Lance une collaboration structurée multi-agents selon un pattern.
+
+**Authentification :** Oui
+
+**Body :**
+
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `patternName` | `string` | ✅ | Nom du pattern (ex: `code-review`) |
+| `context.title` | `string` | ✅ | Titre de la tâche |
+| `context.description` | `string` | ✅ | Description détaillée |
+| `context.files` | `string[]` | ❌ | Fichiers concernés |
+| `context.instructions` | `string` | ❌ | Instructions supplémentaires |
+
+**Réponse 202 :**
 ```json
 {
-  "messages": [
+  "orchestrationId": "uuid",
+  "pattern": "code-review",
+  "status": "running",
+  "tasks": 3,
+  "message": "Collaboration \"code-review\" démarrée"
+}
+```
+
+---
+
+### `POST /api/agents/delegate-autonomous`
+
+Délègue une tâche à un agent autonome. L'agent peut sous-déléguer automatiquement.
+
+**Authentification :** Oui
+
+**Body :**
+
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `role` | `string` | ✅ | Rôle cible (coder, architect…) |
+| `title` | `string` | ✅ | Titre de la tâche |
+| `description` | `string` | ✅ | Description complète |
+| `files` | `string[]` | ❌ | Fichiers à traiter |
+| `instructions` | `string` | ❌ | Instructions spécifiques |
+| `priority` | `"low"\|"normal"\|"high"\|"critical"` | ❌ | Priorité (défaut: `normal`) |
+| `timeoutMs` | `number` | ❌ | Timeout en ms |
+
+**Réponse 202 :**
+```json
+{
+  "taskId": "uuid",
+  "role": "coder",
+  "status": "pending",
+  "message": "Tâche déléguée à l'agent autonome \"coder\""
+}
+```
+
+---
+
+### `GET /api/agents/persistence/status`
+
+État de la connexion Supabase pour la persistance des agents.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/agents/tool-mapping`
+
+Mapping complet outil → agent (tous les outils).
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/agents/tool-mapping/primary`
+
+Mapping optimisé outil → agent principal. Utilisé par le frontend.
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "success": true, "mapping": { "read_file": "coder", "run_tests": "test" }, "totalTools": 42 }`
+
+---
+
+### `GET /api/agents/:role/tools`
+
+Liste tous les outils disponibles pour un rôle donné.
+
+**Authentification :** Oui
+
+**Path params :** `role` (string)
+
+**Réponse 200 :** `{ "success": true, "role": "coder", "tools": ["read_file", "write_file", ...], "count": 12 }`
+
+---
+
+### `GET /api/v2/agents/*` · `GET /api/v2/metrics`
+
+Endpoints du runtime V2 (nouveau système coexistant). Même logique, nouveau ToolRegistry.
+
+**Authentification :** Oui
+
+---
+
+## Workflows
+
+### `GET /api/workflows`
+
+Liste tous les workflows.
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "status": "success", "workflows": [{ "id": "uuid", "name": "...", "enabled": true, "schedule": "24h", ... }] }`
+
+---
+
+### `GET /api/workflows/active-runs`
+
+Liste les exécutions de workflows en cours.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/workflows`
+
+Crée un nouveau workflow.
+
+**Authentification :** Oui
+
+**Body :**
+
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Nom du workflow |
+| `description` | `string` | ❌ | Description |
+| `steps` | `object[]` | ✅ | Étapes (tableau JSON) |
+| `schedule` | `string` | ❌ | Intervalle (ex: `"24h"`, `"30m"`) |
+| `enabled` | `boolean` | ❌ | Actif par défaut (`true`) |
+
+**Réponse 200 :** `{ "status": "success", "workflow": { ... } }`
+
+---
+
+### `POST /api/workflows/:id/run`
+
+Exécute immédiatement un workflow.
+
+**Authentification :** Oui · **Path params :** `id` (UUID)
+
+**Réponse 200 :** `{ "status": "success", "result": { ... } }`
+
+---
+
+### `POST /api/workflows/:id/toggle`
+
+Active ou désactive un workflow.
+
+**Authentification :** Oui
+
+**Body :** `{ "enabled": true }`
+
+---
+
+### `DELETE /api/workflows/:id`
+
+Supprime un workflow.
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "status": "success" }` ou `{ "status": "not_found" }`
+
+---
+
+## Conversations
+
+### `GET /api/conversations`
+
+Liste les conversations (paginées).
+
+**Authentification :** Oui
+
+**Query params :**
+
+| Nom | Type | Description |
+|---|---|---|
+| `limit` | `number` | Max 100, défaut 30 |
+| `offset` | `number` | Offset pour la pagination |
+
+**Réponse 200 :** `{ "status": "success", "conversations": [{ "id": "uuid", "title": "...", "message_count": 12, ... }] }`
+
+---
+
+### `GET /api/conversations/search`
+
+Recherche full-text dans les messages (PostgreSQL `to_tsvector` en français).
+
+**Authentification :** Oui
+
+**Query params :** `q` (string, requis) · `limit` (number, max 50)
+
+**Réponse 200 :** `{ "status": "success", "results": [{ "message_id": "uuid", "content": "...", "rank": 0.8 }] }`
+
+---
+
+### `GET /api/conversations/:id`
+
+Récupère les messages d'une conversation.
+
+**Authentification :** Oui
+
+**Path params :** `id` (UUID)
+
+**Query params :** `limit` (max 500, défaut 100) · `offset`
+
+**Réponse 200 :** `{ "status": "success", "messages": [{ "id": "uuid", "role": "user", "content": "...", "created_at": "..." }] }`
+
+---
+
+### `PATCH /api/conversations/:id`
+
+Met à jour le titre d'une conversation.
+
+**Authentification :** Oui · **Body :** `{ "title": "Nouveau titre" }`
+
+---
+
+### `DELETE /api/conversations/:id`
+
+Supprime une conversation et ses messages (cascade).
+
+**Authentification :** Oui
+
+---
+
+### `DELETE /api/conversations/all`
+
+Supprime toutes les conversations.
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "status": "success", "deleted": 42 }`
+
+---
+
+## Mémoires
+
+### `GET /api/memories`
+
+Liste les mémoires long-terme (Supabase). Requiert Supabase configuré.
+
+**Authentification :** Oui
+
+**Query params :** `limit` (max 100, défaut 20) · `offset`
+
+**Réponse 200 :** `{ "memories": [{ "id": "uuid", "content": "...", "created_at": "..." }] }`
+
+---
+
+### `DELETE /api/memories/:id`
+
+Supprime une mémoire par son ID.
+
+**Authentification :** Oui
+
+---
+
+### `DELETE /api/memories/all`
+
+Supprime toutes les mémoires.
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "status": "success", "deleted": 15 }`
+
+---
+
+## Compétences (Skills)
+
+### `GET /api/skills`
+
+Liste tous les skills natifs avec leur statut.
+
+**Authentification :** Oui
+
+**Réponse 200 :**
+```json
+{
+  "skills": [
+    { "id": "memory", "name": "Long-term Memory (Supabase)", "icon": "Database", "status": "authenticated" },
+    { "id": "automation", "name": "Automation (Puppeteer)", "icon": "Globe", "status": "active" }
+  ]
+}
+```
+
+Statuts possibles : `active` · `authenticated` (Supabase connecté) · `requires_auth` (Supabase non configuré)
+
+---
+
+### `GET /api/custom-skills`
+
+Liste les custom skills créés par l'utilisateur.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/custom-skills`
+
+Crée un nouveau custom skill.
+
+**Authentification :** Oui
+
+**Body :**
+
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Nom unique du skill |
+| `description` | `string` | ✅ | Description pour l'IA |
+| `parameters` | `object[]` | ❌ | Paramètres `[{name, type, description, required}]` |
+| `instruction` | `string` | ✅ | Prompt/instruction exécutée par l'IA |
+| `category` | `string` | ❌ | Catégorie (défaut: `custom`) |
+| `icon` | `string` | ❌ | Icône Lucide (défaut: `Sparkles`) |
+
+---
+
+### `PUT /api/custom-skills/:id` · `DELETE /api/custom-skills/:id`
+
+Met à jour ou supprime un custom skill.
+
+**Authentification :** Oui
+
+---
+
+## Git / GitHub
+
+### `GET /api/git/status`
+
+Statut Git du workspace (fichiers modifiés, branche courante).
+
+**Authentification :** Oui
+
+**Réponse 200 :**
+```json
+{
+  "branch": "main",
+  "clean": false,
+  "files": [
+    { "index": "M", "worktree": " ", "path": "src/app.ts" }
+  ]
+}
+```
+
+---
+
+### `GET /api/git/commits`
+
+Historique des commits récents.
+
+**Authentification :** Oui
+
+**Query params :** `limit` (max 50, défaut 20)
+
+**Réponse 200 :** `{ "commits": [{ "hash": "abc123", "shortHash": "abc", "author": "Dev", "date": "...", "message": "feat: ..." }] }`
+
+---
+
+### `GET /api/git/commits/:hash`
+
+Détail d'un commit (informations + fichiers modifiés).
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/git/commit`
+
+Crée un commit avec tous les fichiers modifiés du workspace (hors `.Leanna`).
+
+**Authentification :** Oui
+
+**Body :** `{ "message": "feat: add new feature" }` (max 200 caractères)
+
+**Réponse 200 :** `{ "success": true, "output": "[main abc1234] feat: ..." }`
+
+---
+
+### `POST /api/git/push`
+
+Pousse vers le remote `origin`.
+
+**Authentification :** Oui · **Body :** vide
+
+---
+
+### `GET /api/git/current-repo`
+
+Récupère owner/repo depuis le remote `origin`.
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "status": "success", "owner": "user", "repo": "my-repo", "remoteUrl": "https://..." }`
+
+---
+
+### `GET /api/github/repos`
+
+Liste les repos GitHub de l'utilisateur (nécessite `GITHUB_TOKEN`).
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/github/issues`
+
+Liste les issues d'un repo.
+
+**Authentification :** Oui
+
+**Query params :** `owner` (requis) · `repo` (requis) · `state` (`open`/`closed`, défaut `open`)
+
+---
+
+### `GET /api/github/pulls`
+
+Liste les pull requests d'un repo.
+
+**Authentification :** Oui · **Query params :** mêmes que `/github/issues`
+
+---
+
+### `GET /api/github/notifications`
+
+Notifications GitHub non lues.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/github/search`
+
+Recherche de repos GitHub.
+
+**Authentification :** Oui · **Query params :** `query` (string, requis)
+
+---
+
+## Profil & Tokens
+
+### `GET /api/profile`
+
+Récupère le profil IA courant (nom, voix, langue, style de réponse…).
+
+**Authentification :** Oui
+
+**Réponse 200 :**
+```json
+{
+  "aiName": "Leanna",
+  "aiVoice": "Aoede",
+  "userName": "Dev",
+  "language": "fr",
+  "responseStyle": "balanced",
+  "reasoningEnabled": true
+}
+```
+
+---
+
+### `POST /api/profile`
+
+Met à jour le profil (merge avec l'existant).
+
+**Authentification :** Oui
+
+**Body :** Tout champ du profil (partiel accepté).
+
+---
+
+### `GET /api/tokens`
+
+Liste les clés API configurées avec leur statut de validité (validé en temps réel).
+
+**Authentification :** Oui
+
+**Réponse 200 :**
+```json
+{
+  "tokens": [
     {
-      "id": "msg-123",
-      "from_role": "architect",
-      "to_role": "coder",
-      "type": "task_delegation",
-      "payload": { "task": "Créer le routeur health" },
-      "created_at": "2026-08-31T17:00:00.000Z"
+      "key": "GEMINI_API_KEY",
+      "label": "Gemini API Key",
+      "configured": true,
+      "valid": true,
+      "preview": "AIza••••••••"
     }
   ]
 }
@@ -828,90 +1035,226 @@ curl -X GET "http://127.0.0.1:4000/api/agents/bus/history?limit=10" \
 
 ---
 
-## Notebooks & Moteur RAG
+### `POST /api/tokens`
+
+Enregistre ou met à jour une clé API dans `.env` (chiffrée au repos).
+
+**Authentification :** Oui
+
+**Body :** `{ "key": "GEMINI_API_KEY", "value": "AIza..." }`
+
+Clés autorisées : `GEMINI_API_KEY` · `SUPABASE_URL` · `SUPABASE_SERVICE_ROLE_KEY` · `OPENROUTER_API_KEY` · `GITHUB_TOKEN`
+
+---
+
+### `GET /api/gemini-keys`
+
+Liste les clés du pool Gemini (rotation automatique sur 429).
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/gemini-keys` · `DELETE /api/gemini-keys/:id`
+
+Ajoute ou supprime une clé du pool Gemini.
+
+**Authentification :** Oui
+
+---
+
+## Notebooks (RAG)
+
+### `GET /api/notebooks`
+
+Liste tous les notebooks.
+
+**Authentification :** Oui
+
+---
 
 ### `POST /api/notebooks`
 
-#### Description
-Crée un nouveau notebook d'étude ou de recherche.
+Crée un nouveau notebook.
 
-#### Authentification
-Oui — `x-leanna-token`
+**Authentification :** Oui · **Body :** `{ "title": "Mon notebook", "description": "..." }`
 
-#### Paramètres
-| Emplacement | Nom | Type | Requis | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| body | `title` | string | Oui | Titre du notebook |
-| body | `description` | string | Non | Description facultative |
+---
 
-#### Exemple de requête
-```bash
-curl -X POST http://127.0.0.1:4000/api/notebooks \
-  -H "Content-Type: application/json" \
-  -H "x-leanna-token: <SECRET>" \
-  -d '{"title": "Analyse Architecture Leanna", "description": "Documentation technique"}'
-```
+### `GET /api/notebooks/:id`
 
-#### Réponse succès (200 OK)
-```json
-{
-  "id": "nb-45f8a9",
-  "title": "Analyse Architecture Leanna",
-  "description": "Documentation technique",
-  "sources": [],
-  "notes": [],
-  "createdAt": "2026-08-31T17:15:00.000Z"
-}
-```
+Détail d'un notebook (sources, metadata).
+
+**Authentification :** Oui
+
+---
+
+### `DELETE /api/notebooks/:id`
+
+Supprime un notebook et ses sources.
+
+**Authentification :** Oui
 
 ---
 
 ### `POST /api/notebooks/:id/sources/upload`
 
-#### Description
-Téléverse et extrait le contenu textuel d'un document (PDF, TXT, MD, Code, Image) pour l'associer au notebook. Les PDF sont traités via `pdf-parse`, puis leur texte extrait est indexé et exploitable par le moteur documentaire.
+Upload un document source (PDF, texte…) pour ingestion RAG. Rate-limité.
 
-#### Authentification
-Oui — `x-leanna-token`
+**Authentification :** Oui · **Content-Type :** `multipart/form-data`
 
-#### Paramètres
-| Emplacement | Nom | Type | Requis | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| path | `id` | string | Oui | Identifiant du notebook |
-| body (form-data) | `file` | binary | Oui | Fichier à ingérer (max 50 Mo) |
-
-#### Codes HTTP
-| Code | Signification |
-| :--- | :--- |
-| 200 | Document ingéré et indexé |
-| 400 | Fichier manquant ou type de fichier non supporté |
-| 401 | Non autorisé |
-| 429 | Rate limit d'embedding atteint |
+**Form fields :** `file` (binaire)
 
 ---
 
-## Gestion des Clés Gemini
+### `POST /api/notebooks/:id/chat`
 
-### `GET /api/gemini-keys`
+Chat contextuel sur le notebook (RAG). Rate-limité.
 
-#### Description
-Liste l'ensemble des clés configurées dans le pool de rotation Gemini.
+**Authentification :** Oui
 
-#### Authentification
-Oui — `x-leanna-token`
+**Body :** `{ "message": "Résume les points clés" }`
 
-#### Réponse succès (200 OK)
+**Réponse 200 :** `{ "answer": "...", "sources": [{ "title": "...", "chunk": "..." }] }`
+
+---
+
+### `POST /api/notebooks/:id/embeddings/reindex`
+
+Relance l'indexation vectorielle des sources. Rate-limité.
+
+**Authentification :** Oui
+
+---
+
+## Documents
+
+### `POST /api/upload-document`
+
+Upload un document (PDF, DOCX…) et l'indexe dans le workspace.
+
+**Authentification :** Oui · **Content-Type :** `multipart/form-data`
+
+**Form fields :** `file` (binaire)
+
+---
+
+### `GET /api/documents`
+
+Liste les documents indexés.
+
+**Authentification :** Oui
+
+---
+
+### `DELETE /api/documents/:id`
+
+Supprime un document indexé.
+
+**Authentification :** Oui
+
+---
+
+## Automatisation
+
+### `GET /api/automation`
+
+Liste les tâches d'automatisation planifiées.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/automation`
+
+Crée une tâche planifiée.
+
+**Authentification :** Oui
+
+**Body :**
+
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Nom de la tâche |
+| `action_name` | `string` | ✅ | Nom du skill à exécuter |
+| `args` | `object` | ❌ | Arguments du skill |
+| `interval_expression` | `string` | ✅ | Intervalle (ex: `"24h"`, `"10m"`) |
+| `enabled` | `boolean` | ❌ | Actif par défaut (`true`) |
+
+---
+
+### `POST /api/automation/:id/toggle` · `DELETE /api/automation/:id`
+
+Active/désactive ou supprime une tâche planifiée.
+
+**Authentification :** Oui
+
+---
+
+## Terminal
+
+### `GET /api/terminal`
+
+Récupère l'état du terminal.
+
+**Authentification :** Oui
+
+> Le terminal interactif est accessible via **WebSocket** (`/terminal`). Voir section [WebSockets](#websockets).
+
+---
+
+## Knowledge Graph
+
+### `GET /api/knowledge/status`
+
+Statut de l'indexation du Knowledge Graph.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/knowledge/scan`
+
+Lance une re-indexation complète du workspace.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/knowledge/impact`
+
+Analyse l'impact d'une modification sur le graphe de dépendances.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/knowledge/understanding`
+
+Retourne la compréhension contextuelle d'un fichier ou d'un symbole.
+
+**Authentification :** Oui
+
+---
+
+## Audit
+
+### `GET /api/audit`
+
+Retourne le log d'audit des opérations sur les fichiers.
+
+**Authentification :** Oui
+
+**Réponse 200 :**
 ```json
 {
-  "keys": [
+  "events": [
     {
-      "id": "key-1",
-      "hint": "AIzaSy...4xK9",
-      "priority": 1,
-      "enabled": true,
-      "usageCount": 154,
-      "errorCount": 0,
-      "lastUsed": "2026-08-31T17:25:00.000Z"
+      "action": "write_file",
+      "target": "src/app.ts",
+      "actor": "user",
+      "details": "updated via IDE",
+      "timestamp": "2026-09-04T10:00:00.000Z"
     }
   ]
 }
@@ -919,597 +1262,127 @@ Oui — `x-leanna-token`
 
 ---
 
-## Knowledge System & Call-Graph AST
+## MCP
 
-### `GET /api/knowledge/health`
+### `GET /api/mcp/status`
 
-#### Description
-Scanne l'état de santé du graphe de connaissances, la mémoire projet, les cycles de dépendances et les métadonnées du workspace.
+Statut des serveurs MCP connectés.
 
-#### Réponse succès (200 OK)
-```json
-{
-  "status": "success",
-  "health": { "overall": "healthy", "isInitialized": true, "warnings": [] },
-  "knowledgeGraph": { "totalFiles": 515, "totalEntities": 8359, "totalLines": 72400 },
-  "dependencyGraph": { "cycleCount": 0, "cycles": [] },
-  "projectMemory": { "totalFacts": 24, "structuralFacts": 8 }
-}
-```
+**Authentification :** Oui
 
 ---
 
-### `GET /api/knowledge/ast/stats`
+### `POST /api/mcp/call`
 
-#### Description
-Retourne les métriques globales du moteur Tree-sitter et du graphe d'appels bidirectionnel.
+Appelle un outil sur un serveur MCP.
 
-#### Réponse succès (200 OK)
-```json
-{
-  "status": "success",
-  "astReady": true,
-  "stats": {
-    "totalNodes": 4337,
-    "totalEdges": 31028,
-    "resolvedEdges": 5405,
-    "crossFileEdges": 1935
-  }
-}
-```
+**Authentification :** Oui
+
+**Body :** `{ "server": "server-name", "tool": "tool-name", "args": { ... } }`
 
 ---
 
-### `GET /api/knowledge/ast/functions`
+## Export
 
-#### Description
-Recherche et liste les fonctions, méthodes et composants indexés par Tree-sitter avec leurs plages de lignes et signatures typées.
+### `POST /api/export`
 
-#### Paramètres Query
-* `q` *(optionnel)* : Mot-clé ou nom de fonction.
-* `file` *(optionnel)* : Filtre par sous-chemin de fichier.
-* `limit` *(optionnel, défaut 50)* : Nombre max de résultats.
+Exporte des données (conversations, mémoires…) dans différents formats.
+
+**Authentification :** Oui
 
 ---
 
-### `GET /api/knowledge/ast/callers`
+## FTP
 
-#### Description
-Trouve toutes les fonctions qui appellent une fonction donnée (analyse d'impact / appelants).
+### `POST /api/ftp/connect`
 
-#### Paramètres Query
-* `fn` *(requis)* : Nom de la fonction ou méthode.
-* `file` *(optionnel)* : Chemin du fichier.
-* `class` *(optionnel)* : Nom de la classe si méthode.
+Établit une connexion FTP.
 
----
+**Authentification :** Oui
 
-### `GET /api/knowledge/ast/callees`
+**Body :** `{ "host": "ftp.example.com", "user": "user", "password": "pass", "port": 21 }`
 
-#### Description
-Trouve toutes les fonctions et méthodes appelées par une fonction donnée (y compris appels `this.method()`).
-
-#### Paramètres Query
-* `fn` *(requis)* : Nom de la fonction source.
-* `file` *(optionnel)* : Chemin du fichier.
+> Par défaut, les IPs privées (RFC 1918) sont bloquées. Définir `ALLOW_FTP_PRIVATE_IPS=true` pour les autoriser.
 
 ---
 
-### `GET /api/knowledge/ast/chain`
+### `GET /api/ftp/list`
 
-#### Description
-Déroule l'arborescence complète et récursive des appels (BFS) à partir d'une fonction racine jusqu'à N niveaux de profondeur.
+Liste les fichiers d'un répertoire FTP.
 
-#### Paramètres Query
-* `fn` *(requis)* : Fonction racine.
-* `depth` *(optionnel, défaut 4)* : Profondeur de recherche BFS.
+**Authentification :** Oui · **Query params :** `path` (string)
 
 ---
 
-### `POST /api/knowledge/reindex`
+## Marketplace
 
-#### Description
-Déclenche une réindexation complète du projet par `ProjectIndexer` et reconstruit le `KnowledgeGraph` et l'arbre AST Tree-sitter.
+### `GET /api/marketplace`
 
----
+Liste les agents et skills disponibles dans le catalogue marketplace.
 
-## Agents Personnalisés (`/api/custom-agents`)
-
-Gestion CRUD et persistance locale (`.Leanna/custom-agents.json`) des agents personnalisés créés via l'Agent Builder, avec validation Zod stricte.
-
-### `GET /api/custom-agents`
-Retourne la liste complète de tous les agents personnalisés enregistrés.
-
-### `POST /api/custom-agents`
-Crée un nouvel agent personnalisé et l'enregistre dynamiquement dans le runtime.
-
-#### Corps de requête (JSON validé Zod)
-```json
-{
-  "name": "Expert Python",
-  "role": "python_expert",
-  "description": "Agent spécialisé en développement et tests Python",
-  "systemPrompt": "Tu es un expert Python...",
-  "capabilities": ["python_exec", "read_project_file"],
-  "maxConcurrency": 2,
-  "defaultTimeoutMs": 60000,
-  "triggerKeywords": ["python", "pytest", "django"]
-}
-```
-
-### `PUT /api/custom-agents/:id`
-Met à jour les propriétés d'un agent personnalisé existant. Rejette toute clé non autorisée (`strict`).
-
-### `DELETE /api/custom-agents/:id`
-Supprime un agent et le désenregistre du registre dynamique.
-
-### `POST /api/custom-agents/import`
-Importe un lot d'agents personnalisés depuis une structure `{ "agents": [...] }`.
-
----
-
-## Intégration MCP (Model Context Protocol) (`/api/mcp`)
-
-Gestion du pont MCP pour connecter des serveurs d'outils externes (Stdio / SSE).
-
-### `GET /api/mcp/servers`
-Liste les serveurs MCP configurés et leur statut (connecté, déconnecté, erreur).
-
-### `POST /api/mcp/servers`
-Ajoute et démarre un nouveau serveur MCP.
-
-#### Corps de requête (JSON validé Zod)
-```json
-{
-  "id": "github-mcp",
-  "name": "GitHub Tool Server",
-  "transport": "stdio",
-  "command": "npx",
-  "args": ["-y", "@modelcontextprotocol/server-github"],
-  "env": { "GITHUB_TOKEN": "ghp_xxx" }
-}
-```
-
-### `PUT /api/mcp/servers/:id`
-Met à jour la configuration d'un serveur MCP.
-
-### `POST /api/mcp/servers/:id/toggle`
-Active ou désactive un serveur MCP (`{ "enabled": true }`).
-
-### `GET /api/mcp/tools`
-Retourne l'ensemble des outils découverts sur tous les serveurs MCP actifs.
-
-### `POST /api/mcp/tools/call`
-Exécute un outil MCP spécifique.
-
-#### Corps de requête (JSON validé Zod)
-```json
-{
-  "tool": "github_create_issue",
-  "arguments": {
-    "title": "Bug fix",
-    "body": "Description..."
-  }
-}
-```
-
----
-
-## Flotte d'Agents Autonomes & Collaboration (`/api/agents`)
-
-### `GET /api/agents/fleet`
-Statut en temps réel de tous les agents de la flotte (rôles statiques et dynamiques).
-
-### `POST /api/agents/collaborate`
-Lance une session de collaboration multi-agents structurée selon un pattern prédéfini.
-
-#### Corps de requête (JSON validé Zod)
-```json
-{
-  "patternName": "feature_development",
-  "context": {
-    "title": "Implémentation Auth JWT",
-    "description": "Créer le module d'authentification et les tests associés",
-    "files": ["server/auth.ts", "tests/auth.test.ts"]
-  }
-}
-```
-
-### `POST /api/agents/delegate-autonomous`
-Délègue de manière asynchrone une tâche à un agent autonome avec sous-délégation automatique.
-
-#### Corps de requête (JSON validé Zod)
-```json
-{
-  "role": "coder",
-  "title": "Refactoring des routes",
-  "description": "Ajouter la validation Zod sur les contrôleurs",
-  "priority": "high",
-  "timeoutMs": 120000
-}
-```
-
----
-
-## Synthèse Vocale TTS (`/api/tts`)
-
-### `POST /api/tts/speak`
-Synthétise un texte en audio PCM (base64) avec mise en cache.
-
-#### Corps de requête (JSON validé Zod)
-```json
-{
-  "text": "Bonjour, je suis votre assistant Jarvis.",
-  "voice": "Puck",
-  "speed": 1.0,
-  "noCache": false
-}
-```
-
-### `POST /api/tts/speak-stream`
-Génère le flux audio en Server-Sent Events (SSE) pour les réponses longues.
-
----
-
-## Format Standardisé des Erreurs de Validation (400 Bad Request)
-
-Toutes les routes équipées de la validation Zod renvoient un format uniforme en cas d'erreur de corps :
-```json
-{
-  "error": "Corps de requête invalide.",
-  "details": [
-    {
-      "field": "role",
-      "message": "Le rôle ne peut contenir que des lettres, chiffres, tirets et underscores"
-    }
-  ]
-}
-```
-
----
-
-
-
-## Interfaces Non-HTTP
-
-### WebSocket `/live` (Gemini Live API Bridge)
-* **URL** : `ws://127.0.0.1:4000/live?conversation_id=<ID>&mode=full`
-* **Authentification** : Cookie httpOnly `Leanna_token` (le token n'est plus accepté en paramètre d'URL pour des raisons de sécurité)
-* **Direction** : Bidirectionnelle temps réel.
-* **Protocole de messages Client → Serveur** :
-  - `{ "audio": "<base64_pcm_16khz>" }` : Envoi de flux microphone.
-  - `{ "video": { "data": "<base64_jpeg>", "mimeType": "image/jpeg" } }` : Envoi d'une capture d'écran / caméra.
-  - `{ "text": "Bonjour Leanna" }` : Envoi d'un message texte utilisateur.
-  - `{ "type": "summarize_context" }` : Demande de compactage manuel du contexte.
-  - `{ "type": "confirm-response", "requestId": "req-1", "approved": true }` : Réponse à une demande d'approbation critique.
-* **Protocole de messages Serveur → Client** :
-  - `{ "audio": "<base64_pcm_16khz>" }` : Flux vocal de réponse de l'assistant.
-  - `{ "text": "..." }` : Transcription textuelle incrémentale.
-  - `{ "tool_start": "read_project_file", "args": { "path": "server.ts" } }` : Début d'exécution d'un outil.
-  - `{ "tool_used": "read_project_file", "info": "..." }` : Résultat d'un outil.
-  - `{ "context_size": { "currentSize": 45000, "maxSize": 1000000, "percent": 5, "level": "ok" } }` : Métriques de contexte.
-  - `{ "ide-action": { "type": "open-file", "path": "src/main.tsx" } }` : Commande de pilotage UI.
-
-### WebSocket `/terminal` (Console PTY-like)
-* **URL** : `ws://127.0.0.1:4000/terminal`
-* **Authentification** : Token transmis via cookie `Leanna_token` (posé automatiquement) **ou** via le sous-protocole WebSocket `['token', '<SECRET>']`. Le paramètre d'URL `?token=` n'est plus supporté depuis la v2 (audit sécurité H-2).
-* **Direction** : Bidirectionnelle.
-* **Messages Client → Serveur** :
-  - `{ "type": "input", "data": "ls -la\r" }`
-  - `{ "type": "resize", "data": { "cols": 80, "rows": 24 } }`
-* **Messages Serveur → Client** :
-  - Flux binaire ou texte brut de sortie standard (`stdout`/`stderr`).
-
----
-
-## Marketplace d'Agents et de Skills (`/api/marketplace`)
-
-Registre communautaire d'agents, skills et bundles installables en un clic. Tous les endpoints sont protégés par le middleware `x-leanna-token`.
-
-### `GET /api/marketplace/search`
-
-Recherche paginée dans le catalogue avec filtres.
-
-**Query params** :
-
-| Param | Type | Description | Défaut |
-| :--- | :--- | :--- | :--- |
-| `query` | `string` | Recherche plein-texte (nom, description, tags, auteur) | — |
-| `type` | `agent\|skill\|bundle` | Filtrer par type de paquet | — |
-| `category` | `string` | Filtrer par catégorie (`code`, `devops`, `web`, `data`, `writing`, `security`, `productivity`, `ai`, `other`) | — |
-| `sort` | `popular\|recent\|rating\|installs` | Critère de tri | `popular` |
-| `page` | `number` | Numéro de page (1-indexed) | `1` |
-| `limit` | `number` | Nombre de résultats par page (max 50) | `20` |
-| `verified` | `boolean` | Filtrer sur les paquets certifiés | — |
-| `featured` | `boolean` | Filtrer sur les paquets mis en avant | — |
-| `tags` | `string` | Tags séparés par virgule | — |
-
-**Réponse `200`** :
-```json
-{
-  "success": true,
-  "packages": [ /* MarketplacePackage[] */ ],
-  "total": 10,
-  "page": 1,
-  "totalPages": 1
-}
-```
-
----
-
-### `GET /api/marketplace/featured`
-
-Retourne les paquets mis en avant (`featured: true`), triés par popularité.
-
-**Réponse `200`** :
-```json
-{ "success": true, "packages": [ /* MarketplacePackage[] */ ] }
-```
-
----
-
-### `GET /api/marketplace/installed`
-
-Retourne les paquets installés localement sur cette instance (marqués `_installed: true`).
-
-**Réponse `200`** :
-```json
-{ "success": true, "packages": [ /* MarketplacePackage[] avec _installed: true */ ] }
-```
-
----
-
-### `GET /api/marketplace/stats`
-
-Statistiques globales du catalogue.
-
-**Réponse `200`** :
-```json
-{
-  "success": true,
-  "stats": {
-    "total": 10,
-    "agents": 6,
-    "skills": 2,
-    "bundles": 2,
-    "verified": 7,
-    "totalInstalls": 18770,
-    "installed": 3
-  }
-}
-```
-
----
-
-### `GET /api/marketplace/package/:id`
-
-Retourne le détail complet d'un paquet (incluant README, reviews, rapport sécurité).
-
-**Réponse `200`** :
-```json
-{
-  "success": true,
-  "package": { /* MarketplacePackage complet avec _installed */ }
-}
-```
-
-**Réponse `404`** si le paquet est introuvable.
+**Authentification :** Oui
 
 ---
 
 ### `POST /api/marketplace/install`
 
-Installe un paquet : l'agent est enregistré dans le `DynamicAgentRegistry` et persisté dans `.Leanna/custom-agents.json` ; les skills sont créés dans Supabase `custom_skills` (si configuré).
+Installe un item du marketplace.
 
-**Corps** :
-```json
-{ "packageId": "code-reviewer-pro", "version": "2.1.0" }
-```
-
-**Réponse `200`** :
-```json
-{
-  "success": true,
-  "packageId": "code-reviewer-pro",
-  "agentInstalled": true,
-  "skillsInstalled": 0,
-  "warnings": [],
-  "message": "\"Code Reviewer Pro\" installé avec succès. Agent disponible dans l'Agent Builder."
-}
-```
-
-**Réponse `403`** si le paquet est signalé (`trustLevel: "flagged"`).
+**Authentification :** Oui · **Body :** `{ "id": "item-id" }`
 
 ---
 
-### `POST /api/marketplace/uninstall`
+## WebSockets
 
-Désinstalle un paquet : supprime l'agent du registre dynamique et du JSON local.
+### `WS /live`
 
-**Corps** :
+Session Gemini Live bidirectionnelle. Gère le texte, l'audio, la vidéo et les tool calls.
+
+**Auth :** Cookie `Leanna_token` (posé par le premier appel REST authentifié)
+
+**Messages entrants (client → serveur) :**
+
 ```json
-{ "packageId": "code-reviewer-pro" }
+{ "type": "text", "text": "Explique ce code" }
+{ "type": "audio_chunk", "data": "<base64>" }
+{ "type": "video_frame", "data": "<base64>" }
+{ "type": "tool_result", "callId": "uuid", "result": { ... } }
 ```
 
-**Réponse `200`** :
+**Messages sortants (serveur → client) :**
+
 ```json
-{ "success": true, "message": "\"Code Reviewer Pro\" désinstallé." }
+{ "type": "text_chunk", "text": "Bien sûr..." }
+{ "type": "audio_chunk", "data": "<base64>" }
+{ "type": "tool_call", "callId": "uuid", "name": "read_file", "args": { ... } }
+{ "type": "knowledge_progress", "phase": "indexing", "current": 42, "total": 100 }
+{ "type": "agent_event", "event": "task_started", "taskId": "uuid", "role": "coder" }
+{ "type": "mission_event", "event": "step_completed", ... }
 ```
 
 ---
 
-### `POST /api/marketplace/publish`
+### `WS /sandbox-watch`
 
-Publie un nouveau paquet dans le registre local après validation de sécurité automatique. La publication est bloquée si des flags critiques sont détectés.
+Notifications temps réel des changements dans le sandbox.
 
-**Corps** (schéma `PublishPackageSchema`) :
+**Auth :** Cookie `Leanna_token`
+
+**Messages sortants :**
 ```json
-{
-  "name": "Mon Agent Spécialisé",
-  "description": "Description courte du paquet (≤ 200 chars)",
-  "type": "agent",
-  "category": "code",
-  "tags": ["typescript", "review"],
-  "version": "1.0.0",
-  "author": "mon_pseudo",
-  "license": "MIT",
-  "avatar": "🤖",
-  "color": "#6366f1",
-  "agent": {
-    "name": "Mon Agent",
-    "role": "mon_agent",
-    "description": "...",
-    "systemPrompt": "Tu es un expert en...",
-    "capabilities": ["read_project_file", "reasoning_think"],
-    "tools": [],
-    "maxConcurrency": 2,
-    "defaultTimeoutMs": 60000,
-    "triggerKeywords": ["review", "audit"]
-  }
-}
-```
-
-**Réponse `200`** :
-```json
-{
-  "success": true,
-  "package": { /* MarketplacePackage */ },
-  "securityReport": {
-    "trustLevel": "community",
-    "score": 94,
-    "warnings": [],
-    "flags": [],
-    "summary": "Aucun problème détecté. Paquet approuvé."
-  }
-}
-```
-
-**Réponse `422`** si des flags critiques bloquent la publication.
-
----
-
-### `POST /api/marketplace/rate`
-
-Soumet un avis sur un paquet et recalcule la note moyenne.
-
-**Corps** :
-```json
-{
-  "packageId": "code-reviewer-pro",
-  "rating": 5,
-  "comment": "Excellent agent, très utile au quotidien !",
-  "author": "dev_pro_42"
-}
-```
-
-**Réponse `200`** :
-```json
-{ "success": true, "newRating": 4.8, "reviewCount": 128 }
+{ "type": "file_changed", "path": "src/app.ts", "action": "modified" }
+{ "type": "file_created", "path": "src/new.ts" }
+{ "type": "file_deleted", "path": "src/old.ts" }
 ```
 
 ---
 
-### `POST /api/marketplace/validate-security`
+### `WS /terminal`
 
-Lance le scan de sécurité sur un brouillon de paquet **sans** le publier. Utile pour un aperçu avant soumission.
+Terminal PTY interactif.
 
-**Corps** : identique à `POST /api/marketplace/publish`
+**Auth :** Token via cookie ou query param
 
-**Réponse `200`** :
-```json
-{
-  "success": true,
-  "securityReport": {
-    "trustLevel": "community",
-    "analyzedAt": "2026-09-01T12:00:00.000Z",
-    "score": 94,
-    "warnings": [],
-    "flags": [],
-    "summary": "Aucun problème détecté."
-  }
-}
-```
+**Messages entrants :** Commandes shell en texte brut ou JSON `{ "type": "resize", "cols": 80, "rows": 24 }`
 
----
-
-### `GET /api/marketplace/export/:id`
-
-Télécharge un paquet complet au format JSON avec en-tête `Content-Disposition: attachment`.
-
-**Réponse** : Fichier JSON avec nom `{id}-v{version}.leanna.json`
-
----
-
-### Schéma `MarketplacePackage`
-
-```typescript
-interface MarketplacePackage {
-  id: string;                    // Slug unique (ex: "code-reviewer-pro")
-  name: string;                  // Nom affiché
-  description: string;           // Description courte ≤ 200 chars
-  readme?: string;               // README Markdown
-  type: "agent" | "skill" | "bundle";
-  category: MarketplaceCategory; // "code" | "devops" | "web" | ...
-  tags: string[];
-  version: string;               // Semver (ex: "2.1.0")
-  versions: string[];            // Historique des versions
-  author: string;
-  license: string;
-  avatar: string;                // Emoji
-  color: string;                 // Hex (#rrggbb)
-  agent?: PackageAgentDefinition;
-  skills?: PackageSkillDefinition[];
-  security: {
-    trustLevel: "verified" | "community" | "unreviewed" | "flagged";
-    score: number;               // 0–100
-    warnings: string[];
-    flags: string[];             // Problèmes critiques
-    summary: string;
-    analyzedAt: string;
-  };
-  stats: {
-    downloads: number;
-    installs: number;
-    rating: number;              // Moyenne 0–5
-    reviewCount: number;
-    weeklyDownloads: number;
-  };
-  reviews: Array<{
-    id: string;
-    author: string;
-    rating: number;              // 1–5
-    comment: string;
-    createdAt: string;
-    helpful: number;
-  }>;
-  publishedAt: string;
-  updatedAt: string;
-  featured: boolean;
-  verified: boolean;
-  _installed?: boolean;          // Enrichissement serveur — non persisté
-}
-```
-
----
-
-### Niveaux de confiance sécurité
-
-| Niveau | Couleur | Condition |
-| :--- | :--- | :--- |
-| `verified` | Vert | Certifié par l'équipe Leanna, score ≥ 95 |
-| `community` | Bleu | Validé par la communauté, score ≥ 80, aucun flag |
-| `unreviewed` | Gris | Non encore analysé |
-| `flagged` | Rouge | Flags critiques détectés — installation bloquée |
-
-**Patterns de sécurité analysés** (12 règles) :
-- Prompt injection (`ignore previous instructions`)
-- Utilisation de `eval()`
-- Accès aux variables d'environnement (`process.env`)
-- Import `child_process` ou appels `exec`/`execSync`
-- Commandes destructives (`sudo`, `rm -rf`)
-- Opérations SQL destructives (`DROP TABLE`, `TRUNCATE`)
-- Tentatives de role-jailbreak (`act as`, `pretend you are`)
-- Références à des secrets/tokens hardcodés
-- Requêtes HTTP externes non Leanna
-- Décodage base64 suspect
-
+**Messages sortants :** Sortie du terminal en texte brut (stdout + stderr du PTY)
