@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, RotateCcw, Save, ChevronRight, Settings2,
   User, Cpu, Globe, SlidersHorizontal, Languages,
-  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot
+  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BarChart3
 } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip.js';
 import { useProfile } from '../context/UserProfileContext.js';
@@ -22,7 +22,7 @@ import {
   OpenRouterSection,
   SelfRootSection,
   SafeguardsSection,
-  CustomSkillsSection,
+  CustomSkillsSection, SkillTuningSection,
   KnowledgeHealthSection,
   SystemPromptSection,
 } from '../components/settings/index.js';
@@ -44,6 +44,7 @@ const NAV_GROUPS = [
       { id: 'systemprompt-settings', icon: Settings2, label: 'Prompt Système', keywords: 'prompt systeme instruction personnaliser comportement custom system' },
       { id: 'agents-settings', icon: Bot, label: 'Agents', keywords: 'agent multi-agents coder test docs refactor security review architect délégation solo' },
       { id: 'custom-skills-settings', icon: Code2, label: 'Skills custom', keywords: 'skill personnalisé custom outil tool instruction prompt automatisation' },
+      { id: 'skill-tuning-settings', icon: BarChart3, label: 'Tuning des skills', keywords: 'métriques historique feedback proposition tuning rollback optimisation' },
       { id: 'openrouter-settings', icon: Globe, label: 'Modèles & API', keywords: 'openrouter cles providers gpt gemini claude modèle' },
       { id: 'model-settings', icon: SlidersHorizontal, label: 'Hyperparamètres', keywords: 'temperature top p créativité précis équilibré preset' },
       { id: 'tokens-settings', icon: Key, label: 'Tokens API', keywords: 'cle api gemini tokens pool rotation' },
@@ -367,6 +368,7 @@ export default function SettingsView() {
                 {activeSection === 'systemprompt-settings' && <SystemPromptSection />}
                 {activeSection === 'agents-settings' && <AgentsSection />}
                 {activeSection === 'custom-skills-settings' && <CustomSkillsSection />}
+                {activeSection === 'skill-tuning-settings' && <SkillTuningSection />}
                 {activeSection === 'openrouter-settings' && <OpenRouterSection />}
                 {activeSection === 'model-settings' && <ModelSection />}
                 {activeSection === 'behavior-settings' && <BehaviorSection />}
@@ -395,6 +397,7 @@ function getSectionDescription(id: string): string {
     'systemprompt-settings': 'Personnalisez les instructions système de l\'assistant.',
     'agents-settings': 'Activez ou désactivez les agents spécialisés (coder, test, docs, etc.).',
     'custom-skills-settings': 'Créez et gérez vos skills personnalisés stockés en BDD.',
+    'skill-tuning-settings': 'Analysez, validez et restaurez les améliorations proposées pour vos skills.',
     'openrouter-settings': 'Sélectionnez votre provider et modèle pour les requêtes texte.',
     'model-settings': 'Ajustez la créativité et la cohérence des réponses.',
     'behavior-settings': 'Langue, style et format des réponses de l\'IA.',

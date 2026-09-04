@@ -11,6 +11,7 @@ export { OpenRouterSection } from './OpenRouterSection.js';
 export { SelfRootSection } from './SelfRootSection.js';
 export { SafeguardsSection } from './SafeguardsSection.js';
 export { CustomSkillsSection } from './CustomSkillsSection.js';
+export { SkillTuningSection } from './SkillTuningSection.js';
 export { KnowledgeHealthSection } from './KnowledgeHealthSection.js';
 export { SystemPromptSection } from './SystemPromptSection.js';
 export { Section, Field, TextInput, SecretInput, ChipGroup, ToggleSwitch, SectionDivider, InfoRow } from './SettingsPrimitives.js';
