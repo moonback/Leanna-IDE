@@ -58,6 +58,8 @@ import { createTerminalRouter, setupTerminalWebSocket } from "./server/routes/te
 import memoriesRouter from "./server/routes/memories.js";
 import conversationsRouter from "./server/routes/conversations.js";
 import { createSkillTuningRouter } from "./server/routes/skill-tuning.js";
+import { createSupabaseSkillTraceStore } from "./server/runtime/SkillTraceStore.js";
+import { createSkillTuningScheduler } from "./server/runtime/SkillTuningScheduler.js";
 import listsRouter from "./server/routes/lists.js";
 import automationRouter from "./server/routes/automation.js";
 import { createNotebooksRouter } from "./server/routes/notebooks/index.js";
@@ -316,6 +318,9 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
 const runtimeV2 = runtime;
 const observability = new Observability();
 observability.attach(runtime.events);
+const skillTuningStore = createSupabaseSkillTraceStore();
+const skillTuningIntervalMs = Number(process.env.LEANNA_SKILL_TUNING_INTERVAL_MS ?? 0);
+const skillTuningScheduler = createSkillTuningScheduler(skillTuningStore, skillTuningIntervalMs);
 
 // Connecter l'AgentOrchestrator au nouveau skillManager (compatible avec l'ancien)
 // L'ancien SkillManager faisait cela dans son constructeur, maintenant on le fait explicitement
@@ -503,7 +508,7 @@ async function startServer() {
   app.use("/api/mcp", mcpRouter);
   app.use("/api/memories", memoriesRouter);
   app.use("/api/conversations", conversationsRouter);
-  app.use("/api/skill-tuning", createSkillTuningRouter(undefined, undefined, () => skillManager.loadCustomSkills()));
+  app.use("/api/skill-tuning", createSkillTuningRouter(skillTuningStore, undefined, () => skillManager.loadCustomSkills()));
   app.use("/api/lists", listsRouter);
   app.use("/api/terminal", createTerminalRouter({ apiToken }));
   app.use("/api/knowledge", knowledgeRouter);
@@ -786,8 +791,11 @@ async function startServer() {
     embeddingStore,
     stopAllWorkflowTimers,
     stopAllScheduledTasks,
+    stopSkillTuningScheduler: () => skillTuningScheduler.stop(),
     stopCustomSkillsHotReload: () => skillManager.stopCustomSkillsHotReload(),
   });
+
+  skillTuningScheduler.start();
 }
 
 startServer();
