@@ -91,7 +91,20 @@ export type FileContentResponse = {
   content: string;
 };
 
+export type FileCountResponse = {
+  count: number;
+};
+
 export const ideApi = {
+  async countFiles(): Promise<number> {
+    const response = await fetchWithRetry('/api/ide/file-count', {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data: FileCountResponse = await response.json();
+    return data.count;
+  },
+
   /**
    * Load the file tree from the server (cached 800ms + dedup in-flight)
    */

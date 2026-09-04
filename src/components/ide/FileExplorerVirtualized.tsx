@@ -435,6 +435,23 @@ const FileExplorer = memo(function FileExplorer({
   const [sandboxActive, setSandboxActive] = useState(false);
   const [sandboxModifiedCount, setSandboxModifiedCount] = useState(0);
   const [liveDiffPaths, setLiveDiffPaths] = useState<Map<string, DiffInfo>>(new Map());
+  const [projectFileCount, setProjectFileCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    import('../../services/ideApi.js')
+      .then(({ ideApi }) => ideApi.countFiles())
+      .then(count => {
+        if (mounted) setProjectFileCount(count);
+      })
+      .catch(() => {
+        if (mounted) setProjectFileCount(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [tree]);
 
   useEffect(() => {
     let mounted = true;
@@ -718,6 +735,7 @@ const FileExplorer = memo(function FileExplorer({
   }, [onToggleDirectory]);
 
   const fileCount = useMemo(() => countEntries(processedTree), [processedTree]);
+  const displayedFileCount = searchQuery ? fileCount : (projectFileCount ?? fileCount);
 
   // ── Rendu amélioré ─────────────────────────────────────────────────────────
 
@@ -774,7 +792,7 @@ const FileExplorer = memo(function FileExplorer({
               className="text-xs px-2 py-0.5 rounded-full font-medium"
               style={{ color: 'var(--text-dimmed)', background: 'var(--bg-input)' }}
             >
-              {fileCount}
+              {displayedFileCount}
             </span>
           )}
         </div>

@@ -44,6 +44,8 @@ export interface SkillContext {
   emitToClient?: (data: any) => void;
   /** Nom de la voix pour la synthèse vocale TTS */
   voiceName?: string;
+  /** Délai minimal entre deux annonces vocales de raisonnement */
+  ttsCooldownMs?: number;
   /** Indique si les annonces vocales de raisonnement sont activées */
   reasoningVoiceEnabled?: boolean;
   /** Callback pour notifier la session Live API d'une mise à jour de tâche en arrière-plan */

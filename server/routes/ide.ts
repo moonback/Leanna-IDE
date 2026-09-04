@@ -7,6 +7,37 @@ import { appendAuditEvent } from '../audit.js';
 
 const router = Router();
 
+const EXCLUDED_TREE_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'build', 'out']);
+
+async function countFilesRecursively(directory: string): Promise<number> {
+  const entries = await fs.promises.readdir(directory, { withFileTypes: true });
+  let count = 0;
+
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (!EXCLUDED_TREE_DIRECTORIES.has(entry.name)) {
+        count += await countFilesRecursively(path.join(directory, entry.name));
+      }
+    } else if (entry.isFile()) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+// GET /api/ide/file-count
+router.get('/file-count', async (req: Request, res: Response) => {
+  try {
+    const root = getWorkspaceRoot(req);
+    if (!root) return res.status(200).json({ count: 0 });
+
+    res.json({ count: await countFilesRecursively(root) });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/ide/tree
 router.get('/tree', async (req: Request, res: Response) => {
   try {
@@ -43,8 +74,8 @@ router.get('/tree', async (req: Request, res: Response) => {
     const entries = fs.readdirSync(targetDir, { withFileTypes: true });
     
     // Filter excluded directories
-    const filteredEntries = entries.filter(entry => 
-      !['node_modules', '.git', 'dist', 'build', 'out'].includes(entry.name)
+    const filteredEntries = entries.filter(entry =>
+      !EXCLUDED_TREE_DIRECTORIES.has(entry.name)
     );
 
     // Sort: directories first, then alphabetical
