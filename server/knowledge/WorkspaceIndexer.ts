@@ -25,6 +25,7 @@ import type { StoredDocument } from "./DocumentStore.js";
 import { isSandboxActive, getSandboxRoot } from "../utils/sandbox.js";
 import { fileWatcher } from "./FileWatcher.js";
 import type { FileChangeEvent } from "./FileWatcher.js";
+import { broadcastKnowledgeProgress } from "../utils/knowledgeBroadcaster.js";
 
 const log = createLogger("WorkspaceIndexer");
 
@@ -663,19 +664,30 @@ export class WorkspaceIndexer {
 
   /**
    * Gère les changements de fichiers documents.
+   * Broadcast un événement knowledge_progress phase=done après chaque traitement
+   * pour permettre aux composants UI de se rafraîchir automatiquement.
    */
   private async handleFileChanges(events: FileChangeEvent[]): Promise<void> {
-    for (const event of events) {
-      const ext = path.extname(event.relativePath).toLowerCase();
-      if (!DOCUMENT_EXTENSIONS.has(ext)) continue;
+    let processed = 0;
+    const relevant = events.filter(e =>
+      DOCUMENT_EXTENSIONS.has(path.extname(e.relativePath).toLowerCase())
+    );
+    if (relevant.length === 0) return;
 
+    for (const event of relevant) {
       if (event.type === "deleted") {
         this.removeDocument(event.relativePath);
       } else {
         // created ou modified
         await this.extractFile(event.relativePath);
       }
+      processed++;
     }
+
+    // Notifier les clients UI que le store documentaire a été mis à jour
+    broadcastKnowledgeProgress("done", processed, processed, {
+      totalEntities: this.extractedPaths.size,
+    });
   }
 
   // ─── API publique ─────────────────────────────────────────────────────────

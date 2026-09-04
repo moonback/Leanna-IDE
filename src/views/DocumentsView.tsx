@@ -253,6 +253,20 @@ function DocumentsTab() {
 
   useEffect(() => { loadDocuments(); loadCollections(); }, [loadDocuments, loadCollections]);
 
+  // ── Auto-refresh: knowledge_progress done + polling toutes les 30s ────────
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail as { phase: string };
+      if (d.phase === 'done') { loadDocuments(); loadCollections(); }
+    };
+    window.addEventListener('Leanna-knowledge-progress', handler);
+    const interval = setInterval(() => { loadDocuments(); loadCollections(); }, 30_000);
+    return () => {
+      window.removeEventListener('Leanna-knowledge-progress', handler);
+      clearInterval(interval);
+    };
+  }, [loadDocuments, loadCollections]);
+
   const handleUpload = useCallback(async (file: File) => {
     setUploading(true);
     try {
@@ -743,6 +757,20 @@ function MemoryTab() {
 
   useEffect(() => { loadFacts(); }, [loadFacts]);
 
+  // ── Auto-refresh: knowledge_progress done + polling toutes les 30s ────────
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail as { phase: string };
+      if (d.phase === 'done') loadFacts();
+    };
+    window.addEventListener('Leanna-knowledge-progress', handler);
+    const interval = setInterval(() => loadFacts(), 30_000);
+    return () => {
+      window.removeEventListener('Leanna-knowledge-progress', handler);
+      clearInterval(interval);
+    };
+  }, [loadFacts]);
+
   const handleAddFact = useCallback(async () => {
     if (!newFact.content.trim()) return;
     try {
@@ -973,6 +1001,20 @@ function RelationsTab() {
 
   useEffect(() => { loadRelations(); }, [loadRelations]);
 
+  // ── Auto-refresh: knowledge_progress done + polling toutes les 30s ────────
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail as { phase: string };
+      if (d.phase === 'done') loadRelations();
+    };
+    window.addEventListener('Leanna-knowledge-progress', handler);
+    const interval = setInterval(() => loadRelations(), 30_000);
+    return () => {
+      window.removeEventListener('Leanna-knowledge-progress', handler);
+      clearInterval(interval);
+    };
+  }, [loadRelations]);
+
   const RELATION_COLORS: Record<string, string> = {
     references: '#60a5fa', extends: '#34d399', contradicts: '#f87171',
     summarizes: '#818cf8', updates: '#fbbf24', related: '#a78bfa',
@@ -1066,62 +1108,77 @@ function StatsTab() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [docsStatsRes, wsDocsRes, kgHealthRes, kgDashboardRes] = await Promise.all([
-          fetch('/api/documents/stats'),
-          fetch('/api/knowledge/documents'),
-          fetch('/api/knowledge/health'),
-          fetch('/api/knowledge/dashboard'),
-        ]);
+  const loadStats = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [docsStatsRes, wsDocsRes, kgHealthRes, kgDashboardRes] = await Promise.all([
+        fetch('/api/documents/stats'),
+        fetch('/api/knowledge/documents'),
+        fetch('/api/knowledge/health'),
+        fetch('/api/knowledge/dashboard'),
+      ]);
 
-        if (docsStatsRes.ok) {
-          const docsData = await docsStatsRes.json();
-          setStats(docsData.stats);
-        }
-
-        if (wsDocsRes.ok) {
-          const wsData = await wsDocsRes.json();
-          const totalWords = wsData.documents.reduce((sum: number, d: any) =>
-            sum + (d.textLength || 0), 0);
-
-          const docsByType: Record<string, number> = {};
-          wsData.documents.forEach((d: any) => {
-            const type = d.mimeType || 'auto_extracted';
-            docsByType[type] = (docsByType[type] || 0) + 1;
-          });
-
-          setWorkspaceStats({
-            documentCount: wsData.documentCount,
-            totalWords,
-            documentsByType: docsByType,
-          });
-        }
-
-        if (kgHealthRes.ok) {
-          const kgData = await kgHealthRes.json();
-          setProjectMemoryStats({
-            totalFacts: kgData.projectMemory?.totalFacts || 0,
-            factsByCategory: kgData.projectMemory?.categoryBreakdown || {},
-            structuralFacts: kgData.projectMemory?.structuralFacts || 0,
-          });
-        }
-
-        if (kgDashboardRes.ok) {
-          const kgDbData = await kgDashboardRes.json();
-          setKgStats({
-            totalRelations: kgDbData.graph?.relations?.total || 0,
-            cycleCount: kgDbData.graph?.cycleCount || 0,
-          });
-        }
-      } catch {
-        toastError('Impossible de charger les statistiques');
-      } finally {
-        setLoading(false);
+      if (docsStatsRes.ok) {
+        const docsData = await docsStatsRes.json();
+        setStats(docsData.stats);
       }
-    })();
+
+      if (wsDocsRes.ok) {
+        const wsData = await wsDocsRes.json();
+        const totalWords = wsData.documents.reduce((sum: number, d: any) =>
+          sum + (d.textLength || 0), 0);
+
+        const docsByType: Record<string, number> = {};
+        wsData.documents.forEach((d: any) => {
+          const type = d.mimeType || 'auto_extracted';
+          docsByType[type] = (docsByType[type] || 0) + 1;
+        });
+
+        setWorkspaceStats({
+          documentCount: wsData.documentCount,
+          totalWords,
+          documentsByType: docsByType,
+        });
+      }
+
+      if (kgHealthRes.ok) {
+        const kgData = await kgHealthRes.json();
+        setProjectMemoryStats({
+          totalFacts: kgData.projectMemory?.totalFacts || 0,
+          factsByCategory: kgData.projectMemory?.categoryBreakdown || {},
+          structuralFacts: kgData.projectMemory?.structuralFacts || 0,
+        });
+      }
+
+      if (kgDashboardRes.ok) {
+        const kgDbData = await kgDashboardRes.json();
+        setKgStats({
+          totalRelations: kgDbData.graph?.relations?.total || 0,
+          cycleCount: kgDbData.graph?.cycleCount || 0,
+        });
+      }
+    } catch {
+      toastError('Impossible de charger les statistiques');
+    } finally {
+      setLoading(false);
+    }
   }, [toastError]);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
+
+  // ── Auto-refresh: knowledge_progress done + polling toutes les 30s ────────
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail as { phase: string };
+      if (d.phase === 'done') loadStats();
+    };
+    window.addEventListener('Leanna-knowledge-progress', handler);
+    const interval = setInterval(() => loadStats(), 30_000);
+    return () => {
+      window.removeEventListener('Leanna-knowledge-progress', handler);
+      clearInterval(interval);
+    };
+  }, [loadStats]);
 
   if (loading) {
     return (
