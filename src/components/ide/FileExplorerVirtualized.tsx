@@ -723,7 +723,18 @@ const FileExplorer = memo(function FileExplorer({
       >
         <div className="flex items-center gap-2 min-w-0">
           <button
-            onClick={() => {
+            onClick={async () => {
+              // Fermer tous les onglets et désactiver le workspace actuel
+              window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: null } }));
+              
+              // Désactiver le workspace côté serveur
+              try {
+                await fetch('/api/self-root/clear', { method: 'POST' });
+              } catch (e) {
+                console.error('[FileExplorer] Failed to clear workspace:', e);
+              }
+              
+              // Ouvrir la modale de sélection
               window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher'));
             }}
             className="flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors hover:bg-[var(--bg-panel)]"
@@ -957,22 +968,26 @@ const FileExplorer = memo(function FileExplorer({
               <Folder size={28} style={{ color: 'var(--accent-primary)' }} />
             </div>
             <p className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-              Dossier vide
+              {currentDir === '.' || !currentDir ? 'Aucun projet ouvert' : 'Dossier vide'}
             </p>
             <p className="text-sm mb-5 leading-relaxed opacity-60" style={{ color: 'var(--text-muted)' }}>
-              Créez un fichier ou ouvrez un projet.
+              {currentDir === '.' || !currentDir 
+                ? 'Ouvrez un projet pour commencer à travailler.' 
+                : 'Créez un fichier pour commencer.'}
             </p>
-            <button
-              onClick={onCreateFile}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition hover:shadow-lg hover:scale-105"
-              style={{
-                backgroundColor: 'var(--accent-primary)',
-                color: 'white',
-              }}
-            >
-              <Plus size={16} />
-              Nouveau fichier
-            </button>
+            {(currentDir !== '.' && currentDir) && (
+              <button
+                onClick={onCreateFile}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition hover:shadow-lg hover:scale-105"
+                style={{
+                  backgroundColor: 'var(--accent-primary)',
+                  color: 'white',
+                }}
+              >
+                <Plus size={16} />
+                Nouveau fichier
+              </button>
+            )}
           </div>
         ) : processedTree.length === 0 && searchQuery ? (
           <div className="flex flex-col items-center justify-center py-20 px-4 text-center">

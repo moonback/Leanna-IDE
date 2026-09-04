@@ -370,7 +370,18 @@ const FileExplorer = memo(function FileExplorer({
         <Tooltip
           content="Changer de projet racine"
           as="button"
-          onClick={() => {
+          onClick={async () => {
+            // Fermer tous les onglets et désactiver le workspace actuel
+            window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: null } }));
+            
+            // Désactiver le workspace côté serveur
+            try {
+              await fetch('/api/self-root/clear', { method: 'POST' });
+            } catch (e) {
+              console.error('[FileExplorer] Failed to clear workspace:', e);
+            }
+            
+            // Ouvrir la modale de sélection
             window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher'));
           }}
           className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs font-semibold transition-colors hover:opacity-90 shadow-sm"

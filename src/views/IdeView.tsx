@@ -326,18 +326,49 @@ export default function IdeView() {
       }
     };
 
-    const handleWorkspaceChanged = () => {
+    const handleWorkspaceChanged = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      const workspace = detail?.workspace;
+      
+      console.log('[IdeView] Workspace changed:', workspace);
+      
+      // Fermer tous les onglets
       fileSystem.openFiles.forEach(f => fileSystem.closeTab(f.path));
-      fileSystem.loadTree();
+      
+      if (workspace === null || workspace === undefined) {
+        // Pas de workspace - vider l'arbre
+        console.log('[IdeView] No workspace - clearing tree');
+        fileSystem.setTree([]);
+        fileSystem.setWorkspaceTree([]);
+      } else {
+        // Nouveau workspace - recharger l'arbre
+        console.log('[IdeView] New workspace - reloading tree');
+        fileSystem.loadTree();
+        fileSystem.loadWorkspaceTree();
+      }
+      
+      console.log('[IdeView] All tabs closed and tree updated');
+    };
+
+    const handleNoWorkspace = () => {
+      console.log('[IdeView] No workspace mode - closing all tabs and clearing tree');
+      fileSystem.openFiles.forEach(f => fileSystem.closeTab(f.path));
+      // Vider l'arbre des fichiers en passant un tableau vide
+      fileSystem.setTree([]);
+      fileSystem.setWorkspaceTree([]);
+      fileSystem.setCurrentDir('.');
+      console.log('[IdeView] Tree cleared for no-workspace mode');
     };
 
     window.addEventListener('Leanna-ide-open-file', handleOpenFile);
     window.addEventListener('Leanna-ide-file-changed', handleFileChanged);
     window.addEventListener('Leanna-workspace-changed', handleWorkspaceChanged);
+    window.addEventListener('Leanna-no-workspace-mode', handleNoWorkspace);
     return () => {
       window.removeEventListener('Leanna-ide-open-file', handleOpenFile);
       window.removeEventListener('Leanna-ide-file-changed', handleFileChanged);
       window.removeEventListener('Leanna-workspace-changed', handleWorkspaceChanged);
+      window.removeEventListener('Leanna-no-workspace-mode', handleNoWorkspace);
     };
   }, [openFileAt, fileSystem]);
 

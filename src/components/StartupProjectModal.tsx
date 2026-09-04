@@ -173,8 +173,10 @@ export function StartupProjectModal() {
 
   // Écouteur global pour ouvrir le switcher depuis n'importe où dans l'application
   useEffect(() => {
-    const handleOpenModal = () => {
-      fetchWorkspaces();
+    const handleOpenModal = async () => {
+      // Attendre un peu pour que le workspace soit fermé côté serveur
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await fetchWorkspaces();
       setIsOpen(true);
       setError(null);
     };
@@ -212,8 +214,10 @@ export function StartupProjectModal() {
 
   const activate = useCallback(async (newRoot: string) => {
     // Quitter le mode "sans projet" si l'utilisateur ouvre finalement un projet
+    console.log('[StartupProjectModal] Activating new workspace:', newRoot);
     sessionStorage.removeItem(NO_WORKSPACE_KEY);
     ideApi.invalidateCache();
+    console.log('[StartupProjectModal] Dispatching workspace-changed event');
     window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
     window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: newRoot } }));
     setCurrentPath(newRoot);

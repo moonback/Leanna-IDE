@@ -372,7 +372,20 @@ function NoWorkspaceBadge() {
     >
       <motion.button
         type="button"
-        onClick={() => window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher'))}
+        onClick={async () => {
+          // Fermer tous les onglets et désactiver le workspace actuel
+          window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: null } }));
+          
+          // Désactiver le workspace côté serveur
+          try {
+            await fetch('/api/self-root/clear', { method: 'POST' });
+          } catch (e) {
+            console.error('[UnifiedSidebar] Failed to clear workspace:', e);
+          }
+          
+          // Ouvrir la modale de sélection
+          window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher'));
+        }}
         className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2"
         style={{
           backgroundColor: 'color-mix(in srgb, var(--color-warning, #f59e0b) 12%, transparent)',
