@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="\assets\images\header2.png" alt="Sho ia" width="240" />
+</p>
+<p align="center">
+  <img src="\assets\images\header.png" alt="Shop ia" width="100%" />
+</p>
 # Leanna — AI Operating System
 
 Leanna est un environnement de développement augmenté par IA, conçu pour les développeurs qui veulent déléguer des tâches complexes à une IA multimodale en temps réel. Il intègre un éditeur de code (Monaco), un terminal interactif, un système d'agents autonomes, et une interaction vocale via l'API Gemini Live — le tout dans une application web ou desktop (Electron).
