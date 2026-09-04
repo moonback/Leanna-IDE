@@ -35,6 +35,7 @@ export interface AgentEvent {
   timestamp: string;
   summary?: string;
   durationMs?: number;
+  progress?: { current: number; total: number; label: string };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -56,7 +57,7 @@ export class ProgressNotifier {
   /**
    * Notifie la progression d'une tâche agent via tous les canaux configurés.
    */
-  notify(task: AgentTask, event: ProgressEvent): void {
+  notify(task: AgentTask, event: ProgressEvent, progress?: AgentEvent["progress"]): void {
     const agent = getAgentDefinition(task.role);
 
     // Log structuré
@@ -109,6 +110,8 @@ export class ProgressNotifier {
           timestamp: new Date().toISOString(),
           detail: event === "started"
             ? `Agent "${agent.name}" démarre la tâche "${task.title}"`
+            : event === "progress"
+            ? progress?.label
             : event === "completed"
             ? task.result?.summary
             : event === "failed"
@@ -116,6 +119,7 @@ export class ProgressNotifier {
             : undefined,
           summary: task.result?.summary,
           durationMs: task.result?.durationMs,
+          progress,
         };
         this.eventBroadcaster(agentEvent);
       } catch {

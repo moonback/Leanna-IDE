@@ -161,7 +161,7 @@ Améliorations de qualité, performance et DX ciblées sur les frictions identif
 ### UI/UX
 | Fonctionnalité | Statut |
 |---|---|
-| Indicateur de progression des agents en temps réel (barre + log) | 🚧 En cours |
+| Indicateur de progression des agents en temps réel (barre + log) | ✅ Fait |
 | Notifications desktop (OS) pour les événements agents importants | 📋 Planifié |
 | Raccourcis clavier configurables (remapping) | 📋 Planifié |
 | Diff viewer intégré côté UI (sandbox file-diff) | 📋 Planifié |

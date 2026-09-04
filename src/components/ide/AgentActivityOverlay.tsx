@@ -4,6 +4,8 @@ import {
   Bot, Target, Loader2, CheckCircle2, XCircle,
   Brain, ChevronUp, ChevronDown, Zap, AlertTriangle,
 } from 'lucide-react';
+import { useSyncExternalStore } from 'react';
+import { getAgentTasks, subscribe, type AgentTaskEntry } from '../../stores/agentActivityStore.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Agent Activity Overlay — Indicateur flottant toujours visible
@@ -29,6 +31,8 @@ interface AgentActivity {
   title: string;
   status: string;
   timestamp: Date;
+  progress?: AgentTaskEntry['progress'];
+  steps: string[];
 }
 
 interface MissionActivity {
@@ -60,7 +64,17 @@ interface AgentActivityOverlayProps {
 }
 
 export function AgentActivityOverlay({ onOpenAgents, onOpenMissions, isChatOpen }: AgentActivityOverlayProps) {
-  const [agents, setAgents] = useState<AgentActivity[]>([]);
+  const agentTasks = useSyncExternalStore(subscribe, getAgentTasks, getAgentTasks);
+  const agents = agentTasks.map((task): AgentActivity => ({
+    taskId: task.id,
+    role: task.role,
+    agentName: task.agentName,
+    title: task.title,
+    status: task.status,
+    timestamp: new Date(task.timestamp),
+    progress: task.progress,
+    steps: task.steps,
+  }));
   const [missions, setMissions] = useState<MissionActivity[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [lastEvent, setLastEvent] = useState<string>('');
@@ -85,21 +99,6 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions, isChatOpen 
         const active = (data.tasks ?? []).filter(t => t.status === 'running' || t.status === 'pending');
         if (active.length === 0) return;
 
-        setAgents(prev => {
-          const existingIds = new Set(prev.map(a => a.taskId));
-          const incoming: AgentActivity[] = active
-            .filter(t => !existingIds.has(t.id))
-            .map(t => ({
-              taskId: t.id,
-              role: t.role,
-              agentName: ROLE_TO_NAME[t.role] ?? t.role,
-              title: t.title,
-              status: t.status,
-              timestamp: new Date(t.createdAt),
-            }));
-          return incoming.length > 0 ? [...prev, ...incoming] : prev;
-        });
-
         setLastEvent(`${active.length} agent(s) en cours repris`);
       } catch {
         // best-effort — ne pas bloquer l'UI
@@ -117,18 +116,6 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions, isChatOpen 
       if (!detail) return;
 
       if (detail.type === 'agent_event') {
-        setAgents(prev => {
-          const filtered = prev.filter(a => a.taskId !== detail.taskId);
-          const isDone = detail.event === 'task_completed' || detail.event === 'task_failed';
-          return [...filtered, {
-            taskId: detail.taskId,
-            role: detail.role,
-            agentName: detail.agentName,
-            title: detail.title,
-            status: isDone ? detail.event.replace('task_', '') : detail.status,
-            timestamp: new Date(detail.timestamp),
-          }];
-        });
         setLastEvent(`${detail.agentName}: ${detail.detail || detail.title}`);
       }
     };
@@ -202,14 +189,6 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions, isChatOpen 
   useEffect(() => {
     const now = Date.now();
     const staleThreshold = 5000;
-
-    setAgents(prev => {
-      const cleaned = prev.filter(a => {
-        if (a.status === 'running' || a.status === 'pending') return true;
-        return (now - a.timestamp.getTime()) < staleThreshold;
-      });
-      return cleaned.length !== prev.length ? cleaned : prev;
-    });
 
     setMissions(prev => {
       const cleaned = prev.filter(m => m.status === 'in_progress');
@@ -303,6 +282,21 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions, isChatOpen 
                   <span className="text-xs truncate block" style={{ color: 'var(--text-dimmed)' }}>
                     {agent.title}
                   </span>
+                  {agent.progress && (
+                    <>
+                      <div className="h-1 mt-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-base)' }}>
+                        <motion.div className="h-full rounded-full" style={{ backgroundColor: 'var(--color-accent-alt)' }} animate={{ width: `${Math.round(agent.progress.current / agent.progress.total * 100)}%` }} />
+                      </div>
+                      <span className="text-xs truncate block" style={{ color: 'var(--text-dimmed)' }}>
+                        {agent.progress.current}/{agent.progress.total} · {agent.progress.label}
+                      </span>
+                    </>
+                  )}
+                  {agent.steps.length > 0 && (
+                    <span className="text-xs truncate block" style={{ color: 'var(--text-dimmed)' }}>
+                      Journal: {agent.steps[agent.steps.length - 1]}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
