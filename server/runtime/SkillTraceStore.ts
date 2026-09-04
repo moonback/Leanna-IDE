@@ -1,7 +1,40 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { SkillInteractionTrace, SkillTraceObserver } from "./types.js";
 
-export class SupabaseSkillTraceStore implements SkillTraceObserver {
+export type SkillFeedbackLabel = "correct" | "incorrect" | "needs_improvement";
+
+export interface SkillInteractionFeedback {
+  callId: string;
+  label: SkillFeedbackLabel;
+  correction?: string;
+  comment?: string;
+}
+
+export interface SkillInteractionRecord extends SkillInteractionTrace {
+  id: string;
+  createdAt: string;
+}
+
+export interface SkillMetrics {
+  toolName: string;
+  calls: number;
+  failures: number;
+  successRate: number;
+  averageDurationMs: number;
+  feedback: {
+    correct: number;
+    incorrect: number;
+    needsImprovement: number;
+  };
+}
+
+export interface SkillTuningStore extends SkillTraceObserver {
+  listRecent(options?: { toolName?: string; limit?: number }): Promise<SkillInteractionRecord[]>;
+  getMetrics(options?: { toolName?: string; limit?: number }): Promise<SkillMetrics[]>;
+  recordFeedback(feedback: SkillInteractionFeedback): Promise<void>;
+}
+
+export class SupabaseSkillTraceStore implements SkillTuningStore {
   constructor(private readonly supabase: SupabaseClient) {}
 
   async record(trace: SkillInteractionTrace): Promise<void> {
@@ -20,6 +53,88 @@ export class SupabaseSkillTraceStore implements SkillTraceObserver {
       error_message: trace.error ?? null,
     });
 
+    if (error) throw new Error(error.message);
+  }
+
+  async listRecent(options: { toolName?: string; limit?: number } = {}): Promise<SkillInteractionRecord[]> {
+    const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
+    let query = this.supabase
+      .from("skill_interactions")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (options.toolName) query = query.eq("tool_name", options.toolName);
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row: any) => ({
+      callId: row.call_id,
+      toolName: row.tool_name,
+      startedAt: row.started_at,
+      durationMs: row.duration_ms,
+      success: row.success,
+      attemptCount: row.attempt_count,
+      agentId: row.agent_id ?? undefined,
+      conversationId: row.conversation_id ?? undefined,
+      messageId: row.message_id ?? undefined,
+      arguments: row.arguments_redacted ?? {},
+      resultSummary: row.result_summary ?? undefined,
+      error: row.error_message ?? undefined,
+      id: row.id,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async getMetrics(options: { toolName?: string; limit?: number } = {}): Promise<SkillMetrics[]> {
+    const traces = await this.listRecent(options);
+    const grouped = new Map<string, SkillMetrics>();
+    for (const trace of traces) {
+      const current = grouped.get(trace.toolName) ?? {
+        toolName: trace.toolName,
+        calls: 0,
+        failures: 0,
+        successRate: 0,
+        averageDurationMs: 0,
+        feedback: { correct: 0, incorrect: 0, needsImprovement: 0 },
+      };
+      current.calls += 1;
+      current.failures += trace.success ? 0 : 1;
+      current.averageDurationMs += trace.durationMs;
+      grouped.set(trace.toolName, current);
+    }
+
+    if (traces.length > 0) {
+      const { data, error } = await this.supabase
+        .from("skill_interaction_feedback")
+        .select("call_id, label")
+        .in("call_id", traces.map((trace) => trace.callId));
+      if (error) throw new Error(error.message);
+
+      const toolByCallId = new Map(traces.map((trace) => [trace.callId, trace.toolName]));
+      for (const feedback of data ?? []) {
+        const toolName = toolByCallId.get(feedback.call_id);
+        const metric = toolName ? grouped.get(toolName) : undefined;
+        if (!metric) continue;
+        if (feedback.label === "correct") metric.feedback.correct += 1;
+        if (feedback.label === "incorrect") metric.feedback.incorrect += 1;
+        if (feedback.label === "needs_improvement") metric.feedback.needsImprovement += 1;
+      }
+    }
+
+    for (const metric of grouped.values()) {
+      metric.successRate = Math.round(((metric.calls - metric.failures) / metric.calls) * 100) / 100;
+      metric.averageDurationMs = Math.round(metric.averageDurationMs / metric.calls);
+    }
+    return Array.from(grouped.values()).sort((left, right) => right.calls - left.calls);
+  }
+
+  async recordFeedback(feedback: SkillInteractionFeedback): Promise<void> {
+    const { error } = await this.supabase.from("skill_interaction_feedback").insert({
+      call_id: feedback.callId,
+      label: feedback.label,
+      correction: feedback.correction ?? null,
+      comment: feedback.comment ?? null,
+    });
     if (error) throw new Error(error.message);
   }
 }

@@ -57,6 +57,7 @@ import mcpRouter from "./server/routes/mcp.js";
 import { createTerminalRouter, setupTerminalWebSocket } from "./server/routes/terminal.js";
 import memoriesRouter from "./server/routes/memories.js";
 import conversationsRouter from "./server/routes/conversations.js";
+import skillTuningRouter from "./server/routes/skill-tuning.js";
 import listsRouter from "./server/routes/lists.js";
 import automationRouter from "./server/routes/automation.js";
 import { createNotebooksRouter } from "./server/routes/notebooks/index.js";
@@ -502,6 +503,7 @@ async function startServer() {
   app.use("/api/mcp", mcpRouter);
   app.use("/api/memories", memoriesRouter);
   app.use("/api/conversations", conversationsRouter);
+  app.use("/api/skill-tuning", skillTuningRouter);
   app.use("/api/lists", listsRouter);
   app.use("/api/terminal", createTerminalRouter({ apiToken }));
   app.use("/api/knowledge", knowledgeRouter);
