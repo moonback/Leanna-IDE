@@ -41,6 +41,7 @@ export interface SkillTuningProposal {
   confidence: number;
   createdAt: string;
   reviewedAt?: string;
+  appliedRevisionId?: string;
 }
 
 export interface SkillTuningStore extends SkillTraceObserver {
@@ -181,6 +182,7 @@ export class SupabaseSkillTraceStore implements SkillTuningStore {
       confidence: Number(row.confidence),
       createdAt: row.created_at,
       reviewedAt: row.reviewed_at ?? undefined,
+      appliedRevisionId: row.applied_revision_id ?? undefined,
     }));
   }
 
@@ -209,6 +211,7 @@ export class SupabaseSkillTraceStore implements SkillTuningStore {
       expectedMetric: data.expected_metric,
       confidence: Number(data.confidence),
       createdAt: data.created_at,
+      appliedRevisionId: data.applied_revision_id ?? undefined,
     };
   }
 
@@ -231,6 +234,7 @@ export class SupabaseSkillTraceStore implements SkillTuningStore {
       confidence: Number(data.confidence),
       createdAt: data.created_at,
       reviewedAt: data.reviewed_at ?? undefined,
+      appliedRevisionId: data.applied_revision_id ?? undefined,
     };
   }
 

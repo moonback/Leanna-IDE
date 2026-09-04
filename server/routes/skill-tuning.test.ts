@@ -120,6 +120,46 @@ test("skill tuning routes: generates and reviews a proposal", async () => {
   }
 });
 
+test("skill tuning routes: does not duplicate an open proposal", async () => {
+  let created = false;
+  const proposalStore: SkillTuningStore = {
+    ...store,
+    getMetrics: async () => [{
+      toolName: "security_audit",
+      calls: 6,
+      failures: 2,
+      successRate: 0.67,
+      averageDurationMs: 30,
+      feedback: { correct: 1, incorrect: 1, needsImprovement: 1 },
+    }],
+    listProposals: async () => [{
+      id: "proposal-existing",
+      toolName: "security_audit",
+      status: "proposed",
+      hypothesis: "Déjà analysé",
+      evidence: {},
+      proposedChange: {},
+      expectedMetric: "",
+      confidence: 0.8,
+      createdAt: "2026-09-04T00:00:00.000Z",
+    }],
+    createProposal: async (proposal: any) => {
+      created = true;
+      return { id: "proposal-2", createdAt: "2026-09-04T00:00:00.000Z", ...proposal };
+    },
+  };
+  const { server, port } = await createTestServer(proposalStore);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/skill-tuning/proposals/generate`, { method: "POST" });
+    assert.equal(response.status, 201);
+    const body = await response.json() as any;
+    assert.deepEqual(body.proposals, []);
+    assert.equal(created, false);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
 test("skill tuning routes: requires approval before applying a revision", async () => {
   let applied = false;
   const versionStore = {

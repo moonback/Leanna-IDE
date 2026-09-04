@@ -6,9 +6,17 @@ const MIN_NEGATIVE_FEEDBACK = 2;
 
 export async function generateSkillTuningProposals(store: SkillTuningStore): Promise<SkillTuningProposal[]> {
   const metrics = await store.getMetrics({ limit: 500 });
+  const existingProposals = await store.listProposals({ limit: 500 });
   const proposals: SkillTuningProposal[] = [];
 
   for (const metric of metrics) {
+    const hasOpenProposal = existingProposals.some((proposal) =>
+      proposal.toolName === metric.toolName &&
+      !proposal.appliedRevisionId &&
+      (proposal.status === "proposed" || proposal.status === "approved"),
+    );
+    if (hasOpenProposal) continue;
+
     const negativeFeedback = metric.feedback.incorrect + metric.feedback.needsImprovement;
     const hasEnoughEvidence = metric.calls >= MIN_CALLS && (
       metric.successRate < MAX_SUCCESS_RATE || negativeFeedback >= MIN_NEGATIVE_FEEDBACK
