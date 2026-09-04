@@ -21,6 +21,7 @@ export interface GracefulShutdownDeps {
   embeddingStore: EmbeddingStore;
   stopAllWorkflowTimers: () => void;
   stopAllScheduledTasks: () => void;
+  stopCustomSkillsHotReload: () => void;
 }
 
 export type GracefulShutdownFn = (reason: string) => Promise<void>;
@@ -49,6 +50,7 @@ export function setupGracefulShutdown(deps: GracefulShutdownDeps): GracefulShutd
     // 3. Arrêter les timers (ordre indifférent, les deux sont indépendants)
     deps.stopAllWorkflowTimers();
     deps.stopAllScheduledTasks();
+    deps.stopCustomSkillsHotReload();
 
     // 3b. Arrêter les serveurs MCP
     await deps.mcpBridge.shutdown();

@@ -30,6 +30,8 @@ export class SkillManagerV2 {
   private registry: ToolRegistry;
   private eventBus: EventBus;
   private skills: LegacySkill[] = [];
+  private customSkillsReloadTimer: ReturnType<typeof setInterval> | null = null;
+  private customSkillsReloadInFlight = false;
   private _missionExecutor: any = null;
   // private initialized = false;
 
@@ -50,11 +52,12 @@ export class SkillManagerV2 {
    */
   registerSkill(skill: LegacySkill): void {
     // Éviter les doublons
-    if (this.skills.some((s) => s.name === skill.name)) {
+    const previousSkill = this.skills.find((s) => s.name === skill.name);
+    if (previousSkill) {
       // Remplacer
       this.skills = this.skills.filter((s) => s.name !== skill.name);
       // Unregister les anciens outils de cette skill
-      for (const decl of skill.declarations) {
+      for (const decl of previousSkill.declarations) {
         this.registry.unregister(decl.name);
       }
     }
@@ -298,7 +301,7 @@ export class SkillManagerV2 {
    */
   public async loadCustomSkills(): Promise<void> {
     try {
-      const { getCustomSkillDeclarations, handleCustomSkillCall, customSkillsManagementSkill } = 
+      const { getCustomSkillDeclarations, handleCustomSkillCall, customSkillsManagementSkill } =
         await import('../../skills/customSkills');
 
       // Enregistrer le skill de gestion CRUD comme une skill classique
@@ -311,21 +314,49 @@ export class SkillManagerV2 {
 
       // Charger les déclarations des custom skills actifs
       const declarations = await getCustomSkillDeclarations();
-      if (declarations.length > 0) {
-        // Créer une skill proxy pour les custom skills
-        const customSkillProxy: LegacySkill = {
-          name: "custom_skills_proxy",
-          declarations: declarations as any[],
-          handleToolCall: async (name: string, args: any) => {
-            return handleCustomSkillCall(name, args);
-          },
-        };
-        this.registerSkill(customSkillProxy);
-        console.log(`[SkillManagerV2] ✓ ${declarations.length} custom skill(s) chargé(s) depuis la BDD.`);
-      }
+      // Enregistrer aussi une liste vide pour retirer les skills désactivés ou supprimés.
+      const customSkillProxy: LegacySkill = {
+        name: "custom_skills_proxy",
+        declarations: declarations as any[],
+        handleToolCall: async (name: string, args: any) => {
+          return handleCustomSkillCall(name, args);
+        },
+      };
+      this.registerSkill(customSkillProxy);
+      console.log(`[SkillManagerV2] ✓ ${declarations.length} custom skill(s) chargé(s) depuis la BDD.`);
     } catch (err: any) {
       // Non critique — les custom skills ne bloquent pas le démarrage
       console.warn(`[SkillManagerV2] Custom skills non chargés:`, err.message);
+    }
+  }
+
+  /** Démarre le rafraîchissement périodique des custom skills. */
+  public startCustomSkillsHotReload(intervalMs = 30_000): void {
+    this.stopCustomSkillsHotReload();
+    if (intervalMs <= 0) return;
+
+    this.customSkillsReloadTimer = setInterval(() => {
+      if (this.customSkillsReloadInFlight) return;
+      this.customSkillsReloadInFlight = true;
+      import('../../skills/customSkills')
+        .then(({ invalidateCustomSkillsCache }) => {
+          invalidateCustomSkillsCache();
+          return this.loadCustomSkills();
+        })
+        .catch((err: unknown) => {
+          console.warn('[SkillManagerV2] Hot-reload des custom skills échoué:', err);
+        })
+        .finally(() => {
+          this.customSkillsReloadInFlight = false;
+        });
+    }, intervalMs);
+  }
+
+  /** Arrête le rafraîchissement périodique des custom skills. */
+  public stopCustomSkillsHotReload(): void {
+    if (this.customSkillsReloadTimer) {
+      clearInterval(this.customSkillsReloadTimer);
+      this.customSkillsReloadTimer = null;
     }
   }
 

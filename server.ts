@@ -288,6 +288,8 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
   onReady: async (r, sm) => {
     // Charger les custom skills après l'initialisation de base
     await sm.loadCustomSkills();
+    const customSkillsReloadInterval = Number(process.env.LEANNA_CUSTOM_SKILLS_RELOAD_INTERVAL_MS ?? 30_000);
+    sm.startCustomSkillsHotReload(Number.isFinite(customSkillsReloadInterval) ? customSkillsReloadInterval : 30_000);
     
     // Initialiser le Mission System (doit être fait après que les outils soient enregistrés)
     try {
@@ -782,6 +784,7 @@ async function startServer() {
     embeddingStore,
     stopAllWorkflowTimers,
     stopAllScheduledTasks,
+    stopCustomSkillsHotReload: () => skillManager.stopCustomSkillsHotReload(),
   });
 }
 
