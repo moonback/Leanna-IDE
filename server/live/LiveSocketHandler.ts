@@ -662,7 +662,7 @@ export function attachLiveWebSocket(
             if (message.goAway) handleGoAway(message.goAway);
 
             const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (audio) clientWs.send(JSON.stringify({ audio }));
+            if (audio) clientWs.send(Buffer.from(audio, 'base64'));
 
             const textPart = message.serverContent?.modelTurn?.parts?.find(p => p.text);
             if (textPart?.text) {
@@ -857,16 +857,12 @@ export function attachLiveWebSocket(
       };
 
       // ── Client message handler ──────────────────────────────────────
-      clientWs.on('message', (data) => {
+      clientWs.on('message', (data, isBinary) => {
         try {
-          const msg = JSON.parse(data.toString());
-
-          if (msg.audio) {
-            // ── Rate limiting audio (100 KB/s) ──────────────────────────────
+          if (isBinary) {
             const now = Date.now();
             const elapsed = now - audioRateState.windowStart;
 
-            // Reset de la fenêtre si > 1s
             if (elapsed >= AUDIO_RATE_WINDOW_MS) {
               if (audioRateState.droppedChunks > 0) {
                 console.warn(`[AudioRateLimit] ${audioRateState.droppedChunks} chunk(s) abandonnés dans la fenêtre précédente (${Math.round(audioRateState.bytesInWindow / 1024)} KB/s)`);
@@ -876,15 +872,12 @@ export function attachLiveWebSocket(
               audioRateState.droppedChunks = 0;
             }
 
-            // Taille du chunk audio (base64 → bytes réels ≈ length * 0.75)
-            const chunkBytes = Math.ceil((msg.audio as string).length * 0.75);
+            const buf = data as Buffer;
+            const chunkBytes = buf.byteLength;
 
             if (audioRateState.bytesInWindow + chunkBytes > AUDIO_RATE_LIMIT_BYTES_PER_SEC) {
-              // Débit dépassé — ignorer ce chunk
               audioRateState.violations++;
               audioRateState.droppedChunks++;
-
-              // Notifier le client tous les N violations pour éviter le spam
               if (audioRateState.violations % AUDIO_RATE_VIOLATION_LOG_INTERVAL === 1) {
                 console.warn(`[AudioRateLimit] Violation #${audioRateState.violations} — débit > ${AUDIO_RATE_LIMIT_BYTES_PER_SEC / 1024} KB/s`);
                 try {
@@ -896,11 +889,14 @@ export function attachLiveWebSocket(
                 } catch { /* ignore si WS fermé */ }
               }
             } else {
-              // Dans les limites — transmettre à Gemini
               audioRateState.bytesInWindow += chunkBytes;
-              session.sendRealtimeInput({ audio: { data: msg.audio, mimeType: 'audio/pcm;rate=16000' } });
+              session.sendRealtimeInput({ audio: { data: buf.toString('base64'), mimeType: 'audio/pcm;rate=16000' } });
             }
+            return;
           }
+
+          const msg = JSON.parse(data.toString());
+
           if (msg.video) {
             session.sendRealtimeInput({ video: { data: msg.video.data, mimeType: msg.video.mimeType } });
           }
