@@ -112,7 +112,7 @@ const DEFAULT_PROFILE: UserProfile = {
   language:      'fr',
   responseStyle: 'balanced',
   // Auto Mute
-  autoMuteEnabled: true,   // Activé par défaut
+  autoMuteEnabled: false,   // Activé par défaut
   autoMuteTimeout: 40,     // 40 secondes par défaut
   // VAD (Voice Activity Detection)
   vadEnabled: true,        // Activé par défaut (économie bande passante)
@@ -121,17 +121,17 @@ const DEFAULT_PROFILE: UserProfile = {
   // Model hyperparameters
   temperature:      0.9,
   topP:             0.95,
-  textProvider:     'gemini',
-  openrouterModel:  'google/gemini-2.5-flash',
+  textProvider:     'openrouter',
+  openrouterModel:  'minimax/minimax-m3:free',
   openrouterApiKey: '',
   openrouterImageModel: 'google/gemini-2.5-flash-image',
-  theme:         'light',
+  theme:         'dark',
   accentColor:   '#0ea5e9',
   floatingOrb:   false,
   compactPrompt: true,
   // Agents
   agents: {
-    enabled: true,
+    enabled: false,
     allowedRoles: [
       'coder', 'refactor', 'debugger', 'reviewer', 'tester', 'security', 'architect',
       'writer', 'formatter', 'researcher', 'proofreader', 'translator', 'summarizer', 'planner',
@@ -139,7 +139,7 @@ const DEFAULT_PROFILE: UserProfile = {
   },
   // Reasoning
   reasoningEnabled: true,
-  reasoningVoiceEnabled: true,
+  reasoningVoiceEnabled: false,
   // Custom system prompt
   customSystemPrompt: '',
 };
