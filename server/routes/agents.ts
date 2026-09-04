@@ -15,6 +15,7 @@ import {
   getToolsForAgent,
 } from '../agents/index.js';
 import { AgentPersistence } from '../agents/AgentPersistence.js';
+import { agentEventStream } from '../agents/AgentEventStream.js';
 
 // ── Schémas de validation ────────────────────────────────────────────────────
 
@@ -190,6 +191,33 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
     } catch (e: any) {
       return res.status(400).json({ error: e.message });
     }
+  });
+
+  /**
+   * GET /api/agents/events
+   * Flux SSE des événements de progression des agents.
+   */
+  router.get('/events', (_req: Request, res: Response) => {
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+    res.write('retry: 5000\n\n');
+
+    const keepAlive = setInterval(() => {
+      if (!res.destroyed) res.write(': keep-alive\n\n');
+    }, 15_000);
+    const unsubscribe = agentEventStream.subscribe((event) => {
+      if (res.destroyed) return;
+      res.write(`event: agent_event\ndata: ${JSON.stringify(event)}\n\n`);
+    });
+
+    res.on('close', () => {
+      clearInterval(keepAlive);
+      unsubscribe();
+    });
   });
 
   /**

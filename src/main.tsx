@@ -16,6 +16,7 @@ import { FloatingOrb } from './components/FloatingOrb.js';
 import { CriticalEditConfirm } from './components/CriticalEditConfirm.js';
 import { StartupProjectModal } from './components/StartupProjectModal.js';
 import { useProfile } from './context/UserProfileContext.js';
+import { useAgentEventStream } from './hooks/useAgentEventStream.js';
 import { Loader2 } from 'lucide-react';
 import { UnifiedSidebar } from './components/UnifiedSidebar.js';
 const MemoriesView = lazy(() => import('./views/MemoriesView'));
@@ -494,6 +495,7 @@ function AnimatedRoutes() {
 function Layout() {
   const liveAPI = useLiveAPI();
   const { profile } = useProfile();
+  useAgentEventStream();
 
   // ── Cleanup global resources on unmount ─────────────────────────────────
   useEffect(() => {
