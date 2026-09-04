@@ -145,8 +145,7 @@ Améliorations de qualité, performance et DX ciblées sur les frictions identif
 ### DX & Outillage
 | Fonctionnalité | Statut |
 |---|---|
-| CLI `leanna` pour démarrage, config et gestion des clés | 📋 Planifié |
-| Variables d'environnement validées au démarrage avec messages d'erreur clairs | 📋 Planifié |
+| Variables d'environnement validées au démarrage avec messages d'erreur clairs | ✅ Fait |
 | Hot-reload des custom skills sans redémarrage serveur | 📋 Planifié |
 | Export/Import complet du profil (skills, workflows, agents) | 📋 Planifié |
 | Documentation interactive des skills (auto-générée depuis les déclarations) | 📋 Planifié |

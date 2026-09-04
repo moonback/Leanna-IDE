@@ -1,6 +1,7 @@
 import path from "path";
 import dotenv from "dotenv";
 import { decrypt } from "./server/utils/crypto.js";
+import { validateEnvironment } from "./server/config/environment.js";
 
 const configRoot = process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || process.cwd();
 dotenv.config({ path: path.join(configRoot, ".env") });
@@ -36,7 +37,17 @@ function validateSupabaseEnvironment(): void {
   process.stdout.write("[Bootstrap] Configuration Supabase validée.\n");
 }
 
-validateSupabaseEnvironment();
+try {
+  validateEnvironment();
+  validateSupabaseEnvironment();
+  process.stdout.write("[Bootstrap] Variables d'environnement validées.\n");
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  process.stderr.write(`[Bootstrap] Échec de validation de la configuration :\n${message}\n`);
+  process.exitCode = 1;
+  process.exit();
+}
+
 void import("./server.js").catch((error) => {
   const details = error instanceof Error ? (error.stack || error.message) : String(error);
   process.stderr.write(`[Bootstrap] Échec du démarrage du serveur: ${details}\n`);
