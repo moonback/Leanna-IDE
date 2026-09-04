@@ -161,11 +161,13 @@ describe("ToolRegistry", () => {
       agentId: "agent-1",
       conversationId: "conversation-1",
       messageId: "message-1",
+      toolCallId: "fc_test-call-1",
     });
 
     assert.equal(traces.length, 1);
     assert.equal(traces[0].success, true);
     assert.equal(traces[0].conversationId, "conversation-1");
+    assert.equal(traces[0].toolCallId, "fc_test-call-1");
     assert.equal(traces[0].arguments.token, "[redacted]");
     assert.equal(traces[0].arguments.input, "hello");
   });

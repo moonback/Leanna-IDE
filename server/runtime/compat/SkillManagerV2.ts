@@ -109,6 +109,7 @@ export class SkillManagerV2 {
       context,
       conversationId: context?.conversationId,
       messageId: context?.messageId,
+      toolCallId: context?.toolCallId,
     });
   }
 

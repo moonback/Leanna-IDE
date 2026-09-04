@@ -132,6 +132,7 @@ export interface SkillInteractionTrace {
   agentId?: string;
   conversationId?: string;
   messageId?: string;
+  toolCallId?: string;
   arguments: Record<string, unknown>;
   resultSummary?: string;
   error?: string;

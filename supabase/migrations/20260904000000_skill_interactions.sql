@@ -10,6 +10,7 @@ create table if not exists public.skill_interactions (
     agent_id text,
     conversation_id uuid references public.conversations(id) on delete set null,
     message_id uuid references public.conversation_messages(id) on delete set null,
+    tool_call_id text,
     arguments_redacted jsonb not null default '{}'::jsonb,
     result_summary text,
     error_message text,
@@ -24,9 +25,23 @@ on public.skill_interactions(conversation_id, created_at desc);
 
 alter table public.skill_interactions enable row level security;
 
-create policy "Service role full access on skill_interactions"
-on public.skill_interactions for all to service_role
-using (true) with check (true);
+alter table public.skill_interactions
+    add column if not exists tool_call_id text;
+
+do $$
+begin
+    if not exists (
+        select 1 from pg_policies
+        where schemaname = 'public'
+          and tablename = 'skill_interactions'
+          and policyname = 'Service role full access on skill_interactions'
+    ) then
+        create policy "Service role full access on skill_interactions"
+        on public.skill_interactions for all to service_role
+        using (true) with check (true);
+    end if;
+end
+$$;
 
 create table if not exists public.skill_interaction_feedback (
     id uuid default gen_random_uuid() primary key,
@@ -42,9 +57,20 @@ on public.skill_interaction_feedback(call_id, created_at desc);
 
 alter table public.skill_interaction_feedback enable row level security;
 
-create policy "Service role full access on skill_interaction_feedback"
-on public.skill_interaction_feedback for all to service_role
-using (true) with check (true);
+do $$
+begin
+    if not exists (
+        select 1 from pg_policies
+        where schemaname = 'public'
+          and tablename = 'skill_interaction_feedback'
+          and policyname = 'Service role full access on skill_interaction_feedback'
+    ) then
+        create policy "Service role full access on skill_interaction_feedback"
+        on public.skill_interaction_feedback for all to service_role
+        using (true) with check (true);
+    end if;
+end
+$$;
 
 create table if not exists public.skill_tuning_proposals (
     id uuid default gen_random_uuid() primary key,
@@ -64,9 +90,20 @@ on public.skill_tuning_proposals(status, created_at desc);
 
 alter table public.skill_tuning_proposals enable row level security;
 
-create policy "Service role full access on skill_tuning_proposals"
-on public.skill_tuning_proposals for all to service_role
-using (true) with check (true);
+do $$
+begin
+    if not exists (
+        select 1 from pg_policies
+        where schemaname = 'public'
+          and tablename = 'skill_tuning_proposals'
+          and policyname = 'Service role full access on skill_tuning_proposals'
+    ) then
+        create policy "Service role full access on skill_tuning_proposals"
+        on public.skill_tuning_proposals for all to service_role
+        using (true) with check (true);
+    end if;
+end
+$$;
 
 create table if not exists public.custom_skill_revisions (
         id uuid default gen_random_uuid() primary key,
@@ -83,9 +120,20 @@ on public.custom_skill_revisions(skill_id, created_at desc);
 
 alter table public.custom_skill_revisions enable row level security;
 
-create policy "Service role full access on custom_skill_revisions"
-on public.custom_skill_revisions for all to service_role
-using (true) with check (true);
+do $$
+begin
+    if not exists (
+        select 1 from pg_policies
+        where schemaname = 'public'
+          and tablename = 'custom_skill_revisions'
+          and policyname = 'Service role full access on custom_skill_revisions'
+    ) then
+        create policy "Service role full access on custom_skill_revisions"
+        on public.custom_skill_revisions for all to service_role
+        using (true) with check (true);
+    end if;
+end
+$$;
 
 alter table public.skill_tuning_proposals
     add column if not exists applied_revision_id uuid references public.custom_skill_revisions(id) on delete set null;

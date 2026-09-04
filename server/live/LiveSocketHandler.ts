@@ -1200,6 +1200,7 @@ async function handleToolCall(
   const context = {
     conversationId,
     messageId: undefined as string | undefined,
+    toolCallId: undefined as string | undefined,
     voiceName,
     reasoningVoiceEnabled: (currentProfile as any).reasoningVoiceEnabled !== false,
     notifyLiveAPI: (message: string) => {
@@ -1224,7 +1225,7 @@ async function handleToolCall(
 
   for (const call of toolCall.functionCalls) {
     try {
-      context.messageId = call.id;
+      context.toolCallId = call.id;
       // Ask mode guard
       if (mode === 'ask' && WRITE_TOOLS.has(call.name)) {
         const filePath = (call.args?.path || call.args?.newPath || '') as string;

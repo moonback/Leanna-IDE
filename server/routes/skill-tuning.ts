@@ -10,6 +10,7 @@ import {
   type CustomSkillUpdate,
   type CustomSkillVersionStore,
 } from "../runtime/CustomSkillVersioning.js";
+import { invalidateCustomSkillsCache } from "../skills/customSkills.js";
 
 const FeedbackSchema = z.object({
   callId: z.string().min(1).max(200),
@@ -36,6 +37,7 @@ function parseLimit(value: unknown, fallback = 100): number {
 export function createSkillTuningRouter(
   store: SkillTuningStore | undefined = createSupabaseSkillTraceStore(),
   versionStore: CustomSkillVersionStore | undefined = createSupabaseCustomSkillVersionStore(),
+  onSkillChanged?: () => void | Promise<void>,
 ): Router {
   const router = Router();
 
@@ -148,6 +150,8 @@ export function createSkillTuningRouter(
         sourceProposalId: req.params.id,
       });
       if (store) await store.markProposalApplied(req.params.id, result.revision.id);
+      invalidateCustomSkillsCache();
+      await onSkillChanged?.();
       return res.json({ status: "success", ...result });
     } catch (error: any) {
       return res.status(409).json({ status: "error", error: error.message });
@@ -158,6 +162,8 @@ export function createSkillTuningRouter(
     if (!versionStore) return res.status(503).json({ status: "error", error: "Le versionnement Supabase des custom skills n'est pas configuré." });
     try {
       const result = await versionStore.rollback(req.params.id);
+      invalidateCustomSkillsCache();
+      await onSkillChanged?.();
       return res.json({ status: "success", ...result });
     } catch (error: any) {
       return res.status(409).json({ status: "error", error: error.message });

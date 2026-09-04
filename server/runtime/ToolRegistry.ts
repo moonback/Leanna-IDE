@@ -47,6 +47,7 @@ export interface ToolCallOptions {
   /** Identifiants de corrélation pour l'analyse historique */
   conversationId?: string;
   messageId?: string;
+  toolCallId?: string;
 }
 
 export interface ToolRegistryConfig {
@@ -202,7 +203,7 @@ export class ToolRegistry {
       this.recordTrace({
         callId, toolName: name, startedAt, durationMs: Date.now() - startTime,
         success: false, attemptCount: 0, agentId: options.agentId,
-        conversationId: options.conversationId, messageId: options.messageId,
+        conversationId: options.conversationId, messageId: options.messageId, toolCallId: options.toolCallId,
         arguments: safeArguments, error: `Outil "${name}" introuvable`,
       });
       throw new ToolNotFoundError(name, this.getSuggestions(name));
@@ -216,7 +217,7 @@ export class ToolRegistry {
         this.recordTrace({
           callId, toolName: name, startedAt, durationMs: Date.now() - startTime,
           success: false, attemptCount: 0, agentId: options.agentId,
-          conversationId: options.conversationId, messageId: options.messageId,
+          conversationId: options.conversationId, messageId: options.messageId, toolCallId: options.toolCallId,
           arguments: safeArguments, error: (error as Error).message,
         });
         throw error;
@@ -250,7 +251,7 @@ export class ToolRegistry {
         this.recordTrace({
           callId, toolName: name, startedAt, durationMs, success: true,
           attemptCount: attempt + 1, agentId: options.agentId,
-          conversationId: options.conversationId, messageId: options.messageId,
+          conversationId: options.conversationId, messageId: options.messageId, toolCallId: options.toolCallId,
           arguments: safeArguments, resultSummary: summarizeTraceValue(result),
         });
         this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs, success: true, agentId: options.agentId, conversationId: options.conversationId, messageId: options.messageId, callId });
@@ -270,7 +271,7 @@ export class ToolRegistry {
     this.recordTrace({
       callId, toolName: name, startedAt, durationMs, success: false,
       attemptCount: maxRetries + 1, agentId: options.agentId,
-      conversationId: options.conversationId, messageId: options.messageId,
+      conversationId: options.conversationId, messageId: options.messageId, toolCallId: options.toolCallId,
       arguments: safeArguments, error: lastError?.message,
     });
     this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs, success: false, agentId: options.agentId, conversationId: options.conversationId, messageId: options.messageId, callId, error: lastError?.message });
