@@ -1,313 +1,312 @@
-# Architecture système
-
-Le système **Leanna** repose sur une architecture hybride **Desktop / Web** orchestrée autour d'un processus central Node.js / Express intégrant un serveur de développement Vite (en mode middleware), un runtime d'outils pour l'IA, une gestion de bac à sable local (Sandbox) et une connexion temps réel WebSocket avec Google Gemini Live API.
-
-```mermaid
-flowchart TB
-    subgraph Client ["Interface Utilisateur (Renderer / Desktop)"]
-        UI["React 19 SPA<br/>(Monaco, Views, Panels)"]
-        Preload["Electron Preload<br/>(contextBridge)"]
-        LiveHook["useLiveAPI<br/>(Audio PCM / WebSocket)"]
-    end
-
-    subgraph ElectronMain ["Processus Electron Main"]
-        MainWin["BrowserWindow & IPC Handlers"]
-        TrayLog["File Logger & Desktop Capturer"]
-    end
-
-    subgraph BackendServer ["Serveur Backend (Node.js / Express)"]
-        AuthMiddleware["Auth Gate & Rate Limiting<br/>(x-leanna-token)"]
-        ZodValidator["Validation Zod Universelle<br/>(server/middleware/validateBody.ts)"]
-        
-        subgraph Routers ["Routeurs API REST"]
-            IDERouter["/api/ide<br/>(Filesystem / Search)"]
-            SandboxRouter["/api/sandbox<br/>(Isolation / Diffs)"]
-            AgentsRouter["/api/agents & /api/custom-agents<br/>(Orchestration / Fleet / Builder)"]
-            MarketplaceRouter["/api/marketplace<br/>(Registre / Install / Publish / Rate)"]
-            MCPRouter["/api/mcp<br/>(Stdio & SSE Tool Bridge)"]
-            FTPRouter["/api/ftp<br/>(FTP/FTPS Workspace Sync)"]
-            NotebooksRouter["/api/notebooks<br/>(RAG / Sources)"]
-            OtherRouters["/api/workflows, /api/tts, /api/profile..."]
-        end
-
-        subgraph Sockets ["WebSockets (/live, /terminal, /sandbox-watch)"]
-            LiveHandler["LiveSocketHandler<br/>(Gemini Live Bridge)"]
-            TermHandler["Terminal WebSocket<br/>(PTY Shell)"]
-            WatchHandler["Sandbox Watcher<br/>(FS Events)"]
-        end
-
-        subgraph CoreEngine ["Moteur Fondamental & Sécurité"]
-            SelfRoot["Multi-Workspace & Path Security<br/>(SELF_ROOT & workspaces.json)"]
-            FtpSync["FTP Workspace Sync<br/>(local mirror & push)"]
-            SandboxEngine["Sandbox Mirror Manager<br/>(.Leanna/sandbox)"]
-            SkillRuntime["SkillManagerV2 & ToolRegistry"]
-            AgentBus["AgentMessageBus & Orchestrator"]
-            Supervisor["Supervisor & PostEditValidator"]
-        end
-    end
-
-    subgraph External ["Services Externes & Cloud"]
-        GeminiAPI["Google Gemini Live API<br/>(Audio / Tools / Vision)"]
-        SupabaseDB["Supabase Postgres<br/>(pgvector, Memories, History)"]
-        OpenRouterAPI["OpenRouter API<br/>(LLMs alternatifs)"]
-        MCPServers["Serveurs MCP Externes<br/>(stdio / SSE)"]
-        FTPServers["Serveurs FTP/FTPS Externes"]
-    end
-
-    UI --> Preload
-    Preload --> MainWin
-    UI <--> LiveHook
-    LiveHook <-->|WebSocket :4000/live| LiveHandler
-    UI <-->|WebSocket :4000/terminal| TermHandler
-    UI <-->|WebSocket :4000/sandbox-watch| WatchHandler
-    UI -->|HTTP Fetch + x-leanna-token| AuthMiddleware
-
-    AuthMiddleware --> Routers
-    LiveHandler <--> GeminiAPI
-    LiveHandler --> SkillRuntime
-    SkillRuntime --> SelfRoot
-    SkillRuntime --> SandboxEngine
-    SkillRuntime --> AgentBus
-    SkillRuntime --> MCPServers
-    
-    Routers --> CoreEngine
-    FTPRouter --> FtpSync
-    FtpSync <--> FTPServers
-    CoreEngine --> SupabaseDB
-    Routers --> OpenRouterAPI
-```
-
----
+# Architecture — Leanna AI Operating System
 
 ## Vue d'ensemble
 
-Leanna fonctionne selon les principes architecturaux suivants :
+Leanna est une application full-stack monoprocessus en développement et deux processus en production Electron. Le frontend React est servi par le même serveur Express qui expose l'API REST et les WebSockets. En mode desktop, Electron embarque le tout dans un processus Node.js unique.
 
-1. **Mode Multi-Workspace & Périmètre Self-Root** : L'IDE gère dynamiquement plusieurs dépôts externes tout en confinant rigoureusement toutes les compétences IA, explorateurs et opérations au projet actif (`SELF_ROOT`). Les dépôts sont persistés dans `.Leanna/workspaces.json` et les chemins candidats sont pré-validés (rejet des racines disques et dossiers système). L'utilisateur peut cloner directement un dépôt distant via une URL (GitHub, GitLab, SSH…) depuis la modale Multi-Workspace — le flux SSE `POST /api/self-root/clone` transmet la progression git en temps réel et active le workspace automatiquement à la fin.
-2. **Synchronisation FTP par miroir local** : Un workspace FTP est téléchargé dans `~/.Leanna/ftp-workspaces/<hôte>_<port>/<chemin>/`, puis activé comme un workspace classique. Le téléchargement récursif ignore les dossiers système courants et continue malgré les erreurs par fichier. Les modifications peuvent être poussées vers le serveur via `POST /api/ftp/push`, en totalité ou sur une liste de chemins relatifs.
-3. **Isolation par Sandbox** : Par défaut, toute écriture effectuée par l'utilisateur ou par l'IA est appliquée dans un dossier miroir `.Leanna/sandbox` du workspace actif. Les modifications ne sont reportées dans le projet principal qu'après validation TypeScript (`tsc --noEmit`) et approbation explicite (`sync` ou `accept-file`).
-4. **Dialogue Multimodal Temps Réel** : L'interface échange des flux audio PCM 16kHz et des captures vidéo/écran directement avec l'API Gemini Live. Lorsque l'IA décide d'exécuter une action, elle invoque des outils (`functionDeclarations`) interceptés côté backend par le `LiveSocketHandler`.
-5. **Lecture & Indexation des documents PDF** : Les fichiers PDF du workspace sont détectés, lus via `pdf-parse`, indexés dans le `WorkspaceIndexer` et exposés à l’IDE avec un aperçu document et un texte extrait exploitable par le moteur de connaissances.
-6. **Coexistence Runtime V1 & V2** : Le système migre progressivement d'un `SkillManager` historique vers une architecture découplée `ToolRegistry` + `RuntimeV2` tout en conservant une compatibilité ascendante complète.
+```mermaid
+graph TD
+    subgraph Client["Client (Navigateur / Electron Renderer)"]
+        UI["React 19 SPA"]
+        WS_CLIENT["WebSocket Client"]
+        MONACO["Monaco Editor"]
+    end
+
+    subgraph Server["Serveur Express (port 4000)"]
+        VITE["Vite Middleware (dev)"]
+        API["API REST /api/*"]
+        AUTH["Auth Middleware\n(x-leanna-token)"]
+        RATE["Rate Limiter\n(express-rate-limit)"]
+
+        subgraph WS["WebSocket Servers"]
+            WS_LIVE["/live — Gemini Live"]
+            WS_SANDBOX["/sandbox-watch"]
+            WS_TERMINAL["/terminal"]
+        end
+
+        subgraph SKILLS["Skill Manager V2"]
+            RUNTIME["Tool Registry"]
+            BUILTIN["25+ Built-in Skills"]
+            CUSTOM["Custom Skills (Supabase)"]
+        end
+
+        subgraph AGENTS["Agent Orchestrator"]
+            FLEET["Agent Fleet\n(coder/architect/test…)"]
+            BUS["Message Bus"]
+            PERSIST["Agent Persistence"]
+        end
+
+        subgraph KNOWLEDGE["Knowledge Layer"]
+            KG["Knowledge Graph\n(AST + FileWatcher)"]
+            WI["Workspace Indexer\n(docs extraction)"]
+            NB["Notebook Manager\n(RAG + Embeddings)"]
+        end
+    end
+
+    subgraph EXTERNAL["Services Externes"]
+        GEMINI["Google Gemini API\n(text + live + TTS)"]
+        SUPABASE["Supabase\n(PostgreSQL + pgvector)"]
+        GITHUB_API["GitHub API"]
+        OPENROUTER["OpenRouter API"]
+        MCP["MCP Servers\n(Model Context Protocol)"]
+    end
+
+    subgraph ELECTRON["Electron (production)"]
+        MAIN["main.cjs\n(process principal)"]
+        PRELOAD["preload.cjs\n(IPC bridge)"]
+        SERVER_EMB["server.cjs\n(embarqué)"]
+    end
+
+    UI --> API
+    UI --> WS_CLIENT
+    WS_CLIENT --> WS_LIVE
+    WS_CLIENT --> WS_SANDBOX
+    WS_CLIENT --> WS_TERMINAL
+
+    API --> AUTH --> RATE
+    RATE --> SKILLS
+    RATE --> AGENTS
+    RATE --> KNOWLEDGE
+
+    SKILLS --> GEMINI
+    SKILLS --> SUPABASE
+    SKILLS --> GITHUB_API
+    SKILLS --> OPENROUTER
+    SKILLS --> MCP
+
+    WS_LIVE --> GEMINI
+    AGENTS --> SKILLS
+    PERSIST --> SUPABASE
+    NB --> SUPABASE
+    KG --> RUNTIME
+
+    MAIN --> SERVER_EMB
+    PRELOAD --> UI
+```
 
 ---
 
 ## Frontend
 
-L'interface utilisateur est développée en **React 19** avec **TypeScript** et stylisée via **TailwindCSS v4** et **Vanilla CSS** (`src/index.css`, `src/DESIGN_TOKENS.md`).
+### Structure des composants
 
-### Architecture Frontend
-* **Point d'entrée** (`src/main.tsx`) : Configure le routage avec React Router v7, le thème (clair/sombre/accent), et applique un intercepteur global sur `window.fetch` avec :
-  - Injection automatique du jeton d'authentification `x-leanna-token` depuis `localStorage`.
-  - Déduplication des requêtes `GET` idempotentes en vol.
-  - **Circuit Breaker** réseau : bloque temporairement les requêtes pendant 8 secondes après 12 échecs consécutifs pour éviter les erreurs `ENOBUFS` / `ECONNREFUSED`.
-* **Gestion d'état** : Stores locaux légers, contextes React dédiés (`UserProfileContext`, `LiveAPIContext`, `ScreenShareContext`) et hooks spécialisés (`useLiveAPI`, `useTerminal`, `useSandboxDiff`).
-* **Composants majeurs** :
-  - `IdeView` (`src/views/IdeView.tsx`) : Environnement de travail avec Monaco Editor, arborescence virtuelle, onglets et panneaux latéraux rétractables.
-  - `UnifiedSidebar` : Barre latérale unique supportant les contextes `global` et `ide`.
-  - `Panels` (`src/components/panels/`) : Panneaux spécialisés pour le Terminal, le Navigateur webview, les Métriques d'agents, la Flotte d'agents (`AgentFleetPanel`), le Constructeur visuel d'agents (`AgentBuilderPanel`), les Tâches planifiées, les Workflows, les MCP et l'Audit.
-  - `StartupProjectModal` : Modale de démarrage permettant de sélectionner ou changer le projet cible géré par `SELF_ROOT`. Comprend les onglets **Dépôts récents**, **Ouvrir local**, **Cloner** (URL Git → clone SSE) et **FTP** (test FTP/FTPS → téléchargement SSE → activation automatique).
+```
+src/
+├── main.tsx                    # Bootstrap : providers, routing, auth gate, circuit breaker fetch
+├── views/                      # Pages (chargées lazy)
+│   ├── IdeView.tsx             # IDE principal (Monaco + terminal + panels)
+│   ├── NotebooksView.tsx       # RAG notebooks (chat + sources)
+│   ├── GitHubView.tsx          # Intégration Git/GitHub
+│   ├── AutomationView.tsx      # Workflows et tâches planifiées
+│   ├── DocumentsView.tsx       # Gestion de documents
+│   ├── MemoriesView.tsx        # Mémoires long-terme Supabase
+│   ├── HistoryView.tsx         # Historique conversations
+│   ├── ListsView.tsx           # Listes intelligentes
+│   └── SettingsView.tsx        # Paramètres, tokens, profil
+├── components/
+│   ├── UnifiedSidebar.tsx      # Navigation latérale (contexte global / IDE)
+│   ├── FloatingOrb.tsx         # Orb flottant draggable (chat rapide hors IDE)
+│   ├── CriticalEditConfirm.tsx # Confirmation avant modif de fichiers critiques
+│   ├── StartupProjectModal.tsx # Sélecteur de workspace au démarrage
+│   ├── ide/                    # FileExplorer, EditorTabs, composants IDE
+│   ├── panels/                 # SandboxPanel, AgentPanel, VisionPanel
+│   ├── sidebar/                # Éléments de la sidebar
+│   ├── settings/               # Sous-vues des paramètres
+│   ├── notebooks/              # Composants notebooks RAG
+│   ├── workflows/              # Constructeur de workflows
+│   ├── github/                 # Composants GitHub
+│   ├── knowledge/              # Composants Knowledge Graph
+│   └── ui/                     # Toast, ConfirmDialog, composants génériques
+├── context/
+│   ├── LiveAPIContext.tsx       # Connexion WebSocket Gemini Live
+│   ├── UserProfileContext.tsx   # Profil utilisateur (nom, voix, thème…)
+│   └── ScreenShareContext.tsx   # Capture et streaming d'écran vers Gemini
+├── hooks/
+│   └── useLiveAPI.ts           # Hook principal WebSocket Live (connect/disconnect/send)
+└── services/
+    ├── ideApi.ts               # Client REST pour les opérations IDE (arbre, CRUD fichiers)
+    ├── sandboxApi.ts           # Client REST pour le sandbox
+    └── supabase.ts             # Client Supabase (frontend)
+```
 
----
+### Routing
 
-## Electron (Desktop)
+React Router v7, mode `BrowserRouter`. Toutes les routes sont chargées en `lazy` pour le code splitting :
 
-En mode Desktop, Leanna encapsule l'application dans **Electron 43** :
+| Route | Vue | Description |
+|---|---|---|
+| `/` | → redirect `/ide` | Redirection par défaut |
+| `/ide` | `IdeView` | IDE Monaco + chat + panels |
+| `/memories` | `MemoriesView` | Mémoires Supabase |
+| `/history` | `HistoryView` | Historique des conversations |
+| `/settings` | `SettingsView` | Configuration complète |
+| `/lists` | `ListsView` | Listes intelligentes |
+| `/github` | `GitHubView` | Git / GitHub |
+| `/automation` | `AutomationView` | Workflows et tâches planifiées |
+| `/documents` | `DocumentsView` | Documents uploadés |
+| `/notebooks` | `NotebooksView` | RAG notebooks |
 
-* **Processus Main** (`electron/main.cjs`) :
-  - Démarre le splash screen (`electron/splash.html`) visible pendant au moins 5 secondes.
-  - En mode packagé (`isPackaged = true`), démarre automatiquement le serveur backend embarqué via `require('dist/server.cjs')`.
-  - Configure les répertoires persistants dans `app.getPath('userData')` (`.env`, logs, profils).
-  - Fournit des gestionnaires IPC sécurisés.
-  - Implémente un **Graceful Shutdown** complet sur l'événement `before-quit` pour libérer les sockets, tuer les sous-processus PTY/MCP sur Windows (`taskkill /T /F`) et fermer proprement les sessions actives.
-* **Processus Preload** (`electron/preload.cjs`) :
-  - `nodeIntegration: false` et `contextIsolation: true` sont obligatoires.
-  - Expose l'objet `window.electronAPI` via `contextBridge.exposeInMainWorld`.
-* **IPC Channels enregistrés** :
-  - `electron/folder-contents` : lecture des dossiers locaux.
-  - `electron/create-file` / `electron/create-folder` : création d'éléments.
-  - `electron/delete-path` : suppression de fichiers ou dossiers.
-  - `electron/open-path` / `electron/open-external` : ouverture shell native.
-  - `electron/get-project-root` : racine courante de l'exécutable.
-  - `electron/select-folder` : dialogue natif de sélection de répertoire.
-  - `electron/get-screen-sources` : capture des flux d'écrans/fenêtres pour le partage multimodal.
-  - `electron/git-clone` : clone un dépôt git distant (`url`, `targetDir?`) via `child_process.execFile('git', ['clone', …])` avec timeout 5 min et nettoyage automatique en cas d'échec. Retourne `{ success, path?, repoName?, error? }`.
-  - `electron/quit` : fermeture propre de l'application.
+Les transitions de routes sont animées avec `motion/react` (`AnimatePresence` + `mode="wait"`).
+
+### Gestion d'état
+
+- **React Context** : `LiveAPIContext` (WebSocket), `UserProfileContext` (profil + thème), `ScreenShareContext` (capture vidéo)
+- **État local** : hooks `useState` / `useReducer` dans les composants
+- **Persistance frontend** : `localStorage` (`Leanna_api_token`, `Leanna_user_profile`)
+- **Pas de store global** (Redux/Zustand) : l'état métier est dans les contextes et remonte vers le serveur
+
+### Optimisations réseau (frontend)
+
+Le `window.fetch` est patché dans `main.tsx` avec :
+- **Injection automatique** du header `x-leanna-token` sur toutes les requêtes `/api/*`
+- **Déduplication in-flight** : les GET identiques en parallèle ne déclenchent qu'une seule requête
+- **Circuit breaker** : après 12 échecs réseau consécutifs, toutes les requêtes API renvoient 503 pendant 8 secondes pour prévenir le ENOBUFS
 
 ---
 
 ## Backend / API
 
-Le serveur backend repose sur **Express 4** (`server.ts` et `server-bootstrap.ts`) et est articulé en couches fonctionnelles modulaires :
+### Couches applicatives
 
-```text
-server/
-├── routes/             # Contrôleurs et points d'accès HTTP REST modulaires
-├── middleware/         # Middlewares Express dont validateBody (Zod validation)
-├── live/               # Sessions Gemini Live WebSocket et dispatch d'outils
-├── runtime/            # Runtime V2, registre d'outils, observabilité
-├── agents/             # Flotte d'agents, registre dynamique, bus de messages
-├── autonomy/           # Superviseur anti-boucles de régression
-├── knowledge/          # Knowledge Graph, WorkspaceIndexer et mémoire projet
-├── notebooks/          # Moteur RAG, découpage, extraction et file de traitement
-├── mcp/                # Bridge de protocoles MCP (Stdio & SSE)
-└── utils/              # SelfRoot, Sandbox, FTP Sync, Checkpoint Git, Cryptographie
+```
+server-bootstrap.ts          # 1. Charge .env, déchiffre les clés sensibles, valide Supabase
+server.ts                    # 2. Initialise tout et démarre le serveur HTTP
+  ├── bootstrapRuntimeSync() # 3. Enregistre tous les skills dans le ToolRegistry
+  ├── agentOrchestrator      # 4. Connecte l'orchestrateur au SkillManager
+  ├── loadWorkflows()        # 5. Charge les workflows planifiés depuis Supabase
+  ├── loadScheduledTasks()   # 6. Charge les tâches automation
+  ├── projectIndexer.scanAll()# 7. Lance l'indexation du Knowledge Graph
+  └── startServer()          # 8. Express + WebSocket servers
 ```
 
-### Couche de Validation & Sécurité des Données Entrantes
-* **Middleware `validateBody<T>(schema: ZodSchema<T>)`** (`server/middleware/validateBody.ts`) :
-  - Intercepte et parse `req.body` avec `schema.safeParse()`.
-  - Supprime les champs non déclarés (strip) ou rejette les propriétés interdites (`.strict()`).
-  - Renvoie un code `HTTP 400` structuré avec le détail des champs invalides avant d'atteindre la logique métier.
-* **Registre Dynamique d'Agents (`DynamicAgentRegistry`)** :
-  - Permet l'enregistrement, l'activation, la désactivation et l'orchestration à chaud d'agents définis par l'utilisateur sans redémarrage du serveur.
+### Middlewares (ordre d'application)
 
-### Boucle qualité post-modification
+1. **Rate limiters globaux** (`express-rate-limit`) — configurés dans `server/config/rateLimits.ts`
+2. **Compression** (`compression`) — gzip sur les réponses
+3. **Static files** — `dist/` en production, Vite middleware en développement
+4. **`requireAuth`** — vérifie le header `x-leanna-token` sur toutes les routes `/api/*` sauf `/api/health`
+5. **Routeurs modulaires** — un fichier par domaine dans `server/routes/`
+6. **Error handler global** — catch-all Express en fin de chaîne
 
-Le skill composite `quality_loop` (`server/autonomy/SmartSkills.ts`) fournit un point d'entrée unique pour les modifications assistées par agent. Il capture une validation de référence avant écriture, applique le changement, puis exécute séquentiellement le formatage ciblé, le typecheck et la vérification du fichier avec ses tests associés. La séquence s'arrête dès qu'une phase échoue.
+### Runtime et Skill System
 
-Le résultat contient une synthèse du diff (`changed`, lignes ajoutées et supprimées) ainsi que les snapshots `baseline` et `current`. `AgentValidation.compare` tolère les erreurs préexistantes stables, mais transforme toute augmentation des erreurs de typecheck, lint, sécurité ou tests en régression bloquante. Aucune nouvelle tentative automatique n'est lancée par cette boucle ; la correction suivante doit être explicitement demandée.
-
-### Contexte traçable
-
-Les réponses fondées sur le workspace doivent transporter un registre de preuves, et non seulement du texte : `sourceId`, chemin ou URL, lignes utilisées, tests exécutés et extrait ayant servi à la réponse. Le renderer présente ce registre dans le bouton **Inspecter le contexte**. Une exclusion est persistée pour la réponse courante, déclenche une nouvelle sélection de contexte et invalide les citations associées à la source retirée. Le serveur doit refuser ou marquer toute citation dont la preuve n'est pas présente dans ce registre.
-
-### Plan d'action avant mission
-
-Une mission comportant plusieurs étapes passe par un état `planned` avant `running`. Le plan affiché contient `objectives`, `targetFiles`, `tools`, `risks`, `estimatedCost` (tokens, appels et durée) et `stopConditions`. L'utilisateur peut confirmer, modifier ou annuler le plan ; les conditions d'arrêt restent actives pendant l'exécution et toute violation termine la mission avec un rapport explicite.
-
-### Knowledge System & Analyse Syntaxique Tree-sitter
-Le sous-système `server/knowledge/` offre une compréhension sémantique et structurelle approfondie du projet :
-
-```text
-server/knowledge/
-├── ASTParser.ts          # Moteur d'analyse syntaxique Tree-sitter (WASM) pour TS/TSX/JS
-├── ASTCallGraph.ts       # Graphe d'appels bidirectionnel (qui appelle qui, BFS call chain)
-├── ProjectIndexer.ts     # Scanneur de projet et synchroniseur AST incrémental
-├── KnowledgeGraph.ts     # Graphe unifié des entités, relations et dépendances
-├── RelationExtractor.ts  # Détecteur sémantique (calls 0.95, extends, composes, tests)
-├── FileWatcher.ts        # Surveillance événementielle et ré-indexation à chaud
-├── WorkspaceIndexer.ts   # Extraction documentaire du workspace (.md, .txt, .rst...)
-├── DocumentStore.ts      # Index sémantique et liens inter-documents
-├── DependencyGraph.ts    # Détecteur de cycles DFS et métriques de couplage
-├── ProjectMemory.ts      # Faits métier, architecture et conventions protégées
-└── UnderstandingEngine.ts # Synthèse contextuelle et calcul de scores pour le LLM
+```
+server/runtime/
+├── bootstrap.ts             # bootstrapRuntimeSync() — point d'entrée unique
+├── ToolRegistry             # Registre de tous les outils disponibles
+├── Observability.ts         # Métriques et événements du runtime
+├── compat/SkillManagerV2.ts # Adaptateur de compatibilité (migration progressive)
+└── routes/
+    ├── agents.ts            # GET/POST /api/v2/agents/*
+    └── metrics.ts           # GET /api/v2/metrics
 ```
 
-* **Indexation AST Incrémentale** :
-  - Utilise `web-tree-sitter` (WASM) avec les grammaires TypeScript, TSX et JavaScript sans nécessiter de compilation native.
-  - Extrait les positions de code exactes (`lineStart` à `lineEnd`), les paramètres typés et les annotations de retour.
-  - Détecte les appels de fonctions directs, chaînés, en contexte `await` ainsi que les appels de méthodes intra-classe (`this.method()`).
-* **Extraction documentaire PDF** :
-  - `WorkspaceIndexer` inclut désormais les fichiers `.pdf` dans le scan documentaire du workspace.
-  - `pdf-parse` extrait le texte encodé des PDF pour le stocker dans le `DocumentStore` et l’exposer aux outils de connaissance, recherche et analyse documentaire.
-  - `IdeView` et `PdfPreview` affichent ensuite le document pour une consultation directe dans l’IDE.
-* **Graphe d'Appels Bidirectionnel (`ASTCallGraph`)** :
-  - Maintient en mémoire la cartographie des appelants (`getCallers`), des fonctions appelées (`getCallees`) et des chaînes d'exécution récursives (`getCallChain`).
-  - Mis à jour instantanément à chaque modification de fichier via le `FileWatcher`.
+Les 25+ skills natifs (`server/skills/`) sont enregistrés une seule fois au démarrage via `bootstrapRuntimeSync`. Les custom skills sont chargés depuis Supabase (`sm.loadCustomSkills()`).
+
+### Agent Orchestrator
+
+```
+server/agents/
+├── index.ts                 # AgentOrchestrator, MessageBus, Registry, Persistence
+├── AgentPersistence.ts      # Sauvegarde/restauration depuis Supabase
+└── ...
+```
+
+L'orchestrateur implémente une boucle **Observe → Decide → Act** par rôle. Les agents communiquent via le `MessageBus` interne. Chaque tâche peut être sous-déléguée automatiquement (`delegateAutonomously`).
+
+### Authentification
+
+Toutes les routes `/api/*` (sauf `GET /api/health`) exigent le header :
+
+```
+x-leanna-token: <Leanna_API_TOKEN>
+```
+
+Le token est comparé via `crypto.timingSafeEqual` pour éviter les timing attacks. Les WebSockets `/live` et `/sandbox-watch` valident le token via cookie `Leanna_token` (posé automatiquement par le premier appel REST authentifié).
+
+Le token est auto-généré (256 bits, URL-safe base64) au premier démarrage si absent du `.env`.
+
+### WebSockets
+
+| Endpoint | Usage | Auth |
+|---|---|---|
+| `/live` | Session Gemini Live bidirectionnelle (texte, audio, vidéo, tool calls) | Cookie `Leanna_token` |
+| `/sandbox-watch` | Notifications temps réel des fichiers modifiés dans le sandbox | Cookie `Leanna_token` |
+| `/terminal` | Terminal PTY interactif | Token query/cookie |
 
 ---
 
-## Base de données & Persistance
+## Sandbox
 
-L'application utilise une architecture de persistance hybride (fichiers locaux + Supabase Postgres) :
+Le sandbox est un mécanisme de sécurité central : toutes les modifications de l'IA sont d'abord appliquées dans un dossier miroir (`.Leanna/sandbox/`), jamais directement dans le workspace. L'utilisateur valide (`/api/sandbox/sync`) ou rejette (`/api/sandbox/discard`) les changements.
 
-### Persistance locale (fichiers JSON / NDJSON)
-* `.env` / `.env.local` : Configuration chiffrée (AES-256-CBC via `server/utils/crypto.ts` pour les clés sensibles).
-* `.Leanna-profile.json` : Profil utilisateur et préférences d'assistant (chargé et surveillé en temps réel via `fs.watchFile`).
-* `.gemini-keys.json` : Pool de clés Google Gemini avec priorités, compteurs d'usage et état d'activation.
-* `.Leanna/custom-agents.json` : Définitions persistées des agents créés dans l'Agent Builder ou installés depuis le Marketplace.
-* `.Leanna/marketplace-registry.json` : Paquets publiés localement dans le Marketplace (les paquets du catalogue communautaire sont seedés en mémoire).
-* `.Leanna/marketplace-installs.json` : Liste des IDs de paquets Marketplace installés sur cette instance.
-* `.Leanna/workspaces.json` : Historique ordonné et métadonnées des espaces de travail configurés.
-* `.Leanna-audit.log` : Journal d'audit au format NDJSON consignant les actions système et modifications de code.
+```
+Workspace principal (SELF_ROOT)
+       ↕ copie miroir
+.Leanna/sandbox/        ← l'IA écrit ici
+       ↕ diff + validation TypeScript
+/api/sandbox/diff       ← visualisation des changements
+/api/sandbox/sync       ← application après validation TSC
+/api/sandbox/accept-file / reject-file  ← granularité fichier par fichier
+```
 
-### Persistance Cloud (Supabase Postgres)
-Lorsque `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` sont renseignés, les tables suivantes sont exploitées :
+La sortie du mode sandbox nécessite un code à 6 chiffres (`SANDBOX_EXIT_CODE`) avec rate limiting et comparaison en temps constant.
 
-| Table | Rôle | Schéma clé |
-| :--- | :--- | :--- |
-| `memories` | Mémoires à long terme avec recherche vectorielle | `id (uuid)`, `content (text)`, `tags (text[])`, `embedding (vector(768))`, `updated_at` |
-| `conversations` | Sessions de discussion et résumés | `id (uuid)`, `title (text)`, `summary (text)`, `started_at`, `ended_at`, `message_count` |
-| `conversation_messages` | Messages individuels des conversations | `id (uuid)`, `conversation_id (uuid)`, `role (text)`, `content (text)`, `created_at` |
-| `workflows` | Pipelines de tâches et exécutions planifiées | `id (uuid)`, `name (text)`, `steps (jsonb)`, `schedule (text)`, `enabled (boolean)`, `last_run_status` |
-| `scheduled_tasks` | Tâches d'automatisation récurrentes | `id (uuid)`, `name (text)`, `action_name (text)`, `args (jsonb)`, `interval_expression (text)` |
-| `custom_skills` | Compétences dynamiques créées par l'utilisateur | `id (uuid)`, `name (text)`, `parameters (jsonb)`, `instruction (text)`, `enabled (boolean)` |
-| `agent_tasks` | Tâches de la flotte d'agents autonomes | `id (text)`, `orchestration_id`, `role`, `status`, `result (jsonb)`, `context_files` |
-| `agent_orchestrations`| Plans d'orchestration multi-agents | `id (text)`, `title`, `status`, `dependencies (jsonb)` |
-| `agent_messages` | Historique des messages du bus inter-agents | `id (text)`, `from_role`, `to_role`, `type`, `payload (jsonb)` |
+---
+
+## Base de données
+
+Supabase (PostgreSQL managé) avec deux extensions activées :
+
+- **`pgvector`** : recherche par similarité vectorielle (RAG, mémoires sémantiques)
+- **`pg_trgm`** : recherche textuelle par trigrammes
+
+Toutes les tables ont **RLS activé** avec accès exclusif au `service_role` (backend). Le frontend n'a pas d'accès direct à Supabase.
+
+Voir [DB_SCHEMA.md](DB_SCHEMA.md) pour le détail complet des tables et relations.
 
 ---
 
 ## Services externes
 
-| Service | Rôle | Intégration | Configuration || :--- | :--- | :--- | :--- |
-| **Google Gemini Live API** | Modèle LLM multimodal temps réel (voix, vision, outils) | `@google/genai` (modèle `gemini-3.1-flash-live-preview`) | `GEMINI_API_KEY` ou `.gemini-keys.json` |
-| **Supabase** | Base de données relationnelle, pgvector et RLS | `@supabase/supabase-js` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
-| **OpenRouter** | Passerelle vers modèles LLM alternatifs | Requêtes HTTP REST (`https://openrouter.ai/api/v1`) | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` |
-| **GitHub API** | Gestion des dépôts, issues, pull requests | Requêtes HTTP REST (`https://api.github.com`) | `GITHUB_TOKEN` |
+| Service | Intégration | Rôle |
+|---|---|---|
+| **Google Gemini API** | `@google/genai` | Génération de texte, Gemini Live (voix + vision), TTS, embeddings |
+| **Supabase** | `@supabase/supabase-js` (backend uniquement) | Persistance : mémoires, conversations, workflows, custom skills, agents |
+| **GitHub API** | `GITHUB_TOKEN` via `githubSkill` | Liste repos, issues, PRs, notifications, recherche |
+| **OpenRouter** | REST via `OPENROUTER_API_KEY` | Modèles alternatifs (GPT-4o-mini, etc.) pour analyse de code |
+| **MCP Servers** | `server/mcp/` bridge | Extensibilité via le Model Context Protocol |
+| **Puppeteer** | `puppeteer` (headless Chrome) | Automatisation web, captures d'écran, scraping |
+| **FTP** | `basic-ftp` | Connexions FTP (sécurité : IPs privées bloquées par défaut) |
 
----
+### Pool de clés Gemini
 
-## Sécurité & Garde-fous
-
-Leanna met en œuvre plusieurs couches défensives pour encadrer la modification du code source :
-
-```mermaid
-flowchart TD
-    Req[Modification de code demandée par l'IA] --> CheckLimit{Vérification Rate Limit<br/>30 écritures / min}
-    CheckLimit -- Échec --> Block1[Rejet de la modification]
-    CheckLimit -- OK --> PathNorm[Normalisation du chemin<br/>normalizeSelfPath]
-    
-    PathNorm --> CheckScope{Dans SELF_ROOT ?}
-    CheckScope -- Non --> Block2[Rejet : Sortie de périmètre 403]
-    CheckScope -- Oui --> CheckForbidden{Fichier interdit ?<br/>.git/config, node_modules...}
-    
-    CheckForbidden -- Oui --> Block3[Rejet : Cible protégée]
-    CheckForbidden -- Non --> CheckCritical{Fichier critique ?<br/>server.ts, .env...}
-    
-    CheckCritical -- Oui --> AskUser[Confirmation UI via WebSocket<br/>confirmationBridge]
-    AskUser -- Refus / Timeout 30s --> Block4[Annulation utilisateur]
-    AskUser -- Approuvé --> Checkpoint[Création Checkpoint Git automatique]
-    CheckCritical -- Non --> Checkpoint
-    
-    Checkpoint --> WriteTarget{Mode Sandbox actif ?}
-    WriteTarget -- Oui --> WriteSB[Écriture dans .Leanna/sandbox]
-    WriteTarget -- Non --> WriteMain[Écriture dans SELF_ROOT]
-    
-    WriteSB --> AuditLog[Journalisation Audit NDJSON]
-    WriteMain --> AuditLog
-    AuditLog --> PostValidator[PostEditValidator : Exécution tsc --noEmit]
-    PostValidator --> SupervisorCheck{Erreurs détectées ?}
-    SupervisorCheck -- Oui --> InjectCorrection[Injection consigne de correction à l'IA]
-    SupervisorCheck -- Non --> End[Modification terminée]
-```
-
-1. **Authentification obligatoire** (`server/security.ts`) : `Leanna_API_TOKEN` est toujours défini au démarrage — généré automatiquement (32 octets, base64url) si absent, persisté dans `.env`. Toutes les routes `/api/*` et WebSockets (`/live`, `/terminal`, `/sandbox-watch`) exigent ce token.
-2. **Token WebSocket sécurisé** (`server/routes/terminal.ts`, `server.ts`) : le token n'est plus transmis en paramètre d'URL pour aucun endpoint WebSocket (fuite logs/historique). Il est lu depuis le cookie httpOnly `Leanna_token` pour `/live`, `/terminal` et `/sandbox-watch`. Le terminal accepte aussi l'en-tête `Sec-WebSocket-Protocol` ou `X-Leanna-Token` pour la compatibilité avec certains clients.
-3. **Exécution de commandes sans shell** (`server/skills/`, `server/utils/`, `server/mcp/`) : `shell: true` est conditionnel et limité aux environnements Windows pour les fichiers `.cmd`/`.bat`. Sur Unix, `execFile` s'exécute directement sans interprétation shell. Les fonctions `sanitizeCommandArgument()` et `validateSafePath()` dans `security.ts` fournissent une validation par allowlist.
-4. **Chiffrement des secrets avec clé forte** (`server/utils/crypto.ts`) : `Leanna_MASTER_KEY` est désormais généré automatiquement (256 bits aléatoires) s'il est absent. La clé est mise en cache en mémoire et persistée dans `.env`. Le chiffrement AES-256-GCM est ainsi toujours basé sur un secret réel, pas sur des attributs machine devinables.
-5. **Protection SSRF avec anti-DNS rebinding** (`server/skills/automationHelpers.ts`) : `assertSafeUrl()` effectue désormais une résolution DNS réelle et vérifie toutes les adresses IP résolues contre la liste de blocage. Empêche les attaques DNS rebinding sur la navigation Puppeteer.
-6. **Client FTP avec blocage des IP privées** (`server/routes/ftp.ts`) : `validateFtpHost()` applique la même protection DNS rebinding aux connexions FTP. Variable `ALLOW_FTP_PRIVATE_IPS=true` pour les usages internes légitimes.
-7. **Code sandbox à temps constant** (`server/routes/sandbox.ts`) : `verifyExitCode()` utilise `crypto.timingSafeEqual`. Rate limiter dédié : 3 tentatives/minute par IP, blocage 15 minutes après dépassement.
-8. **Sanitisation HTML durcie** (`src/utils/sanitizeMarkdownHtml.ts`) : l'attribut `style` a été retiré de la liste blanche de `<span>` pour éliminer la surface d'attaque CSS (exfiltration, mise en page trompeuse).
-9. **Path Traversal & Symlink Escapes** : Résolution centralisée dans `server/utils/selfRoot.ts` et `server/security.ts`. Les chemins sortant de `SELF_ROOT` sont immédiatement rejetés.
-10. **Fichiers critiques protégés** : Toute modification de `server.ts`, `server/security.ts`, `.env`, `.env.local`, etc. nécessite une confirmation explicite de l'utilisateur via une modale bloquante (timeout 30 s).
-11. **Superviseur anti-régression** (`server/autonomy/Supervisor.ts`) : Analyse les résultats `verify_file` et du build global après les éditions. Chaque approche autorise 2 échecs ; une erreur répétée force un pivot. Après 3 approches échouées, le fichier est verrouillé.
-12. **Context Gate pré-écriture** (`server/live/LiveSocketHandler.ts`) : Si `knowledge_build_context` retourne une confiance < 65 % ou un risque élevé, les écritures sont suspendues.
-13. **Prompt Injection Guard** (`server/utils/promptInjectionGuard.ts`) : Filtre les entrées suspectes pouvant détourner les instructions système.
-14. **Isolation Electron** : `nodeIntegration: false`, `contextIsolation: true` et filtrage strict des canaux IPC.
+`server/utils/geminiKeyPool.ts` maintient plusieurs clés Gemini (configurées dans `.gemini-keys.json`) et effectue une rotation automatique sur erreur 429. Cela évite les limitations de débit pour les utilisateurs intensifs.
 
 ---
 
 ## Décisions d'architecture
 
-* **Intégration Vite en mode Middleware dans Express** :
-  > Décision : Démarrer Vite au sein du serveur Express via `vite.createServer({ server: { middlewareMode: true, hmr: { server } } })` plutôt que comme deux processus HTTP distincts.
-  > Problème résolu : Évite les problèmes de proxy croisé, les boucles TCP infinies (`ENOBUFS`) et permet d'unifier l'écoute sur un port unique (4000) pour l'API, le HMR et les WebSockets.
-* **Système de miroir Sandbox fichier par fichier** :
-  > Décision : Conserver le projet original intact et dupliquer les fichiers modifiés dans `.Leanna/sandbox`.
-  > Problème résolu : Permet à l'IA de proposer des refactorisations massives sans risque de casser l'application en cours d'exécution avant validation de l'utilisateur.
-* **Rotation dynamique des clés Gemini** (`server/utils/geminiKeyPool.ts`) :
-  > Décision : Mettre en place un pool multi-clés surveillant les statuts d'erreur HTTP 429 / RESOURCE_EXHAUSTED.
-  > Problème résolu : Assure la continuité de service des agents et de l'assistant vocal lors des sessions intensives de programmation assistée.
+### Vite embarqué dans Express (pas de port séparé)
+
+En développement, Vite est monté comme middleware Express (`middlewareMode: true`) sur le même port (4000). Cela évite les problèmes de CORS, simplifie l'authentification cookie, et empêche la boucle TCP infinie (ENOBUFS) qui survenait quand le proxy Vite pointait vers lui-même.
+
+### Monoprocessus en développement
+
+Le backend et le frontend partagent le même processus Node.js. C'est intentionnel : les skills (système de fichiers, terminal, Git) ont besoin d'un accès direct au système, et un processus séparé complexifierait la communication sans avantage réel pour un IDE local.
+
+### SkillManagerV2 + ToolRegistry (migration progressive)
+
+L'ancien SkillManager inline a été remplacé par un `ToolRegistry` centralisé avec un adaptateur de compatibilité (`SkillManagerV2`). Cela permet la coexistence de l'ancien code et du nouveau runtime V2 (`/api/v2/*`) pendant la migration.
+
+### Sandbox par défaut activé
+
+Par sécurité, le sandbox est activé dès qu'un projet est sélectionné. L'IA ne peut jamais écrire directement dans le workspace sans validation explicite. Ce choix protège contre les modifications accidentelles ou malveillantes sur le code source de l'application elle-même (Leanna est un IDE auto-hébergé qui gère son propre code).
+
+### Écoute sur `127.0.0.1` par défaut
+
+Le serveur n'écoute que sur la loopback pour éviter l'exposition du terminal shell et des outils de fichiers sur le réseau local. `Leanna_LISTEN_HOST=0.0.0.0` est disponible pour les cas d'usage réseau, avec avertissement explicite.
+
+### TypeScript strict end-to-end
+
+`tsconfig.json` active `strict`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`. Le build esbuild du serveur est séparé du build Vite du frontend pour permettre un bundle CJS compatible Electron.
