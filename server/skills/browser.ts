@@ -60,6 +60,90 @@ export interface LinkCandidate {
   isExternal: boolean;
 }
 
+export interface ResearchSource {
+  url: string;
+  title: string;
+  domain: string;
+  content: string;
+  contentLength: number;
+  reliability: number;
+  freshness: { score: number; label: "recent" | "dated" | "unknown"; date?: string };
+  facts: string[];
+  evidence: string[];
+  contradictions: string[];
+}
+
+export interface ResearchResult {
+  query: string;
+  sources: ResearchSource[];
+  consensus: string[];
+  contradictions: Array<{ claim: string; sources: string[] }>;
+  confidence: number;
+}
+
+const RESEARCH_STOP_WORDS = new Set(["avec", "dans", "pour", "plus", "this", "that", "from", "have", "about", "their", "elles", "sont", "être", "comme"]);
+
+function sourceReliability(url: string, content: string): number {
+  const parsed = new URL(url);
+  const host = parsed.hostname.toLowerCase();
+  let score = parsed.protocol === "https:" ? 0.55 : 0.35;
+  if (/\.(gov|gouv|edu|ac\.[a-z]{2})$/i.test(host)) score += 0.25;
+  if (/^www\.(reuters|apnews|bbc|who|un|nature|arxiv)\./i.test(host)) score += 0.2;
+  if (content.length > 1200) score += 0.05;
+  return Math.min(1, Number(score.toFixed(2)));
+}
+
+function sourceFreshness(content: string, url: string): ResearchSource["freshness"] {
+  const dateMatch = `${content.slice(0, 4000)} ${url}`.match(/\b(20\d{2})[-/]([01]\d)[-/]([0-3]\d)\b|\b([01]?\d)[-/]([0-3]?\d)[-/](20\d{2})\b/);
+  if (!dateMatch) return { score: 0.5, label: "unknown" };
+  const year = Number(dateMatch[1] ?? dateMatch[6]);
+  const month = Number(dateMatch[2] ?? dateMatch[4] ?? 1);
+  const day = Number(dateMatch[3] ?? dateMatch[5] ?? 1);
+  const ageDays = Math.max(0, (Date.now() - new Date(year, month - 1, day).getTime()) / 86_400_000);
+  return { score: Number(Math.max(0, 1 - ageDays / 1825).toFixed(2)), label: ageDays <= 365 ? "recent" : "dated", date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}` };
+}
+
+function extractSourceEvidence(content: string, query: string): { facts: string[]; evidence: string[] } {
+  const terms = query.toLowerCase().split(/\W+/).filter((term) => term.length > 3);
+  const sentences = content.split(/(?<=[.!?])\s+/).map((sentence) => sentence.trim()).filter((sentence) => sentence.length >= 35 && sentence.length <= 500);
+  const relevant = sentences.filter((sentence) => {
+    const lower = sentence.toLowerCase();
+    return terms.some((term) => lower.includes(term)) || /\b\d+(?:[.,]\d+)?\s*%?\b/.test(sentence);
+  }).slice(0, 8);
+  return { facts: relevant.slice(0, 5), evidence: relevant.slice(0, 8) };
+}
+
+function claimKey(claim: string): string {
+  return claim.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter((word) => word.length > 3 && !RESEARCH_STOP_WORDS.has(word)).slice(0, 8).join(" ");
+}
+
+function compareResearchSources(sources: ResearchSource[]): Pick<ResearchResult, "consensus" | "contradictions" | "confidence"> {
+  const claims = new Map<string, Array<{ source: ResearchSource; claim: string }>>();
+  for (const source of sources) {
+    for (const claim of source.facts) {
+      const key = claimKey(claim);
+      if (key) claims.set(key, [...(claims.get(key) ?? []), { source, claim }]);
+    }
+  }
+  const consensus: string[] = [];
+  const contradictions: Array<{ claim: string; sources: string[] }> = [];
+  for (const entries of claims.values()) {
+    if (entries.length < 2) continue;
+    const numbers = new Set(entries.map((entry) => entry.claim.match(/\b\d+(?:[.,]\d+)?\s*%?\b/g)?.join(",") ?? "none"));
+    const negations = new Set(entries.map((entry) => /\b(not|no|ne|pas|sans|never|jamais)\b/i.test(entry.claim)));
+    if (numbers.size > 1 || negations.size > 1) {
+      contradictions.push({ claim: entries[0].claim, sources: entries.map((entry) => entry.source.url) });
+      entries.forEach((entry) => entry.source.contradictions.push(`Divergence avec ${entries.filter((other) => other.source !== entry.source).map((other) => other.source.domain).join(", ")}`));
+    } else {
+      consensus.push(entries[0].claim);
+    }
+  }
+  const diversity = new Set(sources.map((source) => source.domain)).size / Math.max(1, sources.length);
+  const evidenceRate = sources.length ? sources.filter((source) => source.evidence.length > 0).length / sources.length : 0;
+  const quality = sources.length ? sources.reduce((sum, source) => sum + source.reliability * source.freshness.score, 0) / sources.length : 0;
+  return { consensus: consensus.slice(0, 10), contradictions: contradictions.slice(0, 10), confidence: Number(Math.max(0, Math.min(1, quality * 0.45 + diversity * 0.2 + evidenceRate * 0.2 + (consensus.length > 0 ? 0.15 : 0))).toFixed(2)) };
+}
+
 function classifyHost(hostname: string): "PUBLIC_WEB" | "PRIVATE_NETWORK" | "LOCALHOST" | "LOOPBACK" | "LINK_LOCAL" | "INTERNAL" {
   const host = hostname.toLowerCase().replace(/\.$/, "");
   if (host === "localhost" || host.endsWith(".localhost")) return "LOCALHOST";
@@ -1206,7 +1290,7 @@ export const browserSkill: Skill = {
       }
 
       // 4. Visiter et lire chaque source
-      const sources: Array<{ url: string; title: string; content: string; contentLength: number }> = [];
+      const sources: ResearchSource[] = [];
       const errors: Array<{ url: string; message: string }> = [];
 
       for (const url of candidates) {
@@ -1214,16 +1298,34 @@ export const browserSkill: Skill = {
         await waitForBrowserCondition(url, "url", 10_000);
         const result = await readPageContentWithRetry(null, 2, 1200);
         if (result.status === "success") {
+          const sourceUrl = result.url || url;
+          const content = result.content ?? "";
+          const extracted = extractSourceEvidence(content, query);
           sources.push({
-            url: result.url || url,
+            url: sourceUrl,
             title: result.title ?? "",
-            content: result.content ?? "",
-            contentLength: result.contentLength ?? 0,
+            domain: new URL(sourceUrl).hostname,
+            content,
+            contentLength: result.contentLength ?? content.length,
+            reliability: sourceReliability(sourceUrl, content),
+            freshness: sourceFreshness(content, sourceUrl),
+            facts: extracted.facts,
+            evidence: extracted.evidence,
+            contradictions: [],
           });
         } else {
           errors.push({ url, message: result.message });
         }
       }
+
+      const comparison = compareResearchSources(sources);
+      const research: ResearchResult = {
+        query,
+        sources,
+        consensus: comparison.consensus,
+        contradictions: comparison.contradictions,
+        confidence: comparison.confidence,
+      };
 
       return {
         status: sources.length > 0 ? "success" : "error",
@@ -1232,10 +1334,13 @@ export const browserSkill: Skill = {
         searchUrl,
         sourcesRead: sources.length,
         sources,
+        consensus: research.consensus,
+        contradictions: research.contradictions,
+        confidence: research.confidence,
         errors: errors.length ? errors : undefined,
         message:
           sources.length > 0
-            ? `${sources.length} source(s) lue(s) pour "${query}". Synthétise la réponse à partir de leur contenu en citant tes sources (URL/titre).`
+            ? `${sources.length} source(s) lue(s) pour "${query}". Consensus: ${research.consensus.length}, contradictions: ${research.contradictions.length}, confiance: ${(research.confidence * 100).toFixed(0)}%. Cite les preuves par URL/titre.`
             : `Aucune source n'a pu être lue pour "${query}".`,
       };
     }
