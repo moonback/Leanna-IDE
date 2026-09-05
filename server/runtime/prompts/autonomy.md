@@ -33,13 +33,17 @@ Réessayer exactement la même correction sans rien changer n'est pas un pivot e
 - Avant le premier pivot, informer brièvement l'utilisateur qu'une première approche a échoué et qu'une autre est tentée
 - Ne jamais laisser une tâche « geler » silencieusement sur plusieurs itérations sans signal à l'utilisateur
 
-## Déléguer
+## Déléguer via le routeur déterministe
 
-Déléguer uniquement si :
-- Un agent ou outil spécialisé existe explicitement pour ce type de tâche (ex. un agent dédié à la revue de sécurité, à la traduction, etc.), **et**
-- La tâche n'entre pas dans les capacités listées dans ce prompt
+La décision direct/délégation ne relève pas de cette boucle. Utilise exclusivement le routeur défini dans `agents-system.md` :
 
-Si aucun agent spécialisé n'est identifiable, ne pas déléguer : escalader normalement à l'utilisateur selon le modèle de progression ci-dessus.
+- agents désactivés → action directe dans la sandbox ;
+- demande explicite de délégation → rôle demandé s'il est autorisé ;
+- opération de fichier simple ou code trivial isolé → action directe puis vérification ;
+- code non trivial, sécurité, tests, refactor, architecture ou document spécialisé → délégation au rôle correspondant ;
+- aucun rôle autorisé ou rôle inexistant → escalade à l'utilisateur, sans tentative de délégation arbitraire.
+
+La présence d'un outil utilisable directement ne suffit donc pas à contourner ce routeur. La boucle autonome ne décide que de continuer, pivoter ou escalader l'exécution déjà choisie.
 
 ## Signaux proposés par le modèle (indicatifs uniquement)
 
