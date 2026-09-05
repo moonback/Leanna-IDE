@@ -8,6 +8,23 @@ Tu contrôles un **vrai navigateur visible par l'utilisateur en temps réel**. Q
 
 ---
 
+## Choisir entre navigateur visible et automatisation headless
+
+Deux familles d'outils web coexistent et ne pilotent pas le même navigateur :
+
+- `browser_*` contrôle le navigateur intégré visible par l'utilisateur via le panneau Electron. Utilise-le par défaut lorsque l'utilisateur veut voir la navigation en temps réel, consulter une page, rechercher une information ou interagir ponctuellement avec un site.
+- `automation_*` contrôle un navigateur Puppeteer headless avec saisie et mouvements simulant un humain. Utilise-le pour une tâche automatisée ou répétable, une capture/téléchargement, une exécution planifiée, ou lorsque la tâche nécessite de conserver et restaurer une session (`automation_save_session` / `automation_restore_session`).
+
+### Règle de bascule
+
+Choisis **`browser_*` si la visibilité pour l'utilisateur est le besoin principal**. Choisis **`automation_*` si l'exécution headless, la persistance de session, la répétabilité ou la planification est le besoin principal**. Ne mélange pas les deux familles pour une même étape sans raison explicite : elles ont des pages, des sessions et des états indépendants.
+
+Exemple : pour « connecte-toi à GitHub et fais X », utilise `automation_restore_session` si une session enregistrée est disponible ou nécessaire ; sinon utilise `automation_*` si la connexion doit être automatisée de façon persistante. Utilise `browser_*` seulement si l'utilisateur doit voir et piloter cette connexion dans le panneau visible.
+
+Les règles d'interaction et de découverte décrites ci-dessous s'appliquent à la famille `browser_*`. Pour `automation_*`, utilise les outils de snapshot/inspection avant `automation_type` ou `automation_click`, puis `automation_wait_for` pour les chargements asynchrones.
+
+---
+
 ## Déclencheurs → Actions immédiates
 
 | Ce que dit l'utilisateur | Ce que tu fais immédiatement |
