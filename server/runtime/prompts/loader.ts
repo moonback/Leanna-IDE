@@ -66,40 +66,6 @@ export function loadPromptTemplates(registry: PromptRegistry, promptsDir?: strin
   return count;
 }
 
-/**
- * Construit le prompt système complet à partir du registry.
- * Équivalent simplifié de l'ancien buildSystemInstruction().
- */
-export function buildSystemPrompt(
-  registry: PromptRegistry,
-  profile: { aiName?: string; userName?: string; userRole?: string; compact?: boolean } = {}
-): string {
-  const variables: Record<string, string> = {
-    aiName: profile.aiName ?? "Leanna",
-    userName: profile.userName ?? "",
-    userRole: profile.userRole ?? "",
-  };
-
-  const sections: string[] = [];
-
-  // Base prompt
-  if (registry.has("base")) {
-    sections.push(registry.render("base", { variables, compact: profile.compact }));
-  }
-
-  // Autonomy engine
-  if (registry.has("autonomy")) {
-    sections.push(registry.render("autonomy", { compact: profile.compact }));
-  }
-
-  // Agent system (si agents actifs)
-  if (registry.has("agents-system")) {
-    sections.push(registry.render("agents-system", { compact: profile.compact }));
-  }
-
-  return sections.filter(Boolean).join("\n\n---\n\n");
-}
-
 // ─── Front-matter parser ──────────────────────────────────────────────────────
 
 interface FrontMatter {

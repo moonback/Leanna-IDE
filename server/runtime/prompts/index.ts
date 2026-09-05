@@ -33,7 +33,7 @@ export {
 } from "./types.js";
 
 // Builder
-export { SystemPromptBuilder, getSystemPromptBuilder, buildSystemInstructionV3 } from "./SystemPromptBuilder.js";
+export { SystemPromptBuilder, getSystemPromptBuilder, buildSystemPrompt, buildSystemInstructionV3 } from "./SystemPromptBuilder.js";
 
 // Loader
-export { loadPromptTemplates, buildSystemPrompt } from "./loader.js";
+export { loadPromptTemplates } from "./loader.js";

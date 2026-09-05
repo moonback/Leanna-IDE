@@ -276,9 +276,13 @@ export function getSystemPromptBuilder(): SystemPromptBuilder {
 }
 
 /**
- * Construit le prompt système avec la config par défaut.
- * Drop-in replacement pour l'ancien buildSystemInstruction().
+ * Source canonique de construction du prompt système.
  */
-export function buildSystemInstructionV3(config: SystemPromptConfig = {}): string {
+export function buildSystemPrompt(config: SystemPromptConfig = {}): string {
   return getSystemPromptBuilder().build(config);
+}
+
+/** @deprecated Utiliser buildSystemPrompt. */
+export function buildSystemInstructionV3(config: SystemPromptConfig = {}): string {
+  return buildSystemPrompt(config);
 }

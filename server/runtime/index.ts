@@ -58,8 +58,9 @@ export { adaptSkill, adaptAllSkills, createToolCallProxy } from "./compat/SkillA
 export type { LegacySkill, AdaptOptions } from "./compat/SkillAdapter.js";
 
 // Prompts
-export { loadPromptTemplates, buildSystemPrompt } from "./prompts/loader.js";
+export { loadPromptTemplates } from "./prompts/loader.js";
 export { SystemPromptBuilder, buildSystemInstructionV3 } from "./prompts/SystemPromptBuilder.js";
+export { buildSystemPrompt } from "./prompts/SystemPromptBuilder.js";
 
 // Bootstrap
 export { bootstrapRuntime, bootstrapRuntimeSync } from "./bootstrap.js";
