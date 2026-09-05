@@ -59,5 +59,3 @@ export function buildSystemInstruction(profile: ProfileConfig = {}): string {
 export function buildSystemInstructionV2(config: SystemPromptConfig = {}): string {
   return builder.build(config);
 }
-
-export const Leanna_SYSTEM_INSTRUCTION = buildSystemInstruction();
