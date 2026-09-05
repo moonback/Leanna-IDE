@@ -31,6 +31,9 @@ import { z } from "zod";
 // afficher du contenu data: arbitraire dans le webview visible par l'user.
 const BLOCKED_SCHEMES = /^(javascript|data|file|vbscript|about):/i;
 
+export type BrowserNetworkPolicy = "PUBLIC_WEB";
+const NETWORK_POLICY: BrowserNetworkPolicy = "PUBLIC_WEB";
+
 // Domaines à exclure des résultats de recherche quand on extrait des liens
 // "à visiter" (pages de moteurs de recherche, trackers, etc.)
 const NON_CONTENT_DOMAINS = [
@@ -46,7 +49,43 @@ const NON_CONTENT_DOMAINS = [
 
 const MAX_CONTENT_LENGTH = 15_000; // caractères — évite de saturer le contexte du modèle
 
-function normalizeUrl(raw: string): string {
+export interface LinkCandidate {
+  href: string;
+  text: string;
+  domain: string;
+  position: number;
+  relevance: number;
+  isSponsored: boolean;
+  isNavigation: boolean;
+  isExternal: boolean;
+}
+
+function classifyHost(hostname: string): "PUBLIC_WEB" | "PRIVATE_NETWORK" | "LOCALHOST" | "LOOPBACK" | "LINK_LOCAL" | "INTERNAL" {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  if (host === "localhost" || host.endsWith(".localhost")) return "LOCALHOST";
+  if (host.endsWith(".local") || host.endsWith(".internal") || host === "metadata.google.internal") return "INTERNAL";
+  if (host === "::1" || host === "0.0.0.0" || host === "[::1]") return "LOOPBACK";
+  if (host.startsWith("fe80:") || host.startsWith("fe8") || host.startsWith("fec") || host.startsWith("fed") || host.startsWith("fee") || host.startsWith("fef")) return "LINK_LOCAL";
+  if (host.startsWith("fc") || host.startsWith("fd")) return "PRIVATE_NETWORK";
+
+  const octets = host.split(".").map(Number);
+  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) return "PUBLIC_WEB";
+  const [first, second] = octets;
+  if (first === 127) return "LOOPBACK";
+  if (first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168) || (first === 100 && second >= 64 && second <= 127) || (first === 198 && second >= 18 && second <= 19)) return "PRIVATE_NETWORK";
+  if (first === 169 && second === 254) return "LINK_LOCAL";
+  return "PUBLIC_WEB";
+}
+
+function assertAllowedBrowserUrl(url: string): void {
+  const parsed = new URL(url);
+  const classification = classifyHost(parsed.hostname);
+  if (NETWORK_POLICY === "PUBLIC_WEB" && classification !== "PUBLIC_WEB") {
+    throw new Error(`Destination ${classification} interdite par la policy ${NETWORK_POLICY}.`);
+  }
+}
+
+export function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
 
   if (!trimmed) return "https://www.google.com";
@@ -55,10 +94,15 @@ function normalizeUrl(raw: string): string {
     throw new Error(`Schéma d'URL non autorisé : ${trimmed.slice(0, 20)}...`);
   }
 
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) {
+    assertAllowedBrowserUrl(trimmed);
+    return trimmed;
+  }
 
   if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/.test(trimmed) && !trimmed.includes(" ")) {
-    return `https://${trimmed}`;
+    const normalized = `https://${trimmed}`;
+    assertAllowedBrowserUrl(normalized);
+    return normalized;
   }
 
   return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
@@ -94,6 +138,48 @@ function isContentDomain(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+function canonicalizeLink(url: string): string {
+  const parsed = new URL(url);
+  parsed.hash = "";
+  for (const key of [...parsed.searchParams.keys()]) {
+    if (/^(utm_|gclid$|fbclid$|ref$)/i.test(key)) parsed.searchParams.delete(key);
+  }
+  return parsed.toString();
+}
+
+export function rankLinkCandidates(
+  links: Array<{ text?: string; href?: string }>,
+  currentUrl?: string
+): LinkCandidate[] {
+  const currentDomain = currentUrl ? (() => { try { return new URL(currentUrl).hostname; } catch { return ""; } })() : "";
+  const seen = new Set<string>();
+  const candidates: LinkCandidate[] = [];
+
+  links.forEach((link, position) => {
+    if (!link?.href) return;
+    let href: string;
+    try {
+      href = normalizeUrl(link.href);
+      href = canonicalizeLink(href);
+      if (seen.has(href) || !isContentDomain(href)) return;
+      seen.add(href);
+    } catch {
+      return;
+    }
+    const text = (link.text ?? "").trim().replace(/\s+/g, " ").slice(0, 200);
+    const lower = `${text} ${href}`.toLowerCase();
+    const isSponsored = /sponsor|advert|annonce|pub|ads\b|promoted|utm_|gclid|fbclid/.test(lower);
+    const isNavigation = /^(home|accueil|login|sign in|connexion|menu|search|recherche|privacy|terms|contact|about|à propos|next|previous|suivant|précédent)$/i.test(text)
+      || /\/login(?:[/?#]|$)|\/signup(?:[/?#]|$)|\/privacy(?:[/?#]|$)|\/terms(?:[/?#]|$)/i.test(href);
+    const domain = new URL(href).hostname;
+    const isExternal = Boolean(currentDomain && domain !== currentDomain);
+    const relevance = Math.max(0, 100 - position) + (text.length >= 20 ? 15 : 0) + (isExternal ? 5 : 0) - (isSponsored ? 100 : 0) - (isNavigation ? 50 : 0);
+    candidates.push({ href, text, domain, position, relevance, isSponsored, isNavigation, isExternal });
+  });
+
+  return candidates.sort((a, b) => b.relevance - a.relevance || a.position - b.position);
 }
 
 // Petit wrapper pour garantir qu'on ne renvoie jamais "success" si l'IPC
@@ -1003,10 +1089,7 @@ export const browserSkill: Skill = {
         return { status: "error", message: raw };
       }
       const links = (Array.isArray(raw) ? raw : raw?.links ?? []) as Array<{ text?: string; href?: string }>;
-      const cleaned = links
-        .filter((l) => l?.href)
-        .slice(0, limit)
-        .map((l) => ({ text: (l.text ?? "").trim().slice(0, 200), href: l.href! }));
+      const cleaned = rankLinkCandidates(links).slice(0, limit);
 
       return {
         status: "success",
@@ -1027,16 +1110,17 @@ export const browserSkill: Skill = {
         return { status: "error", message: raw };
       }
       const links = (Array.isArray(raw) ? raw : raw?.links ?? []) as Array<{ text?: string; href?: string }>;
+      const candidates = rankLinkCandidates(links);
 
       const wantedText = text?.trim().toLowerCase();
       const wantedUrl = urlContains?.trim().toLowerCase();
 
-      const match = links.find((l) => {
-        const linkText = (l.text ?? "").toLowerCase();
-        const linkHref = (l.href ?? "").toLowerCase();
+      const match = candidates.find((l) => {
+        const linkText = l.text.toLowerCase();
+        const linkHref = l.href.toLowerCase();
         const textOk = wantedText ? linkText.includes(wantedText) : true;
         const urlOk = wantedUrl ? linkHref.includes(wantedUrl) : true;
-        return !!l.href && textOk && urlOk;
+        return !l.isSponsored && textOk && urlOk;
       });
 
       if (!match) {
@@ -1047,13 +1131,13 @@ export const browserSkill: Skill = {
       }
 
       return withEmit(emit, (fire) => {
-        const normalized = normalizeUrl(match.href!);
+        const normalized = normalizeUrl(match.href);
         fire({ type: "open-browser" });
         fire({ type: "browser-navigate", url: normalized });
         return {
           status: "success",
           url: normalized,
-          matchedText: match.text ?? "",
+          matchedText: match.text,
           message: `Ouverture du lien "${match.text || normalized}".`,
         };
       });
@@ -1084,17 +1168,15 @@ export const browserSkill: Skill = {
         };
       }
       const links = (Array.isArray(rawLinks) ? rawLinks : rawLinks?.links ?? []) as Array<{ text?: string; href?: string }>;
+      const rankedLinks = rankLinkCandidates(links);
 
       // 3. Filtrer : garder des URLs http(s) valides, hors domaines "non-contenu",
       //    et dédupliquer par domaine pour diversifier les sources.
       const seenDomains = new Set<string>();
       const candidates: string[] = [];
-      for (const l of links) {
-        if (!l.href) continue;
-        if (!/^https?:\/\//i.test(l.href)) continue;
-        if (!isContentDomain(l.href)) continue;
-        let domain: string;
-        try { domain = new URL(l.href).hostname; } catch { continue; }
+      for (const l of rankedLinks) {
+        if (l.isSponsored || l.isNavigation) continue;
+        const domain = l.domain;
         if (seenDomains.has(domain)) continue;
         seenDomains.add(domain);
         candidates.push(l.href);

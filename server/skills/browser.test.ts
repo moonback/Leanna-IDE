@@ -1,8 +1,40 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { browserSkill } from "./browser.js";
+import { browserSkill, normalizeUrl, rankLinkCandidates } from "./browser.js";
 
 describe("browser", () => {
+  describe("URL policy and link ranking", () => {
+    it("allows public URLs and rejects private, loopback, and link-local destinations", () => {
+      assert.equal(normalizeUrl("https://example.com/docs"), "https://example.com/docs");
+      for (const url of [
+        "http://localhost:3000",
+        "http://127.0.0.1",
+        "http://10.0.0.1",
+        "http://192.168.1.10",
+        "http://172.16.0.1",
+        "http://169.254.169.254/latest/meta-data",
+      ]) {
+        assert.throws(() => normalizeUrl(url), /interdite|PRIVATE|LOCALHOST|LOOPBACK|LINK_LOCAL/);
+      }
+    });
+
+    it("ranks, filters, and deduplicates link candidates", () => {
+      const candidates = rankLinkCandidates([
+        { text: "Accueil", href: "https://example.com/" },
+        { text: "Résultat documentaire important", href: "https://docs.example.org/page?utm_source=test" },
+        { text: "Résultat documentaire important (copie)", href: "https://docs.example.org/page#section" },
+        { text: "Annonce sponsorisée", href: "https://ads.example.net/click" },
+      ], "https://example.com/search");
+
+      assert.equal(candidates.length, 3);
+      assert.equal(candidates[0].domain, "docs.example.org");
+      assert.equal(candidates[0].isNavigation, false);
+      assert.equal(candidates.some((candidate) => candidate.isSponsored), true);
+      assert.equal(new Set(candidates.map((candidate) => candidate.href)).size, candidates.length);
+      assert.equal(candidates[0].isExternal, true);
+    });
+  });
+
   describe("Skill declaration", () => {
     it("should have the correct skill name", () => {
       assert.strictEqual(browserSkill.name, "browser");
