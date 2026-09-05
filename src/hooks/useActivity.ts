@@ -29,6 +29,12 @@ export interface ReasoningState {
   active: boolean;
   strategy?: string;
   strategyLabel?: string;
+  announcement?: string;
+  /** Texte reçu progressivement pendant les stratégies streamées. */
+  streamText?: string;
+  /** Dernier fragment reçu, utile pour les consommateurs temps réel. */
+  chunk?: string;
+  cached?: boolean;
   /** Étapes CoT visibles en temps réel */
   steps?: ReasoningStep[];
   /** Complexité détectée : simple | moderate | complex | critical */

@@ -1194,7 +1194,6 @@ async function handleToolCall(
 
   const context = {
     voiceName,
-    reasoningVoiceEnabled: (currentProfile as any).reasoningVoiceEnabled !== false,
     notifyLiveAPI: (message: string) => {
       try { session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: `[BACKGROUND TASK UPDATE] ${message}` }] }] }); } catch (e) { console.error('Failed to notify Live API:', e); }
     },

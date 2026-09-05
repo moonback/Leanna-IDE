@@ -27,15 +27,7 @@ export function BehaviorSection() {
           />
         </Field>
 
-        <Field label="Vocal du raisonnement" hint="Active ou désactive les annonces vocales TTS au début et à la fin du raisonnement structuré">
-          <ToggleSwitch
-            value={profile.reasoningVoiceEnabled}
-            onChange={v => setField('reasoningVoiceEnabled', v)}
-            label="Voix raisonnement"
-            hint={profile.reasoningVoiceEnabled ? 'Annonces vocales activées pendant le raisonnement' : 'Mode silencieux — texte seul pendant le raisonnement'}
-          />
-        </Field>
-       
+
         <SectionDivider label="Mode Muet Automatique" />
        
         <Field label="Activer le mode muet automatique" hint="Coupe le micro automatiquement après une période d'inactivité">

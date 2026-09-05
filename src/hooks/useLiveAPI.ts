@@ -304,7 +304,17 @@ export function useLiveAPI() {
       setIsBusy(!!msg.busy);
     }
     if (msg.reasoning) {
-      setReasoning(msg.reasoning);
+      setReasoning(prev => {
+        const incoming = msg.reasoning as Partial<ReasoningState>;
+        const startsNewReasoning = incoming.active === true && !prev.active;
+        const nextChunk = typeof incoming.chunk === 'string' ? incoming.chunk : '';
+        return {
+          ...prev,
+          ...incoming,
+          ...(startsNewReasoning ? { streamText: '' } : {}),
+          ...(nextChunk ? { streamText: startsNewReasoning ? nextChunk : `${prev.streamText ?? ''}${nextChunk}` } : {}),
+        };
+      });
       if (msg.reasoning.active) {
         addLog(`🧠 Raisonnement activé: ${msg.reasoning.strategyLabel || msg.reasoning.strategy}`, 'info');
       }
