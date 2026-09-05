@@ -46,6 +46,26 @@ function waitForCondition(check: () => boolean, timeoutMs = 5000, intervalMs = 5
   });
 }
 
+function closeWebSocket(ws: WebSocket): Promise<void> {
+  if (ws.readyState === WebSocket.CLOSED) return Promise.resolve();
+  return new Promise((resolve) => {
+    ws.once('close', () => resolve());
+    ws.terminate();
+  });
+}
+
+function closeHttpServer(server: http.Server): Promise<void> {
+  server.close();
+  server.closeAllConnections();
+  return Promise.resolve();
+}
+
+function closeWebSocketServer(wss: WebSocketServer): Promise<void> {
+  for (const client of wss.clients) client.terminate();
+  wss.close();
+  return Promise.resolve();
+}
+
 // ─── Tests Routeur REST Terminal ─────────────────────────────────────────────
 
 test('terminal REST: GET /terminal/config returns environment configuration', async () => {
@@ -165,9 +185,9 @@ test('terminal WebSocket: connects, receives welcome message, accepts input & re
     // 5. Fermeture explicite via le message 'close'
     ws.send(JSON.stringify({ type: 'close' }));
   } finally {
-    ws.close();
+    await closeWebSocket(ws);
     await new Promise<void>((resolve) => {
-      terminalWss.close(() => server.close(() => resolve()));
+      closeWebSocketServer(terminalWss).then(() => closeHttpServer(server)).then(resolve);
     });
   }
 });
@@ -205,7 +225,7 @@ test('terminal WebSocket: rejects unauthorized connection when token is required
     assert.equal(closeEvent.reason, 'Unauthorized');
   } finally {
     await new Promise<void>((resolve) => {
-      terminalWss.close(() => server.close(() => resolve()));
+      closeWebSocketServer(terminalWss).then(() => closeHttpServer(server)).then(resolve);
     });
   }
 });
@@ -305,7 +325,7 @@ test('live & sandbox WebSocket: upgrade auth verification (unauthorized vs autho
   });
   await waitForWsOpen(goodLiveWs);
   assert.equal(goodLiveWs.readyState, WebSocket.OPEN);
-  goodLiveWs.close();
+  await closeWebSocket(goodLiveWs);
 
   // 3. Connexion /sandbox-watch avec token valide en cookie -> Doit réussir
   const sandboxWs = new WebSocket(`ws://127.0.0.1:${port}/sandbox-watch`, {
@@ -313,13 +333,12 @@ test('live & sandbox WebSocket: upgrade auth verification (unauthorized vs autho
   });
   await waitForWsOpen(sandboxWs);
   assert.equal(sandboxWs.readyState, WebSocket.OPEN);
-  sandboxWs.close();
+  await closeWebSocket(sandboxWs);
 
   await new Promise<void>((resolve) => {
-    liveWss.close(() => {
-      sandboxWss.close(() => {
-        server.close(() => resolve());
-      });
-    });
+    closeWebSocketServer(liveWss)
+      .then(() => closeWebSocketServer(sandboxWss))
+      .then(() => closeHttpServer(server))
+      .then(resolve);
   });
 });

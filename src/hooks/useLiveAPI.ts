@@ -118,7 +118,7 @@ export function useLiveAPI() {
   // l'envoi pendant isBusy, sauf pendant l'exécution d'outils (tool calls)
   // où Gemini n'écoute pas et où l'audio serait ignoré de toute façon.
   // On mesure également la latence entre le début d'utterance et le premier chunk.
-  const handleAudioData = useCallback((base64Data: string) => {
+  const handleAudioData = useCallback((pcm16: ArrayBuffer) => {
     // Bloquer uniquement pendant l'exécution d'outils côté serveur
     if (isBusyRef.current) return;
 
@@ -129,7 +129,7 @@ export function useLiveAPI() {
       waitingFirstResponseChunkRef.current = true;
     }
 
-    sendAudioData(base64Data);
+    sendAudioData(pcm16);
   }, []);
 
     const { profile } = useProfile();
@@ -171,25 +171,16 @@ export function useLiveAPI() {
         });
       }
     }
-    if (msg.audio) {
-      // ✅ Mesure latence : UNIQUEMENT lors du premier chunk audio de la réponse
-      // Le texte arrive souvent 50-100ms avant l'audio, donc on ne mesure que l'audio
-      if (waitingFirstResponseChunkRef.current && utteranceStartRef.current !== null) {
-        const now = performance.now();
-        const latency = Math.round(now - utteranceStartRef.current);
-        console.debug(`[VoiceLatency] Calcul: now=${Math.round(now)}, start=${Math.round(utteranceStartRef.current)}, latency=${latency}ms`);
-        recordLatency(latency);
-        waitingFirstResponseChunkRef.current = false;
-        utteranceStartRef.current = null;
-      }
-      playAudioChunk(msg.audio);
-    }
     if (msg.interrupted) {
       // Réinitialiser le tracking de latence si l'assistant est interrompu
       utteranceStartRef.current = null;
       waitingFirstResponseChunkRef.current = false;
       handleInterrupt();
       addLog('Interrupted', 'system');
+    }
+    if (typeof msg.audio === 'string') {
+      // Les annonces TTS des outils arrivent en JSON base64, contrairement à l'audio Live binaire.
+      playAudioChunk(msg.audio);
     }
     if (msg.type === 'ide-action' && msg.action) {
       const a = msg.action;
@@ -408,6 +399,16 @@ export function useLiveAPI() {
     recordLatency,
   ]);
 
+  const handleAudioChunk = useCallback((pcm16: ArrayBuffer) => {
+    if (waitingFirstResponseChunkRef.current && utteranceStartRef.current !== null) {
+      const now = performance.now();
+      recordLatency(Math.round(now - utteranceStartRef.current));
+      waitingFirstResponseChunkRef.current = false;
+      utteranceStartRef.current = null;
+    }
+    playAudioChunk(pcm16);
+  }, [playAudioChunk, recordLatency]);
+
   const {
     status,
     connected,
@@ -420,6 +421,7 @@ export function useLiveAPI() {
     sendRawMessage,
   } = useWebSocket({
     onMessage: handleWebSocketMessage,
+    onAudioChunk: handleAudioChunk,
     onLog: addLog,
   });
 

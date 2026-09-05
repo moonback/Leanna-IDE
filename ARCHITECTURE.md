@@ -203,6 +203,24 @@ server/runtime/
 
 Les 25+ skills natifs (`server/skills/`) sont enregistrés une seule fois au démarrage via `bootstrapRuntimeSync`. Les custom skills sont chargés depuis Supabase (`sm.loadCustomSkills()`).
 
+### Prompt, policy et exécution
+
+Le prompt système est construit par `SystemPromptBuilder`, source canonique. `server/prompts/systemInstruction.ts` conserve uniquement des façades de compatibilité (`buildSystemInstruction`, `buildSystemInstructionV2`) qui délèguent au builder canonique.
+
+Les instructions du prompt n'accordent jamais une capacité à elles seules :
+
+```
+ToolRegistry → policy/permissions → executor → skill handler
+```
+
+Les confirmations de commandes passent par `confirmationBridge`. Les scripts npm `test`, `build` et `typecheck` sont classés `known-safe-project` mais restent confirmés ; les scripts arbitraires portent un risque élevé et affichent la commande réelle avant approbation.
+
+Le routeur direct/délégation suit des règles déterministes. Les agents custom n'obtiennent aucune permission implicite : leurs permissions de délégation, cibles, profondeur, outils, capacités, budget et niveau de risque doivent être explicites dans `DelegationPolicy`.
+
+Les boucles autonomes sont bornées par le runtime à trois approches de deux tentatives maximum. Le modèle peut proposer `retry`, `pivot` ou `escalade`, mais le runtime impose les limites et force le pivot/escalade.
+
+Pour le navigateur intégré, la policy `PUBLIC_WEB_AND_LOCALHOST` autorise uniquement `localhost` et `*.localhost` pour le développement local. Elle bloque les IP loopback, réseaux privés, link-local et domaines internes. `browser_research` classe les sources, diversifie les domaines et calcule preuves, consensus, contradictions et confiance.
+
 ### Agent Orchestrator
 
 ```
@@ -310,3 +328,87 @@ Le serveur n'écoute que sur la loopback pour éviter l'exposition du terminal s
 ### TypeScript strict end-to-end
 
 `tsconfig.json` active `strict`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`. Le build esbuild du serveur est séparé du build Vite du frontend pour permettre un bundle CJS compatible Electron.
+
+---
+
+## Tests
+
+### Stratégie de test
+
+Leanna utilise le **Node.js test runner natif** (`node:test`) pour tous les tests unitaires et d'intégration. Pas de framework externe (Jest, Mocha) : les tests sont simples, rapides et portables.
+
+**Couverture actuelle :**
+- ✅ **Skills** : ≥60% de couverture (136+ tests unitaires)
+- ✅ **Routes REST** : 74 tests d'intégration
+
+### Tests unitaires (Skills)
+
+Fichiers : `server/skills/*.test.ts`
+
+**Objectif** : valider la logique métier de chaque skill isolément
+- Validation des schémas Zod
+- Gestion d'erreurs
+- Cas nominaux et cas limites
+- Aucune dépendance réseau (mocks)
+
+Exemple : `server/skills/browser.test.ts` valide que les appels Puppeteer sont correctement formatés sans lancer un navigateur réel.
+
+### Tests d'intégration (Routes REST)
+
+Fichiers : `server/routes/*.test.ts`
+
+**Objectif** : valider le comportement end-to-end des endpoints HTTP
+- Création d'un serveur Express isolé par test
+- Tests sur un port aléatoire (évite les conflits)
+- Validation des codes HTTP (200, 400, 404, 500, 503)
+- Validation des schémas de réponse JSON
+- Tests d'authentification et rate limiting
+
+**Couverture complète des domaines fonctionnels :**
+
+| Domaine | Tests | Couverture |
+|---|---|---|
+| Agents | 15 | Statut, tâches, rôles, flotte, bus de messages, collaboration, persistance, tool-mapping, tool-categories |
+| Marketplace | 13 | Recherche, featured, installed, stats, installation, publication, rating, sécurité, export |
+| Workflows | 7 | Liste, création, exécution, toggle, suppression |
+| Browser | 7 | Validation requêtes, résolution promesses, actions |
+| Upload Document | 7 | Validation types fichiers, rate limiting, contexte |
+| Conversations | 7 | Liste, recherche, messages, mise à jour titre, suppression |
+| Skills | 6 | Liste, propriétés requises, core skills, statut Supabase |
+| Profile & Tokens | 6 | GET/POST profile, GET/POST tokens, validation clés |
+| Terminal | 5 | Configuration, sessions actives, authentification |
+| Memories | 3 | Liste, suppression globale, suppression par ID |
+| Workspace | 3 | Info workspace, verrouillage POST |
+| Health | 1 | Health check |
+
+### Exécution des tests
+
+```bash
+# Tous les tests (skills + routes)
+npm test
+
+# Tests d'intégration seulement
+npm test -- server/routes/*.test.ts
+
+# Tests unitaires seulement
+npm test -- server/skills/*.test.ts
+
+# Un fichier spécifique
+npm test -- server/routes/agents.test.ts
+
+# Mode watch (relance sur changement)
+npm test -- --watch
+
+# Coverage (expérimental)
+npm test -- --coverage
+```
+
+### CI/CD
+
+Les tests sont automatiquement exécutés sur chaque push et pull request via GitHub Actions. Un build échoué ou des tests en erreur bloquent le merge.
+
+**Seuils de qualité :**
+- Build TypeScript doit passer (`tsc --noEmit`)
+- Lint doit passer (`npm run lint`)
+- Tous les tests doivent passer (`npm test`)
+- Coverage skills ≥60%

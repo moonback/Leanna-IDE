@@ -111,8 +111,8 @@ export function SelfRootSection() {
     if (!trimmed || trimmed === status?.rootPath) return;
     setPendingPath(trimmed);
     setPendingSiteUrl(siteUrlInput.trim() || undefined);
-    setPendingName(customNameInput.trim() || undefined);
-  }, [pathInput, siteUrlInput, customNameInput, status]);
+    setPendingName(undefined);
+  }, [pathInput, siteUrlInput, status]);
 
   const handleSwitchWorkspace = (ws: WorkspaceItem) => {
     if (ws.path === status?.rootPath) return;

@@ -16,12 +16,14 @@ import { COLLABORATION_PATTERNS } from "./AgentCommunication.js";
 import { agentPersistence } from "./AgentPersistence.js";
 import { createLogger } from "../utils/logger.js";
 import { initCustomAgents } from "../routes/custom-agents.js";
+import { agentEventStream } from "./AgentEventStream.js";
 
 // Ré-exporter pour compatibilité et usage externe
 export type { AgentEvent } from "./ProgressNotifier.js";
 export { agentMessageBus } from "./AgentMessageBus.js";
 export { agentRegistry } from "./AgentRegistry.js";
-export { COLLABORATION_PATTERNS, DELEGATION_MATRIX } from "./AgentCommunication.js";
+export { COLLABORATION_PATTERNS, DELEGATION_MATRIX, delegationPolicy } from "./AgentCommunication.js";
+export type { DelegationPolicy, DelegationTaskContext } from "./AgentCommunication.js";
 
 const log = createLogger("Orchestrator");
 
@@ -68,13 +70,17 @@ export class AgentOrchestrator {
 
   /** Configure le broadcaster d'événements temps réel vers le frontend */
   setEventBroadcaster(broadcaster: EventBroadcaster): void {
-    this.notifier.setEventBroadcaster(broadcaster);
-    this.registry.setEventBroadcaster(broadcaster);
+    const publish = (event: Parameters<EventBroadcaster>[0]) => {
+      broadcaster(event);
+      agentEventStream.publish(event);
+    };
+    this.notifier.setEventBroadcaster(publish);
+    this.registry.setEventBroadcaster(publish);
 
     // Transmettre les événements du bus de messages au frontend
     agentMessageBus.on("message", (msg) => {
       try {
-        broadcaster({
+          publish({
           type: "agent_event",
           event: "task_started",
           taskId: msg.id,

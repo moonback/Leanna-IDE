@@ -83,14 +83,14 @@ export class SystemPromptBuilder {
     if (isAskMode) {
       // ── Mode Chat/Ask : prompt optimisé pour le Q&A documentaire ──
 
-      // 1. Chat prompt (analyse documentaire, Q&A contextuel)
-      if (this.registry.has("chat")) {
-        sections.push(this.registry.render("chat", renderOpts));
-      }
-
-      // 2. Sécurité (toujours présente)
+      // 1. Sécurité avant toute politique opérationnelle
       if (this.registry.has("safety")) {
         sections.push(this.registry.render("safety", renderOpts));
+      }
+
+      // 2. Chat prompt (analyse documentaire, Q&A contextuel)
+      if (this.registry.has("chat")) {
+        sections.push(this.registry.render("chat", renderOpts));
       }
 
       // 3. Efficacité des outils (lecture seule en ask mode)
@@ -101,32 +101,32 @@ export class SystemPromptBuilder {
     } else {
       // ── Mode Full : prompt agent complet ──
 
-      // 1. Base (identité, processus de réflexion, communication)
+      // 1. Identité, périmètre et politique de tâche
       if (this.registry.has("base")) {
         sections.push(this.registry.render("base", renderOpts));
       }
 
-      // 2. Autonomie (boucle de contrôle)
-      if (this.registry.has("autonomy")) {
-        sections.push(this.registry.render("autonomy", renderOpts));
-      }
-
-      // 3. Navigateur web intégré (comportement conversationnel)
-      if (this.registry.has("browser")) {
-        sections.push(this.registry.render("browser", renderOpts));
-      }
-
-      // 4. Efficacité des outils
-      if (this.registry.has("efficiency")) {
-        sections.push(this.registry.render("efficiency", renderOpts));
-      }
-
-      // 4. Sécurité
+      // 2. Autorité et garde-fous : avant les instructions d'exécution
       if (this.registry.has("safety")) {
         sections.push(this.registry.render("safety", renderOpts));
       }
 
-      // 5. Système multi-agents (conditionnel selon config.agents)
+      // 3. Directives de politique technique et comportementale
+      if (this.registry.has("ai-studio-directives")) {
+        sections.push(this.registry.render("ai-studio-directives", renderOpts));
+      }
+
+      // 4. Politique d'utilisation des outils
+      if (this.registry.has("efficiency")) {
+        sections.push(this.registry.render("efficiency", renderOpts));
+      }
+
+      // 5. Navigateur web intégré (comportement conversationnel)
+      if (this.registry.has("browser")) {
+        sections.push(this.registry.render("browser", renderOpts));
+      }
+
+      // 6. Système multi-agents (conditionnel selon config.agents)
       const agentsEnabled = config.agents?.enabled !== false; // activé par défaut
       if (agentsEnabled && this.registry.has("agents-system")) {
         const allowedRoles = config.agents?.allowedRoles as AgentRole[] | undefined;
@@ -142,9 +142,9 @@ export class SystemPromptBuilder {
         sections.push(this.buildSoloModePrompt());
       }
 
-      // 6. Directives AI Studio Build (comportement, technique, conception)
-      if (this.registry.has("ai-studio-directives")) {
-        sections.push(this.registry.render("ai-studio-directives", renderOpts));
+      // 7. Boucle d'autonomie : après les règles et les capacités disponibles
+      if (this.registry.has("autonomy")) {
+        sections.push(this.registry.render("autonomy", renderOpts));
       }
     }
 
@@ -276,9 +276,13 @@ export function getSystemPromptBuilder(): SystemPromptBuilder {
 }
 
 /**
- * Construit le prompt système avec la config par défaut.
- * Drop-in replacement pour l'ancien buildSystemInstruction().
+ * Source canonique de construction du prompt système.
  */
-export function buildSystemInstructionV3(config: SystemPromptConfig = {}): string {
+export function buildSystemPrompt(config: SystemPromptConfig = {}): string {
   return getSystemPromptBuilder().build(config);
+}
+
+/** @deprecated Utiliser buildSystemPrompt. */
+export function buildSystemInstructionV3(config: SystemPromptConfig = {}): string {
+  return buildSystemPrompt(config);
 }

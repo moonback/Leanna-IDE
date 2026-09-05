@@ -66,6 +66,17 @@ const RUN_ALLOWED_PREFIXES = ["npm ", "npx ", "node "] as const;
 // sous-commandes strictement en lecture seule (aucune exécution de code du
 // projet, aucune modification du disque).
 const NPM_NO_CONFIRM = new Set(["ls", "list", "outdated"]);
+const NPM_KNOWN_SAFE_SCRIPTS = new Set(["test", "build", "typecheck"]);
+
+export type NpmExecutionClass = "read-only" | "known-safe-project" | "arbitrary-script";
+
+export function classifyNpmExecution(parts: string[]): NpmExecutionClass {
+    const sub = (parts[1] ?? "").toLowerCase();
+    if (NPM_NO_CONFIRM.has(sub)) return "read-only";
+    if (sub === "test") return "known-safe-project";
+    if (sub === "run" && NPM_KNOWN_SAFE_SCRIPTS.has((parts[2] ?? "").toLowerCase())) return "known-safe-project";
+    return "arbitrary-script";
+}
 
 const RUN_TIMEOUT_MS = 120_000; // 2 minutes max
 
@@ -137,7 +148,9 @@ async function describeNpmScript(root: string, parts: string[]): Promise<string>
         const pkg = JSON.parse(pkgRaw);
         const scriptCmd = pkg?.scripts?.[scriptName];
         if (scriptCmd) {
-            return `npm ${parts.slice(1).join(" ")}\n→ exécutera : ${truncate(String(scriptCmd), 300)}`;
+            const classification = classifyNpmExecution(parts);
+            const label = classification === "known-safe-project" ? "known-safe project execution" : "arbitrary npm script — confirmation renforcée";
+            return `[${label}] npm ${parts.slice(1).join(" ")}\n→ exécutera : ${truncate(String(scriptCmd), 300)}`;
         }
         return `npm ${parts.slice(1).join(" ")} (script "${scriptName}" introuvable dans package.json)`;
     } catch {
@@ -227,7 +240,8 @@ async function runNpmSubcommand(
             parts.join(" "),
             "npm-command",
             toolContext.emitToClient,
-            description
+            description,
+            classifyNpmExecution(parts) === "arbitrary-script" ? "high" : "standard"
         );
         if (!approved) {
             return { error: "Commande npm refusée par l'utilisateur ou expirée." };
@@ -320,7 +334,7 @@ export const systemSkill: Skill = {
         },
         {
             name: "run_project_command",
-            description: "Exécute une commande npm, npx ou node dans le workspace du projet et retourne stdout/stderr. Commandes autorisées : npm run <script>, npm install <pkg>, npm uninstall <pkg>, npm test, npm audit, npx <outil>, node <script.js>. Les commandes npm qui exécutent du code du projet ou modifient node_modules (run, test, install, uninstall, update, ci, audit) nécessitent une confirmation utilisateur interactive ; seules ls/list/outdated en sont dispensées. Idéal pour lancer des builds, installer des dépendances, exécuter des scripts ou vérifier la compilation.",
+            description: "Exécute une commande npm, npx ou node dans le workspace du projet et retourne stdout/stderr. npm test, npm run build et npm run typecheck sont classés known-safe project execution et demandent une confirmation standard. Tout autre npm run <script> est un arbitrary script et demande une confirmation renforcée (commande réelle + risque élevé). Les commandes npm ls/list/outdated sont les seules opérations sans confirmation.",
             parameters: {
                 type: "OBJECT",
                 properties: {

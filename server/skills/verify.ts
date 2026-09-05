@@ -49,8 +49,9 @@ export interface ParsedTsError {
 }
 
 /**
- * Vérifie l'équilibre des accolades, parenthèses, crochets et quotes dans le code.
- * Retourne null si OK, sinon un message d'erreur descriptif.
+ * Pré-vérifie rapidement l'équilibre des accolades, parenthèses, crochets et quotes.
+ * Ce n'est pas un parseur TypeScript : pour les fichiers TS/TSX, le résultat du
+ * compilateur reste l'autorité syntaxique et cette fonction ne doit pas bloquer.
  */
 export function checkBracketBalance(code: string): string | null {
   const pairs = { "{": "}", "(": ")", "[": "]", '"': '"', "'": "'", "`": "`" };
@@ -1020,13 +1021,18 @@ export const verifySkill: Skill = {
         if (isTypeScript) {
           tsSyntaxError = checkTypeScriptSyntax(validated.code, validated.filePath);
         }
-        const ok = !bracketError && !tsSyntaxError;
+        // Pour TS/TSX, TypeScript est l'arbitre : le scan de crochets est
+        // uniquement un signal rapide et peut produire des faux positifs.
+        const syntaxError = isTypeScript ? tsSyntaxError : bracketError;
+        const ok = !syntaxError;
         return {
           status: ok ? "success" : "failed",
-          message: ok ? "✅ Syntaxe OK." : (bracketError || tsSyntaxError || "Erreur de syntaxe"),
+          message: ok
+            ? (isTypeScript && bracketError ? "✅ Syntaxe TypeScript OK (précheck de crochets non bloquant)." : "✅ Syntaxe OK.")
+            : (syntaxError || "Erreur de syntaxe"),
           bracketBalance: !bracketError,
           tsSyntax: !tsSyntaxError,
-          error: bracketError || tsSyntaxError,
+          error: syntaxError,
         };
       }
 

@@ -326,4 +326,26 @@ describe("SkillManagerV2", () => {
     assert.equal(decls.length, 1);
     assert.equal(decls[0].name, "tool1");
   });
+
+  it("devrait retirer les anciens outils lors du remplacement d'une skill", () => {
+    const sm = new SkillManagerV2();
+    sm.registerSkill({
+      name: "dynamic",
+      declarations: [
+        { name: "old_tool", description: "Ancien outil" },
+        { name: "kept_tool", description: "Outil conservé" },
+      ],
+      handleToolCall: async () => null,
+    });
+
+    sm.registerSkill({
+      name: "dynamic",
+      declarations: [{ name: "kept_tool", description: "Outil actualisé" }],
+      handleToolCall: async () => null,
+    });
+
+    assert.equal(sm.hasTool("old_tool"), false);
+    assert.equal(sm.hasTool("kept_tool"), true);
+    assert.equal(sm.getToolDeclarations()[0].description, "Outil actualisé");
+  });
 });

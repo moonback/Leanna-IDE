@@ -1,20 +1,17 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-function pcmToBase64(pcmData: Float32Array): string {
+function floatToPcm16(pcmData: Float32Array): ArrayBuffer {
   const buffer = new ArrayBuffer(pcmData.length * 2);
   const view = new DataView(buffer);
   for (let i = 0; i < pcmData.length; i++) {
     const s = Math.max(-1, Math.min(1, pcmData[i]));
     view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
   }
-  let binary = '';
-  const bytes = new Uint8Array(buffer);
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
+  return buffer;
 }
 
 export interface UseAudioOptions {
-  onAudioData: (base64Audio: string) => void;
+  onAudioData: (pcm16: ArrayBuffer) => void;
   autoMuteEnabled?: boolean;
   autoMuteTimeout?: number; // in seconds
   vadEnabled?: boolean;      // Voice Activity Detection
@@ -112,17 +109,20 @@ export function useAudio({
     setMuted(prev => !prev);
   }, []);
 
-  const playAudioChunk = useCallback((base64Audio: string) => {
+  const playAudioChunk = useCallback((audioData: ArrayBuffer | string) => {
     const audioCtx = outputAudioCtxRef.current;
     if (!audioCtx) return;
     try {
       if (audioCtx.state === 'suspended') audioCtx.resume();
      
-      const binaryStr = atob(base64Audio);
-      const bytes = new Uint8Array(binaryStr.length);
-      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-
-      const pcm16 = new Int16Array(bytes.buffer);
+      const pcm16 = typeof audioData === 'string'
+        ? (() => {
+            const binaryStr = atob(audioData);
+            const bytes = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+            return new Int16Array(bytes.buffer);
+          })()
+        : new Int16Array(audioData);
       const float32 = new Float32Array(pcm16.length);
       for (let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768.0;
 
@@ -274,7 +274,7 @@ export function useAudio({
           if (amplitude > vadThresholdRef.current) {
             // ✅ Voix détectée → envoyer le chunk et reset le timer de silence
             vadSilenceStartRef.current = null;
-            onAudioData(pcmToBase64(e.inputBuffer.getChannelData(0)));
+            onAudioData(floatToPcm16(e.inputBuffer.getChannelData(0)));
             resetAutoMute();
           } else {
             // 🔇 Silence détecté
@@ -288,13 +288,13 @@ export function useAudio({
             if (silenceDuration < vadSilenceDurationRef.current) {
               // Silence court (< 800ms par défaut) → continuer d'envoyer
               // (pauses naturelles dans les phrases, respiration)
-              onAudioData(pcmToBase64(e.inputBuffer.getChannelData(0)));
+              onAudioData(floatToPcm16(e.inputBuffer.getChannelData(0)));
             }
             // Silence long (> 800ms) → NE RIEN ENVOYER (économie bande passante)
           }
         } else {
           // VAD désactivé → envoyer tout l'audio (comportement original)
-          onAudioData(pcmToBase64(e.inputBuffer.getChannelData(0)));
+          onAudioData(floatToPcm16(e.inputBuffer.getChannelData(0)));
         }
       };
     } catch (err) {

@@ -31,6 +31,11 @@ import { z } from "zod";
 // afficher du contenu data: arbitraire dans le webview visible par l'user.
 const BLOCKED_SCHEMES = /^(javascript|data|file|vbscript|about):/i;
 
+export type BrowserNetworkPolicy = "PUBLIC_WEB" | "PUBLIC_WEB_AND_LOCALHOST";
+// Autorise les serveurs de développement locaux nommés localhost sans ouvrir
+// les IP loopback, les réseaux privés ou les endpoints de métadonnées.
+const NETWORK_POLICY: BrowserNetworkPolicy = "PUBLIC_WEB_AND_LOCALHOST";
+
 // Domaines à exclure des résultats de recherche quand on extrait des liens
 // "à visiter" (pages de moteurs de recherche, trackers, etc.)
 const NON_CONTENT_DOMAINS = [
@@ -46,7 +51,128 @@ const NON_CONTENT_DOMAINS = [
 
 const MAX_CONTENT_LENGTH = 15_000; // caractères — évite de saturer le contexte du modèle
 
-function normalizeUrl(raw: string): string {
+export interface LinkCandidate {
+  href: string;
+  text: string;
+  domain: string;
+  position: number;
+  relevance: number;
+  isSponsored: boolean;
+  isNavigation: boolean;
+  isExternal: boolean;
+}
+
+export interface ResearchSource {
+  url: string;
+  title: string;
+  domain: string;
+  content: string;
+  contentLength: number;
+  reliability: number;
+  freshness: { score: number; label: "recent" | "dated" | "unknown"; date?: string };
+  facts: string[];
+  evidence: string[];
+  contradictions: string[];
+}
+
+export interface ResearchResult {
+  query: string;
+  sources: ResearchSource[];
+  consensus: string[];
+  contradictions: Array<{ claim: string; sources: string[] }>;
+  confidence: number;
+}
+
+const RESEARCH_STOP_WORDS = new Set(["avec", "dans", "pour", "plus", "this", "that", "from", "have", "about", "their", "elles", "sont", "être", "comme"]);
+
+function sourceReliability(url: string, content: string): number {
+  const parsed = new URL(url);
+  const host = parsed.hostname.toLowerCase();
+  let score = parsed.protocol === "https:" ? 0.55 : 0.35;
+  if (/\.(gov|gouv|edu|ac\.[a-z]{2})$/i.test(host)) score += 0.25;
+  if (/^www\.(reuters|apnews|bbc|who|un|nature|arxiv)\./i.test(host)) score += 0.2;
+  if (content.length > 1200) score += 0.05;
+  return Math.min(1, Number(score.toFixed(2)));
+}
+
+function sourceFreshness(content: string, url: string): ResearchSource["freshness"] {
+  const dateMatch = `${content.slice(0, 4000)} ${url}`.match(/\b(20\d{2})[-/]([01]\d)[-/]([0-3]\d)\b|\b([01]?\d)[-/]([0-3]?\d)[-/](20\d{2})\b/);
+  if (!dateMatch) return { score: 0.5, label: "unknown" };
+  const year = Number(dateMatch[1] ?? dateMatch[6]);
+  const month = Number(dateMatch[2] ?? dateMatch[4] ?? 1);
+  const day = Number(dateMatch[3] ?? dateMatch[5] ?? 1);
+  const ageDays = Math.max(0, (Date.now() - new Date(year, month - 1, day).getTime()) / 86_400_000);
+  return { score: Number(Math.max(0, 1 - ageDays / 1825).toFixed(2)), label: ageDays <= 365 ? "recent" : "dated", date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}` };
+}
+
+function extractSourceEvidence(content: string, query: string): { facts: string[]; evidence: string[] } {
+  const terms = query.toLowerCase().split(/\W+/).filter((term) => term.length > 3);
+  const sentences = content.split(/(?<=[.!?])\s+/).map((sentence) => sentence.trim()).filter((sentence) => sentence.length >= 35 && sentence.length <= 500);
+  const relevant = sentences.filter((sentence) => {
+    const lower = sentence.toLowerCase();
+    return terms.some((term) => lower.includes(term)) || /\b\d+(?:[.,]\d+)?\s*%?\b/.test(sentence);
+  }).slice(0, 8);
+  return { facts: relevant.slice(0, 5), evidence: relevant.slice(0, 8) };
+}
+
+function claimKey(claim: string): string {
+  return claim.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter((word) => word.length > 3 && !RESEARCH_STOP_WORDS.has(word)).slice(0, 8).join(" ");
+}
+
+function compareResearchSources(sources: ResearchSource[]): Pick<ResearchResult, "consensus" | "contradictions" | "confidence"> {
+  const claims = new Map<string, Array<{ source: ResearchSource; claim: string }>>();
+  for (const source of sources) {
+    for (const claim of source.facts) {
+      const key = claimKey(claim);
+      if (key) claims.set(key, [...(claims.get(key) ?? []), { source, claim }]);
+    }
+  }
+  const consensus: string[] = [];
+  const contradictions: Array<{ claim: string; sources: string[] }> = [];
+  for (const entries of claims.values()) {
+    if (entries.length < 2) continue;
+    const numbers = new Set(entries.map((entry) => entry.claim.match(/\b\d+(?:[.,]\d+)?\s*%?\b/g)?.join(",") ?? "none"));
+    const negations = new Set(entries.map((entry) => /\b(not|no|ne|pas|sans|never|jamais)\b/i.test(entry.claim)));
+    if (numbers.size > 1 || negations.size > 1) {
+      contradictions.push({ claim: entries[0].claim, sources: entries.map((entry) => entry.source.url) });
+      entries.forEach((entry) => entry.source.contradictions.push(`Divergence avec ${entries.filter((other) => other.source !== entry.source).map((other) => other.source.domain).join(", ")}`));
+    } else {
+      consensus.push(entries[0].claim);
+    }
+  }
+  const diversity = new Set(sources.map((source) => source.domain)).size / Math.max(1, sources.length);
+  const evidenceRate = sources.length ? sources.filter((source) => source.evidence.length > 0).length / sources.length : 0;
+  const quality = sources.length ? sources.reduce((sum, source) => sum + source.reliability * source.freshness.score, 0) / sources.length : 0;
+  return { consensus: consensus.slice(0, 10), contradictions: contradictions.slice(0, 10), confidence: Number(Math.max(0, Math.min(1, quality * 0.45 + diversity * 0.2 + evidenceRate * 0.2 + (consensus.length > 0 ? 0.15 : 0))).toFixed(2)) };
+}
+
+function classifyHost(hostname: string): "PUBLIC_WEB" | "PRIVATE_NETWORK" | "LOCALHOST" | "LOOPBACK" | "LINK_LOCAL" | "INTERNAL" {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  if (host === "localhost" || host.endsWith(".localhost")) return "LOCALHOST";
+  if (host.endsWith(".local") || host.endsWith(".internal") || host === "metadata.google.internal") return "INTERNAL";
+  if (host === "::1" || host === "0.0.0.0" || host === "[::1]") return "LOOPBACK";
+  if (host.startsWith("fe80:") || host.startsWith("fe8") || host.startsWith("fec") || host.startsWith("fed") || host.startsWith("fee") || host.startsWith("fef")) return "LINK_LOCAL";
+  if (host.startsWith("fc") || host.startsWith("fd")) return "PRIVATE_NETWORK";
+
+  const octets = host.split(".").map(Number);
+  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) return "PUBLIC_WEB";
+  const [first, second] = octets;
+  if (first === 127) return "LOOPBACK";
+  if (first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168) || (first === 100 && second >= 64 && second <= 127) || (first === 198 && second >= 18 && second <= 19)) return "PRIVATE_NETWORK";
+  if (first === 169 && second === 254) return "LINK_LOCAL";
+  return "PUBLIC_WEB";
+}
+
+function assertAllowedBrowserUrl(url: string): void {
+  const parsed = new URL(url);
+  const classification = classifyHost(parsed.hostname);
+  const localhostAllowed = NETWORK_POLICY === "PUBLIC_WEB_AND_LOCALHOST" && classification === "LOCALHOST";
+  if (classification !== "PUBLIC_WEB" && !localhostAllowed) {
+    throw new Error(`Destination ${classification} interdite par la policy ${NETWORK_POLICY}.`);
+  }
+}
+
+export function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
 
   if (!trimmed) return "https://www.google.com";
@@ -55,10 +181,15 @@ function normalizeUrl(raw: string): string {
     throw new Error(`Schéma d'URL non autorisé : ${trimmed.slice(0, 20)}...`);
   }
 
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) {
+    assertAllowedBrowserUrl(trimmed);
+    return trimmed;
+  }
 
   if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/.test(trimmed) && !trimmed.includes(" ")) {
-    return `https://${trimmed}`;
+    const normalized = `https://${trimmed}`;
+    assertAllowedBrowserUrl(normalized);
+    return normalized;
   }
 
   return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
@@ -94,6 +225,48 @@ function isContentDomain(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+function canonicalizeLink(url: string): string {
+  const parsed = new URL(url);
+  parsed.hash = "";
+  for (const key of [...parsed.searchParams.keys()]) {
+    if (/^(utm_|gclid$|fbclid$|ref$)/i.test(key)) parsed.searchParams.delete(key);
+  }
+  return parsed.toString();
+}
+
+export function rankLinkCandidates(
+  links: Array<{ text?: string; href?: string }>,
+  currentUrl?: string
+): LinkCandidate[] {
+  const currentDomain = currentUrl ? (() => { try { return new URL(currentUrl).hostname; } catch { return ""; } })() : "";
+  const seen = new Set<string>();
+  const candidates: LinkCandidate[] = [];
+
+  links.forEach((link, position) => {
+    if (!link?.href) return;
+    let href: string;
+    try {
+      href = normalizeUrl(link.href);
+      href = canonicalizeLink(href);
+      if (seen.has(href) || !isContentDomain(href)) return;
+      seen.add(href);
+    } catch {
+      return;
+    }
+    const text = (link.text ?? "").trim().replace(/\s+/g, " ").slice(0, 200);
+    const lower = `${text} ${href}`.toLowerCase();
+    const isSponsored = /sponsor|advert|annonce|pub|ads\b|promoted|utm_|gclid|fbclid/.test(lower);
+    const isNavigation = /^(home|accueil|login|sign in|connexion|menu|search|recherche|privacy|terms|contact|about|à propos|next|previous|suivant|précédent)$/i.test(text)
+      || /\/login(?:[/?#]|$)|\/signup(?:[/?#]|$)|\/privacy(?:[/?#]|$)|\/terms(?:[/?#]|$)/i.test(href);
+    const domain = new URL(href).hostname;
+    const isExternal = Boolean(currentDomain && domain !== currentDomain);
+    const relevance = Math.max(0, 100 - position) + (text.length >= 20 ? 15 : 0) + (isExternal ? 5 : 0) - (isSponsored ? 100 : 0) - (isNavigation ? 50 : 0);
+    candidates.push({ href, text, domain, position, relevance, isSponsored, isNavigation, isExternal });
+  });
+
+  return candidates.sort((a, b) => b.relevance - a.relevance || a.position - b.position);
 }
 
 // Petit wrapper pour garantir qu'on ne renvoie jamais "success" si l'IPC
@@ -736,6 +909,20 @@ export const browserSkill: Skill = {
       return lastResult;
     };
 
+    const waitForBrowserCondition = async (
+      condition: string,
+      conditionType: "selector" | "text" | "url" = "selector",
+      timeout = 10_000
+    ): Promise<boolean> => {
+      const result = await runBrowserAction({
+        type: "browser-wait-for",
+        condition,
+        conditionType,
+        timeout,
+      }, timeout + 2_000);
+      return typeof result !== "string" && (result as any)?.found !== false;
+    };
+
     // ── browser_navigate ──────────────────────────────────────────────────────
     if (name === "browser_navigate") {
       const { url } = validateArgs(browserSkill.inputSchemas!["browser_navigate"], args);
@@ -912,7 +1099,7 @@ export const browserSkill: Skill = {
         tries < attempts &&
         (last.status === "error" || (last.content ?? "").trim().length < 40)
       ) {
-        await new Promise<void>((r) => setTimeout(r, delayMs));
+        await waitForBrowserCondition(selector ?? "body", "selector", delayMs);
         last = await readPageContent(selector);
         tries += 1;
       }
@@ -942,8 +1129,8 @@ export const browserSkill: Skill = {
       emit({ type: "open-browser" });
       emit({ type: "browser-navigate", url: normalized });
 
-      // 2. Laisser un court délai initial avant la première lecture
-      await new Promise<void>((r) => setTimeout(r, 2000));
+      // 2. Attendre un signal observable plutôt qu'un délai fixe.
+      await waitForBrowserCondition(normalized, "url", 10_000);
 
       // 3. Lire le contenu, avec retry si la page n'a pas fini de charger
       const result = await readPageContentWithRetry(selector ?? null);
@@ -1003,10 +1190,7 @@ export const browserSkill: Skill = {
         return { status: "error", message: raw };
       }
       const links = (Array.isArray(raw) ? raw : raw?.links ?? []) as Array<{ text?: string; href?: string }>;
-      const cleaned = links
-        .filter((l) => l?.href)
-        .slice(0, limit)
-        .map((l) => ({ text: (l.text ?? "").trim().slice(0, 200), href: l.href! }));
+      const cleaned = rankLinkCandidates(links).slice(0, limit);
 
       return {
         status: "success",
@@ -1027,16 +1211,17 @@ export const browserSkill: Skill = {
         return { status: "error", message: raw };
       }
       const links = (Array.isArray(raw) ? raw : raw?.links ?? []) as Array<{ text?: string; href?: string }>;
+      const candidates = rankLinkCandidates(links);
 
       const wantedText = text?.trim().toLowerCase();
       const wantedUrl = urlContains?.trim().toLowerCase();
 
-      const match = links.find((l) => {
-        const linkText = (l.text ?? "").toLowerCase();
-        const linkHref = (l.href ?? "").toLowerCase();
+      const match = candidates.find((l) => {
+        const linkText = l.text.toLowerCase();
+        const linkHref = l.href.toLowerCase();
         const textOk = wantedText ? linkText.includes(wantedText) : true;
         const urlOk = wantedUrl ? linkHref.includes(wantedUrl) : true;
-        return !!l.href && textOk && urlOk;
+        return !l.isSponsored && textOk && urlOk;
       });
 
       if (!match) {
@@ -1047,13 +1232,13 @@ export const browserSkill: Skill = {
       }
 
       return withEmit(emit, (fire) => {
-        const normalized = normalizeUrl(match.href!);
+        const normalized = normalizeUrl(match.href);
         fire({ type: "open-browser" });
         fire({ type: "browser-navigate", url: normalized });
         return {
           status: "success",
           url: normalized,
-          matchedText: match.text ?? "",
+          matchedText: match.text,
           message: `Ouverture du lien "${match.text || normalized}".`,
         };
       });
@@ -1073,7 +1258,7 @@ export const browserSkill: Skill = {
       // 1. Lancer la recherche
       emit({ type: "open-browser" });
       emit({ type: "browser-navigate", url: searchUrl });
-      await new Promise<void>((r) => setTimeout(r, 2000));
+      await waitForBrowserCondition(searchUrl, "url", 10_000);
 
       // 2. Extraire les liens de la page de résultats
       const rawLinks = await runBrowserAction({ type: "browser-get-links", selector: null }, 12_000);
@@ -1084,17 +1269,15 @@ export const browserSkill: Skill = {
         };
       }
       const links = (Array.isArray(rawLinks) ? rawLinks : rawLinks?.links ?? []) as Array<{ text?: string; href?: string }>;
+      const rankedLinks = rankLinkCandidates(links);
 
       // 3. Filtrer : garder des URLs http(s) valides, hors domaines "non-contenu",
       //    et dédupliquer par domaine pour diversifier les sources.
       const seenDomains = new Set<string>();
       const candidates: string[] = [];
-      for (const l of links) {
-        if (!l.href) continue;
-        if (!/^https?:\/\//i.test(l.href)) continue;
-        if (!isContentDomain(l.href)) continue;
-        let domain: string;
-        try { domain = new URL(l.href).hostname; } catch { continue; }
+      for (const l of rankedLinks) {
+        if (l.isSponsored || l.isNavigation) continue;
+        const domain = l.domain;
         if (seenDomains.has(domain)) continue;
         seenDomains.add(domain);
         candidates.push(l.href);
@@ -1110,24 +1293,42 @@ export const browserSkill: Skill = {
       }
 
       // 4. Visiter et lire chaque source
-      const sources: Array<{ url: string; title: string; content: string; contentLength: number }> = [];
+      const sources: ResearchSource[] = [];
       const errors: Array<{ url: string; message: string }> = [];
 
       for (const url of candidates) {
         emit({ type: "browser-navigate", url });
-        await new Promise<void>((r) => setTimeout(r, 2000));
+        await waitForBrowserCondition(url, "url", 10_000);
         const result = await readPageContentWithRetry(null, 2, 1200);
         if (result.status === "success") {
+          const sourceUrl = result.url || url;
+          const content = result.content ?? "";
+          const extracted = extractSourceEvidence(content, query);
           sources.push({
-            url: result.url || url,
+            url: sourceUrl,
             title: result.title ?? "",
-            content: result.content ?? "",
-            contentLength: result.contentLength ?? 0,
+            domain: new URL(sourceUrl).hostname,
+            content,
+            contentLength: result.contentLength ?? content.length,
+            reliability: sourceReliability(sourceUrl, content),
+            freshness: sourceFreshness(content, sourceUrl),
+            facts: extracted.facts,
+            evidence: extracted.evidence,
+            contradictions: [],
           });
         } else {
           errors.push({ url, message: result.message });
         }
       }
+
+      const comparison = compareResearchSources(sources);
+      const research: ResearchResult = {
+        query,
+        sources,
+        consensus: comparison.consensus,
+        contradictions: comparison.contradictions,
+        confidence: comparison.confidence,
+      };
 
       return {
         status: sources.length > 0 ? "success" : "error",
@@ -1136,10 +1337,13 @@ export const browserSkill: Skill = {
         searchUrl,
         sourcesRead: sources.length,
         sources,
+        consensus: research.consensus,
+        contradictions: research.contradictions,
+        confidence: research.confidence,
         errors: errors.length ? errors : undefined,
         message:
           sources.length > 0
-            ? `${sources.length} source(s) lue(s) pour "${query}". Synthétise la réponse à partir de leur contenu en citant tes sources (URL/titre).`
+            ? `${sources.length} source(s) lue(s) pour "${query}". Consensus: ${research.consensus.length}, contradictions: ${research.contradictions.length}, confiance: ${(research.confidence * 100).toFixed(0)}%. Cite les preuves par URL/titre.`
             : `Aucune source n'a pu être lue pour "${query}".`,
       };
     }

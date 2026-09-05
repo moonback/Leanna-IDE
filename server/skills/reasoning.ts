@@ -2,14 +2,14 @@ import { Skill } from "./base.js";
 import fs from "fs";
 import { generateText, getActiveProvider } from "../utils/textGeneration.js";
 import { generateSpeech } from "../utils/geminiTTS.js";
-import { SELF_ROOT, normalizeSelfPath } from "../utils/selfRoot.js";
 import { ChainOfThoughtExecutor, assessComplexity, type ComplexityLevel } from "./chainOfThought.js";
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 // Anti-doublon pour l'annonce vocale TTS (évite les répétitions si reasoning_think est appelé en boucle)
 let _lastTTSAnnouncementTime = 0;
-const TTS_ANNOUNCEMENT_COOLDOWN_MS = 30_000; // 30s minimum entre deux annonces
+const TTS_ANNOUNCEMENT_COOLDOWN_MS = 30_000; // 30s minimum entre deux annonces (valeur par défaut, surchargeable via context.ttsCooldownMs)
+const TTS_MAX_CHARS = 220; // Longueur max de l'annonce envoyée au TTS, pour éviter des synthèses trop longues
 
 import { getProjectRoot, normalizeProjectPath } from "./codebaseHelpers.js";
 
@@ -30,6 +30,7 @@ type ThinkingStrategy =
   | "tree_of_thought"
   | "document_analysis"
   | "comparative_analysis"
+  | "root_cause_analysis"
   | "auto";
 
 interface ThinkingConfig {
@@ -40,7 +41,8 @@ interface ThinkingConfig {
 }
 
 const THINKING_STRATEGIES: Record<Exclude<ThinkingStrategy, "auto">, ThinkingConfig> = {
-  chain_of_thought: {    strategy: "chain_of_thought",
+  chain_of_thought: {
+    strategy: "chain_of_thought",
     label: "Chain of Thought",
     description: "Raisonnement étape par étape, chaque étape découlant logiquement de la précédente.",
     systemPrompt: `Tu es un expert en raisonnement logique et en analyse documentaire. Résous le problème ci-dessous en utilisant une approche Chain of Thought :
@@ -367,6 +369,51 @@ Critères retenus : [liste des dimensions de comparaison]
 ## Points nécessitant une vérification humaine
 - ...`,
   },
+
+  root_cause_analysis: {
+    strategy: "root_cause_analysis",
+    label: "Analyse des causes racines",
+    description: "Remonte méthodiquement (5 Pourquoi / Ishikawa) d'un symptôme observé à sa cause profonde, pour éviter de traiter uniquement les effets. Idéal pour incidents, bugs récurrents, pannes ou dysfonctionnements.",
+    systemPrompt: `Tu es un expert en analyse de causes racines (méthode des "5 Pourquoi" et diagramme d'Ishikawa). Ton objectif est de ne jamais t'arrêter au premier symptôme.
+
+INSTRUCTIONS :
+1. Décris précisément le SYMPTÔME observé (ce qui a été constaté, avec faits et données si disponibles).
+2. Applique la méthode des 5 Pourquoi : pour chaque réponse, demande à nouveau "pourquoi" jusqu'à atteindre une cause qui, si elle est corrigée, empêche la récurrence du symptôme.
+3. Si plusieurs causes potentielles existent en parallèle, structure-les selon les catégories d'Ishikawa pertinentes (Méthode, Matériel/Outils, Main-d'œuvre/Humain, Milieu/Environnement, Mesure/Données, Management/Process — ne garde que les catégories pertinentes).
+4. Distingue la CAUSE RACINE (structurelle, systémique) des causes immédiates ou déclencheurs (symptomatiques).
+5. Propose une action corrective pour la cause racine ET, si utile, une action palliative immédiate pour limiter les dégâts en attendant.
+6. Vérifie ta chaîne causale : chaque "pourquoi" découle-t-il logiquement et factuellement du précédent, ou y a-t-il un saut non justifié ?
+
+PRINCIPES :
+- Ne pas s'arrêter à la première explication plausible : viser la cause structurelle, pas le premier coupable apparent.
+- Séparer les FAITS observés des HYPOTHÈSES non vérifiées ; signaler clairement ces dernières.
+- Éviter d'attribuer la cause uniquement à une "erreur humaine" sans creuser le processus ou le contexte qui l'a permise.
+- Si les informations sont insuffisantes pour conclure avec certitude, le dire explicitement plutôt que d'inventer.
+
+FORMAT DE RÉPONSE :
+## Symptôme observé
+(description factuelle)
+
+## Chaîne des 5 Pourquoi
+1. Pourquoi [symptôme] ? → ...
+2. Pourquoi cela ? → ...
+3. Pourquoi cela ? → ...
+4. Pourquoi cela ? → ...
+5. Pourquoi cela ? → ...
+
+## Cause(s) racine(s) identifiée(s)
+- ...
+
+## Causes immédiates / déclencheurs (à distinguer de la cause racine)
+- ...
+
+## Actions recommandées
+- **Corrective (cause racine)** : ...
+- **Palliative (immédiate)** : ...
+
+## Niveau de confiance
+(élevé / moyen / faible — et ce qu'il faudrait vérifier pour l'augmenter)`,
+  },
 };
 
 // ─── Strategy Auto-Selection ────────────────────────────────────────────────
@@ -392,6 +439,7 @@ function buildReasoningExplanation(
     tree_of_thought: "J'explore plusieurs approches en parallèle avant de choisir la meilleure.",
     document_analysis: "J'analyse le document en profondeur pour en extraire la structure et les éléments clés.",
     comparative_analysis: "Je croise les sources pour identifier les convergences et les écarts.",
+    root_cause_analysis: "Je remonte étape par étape jusqu'à la cause racine, pas seulement le symptôme.",
   };
 
   // Raisons supplémentaires basées sur le contexte du prompt (usage documentaire)
@@ -406,6 +454,8 @@ function buildReasoningExplanation(
     contextReason = "C'est une question de structuration qui mérite une réflexion approfondie.";
   } else if (/réorganis|restructur|refonte|réécri|réécriture|remanier/i.test(lower)) {
     contextReason = "Cette réorganisation du document nécessite de bien planifier pour éviter les incohérences.";
+  } else if (/cause (racine|profonde|première)|root cause|5 pourquoi|5 whys|panne récurrente|bug récurrent|incident récurrent/i.test(lower)) {
+    contextReason = "Je remonte à la cause racine du problème avant de proposer une correction durable.";
   } else if (/incohérence|erreur|correction|contradiction|anomalie|coquille/i.test(lower)) {
     contextReason = "Pour identifier la source du problème, je dois analyser le document méthodiquement.";
   } else if (/plusieurs.*(document|section|fichier|page|source|version)/i.test(lower)) {
@@ -427,102 +477,136 @@ function buildReasoningExplanation(
   return contextReason || strategyReasons[strategy];
 }
 
+// ── Heuristiques pondérées ──────────────────────────────────────────────────
+// Chaque stratégie porte une liste de motifs (regex, poids). Le score total
+// d'une stratégie est la somme des poids des motifs qui matchent le prompt.
+// La stratégie au score le plus élevé l'emporte, à condition de dépasser
+// MIN_SCORE_THRESHOLD ; sinon on retombe sur chain_of_thought (le plus polyvalent).
+// Ce système remplace l'ancienne chaîne de if/else ordonnée : il évite les biais
+// d'ordre (un motif tardif ne peut plus être "masqué" par un motif antérieur trop
+// large) et rend l'ajout d'une stratégie ou d'un mot-clé trivial et localisé.
+
+interface StrategyPattern {
+  regex: RegExp;
+  weight: number;
+}
+
+const MIN_SCORE_THRESHOLD = 1;
+
+const STRATEGY_PATTERNS: Record<Exclude<ThinkingStrategy, "auto">, StrategyPattern[]> = {
+  comparative_analysis: [
+    { regex: /compar(er|aison|atif|ative)/i, weight: 2 },
+    { regex: /croiser|différence(s)?.*entre|divergence|version.*(précédente|antérieure|actuelle)/i, weight: 2 },
+    { regex: /\bvs\b|versus/i, weight: 2 },
+    { regex: /entre.*(document|version|source|fichier)/i, weight: 1.5 },
+    { regex: /réconcili|fusionner.*version|merge.*document/i, weight: 2 },
+    { regex: /écart(s)?.*entre|delta\b/i, weight: 1.5 },
+  ],
+
+  root_cause_analysis: [
+    { regex: /cause (racine|profonde|première)/i, weight: 2.5 },
+    { regex: /root cause/i, weight: 2.5 },
+    { regex: /5 pourquoi|5 whys|five whys/i, weight: 2.5 },
+    { regex: /pourquoi.*(arrive|se produit|survient|persiste|revient)/i, weight: 2 },
+    { regex: /diagnostiquer|diagnostic.*(panne|incident|défaillance)/i, weight: 2 },
+    { regex: /origine du problème|à l'origine de/i, weight: 1.5 },
+    { regex: /panne récurrente|bug récurrent|incident récurrent|dysfonctionnement/i, weight: 1.5 },
+  ],
+
+  document_analysis: [
+    { regex: /résum(é|er)|synth(è|é)s(e|er)|condenser|point(s)?.?clé(s)?|idée(s)?.?clé(s)?/i, weight: 1.5 },
+    { regex: /extraire|extraction|identifier.*information|repérer.*dans|inventorier/i, weight: 1.5 },
+    { regex: /relire|relecture|proofreading|réviser.*document|corriger.*texte/i, weight: 1.5 },
+    { regex: /conformit(é)?|audit|norme|iso\s?\d|check.?list|réglementaire/i, weight: 1.5 },
+    { regex: /annoter|annotation|marge|feedback.*document/i, weight: 1.5 },
+    { regex: /classif|catégoris|trier.*document|ranger|taxon|étiqueter/i, weight: 1.5 },
+    { regex: /analyser.*document|analyse.*contenu|examen.*texte|diagnostic.*document/i, weight: 2 },
+    { regex: /table des matières|sommaire.*générer|index.*document/i, weight: 1.5 },
+    { regex: /cohérence.*document|qualité.*rédaction|lisibilité/i, weight: 1.5 },
+    { regex: /fiche.*lecture|note.*synthèse|abstract|executive.?summary/i, weight: 1.5 },
+  ],
+
+  decomposition: [
+    { regex: /complexe/i, weight: 1 },
+    { regex: /dossier/i, weight: 1 },
+    { regex: /rapport/i, weight: 0.75 },
+    { regex: /plusieurs parties/i, weight: 1.5 },
+    { regex: /multi-étapes/i, weight: 1.5 },
+    { regex: /structurer/i, weight: 1 },
+    { regex: /organiser/i, weight: 1 },
+    { regex: /plan\b(?!.*d'action.*simple)/i, weight: 1 },
+    { regex: /restructur|réorganis|refonte/i, weight: 1.5 },
+  ],
+
+  analogical: [
+    { regex: /comme|similaire|analogie|comparable|ressemble/i, weight: 1 },
+    { regex: /modèle de document|template|s'inspirer de|à la manière de/i, weight: 1.5 },
+  ],
+
+  first_principles: [
+    { regex: /fondamental|principes|repenser/i, weight: 1 },
+    { regex: /depuis zéro|from scratch|repartir de la base/i, weight: 1.5 },
+    // "pourquoi" seul est un signal faible ici : les formulations fortes de
+    // recherche de cause (bug, panne, incident...) sont captées avec un poids
+    // bien plus élevé par root_cause_analysis, qui l'emportera dans ces cas.
+    { regex: /\bpourquoi\b/i, weight: 0.5 },
+  ],
+
+  self_critique: [
+    { regex: /vérifier|critiquer|robuste|fiable/i, weight: 1 },
+    { regex: /cas limite|valider|contre-vérifier|double check/i, weight: 1 },
+    { regex: /\brelire\b/i, weight: 0.5 },
+  ],
+
+  tree_of_thought: [
+    { regex: /enjeu (majeur|critique|stratégique)/i, weight: 2 },
+    { regex: /décision (stratégique|irréversible)/i, weight: 2 },
+    { regex: /irréversible|à fort enjeu|risque élevé/i, weight: 1.5 },
+  ],
+
+  chain_of_thought: [
+    { regex: /étape par étape|pas à pas|step by step/i, weight: 1.5 },
+  ],
+};
+
 function autoSelectStrategy(prompt: string): Exclude<ThinkingStrategy, "auto"> {
   const lower = (prompt ?? "").toLowerCase();
 
-  // Déléguer la détection de complexité à assessComplexity
+  // La complexité "critical" force toujours l'exploration multi-branches,
+  // indépendamment du score textuel (garde-fou prioritaire).
   const complexity = assessComplexity(prompt);
   if (complexity === "critical") return "tree_of_thought";
 
-  // ── Analyse comparative (priorité haute : doit passer avant document_analysis) ──
-  if (
-    /compar(er|aison|atif|ative)/i.test(lower) ||
-    /croiser|différence(s)?.*entre|divergence|version.*(précédente|antérieure|actuelle)/i.test(lower) ||
-    /\bvs\b|versus/i.test(lower) ||
-    /entre.*(document|version|source|fichier)/i.test(lower) ||
-    /réconcili|fusionner.*version|merge.*document/i.test(lower) ||
-    /écart(s)?.*entre|delta\b/i.test(lower)
-  ) {
-    return "comparative_analysis";
+  const scores: Partial<Record<Exclude<ThinkingStrategy, "auto">, number>> = {};
+
+  for (const [strategyId, patterns] of Object.entries(STRATEGY_PATTERNS) as [
+    Exclude<ThinkingStrategy, "auto">,
+    StrategyPattern[]
+  ][]) {
+    let score = 0;
+    for (const { regex, weight } of patterns) {
+      if (regex.test(lower)) score += weight;
+    }
+    if (score > 0) scores[strategyId] = score;
   }
 
-  // ── Analyse documentaire (synthèse, extraction, relecture, conformité, annotation) ──
-  if (
-    /résum(é|er)|synth(è|é)s(e|er)|condenser|point(s)?.?clé(s)?|idée(s)?.?clé(s)?/i.test(lower) ||
-    /extraire|extraction|identifier.*information|repérer.*dans|inventorier/i.test(lower) ||
-    /relire|relecture|proofreading|réviser.*document|corriger.*texte/i.test(lower) ||
-    /conformit(é)?|audit|norme|iso\s?\d|check.?list|réglementaire/i.test(lower) ||
-    /annoter|annotation|marge|feedback.*document/i.test(lower) ||
-    /classif|catégoris|trier.*document|ranger|taxon|étiqueter/i.test(lower) ||
-    /analyser.*document|analyse.*contenu|examen.*texte|diagnostic.*document/i.test(lower) ||
-    /table des matières|sommaire.*générer|index.*document/i.test(lower) ||
-    /cohérence.*document|qualité.*rédaction|lisibilité/i.test(lower) ||
-    /fiche.*lecture|note.*synthèse|abstract|executive.?summary/i.test(lower)
-  ) {
-    return "document_analysis";
+  // Légers ajustements liés au niveau de complexité global détecté.
+  if (complexity === "complex") {
+    scores.decomposition = (scores.decomposition ?? 0) + 1.5;
+  } else if (complexity === "moderate") {
+    scores.chain_of_thought = (scores.chain_of_thought ?? 0) + 0.5;
   }
 
-  // ── Décomposition (problèmes structurels, multi-parties) ──
-  if (
-    lower.includes("complexe") ||
-    lower.includes("dossier") ||
-    lower.includes("rapport") ||
-    lower.includes("plusieurs parties") ||
-    lower.includes("multi-étapes") ||
-    lower.includes("structurer") ||
-    lower.includes("organiser") ||
-    /plan\b(?!.*d'action.*simple)/i.test(lower) ||
-    /restructur|réorganis|refonte/i.test(lower) ||
-    complexity === "complex"
-  ) {
-    return "decomposition";
+  let bestStrategy: Exclude<ThinkingStrategy, "auto"> = "chain_of_thought";
+  let bestScore = 0;
+  for (const [strategyId, score] of Object.entries(scores) as [Exclude<ThinkingStrategy, "auto">, number][]) {
+    if (score > bestScore) {
+      bestScore = score;
+      bestStrategy = strategyId;
+    }
   }
 
-  // ── Analogie ──
-  if (
-    lower.includes("comme") ||
-    lower.includes("similaire") ||
-    lower.includes("analogie") ||
-    lower.includes("comparable") ||
-    lower.includes("ressemble") ||
-    lower.includes("modèle de document") ||
-    lower.includes("template") ||
-    lower.includes("s'inspirer de") ||
-    lower.includes("à la manière de")
-  ) {
-    return "analogical";
-  }
-
-  // ── Premiers principes ──
-  if (
-    lower.includes("fondamental") ||
-    lower.includes("pourquoi") ||
-    lower.includes("principes") ||
-    lower.includes("repenser") ||
-    lower.includes("depuis zéro") ||
-    lower.includes("from scratch") ||
-    lower.includes("repartir de la base")
-  ) {
-    return "first_principles";
-  }
-
-  // ── Auto-critique (vérification, robustesse) ──
-  if (
-    lower.includes("vérifier") ||
-    lower.includes("critiquer") ||
-    lower.includes("robuste") ||
-    lower.includes("fiable") ||
-    lower.includes("relire") ||
-    lower.includes("cas limite") ||
-    lower.includes("valider") ||
-    lower.includes("contre-vérifier") ||
-    lower.includes("double check")
-  ) {
-    return "self_critique";
-  }
-
-  // Par défaut : Chain of Thought (le plus polyvalent)
-  return "chain_of_thought";
+  return bestScore >= MIN_SCORE_THRESHOLD ? bestStrategy : "chain_of_thought";
 }
 
 // ─── Build the thinking prompt ──────────────────────────────────────────────
@@ -540,9 +624,9 @@ export const reasoningSkill: Skill = {
     {
       name: "reasoning_think",
       description:
-        "Effectue un raisonnement structuré selon la stratégie choisie (auto, chain_of_thought, decomposition, document_analysis, comparative_analysis, self_critique, tree_of_thought…). " +
+        "Effectue un raisonnement structuré selon la stratégie choisie (auto, chain_of_thought, decomposition, document_analysis, comparative_analysis, root_cause_analysis, self_critique, tree_of_thought…). " +
         "Retourne un plan d'action. **Ne jamais s'arrêter après cet outil** — exécute immédiatement le plan ou formule la réponse finale. " +
-        "Utiliser uniquement si : ≥ 3 étapes logiques, document sensible/confidentiel, approche ayant échoué (self_critique), analyse/synthèse/comparaison de documents (document_analysis, comparative_analysis), ou production d'un document/dossier majeur (tree_of_thought).",
+        "Utiliser uniquement si : ≥ 3 étapes logiques, document sensible/confidentiel, approche ayant échoué (self_critique), analyse/synthèse/comparaison de documents (document_analysis, comparative_analysis), diagnostic d'un incident/bug/panne récurrente (root_cause_analysis), ou production d'un document/dossier majeur (tree_of_thought).",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -553,7 +637,7 @@ export const reasoningSkill: Skill = {
           strategy: {
             type: "STRING",
             description:
-              "La stratégie de pensée à utiliser : 'chain_of_thought', 'decomposition', 'analogical', 'self_critique', 'first_principles', 'tree_of_thought', 'document_analysis', 'comparative_analysis', ou 'auto' pour laisser Leanna choisir. Défaut: 'auto'. Utilisez 'document_analysis' pour synthèse/extraction/relecture de documents, 'comparative_analysis' pour croiser des sources, 'tree_of_thought' pour les tâches critiques.",
+              "La stratégie de pensée à utiliser : 'chain_of_thought', 'decomposition', 'analogical', 'self_critique', 'first_principles', 'tree_of_thought', 'document_analysis', 'comparative_analysis', 'root_cause_analysis', ou 'auto' pour laisser Leanna choisir. Défaut: 'auto'. Utilisez 'document_analysis' pour synthèse/extraction/relecture de documents, 'comparative_analysis' pour croiser des sources, 'root_cause_analysis' pour remonter du symptôme à la cause profonde d'un incident/bug/panne, 'tree_of_thought' pour les tâches critiques.",
           },
         },
         required: ["prompt"],
@@ -694,16 +778,19 @@ export const reasoningSkill: Skill = {
         chosenStrategy === "chain_of_thought" ||
         chosenStrategy === "tree_of_thought" ||
         chosenStrategy === "document_analysis" ||
-        chosenStrategy === "comparative_analysis";
+        chosenStrategy === "comparative_analysis" ||
+        chosenStrategy === "root_cause_analysis";
 
       const complexity = assessComplexity(prompt);
       const shouldRunCoT = isDecompositionStrategy && complexity !== "simple";
 
       // ── Annonce du raisonnement (texte + TTS) ──────────────────────────────
-      // IMPORTANT : on signale TOUJOURS à l'utilisateur que le raisonnement démarre
-      // AVANT de lancer quoi que ce soit (CoT ou LLM principal).
-      // 1. Émission texte immédiate (jamais bloquée par cooldown ou erreur TTS)
-      // 2. TTS audio en bonus si cooldown OK et génération réussie
+      // IMPORTANT : on signale TOUJOURS à l'utilisateur (par le texte) que le
+      // raisonnement démarre, AVANT de lancer quoi que ce soit (CoT ou LLM
+      // principal). La voix (TTS), elle, est volontairement plus sélective :
+      // - jamais pour une complexité "simple" (pas besoin de prévenir pour peu)
+      // - respect d'un cooldown (configurable via context.ttsCooldownMs)
+      // - texte tronqué pour éviter des synthèses trop longues
       const reasonLabel = config.label;
       const complexityLabels: Record<string, string> = {
         simple: "simple",
@@ -713,9 +800,13 @@ export const reasoningSkill: Skill = {
       };
       const complexityText = complexityLabels[complexity] || complexity;
       const reasonExplanation = buildReasoningExplanation(prompt, chosenStrategy, complexity);
-      const announcementText = `J'active mon raisonnement ${reasonLabel}, la tâche est ${complexityText}. ${reasonExplanation}`;
+      let announcementText = `J'active mon raisonnement ${reasonLabel}, la tâche est ${complexityText}. ${reasonExplanation}`;
+      if (announcementText.length > TTS_MAX_CHARS) {
+        announcementText = announcementText.slice(0, TTS_MAX_CHARS - 1).trimEnd() + "…";
+      }
 
       // 1. Émettre l'état reasoning + texte d'annonce au frontend IMMÉDIATEMENT
+      //    (toujours, indépendamment de la voix)
       if (context?.emitToClient) {
         context.emitToClient({
           reasoning: {
@@ -728,20 +819,34 @@ export const reasoningSkill: Skill = {
         });
       }
 
-      // 2. TTS audio (avec cooldown pour éviter spam) — on ATTEND l'audio avant de continuer
-      const now = Date.now();
+      // 2. TTS audio — fire-and-forget pour ne pas bloquer le raisonnement.
+      //    On mémorise localement (didSpeakStart) si CETTE invocation a
+      //    déclenché la voix, plutôt que de relire le timestamp global au
+      //    moment de l'annonce de fin : en cas d'appels concurrents, relire
+      //    _lastTTSAnnouncementTime pourrait refléter le cooldown d'un AUTRE
+      //    appel et faire parler/taire la mauvaise invocation.
+      const cooldownMs = context?.ttsCooldownMs ?? TTS_ANNOUNCEMENT_COOLDOWN_MS;
       const ttsEnabled = context?.reasoningVoiceEnabled !== false;
-      if (context?.emitToClient && ttsEnabled && (now - _lastTTSAnnouncementTime > TTS_ANNOUNCEMENT_COOLDOWN_MS)) {
+      const now = Date.now();
+      const shouldSpeak =
+        ttsEnabled &&
+        complexity !== "simple" && // pas d'annonce vocale pour les tâches triviales
+        now - _lastTTSAnnouncementTime > cooldownMs;
+      let didSpeakStart = false;
+
+      if (context?.emitToClient && shouldSpeak) {
         _lastTTSAnnouncementTime = now;
-        try {
-          const audioBase64 = await generateSpeech(announcementText, { voiceName: context.voiceName || "Aoede" });
-          if (audioBase64 && context.emitToClient) {
-            context.emitToClient({ audio: audioBase64 });
-          }
-        } catch (ttsErr) {
-          // TTS échouée — pas grave, l'annonce texte est déjà envoyée
-          console.warn(`[ReasoningSkill] TTS annonce échouée (non bloquant): ${(ttsErr as Error).message}`);
-        }
+        didSpeakStart = true;
+        generateSpeech(announcementText, { voiceName: context.voiceName || "Aoede" })
+          .then((audioBase64) => {
+            if (audioBase64 && context.emitToClient) {
+              context.emitToClient({ audio: audioBase64 });
+            }
+          })
+          .catch((ttsErr) => {
+            // TTS échouée — pas grave, l'annonce texte est déjà envoyée
+            console.warn(`[ReasoningSkill] TTS annonce échouée (non bloquant): ${(ttsErr as Error).message}`);
+          });
       }
 
       let cotContext = "";
@@ -796,9 +901,8 @@ export const reasoningSkill: Skill = {
         // Notify frontend that reasoning is done
         if (context?.emitToClient) {
           context.emitToClient({ reasoning: { active: false } });
-          // Annonce vocale de fin uniquement si l'annonce de début a été jouée récemment ET si la voix raisonnement est activée
-          const ttsEndEnabled = context?.reasoningVoiceEnabled !== false;
-          if (ttsEndEnabled && Date.now() - _lastTTSAnnouncementTime < TTS_ANNOUNCEMENT_COOLDOWN_MS) {
+          // Annonce vocale de fin uniquement si CETTE invocation a parlé au début.
+          if (didSpeakStart) {
             generateSpeech("Mon raisonnement est terminé, je passe à l'action.", { voiceName: context.voiceName || "Aoede" })
               .then((audioBase64) => {
                 if (audioBase64 && context.emitToClient) {
@@ -842,15 +946,15 @@ export const reasoningSkill: Skill = {
       return {
         strategies,
         auto_selection_info: {
-          description: "Le mode 'auto' utilise assessComplexity() pour détecter la complexité de la tâche.",
+          description: "Le mode 'auto' calcule un score pondéré par stratégie à partir de motifs textuels (STRATEGY_PATTERNS), puis retient le score le plus élevé (seuil minimum : MIN_SCORE_THRESHOLD). La complexité 'critical' (assessComplexity()) force toujours tree_of_thought, indépendamment du score textuel.",
           levels: {
-            simple: "Réponse directe, pas de décomposition",
-            moderate: "chain_of_thought ou decomposition selon les mots-clés",
-            complex: "decomposition avec analyse des dépendances",
-            critical: "tree_of_thought — exploration de 3 branches avant décision",
+            simple: "Réponse directe, pas de décomposition, pas d'annonce vocale",
+            moderate: "Score textuel + léger bonus pour chain_of_thought",
+            complex: "Score textuel + bonus pour decomposition",
+            critical: "tree_of_thought forcé — exploration de 3 branches avant décision",
           },
         },
-        note: "Utilisez reasoning_think avec le paramètre 'strategy' pour choisir, ou laissez 'auto' pour une sélection automatique basée sur la complexité détectée.",
+        note: "Utilisez reasoning_think avec le paramètre 'strategy' pour choisir, ou laissez 'auto' pour une sélection automatique basée sur les motifs détectés et la complexité.",
       };
     }
 

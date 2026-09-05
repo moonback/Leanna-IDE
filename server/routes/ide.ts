@@ -7,58 +7,261 @@ import { appendAuditEvent } from '../audit.js';
 
 const router = Router();
 
-// GET /api/ide/tree
-router.get('/tree', async (req: Request, res: Response) => {
+const EXCLUDED_TREE_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'build', 'out']);
+
+async function countFilesRecursively(directory: string): Promise<number> {
+  const entries = await fs.promises.readdir(directory, { withFileTypes: true });
+  let count = 0;
+
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (!EXCLUDED_TREE_DIRECTORIES.has(entry.name)) {
+        count += await countFilesRecursively(path.join(directory, entry.name));
+      }
+    } else if (entry.isFile()) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+// GET /api/ide/file-count
+router.get('/file-count', async (req: Request, res: Response) => {
   try {
     const root = getWorkspaceRoot(req);
-    if (!root) return res.status(200).json({ path: '', entries: [] });
-    const walk = (current: string, _rel = '.'): any[] => {
-      const entries = fs.readdirSync(current, { withFileTypes: true });
-      return entries
-        .filter(entry => !['node_modules', '.git', 'dist', 'build', 'out'].includes(entry.name))
-        .sort((a, b) => {
-          // Directories first, then alphabetical
-          if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
-          return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-        })
-        .map(entry => {
-          const entryPath = path.join(current, entry.name);
-          const entryRel = path.relative(root, entryPath).replace(/\\/g, '/');
-          if (entry.isDirectory()) {
-            return { name: entry.name, path: entryRel === '' ? '.' : entryRel, type: 'directory', children: walk(entryPath, entryRel) };
-          }
-          return { name: entry.name, path: entryRel === '' ? '.' : entryRel, type: 'file' };
-        });
-    };
-    res.json({ path: root, entries: walk(root) });
+    if (!root) return res.status(200).json({ count: 0 });
+
+    res.json({ count: await countFilesRecursively(root) });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// GET /api/ide/tree-workspace — Always returns the real workspace tree (ignores sandbox)
+// GET /api/ide/tree
+router.get('/tree', async (req: Request, res: Response) => {
+  try {
+    const root = getWorkspaceRoot(req);
+    if (!root) return res.status(200).json({ path: '', entries: [] });
+
+    // Pagination parameters
+    const requestedPath = typeof req.query.path === 'string' ? req.query.path : '';
+    const page = typeof req.query.page === 'string' ? parseInt(req.query.page) : 1;
+    const pageSize = typeof req.query.pageSize === 'string' ? parseInt(req.query.pageSize) : 0;
+
+    // Target directory to list
+    const targetDir = requestedPath 
+      ? path.resolve(root, requestedPath.replace(/\\/g, '/'))
+      : root;
+
+    // Validate target directory is within workspace
+    const relativeTarget = path.relative(root, targetDir);
+    if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) {
+      return res.status(403).json({ error: 'Chemin hors du workspace.' });
+    }
+
+    // Check if directory exists
+    if (!fs.existsSync(targetDir)) {
+      return res.status(404).json({ error: 'Répertoire introuvable.' });
+    }
+
+    const stat = await fs.promises.stat(targetDir);
+    if (!stat.isDirectory()) {
+      return res.status(400).json({ error: 'Le chemin spécifié n\'est pas un répertoire.' });
+    }
+
+    // Read entries at this directory level only
+    const entries = fs.readdirSync(targetDir, { withFileTypes: true });
+    
+    // Filter excluded directories
+    const filteredEntries = entries.filter(entry =>
+      !EXCLUDED_TREE_DIRECTORIES.has(entry.name)
+    );
+
+    // Sort: directories first, then alphabetical
+    const sortedEntries = filteredEntries.sort((a, b) => {
+      if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+
+    // Pagination logic
+    let resultEntries = sortedEntries;
+    let pagination: any = null;
+
+    if (pageSize > 0 && page >= 1) {
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      resultEntries = sortedEntries.slice(startIndex, endIndex);
+
+      pagination = {
+        page,
+        pageSize,
+        total: sortedEntries.length,
+        totalPages: Math.ceil(sortedEntries.length / pageSize),
+        hasMore: endIndex < sortedEntries.length
+      };
+    } else {
+      // For backward compatibility: if no pagination requested, limit to prevent memory issues
+      // Default safe limit for large directories
+      const SAFE_LIMIT = 10000;
+      if (sortedEntries.length > SAFE_LIMIT) {
+        resultEntries = sortedEntries.slice(0, SAFE_LIMIT);
+        pagination = {
+          page: 1,
+          pageSize: SAFE_LIMIT,
+          total: sortedEntries.length,
+          totalPages: Math.ceil(sortedEntries.length / SAFE_LIMIT),
+          hasMore: true,
+          warning: 'Limite de sécurité appliquée. Utilisez les paramètres de pagination pour accéder à tous les résultats.'
+        };
+      }
+    }
+
+    // Build response entries
+    const responseEntries = resultEntries.map(entry => {
+      const entryPath = path.join(targetDir, entry.name);
+      const entryRel = path.relative(root, entryPath).replace(/\\/g, '/');
+      if (entry.isDirectory()) {
+        return { 
+          name: entry.name, 
+          path: entryRel === '' ? '.' : entryRel, 
+          type: 'directory' as const,
+          children: [] // Empty children for paginated mode - clients should request subdirectories separately
+        };
+      }
+      return { 
+        name: entry.name, 
+        path: entryRel === '' ? '.' : entryRel, 
+        type: 'file' as const 
+      };
+    });
+
+    const response: any = {
+      path: targetDir,
+      entries: responseEntries
+    };
+
+    if (pagination) {
+      response.pagination = pagination;
+    }
+
+    res.json(response);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/ide/tree-workspace — Returns the real workspace tree with server-side pagination (ignores sandbox)
 router.get('/tree-workspace', async (req: Request, res: Response) => {
   try {
     const root = getDefaultWorkspaceRoot();
     if (!root) return res.status(200).json({ path: '', entries: [] });
-    const walk = (current: string): any[] => {
-      const entries = fs.readdirSync(current, { withFileTypes: true });
-      return entries
-        .filter(entry => !['node_modules', '.git', 'dist', 'build', 'out', '.Leanna'].includes(entry.name))
-        .sort((a, b) => {
-          if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
-          return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-        })
-        .map(entry => {
-          const entryPath = path.join(current, entry.name);
-          const entryRel = path.relative(root, entryPath).replace(/\\/g, '/');
-          if (entry.isDirectory()) {
-            return { name: entry.name, path: entryRel === '' ? '.' : entryRel, type: 'directory', children: walk(entryPath) };
-          }
-          return { name: entry.name, path: entryRel === '' ? '.' : entryRel, type: 'file' };
-        });
+
+    // Pagination parameters
+    const requestedPath = typeof req.query.path === 'string' ? req.query.path : '';
+    const page = typeof req.query.page === 'string' && !isNaN(parseInt(req.query.page))
+      ? parseInt(req.query.page)
+      : 1;
+    const pageSize = typeof req.query.pageSize === 'string' && !isNaN(parseInt(req.query.pageSize))
+      ? parseInt(req.query.pageSize)
+      : 0;
+
+    // Target directory to list
+    const targetDir = requestedPath
+      ? path.resolve(root, requestedPath.replace(/\\/g, '/'))
+      : root;
+
+    // Validate target directory is within workspace
+    const relativeTarget = path.relative(root, targetDir);
+    if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) {
+      return res.status(403).json({ error: 'Chemin hors du workspace.' });
+    }
+
+    // Check if directory exists
+    if (!fs.existsSync(targetDir)) {
+      return res.status(404).json({ error: 'Répertoire introuvable.' });
+    }
+
+    const stat = await fs.promises.stat(targetDir);
+    if (!stat.isDirectory()) {
+      return res.status(400).json({ error: 'Le chemin spécifié n\'est pas un répertoire.' });
+    }
+
+    // Read entries at this directory level only
+    const entries = fs.readdirSync(targetDir, { withFileTypes: true });
+    
+    // Filter excluded directories
+    const filteredEntries = entries.filter(entry =>
+      !['node_modules', '.git', 'dist', 'build', 'out', '.Leanna'].includes(entry.name)
+    );
+
+    // Sort: directories first, then alphabetical
+    const sortedEntries = filteredEntries.sort((a, b) => {
+      if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+
+    // Pagination logic
+    let resultEntries = sortedEntries;
+    let pagination: any = null;
+
+    if (pageSize > 0 && page >= 1) {
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      resultEntries = sortedEntries.slice(startIndex, endIndex);
+
+      pagination = {
+        page,
+        pageSize,
+        total: sortedEntries.length,
+        totalPages: Math.ceil(sortedEntries.length / pageSize),
+        hasMore: endIndex < sortedEntries.length
+      };
+    } else {
+      // For backward compatibility: if no pagination requested, limit to prevent memory issues
+      const SAFE_LIMIT = 10000;
+      if (sortedEntries.length > SAFE_LIMIT) {
+        resultEntries = sortedEntries.slice(0, SAFE_LIMIT);
+        pagination = {
+          page: 1,
+          pageSize: SAFE_LIMIT,
+          total: sortedEntries.length,
+          totalPages: Math.ceil(sortedEntries.length / SAFE_LIMIT),
+          hasMore: true,
+          warning: 'Limite de sécurité appliquée. Utilisez les paramètres de pagination pour accéder à tous les résultats.'
+        };
+      }
+    }
+
+    // Build response entries
+    const responseEntries = resultEntries.map(entry => {
+      const entryPath = path.join(targetDir, entry.name);
+      const entryRel = path.relative(root, entryPath).replace(/\\/g, '/');
+      if (entry.isDirectory()) {
+        return {
+          name: entry.name,
+          path: entryRel === '' ? '.' : entryRel,
+          type: 'directory' as const,
+          children: [] // Empty children for paginated mode - clients should request subdirectories separately
+        };
+      }
+      return {
+        name: entry.name,
+        path: entryRel === '' ? '.' : entryRel,
+        type: 'file' as const
+      };
+    });
+
+    const response: any = {
+      path: targetDir,
+      entries: responseEntries
     };
-    res.json({ path: root, entries: walk(root) });
+
+    if (pagination) {
+      response.pagination = pagination;
+    }
+
+    res.json(response);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

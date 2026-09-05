@@ -34,29 +34,39 @@ export const ALLOWED_ATTRIBUTES: Record<string, Set<string>> = {
  * Validates that a URL scheme is safe for use in href attributes.
  * Only allows: https?, mailto:, relative paths (/), and hash fragments (#)
  * Explicitly blocks: javascript:, data:, vbscript:, and other dangerous schemes
+ *
+ * SECURITY FIX: Browsers strip ASCII tab (\t), newline (\n) and carriage-return (\r)
+ * characters from a URL *before* resolving its scheme. A naive prefix check like
+ * `value.startsWith('javascript:')` can therefore be bypassed with a payload such as
+ * `"java\tscript:alert(1)"`, which the string comparison sees as a harmless value but
+ * which the browser resolves and executes as `javascript:alert(1)`. We strip those
+ * characters first so the check can't be evaded this way.
  */
 function isSafeHref(value: string): boolean {
+  // Normalize away characters browsers ignore when parsing a URL scheme.
+  const normalized = value.replace(/[\t\n\r]/g, '');
+
   // Test against safe schemes
   const safeSchemePattern = /^(https?:|mailto:|#|\/)/i;
-  if (safeSchemePattern.test(value)) {
+  if (safeSchemePattern.test(normalized)) {
     return true;
   }
-  
+
   // Explicitly block dangerous schemes
   const dangerousSchemes = ['javascript:', 'data:', 'vbscript:', 'file:', 'about:'];
-  const lowerValue = value.toLowerCase();
+  const lowerValue = normalized.toLowerCase();
   for (const scheme of dangerousSchemes) {
     if (lowerValue.startsWith(scheme)) {
       return false;
     }
   }
-  
+
   // If no scheme is present (relative URL), allow it
   // This handles cases like "path/to/page" or "./file.html"
-  if (!value.includes(':')) {
+  if (!normalized.includes(':')) {
     return true;
   }
-  
+
   // Default: deny
   return false;
 }

@@ -164,12 +164,28 @@ export interface AgentDefinition {
   description: string;
   /** Capacités de l'agent (skills/outils auxquels il a accès) */
   capabilities: string[];
+  /** Politique explicite de délégation inter-agents. */
+  permissions?: AgentPermissions;
   /** Instructions système spécifiques à l'agent */
   systemPrompt: string;
   /** Nombre max de tâches simultanées */
   maxConcurrency: number;
   /** Timeout par défaut en ms */
   defaultTimeoutMs: number;
+}
+
+export interface AgentPermissions {
+  allowDelegation: boolean;
+  allowReceiveDelegation: boolean;
+  maxDelegationDepth: number;
+  allowedTargets?: string[];
+  allowedCapabilities?: string[];
+  allowedTools?: string[];
+  budget?: {
+    maxDelegations?: number;
+    maxTokens?: number;
+  };
+  riskLevel?: "low" | "medium" | "high" | "critical";
 }
 
 /** Tâche déléguée à un agent */

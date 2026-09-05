@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useRef, lazy, Suspense } fro
 import { useNavigate } from 'react-router-dom';
 // Monaco Editor - lazy loaded to reduce initial bundle
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.Editor })));
+const DiffViewer = lazy(() => import('../components/ide/DiffViewer.js').then(m => ({ default: m.DiffViewer })));
 // Panels - lazy loaded
 const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel.js').then(m => ({ default: m.SandboxPanel })));
 const VisionPanel = lazy(() => import('../components/panels/VisionPanel.js').then(m => ({ default: m.VisionPanel })));
@@ -14,7 +15,6 @@ import type { RichDocument } from '../components/ide/RichDocumentViewer.js';
 import { IdeModal, type ModalMode } from '../components/ide/IdeModal.js';
 import { ContextMenu, type ContextTarget, type ClipboardEntry } from '../components/ide/ContextMenu.js';
 import { NotebookPickerModal } from '../components/ide/NotebookPickerModal.js';
-import { DiffViewer } from '../components/ide/DiffViewer.js';
 import { CommandPalette } from '../components/ide/CommandPalette.js';
 import { GlobalSearch } from '../components/ide/GlobalSearch.js';
 import { StatusBar } from '../components/ide/StatusBar.js';
@@ -74,7 +74,10 @@ export default function IdeView() {
   const { info: toastInfo } = useToast();
 
   // Settings navigation handler
-  const openSettings = useCallback(() => navigate('/settings'), [navigate]);
+  const openSettings = useCallback(
+    (section?: string) => navigate(section ? `/settings?section=${section}` : '/settings'),
+    [navigate],
+  );
 
   // Initialize the global activity store (listens to events even when panel is closed)
   useEffect(() => {
@@ -925,6 +928,8 @@ export default function IdeView() {
           onOpenFile={openFileAt}
           onOpenFileDiff={(path) => openSandboxDiff(path)}
           onToggleDirectory={fileSystem.toggleDirectory}
+          onLoadDirectory={fileSystem.loadDirectory}
+          onLoadWorkspaceDirectory={fileSystem.loadWorkspaceDirectory}
           onContextMenu={(e, entry) => {
             e.preventDefault();
             setContextMenu({
@@ -1269,12 +1274,23 @@ export default function IdeView() {
       )}
 
       {showDiffViewer && activeFile && (
-        <DiffViewer
-          filePath={activeFile.path}
-          currentContent={activeFile.content}
-          theme={ideSettings.theme}
-          onClose={() => setShowDiffViewer(false)}
-        />
+        <Suspense
+          fallback={
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center"
+              style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-muted)' }}
+            >
+              Chargement de la comparaison...
+            </div>
+          }
+        >
+          <DiffViewer
+            filePath={activeFile.path}
+            currentContent={activeFile.content}
+            theme={ideSettings.theme}
+            onClose={() => setShowDiffViewer(false)}
+          />
+        </Suspense>
       )}
 
       {showCommandPalette && (

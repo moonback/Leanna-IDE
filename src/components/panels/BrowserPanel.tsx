@@ -6,69 +6,16 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ArrowLeft,
-  ArrowRight,
-  RefreshCw,
-  X,
-  Home,
-  Globe,
-  Lock,
-  AlertTriangle,
-  Loader2,
-  Bot,
-  ExternalLink,
-} from 'lucide-react';
-
-// ─── Types webview (Electron-specific, non exposés par le tsconfig) ───────────
-
-interface WebviewElement extends HTMLElement {
-  src: string;
-  loadURL(url: string): void;
-  reload(): void;
-  goBack(): void;
-  goForward(): void;
-  canGoBack(): boolean;
-  canGoForward(): boolean;
-  getURL(): string;
-  getTitle(): string;
-  executeJavaScript(code: string): Promise<unknown>;
-}
-
-interface WebviewTitleEvent extends Event {
-  title: string;
-  explicitSet: boolean;
-}
-
-interface WebviewFailLoadEvent extends Event {
-  errorCode: number;
-  errorDescription: string;
-  validatedURL: string;
-}
-
-interface WebviewNavigateEvent extends Event {
-  url: string;
-  httpResponseCode: number;
-  httpStatusText: string;
-}
-
-// ─── Props ────────────────────────────────────────────────────────────────────
-
-interface BrowserPanelProps {
-  onClose: () => void;
-  /** URL courante contrôlée depuis l'extérieur (ex: par Leanna via skill) */
-  url?: string;
-  /** URL d'accueil par défaut */
-  defaultUrl?: string;
-  /** Prend toute la largeur disponible (zone principale). Défaut : false */
-  fullWidth?: boolean;
-  /** Largeur fixe en mode panneau latéral. Ignoré si fullWidth=true. */
-  width?: string;
-  /** Callback pour ouvrir l'URL dans un nouvel onglet de l'application */
-  onOpenInNewTab?: (url: string) => void;
-  /** Callback quand une URL est ouverte dans une fenêtre externe */
-  onOpenExternal?: () => void;
-}
+import { AlertTriangle } from 'lucide-react';
+import { BrowserExternalOverlay } from './BrowserExternalOverlay.js';
+import { BrowserToolbar } from './BrowserToolbar.js';
+import type {
+  BrowserPanelProps,
+  WebviewElement,
+  WebviewFailLoadEvent,
+  WebviewNavigateEvent,
+  WebviewTitleEvent,
+} from './browserTypes.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -84,15 +31,10 @@ export function normalizeUrl(raw: string): string {
   return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
 }
 
-function isHttps(url: string): boolean {
-  return url.startsWith('https://');
-}
-
 // ─── Composant ───────────────────────────────────────────────────────────────
 
 export function BrowserPanel({
   onClose,
-  onOpenInNewTab,
   onOpenExternal,
   url: controlledUrl,
   defaultUrl = BROWSER_HOME_URL,
@@ -1332,8 +1274,6 @@ export function BrowserPanel({
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  const secure = isHttps(currentUrl);
-
   return (
     <div
       className={`flex flex-col min-h-0 ${fullWidth ? 'flex-1 min-w-0' : 'border-l'}`}
@@ -1348,136 +1288,24 @@ export function BrowserPanel({
         backgroundColor: 'var(--bg-panel)',
       }}
     >
-      {/* ── Toolbar ── */}
-      <div
-        className="flex flex-col gap-1.5 px-2 py-2 flex-shrink-0"
-        style={{ borderBottom: '1px solid var(--border-base)' }}
-      >
-        {/* Title row */}
-        <div className="flex items-center justify-between gap-1 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Globe size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-            <span
-              className="text-sm font-semibold truncate"
-              style={{ color: 'var(--text-primary)' }}
-              title={pageTitle || 'Navigateur'}
-            >
-              {pageTitle || 'Navigateur'}
-            </span>
-            {/* Badge Leanna pilote */}
-            {assistantNavActive && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium"
-                style={{
-                  backgroundColor: 'color-mix(in srgb, var(--color-accent-alt) 15%, transparent)',
-                  color: 'var(--color-accent-alt)',
-                  border: '1px solid color-mix(in srgb, var(--color-accent-alt) 30%, transparent)',
-                }}
-              >
-                <Bot size={10} />
-                Leanna
-              </span>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded hover:bg-white/10 transition flex-shrink-0"
-            title="Fermer le navigateur"
-            aria-label="Fermer le navigateur"
-          >
-            <X size={13} style={{ color: 'var(--text-muted)' }} />
-          </button>
-        </div>
-
-        {/* Nav buttons + URL bar */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={handleGoBack}
-            disabled={!canGoBack}
-            className="p-1.5 rounded transition hover:bg-white/10 disabled:opacity-30"
-            title="Page précédente"
-            aria-label="Page précédente"
-          >
-            <ArrowLeft size={13} style={{ color: 'var(--text-muted)' }} />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleGoForward}
-            disabled={!canGoForward}
-            className="p-1.5 rounded transition hover:bg-white/10 disabled:opacity-30"
-            title="Page suivante"
-            aria-label="Page suivante"
-          >
-            <ArrowRight size={13} style={{ color: 'var(--text-muted)' }} />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleRefresh}
-            className="p-1.5 rounded transition hover:bg-white/10"
-            title={loading ? 'Arrêter' : 'Actualiser'}
-            aria-label={loading ? 'Arrêter le chargement' : 'Actualiser'}
-          >
-            {loading ? (
-              <Loader2 size={13} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
-            ) : (
-              <RefreshCw size={13} style={{ color: 'var(--text-muted)' }} />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleHome}
-            className="p-1.5 rounded transition hover:bg-white/10"
-            title="Page d'accueil"
-            aria-label="Page d'accueil"
-          >
-            <Home size={13} style={{ color: 'var(--text-muted)' }} />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleOpenInNewWindow}
-            className="p-1.5 rounded transition hover:bg-white/10"
-            title="Ouvrir dans une nouvelle fenêtre"
-            aria-label="Ouvrir dans une nouvelle fenêtre"
-          >
-            <ExternalLink size={13} style={{ color: 'var(--text-muted)' }} />
-          </button>
-
-          {/* URL bar */}
-          <div
-            className="flex flex-1 items-center gap-1 min-w-0 rounded-lg px-2 py-1"
-            style={{
-              backgroundColor: 'var(--bg-input, var(--bg-secondary))',
-              border: `1px solid ${assistantNavActive ? 'rgba(139,92,246,0.5)' : 'var(--border-base)'}`,
-              transition: 'border-color 0.2s',
-            }}
-          >
-            {secure ? (
-              <Lock size={11} style={{ color: 'var(--color-success)', flexShrink: 0 }} aria-label="Connexion sécurisée" />
-            ) : (
-              <AlertTriangle size={11} style={{ color: 'var(--color-warning)', flexShrink: 0 }} aria-label="Connexion non sécurisée" />
-            )}
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={e => setInputValue(e.target.value)}
-              onKeyDown={handleInputKeyDown}
-              onFocus={e => e.target.select()}
-              className="flex-1 bg-transparent outline-none text-sm min-w-0"
-              style={{ color: 'var(--text-primary)' }}
-              placeholder="Entrez une URL ou une recherche…"
-              aria-label="Barre d'adresse"
-              spellCheck={false}
-            />
-          </div>
-        </div>
-      </div>
+      <BrowserToolbar
+        pageTitle={pageTitle}
+        assistantNavActive={assistantNavActive}
+        currentUrl={currentUrl}
+        inputValue={inputValue}
+        loading={loading}
+        canGoBack={canGoBack}
+        canGoForward={canGoForward}
+        inputRef={inputRef}
+        onClose={onClose}
+        onInputChange={setInputValue}
+        onInputKeyDown={handleInputKeyDown}
+        onGoBack={handleGoBack}
+        onGoForward={handleGoForward}
+        onRefresh={handleRefresh}
+        onHome={handleHome}
+        onOpenExternal={handleOpenInNewWindow}
+      />
 
       {/* ── Error banner ── */}
       {loadError && (
@@ -1508,71 +1336,16 @@ export function BrowserPanel({
           }}
         />
         
-        {/* Overlay message quand une fenêtre externe est ouverte */}
         {isExternalWindowOpen && (
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center"
-            style={{
-              backgroundColor: 'var(--bg-panel)',
-              zIndex: 10,
+          <BrowserExternalOverlay
+            onDismiss={() => {
+              if (externalWindowRef.current && !externalWindowRef.current.closed) {
+                externalWindowRef.current.close();
+              }
+              setIsExternalWindowOpen(false);
+              externalWindowRef.current = null;
             }}
-          >
-            <div
-              className="flex flex-col items-center gap-4 p-6 rounded-lg"
-              style={{
-                backgroundColor: 'var(--bg-panel)',
-                border: '1px solid var(--border-base)',
-                maxWidth: '400px',
-              }}
-            >
-              <svg 
-                style={{ width: 64, height: 64, opacity: 0.8 }}
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="1.5"
-              >
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                <polyline points="15,3 21,3 21,9"/>
-                <line x1="10" y1="14" x2="21" y2="3"/>
-              </svg>
-              <h2
-                className="text-lg font-semibold"
-                style={{ color: 'var(--accent-primary)' }}
-              >
-                Page ouverte dans une nouvelle fenêtre
-              </h2>
-              <p
-                className="text-center text-sm"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Cette page a été ouverte dans votre navigateur par défaut.<br />
-                Elle se rechargera automatiquement ici dès que vous fermez la fenêtre externe.
-              </p>
-              <button
-                onClick={() => {
-                  if (externalWindowRef.current && !externalWindowRef.current.closed) {
-                    externalWindowRef.current.close();
-                  }
-                  setIsExternalWindowOpen(false);
-                  externalWindowRef.current = null;
-                }}
-                className="px-4 py-2 rounded-lg text-sm font-medium"
-                style={{
-                  backgroundColor: 'var(--accent-primary)',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'opacity 0.2s',
-                }}
-                onMouseOver={(e) => (e.currentTarget as HTMLButtonElement).style.opacity = '0.9'}
-                onMouseOut={(e) => (e.currentTarget as HTMLButtonElement).style.opacity = '1'}
-              >
-                Fermer le message
-              </button>
-            </div>
-          </div>
+          />
         )}
       </div>
     </div>

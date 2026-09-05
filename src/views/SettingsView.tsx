@@ -77,10 +77,13 @@ function getActiveLabel(id: string) {
 
 export default function SettingsView() {
   const navigate = useNavigate();
+  const searchParams = new URLSearchParams(window.location.search);
   const { profile, save, reset } = useProfile();
   const { success, error: toastError } = useToast();
   const [saving, setSaving] = useState(false);
-  const [activeSection, setActiveSection] = useState('profile-settings');
+  const [activeSection, setActiveSection] = useState(
+    searchParams.get('section') === 'tokens-settings' ? 'tokens-settings' : 'profile-settings',
+  );
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSave = useCallback(async () => {

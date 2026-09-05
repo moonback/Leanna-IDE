@@ -22,6 +22,7 @@ import fs from "fs";
 import path from "path";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 import { createLogger } from "../utils/logger.js";
+import { knowledgeGraphCache } from "./KnowledgeGraphCache.js";
 import type {
   FileNode,
   CodeEntity,
@@ -64,6 +65,7 @@ export class KnowledgeGraph {
   private updateListeners: Set<() => void> = new Set();
   /** Timer de debounce pour la persistence asynchrone */
   private persistTimer: NodeJS.Timeout | null = null;
+  private workspaceLoadVersion = 0;
   /**
    * Index AST en mémoire — non persisté, reconstruit à chaque démarrage.
    * Contient les résultats Tree-sitter bruts par chemin de fichier.
@@ -87,6 +89,19 @@ export class KnowledgeGraph {
 
     if (SELF_ROOT) {
       this.loadFromDisk();
+      void this.hydrateFromSharedCache(SELF_ROOT, ++this.workspaceLoadVersion);
+    }
+  }
+
+  private async hydrateFromSharedCache(projectRoot: string, loadVersion: number): Promise<void> {
+    const cached = await knowledgeGraphCache.get(projectRoot);
+    if (!cached || loadVersion !== this.workspaceLoadVersion || cached.projectRoot !== projectRoot) return;
+
+    const cachedTime = Date.parse(cached.lastIndexed);
+    const localTime = Date.parse(this.state.lastIndexed);
+    if (cachedTime > localTime) {
+      this.state = this.validateState(cached);
+      log.info(`⚡ KnowledgeGraph chargé depuis le cache partagé: ${this.state.stats.totalFiles} fichiers`);
     }
   }
 
@@ -162,7 +177,10 @@ export class KnowledgeGraph {
       const data = JSON.stringify(this.state, null, 2);
       fs.writeFile(storePath, data, "utf-8", (err) => {
         if (err) log.error(`❌ Échec sauvegarde graphe: ${err.message}`);
-        else log.info(`💾 Graphe sauvegardé: ${storePath}`);
+        else {
+          void knowledgeGraphCache.set(SELF_ROOT, this.state);
+          log.info(`💾 Graphe sauvegardé: ${storePath}`);
+        }
       });
       
       this.dirty = false;
@@ -191,6 +209,7 @@ export class KnowledgeGraph {
         }
         fs.writeFileSync(storePath, JSON.stringify(this.state, null, 2), "utf-8");
         this.dirty = false;
+        void knowledgeGraphCache.set(SELF_ROOT, this.state);
         log.info(`💾 Graphe flushé (shutdown): ${storePath}`);
       } catch (err) {
         log.error(`❌ Échec flush graphe: ${(err as Error).message}`);

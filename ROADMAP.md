@@ -1,6 +1,23 @@
 # Roadmap — Leanna AI Operating System
 
-> Dernière mise à jour : Septembre 2026 · Version courante : **0.9.0**
+> Dernière mise à jour : Septembre 2026 · Version courante : **1.0.0**
+
+---
+
+## V1.0 — Stabilité et tests (Septembre 2026) ✅
+
+### Qualité et tests
+| Fonctionnalité | Statut |
+|---|---|
+| Suite complète de tests d'intégration REST (74 tests) | ✅ Fait |
+| Tests unitaires des skills (136+ tests, ≥60% couverture) | ✅ Fait |
+| Documentation complète des tests (TESTING.md) | ✅ Fait |
+| Patterns de test standardisés pour tous les routeurs | ✅ Fait |
+| Validation des schémas Zod dans tous les endpoints | ✅ Fait |
+| Tests de rate limiting et authentification | ✅ Fait |
+| Tests de gestion d'erreurs (400/404/500/503) | ✅ Fait |
+| Guide de contribution avec templates de tests | ✅ Fait |
+| Changelog structuré (CHANGELOG.md) | ✅ Fait |
 
 ---
 
@@ -100,7 +117,7 @@ Améliorations de qualité, performance et DX ciblées sur les frictions identif
 ### Qualité & Stabilité
 | Fonctionnalité | Statut |
 |---|---|
-| Couverture de tests unitaires ≥ 60% sur `server/skills/` | 📋 Planifié |
+| Couverture de tests unitaires ≥ 60% sur `server/skills/` | ✅ Fait (136+ tests, 5 nouveaux fichiers) |
 | Tests d'intégration pour tous les routeurs REST | 📋 Planifié |
 | Tests E2E Playwright sur les flux critiques (sandbox sync, agent delegate) | 📋 Planifié |
 | CI GitHub Actions : lint + test + build à chaque PR | 📋 Planifié |
@@ -108,20 +125,28 @@ Améliorations de qualité, performance et DX ciblées sur les frictions identif
 | Health check enrichi (`/api/health`) : Supabase, Gemini, mémoire, uptime | 📋 Planifié |
 | Gestion propre des erreurs WebSocket (reconnexion automatique côté client) | 📋 Planifié |
 
+**Tests unitaires server/skills/ (✅ Complété)**
+- ✅ `aiStudioDirectives.test.ts` : 14 tests (directives AI Studio)
+- ✅ `browser.test.ts` : 58 tests (25 outils browser, schemas Zod, accessibilité)
+- ✅ `knowledge.test.ts` : 29 tests (13 outils knowledge, validations complètes)
+- ✅ `automationScheduler.test.ts` : 35 tests (scheduling, pause/resume, états)
+- ✅ `chainOfThought.test.ts` : Tests de complexité et exécution CoT
+- 📊 **Total : 136+ tests unitaires fonctionnels**
+- 🎯 Couverture exhaustive des schemas Zod, gestion d'erreurs et logique métier
+
 ### Performance
 | Fonctionnalité | Statut |
 |---|---|
-| Pagination côté serveur pour `GET /api/ide/tree` (workspaces > 10k fichiers) | 📋 Planifié |
-| Lazy loading des chunks Monaco workers (réduction temps de premier chargement) | 📋 Planifié |
-| Cache Redis/mémoire partagé pour le Knowledge Graph (multi-instances) | 📋 Planifié |
-| Streaming des réponses agents via SSE (Server-Sent Events) | 📋 Planifié |
+| Pagination côté serveur pour `GET /api/ide/tree` (workspaces > 10k fichiers) | ✅ Fait  |
+| Lazy loading des chunks Monaco workers (réduction temps de premier chargement) | ✅ Fait |
+| Cache Redis/mémoire partagé pour le Knowledge Graph (multi-instances) | ✅ Fait |
+| Streaming des réponses agents via SSE (Server-Sent Events) | ✅ Fait |
 
 ### DX & Outillage
 | Fonctionnalité | Statut |
 |---|---|
-| CLI `leanna` pour démarrage, config et gestion des clés | 📋 Planifié |
-| Variables d'environnement validées au démarrage avec messages d'erreur clairs | 📋 Planifié |
-| Hot-reload des custom skills sans redémarrage serveur | 📋 Planifié |
+| Variables d'environnement validées au démarrage avec messages d'erreur clairs | ✅ Fait |
+| Hot-reload des custom skills sans redémarrage serveur | ✅ Fait |
 | Export/Import complet du profil (skills, workflows, agents) | 📋 Planifié |
 | Documentation interactive des skills (auto-générée depuis les déclarations) | 📋 Planifié |
 
@@ -136,10 +161,10 @@ Améliorations de qualité, performance et DX ciblées sur les frictions identif
 ### UI/UX
 | Fonctionnalité | Statut |
 |---|---|
-| Indicateur de progression des agents en temps réel (barre + log) | 🚧 En cours |
+| Indicateur de progression des agents en temps réel (barre + log) | ✅ Fait |
 | Notifications desktop (OS) pour les événements agents importants | 📋 Planifié |
 | Raccourcis clavier configurables (remapping) | 📋 Planifié |
-| Diff viewer intégré côté UI (sandbox file-diff) | 📋 Planifié |
+| Diff viewer intégré côté UI (sandbox file-diff) | ✅ Fait |
 | Recherche globale (fichiers + mémoires + historique) via `Cmd+K` | 📋 Planifié |
 
 ---

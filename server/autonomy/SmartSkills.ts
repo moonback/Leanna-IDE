@@ -362,13 +362,39 @@ async function executeValidatePatch(
     if (fileContent?.error) continue;
 
     // Utiliser reasoning_think pour comprendre la correction nécessaire
-    await handler("reasoning_think", {
+    const reasoningResult = await handler("reasoning_think", {
       thought: `Le fichier ${path} a les erreurs suivantes après modification:\n${errors}\n\nContenu actuel pertinent:\n${typeof fileContent === 'string' ? fileContent.slice(0, 2000) : JSON.stringify(fileContent).slice(0, 2000)}\n\nQuelle correction précise appliquer ?`,
+      prompt: `Le fichier ${path} a les erreurs suivantes après modification:\n${errors}\n\nContenu actuel pertinent:\n${typeof fileContent === 'string' ? fileContent.slice(0, 2000) : JSON.stringify(fileContent).slice(0, 2000)}\n\nRetourne uniquement un objet JSON valide au format {"search":"texte exact actuel","replace":"texte corrigé"}. N'ajoute aucun commentaire ni bloc Markdown.`,
       strategy: "auto",
     }, context);
 
-    // La correction sera tentée au prochain tour de la boucle
-    // (le reasoning a mis en cache la solution, le modèle l'utilisera)
+    const correction = extractCorrection(reasoningResult);
+    if (!correction) {
+      return {
+        success: false,
+        attempts: attempt,
+        file: path,
+        finalState: "needs_human",
+        errors: `${errors} Correction automatique inexploitable: reasoning_think n'a pas fourni un objet JSON {"search":"...","replace":"..."}.`,
+        corrections,
+      };
+    }
+
+    const correctionResult = await handler("modify_project_file", {
+      path,
+      search: correction.search,
+      replace: correction.replace,
+    }, context);
+    if (correctionResult?.error) {
+      return {
+        success: false,
+        attempts: attempt,
+        file: path,
+        finalState: "needs_human",
+        errors: `${errors} Application de la correction échouée: ${correctionResult.error}`,
+        corrections,
+      };
+    }
   }
 
   return {
@@ -378,6 +404,24 @@ async function executeValidatePatch(
     finalState: "needs_human",
     errors: "Corrections automatiques épuisées.",
   };
+}
+
+function extractCorrection(result: any): { search: string; replace: string } | null {
+  const raw = typeof result === "string"
+    ? result
+    : result?.reasoning ?? result?.answer ?? result?.thought;
+  if (typeof raw !== "string") return null;
+
+  const jsonMatch = raw.match(/```json\s*([\s\S]*?)\s*```/) ?? raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
+  try {
+    const parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
+    if (typeof parsed?.search !== "string" || typeof parsed?.replace !== "string") return null;
+    return { search: parsed.search, replace: parsed.replace };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -413,16 +457,22 @@ async function executeReadUntilUnderstood(
     };
   }
 
-  // Extraire la confiance initiale
-  confidence = contextResult?.understandingScore
-    ?? contextResult?.score
+  // La confiance initiale vient du score de compréhension calculé par le moteur.
+  confidence = contextResult?.score?.confidence
+    ?? contextResult?.understandingScore
     ?? contextResult?.confidence
     ?? 30;
 
-  // Extraire les fichiers recommandés
-  const recommendedFiles: string[] = contextResult?.relevantFiles
-    ?? contextResult?.files?.map((f: any) => f.path || f)
+  // Conserver la pertinence sémantique par fichier : lire un fichier n'est pas
+  // une preuve de compréhension si le moteur ne le juge pas pertinent.
+  const contextFiles: Array<{ path: string; relevance?: number }> = contextResult?.batch?.files
+    ?.map((file: any) => ({ path: file.path, relevance: file.relevance }))
+    .filter((file: { path?: string }) => Boolean(file.path))
+    ?? contextResult?.files?.map((file: any) => ({ path: file.path || file, relevance: file.relevance }))
     ?? [];
+  const recommendedFiles = contextFiles.map((file) => file.path);
+  const relevanceByFile = new Map(contextFiles.map((file) => [file.path, file.relevance]));
+  const initialConfidence = confidence;
 
   // Extraire les findings du contexte
   if (contextResult?.facts) {
@@ -442,9 +492,13 @@ async function executeReadUntilUnderstood(
 
     filesRead.push(file);
 
-    // Chaque fichier lu augmente la confiance proportionnellement
-    const boost = Math.min(15, (100 - confidence) * 0.2);
-    confidence = Math.min(100, confidence + boost);
+    const relevances = filesRead
+      .map((readFile) => relevanceByFile.get(readFile))
+      .filter((relevance): relevance is number => typeof relevance === "number");
+    if (relevances.length > 0) {
+      const averageRelevance = relevances.reduce((sum, relevance) => sum + relevance, 0) / relevances.length;
+      confidence = Math.round((initialConfidence + Math.max(0, Math.min(1, averageRelevance)) * 100) / 2);
+    }
 
     log.info(`[read_until_understood] Lu: ${file} → confiance: ${confidence.toFixed(0)}%`);
   }

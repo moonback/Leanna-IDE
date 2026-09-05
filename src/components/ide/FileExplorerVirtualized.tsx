@@ -29,6 +29,8 @@ type FileExplorerProps = {
   onOpenFile: (path: string) => void;
   onOpenFileDiff?: (path: string) => void;
   onToggleDirectory: (path: string) => void;
+  onLoadDirectory?: (path: string) => void;
+  onLoadWorkspaceDirectory?: (path: string) => void;
   onContextMenu: (e: React.MouseEvent, entry: TreeEntry) => void;
   onCreateFile: () => void;
   onRefresh: () => void;
@@ -207,6 +209,7 @@ function toDataNode(
   searchQuery: string,
   onOpenFile: (path: string) => void,
   onToggleDirectory: (path: string) => void,
+  onLoadDirectory: ((path: string) => void) | undefined,
   onContextMenu: (e: React.MouseEvent, entry: TreeEntry) => void,
   draggingPath: string | null,
   dragOverPath: string | null,
@@ -246,7 +249,10 @@ function toDataNode(
 
   const activateRow = () => {
     if (entry.type === 'file') onOpenFile(entry.path);
-    else onToggleDirectory(entry.path);
+    else {
+      onToggleDirectory(entry.path);
+      onLoadDirectory?.(entry.path);
+    }
   };
 
   const title = (
@@ -380,6 +386,7 @@ function toDataNode(
           searchQuery,
           onOpenFile,
           onToggleDirectory,
+          onLoadDirectory,
           onContextMenu,
           draggingPath,
           dragOverPath,
@@ -415,6 +422,8 @@ const FileExplorer = memo(function FileExplorer({
   onOpenFile,
   onOpenFileDiff,
   onToggleDirectory,
+  onLoadDirectory,
+  onLoadWorkspaceDirectory,
   onContextMenu,
   onCreateFile,
   onRefresh,
@@ -426,6 +435,23 @@ const FileExplorer = memo(function FileExplorer({
   const [sandboxActive, setSandboxActive] = useState(false);
   const [sandboxModifiedCount, setSandboxModifiedCount] = useState(0);
   const [liveDiffPaths, setLiveDiffPaths] = useState<Map<string, DiffInfo>>(new Map());
+  const [projectFileCount, setProjectFileCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    import('../../services/ideApi.js')
+      .then(({ ideApi }) => ideApi.countFiles())
+      .then(count => {
+        if (mounted) setProjectFileCount(count);
+      })
+      .catch(() => {
+        if (mounted) setProjectFileCount(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [tree]);
 
   useEffect(() => {
     let mounted = true;
@@ -583,6 +609,7 @@ const FileExplorer = memo(function FileExplorer({
         debouncedSearch,
         onOpenFile,
         onToggleDirectory,
+        onLoadDirectory,
         onContextMenu,
         draggingPath,
         dragOverPath,
@@ -601,6 +628,7 @@ const FileExplorer = memo(function FileExplorer({
     debouncedSearch,
     onOpenFile,
     onToggleDirectory,
+    onLoadDirectory,
     onContextMenu,
     onMoveEntry,
     draggingPath,
@@ -624,7 +652,8 @@ const FileExplorer = memo(function FileExplorer({
       else next.add(dirPath);
       return next;
     });
-  }, []);
+    onLoadWorkspaceDirectory?.(dirPath);
+  }, [onLoadWorkspaceDirectory]);
 
   const processedWorkspaceTree = useMemo(() => {
     if (!workspaceTree || workspaceTree.length === 0) return [];
@@ -667,6 +696,7 @@ const FileExplorer = memo(function FileExplorer({
         debouncedSearch,
         openWsFile,
         wsToggleDir,
+        onLoadWorkspaceDirectory,
         onContextMenu,
         null,
         null,
@@ -686,6 +716,7 @@ const FileExplorer = memo(function FileExplorer({
     onOpenFile,
     onOpenFileDiff,
     wsToggleDir,
+    onLoadWorkspaceDirectory,
     onContextMenu,
     effectiveDiffPaths,
     noopDrag,
@@ -704,6 +735,7 @@ const FileExplorer = memo(function FileExplorer({
   }, [onToggleDirectory]);
 
   const fileCount = useMemo(() => countEntries(processedTree), [processedTree]);
+  const displayedFileCount = searchQuery ? fileCount : (projectFileCount ?? fileCount);
 
   // ── Rendu amélioré ─────────────────────────────────────────────────────────
 
@@ -760,7 +792,7 @@ const FileExplorer = memo(function FileExplorer({
               className="text-xs px-2 py-0.5 rounded-full font-medium"
               style={{ color: 'var(--text-dimmed)', background: 'var(--bg-input)' }}
             >
-              {fileCount}
+              {displayedFileCount}
             </span>
           )}
         </div>

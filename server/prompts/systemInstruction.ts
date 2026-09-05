@@ -10,7 +10,7 @@
  * Les types sont centralisés dans server/runtime/prompts/types.ts
  */
 
-import { SystemPromptBuilder } from "../runtime/prompts/SystemPromptBuilder.js";
+import { buildSystemPrompt } from "../runtime/prompts/SystemPromptBuilder.js";
 import type { ProfileConfig, SystemPromptConfig } from "../runtime/prompts/types.js";
 
 // Ré-export des types pour compatibilité ascendante
@@ -22,11 +22,9 @@ export function buildLifeInstruction(): string {
   return "";
 }
 
-const builder = new SystemPromptBuilder();
-
 /**
  * Construit le prompt système complet.
- * Interface identique à l'ancienne — drop-in replacement.
+ * Façade de compatibilité vers buildSystemPrompt.
  * 
  * @param profile - Configuration du profil utilisateur
  * @returns Le prompt système complet assemblé
@@ -49,15 +47,12 @@ export function buildSystemInstruction(profile: ProfileConfig = {}): string {
     extraSections,
   };
 
-  return builder.build(builderConfig);
+  return buildSystemPrompt(builderConfig);
 }
 
 /**
- * Construit le prompt système avec la configuration du builder directement.
- * Alternative moderne à buildSystemInstruction.
+ * Façade V2 de compatibilité vers la source canonique.
  */
 export function buildSystemInstructionV2(config: SystemPromptConfig = {}): string {
-  return builder.build(config);
+  return buildSystemPrompt(config);
 }
-
-export const Leanna_SYSTEM_INSTRUCTION = buildSystemInstruction();

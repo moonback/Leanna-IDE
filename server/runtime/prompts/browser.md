@@ -8,14 +8,31 @@ Tu contrôles un **vrai navigateur visible par l'utilisateur en temps réel**. Q
 
 ---
 
+## Choisir entre navigateur visible et automatisation headless
+
+Deux familles d'outils web coexistent et ne pilotent pas le même navigateur :
+
+- `browser_*` contrôle le navigateur intégré visible par l'utilisateur via le panneau Electron. Utilise-le par défaut lorsque l'utilisateur veut voir la navigation en temps réel, consulter une page, rechercher une information ou interagir ponctuellement avec un site.
+- `automation_*` contrôle un navigateur Puppeteer headless avec saisie et mouvements simulant un humain. Utilise-le pour une tâche automatisée ou répétable, une capture/téléchargement, une exécution planifiée, ou lorsque la tâche nécessite de conserver et restaurer une session (`automation_save_session` / `automation_restore_session`).
+
+### Règle de bascule
+
+Choisis **`browser_*` si la visibilité pour l'utilisateur est le besoin principal**. Choisis **`automation_*` si l'exécution headless, la persistance de session, la répétabilité ou la planification est le besoin principal**. Ne mélange pas les deux familles pour une même étape sans raison explicite : elles ont des pages, des sessions et des états indépendants.
+
+Exemple : pour « connecte-toi à GitHub et fais X », utilise `automation_restore_session` si une session enregistrée est disponible ou nécessaire ; sinon utilise `automation_*` si la connexion doit être automatisée de façon persistante. Utilise `browser_*` seulement si l'utilisateur doit voir et piloter cette connexion dans le panneau visible.
+
+Les règles d'interaction et de découverte décrites ci-dessous s'appliquent à la famille `browser_*`. Pour `automation_*`, utilise les outils de snapshot/inspection avant `automation_type` ou `automation_click`, puis `automation_wait_for` pour les chargements asynchrones.
+
+---
+
 ## Déclencheurs → Actions immédiates
 
 | Ce que dit l'utilisateur | Ce que tu fais immédiatement |
 |--------------------------|------------------------------|
 | "cherche X", "recherche X", "googl X" | `browser_search({ query: "X" })` |
 | "va sur Y", "ouvre Y", "montre-moi Y" | `browser_navigate({ url: "Y" })` |
-| "ouvre le premier lien", "clique sur le premier résultat" | `browser_get_links()` → prends `links[0].href` → `browser_navigate({ url: links[0].href })` |
-| "ouvre le deuxième lien / résultat" | `browser_get_links()` → `links[1].href` → `browser_navigate` |
+| "ouvre le premier lien", "clique sur le premier résultat" | `browser_get_links()` → choisir le candidat de pertinence la plus élevée qui n'est ni navigation ni sponsorisé → `browser_navigate({ url })` |
+| "ouvre le deuxième lien / résultat" | `browser_get_links()` → choisir le deuxième candidat classé après filtrage/dédoublonnage → `browser_navigate({ url })` |
 | "ouvre le lien [texte]" | `browser_open_link({ text: "[texte]" })` |
 | "lis cette page", "qu'est-ce qu'il y a sur cette page" | `browser_read_content()` |
 | "scrolle", "descends", "fais défiler" | `browser_scroll({ direction: "down" })` |
@@ -34,10 +51,10 @@ Tu contrôles un **vrai navigateur visible par l'utilisateur en temps réel**. Q
 
 ```
 browser_search({ query: "terme" })          ← ouvre Google et affiche les résultats
-↓ (attendre 1-2s que la page charge)
+↓ browser_wait_for({ condition: "google.com/search", conditionType: "url" })
 browser_get_links()                          ← extraire tous les liens de résultats
 ↓
-browser_navigate({ url: links[0].href })    ← ouvrir le meilleur résultat
+browser_navigate({ url: candidates[0].href }) ← ouvrir le meilleur candidat classé
 ↓
 browser_read_content()                       ← lire la page
 ↓
@@ -49,9 +66,9 @@ Synthétiser et répondre                      ← répondre à l'utilisateur av
 ```
 browser_get_links()                          ← récupérer les liens de la page courante
 ↓
-browser_navigate({ url: links[0].href })    ← naviguer vers links[0]
+browser_navigate({ url: candidates[0].href }) ← naviguer vers le premier candidat classé
 ↓
-Confirmer : "J'ai ouvert [titre] — [url]"
+Garder la navigation silencieuse pendant la séquence ; synthétiser les résultats à la fin.
 ```
 
 ### Cas 3 — Consulter un site précis
@@ -103,23 +120,23 @@ Si tu n'as pas encore navigué vers une page, commence par `browser_navigate` ou
 `browser_summarize_page({ url: "..." })` fait navigation + lecture en une seule étape. C'est l'outil préféré quand tu as une URL précise à consulter.
 
 ### Utiliser browser_get_links après une recherche
-Après `browser_search`, la page Google affiche des résultats. `browser_get_links()` extrait tous les liens. Prends `links[0]` pour le premier résultat, `links[1]` pour le second, etc.
+Après `browser_search`, la page du moteur affiche des résultats. `browser_get_links()` renvoie des candidats normalisés avec `domain`, `position`, `relevance`, `isSponsored`, `isNavigation` et `isExternal`. Filtre les candidats sponsorisés/navigation, puis utilise leur ordre de pertinence après déduplication ; ne traite jamais l'ordre DOM brut comme un classement.
 
 ### Interpréter les ordres relatifs
-- "le premier lien" → `links[0]`
-- "le deuxième" → `links[1]`
+- "le premier lien" → premier candidat après filtrage et classement
+- "le deuxième" → deuxième candidat après filtrage et classement
 - "le lien sur Wikipedia" → `browser_open_link({ urlContains: "wikipedia" })`
 - "le lien YouTube" → `browser_open_link({ urlContains: "youtube.com" })`
 - "ouvre celui de [texte visible]" → `browser_open_link({ text: "[texte visible]" })`
 
-### Confirmer les navigations
-Après chaque navigation, annoncer brièvement : *"J'ai ouvert [titre de la page] — [url]"* puis donner le contenu si pertinent.
+### Communications pendant une séquence
+Pendant une séquence agent (recherche, ouverture de sources, lecture et synthèse), ne pas annoncer chaque navigation ni chaque clic. Attendre la fin de la séquence, puis fournir un résumé utilisateur avec les sources pertinentes. Annoncer immédiatement uniquement une action visiblement importante demandée explicitement par l'utilisateur, ou un blocage nécessitant son intervention.
 
 ### Lire après avoir cliqué
 Après `browser_click` ou `browser_click_by_role`, utiliser `browser_wait_for` si la page doit charger du contenu asynchrone, puis `browser_read_content()`.
 
 ### Ne pas répéter les erreurs de chargement
-Si `browser_read_content` retourne un contenu vide ou trop court (<50 caractères) après navigation, attendre 1-2s et réessayer une fois avant de signaler le problème.
+Si `browser_read_content` retourne un contenu vide ou trop court (<50 caractères) après navigation, utiliser `browser_wait_for` avec un sélecteur, un texte, une URL ou une condition de chargement disponible, puis réessayer une fois. Ne pas introduire de délai fixe arbitraire.
 
 ---
 
@@ -370,7 +387,6 @@ Après un clic qui déclenche un chargement, utilise `waitFor` ou `browser_wait_
 ```
 // ❌ Mauvais — délai fixe arbitraire
 browser_click_by_role({ role: "button", name: "Rechercher" })
-// attendre 2s...
 browser_read_content()
 
 // ✅ Bon — attendre l'élément de résultat
@@ -406,7 +422,7 @@ Utilise-le quand l'utilisateur dit :
 
 | Situation | Action |
 |-----------|--------|
-| Page vide / contenu < 50 chars | Attendre 2s → réessayer `browser_read_content()` une fois |
+| Page vide / contenu < 50 chars | Utiliser `browser_wait_for` (sélecteur/texte/URL disponible) → réessayer `browser_read_content()` une fois |
 | Timeout navigateur | Signaler à l'utilisateur, proposer `browser_reload()` |
 | Sélecteur CSS introuvable | Essayer `browser_get_accessibility_snapshot()` pour découvrir les éléments ARIA |
 | Rôle/nom ARIA introuvable | Essayer `browser_snapshot()` → `browser_click` avec sélecteur CSS |

@@ -91,11 +91,33 @@ export type FileContentResponse = {
   content: string;
 };
 
+export type FileCountResponse = {
+  count: number;
+};
+
 export const ideApi = {
+  async countFiles(): Promise<number> {
+    const response = await fetchWithRetry('/api/ide/file-count', {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data: FileCountResponse = await response.json();
+    return data.count;
+  },
+
   /**
    * Load the file tree from the server (cached 800ms + dedup in-flight)
    */
-  async loadTree(force = false): Promise<TreeEntry[]> {
+  async loadTree(force = false, requestedPath?: string): Promise<TreeEntry[]> {
+    if (requestedPath) {
+      const response = await fetchWithRetry(`/api/ide/tree?path=${encodeURIComponent(requestedPath)}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      return data.entries || [];
+    }
+
     const now = Date.now();
     if (
       !force &&
@@ -128,7 +150,16 @@ export const ideApi = {
   /**
    * Load the real workspace tree (outside sandbox), cached 2s + dedup.
    */
-  async loadWorkspaceTree(force = false): Promise<TreeEntry[]> {
+  async loadWorkspaceTree(force = false, requestedPath?: string): Promise<TreeEntry[]> {
+    if (requestedPath) {
+      const response = await fetchWithRetry(`/api/ide/tree-workspace?path=${encodeURIComponent(requestedPath)}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      return data.entries || [];
+    }
+
     const now = Date.now();
     if (
       !force &&

@@ -76,26 +76,49 @@ Toutes les opérations de lecture/écriture sont contraintes au workspace actif 
 
 ### `GET /api/ide/tree`
 
-Retourne l'arborescence du workspace actif (sandbox si actif, sinon workspace principal). Exclut `node_modules`, `.git`, `dist`, `build`, `out`.
+Retourne l'arborescence du workspace actif (sandbox si actif, sinon workspace principal). Exclut `node_modules`, `.git`, `dist`, `build`, `out`. **Supporte la pagination côté serveur pour les workspaces avec > 10k fichiers.**
 
 **Authentification :** Oui
+
+**Query Parameters :**
+| Paramètre | Type | Description | Obligatoire |
+|---|---|---|---|
+| `path` | string | Chemin relatif du répertoire à lister (par défaut : racine du workspace) | Non |
+| `page` | number | Numéro de la page (début à 1) | Non |
+| `pageSize` | number | Nombre d'entrées par page (0 = pas de pagination) | Non |
 
 **Réponse 200 :**
 ```json
 {
-  "path": "/absolute/path/to/workspace",
+  "path": "/absolute/path/to/directory",
   "entries": [
     {
       "name": "src",
       "path": "src",
       "type": "directory",
-      "children": [
-        { "name": "main.tsx", "path": "src/main.tsx", "type": "file" }
-      ]
+      "children": []
+    },
+    {
+      "name": "package.json",
+      "path": "package.json",
+      "type": "file"
     }
-  ]
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 100,
+    "total": 150,
+    "totalPages": 2,
+    "hasMore": true
+  }
 }
 ```
+
+**Notes :**
+- Lorsque `pageSize` > 0, seul le niveau de répertoire spécifié est retourné (les dossiers ont `children: []`)
+- Pour accéder aux sous-éléments, faites des requêtes supplémentaires avec le paramètre `path`
+- Si aucun paramètre de pagination n'est fourni et que le répertoire contient > 10 000 entrées, une limite de sécurité de 10 000 est appliquée automatiquement
+- Le champ `pagination` n'est présent que lorsque la pagination est active
 
 ---
 
@@ -1201,6 +1224,25 @@ Récupère l'état du terminal.
 
 > Le terminal interactif est accessible via **WebSocket** (`/terminal`). Voir section [WebSockets](#websockets).
 
+### Exécution de commandes par skill
+
+Le skill `run_project_command` n'est pas un terminal shell généraliste. Il accepte uniquement les préfixes `npm`, `npx` et `node`, applique une allowlist de sous-commandes et bloque les métacaractères shell dangereux.
+
+| Catégorie | Exemples | Confirmation |
+|---|---|---|
+| Lecture seule | `npm ls`, `npm list`, `npm outdated` | Aucune |
+| Known-safe project execution | `npm test`, `npm run build`, `npm run typecheck` | Standard, car `package.json` reste configurable |
+| Script arbitraire | `npm run <autre-script>` | Renforcée : commande réelle du script affichée, risque `high` |
+| Installation/modification | `npm install`, `npm uninstall`, `npm update`, `npm ci` | Standard ou renforcée selon la commande |
+
+Une confirmation interactive indisponible entraîne un refus sûr. Le script réellement associé est lu dans `package.json` avant la demande de confirmation lorsque cela est possible.
+
+### Navigation web intégrée
+
+Les outils `browser_*` utilisent le panneau Electron visible. Les liens extraits sont normalisés, filtrés, classés par pertinence puis dédupliqués avant sélection. Les domaines sponsorisés, de navigation et les destinations non publiques sont exclus des recherches automatiques.
+
+La policy réseau est `PUBLIC_WEB_AND_LOCALHOST` : `localhost` et les sous-domaines `*.localhost` sont autorisés pour les serveurs de développement. Les IP loopback (`127.0.0.1`, `::1`), réseaux privés RFC1918, link-local (`169.254.0.0/16`) et domaines internes restent refusés. Les recherches multi-sources renvoient les sources, domaines, fiabilité, fraîcheur, faits, preuves, consensus, contradictions et confiance globale.
+
 ---
 
 ## Knowledge Graph
@@ -1386,3 +1428,74 @@ Terminal PTY interactif.
 **Messages entrants :** Commandes shell en texte brut ou JSON `{ "type": "resize", "cols": 80, "rows": 24 }`
 
 **Messages sortants :** Sortie du terminal en texte brut (stdout + stderr du PTY)
+
+
+---
+
+## Tests d'intégration
+
+Tous les endpoints REST disposent de tests d'intégration dans `server/routes/*.test.ts`.
+
+**Couverture actuelle : 74 tests d'intégration**
+
+### Tests par routeur
+
+| Routeur | Fichier de test | Nombre de tests | Couverture |
+|---|---|---|---|
+| Agents | `agents.test.ts` | 15 | Statut, tâches, rôles, flotte, bus, collaboration, persistance, mapping |
+| Marketplace | `marketplace.test.ts` | 13 | Recherche, featured, installation, publication, sécurité |
+| Workflows | `workflows.test.ts` | 7 | CRUD, exécution, toggle |
+| Browser | `browser.test.ts` | 7 | Content requests, actions, promesses |
+| Upload Document | `upload-document.test.ts` | 7 | Validation fichiers, types supportés, rate limiting |
+| Conversations | `conversations.test.ts` | 7 | Liste, recherche, messages, CRUD |
+| Skills | `skills.test.ts` | 6 | Liste, propriétés, statut Supabase |
+| Profile | `profile.test.ts` | 6 | GET/POST profile, GET/POST tokens |
+| Terminal | `terminal.test.ts` | 5 | Configuration, sessions, authentification |
+| Memories | `memories.test.ts` | 3 | GET, DELETE (Supabase) |
+| Workspace | `workspace.test.ts` | 3 | GET info, POST interdit |
+| Health | `health.test.ts` | 1 | Health check |
+
+### Exécuter les tests d'intégration
+
+```bash
+# Tous les tests d'intégration des routes
+npm test -- server/routes/*.test.ts
+
+# Un routeur spécifique
+npm test -- server/routes/agents.test.ts
+
+# Voir les résultats détaillés
+npm test 2>&1 | grep -E "(✔|✖)"
+```
+
+### Ajouter des tests pour une nouvelle route
+
+Voir le guide complet dans [CONTRIBUTING.md](CONTRIBUTING.md#ajouter-une-route-api).
+
+Template minimal :
+
+```typescript
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import type { Server } from 'http';
+import myRouter from './my-route.js';
+
+test('GET /my-endpoint returns 200', async () => {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/my-route', myRouter);
+
+  const server: Server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const port = (server.address() as any).port;
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/my-route/my-endpoint`);
+    assert.equal(res.status, 200);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+```

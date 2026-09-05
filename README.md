@@ -4,7 +4,7 @@ Leanna est un environnement de développement augmenté par IA, conçu pour les 
 
 Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un assistant IA local, sécurisé, capable de lire, écrire et exécuter du code dans leur propre workspace, sans envoyer leurs fichiers vers des services tiers non contrôlés.
 
-![Build](https://img.shields.io/badge/build-passing-brightgreen) ![Version](https://img.shields.io/badge/version-0.9.0-blue) ![License](https://img.shields.io/badge/license-BUSL--1.1-orange) ![Node](https://img.shields.io/badge/node-%3E%3D20-green) ![Electron](https://img.shields.io/badge/electron-43-blueviolet)
+![Build](https://img.shields.io/badge/build-passing-brightgreen) ![Version](https://img.shields.io/badge/version-1.0.0-blue) ![License](https://img.shields.io/badge/license-BUSL--1.1-orange) ![Node](https://img.shields.io/badge/node-%3E%3D20-green) ![Electron](https://img.shields.io/badge/electron-43-blueviolet)
 
 ---
 
@@ -185,8 +185,30 @@ npm run dist:win
 ### Tests
 
 ```bash
+# Lancer tous les tests
 npm test
+
+# Lancer les tests d'un module spécifique
+npm test -- server/skills/browser.test.ts
+
+# Lancer uniquement les tests d'intégration des routes
+npm test -- server/routes/*.test.ts
+
+# Lancer les tests avec couverture
+npm test -- --coverage
 ```
+
+**Couverture de tests :**
+- ✅ `server/skills/` : ≥60% de couverture
+  - 136+ tests unitaires sur les skills critiques
+  - Validation exhaustive des schemas Zod
+  - Tests de gestion d'erreurs et logique métier
+- ✅ `server/routes/` : **74 tests d'intégration REST**
+  - Tests complets de tous les endpoints API
+  - Validation des schémas de requêtes/réponses
+  - Gestion des erreurs 400/404/500/503
+  - Tests d'authentification et autorisation
+  - Tests de rate limiting et validation de fichiers
 
 ---
 
@@ -213,7 +235,7 @@ leanna/
 │   ├── prompts/            # System instructions Gemini
 │   ├── routes/             # Routeurs REST (40+ modules)
 │   ├── runtime/            # SkillManagerV2, ToolRegistry, Observability
-│   ├── skills/             # Skills natifs (25+)
+│   ├── skills/             # Skills natifs (25+) avec tests unitaires (≥60% couverture)
 │   ├── utils/              # Sandbox, crypto, checkpoint, selfRoot…
 │   └── workflows/          # Moteur de workflows planifiés
 ├── src/                    # Frontend React
@@ -236,6 +258,19 @@ leanna/
 ├── tsconfig.json           # Configuration TypeScript
 └── package.json            # Dépendances et scripts npm
 ```
+
+---
+
+## Documentation
+
+- [README.md](README.md) — Vue d'ensemble et installation
+- [API_DOCS.md](API_DOCS.md) — Référence complète de l'API REST et WebSockets
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Architecture technique détaillée
+- [CONTRIBUTING.md](CONTRIBUTING.md) — Guide de contribution et conventions
+- [TESTING.md](TESTING.md) — Stratégie de test, patterns et couverture
+- [DB_SCHEMA.md](DB_SCHEMA.md) — Schéma de base de données Supabase
+- [ROADMAP.md](ROADMAP.md) — Feuille de route du projet
+- [SELF_IDE.md](SELF_IDE.md) — Auto-hébergement et développement de Leanna avec Leanna
 
 ---
 

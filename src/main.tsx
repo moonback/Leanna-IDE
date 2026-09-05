@@ -16,6 +16,7 @@ import { FloatingOrb } from './components/FloatingOrb.js';
 import { CriticalEditConfirm } from './components/CriticalEditConfirm.js';
 import { StartupProjectModal } from './components/StartupProjectModal.js';
 import { useProfile } from './context/UserProfileContext.js';
+import { useAgentEventStream } from './hooks/useAgentEventStream.js';
 import { Loader2 } from 'lucide-react';
 import { UnifiedSidebar } from './components/UnifiedSidebar.js';
 const MemoriesView = lazy(() => import('./views/MemoriesView'));
@@ -28,6 +29,11 @@ const GitHubView = lazy(() => import('./views/GitHubView'));
 const DocumentsView = lazy(() => import('./views/DocumentsView'));
 const NotebooksView = lazy(() => import('./views/NotebooksView'));
 import './index.css';
+
+const configuredApiToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_Leanna_API_TOKEN?.trim();
+if (configuredApiToken) {
+  localStorage.setItem('Leanna_api_token', configuredApiToken);
+}
 
 // ── Global fetch interceptor: auto-inject auth token + dedup + CIRCUIT BREAKER
 {
@@ -108,7 +114,7 @@ import './index.css';
 
     let resolvedInit = init;
     if (isApi) {
-      const token = localStorage.getItem('Leanna_api_token');
+      const token = localStorage.getItem('Leanna_api_token') || configuredApiToken;
       if (token) {
         const headers = new Headers(init?.headers);
         if (!headers.has('x-Leanna-token')) {
@@ -168,7 +174,7 @@ try {
   const raw = localStorage.getItem(PROFILE_KEY);
   if (raw) {
     const p = JSON.parse(raw);
-    const _token = localStorage.getItem('Leanna_api_token');
+    const _token = localStorage.getItem('Leanna_api_token') || configuredApiToken;
     fetch('/api/profile', {
       method: 'POST',
       headers: {
@@ -194,7 +200,7 @@ try {
 // Cela permet au frontend de connaître quel agent utilise quel outil
 (async () => {
   try {
-    const _token = localStorage.getItem('Leanna_api_token');
+    const _token = localStorage.getItem('Leanna_api_token') || configuredApiToken;
     const response = await fetch('/api/agents/tool-mapping/primary', {
       headers: _token ? { 'x-Leanna-token': _token } : {},
     });
@@ -286,15 +292,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem('Leanna_api_token') || '';
+    const stored = localStorage.getItem('Leanna_api_token') || configuredApiToken || '';
     setToken(stored);
     setReady(true);
   }, []);
 
   const isAuthenticated = useMemo(() => {
-    const configuredToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_Leanna_API_TOKEN;
-    if (!configuredToken) return true;
-    return token === configuredToken;
+    if (!configuredApiToken) return true;
+    return token === configuredApiToken;
   }, [token]);
 
   if (!ready) return null;
@@ -494,6 +499,7 @@ function AnimatedRoutes() {
 function Layout() {
   const liveAPI = useLiveAPI();
   const { profile } = useProfile();
+  useAgentEventStream();
 
   // ── Cleanup global resources on unmount ─────────────────────────────────
   useEffect(() => {

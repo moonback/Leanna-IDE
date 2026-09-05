@@ -3,10 +3,11 @@ import type { ConnectionStatus } from './useLiveAPI.js';
 
 export interface UseWebSocketOptions {
   onMessage: (msg: any) => void;
+  onAudioChunk: (pcm16: ArrayBuffer) => void;
   onLog: (msg: string, type: 'system' | 'action' | 'error' | 'info') => void;
 }
 
-export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
+export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOptions) {
   const [status, setStatus] = useState<ConnectionStatus>('idle');
   const statusRef = useRef<ConnectionStatus>('idle');
   const wsRef = useRef<WebSocket | null>(null);
@@ -117,6 +118,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
         const query = params.toString() ? `?${params.toString()}` : '';
         const ws = new WebSocket(`${protocol}//${window.location.host}/live${query}`);
         wsRef.current = ws;
+        ws.binaryType = 'arraybuffer';
 
         ws.onopen = () => {
           reconnectCountRef.current = 0; // reset après reconnexion réussie
@@ -147,6 +149,10 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
         };
 
         ws.onmessage = (event) => {
+          if (event.data instanceof ArrayBuffer) {
+            onAudioChunk(event.data);
+            return;
+          }
           try {
             const msg = JSON.parse(event.data);
 
@@ -259,6 +265,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
       const query = params.toString() ? `?${params.toString()}` : '';
       const ws = new WebSocket(`${protocol}//${window.location.host}/live${query}`);
       wsRef.current = ws;
+      ws.binaryType = 'arraybuffer';
 
       ws.onopen = () => {
         reconnectCountRef.current = 0;
@@ -285,6 +292,10 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
       };
 
       ws.onmessage = (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          onAudioChunk(event.data);
+          return;
+        }
         try {
           const msg = JSON.parse(event.data);
 
@@ -385,7 +396,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
   const audioRateRef = useRef({ windowStart: 0, bytesInWindow: 0, clientViolations: 0 });
   const AUDIO_CLIENT_LIMIT_BYTES = 100 * 1024; // 100 KB/s
 
-  const sendAudioData = useCallback((base64Data: string) => {
+  const sendAudioData = useCallback((pcm16: ArrayBuffer) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) return;
 
     const now = Date.now();
@@ -397,8 +408,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
       rate.bytesInWindow = 0;
     }
 
-    // Taille approximative du chunk (base64 → bytes réels ≈ length * 0.75)
-    const chunkBytes = Math.ceil(base64Data.length * 0.75);
+    const chunkBytes = pcm16.byteLength;
 
     if (rate.bytesInWindow + chunkBytes > AUDIO_CLIENT_LIMIT_BYTES) {
       // Throttle côté client — abandonner ce chunk silencieusement
@@ -407,7 +417,7 @@ export function useWebSocket({ onMessage, onLog }: UseWebSocketOptions) {
     }
 
     rate.bytesInWindow += chunkBytes;
-    wsRef.current.send(JSON.stringify({ audio: base64Data }));
+    wsRef.current.send(pcm16);
   }, []);
 
   const sendVideoFrame = useCallback((base64Data: string, mimeType = 'image/jpeg') => {

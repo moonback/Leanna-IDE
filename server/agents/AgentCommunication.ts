@@ -5,7 +5,7 @@
  * pour permettre aux agents de communiquer de manière autonome.
  */
 import { z } from "zod";
-import type { AgentRole, TaskResult } from "./types.js";
+import type { AgentPermissions, AgentRole, TaskResult } from "./types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types de messages inter-agents
@@ -153,6 +153,23 @@ export interface DelegationCapability {
   reason: string;
 }
 
+export interface DelegationTaskContext {
+  taskType?: string;
+  depth?: number;
+  requiredCapabilities?: string[];
+  requiredTools?: string[];
+  budget?: number;
+  riskLevel?: "low" | "medium" | "high" | "critical";
+}
+
+export interface DelegationPolicy {
+  allows(
+    parent: AgentRole,
+    target: AgentRole,
+    task?: DelegationTaskContext
+  ): boolean;
+}
+
 import { STATIC_AGENT_ROLES } from "./types.js";
 import { listAgentRoles } from "./roles.js";
 import { getAgentDefinition } from "./roles.js";
@@ -235,26 +252,60 @@ export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {
 // Vérification de délégation (inclut support des agents personnalisés)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * Vérifie si une délégation de `fromRole` vers `targetRole` est autorisée.
- * 
- * Règles :
- * - Si fromRole ou targetRole est un agent personnalisé (non statique), la délégation est TOUJOURS autorisée
- * - Sinon, on vérifie dans la DELEGATION_MATRIX statique
- */
-export function isDelegationAllowed(fromRole: AgentRole, targetRole: AgentRole): boolean {
-  // Vérifier si l'un des deux est un agent personnalisé (non dans les rôles statiques)
-  const fromIsCustom = !STATIC_AGENT_ROLES.includes(fromRole as (typeof STATIC_AGENT_ROLES)[number]);
-  const targetIsCustom = !STATIC_AGENT_ROLES.includes(targetRole as (typeof STATIC_AGENT_ROLES)[number]);
-  
-  // Si l'agent source ou cible est personnalisé, autoriser la délégation
-  if (fromIsCustom || targetIsCustom) {
-    return true;
+function permissionsFor(role: AgentRole): AgentPermissions {
+  const definition = getAgentDefinition(role);
+  const isStatic = STATIC_AGENT_ROLES.includes(role as (typeof STATIC_AGENT_ROLES)[number]);
+
+  // Les agents custom doivent déclarer explicitement leurs permissions.
+  if (!definition && !isStatic) {
+    return { allowDelegation: false, allowReceiveDelegation: false, maxDelegationDepth: 0 };
   }
-  
-  // Sinon, vérifier dans la matrice statique
-  const allowedTargets = DELEGATION_MATRIX[fromRole as (typeof STATIC_AGENT_ROLES)[number]] ?? [];
-  return allowedTargets.some((d) => d.targetRole === targetRole);
+
+  const matrixTargets = (DELEGATION_MATRIX[role as (typeof STATIC_AGENT_ROLES)[number]] ?? [])
+    .map((entry) => entry.targetRole);
+  return definition?.permissions ?? {
+    allowDelegation: matrixTargets.length > 0,
+    allowReceiveDelegation: isStatic,
+    maxDelegationDepth: 3,
+    allowedTargets: matrixTargets,
+  };
+}
+
+export const delegationPolicy: DelegationPolicy = {
+  allows(parent, target, task = {}) {
+    const parentPermissions = permissionsFor(parent);
+    const targetPermissions = permissionsFor(target);
+    const depth = task.depth ?? 0;
+
+    if (!parentPermissions.allowDelegation || !targetPermissions.allowReceiveDelegation) return false;
+    if (depth >= parentPermissions.maxDelegationDepth || depth >= targetPermissions.maxDelegationDepth) return false;
+    if (parentPermissions.allowedTargets && !parentPermissions.allowedTargets.includes(target)) return false;
+    if (task.riskLevel === "critical" && parentPermissions.riskLevel !== "critical") return false;
+    if (parentPermissions.riskLevel && task.riskLevel === "high" && !["high", "critical"].includes(parentPermissions.riskLevel)) return false;
+    if (task.budget !== undefined && parentPermissions.budget?.maxTokens !== undefined && task.budget > parentPermissions.budget.maxTokens) return false;
+
+    const targetDefinition = getAgentDefinition(target);
+    if (!targetDefinition) return false;
+    if (task.requiredCapabilities?.some((capability) => !targetDefinition.capabilities.includes(capability))) return false;
+    if (task.requiredTools?.some((tool) => !targetDefinition.capabilities.includes(tool))) return false;
+    if (parentPermissions.allowedCapabilities?.some((capability) => !targetDefinition.capabilities.includes(capability))) return false;
+    if (parentPermissions.allowedTools?.some((tool) => !targetDefinition.capabilities.includes(tool))) return false;
+
+    if (task.taskType) {
+      const matrixRule = DELEGATION_MATRIX[parent as (typeof STATIC_AGENT_ROLES)[number]]
+        ?.find((entry) => entry.targetRole === target);
+      if (!matrixRule?.taskTypes.includes(task.taskType)) return false;
+    }
+    return true;
+  },
+};
+
+export function isDelegationAllowed(
+  fromRole: AgentRole,
+  targetRole: AgentRole,
+  task?: DelegationTaskContext
+): boolean {
+  return delegationPolicy.allows(fromRole, targetRole, task);
 }
 
 /** Patterns de collaboration entre agents */

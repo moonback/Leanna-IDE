@@ -92,6 +92,7 @@ const EXECUTABLE_AGENT_TOOLS = new Set([
   "verify_lint",
   "verify_format",
   "verify_full",
+  "run_project_command",
   "quality_loop",
   "knowledge_build_context",
   "knowledge_semantic_search",
@@ -151,6 +152,7 @@ export class AgentExecutor {
     'verify_typecheck': 120_000,
     'verify_lint': 120_000,
     'verify_full': 180_000,
+    'run_project_command': 120_000,
     
     // Outils d'écriture (30-60s)
     'write_project_file': 60_000,
@@ -270,6 +272,10 @@ export class AgentExecutor {
 
     const startTime = Date.now();
 
+    const notifyProgress = (current: number, label: string) => {
+      this.notifier.notify(task, "progress", { current, total: 5, label });
+    };
+
     // Mettre à jour le statut
     task.status = "running";
     task.startedAt = new Date().toISOString();
@@ -283,11 +289,13 @@ export class AgentExecutor {
       log.debug(`[task:${taskShortId}] [${agent.name}] 📂 Étape 1/5 — Résolution des fichiers de contexte...`);
       const contextFiles = await this.resolveContextFiles(task, agent.capabilities);
       const fileContents = await this.readContextFiles(contextFiles);
+      notifyProgress(1, "Contexte résolu");
       log.debug(`[task:${taskShortId}] [${agent.name}] 📂 Contexte résolu — ${contextFiles.length} fichier(s) chargé(s): [${contextFiles.slice(0, 4).join(", ")}${contextFiles.length > 4 ? ` +${contextFiles.length - 4}` : ""}]`);
 
       // ── Étape 2: Construction du prompt ──
       log.debug(`[task:${taskShortId}] [${agent.name}] 📝 Étape 2/5 — Construction du prompt...`);
       const executionPrompt = this.promptBuilder.build(agent, task, fileContents);
+      notifyProgress(2, "Prompt construit");
       log.debug(`[task:${taskShortId}] [${agent.name}] 📝 Prompt construit — ${executionPrompt.length} caractères`);
 
       // ── Étape 3: Exécution directe par l'agent ──
@@ -301,6 +309,7 @@ export class AgentExecutor {
       log.debug(`[task:${taskShortId}] [${agent.name}] 🤖 Réponse initiale: ${initialResultText.length} chars`);
       const toolExecution = await this.executeToolLoop(agent, executionPrompt, initialResultText, task);
       const resultText = toolExecution.resultText;
+      notifyProgress(3, "Exécution agent terminée");
       
       // Logs de consommation des ressources
       const budgetUsage = {
@@ -315,6 +324,7 @@ export class AgentExecutor {
       // ── Étape 4: Matérialisation et vérification des modifications ──
       log.debug(`[task:${taskShortId}] [${agent.name}] 💾 Étape 4/5 — Écriture et vérification des fichiers...`);
       const generatedWriteResult = await this.fileWriter.writeFromAgentOutput(task, resultText);
+      notifyProgress(4, "Fichiers écrits et vérifiés");
       if (generatedWriteResult.written.length > 0) {
         log.debug(`[task:${taskShortId}] [${agent.name}] 💾 Fichiers écrits par FileWriter: [${generatedWriteResult.written.join(", ")}]`);
       }
@@ -333,6 +343,7 @@ export class AgentExecutor {
 
       // Extraire les opérations de mémoire projet des observations
       const memoryOperations = this.extractMemoryOperations(toolExecution.observations);
+      notifyProgress(5, "Résultat évalué");
 
       log.debug(`[task:${taskShortId}] [${agent.name}] 🔍 Étape 5/5 — Évaluation des preuves d'exécution...`);
       log.debug(`[task:${taskShortId}] [${agent.name}] 🔍 Fichiers écrits+vérifiés: [${writeResult.written.join(", ") || "aucun"}] | Erreurs: ${writeResult.errors.length} | Vérification: ${success ? "PASS ✅" : "FAIL ❌"}`);

@@ -33,22 +33,28 @@ Réessayer exactement la même correction sans rien changer n'est pas un pivot e
 - Avant le premier pivot, informer brièvement l'utilisateur qu'une première approche a échoué et qu'une autre est tentée
 - Ne jamais laisser une tâche « geler » silencieusement sur plusieurs itérations sans signal à l'utilisateur
 
-## Déléguer
+## Déléguer via le routeur déterministe
 
-Déléguer uniquement si :
-- Un agent ou outil spécialisé existe explicitement pour ce type de tâche (ex. un agent dédié à la revue de sécurité, à la traduction, etc.), **et**
-- La tâche n'entre pas dans les capacités listées dans ce prompt
+La décision direct/délégation ne relève pas de cette boucle. Utilise exclusivement le routeur défini dans `agents-system.md` :
 
-Si aucun agent spécialisé n'est identifiable, ne pas déléguer : escalader normalement à l'utilisateur selon le modèle de progression ci-dessus.
+- agents désactivés → action directe dans la sandbox ;
+- demande explicite de délégation → rôle demandé s'il est autorisé ;
+- opération de fichier simple ou code trivial isolé → action directe puis vérification ;
+- code non trivial, sécurité, tests, refactor, architecture ou document spécialisé → délégation au rôle correspondant ;
+- aucun rôle autorisé ou rôle inexistant → escalade à l'utilisateur, sans tentative de délégation arbitraire.
 
-## Signaux de contrôle (internes, jamais affichés à l'utilisateur)
+La présence d'un outil utilisable directement ne suffit donc pas à contourner ce routeur. La boucle autonome ne décide que de continuer, pivoter ou escalader l'exécution déjà choisie.
 
-Ces marqueurs sont des instructions internes à l'agent, filtrées avant toute présentation de la sortie à l'utilisateur. Ils ne doivent jamais apparaître dans le texte final visible :
+## Signaux proposés par le modèle (indicatifs uniquement)
 
-- `## RETRY` → force une nouvelle itération de la même approche
-- `## PIVOT` → force un changement d'approche (remplace l'ambiguïté de l'ancien anti-boucle)
-- `## ESCALADE` → arrête la boucle et bascule vers une explication utilisateur
-- `## DÉLÉGATION` → transmet la tâche à un agent spécialisé identifié
+Ces marqueurs peuvent aider le runtime à comprendre l'intention du modèle, mais ils ne contrôlent jamais la boucle et ne doivent jamais apparaître dans le texte final visible :
+
+- `## RETRY` → propose une nouvelle itération de la même approche
+- `## PIVOT` → propose un changement d'approche
+- `## ESCALADE` → propose d'arrêter et d'expliquer le blocage
+- `## DÉLÉGATION` → propose de transmettre la tâche à un agent spécialisé identifié
+
+Le runtime reste l'autorité : il limite chaque approche à 2 tentatives, force un pivot après la deuxième tentative, limite la tâche à 3 approches (6 tentatives maximum) et escalade lorsque cette limite est atteinte, même si le modèle demande de continuer.
 
 ## Anti-boucles
 

@@ -17,7 +17,7 @@
  *
  * Conditions d'arrêt :
  *   - Résultat jugé satisfaisant (pas de signal RETRY, confiance suffisante)
- *   - Nombre max d'itérations atteint (configurable, défaut: 3)
+ *   - Nombre max d'itérations atteint (configurable, défaut: 6)
  *   - Timeout global dépassé
  *   - Deux itérations consécutives produisent le même résultat (détection de boucle)
  */
@@ -33,7 +33,7 @@ const log = createLogger("AutonomousLoop");
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface LoopConfig {
-  /** Nombre maximum d'itérations (défaut: 3) */
+  /** Nombre maximum d'itérations (défaut: 6, borné à 3 approches de 2 tentatives) */
   maxIterations: number;
   /** Timeout global pour toutes les itérations cumulées (ms, défaut: 5 min) */
   globalTimeoutMs: number;
@@ -71,7 +71,7 @@ export interface LoopResult {
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_CONFIG: LoopConfig = {
-  maxIterations: 3,
+  maxIterations: 6,
   globalTimeoutMs: 5 * 60 * 1000, // 5 minutes
   minConfidenceScore: 0.6,
   verifyFiles: true,
@@ -82,6 +82,9 @@ const LOOP_DETECTION_SIMILARITY = 0.85;
 
 // Budget maximal d'erreurs cumulées avant arrêt forcé
 const MAX_CUMULATIVE_ERRORS = 6;
+const MAX_ATTEMPTS_PER_APPROACH = 2;
+const MAX_APPROACHES = 3;
+const MAX_AUTONOMOUS_ATTEMPTS = MAX_ATTEMPTS_PER_APPROACH * MAX_APPROACHES;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AutonomousLoop
@@ -112,7 +115,9 @@ export class AutonomousLoop {
     const originalDescription = task.description;
     const originalFiles = [...task.context.files];
 
-    while (iteration < this.config.maxIterations) {
+    const maxIterations = Math.min(this.config.maxIterations, MAX_AUTONOMOUS_ATTEMPTS);
+
+    while (iteration < maxIterations) {
       iteration++;
 
       // ── Vérification timeout global ──
@@ -125,7 +130,8 @@ export class AutonomousLoop {
         break;
       }
 
-      log.info(`[${agent.name}] Itération ${iteration}/${this.config.maxIterations}`);
+      const approach = Math.floor((iteration - 1) / MAX_ATTEMPTS_PER_APPROACH) + 1;
+      log.info(`[${agent.name}] Approche ${approach}/${MAX_APPROACHES}, tentative ${((iteration - 1) % MAX_ATTEMPTS_PER_APPROACH) + 1}/${MAX_ATTEMPTS_PER_APPROACH}`);
 
       const iterStart = Date.now();
 
@@ -189,7 +195,8 @@ export class AutonomousLoop {
       }
 
       // ── Préparer l'itération suivante ──
-      this.enrichTaskForNextIteration(task, result, observation, iteration, originalDescription, originalFiles);
+      const forcePivot = iteration % MAX_ATTEMPTS_PER_APPROACH === 0;
+      this.enrichTaskForNextIteration(task, result, observation, iteration, originalDescription, originalFiles, forcePivot);
 
       // Reset du statut pour la prochaine itération
       task.status = "pending";
@@ -198,9 +205,9 @@ export class AutonomousLoop {
     }
 
     // Si on a atteint le max sans décision explicite
-    if (iteration >= this.config.maxIterations && finalDecision === "stop") {
+    if (iteration >= maxIterations && finalDecision === "stop") {
       finalDecision = "stop_max_iterations";
-      log.info(`[${agent.name}] Max itérations atteint (${this.config.maxIterations})`);
+      log.info(`[${agent.name}] Limite autonome atteinte (${maxIterations} tentatives, ${MAX_APPROACHES} approches maximum)`);
     }
 
     const totalDuration = Date.now() - globalStart;
@@ -471,7 +478,8 @@ export class AutonomousLoop {
     obs: ObservationReport,
     iterationNumber: number,
     originalDescription: string,
-    originalFiles: string[]
+    originalFiles: string[],
+    forcePivot = false
   ): void {
     const correctionParts: string[] = [
       `## Contexte de l'itération ${iterationNumber} (à corriger / améliorer)`,
@@ -501,6 +509,14 @@ export class AutonomousLoop {
           retryMatch[1].trim()
         );
       }
+    }
+
+    if (forcePivot) {
+      correctionParts.push(
+        ``,
+        `**PIVOT IMPOSE PAR LE RUNTIME :** les deux tentatives de cette approche sont épuisées.`,
+        `La prochaine itération doit changer réellement de stratégie : autre outil, autre découpage ou nouvelle analyse du contexte. Ne répète pas exactement la même correction.`
+      );
     }
 
     // Injecter le contexte de correction dans la description de la tâche

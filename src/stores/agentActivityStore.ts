@@ -25,6 +25,7 @@ export interface AgentTaskEntry {
   summary?: string;
   timestamp: number;
   durationMs?: number;
+  progress?: { current: number; total: number; label: string };
   steps: string[];
 }
 
@@ -178,6 +179,7 @@ function handleAgentEvent(e: Event) {
       detail: detail.detail || t.detail,
       summary: detail.summary || t.summary,
       durationMs: detail.durationMs || t.durationMs,
+      progress: detail.progress || t.progress,
       steps: detail.detail && !t.steps.includes(detail.detail)
         ? [...t.steps, detail.detail]
         : t.steps,
@@ -193,6 +195,7 @@ function handleAgentEvent(e: Event) {
       summary: detail.summary,
       timestamp: detail.timestamp ? new Date(detail.timestamp).getTime() : Date.now(),
       durationMs: detail.durationMs,
+      progress: detail.progress,
       steps: detail.detail ? [detail.detail] : [],
     }];
   }
