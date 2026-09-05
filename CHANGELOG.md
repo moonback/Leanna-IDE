@@ -24,6 +24,21 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ### Documentation
 - Mise à jour de `API_DOCS.md`, `ARCHITECTURE.md` et `TESTING.md` avec les politiques d'exécution, de navigation, de délégation et de validation.
+- Nouvelle section **Choisir entre un navigateur visible et l'automatisation headless** :
+  - Explications des cas d'usage : quand préférer un navigateur visible (débogage, démonstrations, interactions manuelles, tests visuels) et quand privilégier le headless (CI/serveurs, performance, parallélisation).
+  - Critères de décision pratiques : performance, stabilité, observabilité, consommation de ressources, complexité d'installation et compatibilité OS.
+  - Exemples et recettes : configurations pour local, CI et Docker ; snippets de lancement pour les deux modes.
+  - Considérations CI/CD : recommandations d'intégration dans les pipelines, gestion des dépendances navigateur/headless et réduction du flakiness.
+  - Accessibilité et tests visuels : impacts sur les tests E2E, captures d'écran et enregistrement vidéo selon le mode.
+  - Conseils de déploiement et paramètres recommandés : options par défaut, variables d'environnement et flags utiles.
+  - Limites connues et troubleshooting : erreurs courantes (sandboxing, dépendances manquantes, permissions) et solutions.
+- Scope & impact :
+  - Type: documentation (aucune modification de l'API ou code de production prévue).
+  - Risque: faible — contenu informatif seulement.
+  - Taille du changement: 94 fichiers modifiés, +7 446 lignes ajoutées, -1 682 lignes supprimées.
+- Remarques
+  - Pas de breaking changes.
+  - Recommande de relire les nouveaux exemples si vous avez des workflows CI particuliers (Docker, headless sur serveurs sans GPU).
 
 ## [1.0.0] - 2026-09-04
 
