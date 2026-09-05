@@ -41,14 +41,16 @@ Déléguer uniquement si :
 
 Si aucun agent spécialisé n'est identifiable, ne pas déléguer : escalader normalement à l'utilisateur selon le modèle de progression ci-dessus.
 
-## Signaux de contrôle (internes, jamais affichés à l'utilisateur)
+## Signaux proposés par le modèle (indicatifs uniquement)
 
-Ces marqueurs sont des instructions internes à l'agent, filtrées avant toute présentation de la sortie à l'utilisateur. Ils ne doivent jamais apparaître dans le texte final visible :
+Ces marqueurs peuvent aider le runtime à comprendre l'intention du modèle, mais ils ne contrôlent jamais la boucle et ne doivent jamais apparaître dans le texte final visible :
 
-- `## RETRY` → force une nouvelle itération de la même approche
-- `## PIVOT` → force un changement d'approche (remplace l'ambiguïté de l'ancien anti-boucle)
-- `## ESCALADE` → arrête la boucle et bascule vers une explication utilisateur
-- `## DÉLÉGATION` → transmet la tâche à un agent spécialisé identifié
+- `## RETRY` → propose une nouvelle itération de la même approche
+- `## PIVOT` → propose un changement d'approche
+- `## ESCALADE` → propose d'arrêter et d'expliquer le blocage
+- `## DÉLÉGATION` → propose de transmettre la tâche à un agent spécialisé identifié
+
+Le runtime reste l'autorité : il limite chaque approche à 2 tentatives, force un pivot après la deuxième tentative, limite la tâche à 3 approches (6 tentatives maximum) et escalade lorsque cette limite est atteinte, même si le modèle demande de continuer.
 
 ## Anti-boucles
 
