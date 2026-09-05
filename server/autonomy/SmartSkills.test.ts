@@ -44,3 +44,40 @@ test("quality_loop stops after the first failed phase", async () => {
   assert.equal(calls.includes("verify_typecheck"), false);
   assert.equal(calls.includes("verify_file",), true);
 });
+
+test("validate_patch applies the correction returned by reasoning_think", async () => {
+  const calls: string[] = [];
+  let content = "const value = broken;";
+  const skill = createSmartSkills(async (name, args) => {
+    calls.push(name);
+    if (name === "modify_project_file") {
+      content = args.search === "broken" ? content.replace(args.search, args.replace) : content;
+      return { ok: true };
+    }
+    if (name === "verify_file") {
+      return content.includes("fixed")
+        ? { status: "success", ok: true }
+        : { status: "failed", ok: false, error: "value is broken" };
+    }
+    if (name === "read_project_file") return content;
+    if (name === "reasoning_think") return { reasoning: '{"search":"broken","replace":"fixed"}' };
+    return { status: "success", ok: true };
+  });
+
+  const result = await skill.handleToolCall("validate_patch", {
+    path: "sample.ts",
+    search: "value = broken",
+    replace: "value = broken",
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.attempts, 2);
+  assert.deepEqual(calls, [
+    "modify_project_file",
+    "verify_file",
+    "read_project_file",
+    "reasoning_think",
+    "modify_project_file",
+    "verify_file",
+  ]);
+});

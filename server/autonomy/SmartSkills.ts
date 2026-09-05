@@ -362,13 +362,39 @@ async function executeValidatePatch(
     if (fileContent?.error) continue;
 
     // Utiliser reasoning_think pour comprendre la correction nécessaire
-    await handler("reasoning_think", {
+    const reasoningResult = await handler("reasoning_think", {
       thought: `Le fichier ${path} a les erreurs suivantes après modification:\n${errors}\n\nContenu actuel pertinent:\n${typeof fileContent === 'string' ? fileContent.slice(0, 2000) : JSON.stringify(fileContent).slice(0, 2000)}\n\nQuelle correction précise appliquer ?`,
+      prompt: `Le fichier ${path} a les erreurs suivantes après modification:\n${errors}\n\nContenu actuel pertinent:\n${typeof fileContent === 'string' ? fileContent.slice(0, 2000) : JSON.stringify(fileContent).slice(0, 2000)}\n\nRetourne uniquement un objet JSON valide au format {"search":"texte exact actuel","replace":"texte corrigé"}. N'ajoute aucun commentaire ni bloc Markdown.`,
       strategy: "auto",
     }, context);
 
-    // La correction sera tentée au prochain tour de la boucle
-    // (le reasoning a mis en cache la solution, le modèle l'utilisera)
+    const correction = extractCorrection(reasoningResult);
+    if (!correction) {
+      return {
+        success: false,
+        attempts: attempt,
+        file: path,
+        finalState: "needs_human",
+        errors: `${errors} Correction automatique inexploitable: reasoning_think n'a pas fourni un objet JSON {"search":"...","replace":"..."}.`,
+        corrections,
+      };
+    }
+
+    const correctionResult = await handler("modify_project_file", {
+      path,
+      search: correction.search,
+      replace: correction.replace,
+    }, context);
+    if (correctionResult?.error) {
+      return {
+        success: false,
+        attempts: attempt,
+        file: path,
+        finalState: "needs_human",
+        errors: `${errors} Application de la correction échouée: ${correctionResult.error}`,
+        corrections,
+      };
+    }
   }
 
   return {
@@ -378,6 +404,24 @@ async function executeValidatePatch(
     finalState: "needs_human",
     errors: "Corrections automatiques épuisées.",
   };
+}
+
+function extractCorrection(result: any): { search: string; replace: string } | null {
+  const raw = typeof result === "string"
+    ? result
+    : result?.reasoning ?? result?.answer ?? result?.thought;
+  if (typeof raw !== "string") return null;
+
+  const jsonMatch = raw.match(/```json\s*([\s\S]*?)\s*```/) ?? raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
+  try {
+    const parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
+    if (typeof parsed?.search !== "string" || typeof parsed?.replace !== "string") return null;
+    return { search: parsed.search, replace: parsed.replace };
+  } catch {
+    return null;
+  }
 }
 
 /**
