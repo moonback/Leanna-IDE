@@ -194,14 +194,13 @@ export class GeneratedFileWriter {
     const isTsLike = /\.tsx?$/.test(path);
     if (isTsLike) {
       const bracketError = checkBracketBalance(content);
-      if (bracketError) {
-        log.error(`[${agentName}] Validation échouée pour ${path}: ${bracketError}`);
-        return bracketError;
-      }
       const syntaxError = checkTypeScriptSyntax(content, path);
       if (syntaxError) {
         log.error(`[${agentName}] Validation échouée pour ${path}: ${syntaxError}`);
         return syntaxError;
+      }
+      if (bracketError) {
+        log.warn(`[${agentName}] Précheck de crochets non bloquant pour ${path}: ${bracketError}`);
       }
     }
 
