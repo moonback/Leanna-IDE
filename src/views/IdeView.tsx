@@ -74,7 +74,10 @@ export default function IdeView() {
   const { info: toastInfo } = useToast();
 
   // Settings navigation handler
-  const openSettings = useCallback(() => navigate('/settings'), [navigate]);
+  const openSettings = useCallback(
+    (section?: string) => navigate(section ? `/settings?section=${section}` : '/settings'),
+    [navigate],
+  );
 
   // Initialize the global activity store (listens to events even when panel is closed)
   useEffect(() => {

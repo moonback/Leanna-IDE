@@ -9,6 +9,13 @@ let mockConversations: any[] = [];
 let mockMessages: any[] = [];
 let mockSearchResults: any[] = [];
 
+async function closeServer(server: Server): Promise<void> {
+  await new Promise<void>((resolve) => {
+    server.close(() => resolve());
+    server.closeAllConnections();
+  });
+}
+
 test('conversations routes: GET / returns conversations list', async () => {
   const app = express();
   app.use(express.json());
@@ -31,7 +38,7 @@ test('conversations routes: GET / returns conversations list', async () => {
       assert.ok(body.status === 'error');
     }
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await closeServer(server);
   }
 });
 
@@ -51,7 +58,7 @@ test('conversations routes: GET /search validates query param', async () => {
     const body = await res.json() as any;
     assert.ok(body.error.includes('q'));
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await closeServer(server);
   }
 });
 
@@ -76,7 +83,7 @@ test('conversations routes: GET /search with query returns results', async () =>
       assert.equal(body.status, 'error');
     }
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await closeServer(server);
   }
 });
 
@@ -101,7 +108,7 @@ test('conversations routes: GET /:id returns messages', async () => {
       assert.equal(body.status, 'error');
     }
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await closeServer(server);
   }
 });
 
@@ -125,7 +132,7 @@ test('conversations routes: PATCH /:id validates title', async () => {
     const body = await res.json() as any;
     assert.ok(body.error.includes('titre'));
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await closeServer(server);
   }
 });
 
@@ -152,7 +159,7 @@ test('conversations routes: DELETE /all clears all conversations', async () => {
       assert.equal(body.status, 'error');
     }
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await closeServer(server);
   }
 });
 
@@ -178,6 +185,6 @@ test('conversations routes: DELETE /:id deletes specific conversation', async ()
       assert.equal(body.status, 'error');
     }
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await closeServer(server);
   }
 });

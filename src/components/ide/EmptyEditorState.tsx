@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 import {
   Plus, FolderOpen,
-  MessageSquare, Search,
+  MessageSquare, Search, KeyRound, AlertCircle,
   BookOpen, Sparkles,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
@@ -311,7 +311,7 @@ interface EmptyEditorStateProps {
   onOpenFile: (path: string) => void;
   onCreateFile: () => void;
   onCreateFolder: () => void;
-  onShowSettings: () => void;
+  onShowSettings: (section?: string) => void;
   onOpenSearch?: () => void;
   onOpenChat?: () => void;
   onOpenNotebooks?: () => void;
@@ -335,6 +335,33 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSystem, setShowSystem] = useState(false);
   const [ctaHovered, setCtaHovered] = useState(false);
+  const [geminiStatus, setGeminiStatus] = useState<'configured' | 'invalid' | 'unconfigured' | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([fetch('/api/tokens'), fetch('/api/gemini-keys')])
+      .then(async ([tokensResponse, keysResponse]) => [
+        await tokensResponse.json(),
+        await keysResponse.json(),
+      ])
+      .then(([tokensData, keysData]) => {
+        if (!cancelled && tokensData.status === 'success' && keysData.status === 'success') {
+          const geminiToken = tokensData.tokens?.find((token: { key: string; valid: boolean | null }) => token.key === 'GEMINI_API_KEY');
+          const hasActivePoolKey = keysData.keys?.some((key: { disabled: boolean }) => !key.disabled);
+          setGeminiStatus(
+            geminiToken?.valid === false
+              ? 'invalid'
+              : geminiToken?.configured === true || hasActivePoolKey === true
+                ? 'configured'
+                : 'unconfigured',
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setGeminiStatus(null);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const ctaText = connected
     ? 'Session vocale et texte en cours'
@@ -625,6 +652,30 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
             {/* Quick links */}
             <div className="flex items-center gap-1">
+              {geminiStatus !== 'configured' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onShowSettings('tokens-settings')}
+                    className="ai-interactive flex items-center gap-1.5 rounded px-2 py-1 text-sm font-medium"
+                    style={{
+                      color: geminiStatus === 'invalid' ? 'var(--color-error)' : 'var(--text-muted)',
+                      backgroundColor: 'var(--surface-soft)',
+                      border: '1px solid var(--border)',
+                    }}
+                    title={geminiStatus === 'invalid'
+                      ? 'API key not valid. Please pass a valid API key.'
+                      : 'Configurer la clé API Gemini'}
+                  >
+                    {geminiStatus === 'invalid' ? <AlertCircle size={13} /> : <KeyRound size={13} />}
+                    <span>
+                      Gemini: {geminiStatus === null ? 'Vérification…'
+                        : geminiStatus === 'invalid' ? 'Clé invalide' : 'Non configurée'}
+                    </span>
+                  </button>
+                  <span style={{ color: 'var(--text-muted)' }}>·</span>
+                </>
+              )}
               <QuickLink label="Raccourcis" onClick={() => setShowShortcuts(true)} />
               <span style={{ color: 'var(--text-muted)' }}>·</span>
               <QuickLink label="Système" onClick={() => setShowSystem(true)} />
