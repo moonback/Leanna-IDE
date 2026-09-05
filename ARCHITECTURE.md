@@ -219,7 +219,7 @@ Le routeur direct/délégation suit des règles déterministes. Les agents custo
 
 Les boucles autonomes sont bornées par le runtime à trois approches de deux tentatives maximum. Le modèle peut proposer `retry`, `pivot` ou `escalade`, mais le runtime impose les limites et force le pivot/escalade.
 
-Pour le navigateur intégré, la policy `PUBLIC_WEB` bloque les destinations locales et privées. `browser_research` classe les sources, diversifie les domaines et calcule preuves, consensus, contradictions et confiance.
+Pour le navigateur intégré, la policy `PUBLIC_WEB_AND_LOCALHOST` autorise uniquement `localhost` et `*.localhost` pour le développement local. Elle bloque les IP loopback, réseaux privés, link-local et domaines internes. `browser_research` classe les sources, diversifie les domaines et calcule preuves, consensus, contradictions et confiance.
 
 ### Agent Orchestrator
 

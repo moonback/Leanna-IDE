@@ -4,10 +4,11 @@ import { browserSkill, normalizeUrl, rankLinkCandidates } from "./browser.js";
 
 describe("browser", () => {
   describe("URL policy and link ranking", () => {
-    it("allows public URLs and rejects private, loopback, and link-local destinations", () => {
+    it("allows public URLs and localhost while rejecting private, loopback, and link-local destinations", () => {
       assert.equal(normalizeUrl("https://example.com/docs"), "https://example.com/docs");
+      assert.equal(normalizeUrl("http://localhost:3000"), "http://localhost:3000");
+      assert.equal(normalizeUrl("http://app.localhost:4173"), "http://app.localhost:4173");
       for (const url of [
-        "http://localhost:3000",
         "http://127.0.0.1",
         "http://10.0.0.1",
         "http://192.168.1.10",

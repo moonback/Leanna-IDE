@@ -31,8 +31,10 @@ import { z } from "zod";
 // afficher du contenu data: arbitraire dans le webview visible par l'user.
 const BLOCKED_SCHEMES = /^(javascript|data|file|vbscript|about):/i;
 
-export type BrowserNetworkPolicy = "PUBLIC_WEB";
-const NETWORK_POLICY: BrowserNetworkPolicy = "PUBLIC_WEB";
+export type BrowserNetworkPolicy = "PUBLIC_WEB" | "PUBLIC_WEB_AND_LOCALHOST";
+// Autorise les serveurs de développement locaux nommés localhost sans ouvrir
+// les IP loopback, les réseaux privés ou les endpoints de métadonnées.
+const NETWORK_POLICY: BrowserNetworkPolicy = "PUBLIC_WEB_AND_LOCALHOST";
 
 // Domaines à exclure des résultats de recherche quand on extrait des liens
 // "à visiter" (pages de moteurs de recherche, trackers, etc.)
@@ -164,7 +166,8 @@ function classifyHost(hostname: string): "PUBLIC_WEB" | "PRIVATE_NETWORK" | "LOC
 function assertAllowedBrowserUrl(url: string): void {
   const parsed = new URL(url);
   const classification = classifyHost(parsed.hostname);
-  if (NETWORK_POLICY === "PUBLIC_WEB" && classification !== "PUBLIC_WEB") {
+  const localhostAllowed = NETWORK_POLICY === "PUBLIC_WEB_AND_LOCALHOST" && classification === "LOCALHOST";
+  if (classification !== "PUBLIC_WEB" && !localhostAllowed) {
     throw new Error(`Destination ${classification} interdite par la policy ${NETWORK_POLICY}.`);
   }
 }

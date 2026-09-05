@@ -1241,7 +1241,7 @@ Une confirmation interactive indisponible entraîne un refus sûr. Le script ré
 
 Les outils `browser_*` utilisent le panneau Electron visible. Les liens extraits sont normalisés, filtrés, classés par pertinence puis dédupliqués avant sélection. Les domaines sponsorisés, de navigation et les destinations non publiques sont exclus des recherches automatiques.
 
-La policy réseau par défaut est `PUBLIC_WEB` : `localhost`, loopback, réseaux privés RFC1918, link-local (`169.254.0.0/16`) et domaines internes sont refusés. Les recherches multi-sources renvoient les sources, domaines, fiabilité, fraîcheur, faits, preuves, consensus, contradictions et confiance globale.
+La policy réseau est `PUBLIC_WEB_AND_LOCALHOST` : `localhost` et les sous-domaines `*.localhost` sont autorisés pour les serveurs de développement. Les IP loopback (`127.0.0.1`, `::1`), réseaux privés RFC1918, link-local (`169.254.0.0/16`) et domaines internes restent refusés. Les recherches multi-sources renvoient les sources, domaines, fiabilité, fraîcheur, faits, preuves, consensus, contradictions et confiance globale.
 
 ---
 
