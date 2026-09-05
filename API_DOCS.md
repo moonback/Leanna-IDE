@@ -1224,6 +1224,25 @@ Récupère l'état du terminal.
 
 > Le terminal interactif est accessible via **WebSocket** (`/terminal`). Voir section [WebSockets](#websockets).
 
+### Exécution de commandes par skill
+
+Le skill `run_project_command` n'est pas un terminal shell généraliste. Il accepte uniquement les préfixes `npm`, `npx` et `node`, applique une allowlist de sous-commandes et bloque les métacaractères shell dangereux.
+
+| Catégorie | Exemples | Confirmation |
+|---|---|---|
+| Lecture seule | `npm ls`, `npm list`, `npm outdated` | Aucune |
+| Known-safe project execution | `npm test`, `npm run build`, `npm run typecheck` | Standard, car `package.json` reste configurable |
+| Script arbitraire | `npm run <autre-script>` | Renforcée : commande réelle du script affichée, risque `high` |
+| Installation/modification | `npm install`, `npm uninstall`, `npm update`, `npm ci` | Standard ou renforcée selon la commande |
+
+Une confirmation interactive indisponible entraîne un refus sûr. Le script réellement associé est lu dans `package.json` avant la demande de confirmation lorsque cela est possible.
+
+### Navigation web intégrée
+
+Les outils `browser_*` utilisent le panneau Electron visible. Les liens extraits sont normalisés, filtrés, classés par pertinence puis dédupliqués avant sélection. Les domaines sponsorisés, de navigation et les destinations non publiques sont exclus des recherches automatiques.
+
+La policy réseau par défaut est `PUBLIC_WEB` : `localhost`, loopback, réseaux privés RFC1918, link-local (`169.254.0.0/16`) et domaines internes sont refusés. Les recherches multi-sources renvoient les sources, domaines, fiabilité, fraîcheur, faits, preuves, consensus, contradictions et confiance globale.
+
 ---
 
 ## Knowledge Graph

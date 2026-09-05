@@ -7,6 +7,24 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [Unreleased] - 2026-09-05
+
+### Sécurité
+- Durcissement de `run_project_command` : classification des scripts npm connus, confirmation renforcée pour les scripts arbitraires et transmission du niveau de risque à l'interface.
+- Policy navigateur `PUBLIC_WEB` : blocage de localhost, loopback, réseaux privés, link-local et domaines internes.
+- Délégation inter-agents soumise à une `DelegationPolicy` explicite ; suppression de l'autorisation joker pour les agents custom.
+
+### Modifié
+- Classement et déduplication des liens navigateur avant navigation.
+- `browser_research` enrichi avec fiabilité, fraîcheur, faits, preuves, consensus, contradictions et confiance.
+- Boucles autonomes bornées par le runtime à 3 approches × 2 tentatives, avec pivot imposé.
+- `SystemPromptBuilder` devient la source canonique ; les anciennes fonctions de prompt restent des wrappers de compatibilité.
+- Le précheck `checkBracketBalance` est non bloquant pour TypeScript ; l'API Compiler TypeScript reste l'autorité syntaxique.
+- Les workflows de modification sont gradués `TRIVIAL`, `STANDARD` et `COMPLEX`.
+
+### Documentation
+- Mise à jour de `API_DOCS.md`, `ARCHITECTURE.md` et `TESTING.md` avec les politiques d'exécution, de navigation, de délégation et de validation.
+
 ## [1.0.0] - 2026-09-04
 
 ### Ajouté

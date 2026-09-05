@@ -91,6 +91,17 @@ Actuellement : **136+ tests** couvrant :
 - `knowledge.test.ts` — Knowledge Graph, relations
 - Et 19 autres fichiers de test
 
+### Politiques de sécurité et de navigation
+
+Les tests ciblés doivent couvrir les politiques, pas seulement les schémas :
+
+- `system.test.ts` vérifie la classification npm `read-only`, `known-safe-project` et `arbitrary-script`.
+- `confirmationBridge.test.ts` vérifie l'approbation, le refus, le timeout et le nettoyage des confirmations.
+- `browser.test.ts` vérifie le ranking/dédoublonnage des liens et le refus de `localhost`, loopback, réseaux privés et link-local.
+- `verify.test.ts` vérifie que TypeScript Compiler API reste l'arbitre syntaxique et que le précheck de crochets ne bloque pas un faux positif valide.
+
+Un test de policy doit vérifier le chemin d'exécution réel : déclaration du tool, permissions/allowlist, confirmation éventuelle, puis handler. Une mention dans un prompt ne constitue jamais une preuve d'accessibilité.
+
 ---
 
 ## Tests d'intégration (Routes REST)

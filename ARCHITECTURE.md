@@ -203,6 +203,24 @@ server/runtime/
 
 Les 25+ skills natifs (`server/skills/`) sont enregistrés une seule fois au démarrage via `bootstrapRuntimeSync`. Les custom skills sont chargés depuis Supabase (`sm.loadCustomSkills()`).
 
+### Prompt, policy et exécution
+
+Le prompt système est construit par `SystemPromptBuilder`, source canonique. `server/prompts/systemInstruction.ts` conserve uniquement des façades de compatibilité (`buildSystemInstruction`, `buildSystemInstructionV2`) qui délèguent au builder canonique.
+
+Les instructions du prompt n'accordent jamais une capacité à elles seules :
+
+```
+ToolRegistry → policy/permissions → executor → skill handler
+```
+
+Les confirmations de commandes passent par `confirmationBridge`. Les scripts npm `test`, `build` et `typecheck` sont classés `known-safe-project` mais restent confirmés ; les scripts arbitraires portent un risque élevé et affichent la commande réelle avant approbation.
+
+Le routeur direct/délégation suit des règles déterministes. Les agents custom n'obtiennent aucune permission implicite : leurs permissions de délégation, cibles, profondeur, outils, capacités, budget et niveau de risque doivent être explicites dans `DelegationPolicy`.
+
+Les boucles autonomes sont bornées par le runtime à trois approches de deux tentatives maximum. Le modèle peut proposer `retry`, `pivot` ou `escalade`, mais le runtime impose les limites et force le pivot/escalade.
+
+Pour le navigateur intégré, la policy `PUBLIC_WEB` bloque les destinations locales et privées. `browser_research` classe les sources, diversifie les domaines et calcule preuves, consensus, contradictions et confiance.
+
 ### Agent Orchestrator
 
 ```
