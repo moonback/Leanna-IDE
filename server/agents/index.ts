@@ -2,7 +2,8 @@ export { AgentOrchestrator, agentOrchestrator } from "./AgentOrchestrator.js";
 export type { AgentEvent } from "./AgentOrchestrator.js";
 export { agentMessageBus } from "./AgentOrchestrator.js";
 export { agentRegistry } from "./AgentOrchestrator.js";
-export { COLLABORATION_PATTERNS, DELEGATION_MATRIX } from "./AgentOrchestrator.js";
+export { COLLABORATION_PATTERNS, DELEGATION_MATRIX, delegationPolicy } from "./AgentOrchestrator.js";
+export type { DelegationPolicy, DelegationTaskContext } from "./AgentOrchestrator.js";
 
 // Exports directs des nouveaux modules autonomes
 export { AutonomousAgent } from "./AutonomousAgent.js";

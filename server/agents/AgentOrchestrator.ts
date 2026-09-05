@@ -22,7 +22,8 @@ import { agentEventStream } from "./AgentEventStream.js";
 export type { AgentEvent } from "./ProgressNotifier.js";
 export { agentMessageBus } from "./AgentMessageBus.js";
 export { agentRegistry } from "./AgentRegistry.js";
-export { COLLABORATION_PATTERNS, DELEGATION_MATRIX } from "./AgentCommunication.js";
+export { COLLABORATION_PATTERNS, DELEGATION_MATRIX, delegationPolicy } from "./AgentCommunication.js";
+export type { DelegationPolicy, DelegationTaskContext } from "./AgentCommunication.js";
 
 const log = createLogger("Orchestrator");
 
