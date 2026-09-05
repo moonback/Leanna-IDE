@@ -1,7 +1,11 @@
 /**
  * Agent Plugins — Auto-discovery et export
  * 
- * Agents spécialisés dans la rédaction de documents.
+ * Plugins spécialisés dans la rédaction de documents pour AgentRuntime.
+ *
+ * Ce registre est indépendant de server/agents/roles.ts : ses IDs sont
+ * utilisés par AgentRuntime.submit() et les workflows runtime, pas par
+ * l'outil conversationnel agent_delegate.
  * 
  * Pour ajouter un nouvel agent :
  * 1. Créer un fichier <nom>.agent.ts dans ce dossier
