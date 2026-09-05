@@ -822,6 +822,20 @@ export const browserSkill: Skill = {
       return lastResult;
     };
 
+    const waitForBrowserCondition = async (
+      condition: string,
+      conditionType: "selector" | "text" | "url" = "selector",
+      timeout = 10_000
+    ): Promise<boolean> => {
+      const result = await runBrowserAction({
+        type: "browser-wait-for",
+        condition,
+        conditionType,
+        timeout,
+      }, timeout + 2_000);
+      return typeof result !== "string" && (result as any)?.found !== false;
+    };
+
     // ── browser_navigate ──────────────────────────────────────────────────────
     if (name === "browser_navigate") {
       const { url } = validateArgs(browserSkill.inputSchemas!["browser_navigate"], args);
@@ -998,7 +1012,7 @@ export const browserSkill: Skill = {
         tries < attempts &&
         (last.status === "error" || (last.content ?? "").trim().length < 40)
       ) {
-        await new Promise<void>((r) => setTimeout(r, delayMs));
+        await waitForBrowserCondition(selector ?? "body", "selector", delayMs);
         last = await readPageContent(selector);
         tries += 1;
       }
@@ -1028,8 +1042,8 @@ export const browserSkill: Skill = {
       emit({ type: "open-browser" });
       emit({ type: "browser-navigate", url: normalized });
 
-      // 2. Laisser un court délai initial avant la première lecture
-      await new Promise<void>((r) => setTimeout(r, 2000));
+      // 2. Attendre un signal observable plutôt qu'un délai fixe.
+      await waitForBrowserCondition(normalized, "url", 10_000);
 
       // 3. Lire le contenu, avec retry si la page n'a pas fini de charger
       const result = await readPageContentWithRetry(selector ?? null);
@@ -1157,7 +1171,7 @@ export const browserSkill: Skill = {
       // 1. Lancer la recherche
       emit({ type: "open-browser" });
       emit({ type: "browser-navigate", url: searchUrl });
-      await new Promise<void>((r) => setTimeout(r, 2000));
+      await waitForBrowserCondition(searchUrl, "url", 10_000);
 
       // 2. Extraire les liens de la page de résultats
       const rawLinks = await runBrowserAction({ type: "browser-get-links", selector: null }, 12_000);
@@ -1197,7 +1211,7 @@ export const browserSkill: Skill = {
 
       for (const url of candidates) {
         emit({ type: "browser-navigate", url });
-        await new Promise<void>((r) => setTimeout(r, 2000));
+        await waitForBrowserCondition(url, "url", 10_000);
         const result = await readPageContentWithRetry(null, 2, 1200);
         if (result.status === "success") {
           sources.push({
