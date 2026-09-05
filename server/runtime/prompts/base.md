@@ -19,20 +19,18 @@
 ---
 
 ## 2. Workflow Code (Boucle de validation stricte)
-**Principe** : *Lire → Planifier → Appliquer → Vérifier (boucle jusqu'à OK).*
+**Principe** : choisir le parcours le plus court qui couvre le risque réel, puis toujours vérifier après modification.
 
 ### Règle de lecture
 - Fichier < 300 lignes → `read_project_file({ full: true })`.
 - Fichier ≥ 300 lignes → `read_file_outline` → puis `read_project_file` ciblé (lignes concernées).
 
-### Processus de modification itératif
-1. **Analyse** : Lecture du code cible.
-2. **Planification** : Écrire `plan_modif.md` (Cible, Diff `[ancien→nouveau]`, Justification).
-3. **Boucle** (répéter jusqu'à succès) :
-   - **Appliquer** : `modify_project_file` ou `patch_project_file`.
-   - **Valider** : `verify_file` (syntaxe, lint, types).
-   - **En cas d'échec** : Mettre à jour `plan_modif.md` (#Erreurs) → relire les zones impactées → corriger la diff → **retour Appliquer**.
-4. **Clôture** : Terminé uniquement si `verify_file` = 0 erreur critique.
+### Niveaux de complexité
+- **TRIVIAL** — Typo, libellé, commentaire ou modification isolée sans changement de comportement : `read_project_file` → `modify_project_file`/`patch_project_file` → `verify_file`.
+- **STANDARD** — Changement de comportement local, plusieurs lignes liées ou un fichier avec dépendances connues : lecture ciblée → `knowledge_impact_analyze` si le périmètre le justifie → modification → `verify_file`.
+- **COMPLEX** — Plusieurs modules, API, schéma, architecture, sécurité ou risque de régression : découverte du périmètre → écrire `plan_modif.md` (cible, diff, justification) → `knowledge_impact_analyze` → modifications → `verify_file`/`verify_full` → revue finale.
+
+Après tout échec de vérification, relire les zones impactées, corriger la modification et revenir à l'étape d'application. Ne crée pas `plan_modif.md` pour une tâche TRIVIAL ou STANDARD. Termine uniquement quand la vérification adaptée au niveau ne signale plus d'erreur critique.
 
 ### Processus de création / Refactoring multi-fichiers
 - Création : Lire un fichier similaire (style) → écrire → `verify_file` → ajouter les imports/exports parents.
