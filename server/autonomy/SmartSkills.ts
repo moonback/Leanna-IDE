@@ -457,16 +457,22 @@ async function executeReadUntilUnderstood(
     };
   }
 
-  // Extraire la confiance initiale
-  confidence = contextResult?.understandingScore
-    ?? contextResult?.score
+  // La confiance initiale vient du score de compréhension calculé par le moteur.
+  confidence = contextResult?.score?.confidence
+    ?? contextResult?.understandingScore
     ?? contextResult?.confidence
     ?? 30;
 
-  // Extraire les fichiers recommandés
-  const recommendedFiles: string[] = contextResult?.relevantFiles
-    ?? contextResult?.files?.map((f: any) => f.path || f)
+  // Conserver la pertinence sémantique par fichier : lire un fichier n'est pas
+  // une preuve de compréhension si le moteur ne le juge pas pertinent.
+  const contextFiles: Array<{ path: string; relevance?: number }> = contextResult?.batch?.files
+    ?.map((file: any) => ({ path: file.path, relevance: file.relevance }))
+    .filter((file: { path?: string }) => Boolean(file.path))
+    ?? contextResult?.files?.map((file: any) => ({ path: file.path || file, relevance: file.relevance }))
     ?? [];
+  const recommendedFiles = contextFiles.map((file) => file.path);
+  const relevanceByFile = new Map(contextFiles.map((file) => [file.path, file.relevance]));
+  const initialConfidence = confidence;
 
   // Extraire les findings du contexte
   if (contextResult?.facts) {
@@ -486,9 +492,13 @@ async function executeReadUntilUnderstood(
 
     filesRead.push(file);
 
-    // Chaque fichier lu augmente la confiance proportionnellement
-    const boost = Math.min(15, (100 - confidence) * 0.2);
-    confidence = Math.min(100, confidence + boost);
+    const relevances = filesRead
+      .map((readFile) => relevanceByFile.get(readFile))
+      .filter((relevance): relevance is number => typeof relevance === "number");
+    if (relevances.length > 0) {
+      const averageRelevance = relevances.reduce((sum, relevance) => sum + relevance, 0) / relevances.length;
+      confidence = Math.round((initialConfidence + Math.max(0, Math.min(1, averageRelevance)) * 100) / 2);
+    }
 
     log.info(`[read_until_understood] Lu: ${file} → confiance: ${confidence.toFixed(0)}%`);
   }

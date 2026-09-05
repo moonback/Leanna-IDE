@@ -81,3 +81,27 @@ test("validate_patch applies the correction returned by reasoning_think", async 
     "verify_file",
   ]);
 });
+
+test("read_until_understood bases confidence on context and file relevance", async () => {
+  const skill = createSmartSkills(async (name) => {
+    if (name === "knowledge_build_context") {
+      return {
+        score: { confidence: 30 },
+        batch: { files: [{ path: "relevant.ts", relevance: 0.9 }, { path: "weak.ts", relevance: 0.1 }] },
+        facts: [],
+      };
+    }
+    if (name === "read_file_outline") return { status: "success", outline: "ok" };
+    return { status: "success" };
+  });
+
+  const result = await skill.handleToolCall("read_until_understood", {
+    task: "understand the implementation",
+    maxFiles: 1,
+    targetConfidence: 80,
+  });
+
+  assert.equal(result.confidence, 60);
+  assert.deepEqual(result.filesRead, ["relevant.ts"]);
+  assert.equal(result.suggestMore, true);
+});
