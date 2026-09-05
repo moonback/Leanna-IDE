@@ -11,6 +11,7 @@ export interface ConfirmationRequest {
   filePath: string;
   operation: 'write' | 'modify' | 'patch' | 'delete' | 'rename' | 'npm-command';
   reason?: string;
+  riskLevel?: "standard" | "high";
   /** Timestamp de la demande */
   createdAt: number;
 }
@@ -49,6 +50,7 @@ export function requestConfirmation(
   operation: ConfirmationRequest['operation'],
   emitFn: (data: any) => void,
   reason?: string,
+  riskLevel: ConfirmationRequest["riskLevel"] = "standard",
 ): Promise<boolean> {
   const requestId = generateRequestId();
   const request: ConfirmationRequest = {
@@ -56,6 +58,7 @@ export function requestConfirmation(
     filePath,
     operation,
     reason,
+    riskLevel,
     createdAt: Date.now(),
   };
 
@@ -77,6 +80,7 @@ export function requestConfirmation(
         filePath,
         operation,
         reason,
+        riskLevel,
         timeoutMs: CONFIRMATION_TIMEOUT_MS,
       });
       console.log(`[Confirmation] Demande envoyée: ${operation} sur ${filePath} (${requestId})`);

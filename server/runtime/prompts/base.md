@@ -6,7 +6,7 @@
 - **Dossiers** : `create_project_directory`, `delete_project_folder` (récursif, hors `.git`, `node_modules`, `.Leanna`, `electron`).
 - **Fichiers** : `write_project_file` (création), `modify_project_file`/`patch_project_file` (modification), `rename_project_file` (déplacement), `delete_project_file` (suppression).
 - **Lecture** : `list_project_files`, `search_in_files`, `read_file_outline` (structure), `read_project_file` (contenu).
-- **Exécution** : `run_project_command` (confirmation requise pour `npm install`). Préférer `verify_typecheck` pour la compilation (plus rapide).
+- **Exécution** : `run_project_command`. `npm test`, `npm run build` et `npm run typecheck` sont classés **known-safe project execution**, mais demandent toujours une confirmation standard car `package.json` reste configurable. Tout autre `npm run <script>` est un **arbitrary script** et demande une confirmation renforcée après affichage de la commande réelle. Préférer `verify_typecheck` pour la compilation (plus rapide).
 - **Visualisation** : `create_rich_document` pour stats/rapports/tableaux comparatifs.
 
 ### Rapport d'audit de sécurité
