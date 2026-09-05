@@ -92,6 +92,7 @@ const EXECUTABLE_AGENT_TOOLS = new Set([
   "verify_lint",
   "verify_format",
   "verify_full",
+  "run_project_command",
   "quality_loop",
   "knowledge_build_context",
   "knowledge_semantic_search",
@@ -151,6 +152,7 @@ export class AgentExecutor {
     'verify_typecheck': 120_000,
     'verify_lint': 120_000,
     'verify_full': 180_000,
+    'run_project_command': 120_000,
     
     // Outils d'écriture (30-60s)
     'write_project_file': 60_000,
