@@ -16,6 +16,10 @@
     "clean": "rm -rf dist server.js",
     "lint": "node scripts/lint.cjs",
     "test": "node --import tsx --test server/**/*.test.ts",
+    "test:frontend": "vitest run tests/views/",
+    "test:frontend:watch": "vitest watch tests/views/",
+    "test:frontend:coverage": "vitest run tests/views/ --coverage",
+    "test:all": "npm run test && npm run test:frontend",
     "audit:deps": "npm audit --production",
     "audit:deps:full": "npm audit",
     "pack:win": "npm run build && electron-builder --win --dir",
@@ -94,6 +98,9 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/user-event": "^14.5.2",
     "@types/compression": "^1.8.1",
     "@types/express": "^4.17.21",
     "@types/multer": "^2.2.0",
@@ -102,16 +109,19 @@
     "@types/react": "19.1.8",
     "@types/react-dom": "19.1.6",
     "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
     "concurrently": "^10.0.3",
     "cross-env": "^7.0.3",
     "electron": "^43.1.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.25.0",
+    "jsdom": "^24.0.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.23.1",
     "vite": "^6.2.3",
     "vite-plugin-monaco-editor": "^1.1.0",
+    "vitest": "^2.0.5",
     "wait-on": "^9.0.10"
   }
 }

@@ -1,0 +1,21 @@
+# Ignorer les fichiers générés par les tests
+coverage/
+*.lcov
+*.html
+
+# Ignorer les caches
+.vitest/
+
+# Ignorer les fichiers de sortie
+*.test.js
+*.spec.js
+
+# Ignorer les logs de test
+*.log
+
+# Ignorer les rapports
+debug.log
+
+# Ignorer les fichiers temporaires
+*.tmp
+*.temp
