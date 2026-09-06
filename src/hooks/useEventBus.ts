@@ -22,7 +22,7 @@
  * emit({ type: "workspace:context_changed", data: { path: "/new/path" } });
  */
 
-import { useEffect, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import type {
   EventType,
   Event,
@@ -293,7 +293,7 @@ export function useSystemEvents(callback: (event: Event) => void) {
 export function useEventHistory(limit?: number, filter?: EventFilter) {
   const { getHistory } = useEventBus();
   
-  const [history, setHistory] = useRef<Event[]>([]).current;
+  const [history, setHistory] = useState<Event[]>([]);
   
   const refresh = useCallback(() => {
     const events = getHistory(limit, filter);
@@ -302,7 +302,9 @@ export function useEventHistory(limit?: number, filter?: EventFilter) {
 
   const addEventListener = useCallback((callback: (events: Event[]) => void) => {
     const unsub = eventBus.onAny(() => {
-      callback(getHistory(limit, filter));
+      const events = getHistory(limit, filter);
+      setHistory([...events]);
+      callback(events);
     });
     return unsub;
   }, [getHistory, limit, filter]);

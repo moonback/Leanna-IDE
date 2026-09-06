@@ -12,7 +12,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  LayoutDashboard, Target, Play, Pause, Stop, CheckCircle, XCircle, AlertCircle,
+  LayoutDashboard, Target, Play, Pause, Stop, CheckCircle, XCircle, X, AlertCircle,
   Clock, ListOrdered, BarChart3, Settings, Plus, Search, Filter, MoreVertical,
   ChevronRight, ChevronLeft, RefreshCw, Trash2, Edit2, Eye, Rocket
 } from "lucide-react";
