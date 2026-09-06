@@ -576,8 +576,8 @@ export const githubSkill: Skill = {
           console.log(`[GitHub] Ingestion repo: ${owner}/${repo} vers notebook ${notebook_id.slice(0, 8)}...`);
 
           try {
-            // Importer dynamiquement SourceIngester pour éviter les dépendances circulaires
-            const { sourceIngester } = await import('../notebooks/SourceIngester.js');
+            // Importer dynamiquement SourceIngester et notebookManager pour éviter les dépendances circulaires
+            const { sourceIngester, notebookManager } = await import('../notebooks/index.js');
             
             const options: any = {
               maxFiles: Math.min(max_files || 100, 200),
@@ -591,6 +591,14 @@ export const githubSkill: Skill = {
               notebook_id,
               options
             );
+
+            // Ajouter la source au notebook et persister sur le disque
+            const updatedNb = notebookManager.addSource(notebook_id, source);
+            if (!updatedNb) {
+              console.warn(`[GitHub] Notebook ${notebook_id} introuvable lors de l'ajout de la source`);
+            } else {
+              console.log(`[GitHub] Source ajoutée au notebook ${notebook_id} : "${source.title}" (total: ${updatedNb.sources.length} sources)`);
+            }
 
             console.log(`[GitHub] ingest_github_repository OK: ${source.title} [${Date.now() - startTime}ms]`);
             return {

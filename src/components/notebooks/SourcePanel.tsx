@@ -1389,9 +1389,14 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       {showGitHubImport && (
         <GitHubRepositoryImportModal
           onClose={() => setShowGitHubImport(false)}
-          onImportSuccess={(notebookId, repository) => {
+          onImportSuccess={(targetNotebookId, repository) => {
             success(`Dépôt ${repository} ingéré avec succès !`);
-            onRefresh();
+            if (targetNotebookId && targetNotebookId !== notebookId) {
+              window.location.hash = `notebook=${targetNotebookId}`;
+              window.dispatchEvent(new HashChangeEvent('hashchange'));
+            } else {
+              onRefresh();
+            }
           }}
           defaultNotebookId={notebookId}
         />
