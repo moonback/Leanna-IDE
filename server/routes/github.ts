@@ -23,9 +23,45 @@ export function createGithubRouter(skillManager: SkillManager): Router {
   const workspaceGitPaths = ['.', ':(exclude).Leanna', ':(exclude).Leanna/**'];
 
   // GET /api/github/repos
-  router.get('/repos', async (_req: Request, res: Response) => {
+  router.get('/repos', async (req: Request, res: Response) => {
     try {
-      const result = await skillManager.handleToolCall('list_github_repos', {});
+      const { username, sort, limit, visibility } = req.query as {
+        username?: string;
+        sort?: string;
+        limit?: string;
+        visibility?: string;
+      };
+      const result = await skillManager.handleToolCall('list_github_repos', {
+        username: username || undefined,
+        sort: sort || 'updated',
+        limit: limit ? parseInt(limit, 10) : 50,
+        visibility: visibility || undefined,
+      });
+      if (result?.error) return res.status(200).json(result);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/github/user
+  router.get('/user', async (req: Request, res: Response) => {
+    try {
+      const { username } = req.query as { username?: string };
+      const result = await skillManager.handleToolCall('get_github_user', { username });
+      if (result?.error) return res.status(200).json(result);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/github/repo-info
+  router.get('/repo-info', async (req: Request, res: Response) => {
+    try {
+      const { owner, repo } = req.query as { owner?: string; repo?: string };
+      if (!owner || !repo) return res.status(400).json({ error: 'owner et repo sont requis.' });
+      const result = await skillManager.handleToolCall('get_github_repo', { owner, repo });
       if (result?.error) return res.status(200).json(result);
       res.json(result);
     } catch (e: any) {

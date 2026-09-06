@@ -252,9 +252,12 @@ export const githubSkill: Skill = {
         // ─── Get User ───────────────────────────────────────────────────
         case "get_github_user": {
           const username = args.username?.trim();
-          if (!username) return { error: "Le nom d'utilisateur est requis." };
-          console.log(`[GitHub] Récupération profil utilisateur: ${username}`);
-          const data = await githubFetch(`/users/${encodeURIComponent(username)}`);
+          if (!username && !process.env.GITHUB_TOKEN?.trim()) {
+            return { error: "GITHUB_TOKEN non configuré. Spécifiez un nom d'utilisateur." };
+          }
+          const endpoint = username ? `/users/${encodeURIComponent(username)}` : `/user`;
+          console.log(`[GitHub] Récupération profil utilisateur: ${username || '(authentifié)'}`);
+          const data = await githubFetch(endpoint);
           if (data.error) { console.warn(`[GitHub] get_github_user échec: ${data.error}`); return data; }
           console.log(`[GitHub] get_github_user OK: ${data.login} (${data.public_repos} repos, ${data.followers} followers) [${Date.now() - startTime}ms]`);
           return {
@@ -267,6 +270,8 @@ export const githubSkill: Skill = {
             followers: data.followers,
             following: data.following,
             public_repos: data.public_repos,
+            total_private_repos: data.total_private_repos,
+            owned_private_repos: data.owned_private_repos,
             created_at: data.created_at,
             avatar_url: data.avatar_url,
           };
@@ -282,13 +287,17 @@ export const githubSkill: Skill = {
           console.log(`[GitHub] get_github_repo OK: ${data.full_name} ⭐${data.stargazers_count} [${Date.now() - startTime}ms]`);
           return {
             full_name: data.full_name,
+            name: data.name,
+            owner: data.owner?.login || owner,
+            repo: data.name || repo,
             description: data.description,
             language: data.language,
             stars: data.stargazers_count,
             forks: data.forks_count,
             open_issues: data.open_issues_count,
             default_branch: data.default_branch,
-            topics: data.topics,
+            private: !!data.private,
+            topics: data.topics || [],
             license: data.license?.spdx_id,
             updated_at: data.updated_at,
             html_url: data.html_url,
@@ -299,7 +308,8 @@ export const githubSkill: Skill = {
         case "list_github_repos": {
           const username = args.username?.trim();
           const sort = args.sort || "updated";
-          const limit = Math.min(args.limit || 10, 30);
+          const limit = Math.min(args.limit || 50, 100);
+          const visibility = args.visibility;
           console.log(`[GitHub] Liste repos: user=${username || '(authenticated)'}, sort=${sort}, limit=${limit}`);
           
           // Si pas de username et pas de token, on ne peut pas lister les repos privés
@@ -308,9 +318,14 @@ export const githubSkill: Skill = {
             return { error: "GITHUB_TOKEN non configuré. Spécifiez un username ou ajoutez votre token GitHub." };
           }
           
-          const endpoint = username
+          let endpoint = username
             ? `/users/${encodeURIComponent(username)}/repos?sort=${sort}&per_page=${limit}`
-            : `/user/repos?sort=${sort}&per_page=${limit}`;
+            : `/user/repos?sort=${sort}&per_page=${limit}&affiliation=owner,collaborator,organization_member`;
+
+          if (!username && visibility && ['all', 'public', 'private'].includes(visibility)) {
+            endpoint += `&visibility=${visibility}`;
+          }
+
           const data = await githubFetch(endpoint);
           if (data.error) { console.warn(`[GitHub] list_github_repos échec: ${data.error}`); return data; }
           if (!Array.isArray(data)) return { error: "Réponse inattendue de GitHub." };
@@ -318,11 +333,17 @@ export const githubSkill: Skill = {
           return {
             repos: data.map((r: any) => ({
               full_name: r.full_name,
+              name: r.name,
+              owner: r.owner?.login || r.full_name.split('/')[0],
+              repo: r.name || r.full_name.split('/')[1],
               description: r.description,
               language: r.language,
               stars: r.stargazers_count,
+              forks: r.forks_count,
+              default_branch: r.default_branch,
+              topics: r.topics || [],
               updated_at: r.updated_at,
-              private: r.private,
+              private: !!r.private,
               html_url: r.html_url,
             })),
           };

@@ -89,3 +89,71 @@ test('github routes: POST /commit requires a message', async () => {
   }
 });
 
+test('github routes: GET /user delegates to get_github_user', async () => {
+  let calledTool = '';
+  let calledArgs: any = null;
+  const mockSkillManager: any = {
+    handleToolCall: async (name: string, args: any) => {
+      calledTool = name;
+      calledArgs = args;
+      return { login: 'octocat', public_repos: 8 };
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  app.use('/api/github', createGithubRouter(mockSkillManager));
+
+  const server: Server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const port = (server.address() as any).port;
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/github/user?username=octocat`);
+    assert.equal(res.status, 200);
+    const body = await res.json() as any;
+    assert.equal(calledTool, 'get_github_user');
+    assert.equal(calledArgs.username, 'octocat');
+    assert.equal(body.login, 'octocat');
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test('github routes: GET /repo-info validates params and delegates to get_github_repo', async () => {
+  let calledTool = '';
+  let calledArgs: any = null;
+  const mockSkillManager: any = {
+    handleToolCall: async (name: string, args: any) => {
+      calledTool = name;
+      calledArgs = args;
+      return { full_name: 'octocat/Hello-World', private: false };
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  app.use('/api/github', createGithubRouter(mockSkillManager));
+
+  const server: Server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const port = (server.address() as any).port;
+
+  try {
+    const resMissing = await fetch(`http://127.0.0.1:${port}/api/github/repo-info?owner=octocat`);
+    assert.equal(resMissing.status, 400);
+
+    const resOk = await fetch(`http://127.0.0.1:${port}/api/github/repo-info?owner=octocat&repo=Hello-World`);
+    assert.equal(resOk.status, 200);
+    const body = await resOk.json() as any;
+    assert.equal(calledTool, 'get_github_repo');
+    assert.equal(calledArgs.owner, 'octocat');
+    assert.equal(calledArgs.repo, 'Hello-World');
+    assert.equal(body.full_name, 'octocat/Hello-World');
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
