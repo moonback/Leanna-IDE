@@ -24,3 +24,4 @@ export {
   NotesPanelSkeleton,
 } from './Skeleton.js';
 export { ToastProvider, useToast, type ToastType } from './Toast.js';
+export { NotificationCenter, NotificationContext, useNotifications, type NotificationCenterProps } from './NotificationCenter.js';

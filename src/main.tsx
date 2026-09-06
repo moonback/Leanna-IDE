@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfileProvider } from './context/UserProfileContext.js';
 import { ToastProvider } from './components/ui/Toast.js';
 import { ConfirmDialogProvider } from './components/ui/ConfirmDialog.js';
+import { NotificationCenter } from './components/ui/NotificationCenter.js';
 import { patchConsole } from './utils/logger.js';
 import { cleanupGlobalResources, installBeforeUnloadCleanup } from './utils/cleanup.js';
 import { LiveAPIContext } from './context/LiveAPIContext.js';
@@ -28,6 +29,10 @@ const HistoryView = lazy(() => import('./views/HistoryView.js'));
 const GitHubView = lazy(() => import('./views/GitHubView.js'));
 const DocumentsView = lazy(() => import('./views/DocumentsView.js'));
 const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
+const SystemDashboardView = lazy(() => import('./views/SystemDashboardView.js'));
+const MissionDashboardView = lazy(() => import('./views/MissionDashboardView.js'));
+const AgentDashboardView = lazy(() => import('./views/AgentDashboardView.js'));
+const WorkspaceDashboardView = lazy(() => import('./views/WorkspaceDashboardView.js'));
 import './index.css';
 
 const configuredApiToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_Leanna_API_TOKEN?.trim();
@@ -490,6 +495,10 @@ function AnimatedRoutes() {
         <Route path="/automation" element={wrap(<AutomationView />)} />
         <Route path="/documents"  element={wrap(<DocumentsView />)} />
         <Route path="/notebooks"  element={wrap(<NotebooksView />)} />
+        <Route path="/system"     element={wrap(<SystemDashboardView />)} />
+        <Route path="/missions"   element={wrap(<MissionDashboardView />)} />
+        <Route path="/agents"     element={wrap(<AgentDashboardView />)} />
+        <Route path="/workspace"  element={wrap(<WorkspaceDashboardView />)} />
       </Routes>
     </AnimatePresence>
   );
@@ -622,11 +631,13 @@ appRoot.render(
       <UserProfileProvider>
         <ToastProvider>
           <ConfirmDialogProvider>
-            <BrowserRouter>
-              <AuthGate>
-                <Layout />
-              </AuthGate>
-            </BrowserRouter>
+            <NotificationCenter defaultDuration={4000} maxToasts={5}>
+              <BrowserRouter>
+                <AuthGate>
+                  <Layout />
+                </AuthGate>
+              </BrowserRouter>
+            </NotificationCenter>
           </ConfirmDialogProvider>
         </ToastProvider>
       </UserProfileProvider>
