@@ -30,7 +30,6 @@ import type {
 } from "../../server/core/types";
 import {
   VerificationManager,
-  createVerificationManager,
   type VerifyOptions,
   type VerifyBatchOptions,
   type VerificationStrategy,
@@ -103,7 +102,7 @@ export function useVerificationManager(
   autoSubscribe: boolean = true
 ): UseVerificationManagerResult {
   const [manager] = useState<VerificationManager>(
-    () => initialManager || createVerificationManager()
+    () => initialManager || new VerificationManager()
   );
   
   const [verifications, setVerifications] = useState<VerificationResult[]>([]);

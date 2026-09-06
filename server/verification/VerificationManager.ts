@@ -672,6 +672,13 @@ export class VerificationManager {
   }
 
   /**
+   * Retourne toutes les vérifications depuis l'historique.
+   */
+  getAllVerifications(): VerificationResult[] {
+    return this.history.flatMap(batch => batch.results);
+  }
+
+  /**
    * Retourne si le gestionnaire est activé.
    */
   isEnabled(): boolean {

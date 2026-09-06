@@ -12,7 +12,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  LayoutDashboard, Users, Robot, Play, Pause, Stop, CheckCircle, XCircle, 
+  LayoutDashboard, Users, Bot, Play, Pause, Stop, CheckCircle, XCircle, 
   AlertCircle, Clock, Activity, BarChart3, Settings, Plus, Search, Filter,
   MoreVertical, RefreshCw, Trash2, Edit2, Eye, MessageSquare, Network
 } from "lucide-react";
@@ -68,92 +68,6 @@ const taskStatusColors = {
   completed: { bg: "bg-green-50", text: "text-green-700", border: "border-green-200" },
   failed: { bg: "bg-red-50", text: "text-red-700", border: "border-red-200" },
 };
-
-// Mock data pour les agents
-const mockAgents: Agent[] = [
-  {
-    id: "1",
-    name: "Developer Agent",
-    type: "code",
-    status: "idle",
-    capabilities: ["TypeScript", "Node.js", "React", "Git"],
-    description: "Spécialisé dans le développement d'applications",
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    lastActivityAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "Data Analyst Agent",
-    type: "data",
-    status: "busy",
-    capabilities: ["Python", "Pandas", "Data Analysis", "Visualization"],
-    currentTask: "Analyse des données utilisateurs",
-    progress: 75,
-    description: "Expert en analyse de données et statistiques",
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-    lastActivityAt: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    name: "Content Writer Agent",
-    type: "content",
-    status: "idle",
-    capabilities: ["Writing", "Translation", "Documentation", "Content Creation"],
-    description: "Création de contenu technique et documentation",
-    createdAt: new Date(Date.now() - 43200000).toISOString(),
-    lastActivityAt: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: "4",
-    name: "System Monitor Agent",
-    type: "monitoring",
-    status: "busy",
-    capabilities: ["Monitoring", "Alerting", "Logging", "Performance Tracking"],
-    currentTask: "Surveillance des performances système",
-    progress: 45,
-    description: "Surveille les métriques système et génère des alertes",
-    createdAt: new Date(Date.now() - 259200000).toISOString(),
-    lastActivityAt: new Date().toISOString(),
-  },
-];
-
-const mockTasks: Task[] = [
-  {
-    id: "1",
-    title: "Développer un nouveau composant",
-    agentId: "1",
-    status: "in_progress",
-    priority: "high",
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    startedAt: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: "2",
-    title: "Analyser les logs",
-    agentId: "2",
-    status: "completed",
-    priority: "medium",
-    createdAt: new Date(Date.now() - 7200000).toISOString(),
-    completedAt: new Date(Date.now() - 1800000).toISOString(),
-  },
-  {
-    id: "3",
-    title: "Documenter l'API",
-    agentId: "3",
-    status: "pending",
-    priority: "medium",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "4",
-    title: "Surveiller le CPU",
-    agentId: "4",
-    status: "in_progress",
-    priority: "high",
-    createdAt: new Date(Date.now() - 1800000).toISOString(),
-    startedAt: new Date(Date.now() - 1800000).toISOString(),
-  },
-];
 
 // Composant AgentCard
 function AgentCard({ agent, onSelect, onAction }: AgentCardProps) {
@@ -299,8 +213,8 @@ function getAgentIcon(type: string) {
 
 // Hook pour gérer les agents
 function useAgentManager() {
-  const [agents, setAgents] = useState<Agent[]>(mockAgents);
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);

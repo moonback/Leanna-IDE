@@ -433,14 +433,10 @@ function VerificationDetailsModal({ verification, onClose }: VerificationDetails
                           {check.name}
                         </span>
                       </div>
-                      <span className={`
-                        px-2 py-0.5 rounded-full text-xs font-medium
-                        ${check.severity === "error" || check.severity === "critical" 
-                          ? "bg-red-500/10 text-red-600" 
-                          : check.severity === "warning" 
-                            ? "bg-amber-500/10 text-amber-600" 
-                            : "bg-green-500/10 text-green-600"
-                        }`
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        check.severity === "error" || check.severity === "critical" ? "bg-red-500/10 text-red-600" :
+                        check.severity === "warning" ? "bg-amber-500/10 text-amber-600" : "bg-green-500/10 text-green-600"
+                      }`}
                       >
                         {check.severity}
                       </span>

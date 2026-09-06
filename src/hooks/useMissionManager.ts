@@ -131,105 +131,17 @@ export function useMissionManager(): UseMissionManagerResult {
       // });
       // const data = await response.json();
       
-      // Pour l'instant, on utilise des données mock
-      const mockMissions: Mission[] = [
-        {
-          id: "1",
-          title: "Développer un nouveau module",
-          description: "Création d'un module de gestion des artefacts avec support de versioning",
-          status: "in_progress",
-          goals: [
-            {
-              id: "1-1",
-              parentId: null,
-              title: "Concevoir l'architecture",
-              description: "Définir la structure du module",
-              successCriteria: ["Architecture documentée", "Schémas créés"],
-              priority: "high",
-              status: "completed",
-              plannedActions: [],
-              attempts: 1,
-              maxAttempts: 3,
-              createdAt: new Date(Date.now() - 3600000).toISOString(),
-              startedAt: new Date(Date.now() - 3600000).toISOString(),
-              completedAt: new Date(Date.now() - 1800000).toISOString(),
-              progress: 100,
-            },
-            {
-              id: "1-2",
-              parentId: null,
-              title: "Implémenter le core",
-              description: "Développement des fonctionnalités principales",
-              successCriteria: ["Fonctionnalités de base implémentées", "Tests unitaires passés"],
-              priority: "high",
-              status: "in_progress",
-              plannedActions: [],
-              attempts: 2,
-              maxAttempts: 3,
-              createdAt: new Date(Date.now() - 1800000).toISOString(),
-              startedAt: new Date(Date.now() - 1800000).toISOString(),
-              progress: 75,
-            },
-            {
-              id: "1-3",
-              parentId: null,
-              title: "Documenter le module",
-              description: "Créer la documentation complète",
-              successCriteria: ["Documentation technique complète", "Exemples fournis"],
-              priority: "medium",
-              status: "pending",
-              plannedActions: [],
-              attempts: 0,
-              maxAttempts: 3,
-              createdAt: new Date().toISOString(),
-              progress: 0,
-            },
-          ],
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-          config: { maxAttempts: 3, enableReflection: true },
-          progress: 65,
-        },
-        {
-          id: "2",
-          title: "Optimiser les performances",
-          description: "Amélioration des temps de réponse du système",
-          status: "completed",
-          goals: [],
-          createdAt: new Date(Date.now() - 172800000).toISOString(),
-          completedAt: new Date(Date.now() - 172800).toISOString(),
-          config: { maxAttempts: 3, enableReflection: true },
-          progress: 100,
-        },
-        {
-          id: "3",
-          title: "Documenter l'API",
-          description: "Création de la documentation complète de l'API",
-          status: "pending",
-          goals: [],
-          createdAt: new Date().toISOString(),
-          config: { maxAttempts: 3, enableReflection: true },
-          progress: 0,
-        },
-        {
-          id: "4",
-          title: "Implémenter le système de vérification",
-          description: "Création du Verifier avec support de validation des artefacts",
-          status: "in_progress",
-          goals: [],
-          createdAt: new Date(Date.now() - 43200000).toISOString(),
-          config: { maxAttempts: 3, enableReflection: true },
-          progress: 45,
-        },
-      ];
+      // Pour l'instant, on utilise des données vides
+      const missions: Mission[] = [];
       
       setState(prev => ({
         ...prev,
-        missions: mockMissions,
+        missions: missions,
         loading: false,
       }));
       
       // Notifier les abonnés
-      subscribers.current.forEach(callback => callback(mockMissions));
+      subscribers.current.forEach(callback => callback(missions));
       
     } catch (error) {
       if (error instanceof Error && error.name !== 'AbortError') {
