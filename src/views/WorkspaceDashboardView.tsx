@@ -354,7 +354,8 @@ function FileTreeNode({
 
 // Hook pour gérer le workspace
 function useWorkspace() {
-  const [projects, setProjects] = useState<WorkspaceProject[]>([</n    {
+  const [projects, setProjects] = useState<WorkspaceProject[]>([
+    {
       id: "1",
       name: "Jarvis OS",
       path: "/home/user/jarvis-os",
@@ -401,7 +402,8 @@ function useWorkspace() {
     },
   ]);
 
-  const [files, setFiles] = useState<WorkspaceFile[]>([</n    {
+  const [files, setFiles] = useState<WorkspaceFile[]>([
+    {
       id: "1",
       name: "src",
       path: "/",
@@ -467,7 +469,8 @@ function useWorkspace() {
     },
   ]);
 
-  const [resources, setResources] = useState<WorkspaceResource[]>([</n    {
+  const [resources, setResources] = useState<WorkspaceResource[]>([
+    {
       id: "1",
       name: "OpenAI GPT-4",
       type: "model",

@@ -18,6 +18,7 @@ import {
   Container, Bot, Crosshair, Database,
   Activity, Wrench, Users,
   Wand2, BookOpen, Globe, Terminal, Store,
+  Target, UserCog, Briefcase, Cpu,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -39,6 +40,8 @@ export interface SidebarItemConfig {
   dotStateKey?: string;
   /** Only show when assistant is connected */
   requiresAssistant?: boolean;
+  /** Navigation path for direct route navigation */
+  path?: string;
   /** Sub-items for submenu type */
   children?: SidebarItemConfig[];
 }
@@ -227,6 +230,34 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Marketplace',
             stateKey: 'showMarketplace',
             actionKey: 'onToggleMarketplace',
+          },
+          {
+            id: 'mission-dashboard',
+            type: 'button',
+            icon: Target,
+            label: 'Mission Dashboard',
+            path: '/missions',
+          },
+          {
+            id: 'agent-dashboard',
+            type: 'button',
+            icon: UserCog,
+            label: 'Agent Dashboard',
+            path: '/agents',
+          },
+          {
+            id: 'workspace-dashboard',
+            type: 'button',
+            icon: Briefcase,
+            label: 'Workspace Dashboard',
+            path: '/workspace',
+          },
+          {
+            id: 'system-dashboard',
+            type: 'button',
+            icon: Cpu,
+            label: 'System Dashboard',
+            path: '/system',
           },
           {
             id: 'vision',

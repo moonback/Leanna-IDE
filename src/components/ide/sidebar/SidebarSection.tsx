@@ -11,11 +11,12 @@ interface SidebarSectionProps {
   state: Record<string, any>;
   actions: Record<string, (...args: any[]) => void>;
   assistantConnected: boolean;
+  navigate?: (path: string) => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function SidebarSection({ config, state, actions, assistantConnected }: SidebarSectionProps) {
+export function SidebarSection({ config, state, actions, assistantConnected, navigate }: SidebarSectionProps) {
   // Skip the AI/Agent section entirely - those items are now in the right-click menu on the agent status indicator
   if (config.id === 'ai-agent') {
     return null;
@@ -38,6 +39,7 @@ export function SidebarSection({ config, state, actions, assistantConnected }: S
               state={state}
               actions={actions}
               assistantConnected={assistantConnected}
+              navigate={navigate}
             />
           );
         }
@@ -46,6 +48,12 @@ export function SidebarSection({ config, state, actions, assistantConnected }: S
         const isActive = item.stateKey ? Boolean(state[item.stateKey]) : false;
         const dot = item.dotStateKey && state[item.dotStateKey] ? 'var(--color-success)' : undefined;
         const handler = item.actionKey ? actions[item.actionKey] : undefined;
+        const hasPath = item.path && navigate && typeof navigate === 'function';
+        
+        // Debug logs
+        if (item.path) {
+          console.log(`[SidebarSection] Item with path: ${item.id}, path: ${item.path}, navigate defined: ${typeof navigate === 'function'}`);
+        }
 
         // Show a subtle blue dot for assistant-required items when connected but not active
         const assistantDot = item.requiresAssistant && assistantConnected && !isActive && !dot
@@ -57,7 +65,10 @@ export function SidebarSection({ config, state, actions, assistantConnected }: S
             key={item.id}
             icon={item.icon}
             active={isActive}
-            onClick={handler || (() => {})}
+            onClick={hasPath ? () => {
+              console.log(`[SidebarSection] Navigating to: ${item.path}`);
+              navigate(item.path!);
+            } : handler || (() => {})}
             title={item.label}
             dot={assistantDot}
           />
@@ -80,13 +91,15 @@ interface SubmenuItemProps {
     label: string;
     stateKey?: string;
     actionKey?: string;
+    path?: string;
   }>;
   state: Record<string, any>;
   actions: Record<string, (...args: any[]) => void>;
   assistantConnected: boolean;
+  navigate?: (path: string) => void;
 }
 
-function SubmenuItem({ icon, label, children, state, actions }: SubmenuItemProps) {
+function SubmenuItem({ icon, label, children, state, actions, navigate }: SubmenuItemProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -131,6 +144,12 @@ function SubmenuItem({ icon, label, children, state, actions }: SubmenuItemProps
             {children.map((child) => {
               const isActive = child.stateKey ? Boolean(state[child.stateKey]) : false;
               const handler = child.actionKey ? actions[child.actionKey] : undefined;
+              const hasPath = child.path && navigate && typeof navigate === 'function';
+              
+              // Debug logs for submenu items
+              if (child.path) {
+                console.log(`[SubmenuItem] Child with path: ${child.id}, path: ${child.path}, navigate defined: ${typeof navigate === 'function'}`);
+              }
               return (
                 <FlyoutItem
                   key={child.id}
@@ -138,7 +157,13 @@ function SubmenuItem({ icon, label, children, state, actions }: SubmenuItemProps
                   label={child.label}
                   active={isActive}
                   onClick={() => {
-                    handler?.();
+                    if (hasPath) {
+                      console.log(`[SubmenuItem] Navigating to: ${child.path}`);
+                      navigate(child.path!);
+                    } else {
+                      console.log(`[SubmenuItem] Calling handler for: ${child.id}`);
+                      handler?.();
+                    }
                     setOpen(false);
                   }}
                 />

@@ -33,6 +33,10 @@ export function useIDEState(props: UnifiedSidebarProps) {
     showTerminal: props.showTerminal ?? false,
     visionEnabled: props.visionEnabled ?? false,
     screenShareEnabled: props.screenShareEnabled ?? false,
+    showMissionDashboard: props.showMissionDashboard ?? false,
+    showAgentDashboard: props.showAgentDashboard ?? false,
+    showWorkspaceDashboard: props.showWorkspaceDashboard ?? false,
+    showSystemDashboard: props.showSystemDashboard ?? false,
   }), [
     props.showExplorer, props.showGlobalSearch,
     props.showSettings, props.showRunMenu,
@@ -41,6 +45,8 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.showKnowledge, props.showNotebooks, props.showSystemHealth, props.showMcp,
     props.showFleet, props.showBrowser, props.showTerminal,
     props.visionEnabled, props.screenShareEnabled,
+    props.showMissionDashboard, props.showAgentDashboard,
+    props.showWorkspaceDashboard, props.showSystemDashboard,
   ]);
 
   const actions: IDEPanelActions = useMemo(() => ({
@@ -66,6 +72,10 @@ export function useIDEState(props: UnifiedSidebarProps) {
     onToggleTerminal: props.onToggleTerminal ?? noop,
     onToggleVision: props.onToggleVision ?? noop,
     onToggleScreenShare: props.onToggleScreenShare ?? noop,
+    onToggleMissionDashboard: props.onToggleMissionDashboard ?? noop,
+    onToggleAgentDashboard: props.onToggleAgentDashboard ?? noop,
+    onToggleWorkspaceDashboard: props.onToggleWorkspaceDashboard ?? noop,
+    onToggleSystemDashboard: props.onToggleSystemDashboard ?? noop,
   }), [
     props.onToggleExplorer, props.onToggleSearch,
     props.onToggleSettings, props.onToggleRunMenu,
@@ -74,6 +84,8 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.onToggleKnowledge, props.onToggleNotebooks, props.onToggleSystemHealth, props.onToggleMcp,
     props.onToggleFleet, props.onToggleBrowser, props.onToggleTerminal,
     props.onToggleVision, props.onToggleScreenShare,
+    props.onToggleMissionDashboard, props.onToggleAgentDashboard,
+    props.onToggleWorkspaceDashboard, props.onToggleSystemDashboard,
   ]);
 
   return { state, actions };

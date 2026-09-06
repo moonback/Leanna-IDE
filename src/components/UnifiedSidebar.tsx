@@ -237,6 +237,7 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
             actions={actions}
             assistantConnected={props.assistantConnected ?? false}
             skipAnimation={hasAnimatedRef.current}
+            navigate={navigate}
           />
         )}
 
@@ -482,11 +483,13 @@ function IDEToolsSections({
   actions,
   assistantConnected,
   skipAnimation,
+  navigate,
 }: {
   state: import('./sidebar/types.js').IDEPanelState;
   actions: import('./sidebar/types.js').IDEPanelActions;
   assistantConnected: boolean;
   skipAnimation: boolean;
+  navigate: (path: string) => void;
 }) {
   const stateRecord = state as unknown as Record<string, boolean | string | null>;
   const actionsRecord = actions as unknown as Record<string, () => void>;
@@ -522,6 +525,7 @@ function IDEToolsSections({
               state={stateRecord}
               actions={actionsRecord}
               assistantConnected={assistantConnected}
+              navigate={navigate}
             />
             {/* Enhanced tooltip with shortcuts */}
             <div className="sidebar-tooltip">

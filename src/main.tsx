@@ -29,10 +29,10 @@ const HistoryView = lazy(() => import('./views/HistoryView.js'));
 const GitHubView = lazy(() => import('./views/GitHubView.js'));
 const DocumentsView = lazy(() => import('./views/DocumentsView.js'));
 const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
-const SystemDashboardView = lazy(() => import('./views/SystemDashboardView.js'));
-const MissionDashboardView = lazy(() => import('./views/MissionDashboardView.js'));
-const AgentDashboardView = lazy(() => import('./views/AgentDashboardView.js'));
-const WorkspaceDashboardView = lazy(() => import('./views/WorkspaceDashboardView.js'));
+const SystemDashboardView = lazy(() => import('./views/SystemDashboardView.tsx'));
+const MissionDashboardView = lazy(() => import('./views/MissionDashboardView.tsx'));
+const AgentDashboardView = lazy(() => import('./views/AgentDashboardView.tsx'));
+const WorkspaceDashboardView = lazy(() => import('./views/WorkspaceDashboardView.tsx'));
 import './index.css';
 
 const configuredApiToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_Leanna_API_TOKEN?.trim();

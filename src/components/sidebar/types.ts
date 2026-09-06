@@ -24,7 +24,8 @@ export interface IDEPanelState {
   showAgents: boolean;
   showAgentBuilder: boolean;
   showMarketplace: boolean;
-  showMissions: boolean;  showKnowledge: boolean;
+  showMissions: boolean;
+  showKnowledge: boolean;
   showNotebooks: boolean;
   showSystemHealth: boolean;
   showMcp: boolean;
@@ -33,6 +34,10 @@ export interface IDEPanelState {
   showTerminal: boolean;
   visionEnabled: boolean;
   screenShareEnabled: boolean;
+  showMissionDashboard: boolean;
+  showAgentDashboard: boolean;
+  showWorkspaceDashboard: boolean;
+  showSystemDashboard: boolean;
 }
 
 // ─── Actions des panneaux IDE ──────────────────────────────────────────────────
@@ -60,6 +65,10 @@ export interface IDEPanelActions {
   onToggleTerminal: () => void;
   onToggleVision: () => void;
   onToggleScreenShare: () => void;
+  onToggleMissionDashboard: () => void;
+  onToggleAgentDashboard: () => void;
+  onToggleWorkspaceDashboard: () => void;
+  onToggleSystemDashboard: () => void;
 }
 
 // ─── État de l'assistant ───────────────────────────────────────────────────────
@@ -120,6 +129,10 @@ export interface UnifiedSidebarProps {
   visionEnabled?: boolean;
   screenShareEnabled?: boolean;
   mode?: 'full' | 'ask';
+  showMissionDashboard?: boolean;
+  showAgentDashboard?: boolean;
+  showWorkspaceDashboard?: boolean;
+  showSystemDashboard?: boolean;
 
   // ── IDE Actions (only used when context === 'ide') ──
   onToggleExplorer?: () => void;
@@ -154,4 +167,8 @@ export interface UnifiedSidebarProps {
   showAutomation?: boolean;
   onToggleMemory?: () => void;
   showMemory?: boolean;
+  onToggleMissionDashboard?: () => void;
+  onToggleAgentDashboard?: () => void;
+  onToggleWorkspaceDashboard?: () => void;
+  onToggleSystemDashboard?: () => void;
 }
