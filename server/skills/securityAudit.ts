@@ -281,6 +281,9 @@ export const securityAuditSkill: Skill = {
     if (name !== "security_audit") throw new Error(`Unknown tool in security_audit: ${name}`);
     const { includeTests, dependencyMode } = validateArgs(securityAuditSkill.inputSchemas!.security_audit, args ?? {}, name);
     const root = getProjectRoot();
+    if (!root) {
+      return { error: "Aucun workspace ouvert pour effectuer un audit de sécurité." };
+    }
     const auditStartedAt = Date.now();
 
     const { files: candidateFiles, skipped } = collectFiles(root);

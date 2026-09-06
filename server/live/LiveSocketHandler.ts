@@ -391,6 +391,8 @@ export function attachLiveWebSocket(
         'create_rich_document',
         // Custom skills — toujours disponibles (Tier 1)
         'list_custom_skills', 'create_custom_skill', 'update_custom_skill', 'delete_custom_skill', 'toggle_custom_skill',
+        // Project scaffolding — création de nouveau projet
+        'project_scaffold', 'project_list_frameworks',
       ]);
 
       const ASK_MODE_ALLOWED_TOOLS = new Set([

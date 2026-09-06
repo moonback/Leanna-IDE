@@ -31,6 +31,7 @@ export interface SandboxWriteTarget {
  * ne sert qu'à appliquer les politiques de fichiers critiques/interdits.
  */
 export function resolveSandboxWriteTarget(target: string): SandboxWriteTarget | null {
+  if (!getProjectRoot()) return null;
   try {
     const sandboxPath = assertSandboxReady(target);
     const sandboxRoot = fs.realpathSync(getSandboxRoot());
@@ -47,9 +48,12 @@ export function resolveSandboxWriteTarget(target: string): SandboxWriteTarget | 
  * Résout un chemin de lecture dans le workspace actif (sandbox si actif).
  * À la différence des écritures, la racine `.` est valide : les outils de
  * découverte et de recherche doivent pouvoir explorer le projet entier.
+ * Retourne null si aucun workspace n'est actuellement ouvert.
  */
 export function normalizeProjectPath(target: string): string | null {
   if (typeof target !== "string" || !target.trim()) return null;
+  const root = getProjectRoot();
+  if (!root) return null;
   const requestedPath = target.trim();
   if (
     path.isAbsolute(requestedPath)
@@ -61,9 +65,9 @@ export function normalizeProjectPath(target: string): string | null {
     return null;
   }
 
-  const root = path.resolve(getProjectRoot());
-  const candidate = path.resolve(root, requestedPath);
-  const relative = path.relative(root, candidate);
+  const resolvedRoot = path.resolve(root);
+  const candidate = path.resolve(resolvedRoot, requestedPath);
+  const relative = path.relative(resolvedRoot, candidate);
   if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
     return null;
   }
@@ -75,6 +79,10 @@ export function normalizeProjectPath(target: string): string | null {
  * assertSandboxReady(), sans fallback vers SELF_ROOT.
  */
 export function resolveWritePath(relativePath: string): string | null {
+  if (!getProjectRoot()) {
+    console.warn("[resolveWritePath] Écriture refusée : aucun workspace ouvert.");
+    return null;
+  }
   const target = resolveSandboxWriteTarget(relativePath);
   if (!target) {
     console.warn("[resolveWritePath] Écriture refusée : sandbox indisponible ou chemin invalide.");
@@ -85,6 +93,13 @@ export function resolveWritePath(relativePath: string): string | null {
 
 export function checkWorkspace(): { exists: boolean; path: string; message: string } {
   const root = getProjectRoot();
+  if (!root) {
+    return {
+      exists: false,
+      path: "",
+      message: "Aucun workspace ouvert (mode sans projet).",
+    };
+  }
   const exists = fs.existsSync(root);
   return {
     exists,

@@ -148,18 +148,45 @@ export class SystemPromptBuilder {
       }
     }
 
-    // 7. Sections additionnelles (extensibilité) — les deux modes
+    // 7. Contexte du Workspace (projet actif vs mode sans projet)
+    sections.push(this.buildWorkspaceSection(config.workspace));
+
+    // 8. Sections additionnelles (extensibilité) — les deux modes
     if (config.extraSections) {
       for (const section of config.extraSections) {
         sections.push(section.content);
       }
     }
 
-    // 8. Instructions de langue et style
+    // 9. Instructions de langue et style
     const footer = this.buildFooter(config);
     if (footer) sections.push(footer);
 
     return sections.filter(Boolean).join("\n\n");
+  }
+
+  /**
+   * Construit la section d'instructions relative à l'état du workspace.
+   */
+  private buildWorkspaceSection(workspace?: string): string {
+    const trimmed = workspace?.trim();
+    if (trimmed) {
+      return [
+        "## Workspace Projet Actif",
+        `Le dossier du projet sur lequel tu travailles actuellement est : \`${trimmed}\`.`,
+        "Toutes les opérations de lecture, recherche et modification de fichiers s'appliquent à ce projet.",
+      ].join("\n");
+    }
+
+    return [
+      "## Mode Sans Projet Ouvert",
+      "Actuellement, AUCUN workspace (projet de code) n'est ouvert dans Leanna.",
+      "- C'est un état normal et prévu : l'utilisateur utilise l'application pour de la discussion générale, du conseil, de l'assistance, de la conception ou de la recherche web.",
+      "- Ne tente PAS d'appeler des outils d'inspection ou de manipulation de fichiers de projet (ex: get_workspace_info, list_project_files, read_project_file, search_in_files, etc.) car aucun projet n'est actif.",
+      "- Ne signale JAMAIS d'erreur technique de workspace ou de problème d'ouverture de workspace : réponds simplement et directement aux questions de l'utilisateur.",
+      "- Si l'utilisateur exprime le souhait de créer un nouveau projet, tu peux lui proposer d'utiliser l'outil `project_scaffold` pour générer un projet React/Vite/Next.js.",
+      "- Si l'utilisateur demande à travailler sur du code existant, rappelle-lui gentiment qu'il peut sélectionner son dossier de projet via le sélecteur de workspace dans l'interface.",
+    ].join("\n");
   }
 
   /**

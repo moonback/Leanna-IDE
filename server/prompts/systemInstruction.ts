@@ -44,6 +44,7 @@ export function buildSystemInstruction(profile: ProfileConfig = {}): string {
     compact: profile.compactPrompt,
     mode: profile.mode,
     agents: profile.agents,
+    workspace: profile.workspace,
     extraSections,
   };
 

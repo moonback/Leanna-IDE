@@ -154,6 +154,8 @@ export interface SystemPromptConfig {
   excludeSections?: string[];
   /** Sections additionnelles à inclure */
   extraSections?: Array<{ id: string; content: string }>;
+  /** Racine du workspace projet actif (vide ou non défini si aucun projet ouvert) */
+  workspace?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -55,6 +55,9 @@ async function analyzeCodebaseWithOpenRouter(codebaseMarkdown: string): Promise<
 // ─── Reader Handlers ──────────────────────────────────────────────────────────
 
 export async function handleGenerateCodebaseMarkdown(args: any) {
+  if (!getProjectRoot()) {
+    return { error: "Aucun workspace ouvert. Sélectionnez ou créez un projet d'abord." };
+  }
   const codebasePath = resolveWritePath("codebase.md");
   if (!codebasePath) {
     return { error: "Sandbox indisponible : génération de codebase.md refusée tant que le sandbox n'est pas READY." };
@@ -122,6 +125,9 @@ export async function handleGenerateCodebaseMarkdown(args: any) {
 }
 
 export async function handleListProjectFiles(args: any) {
+  if (!getProjectRoot()) {
+    return { error: "Aucun workspace ouvert. Sélectionnez ou créez un projet d'abord." };
+  }
   const dirPath = String(args.path || ".").trim();
   const recursive = args.recursive === true;
   const includeStats = args.includeStats === true;
@@ -199,6 +205,9 @@ export async function handleListProjectFiles(args: any) {
 }
 
 export async function handleReadProjectFile(args: any) {
+  if (!getProjectRoot()) {
+    return { error: "Aucun workspace ouvert. Sélectionnez ou créez un projet d'abord." };
+  }
   const requestedPath = String(args.path || "").trim();
   if (!requestedPath) return { error: "Le chemin de fichier est requis." };
   const normalized = normalizeProjectPath(requestedPath);
@@ -275,6 +284,9 @@ export async function handleReadProjectFile(args: any) {
 }
 
 export async function handleReadFileOutline(args: any) {
+  if (!getProjectRoot()) {
+    return { error: "Aucun workspace ouvert. Sélectionnez ou créez un projet d'abord." };
+  }
   const requestedPath = String(args.path || "").trim();
   if (!requestedPath) return { error: "Le chemin de fichier est requis." };
   const normalized = normalizeProjectPath(requestedPath);
@@ -299,6 +311,9 @@ export async function handleReadFileOutline(args: any) {
 }
 
 export async function handleSearchInFiles(args: any) {
+  if (!getProjectRoot()) {
+    return { error: "Aucun workspace ouvert. Sélectionnez ou créez un projet d'abord." };
+  }
   const query = String(args.query || "").trim();
   if (!query) return { error: "Le terme de recherche est requis." };
   const searchPath = String(args.path || ".").trim();
@@ -408,6 +423,9 @@ export async function handleSearchInFiles(args: any) {
 }
 
 export async function handleAnalyzeProjectFile(args: any, toolContext: any) {
+  if (!getProjectRoot()) {
+    return { error: "Aucun workspace ouvert. Sélectionnez ou créez un projet d'abord." };
+  }
   const requestedPath = String(args.path || "").trim();
   if (!requestedPath) return { error: "Le chemin de fichier est requis." };
   const normalized = normalizeProjectPath(requestedPath);
@@ -431,16 +449,27 @@ export async function handleAnalyzeProjectFile(args: any, toolContext: any) {
 }
 
 export async function handleGetWorkspaceInfo() {
+  const root = getProjectRoot();
+  if (!root) {
+    return {
+      status: "no_workspace",
+      workspace: null,
+      exists: false,
+      detectedConfigFiles: [],
+      message: "Aucun workspace ouvert. L'application est actuellement en mode sans projet.",
+    };
+  }
   const configFiles = ["package.json", "tsconfig.json", ".env", "vite.config.ts", "vite.config.js", "next.config.js", "README.md"];
   const detected: string[] = [];
   for (const f of configFiles) {
-    if (fs.existsSync(path.join(getProjectRoot(), f))) detected.push(f);
+    if (fs.existsSync(path.join(root, f))) detected.push(f);
   }
+  const wsCheck = checkWorkspace();
   return {
     status: "success",
-    workspace: getProjectRoot(),
-    exists: checkWorkspace().exists,
+    workspace: root,
+    exists: wsCheck.exists,
     detectedConfigFiles: detected,
-    message: checkWorkspace().message,
+    message: wsCheck.message,
   };
 }
