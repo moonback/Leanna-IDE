@@ -1,15 +1,13 @@
 import { Skill } from "./base.js";
 import fs from "fs";
-import { generateText, getActiveProvider } from "../utils/textGeneration.js";
-import { generateSpeech } from "../utils/geminiTTS.js";
+import { generateText, generateTextStream, getActiveProvider, type GenerateTextResult } from "../utils/textGeneration.js";
 import { ChainOfThoughtExecutor, assessComplexity, type ComplexityLevel } from "./chainOfThought.js";
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
-// Anti-doublon pour l'annonce vocale TTS (évite les répétitions si reasoning_think est appelé en boucle)
-let _lastTTSAnnouncementTime = 0;
-const TTS_ANNOUNCEMENT_COOLDOWN_MS = 30_000; // 30s minimum entre deux annonces (valeur par défaut, surchargeable via context.ttsCooldownMs)
-const TTS_MAX_CHARS = 220; // Longueur max de l'annonce envoyée au TTS, pour éviter des synthèses trop longues
+const ANNOUNCEMENT_MAX_CHARS = 220;
+const REASONING_CACHE_TTL_MS = 60_000;
+const reasoningCache = new Map<string, { expiresAt: number; result: GenerateTextResult }>();
 
 import { getProjectRoot, normalizeProjectPath } from "./codebaseHelpers.js";
 
@@ -17,6 +15,89 @@ function parseReasoningListCommand(command: unknown): string | null {
   if (typeof command !== "string") return null;
   const match = /^(?:dir|ls)(?:\s+(.+?))?\s*$/i.exec(command);
   return match ? (match[1]?.trim() || "") : null;
+}
+
+function reasoningCacheKey(strategy: string, prompt: string): string {
+  return `${strategy}:${prompt.trim().replace(/\s+/g, " ").toLowerCase()}`;
+}
+
+function reasoningBudget(complexity: ComplexityLevel): { thinkingBudget: number; maxOutputTokens: number } {
+  if (complexity === "critical") return { thinkingBudget: 8_192, maxOutputTokens: 16_384 };
+  if (complexity === "complex") return { thinkingBudget: 4_096, maxOutputTokens: 12_288 };
+  if (complexity === "moderate") return { thinkingBudget: 2_048, maxOutputTokens: 8_192 };
+  return { thinkingBudget: 512, maxOutputTokens: 4_096 };
+}
+
+async function generateWithProviderFallback(options: Parameters<typeof generateText>[0]): Promise<GenerateTextResult> {
+  try {
+    return await generateText(options);
+  } catch (primaryError) {
+    const fallbackProvider = getActiveProvider() === "gemini" ? "openrouter" : "gemini";
+    try {
+      return await generateText({ ...options, forceProvider: fallbackProvider });
+    } catch (fallbackError) {
+      throw new Error(
+        `Provider principal indisponible (${(primaryError as Error).message}); fallback échoué (${(fallbackError as Error).message})`
+      );
+    }
+  }
+}
+
+function extractConfidence(text: string): "low" | "medium" | "high" | null {
+  const match = /(?:niveau de confiance|confidence level)\s*[:\-]?\s*(élev[ée]e?|high|moyenne?|medium|faible|low)/i.exec(text);
+  if (!match) return null;
+  const value = match[1].toLowerCase();
+  if (/faible|low/.test(value)) return "low";
+  if (/moyenne?|medium/.test(value)) return "medium";
+  return "high";
+}
+
+function parseWinner(text: string): number {
+  const jsonWinner = /"winner"\s*:\s*([1-3])/i.exec(text);
+  const labelledWinner = /(?:winner|gagnante?|retenue)\s*[:#]?\s*(?:approach|approche|branch|branche)?\s*([1-3])/i.exec(text);
+  const winner = jsonWinner?.[1] || labelledWinner?.[1];
+  return winner ? Number(winner) : 1;
+}
+
+async function runTreeOfThought(prompt: string, budget: ReturnType<typeof reasoningBudget>): Promise<GenerateTextResult & { evaluation: string; winner: number }> {
+  const temperatures = [0.3, 0.7, 1.0];
+  const branchPrompt = (index: number) =>
+    `Tu es la branche ${index} d'une exploration indépendante. Génère UNE approche complète et distincte pour résoudre le problème ci-dessous. Ne compare pas d'autres branches, ne justifie pas leur absence et termine par un plan exécutable.\n\nPROBLÈME :\n${prompt}`;
+  const branches = await Promise.all(
+    temperatures.map((temperature, index) =>
+      generateWithProviderFallback({
+        prompt: branchPrompt(index + 1),
+        systemPrompt: THINKING_STRATEGIES.tree_of_thought.systemPrompt,
+        temperature,
+        ...budget,
+      })
+    )
+  );
+  const evaluation = await generateWithProviderFallback({
+    prompt: `Évalue ces trois approches indépendantes. Réponds d'abord en JSON strict {"winner":1|2|3,"reasoning":"..."}, puis explique brièvement le choix. Note faisabilité, risques, complexité et réversibilité.\n\nAPPROCHE 1:\n${branches[0].text}\n\nAPPROCHE 2:\n${branches[1].text}\n\nAPPROCHE 3:\n${branches[2].text}`,
+    systemPrompt: "Tu es un évaluateur indépendant et exigeant. Sélectionne la meilleure approche, sans réécrire les branches.",
+    temperature: 0.2,
+    ...budget,
+  });
+  const winner = parseWinner(evaluation.text);
+  return { ...branches[winner - 1], evaluation: evaluation.text, winner };
+}
+
+async function runSelfCritique(prompt: string, initial: GenerateTextResult, budget: ReturnType<typeof reasoningBudget>): Promise<GenerateTextResult> {
+  const critiqueProvider = getActiveProvider() === "gemini" ? "openrouter" : "gemini";
+  const critique = await generateWithProviderFallback({
+    prompt: `Critique indépendamment la solution suivante. Identifie les erreurs factuelles, hypothèses non vérifiées, cas limites et omissions. Ne propose pas encore de réécriture.\n\nPROBLÈME :\n${prompt}\n\nSOLUTION :\n${initial.text}`,
+    systemPrompt: "Tu es un réviseur indépendant, sceptique et précis.",
+    temperature: 0.4,
+    forceProvider: critiqueProvider,
+    ...budget,
+  });
+  return generateWithProviderFallback({
+    prompt: `Corrige la solution à partir de la critique indépendante. Retourne uniquement la solution finale complète, avec un niveau de confiance explicite.\n\nPROBLÈME :\n${prompt}\n\nSOLUTION INITIALE :\n${initial.text}\n\nCRITIQUE :\n${critique.text}`,
+    systemPrompt: "Tu es un expert chargé de produire la version corrigée et directement exploitable.",
+    temperature: 0.3,
+    ...budget,
+  });
 }
 
 // ─── Thinking Strategies ────────────────────────────────────────────────────
@@ -495,57 +576,57 @@ const MIN_SCORE_THRESHOLD = 1;
 
 const STRATEGY_PATTERNS: Record<Exclude<ThinkingStrategy, "auto">, StrategyPattern[]> = {
   comparative_analysis: [
-    { regex: /compar(er|aison|atif|ative)/i, weight: 2 },
-    { regex: /croiser|différence(s)?.*entre|divergence|version.*(précédente|antérieure|actuelle)/i, weight: 2 },
+    { regex: /compar(er|aison|atif|ative)|compar(e|ison|ative)/i, weight: 2 },
+    { regex: /croiser|différence(s)?.*entre|divergence|version.*(précédente|antérieure|actuelle)|cross[- ]?check|difference(s)?.*between|divergence|previous version|current version/i, weight: 2 },
     { regex: /\bvs\b|versus/i, weight: 2 },
-    { regex: /entre.*(document|version|source|fichier)/i, weight: 1.5 },
-    { regex: /réconcili|fusionner.*version|merge.*document/i, weight: 2 },
-    { regex: /écart(s)?.*entre|delta\b/i, weight: 1.5 },
+    { regex: /entre.*(document|version|source|fichier)|between.*(document|version|source|file)/i, weight: 1.5 },
+    { regex: /réconcili|fusionner.*version|merge.*document|reconcile|merge.*version|compare sources/i, weight: 2 },
+    { regex: /écart(s)?.*entre|delta\b|gap(s)?.*between/i, weight: 1.5 },
   ],
 
   root_cause_analysis: [
-    { regex: /cause (racine|profonde|première)/i, weight: 2.5 },
+    { regex: /cause (racine|profonde|première)|root cause|underlying cause/i, weight: 2.5 },
     { regex: /root cause/i, weight: 2.5 },
-    { regex: /5 pourquoi|5 whys|five whys/i, weight: 2.5 },
-    { regex: /pourquoi.*(arrive|se produit|survient|persiste|revient)/i, weight: 2 },
-    { regex: /diagnostiquer|diagnostic.*(panne|incident|défaillance)/i, weight: 2 },
-    { regex: /origine du problème|à l'origine de/i, weight: 1.5 },
-    { regex: /panne récurrente|bug récurrent|incident récurrent|dysfonctionnement/i, weight: 1.5 },
+    { regex: /5 pourquoi|5 whys|five whys|why does.*happen/i, weight: 2.5 },
+    { regex: /pourquoi.*(arrive|se produit|survient|persiste|revient)|why.*(happen|occur|persist|recur)/i, weight: 2 },
+    { regex: /diagnostiquer|diagnostic.*(panne|incident|défaillance)|diagnos(e|is)|troubleshoot/i, weight: 2 },
+    { regex: /origine du problème|à l'origine de|problem origin|source of the problem/i, weight: 1.5 },
+    { regex: /panne récurrente|bug récurrent|incident récurrent|dysfonctionnement|recurring (failure|bug|incident)|system failure/i, weight: 1.5 },
   ],
 
   document_analysis: [
-    { regex: /résum(é|er)|synth(è|é)s(e|er)|condenser|point(s)?.?clé(s)?|idée(s)?.?clé(s)?/i, weight: 1.5 },
-    { regex: /extraire|extraction|identifier.*information|repérer.*dans|inventorier/i, weight: 1.5 },
-    { regex: /relire|relecture|proofreading|réviser.*document|corriger.*texte/i, weight: 1.5 },
-    { regex: /conformit(é)?|audit|norme|iso\s?\d|check.?list|réglementaire/i, weight: 1.5 },
-    { regex: /annoter|annotation|marge|feedback.*document/i, weight: 1.5 },
-    { regex: /classif|catégoris|trier.*document|ranger|taxon|étiqueter/i, weight: 1.5 },
-    { regex: /analyser.*document|analyse.*contenu|examen.*texte|diagnostic.*document/i, weight: 2 },
+    { regex: /résum(é|er)|synth(è|é)s(e|er)|condenser|point(s)?.?clé(s)?|idée(s)?.?clé(s)?|summar(y|ize|ise)|key point(s)?|executive summary/i, weight: 1.5 },
+    { regex: /extraire|extraction|identifier.*information|repérer.*dans|inventorier|extract|extraction|identify.*information|list.*from/i, weight: 1.5 },
+    { regex: /relire|relecture|proofreading|réviser.*document|corriger.*texte|proofread|review.*document|edit.*text/i, weight: 1.5 },
+    { regex: /conformit(é)?|audit|norme|iso\s?\d|check.?list|réglementaire|compliance|regulatory|standard/i, weight: 1.5 },
+    { regex: /annoter|annotation|marge|feedback.*document|annotate|margin note|document feedback/i, weight: 1.5 },
+    { regex: /classif|catégoris|trier.*document|ranger|taxon|étiqueter|classif(y|ication)|categorize|sort.*document|tag/i, weight: 1.5 },
+    { regex: /analyser.*document|analyse.*contenu|examen.*texte|diagnostic.*document|analy[sz]e.*document|content analysis|examine.*text/i, weight: 2 },
     { regex: /table des matières|sommaire.*générer|index.*document/i, weight: 1.5 },
     { regex: /cohérence.*document|qualité.*rédaction|lisibilité/i, weight: 1.5 },
     { regex: /fiche.*lecture|note.*synthèse|abstract|executive.?summary/i, weight: 1.5 },
   ],
 
   decomposition: [
-    { regex: /complexe/i, weight: 1 },
-    { regex: /dossier/i, weight: 1 },
-    { regex: /rapport/i, weight: 0.75 },
-    { regex: /plusieurs parties/i, weight: 1.5 },
-    { regex: /multi-étapes/i, weight: 1.5 },
-    { regex: /structurer/i, weight: 1 },
-    { regex: /organiser/i, weight: 1 },
+    { regex: /complexe|complex/i, weight: 1 },
+    { regex: /dossier|case file/i, weight: 1 },
+    { regex: /rapport|report/i, weight: 0.75 },
+    { regex: /plusieurs parties|multiple parts|several sections/i, weight: 1.5 },
+    { regex: /multi-étapes|multi[- ]step/i, weight: 1.5 },
+    { regex: /structurer|structure/i, weight: 1 },
+    { regex: /organiser|organize|reorganize/i, weight: 1 },
     { regex: /plan\b(?!.*d'action.*simple)/i, weight: 1 },
     { regex: /restructur|réorganis|refonte/i, weight: 1.5 },
   ],
 
   analogical: [
-    { regex: /comme|similaire|analogie|comparable|ressemble/i, weight: 1 },
-    { regex: /modèle de document|template|s'inspirer de|à la manière de/i, weight: 1.5 },
+    { regex: /comme|similaire|analogie|comparable|ressemble|similar|analogy|comparable|resembles/i, weight: 1 },
+    { regex: /modèle de document|template|s'inspirer de|à la manière de|inspired by|like a|document model/i, weight: 1.5 },
   ],
 
   first_principles: [
-    { regex: /fondamental|principes|repenser/i, weight: 1 },
-    { regex: /depuis zéro|from scratch|repartir de la base/i, weight: 1.5 },
+    { regex: /fondamental|principes|repenser|fundamental|principles|rethink/i, weight: 1 },
+    { regex: /depuis zéro|from scratch|repartir de la base|start from the ground up/i, weight: 1.5 },
     // "pourquoi" seul est un signal faible ici : les formulations fortes de
     // recherche de cause (bug, panne, incident...) sont captées avec un poids
     // bien plus élevé par root_cause_analysis, qui l'emportera dans ces cas.
@@ -553,19 +634,19 @@ const STRATEGY_PATTERNS: Record<Exclude<ThinkingStrategy, "auto">, StrategyPatte
   ],
 
   self_critique: [
-    { regex: /vérifier|critiquer|robuste|fiable/i, weight: 1 },
-    { regex: /cas limite|valider|contre-vérifier|double check/i, weight: 1 },
+    { regex: /vérifier|critiquer|robuste|fiable|verify|criticize|robust|reliable/i, weight: 1 },
+    { regex: /cas limite|valider|contre-vérifier|double check|edge case|validate|cross-check/i, weight: 1 },
     { regex: /\brelire\b/i, weight: 0.5 },
   ],
 
   tree_of_thought: [
-    { regex: /enjeu (majeur|critique|stratégique)/i, weight: 2 },
-    { regex: /décision (stratégique|irréversible)/i, weight: 2 },
-    { regex: /irréversible|à fort enjeu|risque élevé/i, weight: 1.5 },
+    { regex: /enjeu (majeur|critique|stratégique)|major|critical|strategic stake/i, weight: 2 },
+    { regex: /décision (stratégique|irréversible)|strategic|irreversible decision/i, weight: 2 },
+    { regex: /irréversible|à fort enjeu|risque élevé|high[- ]stakes|high risk|irreversible/i, weight: 1.5 },
   ],
 
   chain_of_thought: [
-    { regex: /étape par étape|pas à pas|step by step/i, weight: 1.5 },
+    { regex: /étape par étape|pas à pas|step by step|walk me through/i, weight: 1.5 },
   ],
 };
 
@@ -789,8 +870,7 @@ export const reasoningSkill: Skill = {
       // raisonnement démarre, AVANT de lancer quoi que ce soit (CoT ou LLM
       // principal). La voix (TTS), elle, est volontairement plus sélective :
       // - jamais pour une complexité "simple" (pas besoin de prévenir pour peu)
-      // - respect d'un cooldown (configurable via context.ttsCooldownMs)
-      // - texte tronqué pour éviter des synthèses trop longues
+      // - texte tronqué pour rester lisible dans l'interface
       const reasonLabel = config.label;
       const complexityLabels: Record<string, string> = {
         simple: "simple",
@@ -801,8 +881,8 @@ export const reasoningSkill: Skill = {
       const complexityText = complexityLabels[complexity] || complexity;
       const reasonExplanation = buildReasoningExplanation(prompt, chosenStrategy, complexity);
       let announcementText = `J'active mon raisonnement ${reasonLabel}, la tâche est ${complexityText}. ${reasonExplanation}`;
-      if (announcementText.length > TTS_MAX_CHARS) {
-        announcementText = announcementText.slice(0, TTS_MAX_CHARS - 1).trimEnd() + "…";
+      if (announcementText.length > ANNOUNCEMENT_MAX_CHARS) {
+        announcementText = announcementText.slice(0, ANNOUNCEMENT_MAX_CHARS - 1).trimEnd() + "…";
       }
 
       // 1. Émettre l'état reasoning + texte d'annonce au frontend IMMÉDIATEMENT
@@ -817,36 +897,6 @@ export const reasoningSkill: Skill = {
             announcement: announcementText,
           },
         });
-      }
-
-      // 2. TTS audio — fire-and-forget pour ne pas bloquer le raisonnement.
-      //    On mémorise localement (didSpeakStart) si CETTE invocation a
-      //    déclenché la voix, plutôt que de relire le timestamp global au
-      //    moment de l'annonce de fin : en cas d'appels concurrents, relire
-      //    _lastTTSAnnouncementTime pourrait refléter le cooldown d'un AUTRE
-      //    appel et faire parler/taire la mauvaise invocation.
-      const cooldownMs = context?.ttsCooldownMs ?? TTS_ANNOUNCEMENT_COOLDOWN_MS;
-      const ttsEnabled = context?.reasoningVoiceEnabled !== false;
-      const now = Date.now();
-      const shouldSpeak =
-        ttsEnabled &&
-        complexity !== "simple" && // pas d'annonce vocale pour les tâches triviales
-        now - _lastTTSAnnouncementTime > cooldownMs;
-      let didSpeakStart = false;
-
-      if (context?.emitToClient && shouldSpeak) {
-        _lastTTSAnnouncementTime = now;
-        didSpeakStart = true;
-        generateSpeech(announcementText, { voiceName: context.voiceName || "Aoede" })
-          .then((audioBase64) => {
-            if (audioBase64 && context.emitToClient) {
-              context.emitToClient({ audio: audioBase64 });
-            }
-          })
-          .catch((ttsErr) => {
-            // TTS échouée — pas grave, l'annonce texte est déjà envoyée
-            console.warn(`[ReasoningSkill] TTS annonce échouée (non bloquant): ${(ttsErr as Error).message}`);
-          });
       }
 
       let cotContext = "";
@@ -892,25 +942,81 @@ export const reasoningSkill: Skill = {
       const fullPrompt = buildThinkingPrompt(chosenStrategy, enrichedPrompt);
 
       try {
-        const response = await generateText({
-          prompt: fullPrompt,
-          systemPrompt: config.systemPrompt,
-          temperature: 0.3,
-        });
+        const budget = reasoningBudget(complexity);
+        const cacheKey = reasoningCacheKey(chosenStrategy, fullPrompt);
+        const cached = reasoningCache.get(cacheKey);
+        let response: GenerateTextResult;
+        let treeEvaluation: string | undefined;
+        let treeWinner: number | undefined;
+        let confidenceReview = false;
+
+        if (cached && cached.expiresAt > Date.now()) {
+          response = cached.result;
+          context?.emitToClient?.({ reasoning: { chunk: response.text, cached: true } });
+        } else {
+          if (cached) reasoningCache.delete(cacheKey);
+
+          if (chosenStrategy === "tree_of_thought") {
+            const treeResult = await runTreeOfThought(enrichedPrompt, budget);
+            response = treeResult;
+            treeEvaluation = treeResult.evaluation;
+            treeWinner = treeResult.winner;
+          } else {
+            const shouldStream = chosenStrategy === "document_analysis" || chosenStrategy === "comparative_analysis";
+            if (shouldStream) {
+              try {
+                let streamedText = "";
+                streamedText = await generateTextStream({
+                  prompt: fullPrompt,
+                  systemPrompt: config.systemPrompt,
+                  temperature: 0.3,
+                  ...budget,
+                  onChunk: (chunk) => context?.emitToClient?.({ reasoning: { chunk } }),
+                });
+                response = {
+                  text: streamedText,
+                  provider: getActiveProvider(),
+                  model: getActiveProvider() === "gemini" ? "gemini-2.5-flash" : "openrouter",
+                };
+              } catch {
+                response = await generateWithProviderFallback({
+                  prompt: fullPrompt,
+                  systemPrompt: config.systemPrompt,
+                  temperature: 0.3,
+                  ...budget,
+                });
+              }
+            } else {
+              response = await generateWithProviderFallback({
+                prompt: fullPrompt,
+                systemPrompt: config.systemPrompt,
+                temperature: 0.3,
+                ...budget,
+              });
+            }
+
+            if (chosenStrategy === "self_critique") {
+              response = await runSelfCritique(enrichedPrompt, response, budget);
+            }
+          }
+
+          // Une confiance faible sur une tâche complexe justifie une vraie seconde passe.
+          const confidence = extractConfidence(response.text);
+          if (chosenStrategy !== "self_critique" && (confidence === "low" || confidence === "medium") && (complexity === "complex" || complexity === "critical")) {
+            confidenceReview = true;
+            response = await runSelfCritique(enrichedPrompt, response, budget);
+          }
+
+          reasoningCache.set(cacheKey, { expiresAt: Date.now() + REASONING_CACHE_TTL_MS, result: response });
+          if (reasoningCache.size > 50) {
+            const oldestKey = reasoningCache.keys().next().value;
+            if (oldestKey) reasoningCache.delete(oldestKey);
+          }
+        }
 
         // Notify frontend that reasoning is done
         if (context?.emitToClient) {
           context.emitToClient({ reasoning: { active: false } });
-          // Annonce vocale de fin uniquement si CETTE invocation a parlé au début.
-          if (didSpeakStart) {
-            generateSpeech("Mon raisonnement est terminé, je passe à l'action.", { voiceName: context.voiceName || "Aoede" })
-              .then((audioBase64) => {
-                if (audioBase64 && context.emitToClient) {
-                  context.emitToClient({ audio: audioBase64 });
-                }
-              })
-              .catch(() => { /* Non bloquant */ });
-          }
         }
 
         return {
@@ -923,6 +1029,9 @@ export const reasoningSkill: Skill = {
           metadata: {
             auto_selected: !requestedStrategy || requestedStrategy === "auto",
             cot_preprocessing: shouldRunCoT && cotDecomposition.length > 0,
+            cache_hit: Boolean(cached && cached.expiresAt > Date.now()),
+            confidence_review: confidenceReview,
+            ...(treeWinner ? { tree_winner: treeWinner, tree_evaluation: treeEvaluation } : {}),
             model: response.model,
             provider: response.provider,
           },

@@ -288,7 +288,7 @@ const FileList = memo(function FileList({
 }) {
   return (
     <div
-      className="w-64 flex-shrink-0 overflow-y-auto custom-scrollbar"
+      className="w-64 flex-shrink-0 overflow-y-auto custom-scrollbar lg:w-72"
       style={{ borderRight: '1px solid var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
     >
       {loading ? (
@@ -334,6 +334,12 @@ const FileList = memo(function FileList({
                     {file.path}
                   </span>
                 </div>
+                <span
+                  className="hidden shrink-0 text-[10px] font-medium uppercase tracking-wide sm:block"
+                  style={{ color: iconColor }}
+                >
+                  {file.status === 'added' ? 'Ajouté' : file.status === 'deleted' ? 'Supprimé' : 'Modifié'}
+                </span>
                 {isSelected && <ChevronRight size={11} style={{ color: 'var(--text-dimmed)' }} />}
               </button>
             );
@@ -449,14 +455,13 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
           body: JSON.stringify({ path: filePath }),
         });
         const data = await res.json();
-        if (data.status === 'success') {
+        if (res.ok && data.status === 'success' && data.applied === true) {
           setFeedback({ type: 'success', msg: `${filePath.split('/').pop()} appliqué au projet` });
-          setFiles((prev) => prev.filter((f) => f.path !== filePath));
-          const remaining = files.filter((f) => f.path !== filePath);
-          setSelectedFile(remaining.length > 0 ? remaining[0].path : null);
+          setSelectedFile(null);
           window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+          await loadDiffs();
         } else {
-          setFeedback({ type: 'error', msg: 'Fichier introuvable dans le sandbox' });
+          setFeedback({ type: 'error', msg: data.error || 'Le fichier n’a pas pu être appliqué' });
         }
       } catch {
         setFeedback({ type: 'error', msg: 'Erreur réseau' });
@@ -464,7 +469,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
         setActionBusy(null);
       }
     },
-    [files]
+    [loadDiffs]
   );
 
   const handleRejectFile = useCallback(
@@ -478,14 +483,13 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
           body: JSON.stringify({ path: filePath }),
         });
         const data = await res.json();
-        if (data.status === 'success') {
+        if (res.ok && data.status === 'success' && data.reverted === true) {
           setFeedback({ type: 'success', msg: `${filePath.split('/').pop()} rejeté` });
-          setFiles((prev) => prev.filter((f) => f.path !== filePath));
-          const remaining = files.filter((f) => f.path !== filePath);
-          setSelectedFile(remaining.length > 0 ? remaining[0].path : null);
+          setSelectedFile(null);
           window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+          await loadDiffs();
         } else {
-          setFeedback({ type: 'error', msg: 'Fichier introuvable' });
+          setFeedback({ type: 'error', msg: data.error || 'Le fichier n’a pas pu être rejeté' });
         }
       } catch {
         setFeedback({ type: 'error', msg: 'Erreur réseau' });
@@ -493,7 +497,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
         setActionBusy(null);
       }
     },
-    [files]
+    [loadDiffs]
   );
 
   // ─── Accept / Reject ALL ──────────────────────────────────────────────────
@@ -812,12 +816,12 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
     >
       {/* ─── Header ────────────────────────────────────────────────────────── */}
       <div
-        className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+        className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 flex-shrink-0"
         style={{ borderBottom: '1px solid var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
       >
-        <div className="flex items-center gap-3">
-          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Modifications Sandbox
+        <div className="flex min-w-0 items-center gap-3">
+          <h2 className="truncate text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+            {embedded ? 'Comparer les modifications' : 'Modifications Sandbox'}
           </h2>
           <span
             className="text-sm font-medium rounded-full px-2.5 py-0.5"
@@ -827,7 +831,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {/* Mode toggle */}
           <button
             onClick={() => setDiffMode((prev) => (prev === 'side-by-side' ? 'unified' : 'side-by-side'))}
@@ -877,7 +881,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
               }}
               title="Accepter toutes les modifications"
             >
-              <CheckCheck size={12} /> Tout accepter
+              <CheckCheck size={12} /> <span className="hidden sm:inline">Tout accepter</span>
             </button>
           )}
           {files.length > 1 && (
@@ -892,7 +896,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
               }}
               title="Rejeter toutes les modifications"
             >
-              <XCircle size={12} /> Tout rejeter
+              <XCircle size={12} /> <span className="hidden sm:inline">Tout rejeter</span>
             </button>
           )}
 

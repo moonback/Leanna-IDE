@@ -75,6 +75,7 @@ export const StatusBar = memo(function StatusBar({
   
   const [mcpStatus, setMcpStatus] = useState<'ok' | 'error' | 'loading'>('loading');
   const [sandboxActive, setSandboxActive] = useState(false);
+  const [sandboxModifiedCount, setSandboxModifiedCount] = useState(0);
 
   // ── Agent activity ─────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ export const StatusBar = memo(function StatusBar({
     liveActivities.filter(a => a.status === 'running').length;
 
   const modifierKey = getModifierKey();
-  const sandboxLabel = sandboxActive ? 'Sandbox' : 'Sandbox';
+  const sandboxLabel = 'Sandbox';
 
   // ── MCP ────────────────────────────────────────────────────────────────────
 
@@ -128,16 +129,24 @@ export const StatusBar = memo(function StatusBar({
         const data = await res.json();
         if (!cancelled && data.status === 'success') {
           setSandboxActive(data.sandbox?.active ?? false);
+          setSandboxModifiedCount(data.sandbox?.modifiedCount ?? 0);
         }
       } catch {
         /* silent */
       }
     };
+    const handleSandboxChanged = () => { fetchSandbox(); };
     fetchSandbox();
     const interval = setInterval(fetchSandbox, 5000);
+    window.addEventListener('Leanna-sandbox-changed', handleSandboxChanged);
+    window.addEventListener('Leanna-sandbox-file-changed', handleSandboxChanged);
+    window.addEventListener('Leanna-sandbox-file-deleted', handleSandboxChanged);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      window.removeEventListener('Leanna-sandbox-changed', handleSandboxChanged);
+      window.removeEventListener('Leanna-sandbox-file-changed', handleSandboxChanged);
+      window.removeEventListener('Leanna-sandbox-file-deleted', handleSandboxChanged);
     };
   }, []);
 
@@ -331,6 +340,18 @@ export const StatusBar = memo(function StatusBar({
             <span style={{ color: sandboxActive ? 'var(--color-success)' : 'var(--text-muted)' }} className="font-medium">
               {sandboxLabel}
             </span>
+            {sandboxModifiedCount > 0 && (
+              <motion.span
+                key={sandboxModifiedCount}
+                initial={{ scale: 0.7, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="min-w-[16px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold tabular-nums"
+                style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--bg-primary)' }}
+                aria-label={`${sandboxModifiedCount} fichier${sandboxModifiedCount > 1 ? 's' : ''} modifié${sandboxModifiedCount > 1 ? 's' : ''} dans la sandbox`}
+              >
+                {sandboxModifiedCount > 99 ? '99+' : sandboxModifiedCount}
+              </motion.span>
+            )}
           </button>
 
 

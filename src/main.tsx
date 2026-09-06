@@ -189,7 +189,6 @@ try {
         language:             p.language             || 'fr',
         responseStyle:        p.responseStyle        || 'balanced',
         reasoningEnabled:     p.reasoningEnabled     ?? true,
-        reasoningVoiceEnabled: p.reasoningVoiceEnabled ?? true,
       }),
     }).catch(() => { /* server may not be up yet — silently ignore */ });
   }
@@ -611,7 +610,13 @@ class RootErrorBoundary extends React.Component<
 // Patch console in production to suppress console.log/debug noise
 patchConsole();
 
-createRoot(document.getElementById('root')!).render(
+// Vite peut réévaluer ce module pendant un HMR sans perdre le conteneur DOM.
+// Conserver la racine évite un second createRoot et le démontage de Monaco.
+type AppWindow = Window & { __leannaReactRoot?: ReturnType<typeof createRoot> };
+const appWindow = window as AppWindow;
+const appRoot = appWindow.__leannaReactRoot ?? (appWindow.__leannaReactRoot = createRoot(document.getElementById('root')!));
+
+appRoot.render(
   <StrictMode>
     <RootErrorBoundary>
       <UserProfileProvider>

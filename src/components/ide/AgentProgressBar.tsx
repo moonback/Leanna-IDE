@@ -154,23 +154,37 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
   const steps = reasoning.steps ?? [];
   const doneCount = steps.filter(s => s.status === 'done').length;
   const total = reasoning.totalSteps ?? steps.length;
+  const progress = total > 0 ? Math.min(100, Math.round((doneCount / total) * 100)) : reasoning.active ? 18 : 100;
+  const statusLabel = reasoning.active ? 'En cours' : reasoning.cached ? 'Instantané' : 'Terminé';
+  const statusColor = reasoning.active ? 'var(--color-warning)' : 'var(--color-success)';
+  const streamPreview = reasoning.streamText?.trim();
 
   return (
     <div
-      className="border-t"
-      style={{ borderColor: 'color-mix(in srgb, var(--color-accent-alt) 15%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-accent-alt) 3%, transparent)' }}
+      className="border-t px-3 py-2.5"
+      style={{ borderColor: 'color-mix(in srgb, var(--color-accent-alt) 18%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-accent-alt) 4%, transparent)' }}
     >
       {/* Header */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5">
+      <div className="flex items-center gap-2">
         <motion.div
           animate={reasoning.active && !reduceMotion ? { rotate: 360 } : {}}
           transition={reasoning.active && !reduceMotion ? { duration: 2, repeat: Infinity, ease: 'linear' } : {}}
         >
-          <Brain style={{ width: 10, height: 10, color: 'var(--color-accent-alt)' }} />
+          <Brain style={{ width: 14, height: 14, color: 'var(--color-accent-alt)' }} />
         </motion.div>
-        <span className="text-sm tracking-wide font-medium" style={{ color: 'var(--color-accent-alt)' }}>
-          {reasoning.strategyLabel ?? 'Raisonnement'}
-        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-sm tracking-wide font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+              {reasoning.strategyLabel ?? 'Raisonnement'}
+            </span>
+            <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: statusColor }}>
+              {statusLabel}
+            </span>
+          </div>
+          <div className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>
+            {reasoning.announcement ?? (reasoning.active ? 'Analyse des options en cours…' : 'Analyse terminée')}
+          </div>
+        </div>
         {meta && (
           <span
             className="text-xs tracking-wide px-1 py-px rounded font-mono"
@@ -183,16 +197,30 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
             {meta.label}
           </span>
         )}
-        {total > 0 && (
-          <span className="ml-auto text-xs tracking-wide tabular-nums font-mono" style={{ color: 'var(--text-dimmed)' }}>
-            {doneCount}/{total}
-          </span>
-        )}
+        <span className="text-xs tracking-wide tabular-nums font-mono" style={{ color: 'var(--text-secondary)' }}>
+          {total > 0 ? `${doneCount}/${total}` : `${progress}%`}
+        </span>
       </div>
+
+      <div className="mt-2 h-1 overflow-hidden rounded-full" style={{ backgroundColor: 'color-mix(in srgb, var(--text-muted) 18%, transparent)' }}>
+        <motion.div
+          className="h-full rounded-full"
+          initial={{ width: 0 }}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: reduceMotion ? 0.1 : 0.45, ease: 'easeOut' }}
+          style={{ backgroundColor: statusColor }}
+        />
+      </div>
+
+      {streamPreview && (
+        <div className="mt-2 max-h-16 overflow-hidden rounded-md px-2 py-1.5 text-[11px] leading-relaxed font-mono" style={{ color: 'var(--text-secondary)', backgroundColor: 'color-mix(in srgb, var(--bg-base) 45%, transparent)', border: '1px solid color-mix(in srgb, var(--border-base) 60%, transparent)' }}>
+          {streamPreview.slice(-420)}{reasoning.active ? ' ▍' : ''}
+        </div>
+      )}
 
       {/* Steps */}
       {steps.length > 0 && (
-        <div className="px-3 pb-2 space-y-0.5">
+        <div className="pt-2 space-y-0.5">
           {steps.map((step) => {
             const isRun = step.status === 'running';
             const isDone = step.status === 'done';
@@ -226,7 +254,7 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
       )}
 
       {reasoning.active && steps.length === 0 && (
-        <div className="flex items-center gap-1.5 px-3 pb-2">
+        <div className="flex items-center gap-1.5 pt-2">
           {reduceMotion ? (
             [0, 1, 2].map(i => (
               <div key={`dot-${i}`} className="w-1 h-1 rounded-full" style={{ backgroundColor: 'var(--color-accent-alt)', opacity: 0.6 }} />

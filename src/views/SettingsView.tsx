@@ -101,7 +101,6 @@ export default function SettingsView() {
           openrouterImageModel: profile.openrouterImageModel,
           agents: profile.agents,
           reasoningEnabled: profile.reasoningEnabled,
-          reasoningVoiceEnabled: profile.reasoningVoiceEnabled,
           customSystemPrompt: profile.customSystemPrompt,
         }),
       });

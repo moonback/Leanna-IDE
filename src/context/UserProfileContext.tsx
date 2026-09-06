@@ -97,7 +97,6 @@ export interface UserProfile {
   agents:        AgentsConfig;  // Configuration du système multi-agents
   // Reasoning
   reasoningEnabled: boolean;  // Activer/désactiver le raisonnement structuré (CoT, etc.)
-  reasoningVoiceEnabled: boolean;  // Activer/désactiver les annonces vocales pendant le raisonnement
   // Custom system prompt
   customSystemPrompt: string;  // Prompt système personnalisé (ajouté au prompt de base)
 }
@@ -139,7 +138,6 @@ const DEFAULT_PROFILE: UserProfile = {
   },
   // Reasoning
   reasoningEnabled: true,
-  reasoningVoiceEnabled: false,
   // Custom system prompt
   customSystemPrompt: '',
 };
