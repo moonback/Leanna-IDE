@@ -182,7 +182,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
   return (
     <>
     <motion.div
-      className="flex flex-col gap-4 p-3"
+      className="flex flex-col gap-4 p-4 sm:gap-5"
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={spring}
@@ -190,7 +190,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
 
       {/* ═══ Vue d'ensemble ═══ */}
       <motion.div
-        className="rounded-xl border px-3 py-3 flex items-center gap-3 shadow-sm"
+        className="rounded-2xl border px-4 py-4 flex items-center gap-3 shadow-sm"
         style={{
           borderColor: status?.active ? 'rgba(74,222,128,0.28)' : 'var(--border-base)',
           backgroundColor: status?.active ? 'rgba(74,222,128,0.055)' : 'var(--bg-input)',
@@ -199,7 +199,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
         layout
       >
         <div
-          className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: status?.active ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.04)' }}
         >
           <Box size={15} style={{ color: status?.active ? 'var(--color-success)' : 'var(--text-dimmed)' }} />
@@ -214,7 +214,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
           {/* Le compteur change parfois en arrière-plan (watcher de fichiers) sans
               action explicite de l'utilisateur : un léger fade sur le changement
               de valeur rend ce statut silencieux visible sans être bruyant. */}
-          <div className="mt-0.5 h-4 overflow-hidden">
+          <div className="mt-1 min-h-4 overflow-hidden">
             <AnimatePresence mode="popLayout" initial={false}>
               <motion.p
                 key={status?.modifiedCount ?? 0}
@@ -225,10 +225,21 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                 className="text-xs"
                 style={{ color: 'var(--text-muted)' }}
               >
-                {status?.modifiedCount ?? 0} modification{(status?.modifiedCount ?? 0) > 1 ? 's' : ''}
+                {status?.modifiedCount
+                  ? `${status.modifiedCount} modification${status.modifiedCount > 1 ? 's' : ''} en attente`
+                  : 'Aucune modification en attente'}
               </motion.p>
             </AnimatePresence>
           </div>
+          {status?.path && (
+            <p
+              className="mt-1 max-w-[calc(100vw-10rem)] truncate font-mono text-[10px]"
+              style={{ color: 'var(--text-dimmed)' }}
+              title={status.path}
+            >
+              {status.path}
+            </p>
+          )}
         </div>
         <button
           type="button"

@@ -4,13 +4,11 @@ import { useNavigate } from 'react-router-dom';
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.Editor })));
 const DiffViewer = lazy(() => import('../components/ide/DiffViewer.js').then(m => ({ default: m.DiffViewer })));
 // Panels - lazy loaded
-const SandboxPanel = lazy(() => import('../components/panels/SandboxPanel.js').then(m => ({ default: m.SandboxPanel })));
 const VisionPanel = lazy(() => import('../components/panels/VisionPanel.js').then(m => ({ default: m.VisionPanel })));
 const GitHubPanel = lazy(() => import('../components/ide/GitHubPanel.js').then(m => ({ default: m.GitHubPanel })));
 const DocumentsView = lazy(() => import('./DocumentsView.js'));
 const NotebooksView = lazy(() => import('./NotebooksView.js'));
 const RichDocumentViewerLazy = lazy(() => import('../components/ide/RichDocumentViewer.js').then(m => ({ default: m.RichDocumentViewer })));
-import { X } from 'lucide-react';
 import type { RichDocument } from '../components/ide/RichDocumentViewer.js';
 import { IdeModal, type ModalMode } from '../components/ide/IdeModal.js';
 import { ContextMenu, type ContextTarget, type ClipboardEntry } from '../components/ide/ContextMenu.js';
@@ -44,7 +42,7 @@ import { ImagePreview } from '../components/ide/ImagePreview.js';
 import { PdfPreview } from '../components/ide/PdfPreview.js';
 import { EmptyEditorState } from '../components/ide/EmptyEditorState.js';
 import { SelfEditBanner } from '../components/ide/SelfEditBanner.js';
-import { SandboxDiffViewer } from '../components/sandbox/SandboxDiffViewer.js';
+import { SandboxWorkspace } from '../components/sandbox/SandboxWorkspace.js';
 import { AgentPanel } from '../components/panels/AgentPanel.js';
 import { AgentBuilderPanel } from '../components/panels/AgentBuilderPanel.js';
 import { MarketplacePanel } from '../components/panels/MarketplacePanel.js';
@@ -1031,41 +1029,16 @@ export default function IdeView() {
                         />
                       </div>
                       {showBrowser ? null : showSandbox ? (
-                        sandboxView === 'diff' ? (
-                          <SandboxDiffViewer
-                            embedded
-                            initialSelectedFile={selectedSandboxDiffFile}
-                            onClose={() => {
-                              setSandboxView('controls');
-                              setSelectedSandboxDiffFile(null);
-                            }}
-                          />
-                        ) : (
-                          <div className="flex flex-1 flex-col min-h-0" style={{ backgroundColor: 'var(--bg-panel)' }}>
-                            <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-base)' }}>
-                              <div>
-                                <h2 className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Sandbox</h2>
-                                <p className="mt-0.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                                  Espace isolé pour examiner et valider vos modifications
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={closeSandbox}
-                                className="p-2 rounded-lg hover:bg-white/10 transition"
-                                title="Fermer le sandbox"
-                                aria-label="Fermer le sandbox"
-                              >
-                                <X size={15} style={{ color: 'var(--text-muted)' }} />
-                              </button>
-                            </div>
-                            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-                              <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{ color: 'var(--text-muted)' }}>Chargement du sandbox…</div></div>}>
-                                <SandboxPanel onOpenDiff={openSandboxDiff} />
-                              </Suspense>
-                            </div>
-                          </div>
-                        )
+                        <SandboxWorkspace
+                          view={sandboxView}
+                          selectedFile={selectedSandboxDiffFile}
+                          onClose={closeSandbox}
+                          onOpenDiff={openSandboxDiff}
+                          onCloseDiff={() => {
+                            setSandboxView('controls');
+                            setSelectedSandboxDiffFile(null);
+                          }}
+                        />
                       ) : showKnowledge ? (
                         <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement du dashboard…</div></div>}>
                           <DocumentsView />

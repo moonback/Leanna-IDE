@@ -16,7 +16,7 @@ import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { SELF_ROOT, isWriteForbidden } from "./selfRoot.js";
+import { SELF_ROOT, isWriteForbidden, isCriticalFile } from "./selfRoot.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -64,6 +64,39 @@ export class SandboxGuardError extends Error {
 let sandboxState: SandboxState = "DISABLED";
 let sandboxModifiedFiles = new Set<string>();
 let lastSyncTimestamp: number | null = null;
+
+function isSafeMainTarget(mainFile: string): boolean {
+  const root = path.resolve(SELF_ROOT);
+  const target = path.resolve(mainFile);
+  const relative = path.relative(root, target);
+  if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    return false;
+  }
+
+  let current = root;
+  for (const segment of relative.split(path.sep)) {
+    current = path.join(current, segment);
+    try {
+      if (fs.lstatSync(current).isSymbolicLink()) return false;
+    } catch (error: any) {
+      if (error?.code === "ENOENT") break;
+      return false;
+    }
+  }
+  return true;
+}
+
+function assertMainTargetAllowed(mainFile: string, relativePath: string): void {
+  if (isWriteForbidden(mainFile)) {
+    throw new SandboxGuardError("SANDBOX_PATH_ESCAPE", `Synchronisation refusée : cible protégée (${relativePath}).`);
+  }
+  if (isCriticalFile(mainFile)) {
+    throw new SandboxGuardError("SANDBOX_PATH_ESCAPE", `Synchronisation refusée : fichier critique (${relativePath}). Utilisez une confirmation explicite.`);
+  }
+  if (!isSafeMainTarget(mainFile)) {
+    throw new SandboxGuardError("SANDBOX_SYMLINK", `Synchronisation refusée : la cible principale est un lien symbolique ou sort du workspace (${relativePath}).`);
+  }
+}
 
 // ── Mutex pour syncToMain (Audit §7) ─────────────────────────────────────────
 // Empêche deux synchronisations simultanées vers le principal.
@@ -295,7 +328,36 @@ export function resolveSandboxPath(target: string): string | null {
  * Marque un fichier comme modifié dans le sandbox.
  */
 export function markFileModified(relativePath: string): void {
-  sandboxModifiedFiles.add(getCanonicalSandboxRelativePath(relativePath));
+  const canonicalPath = getCanonicalSandboxRelativePath(relativePath);
+  const sandboxPath = assertSandboxReady(canonicalPath);
+  const mainPath = path.join(SELF_ROOT, canonicalPath);
+
+  let differs = true;
+  try {
+    const sandboxExists = fs.existsSync(sandboxPath);
+    const mainExists = fs.existsSync(mainPath);
+    if (sandboxExists === mainExists && sandboxExists) {
+      const sandboxStat = fs.lstatSync(sandboxPath);
+      const mainStat = fs.lstatSync(mainPath);
+      if (sandboxStat.isFile() && mainStat.isFile() && sandboxStat.size === mainStat.size) {
+        differs = !fs.readFileSync(sandboxPath).equals(fs.readFileSync(mainPath));
+      } else if (sandboxStat.isDirectory() && mainStat.isDirectory()) {
+        differs = false;
+      }
+    } else if (!sandboxExists && !mainExists) {
+      differs = false;
+    }
+  } catch {
+    // Conserver le marquage en cas d'erreur de lecture : la synchronisation
+    // doit rester prudente et ne pas perdre une modification potentielle.
+    differs = true;
+  }
+
+  if (differs) {
+    sandboxModifiedFiles.add(canonicalPath);
+  } else {
+    sandboxModifiedFiles.delete(canonicalPath);
+  }
 }
 
 /**
@@ -367,9 +429,7 @@ async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash:
     for (const relPath of modifiedList) {
       const sandboxFile = assertSandboxReady(relPath);
       const mainFile = path.join(SELF_ROOT, relPath);
-      if (isWriteForbidden(mainFile)) {
-        throw new SandboxGuardError("SANDBOX_PATH_ESCAPE", `Synchronisation refusée : cible protégée (${relPath}).`);
-      }
+      assertMainTargetAllowed(mainFile, relPath);
 
       const mainExisted = fs.existsSync(mainFile);
       const sandboxExisted = fs.existsSync(sandboxFile);
@@ -497,8 +557,10 @@ export async function acceptFile(relPath: string): Promise<{ applied: boolean }>
   }
 
   const mainFile = path.join(SELF_ROOT, normalized);
-  if (isWriteForbidden(mainFile)) {
-    console.warn(`[Sandbox] Acceptation refusée pour une cible protégée: ${normalized}`);
+  try {
+    assertMainTargetAllowed(mainFile, normalized);
+  } catch (error: any) {
+    console.warn(`[Sandbox] Acceptation refusée pour ${normalized}:`, error.message);
     return { applied: false };
   }
 

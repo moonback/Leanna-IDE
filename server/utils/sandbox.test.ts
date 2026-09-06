@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { setSelfRoot } from './selfRoot.js';
@@ -30,9 +31,17 @@ test('sandbox: state management and path resolution', () => {
   activateSandbox();
   assert.equal(isSandboxActive(), true);
 
+  const sandboxTestPath = resolveSandboxPath('server/test.ts');
+  assert.ok(sandboxTestPath);
+  fs.mkdirSync(path.dirname(sandboxTestPath), { recursive: true });
+  fs.writeFileSync(sandboxTestPath, '// sandbox-only change\n', 'utf-8');
   markFileModified('server/test.ts');
   const modified = getSandboxModifiedFiles();
   assert.ok(modified.includes('server/test.ts'));
+
+  fs.rmSync(sandboxTestPath, { force: true });
+  markFileModified('server/test.ts');
+  assert.ok(!getSandboxModifiedFiles().includes('server/test.ts'));
 
   deactivateSandbox();
   assert.equal(isSandboxActive(), false);
