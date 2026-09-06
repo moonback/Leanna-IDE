@@ -121,6 +121,87 @@ export function createGithubRouter(skillManager: SkillManager): Router {
     });
   });
 
+  // POST /api/github/ingest-repository
+  // Ingestion complète d'un dépôt GitHub public dans un notebook
+  router.post('/ingest-repository', async (req: Request, res: Response) => {
+    try {
+      const { owner, repo, notebook_id, branch, max_files, file_extensions } = req.body as {
+        owner?: string;
+        repo?: string;
+        notebook_id?: string;
+        branch?: string;
+        max_files?: number;
+        file_extensions?: string[];
+      };
+
+      if (!owner || !repo || !notebook_id) {
+        return res.status(400).json({ 
+          error: 'Les paramètres owner, repo et notebook_id sont requis.' 
+        });
+      }
+
+      console.log(`[GitHub] Ingestion repo API: ${owner}/${repo} vers notebook ${notebook_id}`);
+
+      const result = await skillManager.handleToolCall('ingest_github_repository', {
+        owner,
+        repo,
+        notebook_id,
+        branch: branch || undefined,
+        max_files: max_files || 100,
+        file_extensions: file_extensions || undefined,
+      });
+
+      if (result?.error) {
+        console.warn(`[GitHub] ingestion repo échec: ${result.error}`);
+        return res.status(200).json({ status: 'error', error: result.error });
+      }
+
+      console.log(`[GitHub] ingestion repo OK: ${result.repository}`);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Erreur serveur lors de l\'ingestion du dépôt GitHub.' });
+    }
+  });
+
+  // GET /api/github/repo-files
+  // Lister les fichiers d'un dépôt GitHub
+  router.get('/repo-files', async (req: Request, res: Response) => {
+    try {
+      const { owner, repo, ref, max_files, file_extensions } = req.query as {
+        owner?: string;
+        repo?: string;
+        ref?: string;
+        max_files?: string;
+        file_extensions?: string;
+      };
+
+      if (!owner || !repo) {
+        return res.status(400).json({ 
+          error: 'Les paramètres owner et repo sont requis.' 
+        });
+      }
+
+      const result = await skillManager.handleToolCall('list_github_repo_files', {
+        owner,
+        repo,
+        ref: ref || undefined,
+        max_files: max_files ? Number(max_files) : 100,
+        file_extensions: file_extensions ? JSON.parse(file_extensions) : undefined,
+      });
+
+      if (result?.error) {
+        console.warn(`[GitHub] list repo files échec: ${result.error}`);
+        return res.status(200).json({ status: 'error', error: result.error });
+      }
+
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ 
+        error: e.message || 'Erreur serveur lors de la récupération des fichiers.' 
+      });
+    }
+  });
+
   // GET /api/github/status
   router.get('/status', async (_req: Request, res: Response) => {
     try {

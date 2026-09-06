@@ -7,7 +7,7 @@
 
 // ─── Source (document ingéré dans un notebook) ───────────────────────────────
 
-export type SourceType = 'pdf' | 'text' | 'markdown' | 'url' | 'audio' | 'youtube' | 'docx' | 'html' | 'image';
+export type SourceType = 'pdf' | 'text' | 'markdown' | 'url' | 'audio' | 'youtube' | 'docx' | 'html' | 'image' | 'github-repo';
 
 export interface SourceChunk {
   id: string;
@@ -51,6 +51,27 @@ export interface Source {
   addedAt: string;
   /** Taille du fichier original en octets */
   originalSize: number;
+  /** Métadonnées spécifiques au type de source */
+  metadata?: {
+    /** Pour github-repo : informations sur le dépôt */
+    githubRepo?: {
+      owner: string;
+      repo: string;
+      defaultBranch: string;
+      stars: number;
+      forks: number;
+      language: string;
+      license?: string;
+      topics?: string[];
+      fileCount: number;
+      /** Liste des fichiers ingérés */
+      ingestedFiles?: Array<{
+        path: string;
+        size: number;
+        type: 'file' | 'dir';
+      }>;
+    };
+  };
 }
 
 // ─── Notebook ────────────────────────────────────────────────────────────────

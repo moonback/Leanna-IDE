@@ -12,9 +12,56 @@ import { randomUUID } from "crypto";
 import { createLogger } from "../utils/logger.js";
 import { generateText } from "../utils/textGeneration.js";
 import { embeddingStore } from "./EmbeddingStore.js";
+import path from "path";
 import type { Source, SourceChunk, SourceType } from "./types.js";
 
+// GitHub API constants
+const GITHUB_API = "https://api.github.com";
+const GITHUB_TIMEOUT_MS = 30_000;
+
 const log = createLogger("SourceIngester");
+
+// ─── GitHub API Utilities ─────────────────────────────────────────────────────────
+
+function getGitHubHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Accept": "application/vnd.github+json",
+    "User-Agent": "Leanna",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  const token = process.env.GITHUB_TOKEN?.trim();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+async function githubApiFetch(endpoint: string): Promise<any> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GITHUB_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${GITHUB_API}${endpoint}`, {
+      headers: getGitHubHeaders(),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const errMsg = body.message || `GitHub API ${res.status}: ${res.statusText}`;
+      log.error(`[GitHub] Erreur: ${errMsg}`);
+      return { error: errMsg };
+    }
+    return await res.json();
+  } catch (e: any) {
+    if (e.name === "AbortError") {
+      log.error(`[GitHub] Timeout sur ${endpoint}`);
+      return { error: "Timeout: GitHub API n'a pas répondu." };
+    }
+    log.error(`[GitHub] Erreur réseau: ${e.message}`);
+    return { error: e.message || "Erreur réseau GitHub" };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 // ─── Types internes ─────────────────────────────────────────────────────────
 
@@ -169,6 +216,302 @@ export class SourceIngester {
     }
 
     return this.buildSource(rawText, title, sourceType, url, notebookId);
+  }
+
+  // ─── Ingestion depuis un dépôt GitHub public ─────────────────────────────────
+
+  /**
+   * Ingestion complète d'un dépôt GitHub public.
+   * Récupère la structure du repo, les informations du dépôt, et le contenu des fichiers.
+   */
+  async ingestFromGitHubRepository(
+    owner: string,
+    repo: string,
+    notebookId: string,
+    options: {
+      maxFiles?: number;
+      fileExtensions?: string[];
+      includeSubmodules?: boolean;
+      branch?: string;
+    } = {}
+  ): Promise<Source> {
+    const {
+      maxFiles = 100,
+      fileExtensions = ['.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.go', '.rs', '.cpp', '.c', '.h', '.hpp', '.md', '.txt', '.json', '.yaml', '.yml'],
+      includeSubmodules = false,
+      branch: targetBranch
+    } = options;
+
+    log.info(`🚀 Ingestion repo GitHub: ${owner}/${repo}`);
+
+    // 1. Obtenir les informations du dépôt
+    const repoData = await githubApiFetch(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`);
+    if (repoData.error) {
+      throw new Error(`Impossible de récupérer le dépôt: ${repoData.error}`);
+    }
+
+    const defaultBranch = targetBranch || repoData.default_branch;
+    log.info(`📊 Repo: ${repoData.full_name} (${repoData.language || 'inconnu'}), stars: ${repoData.stargazers_count}, default branch: ${defaultBranch}`);
+
+    // 2. Obtenir la liste des fichiers (via l'arbre GitHub)
+    const treeData = await githubApiFetch(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${defaultBranch}?recursive=1`);
+    if (treeData.error) {
+      throw new Error(`Impossible de récupérer l'arborescence: ${treeData.error}`);
+    }
+
+    // Filtrer les fichiers selon les extensions et la limite
+    const files = (treeData.tree || [])
+      .filter((item: any) => item.type === 'blob')
+      .filter((item: any) => {
+        if (!fileExtensions || fileExtensions.length === 0) return true;
+        const ext = path.extname(item.path).toLowerCase();
+        return fileExtensions.includes(ext);
+      })
+      .slice(0, maxFiles);
+
+    log.info(`📁 ${files.length} fichiers à ingérer (max: ${maxFiles})`);
+
+    // 3. Récupérer le contenu de tous les fichiers en parallèle (avec contrôle de débit)
+    const fileContents: Array<{ path: string; content: string; size: number; type: 'file' }> = [];
+    const ingestedFiles: Array<{ path: string; size: number; type: 'file' | 'dir' }> = [];
+    
+    // Limiter les requêtes concurrentielles pour éviter les rate limits
+    const CONCURRENCY_LIMIT = 5;
+    const batches = this.arrayToBatches(files, CONCURRENCY_LIMIT);
+
+    for (const batch of batches) {
+      const batchPromises = batch.map(async (file: any) => {
+        try {
+          const fileData = await githubApiFetch(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(file.path)}?ref=${defaultBranch}`);
+          if (fileData.error) {
+            log.warn(`⚠️ Erreur récupération fichier ${file.path}: ${fileData.error}`);
+            return null;
+          }
+
+          let content = '';
+          if (fileData.encoding === 'base64' && fileData.content) {
+            content = Buffer.from(fileData.content, 'base64').toString('utf-8');
+          } else if (fileData.content) {
+            content = fileData.content;
+          }
+
+          return {
+            path: file.path,
+            content,
+            size: fileData.size || Buffer.byteLength(content, 'utf-8'),
+            type: 'file' as const
+          };
+        } catch (e: any) {
+          log.warn(`⚠️ Exception récupération fichier ${file.path}: ${e.message}`);
+          return null;
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      for (const result of batchResults) {
+        if (result) {
+          fileContents.push(result);
+          ingestedFiles.push({ path: result.path, size: result.size, type: 'file' });
+        }
+      }
+    }
+
+    if (fileContents.length === 0) {
+      throw new Error('Aucun fichier valide trouvé dans le dépôt avec les critères spécifiés.');
+    }
+
+    log.info(`✅ ${fileContents.length} fichiers récupérés`);
+
+    // 4. Construire le texte combiné avec métadonnées
+    const headerText = `DÉPÔT GITHUB: ${repoData.full_name}\n` +
+      `================================================\n` +
+      `Description: ${repoData.description || 'Aucune description'}\n` +
+      `Étoiles: ${repoData.stargazers_count} | Forks: ${repoData.forks_count}\n` +
+      `Langage: ${repoData.language || 'Inconnu'} | Licence: ${repoData.license?.spdx_id || 'Aucune'}\n` +
+      `Branche: ${defaultBranch}\n` +
+      `URL: ${repoData.html_url}\n` +
+      `Topics: ${repoData.topics?.join(', ') || 'Aucun'}\n` +
+      `\n\n` +
+      `FICHIERS INGÉRÉS (${fileContents.length}):\n` +
+      `------------------------------------------------\n` +
+      fileContents.map(f => `- ${f.path} (${(f.size / 1024).toFixed(1)} KB)`).join('\n') +
+      `\n\n` +
+      `=== CONTENU DES FICHIERS ===\n\n`;
+
+    // Combiner tous les contenus de fichiers
+    const allFileContents = fileContents
+      .map(f => `// === ${f.path} === (${f.size} bytes)\n\n${f.content}`)
+      .join('\n\n\n');
+
+    const rawText = headerText + allFileContents;
+    const totalSize = fileContents.reduce((sum, f) => sum + f.size, 0);
+
+    // 5. Construire la source avec métadonnées GitHub
+    const title = `${repoData.full_name} (GitHub Repository)`;
+    const origin = `https://github.com/${owner}/${repo}`;
+
+    const source = await this.buildGitHubSource(
+      rawText,
+      title,
+      origin,
+      notebookId,
+      owner,
+      repo,
+      defaultBranch,
+      repoData,
+      ingestedFiles,
+      totalSize
+    );
+
+    log.info(`✅ Source GitHub créée: ${title} — ${fileContents.length} fichiers, ${totalSize} bytes`);
+
+    return source;
+  }
+
+  /**
+   * Construction spécifique pour les sources GitHub avec métadonnées enrichies
+   */
+  private async buildGitHubSource(
+    rawText: string,
+    title: string,
+    origin: string,
+    notebookId: string,
+    owner: string,
+    repo: string,
+    defaultBranch: string,
+    repoData: any,
+    ingestedFiles: Array<{ path: string; size: number; type: 'file' | 'dir' }>,
+    totalSize: number
+  ): Promise<Source> {
+    const id = randomUUID();
+
+    // Découpage intelligent en chunks
+    const chunks = this.chunkText(rawText, id, 'text');
+
+    // Comptage de mots
+    const wordCount = rawText.split(/\s+/).filter(w => w.length > 0).length;
+
+    // Détection de langue (par défaut anglais pour le code)
+    const language = 'en';
+
+    // Lancer en parallèle : résumé LLM + vectorisation des chunks
+    const chunkPayload = chunks.map(c => ({ id: c.id, content: c.content }));
+
+    const [{ summary, keywords }] = await Promise.all([
+      this.generateGitHubSummary(rawText, title, repoData),
+      embeddingStore.indexChunks(chunkPayload, id, notebookId)
+        .catch(e => log.warn(`Embedding indexation partielle: ${e.message}`)),
+    ]);
+
+    const source: Source = {
+      id,
+      notebookId,
+      title,
+      type: 'github-repo',
+      origin,
+      rawText: rawText.slice(0, 2_000_000), // Limite à 2M chars pour les grands repos
+      summary,
+      keywords,
+      chunks,
+      wordCount,
+      language,
+      addedAt: new Date().toISOString(),
+      originalSize: totalSize,
+      metadata: {
+        githubRepo: {
+          owner,
+          repo,
+          defaultBranch,
+          stars: repoData.stargazers_count || 0,
+          forks: repoData.forks_count || 0,
+          language: repoData.language || 'Unknown',
+          license: repoData.license?.spdx_id,
+          topics: repoData.topics || [],
+          fileCount: ingestedFiles.length,
+          ingestedFiles,
+        },
+      },
+    };
+
+    return source;
+  }
+
+  /**
+   * Génération de résumé spécifique pour les repos GitHub
+   */
+  private async generateGitHubSummary(
+    text: string,
+    title: string,
+    repoData: any
+  ): Promise<{ summary: string; keywords: string[] }> {
+    try {
+      const textSample = text.slice(0, 20_000); // Échantillon pour éviter les prompts trop longs
+      const repoInfo = `
+Repo: ${repoData.full_name || title}
+Description: ${repoData.description || 'Aucune'}
+Stars: ${repoData.stargazers_count || 0}
+Forks: ${repoData.forks_count || 0}
+Language: ${repoData.language || 'Unknown'}
+License: ${repoData.license?.spdx_id || 'None'}
+Topics: ${repoData.topics?.join(', ') || 'None'}
+Branch: ${repoData.default_branch || 'main'}
+`;
+
+      const prompt = `Analyse ce dépôt GitHub :
+
+INFORMATIONS DU DÉPÔT :
+${repoInfo}
+
+CONTENU DES FICHIERS (extrait) :
+${textSample.slice(0, 10000)}
+
+Réponds en JSON strict avec :
+{
+  "summary": "Résumé technique et fonctionnel du dépôt (structure, technologies, fonctionnalités principales) en 5-8 phrases.",
+  "keywords": ["technologie 1", "framework 2", "concept 3", ..., "mot-clé 15"]
+}
+
+Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, uniquement le JSON.`;
+
+      const result = await generateText({
+        prompt,
+        temperature: 0.3,
+        maxOutputTokens: 2048,
+      });
+
+      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          summary: parsed.summary || "Résumé non disponible.",
+          keywords: Array.isArray(parsed.keywords) ? parsed.keywords.slice(0, 15) : [],
+        };
+      }
+    } catch (e: any) {
+      log.warn(`Erreur génération résumé GitHub: ${e.message}`);
+    }
+
+    // Fallback : résumé basique
+    return {
+      summary: `Dépôt GitHub: ${repoData.full_name || title}. ${repoData.description || 'Dépôt sans description.'} ${repoData.stargazers_count || 0} étoiles.`,
+      keywords: [
+        repoData.language || 'code',
+        ...(repoData.topics || []).slice(0, 5),
+        'github',
+        'repository'
+      ],
+    };
+  }
+
+  /**
+   * Utilitaire pour diviser un tableau en batches
+   */
+  private arrayToBatches<T>(array: T[], batchSize: number): T[][] {
+    const batches: T[][] = [];
+    for (let i = 0; i < array.length; i += batchSize) {
+      batches.push(array.slice(i, i + batchSize));
+    }
+    return batches;
   }
 
   // ─── Construction de la source (commun) ──────────────────────────────────

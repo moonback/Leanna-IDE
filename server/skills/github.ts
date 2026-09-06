@@ -203,6 +203,45 @@ export const githubSkill: Skill = {
         },
       },
     },
+    {
+      name: "list_github_repo_files",
+      description: "Lister tous les fichiers d'un dépôt GitHub avec leurs métadonnées.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          owner: { type: "STRING", description: "Le propriétaire du dépôt" },
+          repo: { type: "STRING", description: "Le nom du dépôt" },
+          ref: { type: "STRING", description: "Branche ou commit (défaut: branche par défaut)" },
+          file_extensions: { 
+            type: "ARRAY", 
+            items: { type: "STRING" }, 
+            description: "Filtrer par extensions de fichiers (optionnel, ex: ['.ts', '.js'])" 
+          },
+          max_files: { type: "NUMBER", description: "Nombre max de fichiers à retourner (défaut: 100, max: 500)" },
+        },
+        required: ["owner", "repo"],
+      },
+    },
+    {
+      name: "ingest_github_repository",
+      description: "Ingérer un dépôt GitHub public entier dans le système de connaissances (nécessite notebookId).",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          owner: { type: "STRING", description: "Le propriétaire du dépôt" },
+          repo: { type: "STRING", description: "Le nom du dépôt" },
+          notebook_id: { type: "STRING", description: "L'ID du notebook où stocker les données ingérées" },
+          branch: { type: "STRING", description: "Branche à ingérer (défaut: branche par défaut du repo)" },
+          max_files: { type: "NUMBER", description: "Nombre max de fichiers à ingérer (défaut: 100, max: 200)" },
+          file_extensions: { 
+            type: "ARRAY", 
+            items: { type: "STRING" }, 
+            description: "Filtrer par extensions de fichiers (défaut: extensions de code courantes)" 
+          },
+        },
+        required: ["owner", "repo", "notebook_id"],
+      },
+    },
   ],
 
   handleToolCall: async (name, args: Record<string, any>) => {
@@ -446,6 +485,113 @@ export const githubSkill: Skill = {
               updated_at: n.updated_at,
             })),
           };
+        }
+
+        // ─── List Repository Files ───────────────────────────────────────────
+        case "list_github_repo_files": {
+          const { owner, repo, ref, file_extensions, max_files } = args;
+          if (!owner || !repo) return { error: "owner et repo sont requis." };
+          
+          const limit = Math.min(max_files || 100, 500);
+          const extensions = file_extensions || [];
+          const targetRef = ref || ''; // Vide = branche par défaut
+          
+          console.log(`[GitHub] Liste fichiers: ${owner}/${repo}${targetRef ? `@${targetRef}` : ''} (max: ${limit}, extensions: ${extensions.length > 0 ? extensions.join(',') : 'toutes'})`);
+
+          // 1. D'abord obtenir les infos du repo pour avoir la branche par défaut
+          let branchToUse = targetRef;
+          if (!branchToUse) {
+            const repoData = await githubFetch(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`);
+            if (repoData.error) { console.warn(`[GitHub] list_github_repo_files échec repo: ${repoData.error}`); return repoData; }
+            branchToUse = repoData.default_branch;
+          }
+
+          // 2. Obtenir l'arbre complet du dépôt
+          const treeEndpoint = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(branchToUse)}?recursive=1`;
+          const treeData = await githubFetch(treeEndpoint);
+          if (treeData.error) { console.warn(`[GitHub] list_github_repo_files échec arbre: ${treeData.error}`); return treeData; }
+          
+          if (!treeData.tree || !Array.isArray(treeData.tree)) {
+            return { error: "Structure de l'arbre inattendue." };
+          }
+
+          // 3. Filtrer et limiter les résultats
+          const files = treeData.tree
+            .filter((item: any) => item.type === 'blob') // Uniquement les fichiers
+            .filter((item: any) => {
+              if (extensions.length === 0) return true;
+              const ext = item.path.split('.').pop()?.toLowerCase();
+              return extensions.includes(`.${ext}`) || extensions.includes(ext || '');
+            })
+            .slice(0, limit);
+
+          console.log(`[GitHub] list_github_repo_files OK: ${files.length} fichiers retournés [${Date.now() - startTime}ms]`);
+          return {
+            repository: {
+              owner,
+              repo,
+              branch: branchToUse,
+              total_files: files.length,
+              truncated: treeData.tree.filter((item: any) => item.type === 'blob').length > limit,
+            },
+            files: files.map((f: any) => ({
+              path: f.path,
+              mode: f.mode,
+              type: f.type,
+              size: f.size,
+              sha: f.sha,
+              url: f.url,
+            })),
+          };
+        }
+
+        // ─── Ingest GitHub Repository ────────────────────────────────────────
+        case "ingest_github_repository": {
+          const { owner, repo, notebook_id, branch, max_files, file_extensions } = args;
+          if (!owner || !repo || !notebook_id) {
+            return { error: "owner, repo et notebook_id sont requis." };
+          }
+
+          console.log(`[GitHub] Ingestion repo: ${owner}/${repo} vers notebook ${notebook_id.slice(0, 8)}...`);
+
+          try {
+            // Importer dynamiquement SourceIngester pour éviter les dépendances circulaires
+            const { sourceIngester } = await import('../notebooks/SourceIngester.js');
+            
+            const options: any = {
+              maxFiles: Math.min(max_files || 100, 200),
+              fileExtensions: file_extensions || ['.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.go', '.rs', '.cpp', '.c', '.h', '.hpp', '.md', '.txt', '.json', '.yaml', '.yml'],
+              branch: branch,
+            };
+
+            const source = await sourceIngester.ingestFromGitHubRepository(
+              owner,
+              repo,
+              notebook_id,
+              options
+            );
+
+            console.log(`[GitHub] ingest_github_repository OK: ${source.title} [${Date.now() - startTime}ms]`);
+            return {
+              status: "success",
+              source: {
+                id: source.id,
+                title: source.title,
+                type: source.type,
+                origin: source.origin,
+                wordCount: source.wordCount,
+                fileCount: source.metadata?.githubRepo?.fileCount || 0,
+                chunks: source.chunks.length,
+                summary: source.summary,
+                keywords: source.keywords,
+              },
+              notebook_id,
+              repository: `${owner}/${repo}`,
+            };
+          } catch (e: any) {
+            console.error(`[GitHub] ingest_github_repository échec: ${e.message}`);
+            return { error: `Échec de l'ingestion: ${e.message}` };
+          }
         }
 
         default:
