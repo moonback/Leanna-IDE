@@ -203,6 +203,45 @@ export const githubSkill: Skill = {
         },
       },
     },
+    {
+      name: "list_github_repo_files",
+      description: "Lister tous les fichiers d'un dépôt GitHub avec leurs métadonnées.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          owner: { type: "STRING", description: "Le propriétaire du dépôt" },
+          repo: { type: "STRING", description: "Le nom du dépôt" },
+          ref: { type: "STRING", description: "Branche ou commit (défaut: branche par défaut)" },
+          file_extensions: { 
+            type: "ARRAY", 
+            items: { type: "STRING" }, 
+            description: "Filtrer par extensions de fichiers (optionnel, ex: ['.ts', '.js'])" 
+          },
+          max_files: { type: "NUMBER", description: "Nombre max de fichiers à retourner (défaut: 100, max: 500)" },
+        },
+        required: ["owner", "repo"],
+      },
+    },
+    {
+      name: "ingest_github_repository",
+      description: "Ingérer un dépôt GitHub public entier dans le système de connaissances (nécessite notebookId).",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          owner: { type: "STRING", description: "Le propriétaire du dépôt" },
+          repo: { type: "STRING", description: "Le nom du dépôt" },
+          notebook_id: { type: "STRING", description: "L'ID du notebook où stocker les données ingérées" },
+          branch: { type: "STRING", description: "Branche à ingérer (défaut: branche par défaut du repo)" },
+          max_files: { type: "NUMBER", description: "Nombre max de fichiers à ingérer (défaut: 100, max: 200)" },
+          file_extensions: { 
+            type: "ARRAY", 
+            items: { type: "STRING" }, 
+            description: "Filtrer par extensions de fichiers (défaut: extensions de code courantes)" 
+          },
+        },
+        required: ["owner", "repo", "notebook_id"],
+      },
+    },
   ],
 
   handleToolCall: async (name, args: Record<string, any>) => {
@@ -213,9 +252,12 @@ export const githubSkill: Skill = {
         // ─── Get User ───────────────────────────────────────────────────
         case "get_github_user": {
           const username = args.username?.trim();
-          if (!username) return { error: "Le nom d'utilisateur est requis." };
-          console.log(`[GitHub] Récupération profil utilisateur: ${username}`);
-          const data = await githubFetch(`/users/${encodeURIComponent(username)}`);
+          if (!username && !process.env.GITHUB_TOKEN?.trim()) {
+            return { error: "GITHUB_TOKEN non configuré. Spécifiez un nom d'utilisateur." };
+          }
+          const endpoint = username ? `/users/${encodeURIComponent(username)}` : `/user`;
+          console.log(`[GitHub] Récupération profil utilisateur: ${username || '(authentifié)'}`);
+          const data = await githubFetch(endpoint);
           if (data.error) { console.warn(`[GitHub] get_github_user échec: ${data.error}`); return data; }
           console.log(`[GitHub] get_github_user OK: ${data.login} (${data.public_repos} repos, ${data.followers} followers) [${Date.now() - startTime}ms]`);
           return {
@@ -228,6 +270,8 @@ export const githubSkill: Skill = {
             followers: data.followers,
             following: data.following,
             public_repos: data.public_repos,
+            total_private_repos: data.total_private_repos,
+            owned_private_repos: data.owned_private_repos,
             created_at: data.created_at,
             avatar_url: data.avatar_url,
           };
@@ -243,13 +287,17 @@ export const githubSkill: Skill = {
           console.log(`[GitHub] get_github_repo OK: ${data.full_name} ⭐${data.stargazers_count} [${Date.now() - startTime}ms]`);
           return {
             full_name: data.full_name,
+            name: data.name,
+            owner: data.owner?.login || owner,
+            repo: data.name || repo,
             description: data.description,
             language: data.language,
             stars: data.stargazers_count,
             forks: data.forks_count,
             open_issues: data.open_issues_count,
             default_branch: data.default_branch,
-            topics: data.topics,
+            private: !!data.private,
+            topics: data.topics || [],
             license: data.license?.spdx_id,
             updated_at: data.updated_at,
             html_url: data.html_url,
@@ -260,7 +308,8 @@ export const githubSkill: Skill = {
         case "list_github_repos": {
           const username = args.username?.trim();
           const sort = args.sort || "updated";
-          const limit = Math.min(args.limit || 10, 30);
+          const limit = Math.min(args.limit || 50, 100);
+          const visibility = args.visibility;
           console.log(`[GitHub] Liste repos: user=${username || '(authenticated)'}, sort=${sort}, limit=${limit}`);
           
           // Si pas de username et pas de token, on ne peut pas lister les repos privés
@@ -269,9 +318,14 @@ export const githubSkill: Skill = {
             return { error: "GITHUB_TOKEN non configuré. Spécifiez un username ou ajoutez votre token GitHub." };
           }
           
-          const endpoint = username
+          let endpoint = username
             ? `/users/${encodeURIComponent(username)}/repos?sort=${sort}&per_page=${limit}`
-            : `/user/repos?sort=${sort}&per_page=${limit}`;
+            : `/user/repos?sort=${sort}&per_page=${limit}&affiliation=owner,collaborator,organization_member`;
+
+          if (!username && visibility && ['all', 'public', 'private'].includes(visibility)) {
+            endpoint += `&visibility=${visibility}`;
+          }
+
           const data = await githubFetch(endpoint);
           if (data.error) { console.warn(`[GitHub] list_github_repos échec: ${data.error}`); return data; }
           if (!Array.isArray(data)) return { error: "Réponse inattendue de GitHub." };
@@ -279,11 +333,17 @@ export const githubSkill: Skill = {
           return {
             repos: data.map((r: any) => ({
               full_name: r.full_name,
+              name: r.name,
+              owner: r.owner?.login || r.full_name.split('/')[0],
+              repo: r.name || r.full_name.split('/')[1],
               description: r.description,
               language: r.language,
               stars: r.stargazers_count,
+              forks: r.forks_count,
+              default_branch: r.default_branch,
+              topics: r.topics || [],
               updated_at: r.updated_at,
-              private: r.private,
+              private: !!r.private,
               html_url: r.html_url,
             })),
           };
@@ -446,6 +506,121 @@ export const githubSkill: Skill = {
               updated_at: n.updated_at,
             })),
           };
+        }
+
+        // ─── List Repository Files ───────────────────────────────────────────
+        case "list_github_repo_files": {
+          const { owner, repo, ref, file_extensions, max_files } = args;
+          if (!owner || !repo) return { error: "owner et repo sont requis." };
+          
+          const limit = Math.min(max_files || 100, 500);
+          const extensions = file_extensions || [];
+          const targetRef = ref || ''; // Vide = branche par défaut
+          
+          console.log(`[GitHub] Liste fichiers: ${owner}/${repo}${targetRef ? `@${targetRef}` : ''} (max: ${limit}, extensions: ${extensions.length > 0 ? extensions.join(',') : 'toutes'})`);
+
+          // 1. D'abord obtenir les infos du repo pour avoir la branche par défaut
+          let branchToUse = targetRef;
+          if (!branchToUse) {
+            const repoData = await githubFetch(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`);
+            if (repoData.error) { console.warn(`[GitHub] list_github_repo_files échec repo: ${repoData.error}`); return repoData; }
+            branchToUse = repoData.default_branch;
+          }
+
+          // 2. Obtenir l'arbre complet du dépôt
+          const treeEndpoint = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(branchToUse)}?recursive=1`;
+          const treeData = await githubFetch(treeEndpoint);
+          if (treeData.error) { console.warn(`[GitHub] list_github_repo_files échec arbre: ${treeData.error}`); return treeData; }
+          
+          if (!treeData.tree || !Array.isArray(treeData.tree)) {
+            return { error: "Structure de l'arbre inattendue." };
+          }
+
+          // 3. Filtrer et limiter les résultats
+          const files = treeData.tree
+            .filter((item: any) => item.type === 'blob') // Uniquement les fichiers
+            .filter((item: any) => {
+              if (extensions.length === 0) return true;
+              const ext = item.path.split('.').pop()?.toLowerCase();
+              return extensions.includes(`.${ext}`) || extensions.includes(ext || '');
+            })
+            .slice(0, limit);
+
+          console.log(`[GitHub] list_github_repo_files OK: ${files.length} fichiers retournés [${Date.now() - startTime}ms]`);
+          return {
+            repository: {
+              owner,
+              repo,
+              branch: branchToUse,
+              total_files: files.length,
+              truncated: treeData.tree.filter((item: any) => item.type === 'blob').length > limit,
+            },
+            files: files.map((f: any) => ({
+              path: f.path,
+              mode: f.mode,
+              type: f.type,
+              size: f.size,
+              sha: f.sha,
+              url: f.url,
+            })),
+          };
+        }
+
+        // ─── Ingest GitHub Repository ────────────────────────────────────────
+        case "ingest_github_repository": {
+          const { owner, repo, notebook_id, branch, max_files, file_extensions } = args;
+          if (!owner || !repo || !notebook_id) {
+            return { error: "owner, repo et notebook_id sont requis." };
+          }
+
+          console.log(`[GitHub] Ingestion repo: ${owner}/${repo} vers notebook ${notebook_id.slice(0, 8)}...`);
+
+          try {
+            // Importer dynamiquement SourceIngester et notebookManager pour éviter les dépendances circulaires
+            const { sourceIngester, notebookManager } = await import('../notebooks/index.js');
+            
+            const options: any = {
+              maxFiles: Math.min(max_files || 100, 200),
+              fileExtensions: file_extensions || ['.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.go', '.rs', '.cpp', '.c', '.h', '.hpp', '.md', '.txt', '.json', '.yaml', '.yml'],
+              branch: branch,
+            };
+
+            const source = await sourceIngester.ingestFromGitHubRepository(
+              owner,
+              repo,
+              notebook_id,
+              options
+            );
+
+            // Ajouter la source au notebook et persister sur le disque
+            const updatedNb = notebookManager.addSource(notebook_id, source);
+            if (!updatedNb) {
+              console.warn(`[GitHub] Notebook ${notebook_id} introuvable lors de l'ajout de la source`);
+            } else {
+              console.log(`[GitHub] Source ajoutée au notebook ${notebook_id} : "${source.title}" (total: ${updatedNb.sources.length} sources)`);
+            }
+
+            console.log(`[GitHub] ingest_github_repository OK: ${source.title} [${Date.now() - startTime}ms]`);
+            return {
+              status: "success",
+              source: {
+                id: source.id,
+                title: source.title,
+                type: source.type,
+                origin: source.origin,
+                wordCount: source.wordCount,
+                fileCount: source.metadata?.githubRepo?.fileCount || 0,
+                chunks: source.chunks.length,
+                summary: source.summary,
+                keywords: source.keywords,
+              },
+              notebook_id,
+              repository: `${owner}/${repo}`,
+            };
+          } catch (e: any) {
+            console.error(`[GitHub] ingest_github_repository échec: ${e.message}`);
+            return { error: `Échec de l'ingestion: ${e.message}` };
+          }
         }
 
         default:

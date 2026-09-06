@@ -135,10 +135,17 @@ export function SourcesSummaryCard({
       />
 
       {/* Header */}
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setCollapsed((value) => !value)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.025]"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setCollapsed((value) => !value);
+          }
+        }}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.025] cursor-pointer"
         aria-expanded={!collapsed}
       >
         {/* Icône */}
@@ -242,7 +249,7 @@ export function SourcesSummaryCard({
             )}
           </div>
         </div>
-      </button>
+      </div>
 
       {/* Contenu */}
       <AnimatePresence initial={false}>

@@ -9,10 +9,11 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   BookOpen, Plus, Trash2, Clock, FileText, MessageSquare,
-  Search, SortAsc, SortDesc, X, ArrowRight,
+  Search, SortAsc, SortDesc, X, ArrowRight, Github,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { CreateNotebookModal } from './CreateNotebookModal.js';
+import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModal.js';
 
 interface NotebookSummary {
   id: string;
@@ -53,6 +54,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const [notebooks, setNotebooks] = useState<NotebookSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showGitHubImport, setShowGitHubImport] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortBy>('updatedAt');
   const [sortDesc, setSortDesc] = useState(true);
@@ -163,6 +165,18 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
               <span>Nouveau</span>
             </motion.button>
+            
+            <motion.button
+              onClick={() => setShowGitHubImport(true)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="notebook-icon-button rounded-lg"
+              style={{ borderColor: 'var(--border-base)' }}
+              title="Importer depuis GitHub"
+            >
+              <Github className="w-4 h-4" />
+            </motion.button>
+            
             {onClose && (
               <motion.button
                 onClick={onClose}
@@ -559,6 +573,19 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+      
+      {/* GitHub Import Modal */}
+      {showGitHubImport && (
+        <GitHubRepositoryImportModal
+          onClose={() => setShowGitHubImport(false)}
+          onImportSuccess={(notebookId, repository) => {
+            success(`Dépôt ${repository} ingéré avec succès !`);
+            loadNotebooks();
+            onSelectNotebook(notebookId);
+          }}
+        />
+      )}
+      
       </div>
     </div>
   );

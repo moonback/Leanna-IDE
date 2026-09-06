@@ -206,7 +206,7 @@ Fonctionnalités avancées et intégrations majeures.
 | Fonctionnalité | Statut |
 |---|---|
 | Ingestion de sources web (URL → chunks) | 📋 Planifié |
-| Ingestion de repos GitHub publics | 💡 Idée |
+| Ingestion de repos GitHub publics | ✅ Fait |
 | Recherche hybride (vectorielle + full-text BM25) | 📋 Planifié |
 | Export des notebooks en PDF/Markdown | 📋 Planifié |
 

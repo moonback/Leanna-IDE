@@ -11,10 +11,11 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Upload, Globe, FileText, Trash2, Loader2, Type, CheckCircle2, XCircle,
   Search, Eye, RefreshCw, Tag, ClipboardPaste, BarChart3, X, FolderCode,
-  CheckSquare, Square, Plus, Sparkles,
+  CheckSquare, Square, Plus, Sparkles, Github,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { SourcesSummaryCard } from './SourcesSummaryCard.js';
+import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModal.js';
 
 interface SourceItem {
   id: string;
@@ -51,11 +52,13 @@ interface UploadFileStatus {
 const TYPE_ICONS: Record<string, string> = {
   pdf: '📕', text: '📄', markdown: '📝', url: '🌐',
   html: '🌍', youtube: '📺', audio: '🎵', docx: '📘', image: '🖼️',
+  'github-repo': '💻',
 };
 
 const TYPE_COLORS: Record<string, string> = {
   pdf: 'var(--color-error)', text: 'var(--text-muted)', markdown: 'var(--color-accent-alt)', url: 'var(--accent-primary)',
   html: 'var(--accent-secondary)', youtube: 'var(--color-error)', audio: 'var(--color-warning)', docx: 'var(--accent-primary)', image: 'var(--color-success)',
+  'github-repo': 'var(--accent-primary)',
 };
 
 const ACCEPTED_EXTENSIONS = '.pdf,.txt,.md,.html,.docx,.doc,.rtf,.csv,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg';
@@ -84,6 +87,9 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
   const [tagInput, setTagInput] = useState<{ sourceId: string; value: string } | null>(null);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  // ─── GitHub Repository import ─────────────────────────────────────────────
+  const [showGitHubImport, setShowGitHubImport] = useState(false);
+  
   // ─── Codebase import ──────────────────────────────────────────────────────
   const [showCodebaseForm, setShowCodebaseForm] = useState(false);
   const [codebaseTitle, setCodebaseTitle] = useState('');
@@ -891,6 +897,17 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
         <motion.button
           {...tapScale}
+          onClick={() => setShowGitHubImport(true)}
+          className="notebook-chip"
+          title="Importer un dépôt GitHub"
+          style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+        >
+          <Github className="w-3.5 h-3.5" />
+          GitHub
+        </motion.button>
+
+        <motion.button
+          {...tapScale}
           onClick={() => { setShowCodebaseForm(!showCodebaseForm); setShowUrlForm(false); setShowTextForm(false); }}
           className={`notebook-chip ${showCodebaseForm ? 'notebook-chip--active' : ''}`}
           style={showCodebaseForm ? { borderColor: 'var(--notebook-accent)', color: 'var(--notebook-accent)', background: 'var(--notebook-accent-surface)' } : {}}
@@ -1367,6 +1384,24 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         </div>
       )}
       </div>{/* end scrollable content */}
+      
+      {/* GitHub Repository Import Modal */}
+      {showGitHubImport && (
+        <GitHubRepositoryImportModal
+          onClose={() => setShowGitHubImport(false)}
+          onImportSuccess={(targetNotebookId, repository) => {
+            success(`Dépôt ${repository} ingéré avec succès !`);
+            if (targetNotebookId && targetNotebookId !== notebookId) {
+              window.location.hash = `notebook=${targetNotebookId}`;
+              window.dispatchEvent(new HashChangeEvent('hashchange'));
+            } else {
+              onRefresh();
+            }
+          }}
+          defaultNotebookId={notebookId}
+        />
+      )}
+      
     </div>
   );
 }
