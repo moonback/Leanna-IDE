@@ -9,7 +9,7 @@
  * - Actions sur les notifications
  */
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Bell, CheckCircle, XCircle, AlertTriangle, Info, X, Clock, Archive, Trash2
@@ -34,6 +34,7 @@ interface NotificationCenterProps {
   position?: "top-right" | "top-left" | "bottom-right" | "bottom-left";
   maxToasts?: number;
   defaultDuration?: number;
+  children?: React.ReactNode;
 }
 
 // Contexte pour les notifications
@@ -423,6 +424,7 @@ export function NotificationCenter({
   position = "top-right",
   maxToasts = 5,
   defaultDuration = 5000,
+  children,
 }: NotificationCenterProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const idRef = useRef(0);
@@ -491,6 +493,7 @@ export function NotificationCenter({
       clearNotifications,
       notifications,
     }}>
+      {children}
       {/* Notifications Toast */}
       <AnimatePresence>
         {toastNotifications.map(notification => (
