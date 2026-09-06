@@ -7,7 +7,7 @@ import { lazy, Suspense } from 'react';
 import { X } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip.js';
 
-const AutomationView = lazy(() => import('../../views/AutomationView'));
+const AutomationView = lazy(() => import('../../views/AutomationView.js'));
 
 interface AutomationPanelProps {
   onClose: () => void;

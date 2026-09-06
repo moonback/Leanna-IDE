@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { FileText, Loader2, X, RefreshCw, Tag } from 'lucide-react';
 import { marked } from 'marked';
-import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml';
+import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
 
 interface SourceData {
   id: string;

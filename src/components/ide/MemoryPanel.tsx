@@ -7,7 +7,7 @@ import { lazy, Suspense } from 'react';
 import { X } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip.js';
 
-const MemoriesView = lazy(() => import('../../views/MemoriesView'));
+const MemoriesView = lazy(() => import('../../views/MemoriesView.js'));
 
 interface MemoryPanelProps {
   onClose: () => void;

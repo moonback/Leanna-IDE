@@ -126,9 +126,12 @@ async function streamWithGemini(options: GenerateTextStreamOptions): Promise<str
     contents: [{ role: 'user', parts }],
     config: {
       temperature: options.temperature ?? 0.5,
+      // Voir generateWithGemini : même repli maxTokens → maxOutputTokens.
       ...(options.maxOutputTokens !== undefined
         ? { maxOutputTokens: options.maxOutputTokens }
-        : {}),
+        : options.maxTokens !== undefined
+          ? { maxOutputTokens: options.maxTokens }
+          : {}),
       ...(options.thinkingBudget !== undefined
         ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } }
         : {}),
@@ -277,9 +280,17 @@ async function generateWithGemini(options: GenerateTextOptions): Promise<Generat
         contents: [{ role: 'user', parts }],
         config: {
           temperature: options.temperature ?? 0.5,
+          // maxOutputTokens est la clé "native" Gemini ; maxTokens est le nom
+          // générique utilisé par les appelants (ex. chainOfThought.ts) qui
+          // partagent le même code avec OpenRouter. Sans ce repli, un appel
+          // ne fournissant que `maxTokens` n'appliquait AUCUNE limite sur
+          // Gemini (le provider par défaut), ce qui rendait les budgets de
+          // tokens du module CoT inopérants dans le cas le plus courant.
           ...(options.maxOutputTokens !== undefined
             ? { maxOutputTokens: options.maxOutputTokens }
-            : {}),
+            : options.maxTokens !== undefined
+              ? { maxOutputTokens: options.maxTokens }
+              : {}),
           ...(options.thinkingBudget !== undefined
             ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } }
             : {}),

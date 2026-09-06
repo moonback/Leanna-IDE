@@ -7,7 +7,7 @@
 
 import { memo, useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { marked } from 'marked';
-import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml';
+import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ResponsiveContainer,

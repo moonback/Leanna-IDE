@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { marked } from 'marked';
-import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml';
+import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
 
 interface MarkdownPreviewProps {
   content: string;

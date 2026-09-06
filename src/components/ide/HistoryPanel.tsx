@@ -7,7 +7,7 @@ import { lazy, Suspense } from 'react';
 import { X } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip.js';
 
-const HistoryView = lazy(() => import('../../views/HistoryView'));
+const HistoryView = lazy(() => import('../../views/HistoryView.js'));
 
 interface HistoryPanelProps {
   onClose: () => void;

@@ -63,7 +63,14 @@ async function runTreeOfThought(prompt: string, budget: ReturnType<typeof reason
   const temperatures = [0.3, 0.7, 1.0];
   const branchPrompt = (index: number) =>
     `Tu es la branche ${index} d'une exploration indépendante. Génère UNE approche complète et distincte pour résoudre le problème ci-dessous. Ne compare pas d'autres branches, ne justifie pas leur absence et termine par un plan exécutable.\n\nPROBLÈME :\n${prompt}`;
-  const branches = await Promise.all(
+
+  // Promise.allSettled (au lieu de Promise.all) : une branche qui échoue
+  // (quota, timeout, provider indisponible) ne doit pas faire perdre les
+  // branches qui ont réussi. Le module chainOfThought.ts applique déjà ce
+  // principe de "gestion granulaire des erreurs" ; runTreeOfThought ne le
+  // faisait pas, alors qu'il représente le chemin le plus coûteux (3 appels
+  // en parallèle) et donc le plus exposé au risque de panne partielle.
+  const settled = await Promise.allSettled(
     temperatures.map((temperature, index) =>
       generateWithProviderFallback({
         prompt: branchPrompt(index + 1),
@@ -73,14 +80,44 @@ async function runTreeOfThought(prompt: string, budget: ReturnType<typeof reason
       })
     )
   );
+
+  const branches: { index: number; result: GenerateTextResult }[] = [];
+  const branchErrors: string[] = [];
+  settled.forEach((outcome, index) => {
+    if (outcome.status === "fulfilled") {
+      branches.push({ index, result: outcome.value });
+    } else {
+      branchErrors.push(`Branche ${index + 1}: ${(outcome.reason as Error)?.message ?? outcome.reason}`);
+    }
+  });
+
+  if (branches.length === 0) {
+    throw new Error(`Toutes les branches Tree-of-Thought ont échoué. ${branchErrors.join(" | ")}`);
+  }
+
+  // Une seule branche a survécu : rien à évaluer, on la retourne directement
+  // plutôt que de payer un appel d'évaluation inutile sur un unique candidat.
+  if (branches.length === 1) {
+    const only = branches[0];
+    return {
+      ...only.result,
+      evaluation: `Une seule branche disponible (${branchErrors.join(" | ")}), retenue par défaut.`,
+      winner: only.index + 1,
+    };
+  }
+
+  const evaluationPrompt = branches
+    .map(({ index, result }) => `APPROCHE ${index + 1}:\n${result.text}`)
+    .join("\n\n");
   const evaluation = await generateWithProviderFallback({
-    prompt: `Évalue ces trois approches indépendantes. Réponds d'abord en JSON strict {"winner":1|2|3,"reasoning":"..."}, puis explique brièvement le choix. Note faisabilité, risques, complexité et réversibilité.\n\nAPPROCHE 1:\n${branches[0].text}\n\nAPPROCHE 2:\n${branches[1].text}\n\nAPPROCHE 3:\n${branches[2].text}`,
+    prompt: `Évalue ces approches indépendantes (${branches.length} sur 3 disponibles${branchErrors.length ? "; " + branchErrors.join(" | ") : ""}). Réponds d'abord en JSON strict {"winner":1|2|3,"reasoning":"..."} en utilisant le numéro d'approche indiqué ci-dessous, puis explique brièvement le choix. Note faisabilité, risques, complexité et réversibilité.\n\n${evaluationPrompt}`,
     systemPrompt: "Tu es un évaluateur indépendant et exigeant. Sélectionne la meilleure approche, sans réécrire les branches.",
     temperature: 0.2,
     ...budget,
   });
   const winner = parseWinner(evaluation.text);
-  return { ...branches[winner - 1], evaluation: evaluation.text, winner };
+  const winningBranch = branches.find((b) => b.index + 1 === winner) ?? branches[0];
+  return { ...winningBranch.result, evaluation: evaluation.text, winner: winningBranch.index + 1 };
 }
 
 async function runSelfCritique(prompt: string, initial: GenerateTextResult, budget: ReturnType<typeof reasoningBudget>): Promise<GenerateTextResult> {
@@ -585,8 +622,11 @@ const STRATEGY_PATTERNS: Record<Exclude<ThinkingStrategy, "auto">, StrategyPatte
   ],
 
   root_cause_analysis: [
+    // Anciennement dupliqué avec une seconde entrée `/root cause/i` de même
+    // poids : toute requête contenant "root cause" recevait +5 au lieu de
+    // +2.5, biaisant le score par rapport aux autres stratégies qui n'ont
+    // qu'une seule entrée par motif.
     { regex: /cause (racine|profonde|première)|root cause|underlying cause/i, weight: 2.5 },
-    { regex: /root cause/i, weight: 2.5 },
     { regex: /5 pourquoi|5 whys|five whys|why does.*happen/i, weight: 2.5 },
     { regex: /pourquoi.*(arrive|se produit|survient|persiste|revient)|why.*(happen|occur|persist|recur)/i, weight: 2 },
     { regex: /diagnostiquer|diagnostic.*(panne|incident|défaillance)|diagnos(e|is)|troubleshoot/i, weight: 2 },
@@ -694,7 +734,7 @@ function autoSelectStrategy(prompt: string): Exclude<ThinkingStrategy, "auto"> {
 
 function buildThinkingPrompt(strategy: Exclude<ThinkingStrategy, "auto">, userPrompt: string): string {
   const config = THINKING_STRATEGIES[strategy];
-  return `${config.systemPrompt}\n\n---\n\nPROBLÈME À RÉSOUDRE :\n${userPrompt}`;
+  return `${config.systemPrompt}\n\n## Niveau de confiance\nIndique explicitement un niveau de confiance (élevé, moyen ou faible) et justifie-le en une phrase.\n\n---\n\nPROBLÈME À RÉSOUDRE :\n${userPrompt}`;
 }
 
 // ─── Skill Export ───────────────────────────────────────────────────────────
@@ -854,10 +894,18 @@ export const reasoningSkill: Skill = {
       // ── Étape de pré-raisonnement : CoT automatique pour complexe/critique ──
       // Pour les stratégies qui bénéficient d'une décomposition préalable,
       // on exécute le ChainOfThoughtExecutor avant d'appeler le LLM principal.
+      //
+      // IMPORTANT : "chain_of_thought" et "tree_of_thought" sont volontairement
+      // EXCLUS de cette liste. Ces deux stratégies effectuent déjà elles-mêmes
+      // une décomposition/exploration complète via leur propre systemPrompt
+      // (et, pour tree_of_thought, via runTreeOfThought ci-dessous qui explore
+      // 3 branches + une évaluation). Les inclure ici doublait le travail :
+      // un "critical" déclenchait jusqu'à 5 appels LLM (1 pré-CoT + 3 branches
+      // + 1 évaluation) pour un seul reasoning_think. Ne garder le pré-CoT que
+      // pour les stratégies qui n'explorent pas déjà nativement plusieurs
+      // pistes de raisonnement.
       const isDecompositionStrategy =
         chosenStrategy === "decomposition" ||
-        chosenStrategy === "chain_of_thought" ||
-        chosenStrategy === "tree_of_thought" ||
         chosenStrategy === "document_analysis" ||
         chosenStrategy === "comparative_analysis" ||
         chosenStrategy === "root_cause_analysis";
@@ -943,7 +991,7 @@ export const reasoningSkill: Skill = {
 
       try {
         const budget = reasoningBudget(complexity);
-        const cacheKey = reasoningCacheKey(chosenStrategy, fullPrompt);
+        const cacheKey = reasoningCacheKey(chosenStrategy, prompt);
         const cached = reasoningCache.get(cacheKey);
         let response: GenerateTextResult;
         let treeEvaluation: string | undefined;
