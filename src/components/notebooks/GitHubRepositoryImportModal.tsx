@@ -42,7 +42,8 @@ interface Notebook {
   id: string;
   title: string;
   description: string;
-  sources: any[];
+  sources?: any[];
+  sourcesCount?: number;
 }
 
 interface GitHubRepositoryImportModalProps {
@@ -127,16 +128,14 @@ export function GitHubRepositoryImportModal({
       if (data.notebooks) {
         setNotebooks(data.notebooks);
         // Sélectionner le premier notebook si aucun n'est sélectionné
-        if (!selectedNotebookId && data.notebooks.length > 0) {
-          setSelectedNotebookId(data.notebooks[0].id);
-        }
+        setSelectedNotebookId(prev => prev || (data.notebooks.length > 0 ? data.notebooks[0].id : null));
       }
     } catch (e: any) {
       setFilesError(`Erreur de chargement des notebooks: ${e.message}`);
     } finally {
       setNotebooksLoading(false);
     }
-  }, [selectedNotebookId]);
+  }, []);
 
   // Charger les notebooks au montage
   useEffect(() => {
@@ -794,12 +793,14 @@ export function GitHubRepositoryImportModal({
                           Aucun notebook disponible
                         </option>
                       ) : (
-                        notebooks.map((notebook) => (
-                          <option key={notebook.id} value={notebook.id}>
-                            {notebook.title} {notebook.sources.length > 0 && 
-                              `(${notebook.sources.length} sources)`}
-                          </option>
-                        ))
+                        notebooks.map((notebook) => {
+                          const count = notebook.sourcesCount ?? (Array.isArray(notebook.sources) ? notebook.sources.length : 0);
+                          return (
+                            <option key={notebook.id} value={notebook.id}>
+                              {notebook.title} {count > 0 ? `(${count} source${count > 1 ? 's' : ''})` : ''}
+                            </option>
+                          );
+                        })
                       )}
                     </select>
                   )}
