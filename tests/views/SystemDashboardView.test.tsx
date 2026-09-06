@@ -521,4 +521,4 @@ describe("SystemDashboardView Edge Cases", () => {
   });
 });
 
-console.log("✅ Tous les tests SystemDashboardView ont été créés avec succès !");
+// Tests créés avec succès pour SystemDashboardView

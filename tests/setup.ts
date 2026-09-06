@@ -10,6 +10,7 @@
 import '@testing-library/jest-dom';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
+import * as React from 'react';
 
 // Nettoyer après chaque test
 afterEach(() => {
@@ -122,24 +123,32 @@ vi.mock('../src/hooks', () => ({
 }));
 
 // Mock global pour Motion (pour éviter les erreurs SSR)
-vi.mock('motion/react', () => ({
-  motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-    button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-    span: ({ children, ...props }: any) => <span {...props}>{children}</span>,
-    input: ({ ...props }: any) => <input {...props} />,
-    textarea: ({ ...props }: any) => <textarea {...props} />,
-  },
-  AnimatePresence: ({ children }: any) => <>{children}</>,
-  useAnimation: () => ({}),
-  useMotionValue: () => ({}),
-  useScroll: () => ({}),
-  useTransform: () => ({}),
-}));
+vi.mock('motion/react', () => {
+  // Filtrer les props spécifiques à Motion qui ne sont pas reconnues par React
+  const filterMotionProps = (props: any) => {
+    const { whileHover, whileTap, initial, animate, exit, transition, layout, ...rest } = props;
+    return rest;
+  };
+  
+  return {
+    motion: {
+      div: ({ children, ...props }: any) => React.createElement('div', filterMotionProps(props), children),
+      button: ({ children, ...props }: any) => React.createElement('button', filterMotionProps(props), children),
+      span: ({ children, ...props }: any) => React.createElement('span', filterMotionProps(props), children),
+      input: (props: any) => React.createElement('input', filterMotionProps(props)),
+      textarea: (props: any) => React.createElement('textarea', filterMotionProps(props)),
+    },
+    AnimatePresence: ({ children }: any) => children,
+    useAnimation: () => ({}),
+    useMotionValue: () => ({}),
+    useScroll: () => ({}),
+    useTransform: () => ({}),
+  };
+});
 
 // Mock global pour les icônes Lucide (pour éviter les erreurs d'import)
 vi.mock('lucide-react', () => {
-  const MockIcon = ({ className }: { className?: string }) => <span className={className}>Icon</span>;
+  const MockIcon = ({ className }: { className?: string }) => React.createElement('span', { className }, 'Icon');
   
   return {
     // Icônes courantes utilisées dans les dashboards
@@ -185,14 +194,11 @@ vi.mock('lucide-react', () => {
     Minimize2: MockIcon,
     Maximize2: MockIcon,
     Shield: MockIcon,
-    Package: MockIcon,
     Wand2: MockIcon,
     BookOpen: MockIcon,
     Globe: MockIcon,
-    Terminal: MockIcon,
     Container: MockIcon,
     Github: MockIcon,
-    GitBranch: MockIcon,
     Workflow: MockIcon,
     Camera: MockIcon,
     Monitor: MockIcon,
@@ -201,15 +207,15 @@ vi.mock('lucide-react', () => {
     Briefcase: MockIcon,
     Cpu: MockIcon,
     UserCog: MockIcon,
-    // Types
-    type LucideIcon: React.ComponentType<{ className?: string }>,
   };
 });
 
+// Suppression des doublons : Package, Terminal, GitBranch
+
 // Mock pour Monaco Editor (s'il est utilisé dans les composants)
 vi.mock('@monaco-editor/react', () => ({
-  default: ({ children }: any) => <div data-testid="monaco-editor">{children}</div>,
-  Editor: ({ children }: any) => <div data-testid="monaco-editor">{children}</div>,
+  default: ({ children }: any) => React.createElement('div', { 'data-testid': 'monaco-editor' }, children),
+  Editor: ({ children }: any) => React.createElement('div', { 'data-testid': 'monaco-editor' }, children),
   useMonaco: () => ({}),
   loader: {
     config: () => ({}),
@@ -219,18 +225,18 @@ vi.mock('@monaco-editor/react', () => ({
 
 // Mock pour Recharts (si utilisé)
 vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }: any) => <div data-testid="recharts-container">{children}</div>,
-  LineChart: ({ children }: any) => <div data-testid="line-chart">{children}</div>,
-  BarChart: ({ children }: any) => <div data-testid="bar-chart">{children}</div>,
-  PieChart: ({ children }: any) => <div data-testid="pie-chart">{children}</div>,
-  Line: ({ children }: any) => <path data-testid="line">{children}</path>,
-  Bar: ({ children }: any) => <rect data-testid="bar">{children}</rect>,
-  Cell: ({ children }: any) => <g data-testid="cell">{children}</g>,
-  XAxis: ({ children }: any) => <g data-testid="x-axis">{children}</g>,
-  YAxis: ({ children }: any) => <g data-testid="y-axis">{children}</g>,
-  CartesianGrid: ({ children }: any) => <g data-testid="grid">{children}</g>,
-  Tooltip: ({ children }: any) => <div data-testid="tooltip">{children}</div>,
-  Legend: ({ children }: any) => <div data-testid="legend">{children}</div>,
+  ResponsiveContainer: ({ children }: any) => React.createElement('div', { 'data-testid': 'recharts-container' }, children),
+  LineChart: ({ children }: any) => React.createElement('div', { 'data-testid': 'line-chart' }, children),
+  BarChart: ({ children }: any) => React.createElement('div', { 'data-testid': 'bar-chart' }, children),
+  PieChart: ({ children }: any) => React.createElement('div', { 'data-testid': 'pie-chart' }, children),
+  Line: ({ children }: any) => React.createElement('path', { 'data-testid': 'line' }, children),
+  Bar: ({ children }: any) => React.createElement('rect', { 'data-testid': 'bar' }, children),
+  Cell: ({ children }: any) => React.createElement('g', { 'data-testid': 'cell' }, children),
+  XAxis: ({ children }: any) => React.createElement('g', { 'data-testid': 'x-axis' }, children),
+  YAxis: ({ children }: any) => React.createElement('g', { 'data-testid': 'y-axis' }, children),
+  CartesianGrid: ({ children }: any) => React.createElement('g', { 'data-testid': 'grid' }, children),
+  Tooltip: ({ children }: any) => React.createElement('div', { 'data-testid': 'tooltip' }, children),
+  Legend: ({ children }: any) => React.createElement('div', { 'data-testid': 'legend' }, children),
 }));
 
 // Mock pour Redux ou Context si nécessaire

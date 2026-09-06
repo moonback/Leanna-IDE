@@ -1027,4 +1027,4 @@ describe("WorkspaceDashboardView Edge Cases", () => {
   });
 });
 
-console.log("✅ Tous les tests WorkspaceDashboardView ont été créés avec succès !");
+// Tests créés avec succès pour WorkspaceDashboardView

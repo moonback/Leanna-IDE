@@ -866,4 +866,4 @@ describe("AgentDashboardView Edge Cases", () => {
   });
 });
 
-console.log("✅ Tous les tests AgentDashboardView ont été créés avec succès !");
+// Tests créés avec succès pour AgentDashboardView
