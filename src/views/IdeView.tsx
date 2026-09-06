@@ -997,10 +997,15 @@ export default function IdeView() {
           <div
             className="ide-splash-progress absolute top-[35px] left-0 right-0 z-50"
             role="progressbar"
-            aria-label="Chargement en cours"
-            aria-valuetext="Traitement en cours"
+            aria-label={fileSystem.loading ? 'Chargement de l’espace de travail' : 'Leanna travaille'}
+            aria-valuetext={fileSystem.loading && assistantWorking ? 'Chargement et traitement en cours' : undefined}
+            data-loading={fileSystem.loading || undefined}
+            data-assistant-working={assistantWorking || undefined}
           >
-            <div className="ide-splash-progress__track">
+            <span className="sr-only" aria-live="polite">
+              {fileSystem.loading ? 'Chargement de l’espace de travail en cours.' : 'Leanna traite votre demande.'}
+            </span>
+            <div className="ide-splash-progress__track" aria-hidden="true">
               <div className="ide-splash-progress__aura" />
               <div className="ide-splash-progress__fill">
                 <span className="ide-splash-progress__glint" />
