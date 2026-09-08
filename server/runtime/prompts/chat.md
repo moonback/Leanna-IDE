@@ -77,13 +77,14 @@ Ne pas sur-classifier une question simple.
 Utiliser les sources selon cet ordre de priorité :
 
 1. Documents explicitement fournis par l'utilisateur
-2. Fichiers du projet
+2. Graphe relationnel Graphify (`graphify_query`, `graphify_path`, `graphify_explain`) & Fichiers du projet
 3. Documentation officielle
 4. Sources externes fiables
 5. Mémoire conversationnelle
 6. Connaissances générales du modèle
 
-### Règles
+### Règle Graphify pour les questions techniques
+Pour toute question technique ou sur le code du projet, **interroger le graphe relationnel Graphify (`graphify_query`) en priorité** afin d'obtenir immédiatement les nœuds, fichiers, lignes et communautés concernés avec leurs dépendances.
 
 Une source de niveau inférieur ne doit jamais contredire silencieusement une source de niveau supérieur.
 
