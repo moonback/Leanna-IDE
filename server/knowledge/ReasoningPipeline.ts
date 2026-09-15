@@ -37,25 +37,22 @@ import { createLogger } from "../utils/logger.js";
 import { semanticSearch } from "./SemanticSearch.js";
 import { projectMemory } from "./ProjectMemory.js";
 import { generateText } from "../utils/textGeneration.js";
-import { estimateTokens } from "../utils/tokenOptimizer.js";
 import type {
   ReasoningStep,
   StepResult,
   PipelineContext,
   ReasoningResult,
-  ContextBatch,
-  ProjectFact,
-  RelevantFile,
+  ContextBatch,  RelevantFile,
 } from "./types.js";
 
 // ─── Import différé pour éviter les dépendances circulaires ─────────────────
 // LearningEngine est importé dynamiquement dans les méthodes qui en ont besoin.
-type LearningEngineType = import("./LearningEngine").LearningEngine;
+type LearningEngineType = import("./LearningEngine.js").LearningEngine;
 let _learningEngineCache: LearningEngineType | null = null;
 async function getLearningEngine(): Promise<LearningEngineType | null> {
   if (_learningEngineCache) return _learningEngineCache;
   try {
-    const mod = await import("./LearningEngine");
+    const mod = await import("./LearningEngine.js");
     _learningEngineCache = mod.learningEngine;
     return _learningEngineCache;
   } catch {

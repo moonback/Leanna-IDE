@@ -1,13 +1,8 @@
-import { randomUUID } from "crypto";
 import { Mission } from "./Mission.js";
-import { Planner, type SubGoalPlan } from "./Planner.js";
+import { Planner } from "./Planner.js";
 import { ReflectionEngine, type ReflectionInput } from "./Reflection.js";
 import { SkillScorer } from "./SkillScorer.js";
-import type {
-  GoalStatus,
-  PlannedAction,
-  GoalResult,
-  ReflectionResult,
+import type {  PlannedAction,  ReflectionResult,
   MissionConfig,
   MissionPlan,
 } from "./types.js";
@@ -457,7 +452,7 @@ export class Executor {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  private createSubGoals(mission: Mission, parentId: string, plans: SubGoalPlan[]): string[] {
+  private createSubGoals(mission: Mission, parentId: string, plans: Array<{ title: string; description: string; successCriteria: string[]; priority: string }>): string[] {
     const ids: string[] = [];
 
     for (const plan of plans) {

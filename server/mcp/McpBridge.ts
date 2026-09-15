@@ -13,7 +13,7 @@
  */
 import { EventEmitter } from 'events';
 import { McpClient, McpClientStatus, McpToolDefinition, McpToolResult } from './McpClient.js';
-import { McpServerConfig, loadMcpConfig, saveMcpConfig, upsertMcpServer, removeMcpServer } from './mcpConfig.js';
+import { McpServerConfig, loadMcpConfig, upsertMcpServer, removeMcpServer } from './mcpConfig.js';
 import { normalizeSelfPath } from '../utils/selfRoot.js';
 import type { Skill } from '../skills/base.js';
 

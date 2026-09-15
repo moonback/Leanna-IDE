@@ -211,7 +211,6 @@ export class AutonomousLoop {
     }
 
     const totalDuration = Date.now() - globalStart;
-    const successCount = iterations.filter(i => i.decision === "stop" || (i.filesWritten.length > 0 && !i.retrySignal)).length;
     log.info(
       `[${agent.name}] 🏁 AutonomousLoop terminé — ${iteration} itération(s) en ${(totalDuration / 1000).toFixed(1)}s — Décision: ${finalDecision}`
     );

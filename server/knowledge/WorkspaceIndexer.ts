@@ -21,7 +21,6 @@ import path from "path";
 import { createLogger } from "../utils/logger.js";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 import { getDocumentStore } from "./DocumentStore.js";
-import type { StoredDocument } from "./DocumentStore.js";
 import { isSandboxActive, getSandboxRoot } from "../utils/sandbox.js";
 import { fileWatcher } from "./FileWatcher.js";
 import type { FileChangeEvent } from "./FileWatcher.js";

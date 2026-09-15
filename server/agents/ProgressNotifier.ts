@@ -6,7 +6,7 @@
  * Persiste également les mises à jour de statut dans Supabase.
  */
 import type { AgentTask, TaskStatus, AgentRole } from "./types.js";
-import { getAgentDefinition } from "./roles.js";
+import { getAgentDefinitionOrThrow } from "./roles.js";
 import { agentPersistence } from "./AgentPersistence.js";
 import { createLogger } from "../utils/logger.js";
 
@@ -58,7 +58,7 @@ export class ProgressNotifier {
    * Notifie la progression d'une tâche agent via tous les canaux configurés.
    */
   notify(task: AgentTask, event: ProgressEvent, progress?: AgentEvent["progress"]): void {
-    const agent = getAgentDefinition(task.role);
+    const agent = getAgentDefinitionOrThrow(task.role);
 
     // Log structuré
     switch (event) {

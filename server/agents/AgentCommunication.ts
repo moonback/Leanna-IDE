@@ -171,7 +171,7 @@ export interface DelegationPolicy {
 }
 
 import { STATIC_AGENT_ROLES } from "./types.js";
-import { listAgentRoles } from "./roles.js";
+import { listAgentRoles as _listAgentRoles } from "./roles.js";
 import { getAgentDefinition } from "./roles.js";
 
 /** Matrice de délégation : quels agents peuvent déléguer à qui */

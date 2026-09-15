@@ -2,9 +2,7 @@ import { randomUUID } from "crypto";
 import type {
   Goal,
   GoalPriority,
-  PlannedAction,
-  MissionState,
-  SkillScore,
+  PlannedAction,  SkillScore,
 } from "./types.js";
 import { Mission } from "./Mission.js";
 import { SkillScorer } from "./SkillScorer.js";

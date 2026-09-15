@@ -10,7 +10,7 @@
  */
 
 import type { AgentRole, TaskPriority } from "./types.js";
-import { DELEGATION_MATRIX, isDelegationAllowed } from "./AgentCommunication.js";
+import { DELEGATION_MATRIX as _DELEGATION_MATRIX, isDelegationAllowed } from "./AgentCommunication.js";
 import { listAgentRoles } from "./roles.js";
 import { createLogger } from "../utils/logger.js";
 

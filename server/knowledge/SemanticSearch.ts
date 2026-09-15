@@ -296,13 +296,13 @@ export class SemanticSearch {
    * Utilise l'index d'entités du KnowledgeGraph.
    */
   searchByEntity(query: string): RelevantFile[] {
-    const lowerQuery = query.toLowerCase();
+    const _lowerQuery = query.toLowerCase();
     const entities = knowledgeGraph.searchEntities(query);
     const fileMap = new Map<string, { entities: CodeEntity[]; score: number }>();
 
     for (const entity of entities) {
       const existing = fileMap.get(entity.filePath);
-      const score = this.computeEntityMatchScore(entity, lowerQuery);
+      const score = this.computeEntityMatchScore(entity, _lowerQuery);
 
       if (existing) {
         existing.entities.push(entity);
@@ -322,7 +322,7 @@ export class SemanticSearch {
       .map(([filePath, data]) => ({
         filePath,
         relevance: data.score,
-        reason: this.buildEntityReason(data.entities, lowerQuery),
+        reason: this.buildEntityReason(data.entities, _lowerQuery),
         relevantSections: [], // Sections extraites plus tard
       }));
   }
@@ -336,16 +336,16 @@ export class SemanticSearch {
    * Utilise la recherche de fichiers du KnowledgeGraph.
    */
   searchByPath(query: string): RelevantFile[] {
-    const lowerQuery = query.toLowerCase();
+    const _lowerQuery = query.toLowerCase();
     const files = knowledgeGraph.searchFiles(query);
 
     const results: RelevantFile[] = files
       .map((file) => {
-        const score = this.computePathMatchScore(file.path, file.name, lowerQuery);
+        const score = this.computePathMatchScore(file.path, file.name, _lowerQuery);
         return {
           filePath: file.path,
           relevance: score,
-          reason: this.buildPathReason(file.path, lowerQuery),
+          reason: this.buildPathReason(file.path, _lowerQuery),
           relevantSections: [],
         };
       })
@@ -366,8 +366,8 @@ export class SemanticSearch {
    * lorsque KnowledgeGraph émet une mise à jour ou que le nb de fichiers change.
    */
   searchByContent(query: string): RelevantFile[] {
-    const lowerQuery = query.toLowerCase();
-    const queryTokens = this.tokenize(lowerQuery);
+    const _lowerQuery = query.toLowerCase();
+    const queryTokens = this.tokenize(_lowerQuery);
     if (queryTokens.length === 0) return [];
 
     const files = knowledgeGraph.getAllFiles();
@@ -383,15 +383,15 @@ export class SemanticSearch {
         const content = this.readFileContent(file.path);
         if (!content) continue;
         const tokens = this.tokenize(content.toLowerCase());
-        const score = this.computeContentScore(queryTokens, tokens, content, lowerQuery);
+        const score = this.computeContentScore(queryTokens, tokens, content, _lowerQuery);
         if (score >= MIN_RELEVANCE_THRESHOLD) results.push({ filePath: file.path, score, content });
       }
       results.sort((a, b) => b.score - a.score);
       return results.slice(0, MAX_RESULTS).map((r) => ({
         filePath: r.filePath,
         relevance: r.score,
-        reason: this.buildContentReason(r.filePath, lowerQuery, r.content),
-        relevantSections: this.extractRelevantSectionsFromContent(r.content, lowerQuery),
+        reason: this.buildContentReason(r.filePath, _lowerQuery, r.content),
+        relevantSections: this.extractRelevantSectionsFromContent(r.content, _lowerQuery),
       }));
     }
 
@@ -420,7 +420,7 @@ export class SemanticSearch {
       }
     }
 
-    const exactPhrase = lowerQuery.trim().length >= 4;
+    const exactPhrase = _lowerQuery.trim().length >= 4;
 
     // ── Phase II : scoring des candidats (seulement ceux récupérés) ──
     for (const filePath of candidates) {
@@ -449,11 +449,11 @@ export class SemanticSearch {
       let exactHit = false, phraseHit = false;
       let cachedContent = index.docContentCache.get(filePath)?.content;
       if (cachedContent) {
-        if (exactPhrase && cachedContent.toLowerCase().includes(lowerQuery)) { phraseHit = true; exactHit = true; }
+        if (exactPhrase && cachedContent.toLowerCase().includes(_lowerQuery)) { phraseHit = true; exactHit = true; }
       } else {
         const content = this.readFileContent(filePath);
         if (content) {
-          if (exactPhrase && content.toLowerCase().includes(lowerQuery)) { phraseHit = true; exactHit = true; }
+          if (exactPhrase && content.toLowerCase().includes(_lowerQuery)) { phraseHit = true; exactHit = true; }
           cachedContent = content;
         }
       }
@@ -485,8 +485,8 @@ export class SemanticSearch {
       out.push({
         filePath,
         relevance: meta.scoreTerms,
-        reason: this.buildContentReason(filePath, lowerQuery, content),
-        relevantSections: this.extractRelevantSectionsFromContent(content, lowerQuery),
+        reason: this.buildContentReason(filePath, _lowerQuery, content),
+        relevantSections: this.extractRelevantSectionsFromContent(content, _lowerQuery),
       });
     }
     if (_scoredContentPerQueryMap) { _scoredContentPerQueryMap.clear(); _scoredContentPerQueryMap = undefined; }
@@ -601,10 +601,10 @@ export class SemanticSearch {
    */
   extractRelevantSectionsFromContent(
     content: string,
-    lowerQuery: string
+    _lowerQuery: string
   ): RelevantSection[] {
     const lines = content.split(/\r?\n/);
-    const queryTokens = this.tokenize(lowerQuery);
+    const queryTokens = this.tokenize(_lowerQuery);
     const sections: RelevantSection[] = [];
     const processedLines = new Set<number>();
 
@@ -612,7 +612,7 @@ export class SemanticSearch {
     const lineScores: { lineIndex: number; score: number }[] = [];
     for (let i = 0; i < lines.length; i++) {
       const lineLower = lines[i].toLowerCase();
-      const score = this.computeLineRelevance(lineLower, queryTokens, lowerQuery);
+      const score = this.computeLineRelevance(lineLower, queryTokens, _lowerQuery);
       if (score > 0) {
         lineScores.push({ lineIndex: i, score });
       }
@@ -748,25 +748,25 @@ export class SemanticSearch {
   /**
    * Calcule le score de correspondance entre une entité et la requête.
    */
-  private computeEntityMatchScore(entity: CodeEntity, lowerQuery: string): number {
+  private computeEntityMatchScore(entity: CodeEntity, _lowerQuery: string): number {
     let score = 0;
     const nameLower = entity.name.toLowerCase();
 
     // Correspondance exacte
-    if (nameLower === lowerQuery) {
+    if (nameLower === _lowerQuery) {
       score = 1.0;
     }
     // Correspondance partielle (le nom contient la requête)
-    else if (nameLower.includes(lowerQuery)) {
+    else if (nameLower.includes(_lowerQuery)) {
       score = 0.8;
     }
     // La requête contient le nom
-    else if (lowerQuery.includes(nameLower)) {
+    else if (_lowerQuery.includes(nameLower)) {
       score = 0.6;
     }
     // Correspondance de mots individuels
     else {
-      const queryWords = lowerQuery.split(/[\s_-]+/);
+      const queryWords = _lowerQuery.split(/[\s_-]+/);
       const nameWords = nameLower.split(/[\s_-]+/);
       const matchCount = queryWords.filter((w) => nameWords.includes(w)).length;
       if (matchCount > 0) {
@@ -788,26 +788,26 @@ export class SemanticSearch {
   /**
    * Calcule le score de correspondance entre le chemin/nom du fichier et la requête.
    */
-  private computePathMatchScore(filePath: string, fileName: string, lowerQuery: string): number {
+  private computePathMatchScore(filePath: string, fileName: string, _lowerQuery: string): number {
     let score = 0;
     const pathLower = filePath.toLowerCase();
     const nameLower = fileName.toLowerCase();
 
     // Correspondance exacte du nom de fichier
-    if (nameLower === lowerQuery) {
+    if (nameLower === _lowerQuery) {
       score = 1.0;
     }
     // Le nom de fichier contient la requête
-    else if (nameLower.includes(lowerQuery)) {
+    else if (nameLower.includes(_lowerQuery)) {
       score = 0.8;
     }
     // Le chemin contient la requête
-    else if (pathLower.includes(lowerQuery)) {
+    else if (pathLower.includes(_lowerQuery)) {
       score = 0.6;
     }
     // Correspondance de mots dans le chemin
     else {
-      const queryWords = lowerQuery.split(/[\s/\\_.-]+/);
+      const queryWords = _lowerQuery.split(/[\s/\\_.-]+/);
       const pathWords = pathLower.split(/[/\\_.-]+/);
       const matchCount = queryWords.filter((w) => pathWords.includes(w)).length;
       if (matchCount > 0) {
@@ -825,14 +825,14 @@ export class SemanticSearch {
     queryTokens: string[],
     fileTokens: string[],
     content: string,
-    lowerQuery: string
+    _lowerQuery: string
   ): number {
     if (fileTokens.length === 0 || queryTokens.length === 0) return 0;
 
     let score = 0;
 
     // 1. Présence de la requête exacte dans le contenu
-    if (content.toLowerCase().includes(lowerQuery)) {
+    if (content.toLowerCase().includes(_lowerQuery)) {
       score += 0.5;
     }
 
@@ -859,12 +859,12 @@ export class SemanticSearch {
   private computeLineRelevance(
     lineLower: string,
     queryTokens: string[],
-    lowerQuery: string
+    _lowerQuery: string
   ): number {
     let score = 0;
 
     // Correspondance exacte de la requête dans la ligne
-    if (lineLower.includes(lowerQuery)) {
+    if (lineLower.includes(_lowerQuery)) {
       score += 0.8;
     }
 
@@ -880,7 +880,7 @@ export class SemanticSearch {
     }
 
     // Bonus pour les commentaires contenant la requête
-    if (/\/\/|#|<!--|\/\*/.test(lineLower) && lineLower.includes(lowerQuery)) {
+    if (/\/\/|#|<!--|\/\*/.test(lineLower) && lineLower.includes(_lowerQuery)) {
       score += 0.1;
     }
 
@@ -941,7 +941,7 @@ export class SemanticSearch {
   /**
    * Construit une explication textuelle pour un résultat par entité.
    */
-  private buildEntityReason(entities: CodeEntity[], lowerQuery: string): string {
+  private buildEntityReason(entities: CodeEntity[], _lowerQuery: string): string {
     const types = new Set(entities.map((e) => e.type));
     const names = entities.map((e) => e.name).slice(0, 3);
     const typeList = Array.from(types).join(", ");
@@ -952,17 +952,17 @@ export class SemanticSearch {
   /**
    * Construit une explication textuelle pour un résultat par chemin.
    */
-  private buildPathReason(filePath: string, lowerQuery: string): string {
+  private buildPathReason(filePath: string, _lowerQuery: string): string {
     return `Chemin correspondant: "${filePath}"`;
   }
 
   /**
    * Construit une explication textuelle pour un résultat par contenu.
    */
-  private buildContentReason(filePath: string, lowerQuery: string, content: string): string {
+  private buildContentReason(filePath: string, _lowerQuery: string, content: string): string {
     // Trouver des lignes pertinentes pour la raison
     const lines = content.split(/\r?\n/);
-    const matchingLines = lines.filter((l) => l.toLowerCase().includes(lowerQuery));
+    const matchingLines = lines.filter((l) => l.toLowerCase().includes(_lowerQuery));
     const excerpt = matchingLines
       .slice(0, 2)
       .map((l) => l.trim().slice(0, 80))
