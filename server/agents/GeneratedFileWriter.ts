@@ -10,7 +10,7 @@
  * 3. JSON structuré { "files": [{ "path": "...", "content": "..." }] }
  */
 import type { AgentTask } from "./types.js";
-import { getAgentDefinition } from "./roles.js";
+import { getAgentDefinitionOrThrow } from "./roles.js";
 import { createLogger } from "../utils/logger.js";
 import { checkBracketBalance, checkTypeScriptSyntax } from "../skills/verify.js";
 
@@ -46,7 +46,7 @@ export class GeneratedFileWriter {
   async writeFromAgentOutput(task: AgentTask, resultText: string): Promise<WriteFromOutputResult> {
     if (!this.skillHandler) return { written: [], errors: [] };
 
-    const agent = getAgentDefinition(task.role);
+    const agent = getAgentDefinitionOrThrow(task.role);
 
     // Vérifier que l'agent a la capacité d'écrire des fichiers
     if (!agent.capabilities.includes("write_project_file")) {

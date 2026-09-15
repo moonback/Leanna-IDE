@@ -460,6 +460,7 @@ export class AgentOrchestrator {
           task.status = "failed";
           task.result = {
             success: false,
+            outcome: "failed" as const,
             summary: "Tâche interrompue par un redémarrage du serveur",
             error: "Server restart",
             durationMs: 0,

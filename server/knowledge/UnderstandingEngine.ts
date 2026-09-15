@@ -295,7 +295,7 @@ export class UnderstandingEngine {
     void baseBatch.quality; // évite unused
 
     // 3. Orchestration selon la stratégie
-    const batch = this.applyStrategy(q, baseBatch, opts);
+    const _batch = this.applyStrategy(q, baseBatch, opts);
 
     // 4. Ajout info graphe (cycles critiques, couplage)
     const riskyCycles = this.findRiskyCycles(batch.files);

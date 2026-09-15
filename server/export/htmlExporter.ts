@@ -4,7 +4,7 @@ export interface HtmlExportOptions {
   title?: string;
   author?: string;
   theme?: 'dark' | 'light' | 'academic' | 'modern';
-  includeToc?: boolean;
+  _includeToc?: boolean;
   headerDate?: string;
 }
 
@@ -16,7 +16,7 @@ export function exportToStandaloneHtml(markdown: string, options: HtmlExportOpti
     title = 'Document Leanna',
     author = 'Leanna',
     theme = 'modern',
-    includeToc = true,
+    _includeToc = true,
     headerDate = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' }),
   } = options;
 

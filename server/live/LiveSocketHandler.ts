@@ -393,6 +393,9 @@ export function attachLiveWebSocket(
         'list_custom_skills', 'create_custom_skill', 'update_custom_skill', 'delete_custom_skill', 'toggle_custom_skill',
         // Project scaffolding — création de nouveau projet
         'project_scaffold', 'project_list_frameworks',
+        // Graphify — Graphe de connaissances et architecture
+        'graphify_query', 'graphify_path', 'graphify_explain', 'graphify_affected',
+        'graphify_god_nodes', 'graphify_read_report', 'graphify_update',
       ]);
 
       const ASK_MODE_ALLOWED_TOOLS = new Set([
@@ -413,6 +416,9 @@ export function attachLiveWebSocket(
         'agent_list_tasks', 'agent_list_roles', 'agent_cancel', 'agent_stats',
         // Custom skills — accessibles en mode ask aussi
         'list_custom_skills', 'create_custom_skill', 'update_custom_skill', 'delete_custom_skill', 'toggle_custom_skill',
+        // Graphify — interrogeable en mode question (lecture seule sécurisée)
+        'graphify_query', 'graphify_path', 'graphify_explain', 'graphify_affected',
+        'graphify_god_nodes', 'graphify_read_report', 'graphify_update',
       ]);
 
       let filteredDeclarations: typeof declarations;
@@ -1128,6 +1134,13 @@ function isContextReady(state: SessionContextGate, toolName?: string, args?: any
     'write_project_file',       // Création d'un nouveau fichier
     'create_project_directory', // Création de dossier
     'rename_project_file',      // Renommage (pas de modification du contenu)
+    'graphify_query',
+    'graphify_path',
+    'graphify_explain',
+    'graphify_affected',
+    'graphify_god_nodes',
+    'graphify_read_report',
+    'graphify_update',
   ]);
 
   if (toolName && SAFE_TOOLS.has(toolName)) {
@@ -1308,14 +1321,14 @@ async function handleToolCall(
       // MAX_RETRIES=2, délai initial RETRY_DELAY_MS=1000ms, backoff exponentiel.
       // Seules les erreurs réseau/IO/timeout sont retentées (pas les erreurs métier).
       let response: unknown = undefined;
-      let lastToolError: Error | undefined;
+      let _lastToolError: Error | undefined;
       for (let attempt = 0; attempt <= TOOL_MAX_RETRIES; attempt++) {
         try {
           response = await skillManager.handleToolCall(call.name, call.args, context);
-          lastToolError = undefined;
+          _lastToolError = undefined;
           break; // Succès — sortir de la boucle
         } catch (toolErr: any) {
-          lastToolError = toolErr;
+          _lastToolError = toolErr;
           const retryable = isRetryableToolError(toolErr);
           const remaining = TOOL_MAX_RETRIES - attempt;
 

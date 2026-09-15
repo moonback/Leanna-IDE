@@ -238,7 +238,7 @@ export class PlanningEngine {
     const steps = this.buildPlanningSteps(ordered, effectiveFiles, opts, impactReport);
 
     // 6) Grouper les étapes en vagues parallèles
-    const waves = this.buildParallelWaves(steps, opts);
+    const _waves = this.buildParallelWaves(steps, opts);
 
     // 7) Post-traitement : checkpoints, validations croisées, suggestions
     const { steps: stepsWithCP, checkpoints } = this.decorateWithCheckpoints(steps, waves, opts);
@@ -750,7 +750,7 @@ export class PlanningEngine {
       s.wave = wave; // Mettre à jour l'étape pour cohérence
     }
 
-    const waves: ParallelWave[] = [];
+    const _waves: ParallelWave[] = [];
     const waveKeys = Array.from(byWave.keys()).sort((a, b) => a - b);
 
     for (let i = 0; i < waveKeys.length; i++) {

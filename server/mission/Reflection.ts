@@ -478,7 +478,7 @@ export class ReflectionEngine {
   private checkRepeatedAction(recent: ReflectionResult[]): LoopDetectionResult {
     if (recent.length < LOOP_CONFIG.repeatedActionWindow) return { isLoop: false };
 
-    const actionKeys = recent.map((r) => `${r.observation}`);
+    const _actionKeys = recent.map((r) => `${r.observation}`);
     const counts = new Map<string, number>();
     const byKey = new Map<string, ReflectionResult[]>();
     for (const r of recent) {

@@ -662,7 +662,7 @@ export class ImpactAnalyzer {
   private computeGlobalRisk(
     modified: string[],
     impacted: ImpactedFile[],
-    weights: ExtendedImpactReport["criteriaWeights"]
+    _weights: ExtendedImpactReport["criteriaWeights"]
   ): number {
     if (impacted.length === 0) return 0;
 

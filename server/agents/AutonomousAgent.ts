@@ -26,11 +26,11 @@ import type {
   CollaborationRequestPayload,
   StatusResponsePayload,
 } from "./AgentCommunication.js";
-import { DELEGATION_MATRIX, isDelegationAllowed } from "./AgentCommunication.js";
+import { isDelegationAllowed } from "./AgentCommunication.js";
 import { AgentMessageBus } from "./AgentMessageBus.js";
 import { AgentExecutor } from "./AgentExecutor.js";
 import { AutonomousLoop, type LoopConfig } from "./AutonomousLoop.js";
-import { getAgentDefinition } from "./roles.js";
+import { getAgentDefinitionOrThrow } from "./roles.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("AutonomousAgent");
@@ -78,7 +78,7 @@ export class AutonomousAgent {
     // La boucle autonome utilise la config par défaut, surchargeable par rôle
     this.loop = new AutonomousLoop(executor, {
       maxIterations: 3,
-      globalTimeoutMs: getAgentDefinition(role).defaultTimeoutMs * 3,
+      globalTimeoutMs: getAgentDefinitionOrThrow(role).defaultTimeoutMs * 3,
       minConfidenceScore: 0.6,
       verifyFiles: true,
       ...loopConfig,
@@ -203,7 +203,7 @@ export class AutonomousAgent {
       };
 
       // Attendre la réponse avec un timeout adapté au rôle cible
-      const targetDef = getAgentDefinition(targetRole);
+      const targetDef = getAgentDefinitionOrThrow(targetRole);
       const response = await this.bus.request(request, targetDef.defaultTimeoutMs + 5_000);
       const result = (response.payload as { result: TaskResult }).result;
 
@@ -290,7 +290,7 @@ export class AutonomousAgent {
       `📋 [${this.agentName}] Reçu task_request de [${message.from}]: "${payload.title}"${isAutonomous ? " [mode autonome]" : ""}`
     );
 
-    const agentDef = getAgentDefinition(this.role);
+    const agentDef = getAgentDefinitionOrThrow(this.role);
 
     const task: AgentTask = {
       id: payload.taskId,
@@ -322,6 +322,7 @@ export class AutonomousAgent {
 
         finalResult = loopResult.finalTask.result ?? {
           success: false,
+          outcome: "failed" as const,
           summary: "Pas de résultat après boucle autonome",
           durationMs: loopResult.totalDurationMs,
         };
@@ -345,6 +346,7 @@ export class AutonomousAgent {
         await this.executor.execute(task);
         finalResult = task.result ?? {
           success: false,
+          outcome: "failed" as const,
           summary: "Pas de résultat",
           durationMs: 0,
         };
@@ -362,6 +364,7 @@ export class AutonomousAgent {
         taskId: task.id,
         result: {
           success: false,
+          outcome: "failed" as const,
           summary: `Erreur: ${(err as Error).message}`,
           error: (err as Error).message,
           durationMs: 0,
@@ -372,7 +375,7 @@ export class AutonomousAgent {
 
   /** Répond à une query de statut */
   private async handleStatusQuery(message: AgentMessage): Promise<void> {
-    const agentDef = getAgentDefinition(this.role);
+    const agentDef = getAgentDefinitionOrThrow(this.role);
     const running = this.runningTasks.size;
     const queued = this.taskQueue.length;
 
@@ -410,7 +413,7 @@ export class AutonomousAgent {
   // ─── Queue interne ─────────────────────────────────────────────────────────
 
   private async processNextTask(): Promise<void> {
-    const agentDef = getAgentDefinition(this.role);
+    const agentDef = getAgentDefinitionOrThrow(this.role);
 
     if (
       this.taskQueue.length === 0 ||
@@ -445,11 +448,11 @@ export class AutonomousAgent {
   // ─── Getters ───────────────────────────────────────────────────────────────
 
   get agentName(): string {
-    return getAgentDefinition(this.role).name;
+    return getAgentDefinitionOrThrow(this.role).name;
   }
 
   get isAvailable(): boolean {
-    const agentDef = getAgentDefinition(this.role);
+    const agentDef = getAgentDefinitionOrThrow(this.role);
     return (
       this.isOnline &&
       this.runningTasks.size < agentDef.maxConcurrency
@@ -458,7 +461,7 @@ export class AutonomousAgent {
 
   get status(): "idle" | "busy" | "overloaded" | "offline" {
     if (!this.isOnline) return "offline";
-    const agentDef = getAgentDefinition(this.role);
+    const agentDef = getAgentDefinitionOrThrow(this.role);
     if (this.runningTasks.size >= agentDef.maxConcurrency) return "overloaded";
     if (this.runningTasks.size > 0 || this.taskQueue.length > 0) return "busy";
     return "idle";

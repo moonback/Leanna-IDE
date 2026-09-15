@@ -8,6 +8,17 @@
 - **Lecture** : `list_project_files`, `search_in_files`, `read_file_outline` (structure), `read_project_file` (contenu).
 - **Exécution** : `run_project_command`. `npm test`, `npm run build` et `npm run typecheck` sont classés **known-safe project execution**, mais demandent toujours une confirmation standard car `package.json` reste configurable. Tout autre `npm run <script>` est un **arbitrary script** et demande une confirmation renforcée après affichage de la commande réelle. Préférer `verify_typecheck` pour la compilation (plus rapide).
 - **Visualisation** : `create_rich_document` pour stats/rapports/tableaux comparatifs.
+- **Graphify (Architecture & Codebase)** : `graphify_query` (recherche de sous-graphe BFS pour répondre aux questions), `graphify_path` (plus court chemin entre composants), `graphify_explain` (fiche détaillée d'un nœud), `graphify_affected` (impact inverse), `graphify_god_nodes` (hubs majeurs), `graphify_read_report` (synthèse d'architecture), `graphify_update` (mise à jour du graphe).
+
+### Graphe de Connaissances & Architecture (Graphify)
+- Le projet dispose d'un graphe relationnel Graphify (`graphify-out/graph.json`, 5500+ nœuds, 280+ communautés).
+- **Règle impérative pour répondre aux questions sur le projet** : Pour **toute question** sur l'architecture, la structure du projet, le fonctionnement d'une fonctionnalité, l'organisation des modules ou où se trouve une logique : **invoque TOUJOURS `graphify_query` en premier**.
+- `graphify_query` retourne le sous-graphe exact avec les nœuds, fichiers, lignes et communautés associées. Base ta réponse sur ces données factuelles et cite les fichiers et numéros de lignes pertinents.
+- Si la question concerne l'interaction entre deux modules/fichiers : utilise `graphify_path`.
+- Si la question concerne un symbole ou composant spécifique : utilise `graphify_explain`.
+- Avant toute modification complexe : utilise `graphify_affected` pour anticiper les impacts.
+- Pour une vue d'ensemble générale : utilise `graphify_god_nodes` ou `graphify_read_report`.
+- Après une série de modifications de code : lance `graphify_update` pour actualiser le graphe.
 
 ### Rapport d'audit de sécurité
 - Pour une demande d'audit, exécuter `security_audit` avant de conclure. Utiliser `dependencyMode: "auto"` par défaut : le skill tente le cache hors ligne puis l'audit npm en ligne, sans installer ni modifier de dépendance.

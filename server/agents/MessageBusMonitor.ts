@@ -15,8 +15,9 @@
 
 import { EventEmitter } from "events";
 import { agentMessageBus } from "./AgentMessageBus.js";
-import type { AgentRole, MessagePriority } from "./types.js";
-import type { AgentMessage, RoutingStrategy } from "./AgentCommunication.js";
+import type { AgentRole } from "./types.js";
+import type { AgentMessage, RoutingStrategy, MessagePriority } from "./AgentCommunication.js";
+
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("MessageBusMonitor");
@@ -152,15 +153,9 @@ export class MessageBusMonitor extends EventEmitter {
   
   /** ID de démarrage pour calculer l'uptime */
   private startTime: number;
-  
-  /** Dernier timestamp de collection */
-  private lastCollectionTime: number;
-
   constructor() {
     super();
     this.startTime = Date.now();
-    this.lastCollectionTime = this.startTime;
-    
     // S'abonner aux messages du bus
     this.setupMessageBusListeners();
   }
@@ -260,8 +255,6 @@ export class MessageBusMonitor extends EventEmitter {
     if (this.aggregatedMetrics.length > this.maxAggregatedMetrics) {
       this.aggregatedMetrics.splice(0, 20);
     }
-
-    this.lastCollectionTime = now;
     log.debug(`Métriques collectées : ${aggregated.totalMessages} messages`);
   }
 
@@ -269,7 +262,6 @@ export class MessageBusMonitor extends EventEmitter {
    * Calcule le temps de traitement moyen
    */
   private calculateAvgProcessingTime(): number {
-    const metrics = agentMessageBus.getMetrics();
     // Note: Il faudrait accéder aux métriques détaillées du bus
     // Pour l'instant, retourner une valeur par défaut
     return 0;
