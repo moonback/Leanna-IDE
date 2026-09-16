@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, RotateCcw, Save, ChevronRight, Settings2,
   User, Cpu, Globe, SlidersHorizontal, Languages,
-  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot
+  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen
 } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip.js';
 import { useProfile } from '../context/UserProfileContext.js';
@@ -25,6 +25,7 @@ import {
   CustomSkillsSection,
   KnowledgeHealthSection,
   SystemPromptSection,
+  SkillsDocumentationSection,
 } from '../components/settings/index.js';
 
 // ─── Nav Groups (4 catégories — Phase 4c du plan) ─────────────────────────────
@@ -44,6 +45,7 @@ const NAV_GROUPS = [
       { id: 'systemprompt-settings', icon: Settings2, label: 'Prompt Système', keywords: 'prompt systeme instruction personnaliser comportement custom system' },
       { id: 'agents-settings', icon: Bot, label: 'Agents', keywords: 'agent multi-agents coder test docs refactor security review architect délégation solo' },
       { id: 'custom-skills-settings', icon: Code2, label: 'Skills custom', keywords: 'skill personnalisé custom outil tool instruction prompt automatisation' },
+      { id: 'skills-doc-settings', icon: BookOpen, label: 'Documentation Skills', keywords: 'documentation doc skills outils tools paramètres schéma tester interactif auto-généré' },
       { id: 'openrouter-settings', icon: Globe, label: 'Modèles & API', keywords: 'openrouter cles providers gpt gemini claude modèle' },
       { id: 'model-settings', icon: SlidersHorizontal, label: 'Hyperparamètres', keywords: 'temperature top p créativité précis équilibré preset' },
       { id: 'tokens-settings', icon: Key, label: 'Tokens API', keywords: 'cle api gemini tokens pool rotation' },
@@ -337,7 +339,7 @@ export default function SettingsView() {
 
         {/* Settings editor canvas */}
         <main className="flex-1 overflow-y-auto px-10 py-6 custom-scrollbar" style={{ backgroundColor: 'var(--bg-base)' }}>
-          <div className="mx-auto max-w-4xl">
+          <div className="mx-auto max-w-7xl">
             {/* Title Section */}
             <div className="mb-4 rounded-2xl border p-4" style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', boxShadow: 'var(--shadow-sm)' }}>
               <div className="flex items-center gap-3">
@@ -379,6 +381,7 @@ export default function SettingsView() {
                 {activeSection === 'selfroot-settings' && <SelfRootSection />}
                 {activeSection === 'safeguards-settings' && <SafeguardsSection />}
                 {activeSection === 'data-settings' && <DataSection />}
+                {activeSection === 'skills-doc-settings' && <SkillsDocumentationSection />}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -407,6 +410,7 @@ function getSectionDescription(id: string): string {
     'selfroot-settings': 'Périmètre verrouillé — l\'IDE n\'opère que sur son propre repo.',
     'safeguards-settings': 'Checkpoints, validation et protections pour l\'auto-modification.',
     'data-settings': 'Supprimez l\'historique des conversations et la mémoire.',
+    'skills-doc-settings': 'Documentation interactive des skills et outils, auto-générée depuis leurs déclarations TypeScript.',
   };
   return descriptions[id] || 'Configurez les préférences de cette section.';
 }

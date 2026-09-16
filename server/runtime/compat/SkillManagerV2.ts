@@ -230,6 +230,13 @@ export class SkillManagerV2 {
   }
 
   /**
+   * Retourne la liste des skills legacy enregistrées.
+   */
+  getSkills(): LegacySkill[] {
+    return [...this.skills];
+  }
+
+  /**
    * Retourne l'EventBus interne.
    */
   getEventBus(): EventBus {

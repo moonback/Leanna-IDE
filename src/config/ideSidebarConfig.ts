@@ -229,6 +229,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
             actionKey: 'onToggleMarketplace',
           },
           {
+            id: 'skills-doc',
+            type: 'button',
+            icon: BookOpen,
+            label: 'Docs Skills',
+            stateKey: 'showSkillsDoc',
+            actionKey: 'onToggleSkillsDoc',
+          },
+          {
             id: 'vision',
             type: 'button',
             icon: Camera,
@@ -250,6 +258,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
       },
     ],
   },
+
 
   // ═══ IA — items exposés via le flyout du status agent (non compté dans les 5 icônes) ═══
   {

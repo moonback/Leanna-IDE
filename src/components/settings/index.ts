@@ -13,4 +13,6 @@ export { SafeguardsSection } from './SafeguardsSection.js';
 export { CustomSkillsSection } from './CustomSkillsSection.js';
 export { KnowledgeHealthSection } from './KnowledgeHealthSection.js';
 export { SystemPromptSection } from './SystemPromptSection.js';
+export { SkillsDocumentationSection } from './SkillsDocumentationSection.js';
 export { Section, Field, TextInput, SecretInput, ChipGroup, ToggleSwitch, SectionDivider, InfoRow } from './SettingsPrimitives.js';
+

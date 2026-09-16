@@ -119,6 +119,30 @@ export class ToolRegistry {
   }
 
   /**
+   * Retourne toutes les définitions d'outils complètes (avec timeout, permissions, catégorie).
+   */
+  getDefinitions(): ToolDefinition[] {
+    return Array.from(this.tools.values()).map((t) => t.definition);
+  }
+
+  /**
+   * Retourne toutes les entrées d'outils avec définitions et métriques.
+   */
+  getToolEntries(): Array<{ definition: ToolDefinition; metrics: { calls: number; failures: number; totalMs: number } }> {
+    return Array.from(this.tools.values()).map((t) => ({
+      definition: t.definition,
+      metrics: { ...t.metrics },
+    }));
+  }
+
+  /**
+   * Retourne la définition d'un outil spécifique.
+   */
+  getDefinition(name: string): ToolDefinition | undefined {
+    return this.tools.get(name)?.definition;
+  }
+
+  /**
    * Retourne les déclarations filtrées par catégorie.
    */
   getDeclarationsByCategory(category: string): ToolDeclaration[] {

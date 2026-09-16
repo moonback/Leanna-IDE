@@ -52,7 +52,7 @@ import { createFtpRouter } from "./server/routes/ftp.js";
 import safeguardsRouter from "./server/routes/safeguards.js";
 import { createUploadDocumentRouter } from "./server/routes/upload-document.js";
 import { createDocumentsRouter } from "./server/routes/documents.js";
-import skillsRouter from "./server/routes/skills.js";
+import skillsRouter, { createSkillsRouter } from "./server/routes/skills.js";
 import mcpRouter from "./server/routes/mcp.js";
 import { createTerminalRouter, setupTerminalWebSocket } from "./server/routes/terminal.js";
 import memoriesRouter from "./server/routes/memories.js";
@@ -499,7 +499,7 @@ async function startServer() {
 
   app.use("/api/upload-document", createUploadDocumentRouter(() => currentProfile));
   app.use("/api/documents", createDocumentsRouter(() => currentProfile));
-  app.use("/api/skills", skillsRouter);
+  app.use("/api/skills", createSkillsRouter(skillManager, runtime));
   app.use("/api/mcp", mcpRouter);
   app.use("/api/memories", memoriesRouter);
   app.use("/api/conversations", conversationsRouter);
