@@ -541,7 +541,7 @@ export class ReasoningPipeline {
   private step_reasoning(
     context: PipelineContext,
     batch: ContextBatch | undefined,
-    understanding: string,
+    _understandingOutput: string,
     critiqueFeedback?: string,
     iteration: number = 1
   ): StepResult {
@@ -765,7 +765,7 @@ export class ReasoningPipeline {
     return result.slice(0, 10);
   }
 
-  private extractSubQueries(understandingOutput: string, task: string, enable: boolean): string[] {
+  private extractSubQueries(_understandingOutput: string, task: string, enable: boolean): string[] {
     if (!enable) return [];
     const base = this.extractKeywords(task);
     if (base.length <= 2) return [];
@@ -1133,12 +1133,10 @@ export class ReasoningPipeline {
   private buildSuggestions(
     context: PipelineContext,
     batch: ContextBatch | undefined,
-    steps: StepResult[],
-    config: ModeConfig
+    _steps: StepResult[],
+    _config: ModeConfig
   ): string[] {
     const suggestions: string[] = [];
-    const searchStep = steps.find((s) => s.step === "search");
-    const contextStep = steps.find((s) => s.step === "context");
 
     // Suggestions basées sur les fichiers
     if (batch && batch.files.length > 0) {
@@ -1334,7 +1332,7 @@ export class ReasoningPipeline {
     const start = (): number => Date.now();
     const dur = (t: number) => Date.now() - t;
 
-    const t0 = start();
+    void start(); // t0 — understanding step (durée trackée par step_understanding)
     const understanding = this.step_understanding(context);
     this.steps.push(understanding);
 

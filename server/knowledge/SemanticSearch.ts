@@ -413,7 +413,7 @@ export class SemanticSearch {
     // (recherche moins coûteuse) pour garantir un minimum de résultats.
     if (candidates.size < MAX_RESULTS * 2) {
       let i = 0;
-      for (const [filePath, length] of Array.from(index.docLengths.entries()).sort((a, b) => a[1] - b[1])) {
+      for (const [filePath, _length] of Array.from(index.docLengths.entries()).sort((a, b) => a[1] - b[1])) {
         if (i >= 200) break;
         candidates.add(filePath);
         i++;
@@ -924,7 +924,8 @@ export class SemanticSearch {
   /**
    * Calcule l'Inverse Document Frequency (IDF) d'un terme dans le corpus.
    */
-  private computeIDF(term: string, allTokens: string[][]): number {
+  // NOTE: computeIDF kept for future TF-IDF scoring implementation
+  public computeIDF(term: string, allTokens: string[][]): number {
     const totalDocs = allTokens.length;
     if (totalDocs === 0) return 0;
 
@@ -959,7 +960,7 @@ export class SemanticSearch {
   /**
    * Construit une explication textuelle pour un résultat par contenu.
    */
-  private buildContentReason(filePath: string, _lowerQuery: string, content: string): string {
+  private buildContentReason(_filePath: string, _lowerQuery: string, content: string): string {
     // Trouver des lignes pertinentes pour la raison
     const lines = content.split(/\r?\n/);
     const matchingLines = lines.filter((l) => l.toLowerCase().includes(_lowerQuery));

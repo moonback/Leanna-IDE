@@ -44,12 +44,13 @@ interface JsonRpcRequest {
   params?: any;
 }
 
-interface JsonRpcResponse {
-  jsonrpc: '2.0';
-  id: number;
-  result?: any;
-  error?: { code: number; message: string; data?: any };
-}
+// JsonRpcResponse: réponses parsées via parseMessage() — interface conservée pour référence
+// interface JsonRpcResponse {
+//   jsonrpc: '2.0';
+//   id: number;
+//   result?: any;
+//   error?: { code: number; message: string; data?: any };
+// }
 
 interface JsonRpcNotification {
   jsonrpc: '2.0';
@@ -583,7 +584,7 @@ export class McpClient extends EventEmitter {
   }
 
   private rejectAllPending(error: Error): void {
-    for (const [id, pending] of this.pendingRequests) {
+    for (const [_id, pending] of this.pendingRequests) {
       clearTimeout(pending.timer);
       pending.reject(error);
     }

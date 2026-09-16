@@ -172,7 +172,7 @@ export class ContentGenerator {
 
     if (options.onChunk) {
       // Mode streaming
-      const { generateTextStream } = await import("../utils/textGeneration");
+      const { generateTextStream } = await import("../utils/textGeneration.js");
       generatedText = await generateTextStream({
         prompt,
         temperature: 0.5,
@@ -214,12 +214,12 @@ export class ContentGenerator {
     notebookId: string,
     sourcesContext: string,
     sources: any[],
-    lang: string,
+    _lang: string,
     options: { sourceIds?: string[]; customInstructions?: string; onChunk?: (chunk: string) => void; imageModel?: string }
   ): Promise<GeneratedDocument> {
-    const { generateImage } = await import("../utils/imageGeneration");
-    const { generateText } = await import("../utils/textGeneration");
-    const { getSandboxRoot } = await import("../utils/sandbox");
+    const { generateImage } = await import("../utils/imageGeneration.js");
+    const { generateText } = await import("../utils/textGeneration.js");
+    const { getSandboxRoot } = await import("../utils/sandbox.js");
     const fs = await import("fs");
     const path = await import("path");
 
@@ -1467,7 +1467,7 @@ Réponds UNIQUEMENT avec un objet JSON contenant :
 
     log.info(`📊 Extraction des données pour visualisation (type: ${vizType})`);
 
-    const { generateText } = await import("../utils/textGeneration");
+    const { generateText } = await import("../utils/textGeneration.js");
     const result = await generateText({
       prompt: extractionPrompt,
       temperature: 0.3,
@@ -1534,7 +1534,7 @@ Réponds UNIQUEMENT avec un objet JSON contenant :
    * Pour des visualisations complexes, le rendu devrait être fait côté client avec D3.js.
    */
   private async renderSvgFromData(data: any, lang: string): Promise<string> {
-    const { generateText } = await import("../utils/textGeneration");
+    const { generateText } = await import("../utils/textGeneration.js");
     
     const svgPrompt = `${lang === "fr" ? "Génère" : "Generate"} a simple SVG visualization based on this data and configuration.
 The SVG should be self-contained and valid XML. Use basic SVG elements (rect, circle, path, line, text).
@@ -1630,7 +1630,7 @@ RÈGLES :
 
       log.info(`🗺️ Génération roadmap automatique pour "${title}" (notebook: ${notebookId})`);
 
-      const { generateText } = await import("../utils/textGeneration");
+      const { generateText } = await import("../utils/textGeneration.js");
       const result = await generateText({
         prompt,
         temperature: 0.6,

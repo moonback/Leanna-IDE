@@ -5,7 +5,7 @@ import { createSmartSkills } from "./SmartSkills.js";
 test("quality_loop executes phases in order and returns a regression report", async () => {
   const calls: string[] = [];
   let content = "const value = 1;";
-  const skill = createSmartSkills(async (name, args) => {
+  const skill = createSmartSkills(async (name, _args) => {
     calls.push(name);
     if (name === "read_project_file") return content;
     if (name === "modify_project_file") {

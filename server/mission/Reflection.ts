@@ -478,7 +478,7 @@ export class ReflectionEngine {
   private checkRepeatedAction(recent: ReflectionResult[]): LoopDetectionResult {
     if (recent.length < LOOP_CONFIG.repeatedActionWindow) return { isLoop: false };
 
-    const _actionKeys = recent.map((r) => `${r.observation}`);
+    // _actionKeys: observation keys used for grouping (below)
     const counts = new Map<string, number>();
     const byKey = new Map<string, ReflectionResult[]>();
     for (const r of recent) {
@@ -1157,7 +1157,7 @@ Réponds en JSON strict:
   private reviseReflection(
     base: ReflectionResult,
     notes: string,
-    params: ReflectionInput
+    _params: ReflectionInput
   ): ReflectionResult {
     const revised: ReflectionResult = {
       ...base,

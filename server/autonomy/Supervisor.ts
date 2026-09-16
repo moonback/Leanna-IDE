@@ -229,7 +229,7 @@ export class Supervisor {
   /**
    * Vérifie si un hash a déjà été vu (détection A→B→A).
    */
-  private _detectContentLoop(filePath: string, newHash: string): boolean {
+  detectContentLoop(filePath: string, newHash: string): boolean {
     const history = this.correctionHistory.get(filePath);
     if (!history || history.contentHashes.length === 0) return false;
     

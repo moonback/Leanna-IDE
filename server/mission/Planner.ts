@@ -252,8 +252,8 @@ RÉPONDS EN JSON STRICT:
 
   // ─── Décomposition heuristique ────────────────────────────────────────────
 
-  private decomposeHeuristic(goal: Goal, availableSkills: string[]): SubGoalPlan[] {
-    const plans: SubGoalPlan[] = [];
+  private decomposeHeuristic(goal: Goal, _availableSkills: string[]): SubGoalPlan[] {
+
 
     const text = `${goal.title} ${goal.description}`.toLowerCase();
 

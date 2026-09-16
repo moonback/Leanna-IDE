@@ -319,7 +319,7 @@ export class LearningEngine {
   ): { lessons: Lesson[]; persistedFactIds: string[] } {
     const lessons: Lesson[] = [];
     if (!action.success) {
-      const _sig = normalizeError(action.errorMessage || action.actionName);
+      normalizeError(action.errorMessage || action.actionName);
       lessons.push({
         type: "error_pattern",
         description: `Échec sur ${action.actionName}: ${action.errorMessage || "sans détail"}`,

@@ -1321,14 +1321,11 @@ async function handleToolCall(
       // MAX_RETRIES=2, délai initial RETRY_DELAY_MS=1000ms, backoff exponentiel.
       // Seules les erreurs réseau/IO/timeout sont retentées (pas les erreurs métier).
       let response: unknown = undefined;
-      let _lastToolError: Error | undefined;
       for (let attempt = 0; attempt <= TOOL_MAX_RETRIES; attempt++) {
         try {
           response = await skillManager.handleToolCall(call.name, call.args, context);
-          _lastToolError = undefined;
           break; // Succès — sortir de la boucle
         } catch (toolErr: any) {
-          _lastToolError = toolErr;
           const retryable = isRetryableToolError(toolErr);
           const remaining = TOOL_MAX_RETRIES - attempt;
 

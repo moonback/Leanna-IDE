@@ -59,6 +59,7 @@ export class TaskScheduler {
             b.completedAt = new Date().toISOString();
             b.result = {
               success: false,
+              outcome: "failed",
               summary: "Tâche bloquée par une dépendance non terminée",
               error: `Dépendances non satisfaites: ${deps.join(", ") || "inconnues"}`,
               durationMs: 0,
@@ -117,6 +118,7 @@ export class TaskScheduler {
           task.completedAt = new Date().toISOString();
           task.result = {
             success: false,
+            outcome: "failed",
             summary: "Tâche annulée : dépendance échouée",
             error: `Dépendance(s) échouée(s): ${deps.filter(d => failed.has(d)).join(", ")}`,
             durationMs: 0,

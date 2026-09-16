@@ -371,7 +371,7 @@ export class Executor {
     mission: Mission,
     goalId: string,
     action: PlannedAction,
-    availableSkills: string[]
+    _availableSkills: string[]
   ): Promise<ReflectionResult> {
     const goal = mission.getGoal(goalId)!;
     const startTime = Date.now();
@@ -461,7 +461,7 @@ export class Executor {
         title: plan.title,
         description: plan.description,
         successCriteria: plan.successCriteria,
-        priority: plan.priority,
+        priority: plan.priority as import("./types.js").GoalPriority,
       });
       ids.push(id);
     }

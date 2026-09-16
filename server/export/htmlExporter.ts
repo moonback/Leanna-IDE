@@ -16,7 +16,6 @@ export function exportToStandaloneHtml(markdown: string, options: HtmlExportOpti
     title = 'Document Leanna',
     author = 'Leanna',
     theme = 'modern',
-    _includeToc = true,
     headerDate = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' }),
   } = options;
 

@@ -133,8 +133,7 @@ test('switching workspace clears knowledge graph and project memory data', () =>
       imports: [],
       exports: [],
       entities: [],
-      dependencies: [],
-      dependents: [],
+      language: 'typescript',
     },
   ]);
   projectMemory.addFact({
