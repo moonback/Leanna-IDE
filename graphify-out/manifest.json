@@ -2100,9 +2100,9 @@
     "semantic_hash": ""
   },
   "src/components/ide/EmptyEditorState.tsx": {
-    "mtime": 1789578850.7333872,
-    "seen": 1789588543.9741435,
-    "ast_hash": "f91c9d77efafc585cd5117832c6d82f4",
+    "mtime": 1789591195.8794365,
+    "seen": 1789591247.4662912,
+    "ast_hash": "7e3b042507a3d1111d3cc29d1b37f64f",
     "semantic_hash": ""
   },
   "src/components/ide/FileExplorer.tsx": {

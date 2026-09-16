@@ -327,7 +327,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   onOpenNotebooks,
 }: EmptyEditorStateProps) {
   const ws = useWorkspaceState();
-  const { connected, isBusy, connect } = useLiveAPIContext();
+  const { connected, isBusy, connect, clearTranscript, clearActivity } = useLiveAPIContext();
   const { profile } = useProfile();
   const { theme } = useTheme();
   const prefersReducedMotion = useReducedMotion();
@@ -401,6 +401,16 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     [prefersReducedMotion]
   );
 
+  // Démarrage d'une session vierge avec Leanna et ouverture du chat
+  const handleConnect = useCallback(() => {
+    if (!connected) {
+      clearTranscript();
+      clearActivity();
+      connect([], 'full');
+    }
+    onOpenChat?.();
+  }, [connected, connect, onOpenChat, clearTranscript, clearActivity]);
+
   // Raccourcis clavier (stabilisés)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -421,13 +431,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onCreateFile, onShowSettings]);
-
-  // Ouverture d'un fichier récent avec gestion d'erreur et chargement
-  const handleConnect = useCallback(() => {
-    onOpenChat?.();
-    if (!connected) connect([], 'full');
-  }, [connected, connect, onOpenChat]);
+  }, [onCreateFile, onShowSettings, handleConnect]);
 
   return (
     <div
