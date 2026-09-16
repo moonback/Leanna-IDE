@@ -29,7 +29,7 @@ export function SkillsDocModal({ isOpen, onClose, initialToolName }: SkillsDocMo
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="w-full max-w-6xl max-h-[92vh] flex flex-col rounded-3xl border shadow-2xl overflow-hidden"
+            className="w-full max-w-8xl max-h-[92vh] flex flex-col rounded-3xl border shadow-2xl overflow-hidden"
             style={{
               backgroundColor: 'var(--bg-primary)',
               borderColor: 'var(--border-strong, var(--border-base))',

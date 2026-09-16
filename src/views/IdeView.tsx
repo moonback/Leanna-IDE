@@ -46,6 +46,7 @@ import { SandboxWorkspace } from '../components/sandbox/SandboxWorkspace.js';
 import { AgentPanel } from '../components/panels/AgentPanel.js';
 import { AgentBuilderPanel } from '../components/panels/AgentBuilderPanel.js';
 import { MarketplacePanel } from '../components/panels/MarketplacePanel.js';
+import { SkillsDocModal } from '../components/skills-doc/SkillsDocModal.js';
 import { initActivityStore, destroyActivityStore, syncActiveTasksFromServer } from '../stores/agentActivityStore.js';
 import { MissionPanel } from '../components/panels/MissionPanel.js';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard.js';
@@ -166,6 +167,7 @@ export default function IdeView() {
   const [showAgents, setShowAgents] = useState(false);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showMarketplace, setShowMarketplace] = useState(false);
+  const [showSkillsDoc, setShowSkillsDoc] = useState(false);
   const [showFleet, setShowFleet] = useState(false);
   const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
@@ -833,6 +835,7 @@ export default function IdeView() {
         showAgents={showAgents}
         showAgentBuilder={showAgentBuilder}
         showMarketplace={showMarketplace}
+        showSkillsDoc={showSkillsDoc}
         showFleet={showFleet}
         showMissions={showMissions}
         showKnowledge={showKnowledge}
@@ -857,6 +860,7 @@ export default function IdeView() {
         onToggleAgents={() => setShowAgents(v => !v)}
         onToggleAgentBuilder={() => setShowAgentBuilder(v => !v)}
         onToggleMarketplace={() => setShowMarketplace(v => !v)}
+        onToggleSkillsDoc={() => setShowSkillsDoc(v => !v)}
         onToggleFleet={() => setShowFleet(v => !v)}
         onToggleMissions={() => setShowMissions(v => !v)}
         onToggleKnowledge={() => {
@@ -1324,6 +1328,12 @@ export default function IdeView() {
       {showMarketplace && (
         <MarketplacePanel onClose={() => setShowMarketplace(false)} />
       )}
+
+      {/* Skills Documentation Modal */}
+      <SkillsDocModal
+        isOpen={showSkillsDoc}
+        onClose={() => setShowSkillsDoc(false)}
+      />
 
       {/* Fleet Panel — modal overlay */}
       {showFleet && (

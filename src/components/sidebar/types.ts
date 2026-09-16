@@ -24,6 +24,7 @@ export interface IDEPanelState {
   showAgents: boolean;
   showAgentBuilder: boolean;
   showMarketplace: boolean;
+  showSkillsDoc: boolean;
   showMissions: boolean;  showKnowledge: boolean;
   showNotebooks: boolean;
   showSystemHealth: boolean;
@@ -50,6 +51,7 @@ export interface IDEPanelActions {
   onToggleAgents: () => void;
   onToggleAgentBuilder: () => void;
   onToggleMarketplace: () => void;
+  onToggleSkillsDoc: () => void;
   onToggleMissions: () => void;
   onToggleKnowledge: () => void;
   onToggleNotebooks: () => void;
@@ -106,6 +108,7 @@ export interface UnifiedSidebarProps {
   showAgents?: boolean;
   showAgentBuilder?: boolean;
   showMarketplace?: boolean;
+  showSkillsDoc?: boolean;
   showMissions?: boolean;
   showKnowledge?: boolean;
   showNotebooks?: boolean;
@@ -134,6 +137,7 @@ export interface UnifiedSidebarProps {
   onToggleAgents?: () => void;
   onToggleAgentBuilder?: () => void;
   onToggleMarketplace?: () => void;
+  onToggleSkillsDoc?: () => void;
   onToggleMissions?: () => void;
   onToggleKnowledge?: () => void;
   onToggleNotebooks?: () => void;
