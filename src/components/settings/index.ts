@@ -14,5 +14,6 @@ export { CustomSkillsSection } from './CustomSkillsSection.js';
 export { KnowledgeHealthSection } from './KnowledgeHealthSection.js';
 export { SystemPromptSection } from './SystemPromptSection.js';
 export { SkillsDocumentationSection } from './SkillsDocumentationSection.js';
+export { HierarchicalMemorySection } from './HierarchicalMemorySection.js';
 export { Section, Field, TextInput, SecretInput, ChipGroup, ToggleSwitch, SectionDivider, InfoRow } from './SettingsPrimitives.js';
 

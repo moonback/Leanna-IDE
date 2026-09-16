@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, RotateCcw, Save, ChevronRight, Settings2,
   User, Cpu, Globe, SlidersHorizontal, Languages,
-  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen
+  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen, Layers
 } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip.js';
 import { useProfile } from '../context/UserProfileContext.js';
@@ -26,6 +26,7 @@ import {
   KnowledgeHealthSection,
   SystemPromptSection,
   SkillsDocumentationSection,
+  HierarchicalMemorySection,
 } from '../components/settings/index.js';
 
 // ─── Nav Groups (4 catégories — Phase 4c du plan) ─────────────────────────────
@@ -55,6 +56,7 @@ const NAV_GROUPS = [
     label: 'Sécurité & Connaissances',
     items: [
       { id: 'knowledge-settings', icon: Database, label: 'Knowledge System', keywords: 'graphe index ast arbre call-graph mémoire faits dépendances santé codebase réindexer fonctions' },
+      { id: 'hierarchical-memory-settings', icon: Layers, label: 'Mémoire hiérarchique', keywords: 'mémoire hierarchique court moyen long terme session projet supabase' },
       { id: 'selfroot-settings', icon: Shield, label: 'Self-Root', keywords: 'workspace projet verrouillé périmètre branche' },
       { id: 'safeguards-settings', icon: ShieldCheck, label: 'Garde-fous', keywords: 'checkpoint rollback validation build test protection critique' },
       { id: 'audit-settings', icon: Database, label: 'Journal système', keywords: 'audit logs historique opérations traçabilité' },
@@ -382,6 +384,7 @@ export default function SettingsView() {
                 {activeSection === 'safeguards-settings' && <SafeguardsSection />}
                 {activeSection === 'data-settings' && <DataSection />}
                 {activeSection === 'skills-doc-settings' && <SkillsDocumentationSection />}
+                {activeSection === 'hierarchical-memory-settings' && <HierarchicalMemorySection />}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -411,6 +414,7 @@ function getSectionDescription(id: string): string {
     'safeguards-settings': 'Checkpoints, validation et protections pour l\'auto-modification.',
     'data-settings': 'Supprimez l\'historique des conversations et la mémoire.',
     'skills-doc-settings': 'Documentation interactive des skills et outils, auto-générée depuis leurs déclarations TypeScript.',
+    'hierarchical-memory-settings': 'Orchestrez la mémoire à 3 niveaux : court-terme (session), moyen-terme (projet) et long-terme (Supabase).',
   };
   return descriptions[id] || 'Configurez les préférences de cette section.';
 }

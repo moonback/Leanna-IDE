@@ -25,6 +25,7 @@ import { EventBus } from "./EventBus.js";
 import { StateMachine } from "./StateMachine.js";
 import { ToolRegistry } from "./ToolRegistry.js";
 import { Memory } from "./Memory.js";
+import { HierarchicalMemoryService } from "./HierarchicalMemoryService.js";
 import type {
   Task,
   TaskResult,
@@ -63,6 +64,7 @@ export class AgentRuntime {
   readonly events: EventBus;
   readonly tools: ToolRegistry;
   readonly memory: Memory;
+  readonly hierarchicalMemory: HierarchicalMemoryService;
   readonly fsm: StateMachine;
 
   // Registre des agents
@@ -89,6 +91,10 @@ export class AgentRuntime {
       defaultTimeoutMs: 180_000, // 3 minutes pour les tâches agent (aligné avec AgentExecutor)
     });
     this.memory = new Memory({ eventBus: this.events });
+    this.hierarchicalMemory = new HierarchicalMemoryService({
+      sessionStore: this.memory,
+      eventBus: this.events,
+    });
     this.fsm = new StateMachine({ eventBus: this.events });
 
     // Logging middleware

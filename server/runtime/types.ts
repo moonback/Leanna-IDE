@@ -139,7 +139,9 @@ export type RuntimeEvent =
   | { type: "workflow:started"; workflowId: string; name: string }
   | { type: "workflow:stepCompleted"; workflowId: string; stepId: string; success: boolean }
   | { type: "workflow:completed"; workflowId: string; success: boolean }
-  | { type: "memory:updated"; level: MemoryLevel; key: string };
+  | { type: "memory:updated"; level: MemoryLevel; key: string }
+  | { type: "memory:hierarchical:stored"; tier: string; id: string }
+  | { type: "memory:hierarchical:promoted"; fromTier: string; toTier: string; sourceId: string; newId: string };
 
 export type RuntimeEventType = RuntimeEvent["type"];
 export type RuntimeEventHandler<T extends RuntimeEventType = RuntimeEventType> =

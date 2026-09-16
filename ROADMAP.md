@@ -179,7 +179,7 @@ Fonctionnalités avancées et intégrations majeures.
 | Support multi-modèles simultanés (Gemini + Claude + GPT en parallèle) | 💡 Idée |
 | Agent de monitoring autonome (surveille les métriques et alerte) | 💡 Idée |
 | Fine-tuning de skills sur la base de l'historique d'interactions | 💡 Idée |
-| Mémoire hiérarchique : court-terme (session) / moyen-terme (projet) / long-terme (Supabase) | 💡 Idée |
+| Mémoire hiérarchique : court-terme (session) / moyen-terme (projet) / long-terme (Supabase) | ✅ Fait |
 | Compréhension de code multi-langages (Python, Rust, Go via Tree-sitter) | 📋 Planifié |
 | Génération de tests automatique à partir du code (skill `test`) | 📋 Planifié |
 | Agent de refactoring avec validation TypeScript intégrée | 📋 Planifié |

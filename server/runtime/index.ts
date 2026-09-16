@@ -17,6 +17,8 @@ export { EventBus } from "./EventBus.js";
 export { StateMachine } from "./StateMachine.js";
 export { ToolRegistry, ToolNotFoundError, ToolTimeoutError, ToolPermissionError } from "./ToolRegistry.js";
 export { Memory } from "./Memory.js";
+export { HierarchicalMemoryService, hierarchicalMemoryService } from "./HierarchicalMemoryService.js";
+export type { HierarchicalTier, HierarchicalMemoryItem, HierarchicalStats, HierarchicalSearchOptions, HierarchicalStoreInput } from "./HierarchicalMemoryService.js";
 export { WorkflowEngine } from "./WorkflowEngine.js";
 export { PromptRegistry } from "./PromptRegistry.js";
 export { AgentLoader } from "./AgentLoader.js";

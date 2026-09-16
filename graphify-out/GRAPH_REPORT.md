@@ -1,16 +1,16 @@
-# Graph Report - Jarvis-os-ori  (2026-09-09)
+# Graph Report - Jarvis-os-ori  (2026-09-16)
 
 ## Corpus Check
-- 576 files · ~1,402,026 words
+- 585 files · ~1,411,551 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5565 nodes · 11736 edges · 286 communities (243 shown, 38 thin omitted)
+- 5533 nodes · 11774 edges · 293 communities (248 shown, 40 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 149 edges (avg confidence: 0.82)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `b62e0a48`
+- Built from commit: `350193c4`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -24,46 +24,46 @@
 - utils/sandbox.ts
 - AgentRole
 - ToolRegistry
-- reasoningPipeline
+- understandingEngine
 - selfRoot.ts
 - roles.ts
 - server/knowledge/index.ts
-- server/utils/logger.ts
+- AgentOrchestrator.ts
 - MarketplacePanel.tsx
 - main.tsx
 - marketplace.ts
 - ../components/ide/RichDocumentViewer.js
 - Navigateur Web Intégré — Comportement et Règles
-- history.ts
+- LiveSocketHandler.ts
 - express
 - ASTParser.ts
 - workspaceIndexer
 - textGeneration.ts
 - workflow.ts
 - security.ts
-- server/agents/index.ts
+- AgentExecutor.ts
 - geminiTTS.ts
 - skills/browser.ts
 - AgentExecutor
-- WorkspaceIndexer.ts
+- fileWatcher
 - knowledgeGraph
 - AgentBuilderPanel.tsx
 - package.json
 - prompts/index.ts
 - UnifiedSidebar.tsx
 - projectMemory
-- runtime/index.ts
+- AgentRuntime
 - dependencies
 - mission/index.ts
-- AgentLoader
+- geminiKeyPool.ts
 - Leanna Design System Tokens
 - SemanticSearch.ts
 - EventBus
-- Planner.ts
+- Executor
 - notebookManager
 - main.cjs
 - tokenOptimizer.ts
-- isSandboxActive
+- codebaseHelpers.ts
 - git.ts
 - reflectionEngine
 - Codebase Skill - Documentation
@@ -79,10 +79,10 @@
 - LearningEngine.ts
 - planningEngine
 - Mission
-- understandingEngine
-- Guide de test — Leanna
+- codebaseWriter.ts
+- delegationManager
 - compilerOptions
-- knowledgeRouter.ts
+- ModuleLoader.ts
 - embeddingStore
 - chainOfThought.ts
 - API Reference — Leanna
@@ -94,11 +94,11 @@
 - AgentFleetPanel.tsx
 - IdeView.tsx
 - dependencyGraph
-- SkillManagerV2
+- runtime/index.ts
 - system.ts
-- V0 — Socle livré
+- Roadmap — Leanna AI Operating System
 - SmartSkills.ts
-- LiveSocketHandler.ts
+- HierarchicalMemoryService.ts
 - ProjectIndexer.ts
 - upload-document.ts
 - ideApi.ts
@@ -115,7 +115,7 @@
 - ChatPanel.tsx
 - AgentPanel.tsx
 - devDependencies
-- FileNode
+- ./SandboxDiffViewer.js
 - runtime/agents/index.ts
 - PromptRegistry
 - customSkills.ts
@@ -125,7 +125,7 @@
 - Guide de contribution — Leanna
 - FileExplorerVirtualized.tsx
 - Leanna — IDE
-- getAgentDefinition
+- custom-agents.ts
 - contentGenerator
 - notebooks/types.ts
 - MissionPanel.tsx
@@ -135,7 +135,7 @@
 - Memory
 - schemas.ts
 - promptCache
-- Architecture — Leanna AI Operating System
+- Tests
 - build
 - GeneratedFileWriter.ts
 - documentSearchEngine
@@ -143,12 +143,12 @@
 - chat.md
 - LoggerInstance
 - AgentProgressBar.tsx
-- ./SandboxDiffViewer.js
+- ../panels/SandboxPanel.js
 - useTranscript.ts
 - CustomSkillsSection.tsx
 - @supabase/supabase-js
 - Supervisor.ts
-- astCallGraph
+- constants.ts
 - SkillScorer
 - backupService
 - ResponseCache
@@ -172,7 +172,7 @@
 - GeneratePanel.tsx
 - ImportToNotebookExample.tsx
 - WorkflowsPanel.tsx
-- DelegationParser.ts
+- server/agents/index.ts
 - securityAudit.ts
 - LiveSkillsMonitor.tsx
 - StatusBar.tsx
@@ -188,11 +188,11 @@
 - GitHubView.tsx
 - audit-fetch-effects.mjs
 - AutonomousAgent.ts
-- Fonctionnalités principales
+- src/utils/logger.ts
 - TECHNIQUE — Standards de code
 - {{aiName}} — Prompt Système (Haute Performance)
 - guidelines.ts
-- WorkspaceState
+- StartupProjectModal.tsx
 - FileExplorer.tsx
 - NotebookChat.tsx
 - AuditPanel.tsx
@@ -200,11 +200,11 @@
 - Skeleton.tsx
 - ActivityFeed.tsx
 - notebook.ts
-- Délégation Structurée et Surveillance du MessageBus
-- 1. Délégation Structurée (DelegationManager)
-- SystemPromptBuilder
+- slidesTheme.ts
+- Erreurs réelles (bugs de code)
+- executeQualityLoop
 - MemoriesView.tsx
-- routes/ide.ts
+- MissionConfig
 - Système Multi-Agents
 - Moteur d'Autonomie
 - Liste des Skills par Catégorie
@@ -214,8 +214,8 @@
 - TokenCounter.tsx
 - Toast.tsx
 - Notebooks (RAG)
-- Backend / API
-- Nouvelles stratégies de routage
+- Architecture — Leanna AI Operating System
+- ProcessingQueue.ts
 - 23. Profondeur adaptative
 - useFileMention.ts
 - DocumentUpload.tsx
@@ -236,44 +236,44 @@
 - SystemLogsPanel.tsx
 - ContextMenu.tsx
 - GlobalSearch.tsx
-- FlyoutMenu.tsx
+- skills.ts
 - ASTCallGraphExplorer.tsx
 - ConfirmDialog.tsx
 - analyze-tooltips.mjs
 - CriticalEditConfirm.tsx
-- useOrbState.ts
+- SkillsDocumentation.tsx
 - NotesPanel.tsx
 - ScheduledTasksPanel.tsx
 - StatusBadge.tsx
 - global.d.ts
 - vite-env.d.ts
-- Tests d'intégration (Routes REST)
+- routes/github.ts
 - Compétences (Skills)
 - Knowledge Graph
 - MermaidDiagram.tsx
-- Bonnes Pratiques
-- Migration Guide
-- SELF_ROOT
-- imageGeneration.ts
+- V0 — Socle livré
+- mission.ts
+- routes/audit.ts
+- richDocument.ts
 - 24. Format de réponse
-- FileIcon.tsx
+- Installation
 - ImportToNotebookButton.tsx
 - NotesCanvas.tsx
 - WorkspacePanel.tsx
-- ModelSection.tsx
+- SkillsPanel.tsx
 - VisualWorkflowBuilder.tsx
-- Conventions de test
+- HierarchicalMemorySection.tsx
 - Tests d'intégration
 - Documents
 - Terminal
 - WebSockets
-- API Résumée
-- Performances
-- Exemples Complets
+- Frontend
+- SidebarItem.tsx
+- CreateNotebookModal.tsx
 - 10. Niveau de confiance
 - 9. Faits, déductions et incertitudes
 - safety.md
-- MockWebSocket
+- isSandboxActive
 - /graphify
 - react-hotkeys-hook
 - 11. Citations et références
@@ -296,24 +296,31 @@
 - FixedSizeTree
 - /graphify
 - CLAUDE.md
+- RootErrorBoundary
+- documentKnowledge.ts
+- ImagePreview.tsx
+- NotebookPickerModal.tsx
+- PdfPreview.tsx
+- TokensSection.tsx
+- QuitConfirmDialog.tsx
 
 ## God Nodes (most connected - your core abstractions)
-1. `react` - 162 edges
-2. `lucide-react` - 128 edges
-3. `AgentRole` - 80 edges
-4. `express` - 78 edges
-5. `knowledgeGraph` - 64 edges
-6. `createLogger()` - 59 edges
-7. `startServer()` - 55 edges
-8. `../components/ide/RichDocumentViewer.js` - 54 edges
-9. `agentMessageBus` - 53 edges
-10. `projectMemory` - 51 edges
+1. `react` - 166 edges
+2. `lucide-react` - 132 edges
+3. `express` - 80 edges
+4. `AgentRole` - 80 edges
+5. `knowledgeGraph` - 63 edges
+6. `createLogger()` - 60 edges
+7. `startServer()` - 56 edges
+8. `projectMemory` - 55 edges
+9. `../components/ide/RichDocumentViewer.js` - 54 edges
+10. `agentMessageBus` - 53 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `startServer()` --indirect_call--> `stopAllScheduledTasks()`  [INFERRED]
   server.ts → server/skills/automationScheduler.ts
-- `startServer()` --indirect_call--> `stopAllWorkflowTimers()`  [INFERRED]
-  server.ts → server/skills/workflow.ts
+- `requireAuth()` --calls--> `authenticateRequest()`  [EXTRACTED]
+  server.ts → server/security.ts
 - `startServer()` --calls--> `setupGracefulShutdown()`  [EXTRACTED]
   server.ts → server/lifecycle.ts
 - `startServer()` --calls--> `attachLiveWebSocket()`  [EXTRACTED]
@@ -324,23 +331,23 @@
 ## Import Cycles
 - None detected.
 
-## Communities (286 total, 38 thin omitted)
+## Communities (293 total, 40 thin omitted)
 
 ### Community 0 - "agents/types.ts"
-Cohesion: 0.06
-Nodes (43): zod, COLLABORATION_PATTERNS, DynamicAgentDefinition, log, PromptBuilder, listAgentDefinitions(), STATIC_AGENT_REGISTRY, canAgentUseTool() (+35 more)
+Cohesion: 0.07
+Nodes (26): log, DynamicAgentDefinition, log, PromptBuilder, STATIC_AGENT_REGISTRY, AGENT_ROLE_ALIASES, AgentDefinition, AgentPermissions (+18 more)
 
 ### Community 1 - "server.ts"
-Cohesion: 0.04
-Nodes (56): compression, express-rate-limit, apiToken, browserActionPending, browserReadPending, applyGlobalRateLimits(), applyStaticAndCompression(), createRateLimitBundle() (+48 more)
+Cohesion: 0.05
+Nodes (47): compression, express-rate-limit, apiToken, browserActionPending, browserReadPending, applyGlobalRateLimits(), applyStaticAndCompression(), createRateLimitBundle() (+39 more)
 
 ### Community 2 - "lucide-react"
 Cohesion: 0.03
-Nodes (35): lucide-react, ChangedFile, GitStatus, NotebookLight, NotebookPickerModalProps, getAuthHeaders(), PdfPreview(), Props (+27 more)
+Nodes (25): lucide-react, ChangedFile, GitStatus, AIConnectionBannerProps, BreadcrumbProps, EXT_COLOR, FileIcon(), FileIconProps (+17 more)
 
 ### Community 3 - "McpClient"
 Cohesion: 0.07
-Nodes (22): convertJsonSchemaToGemini(), mcpBridge, McpServerStatus, McpToolCallMetric, McpToolCallResult, mcpToolToGeminiDeclaration(), JsonRpcNotification, JsonRpcRequest (+14 more)
+Nodes (21): convertJsonSchemaToGemini(), mcpBridge, McpServerStatus, McpToolCallMetric, McpToolCallResult, mcpToolToGeminiDeclaration(), JsonRpcNotification, JsonRpcRequest (+13 more)
 
 ### Community 4 - "useLiveAPI.ts"
 Cohesion: 0.12
@@ -348,47 +355,47 @@ Nodes (21): LiveAPIContext, LiveAPIContextValue, ModifiedFile, ReasoningStep, to
 
 ### Community 5 - "react"
 Cohesion: 0.03
-Nodes (32): react, AIConnectionBannerProps, BreadcrumbProps, Checkpoint, CheckpointPanel, IdeModalProps, ModalMode, getAuthHeaders() (+24 more)
+Nodes (26): react, FloatingOrb(), Checkpoint, CheckpointPanel, IdeModalProps, ModalMode, ModelPickerModal, ModelPickerModalProps (+18 more)
 
 ### Community 6 - "utils/sandbox.ts"
 Cohesion: 0.08
-Nodes (53): ws, checkExitCodeRateLimit(), createSandboxRouter(), createVerifyExitCodeRouter(), exitCodeAttempts, RateLimitEntry, NOTE: monté séparément sur /api/verify-exit-code dans server.ts, resetExitCodeRateLimit() (+45 more)
+Nodes (50): EXCLUDED_TREE_DIRECTORIES, getWorkspaceRoot(), resolveRequestedPath(), resolveRequestedWritePath(), router, checkExitCodeRateLimit(), createSandboxRouter(), createVerifyExitCodeRouter() (+42 more)
 
 ### Community 7 - "AgentRole"
-Cohesion: 0.05
-Nodes (24): MessageHandler, MessageSubscription, PublishOptions, StatusResponsePayload, agentMessageBus, DeadLetterEntry, log, MessageMetric (+16 more)
+Cohesion: 0.09
+Nodes (13): AgentMessage, MessageHandler, MessageSubscription, PublishOptions, StatusResponsePayload, agentMessageBus, DeadLetterEntry, log (+5 more)
 
 ### Community 8 - "ToolRegistry"
-Cohesion: 0.08
-Nodes (26): convertLegacySkill(), createOrchestratorProxy(), LegacySkill, registerLegacySkills(), adaptAllSkills(), adaptDeclaration(), ADAPTED_TOOL_TIMEOUTS, AdaptOptions (+18 more)
+Cohesion: 0.07
+Nodes (23): convertLegacySkill(), createOrchestratorProxy(), LegacySkill, registerLegacySkills(), adaptDeclaration(), ADAPTED_TOOL_TIMEOUTS, AdaptOptions, inferPermissions() (+15 more)
 
-### Community 9 - "reasoningPipeline"
-Cohesion: 0.16
-Nodes (12): getLearningEngine(), InjectedLesson, LearningEngineType, log, MODE_CONFIGS, ModeConfig, reasoningPipeline, ContextBatch (+4 more)
+### Community 9 - "understandingEngine"
+Cohesion: 0.10
+Nodes (8): getLearningEngine(), reasoningPipeline, ContextBatch, PipelineContext, ReasoningResult, StepResult, UnderstandingScore, understandingEngine
 
 ### Community 10 - "selfRoot.ts"
 Cohesion: 0.06
-Nodes (58): BLOCKED_IP_PREFIXES, createFtpRouter(), dnsLookup, isPrivateIp(), validateFtpHost(), ERROR_PATTERNS, ErrorPattern, HealAttempt (+50 more)
+Nodes (55): BLOCKED_IP_PREFIXES, createFtpRouter(), dnsLookup, isPrivateIp(), validateFtpHost(), ERROR_PATTERNS, ErrorPattern, HealAttempt (+47 more)
 
 ### Community 11 - "roles.ts"
 Cohesion: 0.10
-Nodes (24): architectAgent, BASE_SYSTEM_PROMPT, buildAgentPrompt(), coderAgent, debuggerAgent, formatterAgent, plannerAgent, proofreaderAgent (+16 more)
+Nodes (25): architectAgent, BASE_SYSTEM_PROMPT, buildAgentPrompt(), coderAgent, debuggerAgent, formatterAgent, hasAgent(), plannerAgent (+17 more)
 
 ### Community 12 - "server/knowledge/index.ts"
-Cohesion: 0.08
-Nodes (41): ImpactAnalysisOptions, ImpactedFile, ImpactMode, log, MODE_CONFIGS, ModeConfig, RiskLevel, TestRecommendation (+33 more)
+Cohesion: 0.04
+Nodes (82): zod, log, log, STOP_WORDS, DocumentLink, documentStoreCache, DocumentStoreData, log (+74 more)
 
-### Community 13 - "server/utils/logger.ts"
+### Community 13 - "AgentOrchestrator.ts"
 Cohesion: 0.06
-Nodes (27): AgentEventListener, agentEventStream, agentOrchestrator, log, AgentMessageRow, AgentOrchestrationRow, agentPersistence, AgentTaskRow (+19 more)
+Nodes (20): DelegationTaskContext, AgentEventListener, agentEventStream, SkillHandler, agentOrchestrator, log, AgentMessageRow, AgentOrchestrationRow (+12 more)
 
 ### Community 14 - "MarketplacePanel.tsx"
 Cohesion: 0.08
 Nodes (48): CATEGORY_ICONS, CATEGORY_LABELS, fmt(), ImportDropzone(), MarketplacePanel(), MarketplacePanelProps, PackageCard(), PackageDetail() (+40 more)
 
 ### Community 15 - "main.tsx"
-Cohesion: 0.04
-Nodes (31): react-router-dom, dispatchAgentEvent(), useAgentEventStream(), AppWindow, configuredApiToken, InflightEntry, Layout(), ListsView (+23 more)
+Cohesion: 0.07
+Nodes (16): dispatchAgentEvent(), useAgentEventStream(), AppWindow, configuredApiToken, InflightEntry, Layout(), ListsView, SettingsView (+8 more)
 
 ### Community 16 - "marketplace.ts"
 Cohesion: 0.07
@@ -402,13 +409,13 @@ Nodes (38): recharts, ../components/ide/RichDocumentViewer.js, AreaChartBlock, A
 Cohesion: 0.04
 Nodes (47): browser_click_by_role, browser_fill_form, browser_get_accessibility_snapshot, browser_get_accessibility_snapshot — Arbre ARIA (PRÉFÉRÉ sur les SPA), browser_get_element_attribute, browser_get_element_text, browser_select_option, browser_snapshot — Éléments interactifs (CSS) (+39 more)
 
-### Community 19 - "history.ts"
-Cohesion: 0.14
-Nodes (18): router, mockConversations, mockMessages, mockSearchResults, clearAllConversations(), Conversation, ConversationMessage, deleteConversation() (+10 more)
+### Community 19 - "LiveSocketHandler.ts"
+Cohesion: 0.08
+Nodes (37): attachLiveWebSocket(), estimateToolTokens(), estimateToolTokensTotal(), handleToolCall(), isContextReady(), isRetryableToolError(), LiveSocketDeps, normalizeContextPath() (+29 more)
 
 ### Community 20 - "express"
-Cohesion: 0.06
-Nodes (44): express, multer, log, QueueConfig, QueueStats, QueueTask, SourceProcessingPayload, sourceProcessingQueue (+36 more)
+Cohesion: 0.09
+Nodes (25): express, multer, sourceProcessingQueue, CacheConfig, CacheEntry, CacheStats, chatResponseCache, log (+17 more)
 
 ### Community 21 - "ASTParser.ts"
 Cohesion: 0.09
@@ -416,27 +423,27 @@ Nodes (13): web-tree-sitter, astParser, log, NODE_MODULES, TreeSitterModule, TSL
 
 ### Community 22 - "workspaceIndexer"
 Cohesion: 0.09
-Nodes (4): documentStore, getDocumentStore(), FileChangeEvent, workspaceIndexer
+Nodes (3): documentStore, getDocumentStore(), workspaceIndexer
 
 ### Community 23 - "textGeneration.ts"
-Cohesion: 0.14
-Nodes (18): groundedChat, log, ChatMessage, Citation, GeneratedDocument, handleAnalyzeScreenshot(), getNextGeminiKey(), generateText() (+10 more)
+Cohesion: 0.17
+Nodes (17): groundedChat, log, ChatMessage, Citation, getNextGeminiKey(), withGeminiRetry(), generateText(), GenerateTextOptions (+9 more)
 
 ### Community 24 - "workflow.ts"
 Cohesion: 0.07
-Nodes (41): activeRuns, createWorkflow(), createWorkflowSchema, deleteWorkflow(), deleteWorkflowSchema, EvalCtx, evalRpn(), evaluateCondition() (+33 more)
+Nodes (40): activeRuns, createWorkflow(), createWorkflowSchema, deleteWorkflow(), deleteWorkflowSchema, EvalCtx, evalRpn(), evaluateCondition() (+32 more)
 
 ### Community 25 - "security.ts"
-Cohesion: 0.09
-Nodes (20): LiveSocketDeps, BrowserActionPendingEntry, BrowserPendingEntry, createBrowserRouter(), handleSandboxWatchUpgrade(), createTerminalProcess(), createTerminalRouter(), getDefaultShell() (+12 more)
+Cohesion: 0.12
+Nodes (17): handleSandboxWatchUpgrade(), createTerminalProcess(), createTerminalRouter(), getDefaultShell(), setupTerminalWebSocket(), TerminalMessage, terminalProcesses, authenticateRequest() (+9 more)
 
-### Community 26 - "server/agents/index.ts"
-Cohesion: 0.07
-Nodes (38): agentMessageSchema, AgentMessageType, BroadcastPayload, CollaborationPattern, DelegationCapability, delegationPolicy, DelegationTaskContext, EventPayload (+30 more)
+### Community 26 - "AgentExecutor.ts"
+Cohesion: 0.10
+Nodes (15): AgentToolCall, EXECUTABLE_AGENT_TOOLS, log, ToolExecutionState, AgentRepairLoop, RepairAction, RepairDirective, ResultParser (+7 more)
 
 ### Community 27 - "geminiTTS.ts"
-Cohesion: 0.05
-Nodes (58): BOOLEAN_VARIABLES, isSet(), isValidUrl(), URL_VARIABLES, validateEnvironment(), createGeminiKeysRouter(), createTTSRouter(), TtsSpeakSchema (+50 more)
+Cohesion: 0.09
+Nodes (33): createTTSRouter(), TtsSpeakSchema, TtsSpeakStreamSchema, CacheEntry, callGemini(), callGeminiSafe(), callOpenRouter(), callOpenRouterSafe() (+25 more)
 
 ### Community 28 - "skills/browser.ts"
 Cohesion: 0.05
@@ -444,15 +451,11 @@ Nodes (36): accessibilitySnapshotSchema, assertAllowedBrowserUrl(), BrowserNetwo
 
 ### Community 29 - "AgentExecutor"
 Cohesion: 0.11
-Nodes (3): AgentExecutor, ParsedDelegation, hasAgent()
-
-### Community 30 - "WorkspaceIndexer.ts"
-Cohesion: 0.07
-Nodes (22): DocumentLink, documentStoreCache, DocumentStoreData, log, StoredDocument, FileChangeHandler, FileChangeType, fileWatcher (+14 more)
+Nodes (4): AgentExecutor, ParsedDelegation, TaskScheduler, AgentTask
 
 ### Community 31 - "knowledgeGraph"
-Cohesion: 0.11
-Nodes (3): getStorePath(), knowledgeGraph, KnowledgeStats
+Cohesion: 0.09
+Nodes (6): getStorePath(), knowledgeGraph, relationExtractor, EntityRelation, FileNode, KnowledgeStats
 
 ### Community 32 - "AgentBuilderPanel.tsx"
 Cohesion: 0.09
@@ -463,8 +466,8 @@ Cohesion: 0.06
 Nodes (35): author, license, main, name, private, type, version, autoprefixer (+27 more)
 
 ### Community 34 - "prompts/index.ts"
-Cohesion: 0.27
-Nodes (17): buildSystemInstructionV2(), buildSystemInstructionV3(), buildSystemPrompt(), AGENT_ROLES_INFO, AgentRole, AgentsConfig, ALL_AGENT_ROLES, AssistantMode (+9 more)
+Cohesion: 0.16
+Nodes (21): buildSystemInstruction(), buildSystemInstructionV2(), createTokensOptimizationRouter(), buildSystemInstructionV3(), buildSystemPrompt(), getSystemPromptBuilder(), SystemPromptBuilder, AGENT_ROLES_INFO (+13 more)
 
 ### Community 35 - "UnifiedSidebar.tsx"
 Cohesion: 0.10
@@ -474,37 +477,41 @@ Nodes (19): SidebarSectionProps, SubmenuItemProps, AgentStatusBlockProps, AGENT_
 Cohesion: 0.13
 Nodes (3): getStorePath(), projectMemory, ProjectFact
 
-### Community 37 - "runtime/index.ts"
-Cohesion: 0.09
-Nodes (23): AgentRuntime, defaultAgents, BootstrapConfig, BootstrapResult, bootstrapRuntime(), bootstrapRuntimeSync(), LegacySkill, createRuntime() (+15 more)
+### Community 37 - "AgentRuntime"
+Cohesion: 0.08
+Nodes (13): AgentLoader, AgentPlugin, AgentRuntime, createAgentsRouterV2(), StateMachine, StateMachineConfig, TransitionHook, AgentMetadata (+5 more)
 
 ### Community 38 - "dependencies"
 Cohesion: 0.06
 Nodes (36): dependencies, basic-ftp, clsx, compression, cva, dotenv, express, express-rate-limit (+28 more)
 
 ### Community 39 - "mission/index.ts"
-Cohesion: 0.12
-Nodes (24): ExecutorEventEmitter, SkillHandlerFn, CONFIDENCE_CONFIG, ConfidenceAnalysis, log, LOOP_CONFIG, LoopDetectionResult, MEMORY_CONFIG (+16 more)
+Cohesion: 0.13
+Nodes (25): ExecutorEventEmitter, SkillHandlerFn, DecomposeFunction, SubGoalPlan, CONFIDENCE_CONFIG, ConfidenceAnalysis, log, LOOP_CONFIG (+17 more)
+
+### Community 40 - "geminiKeyPool.ts"
+Cohesion: 0.11
+Nodes (25): BOOLEAN_VARIABLES, isSet(), isValidUrl(), URL_VARIABLES, validateEnvironment(), createGeminiKeysRouter(), router, updateEnvFile() (+17 more)
 
 ### Community 41 - "Leanna Design System Tokens"
 Cohesion: 0.06
 Nodes (34): 1. Échelle Typographique, 2. Palette de Couleurs Sémantiques, 3. Rayons et Élévation, 4. Effets Visuels, 5. Checklist de Recette par Composant, 6. Plan de Migration par Phase, 7. Exemples de Migration, 8. Outils de Vérification (+26 more)
 
 ### Community 42 - "SemanticSearch.ts"
-Cohesion: 0.12
-Nodes (12): ensureInvertedIndex(), expandQueryWithSynonyms(), getFileStatSafe(), InvertedIndex, _kgIndexListener, log, semanticSearch, SYNONYM_GROUPS (+4 more)
+Cohesion: 0.11
+Nodes (13): ensureInvertedIndex(), expandQueryWithSynonyms(), getFileStatSafe(), InvertedIndex, _kgIndexListener, log, NOTE: computeIDF kept for future TF-IDF scoring implementation, semanticSearch (+5 more)
 
 ### Community 43 - "EventBus"
-Cohesion: 0.08
-Nodes (15): close(), GracefulShutdownDeps, GracefulShutdownFn, setupGracefulShutdown(), EventBus, Handler, Middleware, Subscription (+7 more)
+Cohesion: 0.10
+Nodes (11): EventBus, Handler, Middleware, Subscription, AgentMetric, Observability, PerformanceSnapshot, ToolRegistryConfig (+3 more)
 
-### Community 44 - "Planner.ts"
-Cohesion: 0.23
-Nodes (5): DecomposeFunction, Planner, SubGoalPlan, Goal, GoalPriority
+### Community 44 - "Executor"
+Cohesion: 0.12
+Nodes (3): Executor, GoalResult, MissionPlan
 
 ### Community 45 - "notebookManager"
-Cohesion: 0.10
-Nodes (10): COLORS, DATA_DIR, ensureDataDir(), getNotebookPath(), ICONS, log, notebookManager, AudioOverview (+2 more)
+Cohesion: 0.11
+Nodes (9): COLORS, DATA_DIR, ensureDataDir(), getNotebookPath(), ICONS, log, notebookManager, Notebook (+1 more)
 
 ### Community 46 - "main.cjs"
 Cohesion: 0.10
@@ -514,9 +521,9 @@ Nodes (20): { app, BrowserWindow, systemPreferences, Notification, ipcMain, shel
 Cohesion: 0.12
 Nodes (28): createSummarizeContextRouter(), calculateMemoryScore(), ChatMessage, CRITICAL_CATEGORIES, DEFAULT_BUDGET_GEMINI, DEFAULT_OPTIMIZATION, estimateTokens(), formatMemoryContext() (+20 more)
 
-### Community 48 - "isSandboxActive"
-Cohesion: 0.12
-Nodes (51): appendAuditEvent(), generateDiffSummary(), codebaseSkill, buildAnalysisPrompt(), buildFilePreview(), buildPackageSummary(), buildTreeMarkdown(), checkWorkspace() (+43 more)
+### Community 48 - "codebaseHelpers.ts"
+Cohesion: 0.13
+Nodes (28): codebaseSkill, buildAnalysisPrompt(), buildFilePreview(), buildPackageSummary(), buildTreeMarkdown(), EXCLUDED_DIRS, EXCLUDED_FILES, extractFileOutline() (+20 more)
 
 ### Community 49 - "git.ts"
 Cohesion: 0.15
@@ -530,25 +537,17 @@ Nodes (31): `analyze_project_file`, Codebase Skill - Documentation, `create_proj
 Cohesion: 0.08
 Nodes (26): TreeEntry, CacheConfig, CacheEntry, cleanupRealtimeCacheListeners(), DEFAULT_CONFIG, EventCallback, eventCallbacks, FileEvent (+18 more)
 
-### Community 53 - "sourceIngester"
-Cohesion: 0.13
-Nodes (6): getGitHubHeaders(), githubApiFetch(), log, SemanticBlock, sourceIngester, SourceType
-
 ### Community 54 - "AutonomousAgent"
-Cohesion: 0.10
-Nodes (7): AgentMessage, SkillHandler, agentRegistry, log, AutonomousAgent, ProgressNotifier, listAgentRoles()
+Cohesion: 0.11
+Nodes (4): agentRegistry, AutonomousAgent, ProgressNotifier, getAgentDefinitionOrThrow()
 
 ### Community 56 - "documentMemory"
-Cohesion: 0.12
+Cohesion: 0.10
 Nodes (5): documentMemory, getStorePath(), DocumentKnowledgeStats, DocumentKnowledgeStore, MemoryFact
-
-### Community 57 - "projectIndexer"
-Cohesion: 0.16
-Nodes (3): projectIndexer, CodeEntity, OutlineEntry
 
 ### Community 58 - "base.ts"
 Cohesion: 0.06
-Nodes (27): { runtime, skillManager }, ChainedAction, ChainExecutionConfig, createErrorResult(), createSuccessResult(), executeChain(), handleActionError(), Skill (+19 more)
+Nodes (26): ChainedAction, ChainExecutionConfig, createErrorResult(), createSuccessResult(), executeChain(), handleActionError(), Skill, SkillContext (+18 more)
 
 ### Community 59 - "KnowledgeGraphCache.ts"
 Cohesion: 0.21
@@ -567,24 +566,24 @@ Cohesion: 0.19
 Nodes (3): ExtendedImpactReport, normalizePath(), planningEngine
 
 ### Community 63 - "Mission"
-Cohesion: 0.09
-Nodes (6): Executor, Mission, MissionConfig, MissionContext, MissionPlan, PlannedAction
+Cohesion: 0.13
+Nodes (5): Mission, Planner, Goal, MissionMetrics, PlannedAction
 
-### Community 65 - "Guide de test — Leanna"
-Cohesion: 0.07
-Nodes (28): 1. Test unitaire de skill, 2. Test d'intégration de route, 3. Exécuter le nouveau test, Ajouter un test, Bonnes pratiques, Breakpoints avec VS Code, CI/CD, Commandes principales (+20 more)
+### Community 64 - "codebaseWriter.ts"
+Cohesion: 0.35
+Nodes (24): appendAuditEvent(), generateDiffSummary(), checkWorkspace(), resolveSandboxWriteTarget(), checkWriteRateLimit(), FileOperation, guardCriticalFile(), GuardResult (+16 more)
 
 ### Community 66 - "compilerOptions"
 Cohesion: 0.07
 Nodes (27): compilerOptions, allowImportingTsExtensions, allowJs, allowSyntheticDefaultImports, esModuleInterop, experimentalDecorators, isolatedModules, jsx (+19 more)
 
-### Community 67 - "knowledgeRouter.ts"
-Cohesion: 0.14
-Nodes (12): router, isPathSecure(), resolveSecurePath(), router, router, router, currentDir, esmRequire (+4 more)
+### Community 67 - "ModuleLoader.ts"
+Cohesion: 0.31
+Nodes (6): currentDir, esmRequire, importModule(), isESM, requireCompat(), requireNative()
 
 ### Community 68 - "embeddingStore"
-Cohesion: 0.13
-Nodes (6): DATA_DIR, EmbeddingIndex, embeddingStore, ensureDataDir(), log, StoredEmbedding
+Cohesion: 0.11
+Nodes (10): close(), GracefulShutdownDeps, GracefulShutdownFn, setupGracefulShutdown(), DATA_DIR, EmbeddingIndex, embeddingStore, ensureDataDir() (+2 more)
 
 ### Community 69 - "chainOfThought.ts"
 Cohesion: 0.14
@@ -599,8 +598,8 @@ Cohesion: 0.08
 Nodes (16): clsx, cva, AutomationPanelProps, AutomationView, IconButton(), IconButtonProps, IconButtonVariant, iconButtonVariants (+8 more)
 
 ### Community 73 - "impactAnalyzer"
-Cohesion: 0.18
-Nodes (3): impactAnalyzer, normalizePath(), scoreToRisk()
+Cohesion: 0.12
+Nodes (6): impactAnalyzer, normalizePath(), scoreToRisk(), router, router, router
 
 ### Community 74 - "TerminalPanel.tsx"
 Cohesion: 0.10
@@ -611,48 +610,52 @@ Cohesion: 0.09
 Nodes (15): AgentFleetPanel(), AgentFleetPanelProps, AgentStat, apiHeaders(), BusMessage, BusMetrics, fetchJSON(), FleetStatus (+7 more)
 
 ### Community 77 - "IdeView.tsx"
-Cohesion: 0.11
-Nodes (18): @monaco-editor/react, ../components/ide/DiffViewer.js, DiffViewer(), DiffViewerProps, getAuthHeaders(), ../components/panels/VisionPanel.js, VisionPanel, VisionPanelProps (+10 more)
+Cohesion: 0.09
+Nodes (22): @monaco-editor/react, ../components/ide/DiffViewer.js, DiffViewer(), DiffViewerProps, getAuthHeaders(), ../components/panels/VisionPanel.js, VisionPanel, VisionPanelProps (+14 more)
 
 ### Community 78 - "dependencyGraph"
 Cohesion: 0.18
 Nodes (3): dependencyGraph, log, DependencyCycle
 
-### Community 80 - "system.ts"
+### Community 79 - "runtime/index.ts"
 Cohesion: 0.09
-Nodes (29): SkillContext, ALLOWED_COMMANDS, ALLOWED_NPM_SUBCOMMANDS, classifyNpmExecution(), describeNpmScript(), execFileAsync, getProjectRoot(), isLongRunningNpmScript() (+21 more)
+Nodes (16): defaultAgents, BootstrapConfig, BootstrapResult, bootstrapRuntime(), bootstrapRuntimeSync(), adaptAllSkills(), adaptSkill(), createToolCallProxy() (+8 more)
 
-### Community 81 - "V0 — Socle livré"
-Cohesion: 0.09
-Nodes (22): Backlog, Collaboration, Desktop & UI, DX & Outillage, IA & Agents, IDE & Système de fichiers, Infrastructure & Sécurité, Intelligence Artificielle (+14 more)
+### Community 80 - "system.ts"
+Cohesion: 0.12
+Nodes (20): ALLOWED_COMMANDS, ALLOWED_NPM_SUBCOMMANDS, classifyNpmExecution(), describeNpmScript(), execFileAsync, getProjectRoot(), isLongRunningNpmScript(), LONG_RUNNING_SCRIPTS (+12 more)
+
+### Community 81 - "Roadmap — Leanna AI Operating System"
+Cohesion: 0.12
+Nodes (15): Backlog, Collaboration, DX & Outillage, IA & Agents, Intégrations, Notebooks & RAG, Performance, Qualité et tests (+7 more)
 
 ### Community 82 - "SmartSkills.ts"
-Cohesion: 0.15
-Nodes (16): AgentValidation, asText(), calculateDiff(), createSmartSkills(), emptyDiff(), executeQualityLoop(), executeValidatePatch(), extractCorrection() (+8 more)
+Cohesion: 0.18
+Nodes (11): AgentValidation, RegressionReport, ValidationSnapshot, createSmartSkills(), executeValidatePatch(), extractCorrection(), log, PlanCodeChangeResult (+3 more)
 
-### Community 83 - "LiveSocketHandler.ts"
-Cohesion: 0.20
-Nodes (16): attachLiveWebSocket(), estimateToolTokens(), estimateToolTokensTotal(), handleToolCall(), isContextReady(), isRetryableToolError(), normalizeContextPath(), SessionContextGate (+8 more)
+### Community 83 - "HierarchicalMemoryService.ts"
+Cohesion: 0.15
+Nodes (10): getGeminiAI(), router, HierarchicalMemoryItem, hierarchicalMemoryService, HierarchicalSearchOptions, HierarchicalStats, HierarchicalStoreInput, HierarchicalTier (+2 more)
 
 ### Community 84 - "ProjectIndexer.ts"
-Cohesion: 0.18
-Nodes (11): CallChain, CallEdge, CallNode, CallNodeId, log, getASTCallGraph(), log, ANALYZABLE_EXTENSIONS (+3 more)
+Cohesion: 0.08
+Nodes (21): astCallGraph, CallChain, CallEdge, CallNode, CallNodeId, log, getASTCallGraph(), log (+13 more)
 
 ### Community 85 - "upload-document.ts"
-Cohesion: 0.15
-Nodes (13): createUploadDocumentRouter(), log, upload, uploadLimiter, markKeyError(), withGeminiRetry(), DETECTION_RULES, excerptFor() (+5 more)
+Cohesion: 0.17
+Nodes (11): createUploadDocumentRouter(), log, upload, uploadLimiter, DETECTION_RULES, excerptFor(), PromptInjectionFinding, PromptInjectionScanResult (+3 more)
 
 ### Community 86 - "ideApi.ts"
-Cohesion: 0.10
-Nodes (21): FALLBACK_STATUS, getElectronAPI(), SelfRootSection(), SelfRootStatus, WorkspaceItem, formatDate(), getElectronAPI(), INLINE_BANNER_TRANSITION (+13 more)
+Cohesion: 0.14
+Nodes (14): FALLBACK_STATUS, getElectronAPI(), SelfRootSection(), SelfRootStatus, WorkspaceItem, CacheEntry, fetchWithRetry(), FileContentResponse (+6 more)
 
 ### Community 87 - "agentActivityStore.ts"
-Cohesion: 0.18
+Cohesion: 0.19
 Nodes (21): agentTasks, cleanup(), clearCompletedTasks(), clearCompletedTools(), destroyActivityStore(), FALLBACK_TOOL_TO_AGENT, formatToolLabel(), getAgentForTool() (+13 more)
 
 ### Community 88 - "Leanna — AI Operating System"
-Cohesion: 0.09
-Nodes (22): 1. Cloner le dépôt, 2. Installer les dépendances, 3. Configurer les variables d'environnement, 4. Lancer en mode développement, 5. (Optionnel) Lancer en mode desktop Electron, Administrateur / Développeur, Configuration, Contribuer (+14 more)
+Cohesion: 0.12
+Nodes (16): Administrateur / Développeur, Configuration, Contribuer, Documentation, Fonctionnalités principales, Lancement, Leanna — AI Operating System, Licence (+8 more)
 
 ### Community 89 - "sanitizeMarkdownHtml.ts"
 Cohesion: 0.13
@@ -660,11 +663,11 @@ Nodes (17): marked, ChatMarkdown, MarkdownPreview, MarkdownPreviewProps, Props, 
 
 ### Community 90 - "contentExtractor"
 Cohesion: 0.19
-Nodes (7): pdf-parse, contentExtractor, DocumentSection, ExtractionOptions, ExtractionResult, pdf, require
+Nodes (6): pdf-parse, contentExtractor, DocumentSection, ExtractionResult, pdf, require
 
 ### Community 91 - "document-system/index.ts"
-Cohesion: 0.21
-Nodes (15): log, AnalysisResult, log, log, STOP_WORDS, STOP_WORDS, DocumentContext, DocumentEntity (+7 more)
+Cohesion: 0.27
+Nodes (14): log, AnalysisResult, log, STOP_WORDS, DocumentContext, DocumentEntity, DocumentMetadata, DocumentRelation (+6 more)
 
 ### Community 92 - "WorkflowEngine"
 Cohesion: 0.15
@@ -679,36 +682,32 @@ Cohesion: 0.19
 Nodes (18): checkConsoleUsage(), checkDuplicateImports(), checkLineLength(), checkMarkers(), checkNewline(), checkTrailingWhitespace(), checkUnusedVariables(), collectFiles() (+10 more)
 
 ### Community 95 - "skills/automation.ts"
-Cohesion: 0.13
-Nodes (29): router, automationSkill, selectorSchema, handleClose(), handleDeleteSession(), handleExtract(), handleInspect(), handleListSessions() (+21 more)
+Cohesion: 0.20
+Nodes (21): router, automationSkill, selectorSchema, cancelScheduledTask(), getScheduledTask(), getScheduledTasksSnapshot(), handleCancelScheduledTask(), handleListScheduledTasks() (+13 more)
 
 ### Community 96 - "reasoning.ts"
-Cohesion: 0.12
-Nodes (13): generateWithProviderFallback(), parseWinner(), reasoningCache, reasoningSkill, runSelfCritique(), runTreeOfThought(), STRATEGY_PATTERNS, StrategyPattern (+5 more)
+Cohesion: 0.13
+Nodes (12): generateWithProviderFallback(), parseWinner(), reasoningCache, reasoningSkill, runSelfCritique(), runTreeOfThought(), STRATEGY_PATTERNS, StrategyPattern (+4 more)
 
 ### Community 97 - "ChatPanel.tsx"
 Cohesion: 0.13
 Nodes (20): BreathingDots, BUBBLE_STYLES, ChatMessage, ChatPanel(), ChatPanelProps, clampWithRubberband(), COLORS, DragSession (+12 more)
 
 ### Community 98 - "AgentPanel.tsx"
-Cohesion: 0.14
-Nodes (12): AGENT_ROSTER, AgentGroupCard(), AgentPanelProps, DelegatedTaskCard(), formatArgs(), formatDuration(), getRoleMeta(), ROLE_META (+4 more)
+Cohesion: 0.13
+Nodes (13): AGENT_ROSTER, AgentGroupCard(), AgentPanelProps, DelegatedTaskCard(), formatArgs(), formatDuration(), getRoleMeta(), ROLE_META (+5 more)
 
 ### Community 99 - "devDependencies"
 Cohesion: 0.10
 Nodes (20): devDependencies, autoprefixer, concurrently, cross-env, electron, electron-builder, esbuild, tailwindcss (+12 more)
 
-### Community 100 - "FileNode"
-Cohesion: 0.33
-Nodes (3): relationExtractor, EntityRelation, FileNode
+### Community 100 - "./SandboxDiffViewer.js"
+Cohesion: 0.17
+Nodes (17): ./SandboxDiffViewer.js, computeDiff(), computeWordDiff(), DiffLine, DiffMode, FileDiff, FileList, getAuthHeaders() (+9 more)
 
 ### Community 101 - "runtime/agents/index.ts"
-Cohesion: 0.18
+Cohesion: 0.19
 Nodes (14): formatterAgent, plannerAgent, AgentConfig, buildPrompt(), createDefaultExecutor(), defineAgent(), parseAgentResponse(), proofreaderAgent (+6 more)
-
-### Community 102 - "PromptRegistry"
-Cohesion: 0.16
-Nodes (3): PromptRegistry, RenderOptions, PromptTemplate
 
 ### Community 103 - "customSkills.ts"
 Cohesion: 0.17
@@ -724,7 +723,7 @@ Nodes (18): ../components/ide/GitHubPanel.js, Commit, CommitDetail, CommitDetail
 
 ### Community 106 - "./DocumentsView.js"
 Cohesion: 0.12
-Nodes (17): DocumentsView, ./DocumentsView.js, CATEGORY_COLORS, DocumentItem, DocumentsTab(), FactItem, MemoryTab(), ProjectFactItem (+9 more)
+Nodes (16): DocumentsView, ./DocumentsView.js, CATEGORY_COLORS, DocumentItem, DocumentsTab(), FactItem, MemoryTab(), ProjectFactItem (+8 more)
 
 ### Community 107 - "Guide de contribution — Leanna"
 Cohesion: 0.11
@@ -738,17 +737,17 @@ Nodes (16): react-window-tree, countEntries(), DataNode, DiffInfo, FileExplorer,
 Cohesion: 0.11
 Nodes (19): 1. Principe, 2. Le module `selfRoot.ts`, 3. Règles pour étendre un skill, 4.1 Transparence des réponses et missions, 4. Les garde-fous auto-modification (Phase 2), 5. Moteur AST Tree-sitter, Call-Graph & Documents PDF, 6. Sandboxing MCP (Phase 4), 7. Configuration développeur (+11 more)
 
-### Community 110 - "getAgentDefinition"
-Cohesion: 0.19
-Nodes (17): permissionsFor(), getAgentDefinition(), AgentDraftSchema, AgentImportSchema, AgentUpdateSchema, ensureDir(), getAgentsFilePath(), handleCreateAgent() (+9 more)
+### Community 110 - "custom-agents.ts"
+Cohesion: 0.29
+Nodes (16): getAgentDefinition(), AgentDraftSchema, AgentImportSchema, AgentUpdateSchema, ensureDir(), getAgentsFilePath(), handleCreateAgent(), handleDeleteAgent() (+8 more)
 
 ### Community 111 - "contentGenerator"
-Cohesion: 0.16
-Nodes (4): contentGenerator, log, GeneratedDocType, ReportSuggestion
+Cohesion: 0.11
+Nodes (9): contentGenerator, log, AudioOverview, GeneratedDocType, GeneratedDocument, ReportSuggestion, ImageGenerationOptions, ImageGenerationResult (+1 more)
 
 ### Community 112 - "notebooks/types.ts"
-Cohesion: 0.22
-Nodes (8): log, ragEngine, STOP_WORDS, ChatThread, RAGSearchOptions, RAGSearchResult, Source, SourceChunk
+Cohesion: 0.15
+Nodes (12): log, ragEngine, STOP_WORDS, getGitHubHeaders(), githubApiFetch(), log, SemanticBlock, ChatThread (+4 more)
 
 ### Community 113 - "MissionPanel.tsx"
 Cohesion: 0.15
@@ -763,11 +762,11 @@ Cohesion: 0.22
 Nodes (10): DocxExportOptions, escapeXml(), exportToDocx(), escapeHtml(), exportToStandaloneHtml(), HtmlExportOptions, exportToPdf(), getBrowser() (+2 more)
 
 ### Community 116 - "utils/checkpoint.ts"
-Cohesion: 0.17
-Nodes (13): createCheckpointRouter(), router, createCheckpoint(), execFileAsync, listCheckpoints(), rollbackToCheckpoint(), validateBuild(), getLastValidationResult() (+5 more)
+Cohesion: 0.22
+Nodes (12): createCheckpointRouter(), createCheckpoint(), execFileAsync, listCheckpoints(), rollbackToCheckpoint(), validateBuild(), getLastValidationResult(), notifyAll() (+4 more)
 
 ### Community 117 - "Memory"
-Cohesion: 0.25
+Cohesion: 0.23
 Nodes (4): Memory, MemoryConfig, MemoryEntry, MemoryLevel
 
 ### Community 118 - "schemas.ts"
@@ -778,9 +777,9 @@ Nodes (17): CONTENT_PARAM, DESCRIPTION_PARAM, DIR_PARAM, END_LINE_PARAM, FILES_O
 Cohesion: 0.17
 Nodes (7): CACHE_DURATIONS, CacheEntry, extractCacheableSections(), findAgentSectionEnd(), findAgentSectionStart(), findBaseSystemPromptEnd(), promptCache
 
-### Community 120 - "Architecture — Leanna AI Operating System"
-Cohesion: 0.12
-Nodes (17): Architecture — Leanna AI Operating System, Base de données, CI/CD, Exécution des tests, Frontend, Gestion d'état, Optimisations réseau (frontend), Pool de clés Gemini (+9 more)
+### Community 120 - "Tests"
+Cohesion: 0.33
+Nodes (6): CI/CD, Exécution des tests, Stratégie de test, Tests, Tests d'intégration (Routes REST), Tests unitaires (Skills)
 
 ### Community 121 - "build"
 Cohesion: 0.12
@@ -791,8 +790,8 @@ Cohesion: 0.18
 Nodes (7): FileValidationError, GeneratedFileWriter, log, SkillHandler, WriteFromOutputResult, checkBracketBalance(), checkTypeScriptSyntax()
 
 ### Community 123 - "documentSearchEngine"
-Cohesion: 0.24
-Nodes (5): documentSearchEngine, SearchOptions, SearchResult, DOC_TYPES, MEMORY_CATEGORIES
+Cohesion: 0.31
+Nodes (3): documentSearchEngine, SearchOptions, SearchResult
 
 ### Community 124 - "list.ts"
 Cohesion: 0.32
@@ -803,16 +802,16 @@ Cohesion: 0.12
 Nodes (16): 12. Gestion des contradictions, 13. Analyse du code, 14. Diagnostic de bug, 15. Analyse d'architecture, 16. Comparaisons, 17. Présentation des données, 18. Gestion de l'information manquante, 20. Mémoire conversationnelle (+8 more)
 
 ### Community 126 - "LoggerInstance"
-Cohesion: 0.17
-Nodes (3): LoggerInstance, ModuleLogger, sanitizeHistoryMessage()
+Cohesion: 0.16
+Nodes (4): getLogEntries(), LoggerInstance, ModuleLogger, sanitizeHistoryMessage()
 
 ### Community 127 - "AgentProgressBar.tsx"
 Cohesion: 0.16
 Nodes (18): AgentProgressBar(), AgentProgressBarProps, CAT_COLOR, CAT_LABEL, CatIcon, COMPLEXITY_LABEL, getCat(), getStepStatus() (+10 more)
 
-### Community 128 - "./SandboxDiffViewer.js"
-Cohesion: 0.08
-Nodes (29): ../panels/SandboxPanel.js, authHeaders(), SandboxPanel(), SandboxPanelProps, SandboxStatus, ./SandboxDiffViewer.js, computeDiff(), computeWordDiff() (+21 more)
+### Community 128 - "../panels/SandboxPanel.js"
+Cohesion: 0.15
+Nodes (12): ../panels/SandboxPanel.js, authHeaders(), SandboxPanel(), SandboxPanelProps, SandboxStatus, SandboxDiffViewer, SandboxPanel, SandboxWorkspaceProps (+4 more)
 
 ### Community 129 - "useTranscript.ts"
 Cohesion: 0.22
@@ -830,9 +829,13 @@ Nodes (10): @supabase/supabase-js, Memory, useSupabaseMemories(), memoryManagerS
 Cohesion: 0.15
 Nodes (12): SkillHandler, BuildResult, DEFAULT_CONFIG, EvaluationOutcome, FileHistory, log, MissionObjective, PhaseResult (+4 more)
 
+### Community 133 - "constants.ts"
+Cohesion: 0.17
+Nodes (7): EXTENDED_ACCENTS, ACCENTS, AuditEntry, CATEGORIES, LANGUAGES, RESPONSE_STYLES, VOICES
+
 ### Community 137 - "automationBrowser.ts"
-Cohesion: 0.20
-Nodes (28): puppeteer, captureSnapshot(), ensurePage(), extractResultsFromDuckDuckGo(), getPuppeteer(), handleClick(), handleDoubleClick(), handleDownloadFile() (+20 more)
+Cohesion: 0.13
+Nodes (37): puppeteer, captureSnapshot(), ensurePage(), extractResultsFromDuckDuckGo(), getPuppeteer(), handleAnalyzeScreenshot(), handleClick(), handleClose() (+29 more)
 
 ### Community 138 - "Résumé de l'analyse et Implémentation de l'Auto-Guérison"
 Cohesion: 0.12
@@ -851,8 +854,8 @@ Cohesion: 0.13
 Nodes (15): Agents, `GET /api/agents/bus/history`, `GET /api/agents/bus/metrics`, `GET /api/agents/collaboration/patterns`, `GET /api/agents/fleet`, `GET /api/agents/persistence/status`, `GET /api/agents/:role/tools`, `GET /api/agents/roles` (+7 more)
 
 ### Community 143 - "serverRestart.ts"
-Cohesion: 0.18
-Nodes (13): DATA_DIR_PREFIXES, DATA_FILE_BASENAMES, DATA_FILE_SUFFIXES, getRestartStatus(), isRunnableServerCode(), notifyClients(), NotifyFn, performRestart() (+5 more)
+Cohesion: 0.12
+Nodes (21): cancelAllPending(), ConfirmationRequest, generateRequestId(), getPendingCount(), handleConfirmationResponse(), pending, PendingConfirmation, requestConfirmation() (+13 more)
 
 ### Community 144 - "ChatCards.tsx"
 Cohesion: 0.16
@@ -902,9 +905,9 @@ Nodes (6): UseNotebookIdExample(), NotebookSummary, useEnsureNotebook(), UseEnsu
 Cohesion: 0.26
 Nodes (13): ActiveRunTracker(), formatElapsed(), formatRelativeTime(), statusColor(), statusIcon(), statusLabel(), stepStatusIcon(), WorkflowRunState (+5 more)
 
-### Community 157 - "DelegationParser.ts"
-Cohesion: 0.29
-Nodes (7): DELEGATION_MATRIX, isDelegationAllowed(), delegationParser, DelegationParseResult, getValidRoles(), log, VALID_PRIORITIES
+### Community 157 - "server/agents/index.ts"
+Cohesion: 0.06
+Nodes (55): agentMessageSchema, AgentMessageType, BroadcastPayload, COLLABORATION_PATTERNS, CollaborationPattern, DELEGATION_MATRIX, DelegationCapability, delegationPolicy (+47 more)
 
 ### Community 158 - "securityAudit.ts"
 Cohesion: 0.20
@@ -963,12 +966,12 @@ Cohesion: 0.31
 Nodes (10): analyzeFile(), checkForEmptyState(), checkForErrorState(), checkForFetch(), checkForLoadingState(), extractUseEffectBlocks(), findTsFiles(), main() (+2 more)
 
 ### Community 172 - "AutonomousAgent.ts"
-Cohesion: 0.10
-Nodes (17): CollaborationRequestPayload, TaskRequestPayload, TaskResponsePayload, DelegatedSubTask, log, TODO: implémenter la logique de collaboration proactive, TaskQueueItem, AutonomousLoop (+9 more)
+Cohesion: 0.11
+Nodes (16): CollaborationRequestPayload, TaskRequestPayload, TaskResponsePayload, DelegatedSubTask, log, TODO: implémenter la logique de collaboration proactive, TaskQueueItem, AutonomousLoop (+8 more)
 
-### Community 173 - "Fonctionnalités principales"
-Cohesion: 0.18
-Nodes (11): 3. Surveillance et Traçage (MessageBusMonitor), Analyse de flux, Architecture, Détection d'anomalies, Export Prometheus (exemple), Fonctionnalités principales, Health Checks, Intégration avec des outils externes (+3 more)
+### Community 173 - "src/utils/logger.ts"
+Cohesion: 0.17
+Nodes (9): consoleWrapper, defaultConfig, devLog(), log, LOG_LEVELS, logger, LoggerConfig, LogLevel (+1 more)
 
 ### Community 174 - "TECHNIQUE — Standards de code"
 Cohesion: 0.18
@@ -977,6 +980,10 @@ Nodes (10): Bibliothèques, COMPORTEMENT — Classification de l'intention, CONC
 ### Community 175 - "{{aiName}} — Prompt Système (Haute Performance)"
 Cohesion: 0.17
 Nodes (11): 1. Périmètre & Outils (CRUD), 2. Workflow Code (Boucle de validation stricte), 3. Gestion des erreurs (Action immédiate), 4. Visualisation de données (Déclencheur automatique), 5. Règles de conduite strictes, {{aiName}} — Prompt Système (Haute Performance), Graphe de Connaissances & Architecture (Graphify), Niveaux de complexité (+3 more)
+
+### Community 177 - "StartupProjectModal.tsx"
+Cohesion: 0.22
+Nodes (8): react-router-dom, formatDate(), getElectronAPI(), INLINE_BANNER_TRANSITION, MODAL_SPRING, OVERLAY_FADE, StartupProjectModal(), WorkspaceItem
 
 ### Community 178 - "FileExplorer.tsx"
 Cohesion: 0.27
@@ -1002,21 +1009,21 @@ Nodes (9): ActivityFeed(), classifyTool(), deduplicateSteps(), FeedEntry, FeedRo
 Cohesion: 0.20
 Nodes (9): AudioOverview, ChatMessage, Citation, GeneratedDoc, NotebookData, NotebookSummary, NoteItem, SourceItem (+1 more)
 
-### Community 185 - "Délégation Structurée et Surveillance du MessageBus"
-Cohesion: 0.22
-Nodes (8): Délégation Structurée et Surveillance du MessageBus, Fichiers Ajoutés, Fichiers Modifiés, Fichiers Modifiés et Ajoutés, Limites connues, Limites et Travaux Futurs, Support, Travaux futurs
+### Community 185 - "slidesTheme.ts"
+Cohesion: 0.36
+Nodes (10): blockToMarkdown(), BodyBlock, buildRevealPresentation(), escapeHtml(), getSlideLimits(), mdToHtml(), parseBodyBlocks(), parseMarkdownToSlides() (+2 more)
 
-### Community 186 - "1. Délégation Structurée (DelegationManager)"
-Cohesion: 0.22
-Nodes (9): 1. Délégation Structurée (DelegationManager), Fonctionnalités clés, Format de délégation batch (orchestration), Format de délégation simple, Migration depuis DelegationParser, Problème résolu, Solution : DelegationManager, Stratégies d'exécution batch (+1 more)
+### Community 186 - "Erreurs réelles (bugs de code)"
+Cohesion: 0.18
+Nodes (10): Catégorie 1 — Variable déclarée avec `_` mais utilisée sans `_` (TS2552), Catégorie 2 — Variables inutilisées (TS6133 / TS6196), Catégorie 3 — Propriété manquante dans un type (TS2741), Catégorie 4 — Propriété inconnue sur un type (TS2353), Catégorie 5 — Type incompatible (TS2322), Catégorie 6 — Extensions d'import manquantes (TS2835), Erreurs réelles (bugs de code), Plan d'action recommandé (+2 more)
+
+### Community 187 - "executeQualityLoop"
+Cohesion: 0.31
+Nodes (8): asText(), calculateDiff(), emptyDiff(), executeQualityLoop(), extractVerifyErrors(), failureResult(), isSuccessful(), readAfter()
 
 ### Community 188 - "MemoriesView.tsx"
 Cohesion: 0.28
 Nodes (6): MemoriesView, MemoryPanelProps, MemoriesView, MemoriesView(), Memory, timeAgo()
-
-### Community 189 - "routes/ide.ts"
-Cohesion: 0.31
-Nodes (6): EXCLUDED_TREE_DIRECTORIES, getWorkspaceRoot(), resolveRequestedPath(), resolveRequestedWritePath(), router, getDefaultWorkspaceRoot()
 
 ### Community 190 - "Système Multi-Agents"
 Cohesion: 0.22
@@ -1054,13 +1061,13 @@ Nodes (6): COLORS, ICONS, ToastContext, ToastContextValue, ToastItem, ToastType
 Cohesion: 0.25
 Nodes (8): `DELETE /api/notebooks/:id`, `GET /api/notebooks`, `GET /api/notebooks/:id`, Notebooks (RAG), `POST /api/notebooks`, `POST /api/notebooks/:id/chat`, `POST /api/notebooks/:id/embeddings/reindex`, `POST /api/notebooks/:id/sources/upload`
 
-### Community 200 - "Backend / API"
-Cohesion: 0.25
-Nodes (8): Agent Orchestrator, Authentification, Backend / API, Couches applicatives, Middlewares (ordre d'application), Prompt, policy et exécution, Runtime et Skill System, WebSockets
+### Community 200 - "Architecture — Leanna AI Operating System"
+Cohesion: 0.14
+Nodes (14): Agent Orchestrator, Architecture — Leanna AI Operating System, Authentification, Backend / API, Base de données, Couches applicatives, Middlewares (ordre d'application), Pool de clés Gemini (+6 more)
 
-### Community 201 - "Nouvelles stratégies de routage"
-Cohesion: 0.25
-Nodes (8): 2. Routage Avancé (AgentMessageBus), `broadcast`, `direct` (par défaut), `load-balanced`, Métriques de routage, Nouvelles stratégies de routage, `round-robin`, Traçage des messages
+### Community 201 - "ProcessingQueue.ts"
+Cohesion: 0.22
+Nodes (8): log, QueueConfig, QueueStats, QueueTask, SourceProcessingPayload, TaskHandler, TaskPriority, TaskStatus
 
 ### Community 202 - "23. Profondeur adaptative"
 Cohesion: 0.25
@@ -1138,6 +1145,10 @@ Nodes (6): ClipboardEntry, ContextMenu(), ContextMenuAction, ContextMenuProps, C
 Cohesion: 0.33
 Nodes (5): getAuthHeaders(), GlobalSearch(), GlobalSearchProps, SearchMatch, SearchResultGroup
 
+### Community 223 - "skills.ts"
+Cohesion: 0.33
+Nodes (7): BUILTIN_SKILL_META, createSkillsRouter(), defaultRouter, generateCodeSnippets(), generateExamplePayload(), normalizeParameters(), SkillMeta
+
 ### Community 224 - "ASTCallGraphExplorer.tsx"
 Cohesion: 0.29
 Nodes (5): ASTStats, CallChainNode, CallChainResult, CallEdge, FunctionItem
@@ -1154,9 +1165,9 @@ Nodes (5): analyzeFile(), findTsxFiles(), main(), PROJECT_ROOT, SRC_DIR
 Cohesion: 0.33
 Nodes (4): ConfirmRequest, CriticalEditConfirm(), OPERATION_LABELS, Props
 
-### Community 228 - "useOrbState.ts"
-Cohesion: 0.47
-Nodes (4): FloatingOrb(), OrbState, OrbStatus, useOrbState()
+### Community 228 - "SkillsDocumentation.tsx"
+Cohesion: 0.22
+Nodes (6): ICON_MAP, SkillDoc, SkillsDocResponse, SkillsDocumentationProps, ToolDoc, ToolParamDoc
 
 ### Community 229 - "NotesPanel.tsx"
 Cohesion: 0.40
@@ -1178,10 +1189,6 @@ Nodes (4): CustomEventMap, react-window-tree, TreeNodeData, Window
 Cohesion: 0.33
 Nodes (5): *.jpeg, *.jpg, *.png, *.svg, *.webp
 
-### Community 234 - "Tests d'intégration (Routes REST)"
-Cohesion: 0.33
-Nodes (6): Couverture par domaine, Objectif, Pattern de test standard, Tests avec dépendances optionnelles, Tests d'intégration (Routes REST), Tests de validation (400 Bad Request)
-
 ### Community 235 - "Compétences (Skills)"
 Cohesion: 0.40
 Nodes (5): Compétences (Skills), `GET /api/custom-skills`, `GET /api/skills`, `POST /api/custom-skills`, `PUT /api/custom-skills/:id` · `DELETE /api/custom-skills/:id`
@@ -1194,29 +1201,29 @@ Nodes (5): `GET /api/knowledge/impact`, `GET /api/knowledge/status`, `GET /api/k
 Cohesion: 0.50
 Nodes (4): mermaid, initMermaid(), MermaidDiagram, Props
 
-### Community 238 - "Bonnes Pratiques"
-Cohesion: 0.40
-Nodes (5): 1. Utiliser la délégation structurée, 2. Choisir la bonne stratégie de routage, 3. Surveiller proactivement, 4. Nettoyer les ressources, Bonnes Pratiques
+### Community 238 - "V0 — Socle livré"
+Cohesion: 0.29
+Nodes (7): Desktop & UI, IDE & Système de fichiers, Infrastructure & Sécurité, Intelligence Artificielle, Intégrations, Knowledge & Mémoire, V0 — Socle livré
 
-### Community 239 - "Migration Guide"
-Cohesion: 0.40
-Nodes (5): Migration Guide, Étape 1 : Commencer par les délégations structurées, Étape 2 : Adopter le routage avancé, Étape 3 : Activer la surveillance, Étape 4 : Nettoyer l'ancien code
+### Community 239 - "mission.ts"
+Cohesion: 0.43
+Nodes (5): { runtime, skillManager }, availableSkillNames, initMissionSystem(), missionSkill, updateMissionSkills()
 
-### Community 240 - "SELF_ROOT"
-Cohesion: 0.13
-Nodes (13): analyzeAuditLog(), AuditEvent, readAuditEntries(), BackupConfig, BackupMetadata, log, router, CacheEntry (+5 more)
+### Community 240 - "routes/audit.ts"
+Cohesion: 0.43
+Nodes (5): analyzeAuditLog(), AuditEvent, readAuditEntries(), router, LogLevel
 
-### Community 241 - "imageGeneration.ts"
-Cohesion: 0.50
-Nodes (3): ImageGenerationOptions, ImageGenerationResult, log
+### Community 241 - "richDocument.ts"
+Cohesion: 0.29
+Nodes (4): RichBlock, RichBlockType, RichDocument, richDocumentSkill
 
 ### Community 242 - "24. Format de réponse"
 Cohesion: 0.40
 Nodes (5): 24. Format de réponse, Question analytique, Question documentaire, Question simple, Question technique
 
-### Community 243 - "FileIcon.tsx"
-Cohesion: 0.50
-Nodes (4): EXT_COLOR, FileIcon(), FileIconProps, pickIcon()
+### Community 243 - "Installation"
+Cohesion: 0.33
+Nodes (6): 1. Cloner le dépôt, 2. Installer les dépendances, 3. Configurer les variables d'environnement, 4. Lancer en mode développement, 5. (Optionnel) Lancer en mode desktop Electron, Installation
 
 ### Community 245 - "NotesCanvas.tsx"
 Cohesion: 0.50
@@ -1226,13 +1233,17 @@ Nodes (4): NoteItem, NotesCanvas(), Props, timeAgo()
 Cohesion: 0.60
 Nodes (4): getElectronAPI(), webSelectFolder(), WorkspacePanel, WorkspaceState
 
+### Community 247 - "SkillsPanel.tsx"
+Cohesion: 0.33
+Nodes (4): iconMap, Skill, SkillsPanel, SkillsPanelProps
+
 ### Community 248 - "VisualWorkflowBuilder.tsx"
 Cohesion: 0.40
 Nodes (3): COMMON_ACTIONS, VisualWorkflowBuilderProps, WorkflowStepForm
 
-### Community 249 - "Conventions de test"
-Cohesion: 0.40
-Nodes (5): Assertions, Conventions de test, Fixtures et mocks, Nommage, Organisation
+### Community 249 - "HierarchicalMemorySection.tsx"
+Cohesion: 0.33
+Nodes (4): HierarchicalMemoryItem, HierarchicalStats, HierarchicalTier, TIER_COLORS
 
 ### Community 250 - "Tests d'intégration"
 Cohesion: 0.50
@@ -1250,17 +1261,13 @@ Nodes (4): Exécution de commandes par skill, `GET /api/terminal`, Navigation we
 Cohesion: 0.50
 Nodes (4): WebSockets, `WS /live`, `WS /sandbox-watch`, `WS /terminal`
 
-### Community 254 - "API Résumée"
-Cohesion: 0.50
-Nodes (4): AgentMessageBus (nouvelles fonctionnalités), API Résumée, DelegationManager, MessageBusMonitor
+### Community 254 - "Frontend"
+Cohesion: 0.40
+Nodes (5): Frontend, Gestion d'état, Optimisations réseau (frontend), Routing, Structure des composants
 
-### Community 255 - "Performances"
-Cohesion: 0.50
-Nodes (4): DelegationManager, MessageBusMonitor, Performances, Routage avancé
-
-### Community 256 - "Exemples Complets"
-Cohesion: 0.50
-Nodes (4): Exemple 1 : Délégation structurée avec orchestration, Exemple 2 : Utilisation du load-balancing, Exemple 3 : Surveillance complète, Exemples Complets
+### Community 256 - "CreateNotebookModal.tsx"
+Cohesion: 0.40
+Nodes (3): CreateNotebookModalProps, SPRING_MOMENTUM, SPRING_UI
 
 ### Community 257 - "10. Niveau de confiance"
 Cohesion: 0.50
@@ -1273,6 +1280,10 @@ Nodes (4): 9. Faits, déductions et incertitudes, Déduction, Fait, Incertitude
 ### Community 259 - "safety.md"
 Cohesion: 0.50
 Nodes (3): Guardrails, Modification des Fichiers et Documents, Proactivité
+
+### Community 260 - "isSandboxActive"
+Cohesion: 0.16
+Nodes (15): ws, isPathSecure(), resolveSecurePath(), initSandboxWatchWSS(), isSandboxActive(), addWatchClient(), broadcast(), connectedClients (+7 more)
 
 ### Community 261 - "/graphify"
 Cohesion: 0.50
@@ -1298,25 +1309,41 @@ Nodes (3): 8. Fidélité documentaire, Faire, Ne pas faire
 Cohesion: 0.50
 Nodes (3): /graphify, Rules for Codebase Questions, Usage
 
+### Community 287 - "documentKnowledge.ts"
+Cohesion: 0.50
+Nodes (3): DOC_TYPES, documentKnowledgeSkill, MEMORY_CATEGORIES
+
+### Community 288 - "ImagePreview.tsx"
+Cohesion: 0.67
+Nodes (3): getAuthHeaders(), ImagePreview(), Props
+
+### Community 290 - "PdfPreview.tsx"
+Cohesion: 0.67
+Nodes (3): getAuthHeaders(), PdfPreview(), Props
+
+### Community 292 - "QuitConfirmDialog.tsx"
+Cohesion: 0.67
+Nodes (3): QuitConfirmDialog(), QuitConfirmDialogProps, useMediaQuery()
+
 ## Knowledge Gaps
-- **1655 isolated node(s):** `WebSocket`, `dotenv`, `path`, `ws`, `{ app, BrowserWindow, systemPreferences, Notification, ipcMain, shell, dialog, desktopCapturer, nativeTheme }` (+1650 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 2199 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **38 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **1604 isolated node(s):** `WebSocket`, `dotenv`, `path`, `ws`, `{ app, BrowserWindow, systemPreferences, Notification, ipcMain, shell, dialog, desktopCapturer, nativeTheme }` (+1599 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 2154 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **40 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `react` connect `react` to `lucide-react`, `useLiveAPI.ts`, `MarketplacePanel.tsx`, `main.tsx`, `../components/ide/RichDocumentViewer.js`, `AgentBuilderPanel.tsx`, `package.json`, `UnifiedSidebar.tsx`, `main.cjs`, `AutomationView.tsx`, `TerminalPanel.tsx`, `AgentFleetPanel.tsx`, `IdeView.tsx`, `ideApi.ts`, `sanitizeMarkdownHtml.ts`, `ChatPanel.tsx`, `AgentPanel.tsx`, `useFileSystem.ts`, `../components/ide/GitHubPanel.js`, `./DocumentsView.js`, `FileExplorerVirtualized.tsx`, `MissionPanel.tsx`, `MultiAgentIndicator.tsx`, `AgentProgressBar.tsx`, `./SandboxDiffViewer.js`, `useTranscript.ts`, `CustomSkillsSection.tsx`, `@supabase/supabase-js`, `UserProfileContext.tsx`, `ChatCards.tsx`, `HistoryView.tsx`, `SystemHealthDashboard.tsx`, `EmptyEditorState.tsx`, `GeneratePanel.tsx`, `ImportToNotebookExample.tsx`, `WorkflowsPanel.tsx`, `LiveSkillsMonitor.tsx`, `StatusBar.tsx`, `WorkflowPanel.tsx`, `GitHubRepositoryImportModal.tsx`, `SlidePreviewModal.tsx`, `TemplateSelectorModal.tsx`, `GitHubView.tsx`, `FileExplorer.tsx`, `NotebookChat.tsx`, `AuditPanel.tsx`, `McpPanel.tsx`, `Skeleton.tsx`, `ActivityFeed.tsx`, `MemoriesView.tsx`, `CommandPalette.tsx`, `SourcePanel.tsx`, `SettingsPrimitives.tsx`, `TokenCounter.tsx`, `Toast.tsx`, `useFileMention.ts`, `DocumentUpload.tsx`, `SlashCommandDropdown.tsx`, `GeneratedDocsPanel.tsx`, `NotebookDetail.tsx`, `NotebookList.tsx`, `AssistantLogsPanel.tsx`, `AudioOverviewPanel.tsx`, `ScreenShareContext.tsx`, `PromptContextIndicator.tsx`, `SystemLogsPanel.tsx`, `ContextMenu.tsx`, `GlobalSearch.tsx`, `ASTCallGraphExplorer.tsx`, `ConfirmDialog.tsx`, `CriticalEditConfirm.tsx`, `useOrbState.ts`, `NotesPanel.tsx`, `ScheduledTasksPanel.tsx`, `StatusBadge.tsx`, `MermaidDiagram.tsx`, `FileIcon.tsx`, `ImportToNotebookButton.tsx`, `NotesCanvas.tsx`, `WorkspacePanel.tsx`, `VisualWorkflowBuilder.tsx`?**
-  _High betweenness centrality (0.166) - this node is a cross-community bridge._
-- **Why does `lucide-react` connect `lucide-react` to `./SandboxDiffViewer.js`, `useTranscript.ts`, `CustomSkillsSection.tsx`, `react`, `MarketplacePanel.tsx`, `main.tsx`, `ChatCards.tsx`, `HistoryView.tsx`, `../components/ide/RichDocumentViewer.js`, `SystemHealthDashboard.tsx`, `EmptyEditorState.tsx`, `GeneratePanel.tsx`, `WorkflowsPanel.tsx`, `LiveSkillsMonitor.tsx`, `StatusBar.tsx`, `package.json`, `WorkflowPanel.tsx`, `AgentBuilderPanel.tsx`, `UnifiedSidebar.tsx`, `GitHubRepositoryImportModal.tsx`, `SlidePreviewModal.tsx`, `TemplateSelectorModal.tsx`, `GitHubView.tsx`, `main.cjs`, `FileExplorer.tsx`, `NotebookChat.tsx`, `AuditPanel.tsx`, `McpPanel.tsx`, `ActivityFeed.tsx`, `MemoriesView.tsx`, `CommandPalette.tsx`, `SourcePanel.tsx`, `SettingsPrimitives.tsx`, `TokenCounter.tsx`, `Toast.tsx`, `AutomationView.tsx`, `TerminalPanel.tsx`, `useFileMention.ts`, `DocumentUpload.tsx`, `IdeView.tsx`, `SlashCommandDropdown.tsx`, `GeneratedDocsPanel.tsx`, `NotebookDetail.tsx`, `NotebookList.tsx`, `AudioOverviewPanel.tsx`, `AgentFleetPanel.tsx`, `AssistantLogsPanel.tsx`, `ideApi.ts`, `sanitizeMarkdownHtml.ts`, `PromptContextIndicator.tsx`, `SystemLogsPanel.tsx`, `ContextMenu.tsx`, `GlobalSearch.tsx`, `FlyoutMenu.tsx`, `ASTCallGraphExplorer.tsx`, `ChatPanel.tsx`, `AgentPanel.tsx`, `CriticalEditConfirm.tsx`, `ConfirmDialog.tsx`, `NotesPanel.tsx`, `ScheduledTasksPanel.tsx`, `StatusBadge.tsx`, `useFileSystem.ts`, `../components/ide/GitHubPanel.js`, `./DocumentsView.js`, `FileExplorerVirtualized.tsx`, `MermaidDiagram.tsx`, `MissionPanel.tsx`, `MultiAgentIndicator.tsx`, `FileIcon.tsx`, `ImportToNotebookButton.tsx`, `NotesCanvas.tsx`, `WorkspacePanel.tsx`, `ModelSection.tsx`, `VisualWorkflowBuilder.tsx`, `AgentProgressBar.tsx`?**
-  _High betweenness centrality (0.109) - this node is a cross-community bridge._
-- **Why does `zod` connect `agents/types.ts` to `server.ts`, `AgentRole`, `selfRoot.ts`, `server/knowledge/index.ts`, `marketplace.ts`, `history.ts`, `express`, `workflow.ts`, `server/agents/index.ts`, `geminiTTS.ts`, `skills/browser.ts`, `WorkspaceIndexer.ts`, `securityAudit.ts`, `package.json`, `graphify.ts`, `mission/index.ts`, `base.ts`, `verify.ts`, `skills/automation.ts`, `customSkills.ts`, `getAgentDefinition`, `list.ts`?**
-  _High betweenness centrality (0.086) - this node is a cross-community bridge._
+- **Why does `react` connect `react` to `lucide-react`, `useLiveAPI.ts`, `MarketplacePanel.tsx`, `main.tsx`, `../components/ide/RichDocumentViewer.js`, `AgentBuilderPanel.tsx`, `package.json`, `UnifiedSidebar.tsx`, `main.cjs`, `AutomationView.tsx`, `TerminalPanel.tsx`, `AgentFleetPanel.tsx`, `IdeView.tsx`, `ideApi.ts`, `sanitizeMarkdownHtml.ts`, `ChatPanel.tsx`, `AgentPanel.tsx`, `./SandboxDiffViewer.js`, `useFileSystem.ts`, `../components/ide/GitHubPanel.js`, `./DocumentsView.js`, `FileExplorerVirtualized.tsx`, `MissionPanel.tsx`, `MultiAgentIndicator.tsx`, `AgentProgressBar.tsx`, `../panels/SandboxPanel.js`, `useTranscript.ts`, `CustomSkillsSection.tsx`, `@supabase/supabase-js`, `constants.ts`, `UserProfileContext.tsx`, `ChatCards.tsx`, `HistoryView.tsx`, `SystemHealthDashboard.tsx`, `EmptyEditorState.tsx`, `GeneratePanel.tsx`, `ImportToNotebookExample.tsx`, `WorkflowsPanel.tsx`, `LiveSkillsMonitor.tsx`, `StatusBar.tsx`, `WorkflowPanel.tsx`, `GitHubRepositoryImportModal.tsx`, `SlidePreviewModal.tsx`, `TemplateSelectorModal.tsx`, `GitHubView.tsx`, `StartupProjectModal.tsx`, `FileExplorer.tsx`, `NotebookChat.tsx`, `AuditPanel.tsx`, `McpPanel.tsx`, `Skeleton.tsx`, `ActivityFeed.tsx`, `MemoriesView.tsx`, `CommandPalette.tsx`, `SourcePanel.tsx`, `SettingsPrimitives.tsx`, `TokenCounter.tsx`, `Toast.tsx`, `useFileMention.ts`, `DocumentUpload.tsx`, `SlashCommandDropdown.tsx`, `GeneratedDocsPanel.tsx`, `NotebookDetail.tsx`, `NotebookList.tsx`, `AssistantLogsPanel.tsx`, `AudioOverviewPanel.tsx`, `ScreenShareContext.tsx`, `PromptContextIndicator.tsx`, `SystemLogsPanel.tsx`, `ContextMenu.tsx`, `GlobalSearch.tsx`, `ASTCallGraphExplorer.tsx`, `ConfirmDialog.tsx`, `CriticalEditConfirm.tsx`, `SkillsDocumentation.tsx`, `NotesPanel.tsx`, `ScheduledTasksPanel.tsx`, `StatusBadge.tsx`, `MermaidDiagram.tsx`, `ImportToNotebookButton.tsx`, `NotesCanvas.tsx`, `WorkspacePanel.tsx`, `SkillsPanel.tsx`, `VisualWorkflowBuilder.tsx`, `HierarchicalMemorySection.tsx`, `SidebarItem.tsx`, `CreateNotebookModal.tsx`, `ImagePreview.tsx`, `NotebookPickerModal.tsx`, `PdfPreview.tsx`, `TokensSection.tsx`, `QuitConfirmDialog.tsx`?**
+  _High betweenness centrality (0.174) - this node is a cross-community bridge._
+- **Why does `lucide-react` connect `lucide-react` to `react`, `MarketplacePanel.tsx`, `main.tsx`, `../components/ide/RichDocumentViewer.js`, `AgentBuilderPanel.tsx`, `package.json`, `UnifiedSidebar.tsx`, `main.cjs`, `AutomationView.tsx`, `TerminalPanel.tsx`, `AgentFleetPanel.tsx`, `IdeView.tsx`, `ideApi.ts`, `sanitizeMarkdownHtml.ts`, `ChatPanel.tsx`, `AgentPanel.tsx`, `./SandboxDiffViewer.js`, `useFileSystem.ts`, `../components/ide/GitHubPanel.js`, `./DocumentsView.js`, `FileExplorerVirtualized.tsx`, `MissionPanel.tsx`, `MultiAgentIndicator.tsx`, `AgentProgressBar.tsx`, `../panels/SandboxPanel.js`, `useTranscript.ts`, `CustomSkillsSection.tsx`, `constants.ts`, `ChatCards.tsx`, `HistoryView.tsx`, `SystemHealthDashboard.tsx`, `EmptyEditorState.tsx`, `GeneratePanel.tsx`, `WorkflowsPanel.tsx`, `LiveSkillsMonitor.tsx`, `StatusBar.tsx`, `WorkflowPanel.tsx`, `GitHubRepositoryImportModal.tsx`, `SlidePreviewModal.tsx`, `TemplateSelectorModal.tsx`, `GitHubView.tsx`, `StartupProjectModal.tsx`, `FileExplorer.tsx`, `NotebookChat.tsx`, `AuditPanel.tsx`, `McpPanel.tsx`, `ActivityFeed.tsx`, `MemoriesView.tsx`, `CommandPalette.tsx`, `SourcePanel.tsx`, `SettingsPrimitives.tsx`, `TokenCounter.tsx`, `Toast.tsx`, `useFileMention.ts`, `DocumentUpload.tsx`, `SlashCommandDropdown.tsx`, `GeneratedDocsPanel.tsx`, `NotebookDetail.tsx`, `NotebookList.tsx`, `AssistantLogsPanel.tsx`, `AudioOverviewPanel.tsx`, `PromptContextIndicator.tsx`, `SystemLogsPanel.tsx`, `ContextMenu.tsx`, `GlobalSearch.tsx`, `ASTCallGraphExplorer.tsx`, `ConfirmDialog.tsx`, `CriticalEditConfirm.tsx`, `SkillsDocumentation.tsx`, `NotesPanel.tsx`, `ScheduledTasksPanel.tsx`, `StatusBadge.tsx`, `MermaidDiagram.tsx`, `ImportToNotebookButton.tsx`, `NotesCanvas.tsx`, `WorkspacePanel.tsx`, `SkillsPanel.tsx`, `VisualWorkflowBuilder.tsx`, `HierarchicalMemorySection.tsx`, `SidebarItem.tsx`, `CreateNotebookModal.tsx`, `ImagePreview.tsx`, `NotebookPickerModal.tsx`, `PdfPreview.tsx`, `TokensSection.tsx`?**
+  _High betweenness centrality (0.112) - this node is a cross-community bridge._
+- **Why does `express` connect `express` to `agents/types.ts`, `server.ts`, `utils/sandbox.ts`, `selfRoot.ts`, `server/knowledge/index.ts`, `marketplace.ts`, `LiveSocketHandler.ts`, `security.ts`, `geminiTTS.ts`, `server/agents/index.ts`, `package.json`, `prompts/index.ts`, `AgentRuntime`, `geminiKeyPool.ts`, `tokenOptimizer.ts`, `impactAnalyzer`, `HierarchicalMemoryService.ts`, `ProjectIndexer.ts`, `upload-document.ts`, `skills/automation.ts`, `skills.ts`, `routes/github.ts`, `custom-agents.ts`, `routes/audit.ts`, `export.ts`, `utils/checkpoint.ts`, `list.ts`?**
+  _High betweenness centrality (0.106) - this node is a cross-community bridge._
 - **What connects `WebSocket`, `dotenv`, `path` to the rest of the system?**
-  _1655 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1604 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `agents/types.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.055218855218855216 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0746031746031746 - nodes in this community are weakly interconnected._
 - **Should `server.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.04135802469135803 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05109126984126984 - nodes in this community are weakly interconnected._
 - **Should `lucide-react` be split into smaller, more focused modules?**
-  _Cohesion score 0.030729359496482783 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.03076923076923077 - nodes in this community are weakly interconnected._

@@ -56,6 +56,7 @@ import skillsRouter, { createSkillsRouter } from "./server/routes/skills.js";
 import mcpRouter from "./server/routes/mcp.js";
 import { createTerminalRouter, setupTerminalWebSocket } from "./server/routes/terminal.js";
 import memoriesRouter from "./server/routes/memories.js";
+import hierarchicalMemoryRouter from "./server/routes/hierarchicalMemory.js";
 import conversationsRouter from "./server/routes/conversations.js";
 import listsRouter from "./server/routes/lists.js";
 import automationRouter from "./server/routes/automation.js";
@@ -274,13 +275,14 @@ import { documentLinkerSkill } from "./server/skills/documentLinker.js";
 import { documentKnowledgeSkill } from "./server/skills/documentKnowledge.js";
 import { richDocumentSkill } from "./server/skills/richDocument.js";
 import { graphifySkill } from "./server/skills/graphify.js";
+import { hierarchicalMemorySkill } from "./server/skills/hierarchicalMemory.js";
 import { createSmartSkills } from "./server/autonomy/SmartSkills.js";
 
 const { runtime, skillManager } = bootstrapRuntimeSync({
   skills: [
     automationSkill, browserSkill, codebaseSkill, githubSkill,
     guidelinesSkill, historySkill, knowledgeSkill, listSkill,
-    memorySkill, reasoningSkill, systemSkill, timeSkill,
+    memorySkill, hierarchicalMemorySkill, reasoningSkill, systemSkill, timeSkill,
     verifySkill, securityAuditSkill, weatherSkill, projectSkill, agentsSkill,
     missionSkill, aiStudioDirectivesSkill, documentLinkerSkill,
     documentKnowledgeSkill, richDocumentSkill, graphifySkill,
@@ -502,6 +504,7 @@ async function startServer() {
   app.use("/api/skills", createSkillsRouter(skillManager, runtime));
   app.use("/api/mcp", mcpRouter);
   app.use("/api/memories", memoriesRouter);
+  app.use("/api/memory/hierarchical", hierarchicalMemoryRouter);
   app.use("/api/conversations", conversationsRouter);
   app.use("/api/lists", listsRouter);
   app.use("/api/terminal", createTerminalRouter({ apiToken }));

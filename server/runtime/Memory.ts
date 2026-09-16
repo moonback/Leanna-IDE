@@ -193,6 +193,40 @@ export class Memory {
   }
 
   /**
+   * Vide un niveau spécifique de mémoire.
+   */
+  clear(level: MemoryLevel): void {
+    const store = this.getStore(level);
+    if (store) store.clear();
+  }
+
+  /**
+   * Liste toutes les entrées valides (non expirées) pour un niveau donné.
+   */
+  list(level: MemoryLevel): MemoryEntry[] {
+    const store = this.getStore(level);
+    if (!store) return [];
+
+    const now = Date.now();
+    const result: MemoryEntry[] = [];
+    const expiredKeys: string[] = [];
+
+    for (const [key, entry] of store.entries()) {
+      if (entry.ttl && now - entry.updatedAt > entry.ttl) {
+        expiredKeys.push(key);
+      } else {
+        result.push(entry);
+      }
+    }
+
+    for (const key of expiredKeys) {
+      store.delete(key);
+    }
+
+    return result;
+  }
+
+  /**
    * Charge la project memory depuis la persistance.
    */
   async loadProject(): Promise<void> {
