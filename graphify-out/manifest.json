@@ -2688,15 +2688,15 @@
     "semantic_hash": ""
   },
   "src/components/sidebar/types.ts": {
-    "mtime": 1788716433.5379152,
-    "seen": 1788909309.9909198,
-    "ast_hash": "8fdea973822d705b88a6f8e20eefa2ea",
+    "mtime": 1789591827.794859,
+    "seen": 1789591964.7366536,
+    "ast_hash": "ef99c9b9b2a9dc017f27ec79f8ed4cdf",
     "semantic_hash": ""
   },
   "src/components/sidebar/useIDEState.ts": {
-    "mtime": 1788716433.5379152,
-    "seen": 1788909309.9909215,
-    "ast_hash": "2bdfd76d7d3830bbce4740d2c9c6548e",
+    "mtime": 1789591846.7724288,
+    "seen": 1789591964.7366648,
+    "ast_hash": "f0f6bbb4acfa5076e014db2b68dcdd94",
     "semantic_hash": ""
   },
   "src/components/templates/TemplateSelectorModal.tsx": {
@@ -3138,9 +3138,9 @@
     "semantic_hash": ""
   },
   "src/views/IdeView.tsx": {
-    "mtime": 1789578850.7333872,
-    "seen": 1789588544.0288846,
-    "ast_hash": "7c981e3bcc41e8b613c2aecd3a2d9013",
+    "mtime": 1789591863.6857688,
+    "seen": 1789591964.7522328,
+    "ast_hash": "3b3334275e6c69ab2fa6efc0c7f3d352",
     "semantic_hash": ""
   },
   "src/views/ListsView.tsx": {
@@ -3558,9 +3558,9 @@
     "semantic_hash": ""
   },
   "src/components/skills-doc/SkillsDocModal.tsx": {
-    "mtime": 1789584686.2111797,
-    "seen": 1789588544.004039,
-    "ast_hash": "ad3f01a2824259c5f5689ea204ff5aba",
+    "mtime": 1789591938.7354062,
+    "seen": 1789591964.7366877,
+    "ast_hash": "4e1914532f0e108f35284424c31a538f",
     "semantic_hash": ""
   },
   "src/components/skills-doc/SkillsDocumentation.tsx": {

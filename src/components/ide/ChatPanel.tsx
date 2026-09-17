@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo, useMem
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, animate } from 'motion/react';
 import {
   Send, Mic, MicOff, User, Bot, Eye, X,
-  Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2, ChevronDown, Download, MessageSquare, MoreVertical,
+  Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2, ChevronDown, Download, MessageSquare, MoreVertical, ArrowDown,
 } from 'lucide-react';
 import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
@@ -739,8 +739,12 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
   const menuRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const messagesInnerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
+  const isProgrammaticScrollRef = useRef(false);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
   const reduceMotion = !!useReducedMotion();
 
   // État et handlers pour le redimensionnement
@@ -841,23 +845,111 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
 
   const { queue, enqueue } = useMessageQueue(isBusy, connected, sendTextMessage);
 
+  const scrollToBottom = useCallback((smooth = false) => {
+    const container = messagesRef.current;
+    if (!container) return;
+
+    isProgrammaticScrollRef.current = true;
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+
+    const targetScroll = container.scrollHeight - container.clientHeight;
+    if (targetScroll < 0) {
+      isProgrammaticScrollRef.current = false;
+      return;
+    }
+
+    if (smooth && !reduceMotion) {
+      container.scrollTo({ top: targetScroll, behavior: 'smooth' });
+      scrollTimeoutRef.current = setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 350);
+    } else {
+      container.scrollTop = targetScroll;
+      requestAnimationFrame(() => {
+        isProgrammaticScrollRef.current = false;
+      });
+    }
+
+    shouldAutoScrollRef.current = true;
+    setShowScrollBtn(false);
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleMessagesScroll = useCallback(() => {
     const container = messagesRef.current;
     if (!container) return;
+    if (isProgrammaticScrollRef.current) return;
+
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    shouldAutoScrollRef.current = distanceFromBottom <= 20;
-  }, []);
+    const isAtBottom = distanceFromBottom <= 80;
+    shouldAutoScrollRef.current = isAtBottom;
+    setShowScrollBtn(!isAtBottom && transcript.length > 1);
+  }, [transcript.length]);
+
+  const lastEntry = transcript[transcript.length - 1];
+  const lastEntryText = lastEntry?.text;
+  const lastEntryId = lastEntry?.id;
 
   useLayoutEffect(() => {
     if (shouldAutoScrollRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
+      scrollToBottom(false);
+      const raf = requestAnimationFrame(() => {
+        if (shouldAutoScrollRef.current) {
+          scrollToBottom(false);
+        }
+      });
+      return () => cancelAnimationFrame(raf);
     }
-  }, [transcript.length, queue.length, isBusy, connecting, reduceMotion]);
+  }, [
+    transcript.length,
+    lastEntryId,
+    lastEntryText,
+    queue.length,
+    isBusy,
+    connecting,
+    activity.length,
+    scrollToBottom,
+  ]);
+
+  // Observer les redimensionnements du contenu (markdown, images, code blocs) pour garder le bas aligné
+  useEffect(() => {
+    const inner = messagesInnerRef.current;
+    if (!inner) return;
+
+    let rafId: number | null = null;
+    const observer = new ResizeObserver(() => {
+      if (shouldAutoScrollRef.current) {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          if (shouldAutoScrollRef.current) {
+            scrollToBottom(false);
+          }
+        });
+      }
+    });
+
+    observer.observe(inner);
+    return () => {
+      observer.disconnect();
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [scrollToBottom]);
 
   const handleSend = useCallback(
     (text: string, displayText?: string) => {
       if (!connected) return;
       try {
+        shouldAutoScrollRef.current = true;
+        scrollToBottom(true);
         if (isBusy) {
           enqueue({ text, displayText });
         } else {
@@ -867,7 +959,7 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
         console.error('[ChatPanel] sendTextMessage failed:', err);
       }
     },
-    [connected, isBusy, enqueue, sendTextMessage]
+    [connected, isBusy, enqueue, sendTextMessage, scrollToBottom]
   );
 
   useEffect(() => {
@@ -876,9 +968,11 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
       if (!connecting) connect([], 'full');
       return;
     }
+    shouldAutoScrollRef.current = true;
+    scrollToBottom(true);
     handleSend(pendingMessage.text, pendingMessage.displayText);
     onPendingMessageConsumed?.();
-  }, [pendingMessage, connected, connecting, connect, handleSend, onPendingMessageConsumed]);
+  }, [pendingMessage, connected, connecting, connect, handleSend, onPendingMessageConsumed, scrollToBottom]);
 
   const handleDocumentAnalyzed = useCallback(
     (result: DocumentResult) => {
@@ -1281,122 +1375,151 @@ export function ChatPanel({ pendingMessage, onPendingMessageConsumed, onDockedCh
       {!minimized && (
         <>
           {/* Messages Area améliorée */}
-          <div
-            ref={messagesRef}
-            onScroll={handleMessagesScroll}
-            className="flex-1 overflow-y-auto px-4 py-4 space-y-3 custom-scrollbar"
-            style={{
-              maxWidth: fullscreen ? '850px' : undefined,
-              margin: fullscreen ? '0 auto' : undefined,
-              width: fullscreen ? '100%' : undefined,
-            }}
-          >
-            {connecting && (
-              <div
-                className="flex items-center gap-3 px-4 py-3 rounded-xl"
-                style={{ backgroundColor: 'var(--bg-secondary)' }}
-              >
-                <BreathingDots color="var(--accent-primary)" reduceMotion={reduceMotion} />
-                <span
-                  className="text-sm"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Connexion en cours...
-                </span>
-              </div>
-            )}
-
-            {transcript.length === 0 && activity.length === 0 && !connecting && (
-              <div className="flex flex-col items-center justify-center h-full gap-5">
-                <div
-                  className="w-16 h-16 rounded-full flex items-center justify-center relative"
-                  style={{ backgroundColor: 'rgba(14, 165, 233, 0.12)' }}
-                >
+          <div className="relative flex-1 min-h-0 flex flex-col">
+            <div
+              ref={messagesRef}
+              onScroll={handleMessagesScroll}
+              className="flex-1 overflow-y-auto px-4 py-4 space-y-3 custom-scrollbar"
+              style={{
+                maxWidth: fullscreen ? '850px' : undefined,
+                margin: fullscreen ? '0 auto' : undefined,
+                width: fullscreen ? '100%' : undefined,
+              }}
+            >
+              <div ref={messagesInnerRef} className="space-y-3">
+                {connecting && (
                   <div
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                      background: 'radial-gradient(circle, rgba(14, 165, 233, 0.15), transparent 70%)',
-                      transform: 'scale(1.6)',
-                    }}
-                  />
-                  <Bot size={28} style={{ color: 'var(--accent-primary)', position: 'relative' }} />
-                </div>
-                <div className="text-center">
-                  <p
-                    className="text-base font-medium mb-1"
-                    style={{ color: 'var(--text-primary)' }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                    style={{ backgroundColor: 'var(--bg-secondary)' }}
                   >
-                    {connected ? 'Prêt à vous aider' : 'Agent hors ligne'}
-                  </p>
-                  <p
-                    className="text-sm max-w-[280px]"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    {connected
-                      ? 'Posez une question ou utilisez une commande'
-                      : 'Connectez-vous pour démarrer une conversation'}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <AnimatePresence initial={false}>
-              {transcript.map((entry) => (
-                <ChatMessage
-                  key={entry.id}
-                  entry={entry}
-                  profile={profile!}
-                  reduceMotion={reduceMotion}
-                  onExcludeSource={(source) => sendRawMessage({ context_exclude: source.path })}
-                />
-              ))}
-            </AnimatePresence>
-
-            {isBusy && (
-              <div className="flex items-center gap-3 px-4 py-2">
-                <BreathingDots color="var(--accent-primary)" reduceMotion={reduceMotion} />
-                <span
-                  className="text-sm"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  {profile?.aiName || 'Leanna'} réfléchit...
-                </span>
-              </div>
-            )}
-
-            {queue.length > 0 && (
-              <div className="px-2 py-2 space-y-1.5">
-                {queue.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2.5 pl-3 pr-3 py-2 rounded-xl relative overflow-hidden"
-                    style={{
-                      backgroundColor: 'rgba(14, 165, 233, 0.06)',
-                      border: '1px solid rgba(14, 165, 233, 0.15)',
-                    }}
-                  >
-                    <div
-                      className="absolute left-0 top-0 bottom-0 w-0.5"
-                      style={{ backgroundColor: 'var(--accent-primary)', opacity: 0.5 }}
-                    />
+                    <BreathingDots color="var(--accent-primary)" reduceMotion={reduceMotion} />
                     <span
-                      className="text-sm truncate ml-1.5"
+                      className="text-sm"
                       style={{ color: 'var(--text-muted)' }}
                     >
-                      {msg.displayText ?? msg.text}
-                    </span>
-                    <span
-                      className="text-xs tracking-wide flex-shrink-0 ml-auto"
-                      style={{ color: 'var(--text-dimmed)' }}
-                    >
-                      en attente
+                      Connexion en cours...
                     </span>
                   </div>
-                ))}
-              </div>
-            )}
+                )}
 
-            <div ref={bottomRef} />
+                {transcript.length === 0 && activity.length === 0 && !connecting && (
+                  <div className="flex flex-col items-center justify-center h-full gap-5">
+                    <div
+                      className="w-16 h-16 rounded-full flex items-center justify-center relative"
+                      style={{ backgroundColor: 'rgba(14, 165, 233, 0.12)' }}
+                    >
+                      <div
+                        className="absolute inset-0 rounded-full"
+                        style={{
+                          background: 'radial-gradient(circle, rgba(14, 165, 233, 0.15), transparent 70%)',
+                          transform: 'scale(1.6)',
+                        }}
+                      />
+                      <Bot size={28} style={{ color: 'var(--accent-primary)', position: 'relative' }} />
+                    </div>
+                    <div className="text-center">
+                      <p
+                        className="text-base font-medium mb-1"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        {connected ? 'Prêt à vous aider' : 'Agent hors ligne'}
+                      </p>
+                      <p
+                        className="text-sm max-w-[280px]"
+                        style={{ color: 'var(--text-muted)' }}
+                      >
+                        {connected
+                          ? 'Posez une question ou utilisez une commande'
+                          : 'Connectez-vous pour démarrer une conversation'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <AnimatePresence initial={false}>
+                  {transcript.map((entry) => (
+                    <ChatMessage
+                      key={entry.id}
+                      entry={entry}
+                      profile={profile!}
+                      reduceMotion={reduceMotion}
+                      onExcludeSource={(source) => sendRawMessage({ context_exclude: source.path })}
+                    />
+                  ))}
+                </AnimatePresence>
+
+                {isBusy && (
+                  <div className="flex items-center gap-3 px-4 py-2">
+                    <BreathingDots color="var(--accent-primary)" reduceMotion={reduceMotion} />
+                    <span
+                      className="text-sm"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      {profile?.aiName || 'Leanna'} réfléchit...
+                    </span>
+                  </div>
+                )}
+
+                {queue.length > 0 && (
+                  <div className="px-2 py-2 space-y-1.5">
+                    {queue.map((msg, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2.5 pl-3 pr-3 py-2 rounded-xl relative overflow-hidden"
+                        style={{
+                          backgroundColor: 'rgba(14, 165, 233, 0.06)',
+                          border: '1px solid rgba(14, 165, 233, 0.15)',
+                        }}
+                      >
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-0.5"
+                          style={{ backgroundColor: 'var(--accent-primary)', opacity: 0.5 }}
+                        />
+                        <span
+                          className="text-sm truncate ml-1.5"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          {msg.displayText ?? msg.text}
+                        </span>
+                        <span
+                          className="text-xs tracking-wide flex-shrink-0 ml-auto"
+                          style={{ color: 'var(--text-dimmed)' }}
+                        >
+                          en attente
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div ref={bottomRef} />
+              </div>
+            </div>
+
+            {/* Bouton pour redescendre au dernier message */}
+            <AnimatePresence>
+              {showScrollBtn && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.8, y: 8 }}
+                  transition={{ duration: 0.15 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.9 }}
+                  onClick={() => scrollToBottom(true)}
+                  className="absolute right-4 bottom-3 p-2.5 rounded-full shadow-lg z-30 flex items-center justify-center cursor-pointer transition-transform hover:scale-105"
+                  style={{
+                    backgroundColor: 'var(--accent-primary)',
+                    color: '#ffffff',
+                    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.4)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                  }}
+                  title="Dernier message"
+                  aria-label="Faire défiler jusqu'au dernier message"
+                >
+                  <ArrowDown size={15} />
+                </motion.button>
+              )}
+            </AnimatePresence>
           </div>
 
           <ActivityFeed steps={activity} connected={connected} />

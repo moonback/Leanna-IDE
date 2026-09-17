@@ -1,7 +1,7 @@
 # Graph Report - Jarvis-os-ori  (2026-09-16)
 
 ## Corpus Check
-- 585 files · ~1,411,551 words
+- 585 files · ~1,411,607 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `350193c4`
+- Built from commit: `419ea964`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 

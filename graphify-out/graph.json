@@ -8555,7 +8555,7 @@
       "file_type": "code",
       "norm_label": "aimenuitem",
       "source_file": "src/components/sidebar/types.ts",
-      "source_location": "L81"
+      "source_location": "L83"
     },
     {
       "id": "src_components_sidebar_types_assistantactions",
@@ -8568,7 +8568,7 @@
       "file_type": "code",
       "norm_label": "assistantactions",
       "source_file": "src/components/sidebar/types.ts",
-      "source_location": "L73"
+      "source_location": "L75"
     },
     {
       "id": "src_components_sidebar_types_assistantstate",
@@ -8581,7 +8581,7 @@
       "file_type": "code",
       "norm_label": "assistantstate",
       "source_file": "src/components/sidebar/types.ts",
-      "source_location": "L67"
+      "source_location": "L69"
     },
     {
       "id": "src_components_sidebar_types_idepanelactions",
@@ -8594,7 +8594,7 @@
       "file_type": "code",
       "norm_label": "idepanelactions",
       "source_file": "src/components/sidebar/types.ts",
-      "source_location": "L40"
+      "source_location": "L41"
     },
     {
       "id": "src_components_sidebar_types_idepanelstate",
@@ -8633,7 +8633,7 @@
       "file_type": "code",
       "norm_label": "unifiedsidebarprops",
       "source_file": "src/components/sidebar/types.ts",
-      "source_location": "L92"
+      "source_location": "L94"
     },
     {
       "id": "src_config_idesidebarconfig_sidebaritemconfig",
@@ -41892,7 +41892,7 @@
       "file_type": "code",
       "norm_label": "ideview()",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L67"
+      "source_location": "L68"
     },
     {
       "id": "src_components_notebooks_sourcessummarycard_sourcessummarycard",
@@ -63804,7 +63804,7 @@
       "file_type": "code",
       "norm_label": "_importmeta",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L64"
+      "source_location": "L65"
     },
     {
       "id": "src_views_ideview_monacoeditor",
@@ -94406,7 +94406,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L125",
+      "source_location": "L126",
       "weight": 1.0
     },
     {
@@ -94418,7 +94418,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L126",
+      "source_location": "L127",
       "weight": 1.0
     },
     {
@@ -94430,7 +94430,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L127",
+      "source_location": "L128",
       "weight": 1.0
     },
     {
@@ -94442,7 +94442,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L133",
+      "source_location": "L134",
       "weight": 1.0
     },
     {
@@ -94454,7 +94454,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L82",
+      "source_location": "L83",
       "weight": 1.0
     },
     {
@@ -94466,7 +94466,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L83",
+      "source_location": "L84",
       "weight": 1.0
     },
     {
@@ -94478,7 +94478,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L90",
+      "source_location": "L91",
       "weight": 1.0
     },
     {
@@ -119158,7 +119158,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L49",
+      "source_location": "L50",
       "weight": 1.0
     },
     {
@@ -119170,7 +119170,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L49",
+      "source_location": "L50",
       "weight": 1.0
     },
     {
@@ -119182,7 +119182,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L49",
+      "source_location": "L50",
       "weight": 1.0
     },
     {
@@ -134345,7 +134345,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L49",
+      "source_location": "L50",
       "weight": 1.0
     },
     {
@@ -179242,7 +179242,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/sidebar/types.ts",
-      "source_location": "L40",
+      "source_location": "L41",
       "weight": 1.0
     },
     {
@@ -179253,7 +179253,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/sidebar/types.ts",
-      "source_location": "L67",
+      "source_location": "L69",
       "weight": 1.0
     },
     {
@@ -179264,7 +179264,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/sidebar/types.ts",
-      "source_location": "L73",
+      "source_location": "L75",
       "weight": 1.0
     },
     {
@@ -179275,7 +179275,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/sidebar/types.ts",
-      "source_location": "L81",
+      "source_location": "L83",
       "weight": 1.0
     },
     {
@@ -179286,7 +179286,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/sidebar/types.ts",
-      "source_location": "L92",
+      "source_location": "L94",
       "weight": 1.0
     },
     {
@@ -184786,7 +184786,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L64",
+      "source_location": "L65",
       "weight": 1.0
     },
     {
@@ -184797,7 +184797,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/views/IdeView.tsx",
-      "source_location": "L67",
+      "source_location": "L68",
       "weight": 1.0
     },
     {
@@ -202601,5 +202601,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "350193c4122ae576180ccbe4994d50e4f0ac62e2"
+  "built_at_commit": "419ea964811020c2156f86788d369f5b4fb888ae"
 }
