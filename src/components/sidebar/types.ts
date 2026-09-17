@@ -32,6 +32,7 @@ export interface IDEPanelState {
   showMcp: boolean;
   showFleet: boolean;
   showBrowser: boolean;
+  showAutonomous: boolean;
   showTerminal: boolean;
   visionEnabled: boolean;
   screenShareEnabled: boolean;
@@ -61,6 +62,7 @@ export interface IDEPanelActions {
   onToggleMcp: () => void;
   onToggleFleet: () => void;
   onToggleBrowser: () => void;
+  onToggleAutonomous: () => void;
   onToggleTerminal: () => void;
   onToggleVision: () => void;
   onToggleScreenShare: () => void;

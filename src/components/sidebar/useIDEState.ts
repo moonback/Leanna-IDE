@@ -32,6 +32,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     showMcp: props.showMcp ?? false,
     showFleet: props.showFleet ?? false,
     showBrowser: props.showBrowser ?? false,
+    showAutonomous: props.showAutonomous ?? false,
     showTerminal: props.showTerminal ?? false,
     visionEnabled: props.visionEnabled ?? false,
     screenShareEnabled: props.screenShareEnabled ?? false,
@@ -41,7 +42,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.showSandbox, props.showGitHub, props.showWorkflow, props.showSkillsMonitor,
     props.showChat, props.showAgents, props.showAgentBuilder, props.showMarketplace, props.showSkillsDoc, props.showMissions,
     props.showKnowledge, props.showNotebooks, props.showSystemHealth, props.showPM2, props.showMcp,
-    props.showFleet, props.showBrowser, props.showTerminal,
+    props.showFleet, props.showBrowser, props.showAutonomous, props.showTerminal,
     props.visionEnabled, props.screenShareEnabled,
   ]);
 
@@ -67,6 +68,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     onToggleMcp: props.onToggleMcp ?? noop,
     onToggleFleet: props.onToggleFleet ?? noop,
     onToggleBrowser: props.onToggleBrowser ?? noop,
+    onToggleAutonomous: props.onToggleAutonomous ?? noop,
     onToggleTerminal: props.onToggleTerminal ?? noop,
     onToggleVision: props.onToggleVision ?? noop,
     onToggleScreenShare: props.onToggleScreenShare ?? noop,
@@ -76,7 +78,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.onToggleSandbox, props.onToggleGitHub, props.onToggleWorkflow, props.onToggleSkillsMonitor,
     props.onToggleChat, props.onToggleAgents, props.onToggleAgentBuilder, props.onToggleMarketplace, props.onToggleSkillsDoc, props.onToggleMissions,
     props.onToggleKnowledge, props.onToggleNotebooks, props.onToggleSystemHealth, props.onTogglePM2, props.onToggleMcp,
-    props.onToggleFleet, props.onToggleBrowser, props.onToggleTerminal,
+    props.onToggleFleet, props.onToggleBrowser, props.onToggleAutonomous, props.onToggleTerminal,
     props.onToggleVision, props.onToggleScreenShare,
   ]);
 

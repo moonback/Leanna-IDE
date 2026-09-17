@@ -842,6 +842,7 @@ export default function IdeView() {
         showSkillsDoc={showSkillsDoc}
         showFleet={showFleet}
         showMissions={showMissions}
+        showAutonomous={showAutonomous}
         showKnowledge={showKnowledge}
         showNotebooks={showNotebooks}
         showSystemHealth={showSystemHealth}
@@ -868,6 +869,7 @@ export default function IdeView() {
         onToggleSkillsDoc={() => setShowSkillsDoc(v => !v)}
         onToggleFleet={() => setShowFleet(v => !v)}
         onToggleMissions={() => setShowMissions(v => !v)}
+        onToggleAutonomous={() => setShowAutonomous(v => !v)}
         onToggleKnowledge={() => {
           setShowKnowledge(v => !v);
           if (!showKnowledge) { setShowHistory(false); setShowAutomation(false); setShowNotebooks(false); setShowMemory(false); }
@@ -1349,6 +1351,11 @@ export default function IdeView() {
       {/* Fleet Panel — modal overlay */}
       {showFleet && (
         <AgentFleetPanel inline onClose={() => setShowFleet(false)} />
+      )}
+
+      {/* Autonomous Core V2 Panel — modal overlay */}
+      {showAutonomous && (
+        <AutonomousCorePanel onClose={() => setShowAutonomous(false)} />
       )}
 
       {/* Terminal Panel — floating overlay */}
