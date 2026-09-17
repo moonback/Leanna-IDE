@@ -22,3 +22,26 @@ export interface TelegramStatus {
   defaultChatId?: string;
   lastError: string | null;
 }
+
+export interface TelegramChatInfo {
+  chatId: string;
+  type?: string;
+  title?: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+export interface TelegramSendResult {
+  success: boolean;
+  chatId?: string;
+  messageId?: number;
+  error?: string;
+}
+
+export interface TelegramBroadcastResult {
+  total: number;
+  success: number;
+  failed: number;
+  errors: Array<{ chatId: string; error: string }>;
+}

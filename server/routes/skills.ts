@@ -130,6 +130,12 @@ const BUILTIN_SKILL_META: Record<string, SkillMeta> = {
     description: 'Directives de modélisation et prompts contextuels',
     category: 'ai',
   },
+  telegram: {
+    name: 'Telegram Bot',
+    icon: 'MessageSquare',
+    description: 'Envoi de messages, photos, documents, notifications et diffusion via le bot Telegram',
+    category: 'communication',
+  },
 };
 
 // ─── Utilitaires de normalisation & génération d'exemples ──────────────────────
@@ -266,6 +272,7 @@ export function createSkillsRouter(skillManager?: any, runtime?: any): Router {
       { id: 'codebase', name: 'Codebase Editor', icon: 'Code', status: 'active' },
       { id: 'security_audit', name: 'Autonomous Security Audit', icon: 'ShieldCheck', status: 'active' },
       { id: 'history', name: 'Conversation History (Supabase)', icon: 'History', status: supabaseConfigured ? 'authenticated' : 'requires_auth' },
+      { id: 'telegram', name: 'Telegram Bot', icon: 'MessageSquare', status: 'active' },
     ];
 
     for (const item of baseSkills) {

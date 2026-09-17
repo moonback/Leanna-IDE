@@ -302,8 +302,13 @@ export async function syncActiveTasksFromServer(): Promise<void> {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export function initActivityStore() {
-  if (initialized) return;
+  if (initialized) {
+    console.log('[agentActivityStore] ⚠️ Déjà initialisé, ignoré');
+    return;
+  }
   initialized = true;
+  
+  console.log('[agentActivityStore] 🚀 Initialisation...');
   
   // Initialiser le mapping outil → agent
   initializeToolAgentMapping();
@@ -313,6 +318,8 @@ export function initActivityStore() {
   window.addEventListener('Leanna-agent-event', handleAgentEvent);
   // Cleanup every 3s
   cleanupInterval = setInterval(cleanup, 3000);
+  
+  console.log('[agentActivityStore] ✅ Initialisé avec succès');
 }
 
 /**
@@ -321,7 +328,12 @@ export function initActivityStore() {
  * pour éviter les fuites mémoire.
  */
 export function destroyActivityStore() {
-  if (!initialized) return;
+  if (!initialized) {
+    console.log('[agentActivityStore] ⚠️ Pas initialisé, rien à détruire');
+    return;
+  }
+  
+  console.log('[agentActivityStore] 🧹 Nettoyage...');
   
   // Nettoyer les event listeners
   window.removeEventListener('Leanna-tool-start', handleToolStart);
@@ -339,6 +351,8 @@ export function destroyActivityStore() {
   agentTasks = [];
   listeners = [];
   initialized = false;
+  
+  console.log('[agentActivityStore] ✅ Nettoyé avec succès');
 }
 
 export function getToolActivities(): ToolActivityEntry[] {

@@ -1,4 +1,4 @@
-import { Bot, type Context } from "grammy";
+import { Bot, type InputFile } from "grammy";
 import path from "path";
 import fs from "fs";
 import { exec } from "child_process";
@@ -8,7 +8,14 @@ import { encrypt, decrypt } from "../utils/crypto.js";
 import { generateText, getActiveProvider } from "../utils/textGeneration.js";
 import { buildSystemInstruction } from "../prompts/systemInstruction.js";
 import { agentOrchestrator } from "../agents/index.js";
-import type { TelegramConfig, TelegramStatus, TelegramBotInfo } from "./types.js";
+import type {
+  TelegramConfig,
+  TelegramStatus,
+  TelegramBotInfo,
+  TelegramChatInfo,
+  TelegramSendResult,
+  TelegramBroadcastResult,
+} from "./types.js";
 
 const execAsync = promisify(exec);
 
@@ -320,10 +327,10 @@ export class TelegramService {
 
         try {
           // Créer une orchestration ou tâche
-          const task = await agentOrchestrator.dispatchTask({
+          const task = await agentOrchestrator.delegateTask({
+            role: "coder",
             title: `[Telegram] ${taskDescription.slice(0, 50)}`,
             description: taskDescription,
-            assignedTo: "coder",
             priority: "medium",
           });
 
@@ -362,7 +369,7 @@ export class TelegramService {
         try {
           const sysPrompt = buildSystemInstruction({
             language: "fr",
-            responseStyle: "concis",
+            responseStyle: "concise",
             workspace: hasProject() ? SELF_ROOT : undefined,
           });
 
@@ -511,6 +518,287 @@ export class TelegramService {
       console.warn("[Telegram] Notification non délivrée :", (e as Error).message);
       return false;
     }
+  }
+
+  /**
+   * Envoie un message texte direct à un chat spécifique (pour usage API et skill)
+   */
+  public async sendMessage(
+    chatId: string | number,
+    text: string,
+    options?: {
+      parse_mode?: "Markdown" | "HTML";
+      disable_notification?: boolean;
+      reply_to_message_id?: number;
+    }
+  ): Promise<TelegramSendResult> {
+    if (!this.isRunning || !this.bot) {
+      return { success: false, chatId: String(chatId), error: "Bot Telegram non démarré ou non initialisé." };
+    }
+
+    if (!text || text.trim().length === 0) {
+      return { success: false, chatId: String(chatId), error: "Le texte du message est vide." };
+    }
+
+    try {
+      const sent = await this.sendLongMessageWithReturn(chatId, text, options);
+      return {
+        success: true,
+        chatId: String(chatId),
+        messageId: sent?.message_id,
+      };
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      console.warn(`[Telegram] sendMessage échoué vers ${chatId}:`, errMsg);
+      return { success: false, chatId: String(chatId), error: errMsg };
+    }
+  }
+
+  /**
+   * Version interne de sendLongMessage qui retourne le Message pour récupérer message_id
+   */
+  private async sendLongMessageWithReturn(
+    chatId: number | string,
+    text: string,
+    options?: { parse_mode?: "Markdown" | "HTML"; disable_notification?: boolean; reply_to_message_id?: number }
+  ): Promise<any> {
+    if (!this.bot) throw new Error("Bot Telegram non initialisé.");
+
+    const MAX_CHUNK = 3900;
+    if (text.length <= MAX_CHUNK) {
+      try {
+        return await this.bot.api.sendMessage(chatId, text, options as any);
+      } catch (err) {
+        return await this.bot.api.sendMessage(chatId, text, { disable_notification: options?.disable_notification } as any);
+      }
+    }
+
+    let lastMsg: any = null;
+    let remaining = text;
+    while (remaining.length > 0) {
+      let chunkSize = Math.min(MAX_CHUNK, remaining.length);
+      if (chunkSize < remaining.length) {
+        const lastNewline = remaining.lastIndexOf("\n", chunkSize);
+        if (lastNewline > MAX_CHUNK * 0.7) {
+          chunkSize = lastNewline + 1;
+        }
+      }
+      const chunk = remaining.slice(0, chunkSize);
+      remaining = remaining.slice(chunkSize);
+
+      try {
+        lastMsg = await this.bot.api.sendMessage(chatId, chunk, options as any);
+      } catch {
+        lastMsg = await this.bot.api.sendMessage(chatId, chunk, { disable_notification: options?.disable_notification } as any);
+      }
+    }
+    return lastMsg;
+  }
+
+  /**
+   * Envoie une photo à un chat spécifique (URL ou chemin de fichier local)
+   */
+  public async sendPhoto(
+    chatId: string | number,
+    photoSource: string,
+    options?: {
+      caption?: string;
+      parse_mode?: "Markdown" | "HTML";
+      disable_notification?: boolean;
+    }
+  ): Promise<TelegramSendResult> {
+    if (!this.isRunning || !this.bot) {
+      return { success: false, chatId: String(chatId), error: "Bot Telegram non démarré ou non initialisé." };
+    }
+
+    try {
+      let input: string | InputFile;
+      if (photoSource.startsWith("http://") || photoSource.startsWith("https://")) {
+        input = photoSource;
+      } else if (fs.existsSync(photoSource)) {
+        input = fs.createReadStream(photoSource) as unknown as InputFile;
+      } else if (hasProject() && fs.existsSync(path.join(SELF_ROOT, photoSource))) {
+        input = fs.createReadStream(path.join(SELF_ROOT, photoSource)) as unknown as InputFile;
+      } else {
+        return { success: false, chatId: String(chatId), error: "Source de la photo introuvable (URL invalide ou fichier inexistant)." };
+      }
+
+      const result = await this.bot.api.sendPhoto(chatId, input as any, options as any);
+      return {
+        success: true,
+        chatId: String(chatId),
+        messageId: result?.message_id,
+      };
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      return { success: false, chatId: String(chatId), error: errMsg };
+    }
+  }
+
+  /**
+   * Envoie un document/fichier à un chat spécifique (URL ou chemin de fichier local)
+   */
+  public async sendDocument(
+    chatId: string | number,
+    docSource: string,
+    options?: {
+      caption?: string;
+      parse_mode?: "Markdown" | "HTML";
+      disable_notification?: boolean;
+    }
+  ): Promise<TelegramSendResult> {
+    if (!this.isRunning || !this.bot) {
+      return { success: false, chatId: String(chatId), error: "Bot Telegram non démarré ou non initialisé." };
+    }
+
+    try {
+      let input: string | InputFile;
+      let resolvedPath = "";
+
+      if (docSource.startsWith("http://") || docSource.startsWith("https://")) {
+        input = docSource;
+      } else {
+        if (fs.existsSync(docSource)) {
+          resolvedPath = docSource;
+        } else if (hasProject() && fs.existsSync(path.join(SELF_ROOT, docSource))) {
+          resolvedPath = path.join(SELF_ROOT, docSource);
+        } else {
+          return { success: false, chatId: String(chatId), error: "Document introuvable (URL invalide ou fichier inexistant)." };
+        }
+        const stats = fs.statSync(resolvedPath);
+        if (stats.size > 50 * 1024 * 1024) {
+          return { success: false, chatId: String(chatId), error: "Fichier trop volumineux (max 50 Mo pour les documents Telegram)." };
+        }
+        input = fs.createReadStream(resolvedPath) as unknown as InputFile;
+      }
+
+      const result = await this.bot.api.sendDocument(chatId, input as any, options as any);
+      return {
+        success: true,
+        chatId: String(chatId),
+        messageId: result?.message_id,
+      };
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      return { success: false, chatId: String(chatId), error: errMsg };
+    }
+  }
+
+  /**
+   * Envoie un message à tous les utilisateurs autorisés (broadcast)
+   */
+  public async broadcast(
+    message: string,
+    options?: {
+      parse_mode?: "Markdown" | "HTML";
+      disable_notification?: boolean;
+      onlyNumericIds?: boolean;
+    }
+  ): Promise<TelegramBroadcastResult> {
+    const result: TelegramBroadcastResult = {
+      total: 0,
+      success: 0,
+      failed: 0,
+      errors: [],
+    };
+
+    const recipients = this.config.allowedUsers.filter((u) => {
+      if (options?.onlyNumericIds) {
+        return /^\d+$/.test(u.trim());
+      }
+      return u.trim().length > 0;
+    });
+
+    if (this.config.defaultChatId && !recipients.includes(this.config.defaultChatId)) {
+      recipients.push(this.config.defaultChatId);
+    }
+
+    result.total = recipients.length;
+
+    if (!this.isRunning || !this.bot || result.total === 0) {
+      return result;
+    }
+
+    for (const recipient of recipients) {
+      try {
+        await this.sendLongMessage(recipient.trim(), message, options);
+        result.success++;
+      } catch (e) {
+        result.failed++;
+        result.errors.push({
+          chatId: recipient.trim(),
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    console.log(`[Telegram] Broadcast terminé : ${result.success}/${result.total} livrés.`);
+    return result;
+  }
+
+  /**
+   * Récupère la liste des utilisateurs autorisés
+   */
+  public getAllowedUsersList(): string[] {
+    return [...this.config.allowedUsers];
+  }
+
+  /**
+   * Récupère les informations détaillées sur un chat Telegram
+   */
+  public async getChatInfo(chatId: string | number): Promise<TelegramChatInfo & { ok: boolean; error?: string }> {
+    if (!this.isRunning || !this.bot) {
+      return { ok: false, chatId: String(chatId), error: "Bot Telegram non démarré ou non initialisé." };
+    }
+
+    try {
+      const chat = await this.bot.api.getChat(chatId);
+      return {
+        ok: true,
+        chatId: String(chat.id),
+        type: chat.type,
+        title: (chat as any).title,
+        username: (chat as any).username,
+        firstName: (chat as any).first_name,
+        lastName: (chat as any).last_name,
+      };
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      return { ok: false, chatId: String(chatId), error: errMsg };
+    }
+  }
+
+  /**
+   * Envoie un fichier depuis le workspace racine (alias pratique pour les skills)
+   */
+  public async sendFromWorkspace(
+    chatId: string | number,
+    relativePath: string,
+    options?: {
+      caption?: string;
+      parse_mode?: "Markdown" | "HTML";
+      disable_notification?: boolean;
+    }
+  ): Promise<TelegramSendResult> {
+    if (!hasProject()) {
+      return { success: false, chatId: String(chatId), error: "Aucun projet actif dans le workspace." };
+    }
+
+    const fullPath = path.resolve(SELF_ROOT, relativePath);
+    const resolved = path.normalize(fullPath);
+    const root = path.normalize(SELF_ROOT);
+
+    if (!resolved.startsWith(root)) {
+      return { success: false, chatId: String(chatId), error: "Tentative d'accès en dehors du workspace refusée (sécurité)." };
+    }
+
+    const ext = path.extname(resolved).toLowerCase();
+    const imageExts = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"];
+
+    if (imageExts.includes(ext)) {
+      return this.sendPhoto(chatId, resolved, options);
+    }
+    return this.sendDocument(chatId, resolved, options);
   }
 }
 
