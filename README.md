@@ -30,6 +30,7 @@ Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un as
 | Tree-sitter | Parsing AST (TypeScript, JavaScript) | ^0.27.0 |
 | pdf-parse | Extraction de documents PDF | ^2.4.5 |
 | basic-ftp | Connexions FTP | 6.2.1 |
+| grammy | Framework Bot Telegram (Long Polling) | ^1.35.0 |
 | esbuild | Build serveur (CJS bundle) | ^0.25.0 |
 
 ---
@@ -73,6 +74,31 @@ POST /api/agents/brain/execute   # Exécution complète Brain
 GET  /api/agents/brain/status/:id # Suivi d'avancement
 ```
 
+### 📱 Bot Telegram — Contrôle Mobile Distant *(nouveau)*
+
+Leanna intègre un service de bot Telegram natif (via `grammy` en mode Long Polling), vous permettant de piloter votre OS IA à distance depuis votre smartphone, sans ouvrir aucun port réseau.
+
+```
+Smartphone (Telegram)
+      ↓ « /agent analyse les performances de la base de données »
+Bot Telegram Leanna (Polling local)
+      ├─ 1. Contrôle de sécurité (Liste blanche d'IDs autorisés)
+      ├─ 2. Routage de la commande vers l'Agent Orchestrator
+      ├─ 3. Exécution de la tâche en tâche de fond dans le workspace
+      └─ 4. Notification proactive du résultat sur votre téléphone 🔔
+```
+
+- **Chat IA contextuel** : Échangez avec Leanna en langage naturel (avec l'historique et le contexte du projet actif).
+- **Commandes intégrées** :
+  - `/status` : État du système, projet actif, moteur IA, mémoire et uptime.
+  - `/agent <tâche>` : Lancement d'une mission autonome par les agents.
+  - `/cmd <commande>` : Exécution sécurisée d'une commande dans le terminal du projet.
+  - `/clear` : Réinitialisation de la mémoire conversationnelle Telegram.
+  - `/help` : Guide complet des commandes.
+- **Sécurité renforcée** : Seuls les identifiants configurés dans la liste blanche (User IDs / usernames) sont autorisés.
+- **Notifications d'agents** : Réception automatique d'un ping Telegram lorsqu'un agent termine ou échoue une tâche.
+- **Interface dédiée dans l'IDE** : Onglet Paramètres > Bot Telegram pour gérer le token, démarrer/arrêter le bot, et tester la liaison.
+
 ---
 
 ### Utilisateur
@@ -92,6 +118,7 @@ GET  /api/agents/brain/status/:id # Suivi d'avancement
 - **Workflows automatisés** planifiables (ex : toutes les 24h, 30m…)
 - **Tâches planifiées** (automation) avec intervalles configurables
 - **Intégration GitHub** : statut Git, commits, push, issues, PRs depuis l'interface
+- **Contrôle à distance via Telegram** : chat IA, lancement d'agents et alertes sur smartphone *(nouveau)*
 - **Gestion de documents** : upload de PDF/DOCX, extraction et indexation
 - **Thème dark/light** et couleur d'accent personnalisable
 
@@ -226,6 +253,7 @@ Toutes les variables sont lues depuis `.env` (ou `.env.local` s'il existe, avec 
 | `FORCE_TIERED_TOOLS` | Force le mode outils par tiers | `true` | ❌ |
 | `SELF_HEAL_READONLY` | Mode auto-correction lecture seule | `false` | ❌ |
 | `SANDBOX_EXIT_CODE` | Code à 6 chiffres pour sortir du sandbox | `123456` | ❌ |
+| `TELEGRAM_BOT_TOKEN` | Token d'API Bot Telegram (obtenu auprès de @BotFather) | `123456:ABC...` | ❌ |
 | `ALLOW_FTP_PRIVATE_IPS` | Autorise les connexions FTP vers IPs privées | `false` | ❌ |
 | `Leanna_LISTEN_HOST` | Interface d'écoute du serveur | `127.0.0.1` | ❌ |
 | `NODE_ENV` | Environnement d'exécution | `development` | ❌ |
@@ -332,9 +360,13 @@ leanna/
 │   ├── notebooks/          # RAG : ingestion, embeddings, recherche
 │   ├── prompts/            # System instructions Gemini
 │   ├── routes/             # Routeurs REST (40+ modules)
-│   │   └── agents.ts       # API REST agents + /brain/plan /brain/execute
+│   │   ├── agents.ts       # API REST agents + /brain/plan /brain/execute
+│   │   └── telegram.ts     # API de gestion du bot Telegram (status, config, start, stop, test)
 │   ├── runtime/            # SkillManagerV2, ToolRegistry, Observability
-│   ├── skills/             # Skills natifs (25+) dont agent_brain
+│   ├── skills/             # Skills natifs (25+) dont agent_brain et telegram
+│   ├── telegram/           # Service Bot Telegram (grammy, whitelist, chat IA, commandes)
+│   │   ├── TelegramService.ts
+│   │   └── types.ts
 │   ├── utils/              # Sandbox, crypto, checkpoint, selfRoot…
 │   └── workflows/          # Moteur de workflows planifiés
 ├── src/                    # Frontend React
