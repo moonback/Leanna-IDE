@@ -307,7 +307,8 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
   if (inline) {
     return (
       <motion.div
-        className="fixed inset-0 z-[9995] flex items-center justify-center"
+        className="fixed inset-0 flex items-center justify-center"
+        style={{ zIndex: 'var(--z-modal)' as any }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}

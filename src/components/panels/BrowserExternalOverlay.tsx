@@ -6,7 +6,7 @@ interface BrowserExternalOverlayProps {
 
 export function BrowserExternalOverlay({ onDismiss }: BrowserExternalOverlayProps) {
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ backgroundColor: 'var(--bg-panel)', zIndex: 10 }}>
+    <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ backgroundColor: 'var(--bg-panel)', zIndex: 'var(--z-sidepanel)' as any }}>
       <div className="flex flex-col items-center gap-4 p-6 rounded-lg" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', maxWidth: '400px' }}>
         <ExternalLink size={64} strokeWidth={1.5} style={{ color: 'var(--text-secondary)', opacity: 0.8 }} aria-hidden="true" />
         <h2 className="text-lg font-semibold" style={{ color: 'var(--accent-primary)' }}>

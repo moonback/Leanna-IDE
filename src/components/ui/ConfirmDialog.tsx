@@ -120,7 +120,8 @@ function ConfirmDialogProvider({ children }: { children: React.ReactNode }) {
       {/* Modal Overlay */}
       {state.open && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center"
+          className="fixed inset-0 flex items-center justify-center"
+          style={{ zIndex: 'var(--z-modal)' as any }}
           style={{
             backgroundColor: 'rgba(0, 0, 0, 0.6)',
             backdropFilter: 'blur(2px)',

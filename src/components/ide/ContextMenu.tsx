@@ -112,7 +112,8 @@ export function ContextMenu({ target, x, y, activeFilePath, clipboardEntry, assi
   return (
     <div
       ref={menuRef}
-      className="fixed z-[200] min-w-48 rounded-xl border py-1 shadow-2xl"
+      className="fixed min-w-48 rounded-xl border py-1 shadow-2xl"
+      style={{ zIndex: 'var(--z-dropdown)' as any }}
       style={{
         left: safeX,
         top: safeY,

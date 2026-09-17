@@ -230,7 +230,8 @@ export function AgentBuilderPanel({ inline, onClose }: AgentBuilderPanelProps) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
       transition={{ duration: 0.25 }}
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      className="fixed inset-0 flex items-center justify-center"
+      style={{ zIndex: 'var(--z-modal)' as any }}
       style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >

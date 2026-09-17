@@ -19,7 +19,8 @@
     "audit:deps": "npm audit --production",
     "audit:deps:full": "npm audit",
     "pack:win": "npm run build && electron-builder --win --dir",
-    "dist:win": "npm run build && electron-builder --win"
+    "dist:win": "npm run build && electron-builder --win",
+    "ui:audit": "node scripts/ui-audit.mjs"
   },
   "build": {
     "appId": "com.Leanna.os",

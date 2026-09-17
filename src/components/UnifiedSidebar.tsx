@@ -218,7 +218,7 @@ export const UnifiedSidebar = memo(function UnifiedSidebar(props: UnifiedSidebar
           borderTopLeftRadius: 'var(--radius-base)',
           borderBottomLeftRadius: 'var(--radius-base)',
           gap: '2px',
-          zIndex: mobileOpen ? 40 : 'auto',
+          zIndex: mobileOpen ? 'var(--z-sidebar)' : 'auto',
           position: mobileOpen ? 'fixed' : 'relative',
           left: 0,
           top: 0,
