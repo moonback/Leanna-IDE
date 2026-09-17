@@ -49,7 +49,7 @@ export function createOpenRouterRouter(getProfile: () => any): Router {
     if (!messages || !Array.isArray(messages) || messages.length === 0)
       return res.status(400).json({ status: 'error', error: 'Messages requis.' });
 
-    const { optimizeMessagesWithLLM, getBudgetForModel } = await import('../utils/tokenOptimizer');
+    const { optimizeMessagesWithLLM, getBudgetForModel } = await import('../utils/tokenOptimizer.js');
     const budget = getBudgetForModel(model || 'default');
     const { messages: optimizedMessages, trimmed, summarized, summaryMethod, summaryTokensCost } =
       await optimizeMessagesWithLLM(messages, budget, { apiKey: key, model: 'openai/gpt-4o-mini' });
