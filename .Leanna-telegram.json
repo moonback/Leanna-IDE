@@ -1,10 +1,10 @@
 {
-  "botToken": "gcm:dd9082a878f07a527791b294:6097f0cda85763f64fad4fcbc98417ad:5bffc3254d419f6b383adc49be610212baf363fe4b308b3eb34e45ac687abe5e8aaca03461d78b55fb8704b5c48d",
+  "botToken": "gcm:07a35dc4c5be754faedbcb86:ef5d5595a75f4fa21025d2f191adad9b:f25c08053920741723b1684e013fa06fcedadde66d33924f0e6fd45a7cb54123a5ac46a8cc03c5260252cfe5f2a7",
   "allowedUsers": [
     "user_test_42",
     "8367779354"
   ],
-  "autoStart": false,
+  "autoStart": true,
   "notificationsEnabled": true,
-  "defaultChatId": ""
+  "defaultChatId": "8367779354"
 }

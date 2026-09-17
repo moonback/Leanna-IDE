@@ -3576,9 +3576,9 @@
     "semantic_hash": ""
   },
   ".Leanna-telegram.json": {
-    "mtime": 1789639716.9875095,
-    "seen": 1789639730.0555532,
-    "ast_hash": "302bce4a7cca4912f36db5d1b34b0a5a",
+    "mtime": 1789640033.297067,
+    "seen": 1789640082.2844002,
+    "ast_hash": "6cadca9adb5ce542822cc868aa40b3e2",
     "semantic_hash": ""
   },
   "server/agents/brain/AgentBrain.test.ts": {
@@ -3648,9 +3648,9 @@
     "semantic_hash": ""
   },
   "server/telegram/TelegramService.ts": {
-    "mtime": 1789638332.2422278,
-    "seen": 1789638423.7824137,
-    "ast_hash": "38e17ab2873ef173b965deefffaa702e",
+    "mtime": 1789640008.397355,
+    "seen": 1789640082.3598387,
+    "ast_hash": "0ebae496e8932aeb02f569415074924d",
     "semantic_hash": ""
   },
   "server/telegram/types.ts": {

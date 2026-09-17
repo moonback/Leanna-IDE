@@ -40,8 +40,12 @@ export class TelegramService {
    * Charge la configuration depuis le fichier local et l'environnement
    */
   private loadConfig(): TelegramConfig {
+    const envTokenRaw = process.env.TELEGRAM_BOT_TOKEN?.trim() || "";
+    const envToken = envTokenRaw.startsWith("gcm:") ? decrypt(envTokenRaw) : envTokenRaw;
+    const validEnvToken = envToken.startsWith("gcm:") ? "" : envToken;
+
     const defaultConfig: TelegramConfig = {
-      botToken: process.env.TELEGRAM_BOT_TOKEN ? decrypt(process.env.TELEGRAM_BOT_TOKEN) : "",
+      botToken: validEnvToken,
       allowedUsers: [],
       autoStart: false,
       notificationsEnabled: true,
@@ -52,10 +56,22 @@ export class TelegramService {
       const p = this.getConfigPath();
       if (fs.existsSync(p)) {
         const data = JSON.parse(fs.readFileSync(p, "utf-8"));
+        let token = "";
+        if (data.botToken) {
+          const dec = decrypt(data.botToken);
+          // Si le déchiffrement échoue (ex: master key régénérée), ignorer la valeur corrompue
+          if (!dec.startsWith("gcm:")) {
+            token = dec;
+          }
+        }
+        if (!token) {
+          token = defaultConfig.botToken || "";
+        }
+
         return {
           ...defaultConfig,
           ...data,
-          botToken: data.botToken ? decrypt(data.botToken) : (defaultConfig.botToken || ""),
+          botToken: token,
           allowedUsers: Array.isArray(data.allowedUsers) ? data.allowedUsers : [],
         };
       }
@@ -116,9 +132,17 @@ export class TelegramService {
       return { success: true };
     }
 
-    const token = this.config.botToken?.trim() || process.env.TELEGRAM_BOT_TOKEN?.trim();
+    let token = this.config.botToken?.trim() || "";
+    if (token.startsWith("gcm:")) {
+      token = "";
+    }
+    if (!token && process.env.TELEGRAM_BOT_TOKEN) {
+      const fallback = process.env.TELEGRAM_BOT_TOKEN.trim();
+      token = fallback.startsWith("gcm:") ? decrypt(fallback) : fallback;
+      if (token.startsWith("gcm:")) token = "";
+    }
     if (!token) {
-      this.lastError = "Aucun token API Telegram configuré.";
+      this.lastError = "Aucun token API Telegram valide configuré.";
       return { success: false, error: this.lastError };
     }
 
