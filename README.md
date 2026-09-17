@@ -1,10 +1,10 @@
 # Leanna — AI Operating System
 
-Leanna est un environnement de développement augmenté par IA, conçu pour les développeurs qui veulent déléguer des tâches complexes à une IA multimodale en temps réel. Il intègre un éditeur de code (Monaco), un terminal interactif, un système d'agents autonomes avec un **cerveau central dynamique (Agent Brain)**, et une interaction vocale via l'API Gemini Live — le tout dans une application web ou desktop (Electron).
+Leanna est un environnement de développement augmenté par IA, conçu pour les développeurs qui veulent déléguer des tâches complexes à une IA multimodale en temps réel. Il intègre un éditeur de code (Monaco), un terminal interactif, un système d'agents autonomes avec un **cerveau central dynamique (Agent Brain)**, un **Autonomous Core V2** capable de poursuivre des objectifs de façon persistante, et une interaction vocale via l'API Gemini Live — le tout dans une application web ou desktop (Electron).
 
 Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un assistant IA local, sécurisé, capable de lire, écrire et exécuter du code dans leur propre workspace, sans envoyer leurs fichiers vers des services tiers non contrôlés.
 
-![Build](https://img.shields.io/badge/build-passing-brightgreen) ![Version](https://img.shields.io/badge/version-1.0.0-blue) ![License](https://img.shields.io/badge/license-BUSL--1.1-orange) ![Node](https://img.shields.io/badge/node-%3E%3D20-green) ![Electron](https://img.shields.io/badge/electron-43-blueviolet)
+![Build](https://img.shields.io/badge/build-passing-brightgreen) ![Version](https://img.shields.io/badge/version-2.0.0-blue) ![License](https://img.shields.io/badge/license-BUSL--1.1-orange) ![Node](https://img.shields.io/badge/node-%3E%3D20-green) ![Electron](https://img.shields.io/badge/electron-43-blueviolet)
 
 ---
 
@@ -47,7 +47,82 @@ Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un as
 
 ## Fonctionnalités principales
 
-### 🧠 Agent Brain — Cerveau Central Leanna *(nouveau)*
+### 🤖 Autonomous Core V2 — Boucle d'autonomie persistante *(nouveau)*
+
+L'**Autonomous Core V2** est la couche supérieure de Leanna. Elle transforme Leanna en un **système agentique vivant** capable de poursuivre ses propres objectifs, détecter les changements, décider, agir, vérifier et apprendre — en continu, même sans intervention de l'utilisateur.
+
+```
+                       LEANNA — Autonomous Core V2
+                                    │
+           ┌──────────────────────┬─┴──────────────────────┐
+           ↓                      ↓                        ↓
+      PERCEPTION               MEMORY                   GOALS
+  FileWatcher +             ProjectMemory            GoalManager
+  EventBus +                LearningEngine           (persistés sur
+  SchedulerTick             KnowledgeGraph            disque JSON)
+           │                      │                        │
+           └──────────────────────┴────────────────────────┘
+                                  ↓
+                          DecisionEngine
+                    (PerceptionEvent × Goals → Mission)
+                                  ↓
+                          MissionManager
+                    (AgentOrchestrator → agents)
+                                  ↓
+                           Agents fleet
+                    (coder, tester, reviewer, security…)
+                                  ↓
+                          ReflectionEngine
+                    (LearningEngine + GoalEvaluator)
+                                  ↓
+                           NEXT CYCLE ↺
+```
+
+**Ce que Leanna peut faire de façon autonome :**
+- Surveiller le workspace en temps réel (fichiers modifiés, dépendances changées)
+- Décider si une mission est nécessaire (avec cooldown, seuil de confiance, niveau d'autonomie)
+- Lancer des agents (tsc, tests, sécurité, revue de code) sans attendre une commande
+- Apprendre des succès et échecs via le `LearningEngine`
+- Détecter proactivement la dette technique, les tests manquants, les dépendances obsolètes
+- Se réveiller la nuit sur un tick planifié et résumer les résultats au matin
+
+**Niveaux d'autonomie (L0–L8) :**
+
+| Niveau | Label | Droits |
+|---|---|---|
+| L0 | Chat uniquement | Réponses textuelles |
+| L1 | Suggestions | Sans exécution |
+| L2 | Lecture autonome | `filesystem.read`, `git.status` |
+| L3 | Analyse autonome | KnowledgeGraph, mémoire |
+| L4 | Sandbox | Modifications isolées |
+| L5 | Tests & validation | `terminal.run_tests`, `tsc` |
+| **L6** | **Corrections autonomes** | **Sync sandbox → main** (défaut) |
+| L7 | Actions externes | git.commit, browser, Telegram |
+| L8 | Missions longues | Multi-agents en arrière-plan |
+
+Chaque outil de la flotte est contrôlé par l'`AutonomyController` qui refuse silencieusement toute action hors niveau autorisé.
+
+**Objectifs persistants (Goals) :**
+
+```json
+{
+  "title": "Maintenir le projet en bon état",
+  "cadence": "continuous",
+  "priority": "medium",
+  "constraints": {
+    "noBreakingChanges": true,
+    "requireTests": true,
+    "maxAutonomyLevel": 5
+  },
+  "checks": ["typescript", "tests", "security", "dependencies", "git_status"]
+}
+```
+
+Les objectifs sont persistés dans `.Leanna/.leanna-goals.json` et rechargés automatiquement à chaque démarrage.
+
+---
+
+### 🧠 Agent Brain — Cerveau Central Leanna
 
 L'**Agent Brain** est la couche cognitive supérieure de Leanna. Il transforme un objectif utilisateur de haut niveau en un graphe d'exécution dynamique, sans aucun workflow codé en dur.
 
@@ -112,6 +187,7 @@ Bot Telegram Leanna (Polling local)
 ---
 
 ### Utilisateur
+- **Autonomous Core V2** : boucle d'autonomie persistante — objectifs, perception, décisions, missions, réflexion *(nouveau)*
 - **Interaction vocale en temps réel** via Gemini Live API (WebSocket `/live`) avec choix de voix
 - **Éditeur de code Monaco** avec coloration syntaxique, multi-onglets, et arborescence de fichiers
 - **Terminal interactif** intégré dans l'interface
@@ -161,45 +237,73 @@ Bot Telegram Leanna (Polling local)
 
 ## Architecture des Agents
 
-Leanna dispose d'un système multi-agents complet organisé en 4 couches :
+Leanna dispose d'un système multi-agents organisé en **5 couches** :
 
 ```
-┌──────────────────────────────────────────────────┐
-│              Agent Brain (nouveau)               │
-│   Compréhension → Décomposition → Planif.       │
-│   → Sélection agents/skills/outils              │
-│   → Exécution → Vérification → Correction       │
-└────────────────────┬─────────────────────────────┘
-                     │ orchestre dynamiquement
-┌────────────────────▼─────────────────────────────┐
-│           AgentOrchestrator                      │
-│   delegateTask · orchestrate · brainPlan        │
-│   collaborateByPattern · brainExecute           │
-└────────────────────┬─────────────────────────────┘
-                     │ utilise
-┌────────────────────▼─────────────────────────────┐
-│     Runtime V2 · SkillManagerV2 (nouveau)        │
-│  ToolRegistry · StateMachine · WorkflowEngine   │
-│  Observability · PromptRegistry · 8 agents V2   │
-└────────────────────┬─────────────────────────────┘
-                     │ exécute via
-┌────────────────────▼─────────────────────────────┐
-│       Agents spécialisés (15 rôles + 8 V2)       │
-│                                                  │
-│  Code & Ingénierie    │  Rédaction & Docs        │
-│  ─────────────────    │  ──────────────────      │
-│  coder                │  writer + V2             │
-│  refactor             │  formatter + V2          │
-│  debugger             │  researcher + V2         │
-│  reviewer             │  proofreader + V2        │
-│  tester               │  translator + V2         │
-│  security             │  summarizer + V2         │
-│  architect            │  planner + V2            │
-│  vision               │                          │
-└──────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│              Autonomous Core V2 (nouveau)                    │
+│  PerceptionLoop · GoalManager · DecisionEngine              │
+│  MissionManager · ReflectionEngine · OpportunityDetector    │
+│  AutonomyController (L0-L8) · GoalEvaluator                 │
+└──────────────────────────┬───────────────────────────────────┘
+                           │ crée des missions → orchestre
+┌──────────────────────────▼───────────────────────────────────┐
+│              Agent Brain                                     │
+│   Compréhension → Décomposition → Planif.                   │
+│   → Sélection agents/skills/outils                          │
+│   → Exécution → Vérification → Correction                   │
+└──────────────────────────┬───────────────────────────────────┘
+                           │ orchestre dynamiquement
+┌──────────────────────────▼───────────────────────────────────┐
+│           AgentOrchestrator                                  │
+│   delegateTask · orchestrate · brainPlan                    │
+│   collaborateByPattern · brainExecute                       │
+└──────────────────────────┬───────────────────────────────────┘
+                           │ utilise
+┌──────────────────────────▼───────────────────────────────────┐
+│     Runtime V2 · SkillManagerV2                              │
+│  ToolRegistry · StateMachine · WorkflowEngine               │
+│  Observability · PromptRegistry · 8 agents V2               │
+└──────────────────────────┬───────────────────────────────────┘
+                           │ exécute via
+┌──────────────────────────▼───────────────────────────────────┐
+│       Agents spécialisés (15 rôles + 8 V2)                   │
+│                                                              │
+│  Code & Ingénierie    │  Rédaction & Docs                   │
+│  ─────────────────    │  ──────────────────                  │
+│  coder                │  writer + V2                         │
+│  refactor             │  formatter + V2                      │
+│  debugger             │  researcher + V2                     │
+│  reviewer             │  proofreader + V2                    │
+│  tester               │  translator + V2                     │
+│  security             │  summarizer + V2                     │
+│  architect            │  planner + V2                        │
+│  vision               │                                      │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 **Délégation dynamique** (via matrice de délégation) : `coder` → `tester` → `reviewer` ; `planner` → `coder, researcher, writer` ; etc.
+
+**Boucle de perception → décision → mission :**
+```
+Fichier modifié (FileWatcher)
+        ↓
+PerceptionEvent "workspace.file_changed"
+        ↓
+DecisionEngine : pertinent pour le goal "maintain-project" ? (confiance > 35%)
+        ↓ oui
+Cooldown OK ? Missions actives < max ?
+        ↓ oui
+DecisionProposal → MissionManager
+        ↓
+AgentOrchestrator.delegateTask(role: "tester")
+        ↓
+Résultat → ReflectionEngine
+        ↓
+LearningEngine.learnFromMission() + GoalEvaluator.evaluate()
+        ↓
+NEXT CYCLE ↺
+```
 
 ---
 
@@ -414,7 +518,19 @@ leanna/
 │   │   ├── AgentCommunication.ts        # Matrice de délégation
 │   │   ├── AgentPersistence.ts          # Persistance tâches agents
 │   │   └── roles.ts                     # Définitions des 15 rôles
-│   ├── autonomy/           # SmartSkills + Supervisor (boucle autonome)
+│   ├── autonomy/           # Autonomous Core V2 + SmartSkills + Supervisor
+│   │   ├── types.ts                   # Types V2 (Goal, Mission, AutonomyLevel…)
+│   │   ├── AutonomousRuntime.ts       # Chef d'orchestre — singleton
+│   │   ├── AutonomyController.ts      # Matrice de permissions L0-L8
+│   │   ├── GoalManager.ts             # CRUD objectifs persistants (JSON)
+│   │   ├── GoalEvaluator.ts           # Évaluation satisfaction objectif
+│   │   ├── PerceptionLoop.ts          # FileWatcher + EventBus → PerceptionEvents
+│   │   ├── DecisionEngine.ts          # PerceptionEvents × Goals → MissionProposal
+│   │   ├── MissionManager.ts          # Proposal → AgentOrchestrator → suivi
+│   │   ├── ReflectionEngine.ts        # Post-mission → LearningEngine + mémoire
+│   │   ├── OpportunityDetector.ts     # Scan passif dette technique / sécurité
+│   │   ├── Supervisor.ts              # Boucle mission-level (V1)
+│   │   └── SmartSkills.ts             # Skills composites avec boucle (V1)
 │   ├── config/             # Rate limiters, configuration serveur
 │   ├── export/             # Export PDF/DOCX/HTML
 │   ├── knowledge/          # Knowledge Graph (indexation workspace, RAG)
@@ -550,6 +666,41 @@ curl -H "x-leanna-token: <Leanna_API_TOKEN>" \
 
 ---
 
+## API Autonomous Core V2
+
+```
+# Statut global du runtime
+GET  /api/agents/autonomous/status
+
+# Diagnostics complets (perception, missions, goals, autonomy)
+GET  /api/agents/autonomous/diagnostics
+
+# Gestion des objectifs
+GET    /api/agents/autonomous/goals          # Lister les objectifs
+POST   /api/agents/autonomous/goals          # Créer un objectif
+GET    /api/agents/autonomous/goals/:id      # Détail d'un objectif
+PATCH  /api/agents/autonomous/goals/:id/pause
+PATCH  /api/agents/autonomous/goals/:id/resume
+DELETE /api/agents/autonomous/goals/:id
+
+# Gestion des missions
+GET  /api/agents/autonomous/missions         # Missions récentes
+GET  /api/agents/autonomous/missions/:id     # Détail d'une mission
+POST /api/agents/autonomous/missions/:id/cancel
+
+# Contrôle du niveau d'autonomie
+PATCH /api/agents/autonomous/level           # Body: { "level": 5 }
+
+# Déclencher manuellement un scan d'opportunités
+POST /api/agents/autonomous/scan
+
+# Injecter un événement de perception manuellement
+POST /api/agents/autonomous/trigger
+# Body: { "type": "scheduler.tick" }
+```
+
+---
+
 ## Dépannage (Troubleshooting)
 
 ### `GET /api/pm2/status 503 Service Unavailable`
@@ -620,5 +771,3 @@ Consultez [CONTRIBUTING.md](CONTRIBUTING.md) pour le workflow Git, les conventio
 Ce projet est distribué sous licence **BUSL 1.1** (Business Source License 1.1).
 
 Voir le fichier [LICENSE](LICENSE) pour les conditions complètes.
-
-code2prompt "C:\Users\Mayss\Desktop\Jarvis-os-ori" --exclude="*.txt,node_modules/**,.git/**,dist/**,build/**,.next/**,coverage/**,.Leanna/**" -O "output.md"
