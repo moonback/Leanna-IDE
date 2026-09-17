@@ -2,13 +2,16 @@ import { Router, Request, Response } from 'express';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
-export function createOpenRouterRouter(getProfile: () => any): Router {
+export function createOpenRouterRouter(_getProfile: () => any): Router {
   const router = Router();
 
   // POST /api/openrouter/test
   router.post('/test', async (req: Request, res: Response) => {
     const { apiKey, model } = req.body as { apiKey?: string; model?: string };
-    if (!apiKey || !apiKey.trim()) return res.status(400).json({ status: 'error', error: 'Clé API requise.' });
+    if (!apiKey || !apiKey.trim()) {
+      res.status(400).json({ status: 'error', error: 'Clé API requise.' });
+      return;
+    }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
@@ -29,7 +32,8 @@ export function createOpenRouterRouter(getProfile: () => any): Router {
       });
       if (!response.ok) {
         const errText = await response.text();
-        return res.json({ status: 'error', error: `HTTP ${response.status}: ${errText.slice(0, 200)}` });
+        res.json({ status: 'error', error: `HTTP ${response.status}: ${errText.slice(0, 200)}` });
+        return;
       }
       const data: any = await response.json();
       res.json({ status: 'success', reply: data?.choices?.[0]?.message?.content || '', model: data?.model });
@@ -45,9 +49,14 @@ export function createOpenRouterRouter(getProfile: () => any): Router {
       apiKey?: string; model?: string; messages?: any[]; temperature?: number; topP?: number; maxTokens?: number;
     };
     const key = apiKey?.trim() || process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_FREE_API_KEY;
-    if (!key) return res.status(400).json({ status: 'error', error: 'Aucune clé API OpenRouter disponible.' });
-    if (!messages || !Array.isArray(messages) || messages.length === 0)
-      return res.status(400).json({ status: 'error', error: 'Messages requis.' });
+    if (!key) {
+      res.status(400).json({ status: 'error', error: 'Aucune clé API OpenRouter disponible.' });
+      return;
+    }
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      res.status(400).json({ status: 'error', error: 'Messages requis.' });
+      return;
+    }
 
     const { optimizeMessagesWithLLM, getBudgetForModel } = await import('../utils/tokenOptimizer.js');
     const budget = getBudgetForModel(model || 'default');
@@ -77,7 +86,8 @@ export function createOpenRouterRouter(getProfile: () => any): Router {
       clearTimeout(timeoutId);
       if (!response.ok) {
         const errText = await response.text();
-        return res.status(response.status).json({ status: 'error', error: `OpenRouter ${response.status}: ${errText.slice(0, 500)}` });
+        res.status(response.status).json({ status: 'error', error: `OpenRouter ${response.status}: ${errText.slice(0, 500)}` });
+        return;
       }
       const data = await response.json();
       const optimization = trimmed > 0 ? { trimmedMessages: trimmed, summarized, summaryMethod, summaryTokensCost } : undefined;
@@ -98,7 +108,10 @@ export function createOpenRouterRouter(getProfile: () => any): Router {
         headers: key ? { Authorization: `Bearer ${key}` } : {},
         signal: controller.signal,
       });
-      if (!response.ok) return res.status(response.status).json({ status: 'error', error: `HTTP ${response.status}` });
+      if (!response.ok) {
+        res.status(response.status).json({ status: 'error', error: `HTTP ${response.status}` });
+        return;
+      }
       const data = await response.json();
       res.json({ status: 'success', data });
     } catch (e: any) {

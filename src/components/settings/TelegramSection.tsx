@@ -15,8 +15,6 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
-  Bell,
-  Sparkles,
 } from 'lucide-react';
 import { Section, Field, TextInput, SecretInput, ToggleSwitch, SectionDivider } from './SettingsPrimitives.js';
 
@@ -89,6 +87,18 @@ export function TelegramSection() {
 
   useEffect(() => {
     fetchStatusAndConfig();
+    const handleStatusChanged = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setStatus(customEvent.detail);
+      } else {
+        fetchStatusAndConfig();
+      }
+    };
+    window.addEventListener('Leanna-telegram-status-changed', handleStatusChanged);
+    return () => {
+      window.removeEventListener('Leanna-telegram-status-changed', handleStatusChanged);
+    };
   }, [fetchStatusAndConfig]);
 
   const handleSaveConfig = async (override?: {
@@ -123,6 +133,7 @@ export function TelegramSection() {
       if (data.status === 'success') {
         setFeedback({ type: 'success', message: 'Paramètres Telegram enregistrés ✓' });
         setStatus(data.data);
+        window.dispatchEvent(new CustomEvent('Leanna-telegram-status-changed', { detail: data.data }));
         if (payload.botToken) {
           setHasToken(true);
           setTokenInput('');
@@ -146,6 +157,7 @@ export function TelegramSection() {
       const data = await res.json();
       if (data.status === 'success') {
         setStatus(data.data);
+        window.dispatchEvent(new CustomEvent('Leanna-telegram-status-changed', { detail: data.data }));
         setFeedback({ type: 'success', message: `Bot démarré avec succès ! (@${data.data?.botInfo?.username})` });
       } else {
         setFeedback({ type: 'error', message: data.error || 'Impossible de démarrer le bot.' });
@@ -165,6 +177,7 @@ export function TelegramSection() {
       const data = await res.json();
       if (data.status === 'success') {
         setStatus(data.data);
+        window.dispatchEvent(new CustomEvent('Leanna-telegram-status-changed', { detail: data.data }));
         setFeedback({ type: 'success', message: 'Bot arrêté.' });
       } else {
         setFeedback({ type: 'error', message: data.error || 'Impossible d\'arrêter le bot.' });
@@ -372,31 +385,25 @@ export function TelegramSection() {
       </Field>
 
       {/* Options */}
-      <Field
+      <ToggleSwitch
         label="Démarrage automatique"
         hint="Lance automatiquement le bot en arrière-plan dès le démarrage de Leanna OS."
-      >
-        <ToggleSwitch
-          checked={autoStart}
-          onChange={(checked) => {
-            setAutoStart(checked);
-            handleSaveConfig({ auto: checked });
-          }}
-        />
-      </Field>
+        value={autoStart}
+        onChange={(checked) => {
+          setAutoStart(checked);
+          handleSaveConfig({ auto: checked });
+        }}
+      />
 
-      <Field
+      <ToggleSwitch
         label="Notifications des Agents"
         hint="Recevez un message sur Telegram lorsque vos agents autonomes terminent ou échouent une tâche."
-      >
-        <ToggleSwitch
-          checked={notificationsEnabled}
-          onChange={(checked) => {
-            setNotificationsEnabled(checked);
-            handleSaveConfig({ notify: checked });
-          }}
-        />
-      </Field>
+        value={notificationsEnabled}
+        onChange={(checked) => {
+          setNotificationsEnabled(checked);
+          handleSaveConfig({ notify: checked });
+        }}
+      />
 
       <Field
         label="Chat ID par défaut"

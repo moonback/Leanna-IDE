@@ -14,11 +14,15 @@ import {
   ScrollText,
   DatabaseZap,
   Github,
+  Send,
+  Play,
+  Square,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { TokenDetailModal } from './TokenDetailModal.js';
 import { ModelPickerModal } from './ModelPickerModal.js';
+import { TelegramStatusModal, type TelegramStatus } from './TelegramStatusModal.js';
 import { formatExactTokenCount, formatTokenCount } from '../../utils/tokenFormatting.js';
 import { getAgentTasks, getToolActivities, subscribe as subscribeActivity } from '../../stores/agentActivityStore.js';
 
@@ -50,10 +54,10 @@ function getModifierKey(): string {
 
 export const StatusBar = memo(function StatusBar({
   filePath,
-  line,
-  column,
+  line: _line,
+  column: _column,
   dirty,
-  encoding = 'UTF-8',
+  encoding: _encoding = 'UTF-8',
   assistantBusy,
   onToggleMcp,
   onToggleSandbox,
@@ -76,6 +80,11 @@ export const StatusBar = memo(function StatusBar({
   const [mcpStatus, setMcpStatus] = useState<'ok' | 'error' | 'loading'>('loading');
   const [sandboxActive, setSandboxActive] = useState(false);
   const [sandboxModifiedCount, setSandboxModifiedCount] = useState(0);
+
+  // ── Telegram ───────────────────────────────────────────────────────────────
+  const [showTelegramModal, setShowTelegramModal] = useState(false);
+  const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
+  const [telegramActionLoading, setTelegramActionLoading] = useState(false);
 
   // ── Agent activity ─────────────────────────────────────────────────────────
 
@@ -113,6 +122,62 @@ export const StatusBar = memo(function StatusBar({
       clearInterval(interval);
     };
   }, []);
+
+  // ── Telegram ───────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchTelegram = async () => {
+      try {
+        const res = await fetch('/api/telegram/status');
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && data.status === 'success') {
+            setTelegramStatus(data.data);
+          }
+        }
+      } catch {
+        /* silent */
+      }
+    };
+
+    const handleTelegramChanged = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        setTelegramStatus(detail);
+      } else {
+        fetchTelegram();
+      }
+    };
+
+    fetchTelegram();
+    const interval = setInterval(fetchTelegram, 10000);
+    window.addEventListener('Leanna-telegram-status-changed', handleTelegramChanged);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('Leanna-telegram-status-changed', handleTelegramChanged);
+    };
+  }, []);
+
+  const handleQuickToggleTelegram = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (telegramActionLoading || !telegramStatus?.isConfigured) return;
+    setTelegramActionLoading(true);
+    try {
+      const endpoint = telegramStatus.isRunning ? '/api/telegram/stop' : '/api/telegram/start';
+      const res = await fetch(endpoint, { method: 'POST' });
+      const data = await res.json();
+      if (data.data) {
+        setTelegramStatus(data.data);
+        window.dispatchEvent(new CustomEvent('Leanna-telegram-status-changed', { detail: data.data }));
+      }
+    } catch {
+      /* silent */
+    } finally {
+      setTelegramActionLoading(false);
+    }
+  }, [telegramActionLoading, telegramStatus]);
 
   // ── Build ──────────────────────────────────────────────────────────────────
 
@@ -387,6 +452,73 @@ export const StatusBar = memo(function StatusBar({
             }} />
             <span style={{ color: 'var(--text-muted)' }} className="font-medium">MCP</span>
           </button>
+
+          {/* Telegram Bot */}
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => setShowTelegramModal(true)}
+              className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+              title={
+                !telegramStatus?.isConfigured
+                  ? 'Telegram : Non configuré (cliquer pour configurer)'
+                  : telegramStatus.isRunning
+                  ? `Telegram : En ligne (@${telegramStatus.botInfo?.username || 'bot'}) — Cliquer pour gérer`
+                  : telegramStatus.lastError
+                  ? `Telegram : Erreur (${telegramStatus.lastError}) — Cliquer pour voir`
+                  : 'Telegram : Arrêté — Cliquer pour démarrer ou gérer'
+              }
+            >
+              <Send
+                size={12}
+                style={{
+                  color: telegramStatus?.isRunning ? 'var(--color-success)' : 'var(--text-muted)',
+                }}
+              />
+              <motion.div
+                className="w-2 h-2 rounded-full"
+                style={{
+                  backgroundColor: telegramStatus?.isRunning
+                    ? 'var(--color-success)'
+                    : telegramStatus?.lastError
+                    ? 'var(--color-error)'
+                    : !telegramStatus?.isConfigured
+                    ? 'var(--color-warning)'
+                    : 'var(--text-muted)',
+                }}
+                animate={telegramStatus?.isRunning ? { scale: [1, 1.25, 1] } : undefined}
+                transition={telegramStatus?.isRunning ? { repeat: Infinity, duration: 2 } : undefined}
+              />
+              <span
+                style={{
+                  color: telegramStatus?.isRunning ? 'var(--color-success)' : 'var(--text-muted)',
+                }}
+                className="font-medium"
+              >
+                Telegram
+              </span>
+            </button>
+
+            {/* Quick toggle start/stop button */}
+            {telegramStatus?.isConfigured && (
+              <button
+                type="button"
+                onClick={handleQuickToggleTelegram}
+                disabled={telegramActionLoading}
+                className="p-1 rounded hover:bg-[var(--bg-hover)] transition-colors opacity-70 hover:opacity-100 disabled:opacity-40"
+                title={telegramStatus.isRunning ? 'Arrêter le bot Telegram' : 'Démarrer le bot Telegram'}
+                aria-label={telegramStatus.isRunning ? 'Arrêter le bot Telegram' : 'Démarrer le bot Telegram'}
+              >
+                {telegramActionLoading ? (
+                  <LoaderCircle size={10} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
+                ) : telegramStatus.isRunning ? (
+                  <Square size={10} className="text-rose-400 hover:text-rose-300" fill="currentColor" />
+                ) : (
+                  <Play size={10} className="text-emerald-400 hover:text-emerald-300" fill="currentColor" />
+                )}
+              </button>
+            )}
+          </div>
 
           {/* Agents — visible uniquement si activé dans les paramètres */}
           {profile.agents.enabled && (
@@ -671,6 +803,13 @@ export const StatusBar = memo(function StatusBar({
 
       {showDetailModal && <TokenDetailModal onClose={() => setShowDetailModal(false)} />}
       {showModelPicker && <ModelPickerModal onClose={() => setShowModelPicker(false)} />}
+      {showTelegramModal && (
+        <TelegramStatusModal
+          status={telegramStatus}
+          onClose={() => setShowTelegramModal(false)}
+          onStatusChange={(newStatus) => setTelegramStatus(newStatus)}
+        />
+      )}
     </>
   );
 });

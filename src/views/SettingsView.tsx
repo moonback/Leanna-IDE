@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -87,10 +87,16 @@ export default function SettingsView() {
   const { profile, save, reset } = useProfile();
   const { success, error: toastError } = useToast();
   const [saving, setSaving] = useState(false);
+  const requestedSection = searchParams.get('section');
   const [activeSection, setActiveSection] = useState(
-    searchParams.get('section') === 'tokens-settings' ? 'tokens-settings' : 'profile-settings',
+    requestedSection || 'profile-settings',
   );
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    const sec = searchParams.get('section');
+    if (sec) setActiveSection(sec);
+  }, [window.location.search]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);

@@ -1002,9 +1002,9 @@
     "semantic_hash": ""
   },
   "server/routes/openrouter.ts": {
-    "mtime": 1788368376.613141,
-    "seen": 1788909309.9905493,
-    "ast_hash": "37c6efb3f41b2c16e21c090f1166cb8b",
+    "mtime": 1789639602.734457,
+    "seen": 1789639730.113568,
+    "ast_hash": "9eaaa10ac46ff7feab93294be621e191",
     "semantic_hash": ""
   },
   "server/routes/profile.test.ts": {
@@ -1104,9 +1104,9 @@
     "semantic_hash": ""
   },
   "server/routes/upload-document.ts": {
-    "mtime": 1788368376.632044,
-    "seen": 1788909309.9905736,
-    "ast_hash": "b785ab6ef6e438c3c91c732353882e64",
+    "mtime": 1789639123.9806592,
+    "seen": 1789639730.118892,
+    "ast_hash": "88d7263dc1de96c82674a529501f3323",
     "semantic_hash": ""
   },
   "server/routes/workflows.test.ts": {
@@ -1524,9 +1524,9 @@
     "semantic_hash": ""
   },
   "server/skills/documentLinker.ts": {
-    "mtime": 1788368376.7369266,
-    "seen": 1788909309.9906602,
-    "ast_hash": "ac14180096f3e9662fe621d6e5f519b4",
+    "mtime": 1789639123.9806592,
+    "seen": 1789639730.1383886,
+    "ast_hash": "f8c762af4dccf1b1a298870ec9b7debf",
     "semantic_hash": ""
   },
   "server/skills/git.test.ts": {
@@ -1638,9 +1638,9 @@
     "semantic_hash": ""
   },
   "server/skills/reasoning.ts": {
-    "mtime": 1788690709.8667555,
-    "seen": 1788909309.9906845,
-    "ast_hash": "28544306137e954aa6b578fc13326ce7",
+    "mtime": 1789639123.9919288,
+    "seen": 1789639730.144083,
+    "ast_hash": "19aa3205a8b24f5f4020fa15176f6330",
     "semantic_hash": ""
   },
   "server/skills/richDocument.ts": {
@@ -1926,15 +1926,15 @@
     "semantic_hash": ""
   },
   "server/utils/textGeneration.ts": {
-    "mtime": 1788689988.9402943,
-    "seen": 1788909309.9907522,
-    "ast_hash": "f25234d8fec14cb73c0a48be2221b1ae",
+    "mtime": 1789639123.9806592,
+    "seen": 1789639730.1551123,
+    "ast_hash": "7b37521bd2fddfa8594c8a9e8806e96d",
     "semantic_hash": ""
   },
   "server/utils/tokenOptimizer.ts": {
-    "mtime": 1788522314.7587547,
-    "seen": 1788909309.990754,
-    "ast_hash": "bebb7856edb798bb589a188bd7c91a14",
+    "mtime": 1789639123.9806592,
+    "seen": 1789639730.1551147,
+    "ast_hash": "d8db9bf18aa32ca707476b82b482bb5b",
     "semantic_hash": ""
   },
   "server/websocket.e2e.test.ts": {
@@ -2232,9 +2232,9 @@
     "semantic_hash": ""
   },
   "src/components/ide/StatusBar.tsx": {
-    "mtime": 1788708176.6824036,
-    "seen": 1788909309.9908223,
-    "ast_hash": "169cb51d3a99e0eb18796cc8a98ed96b",
+    "mtime": 1789639584.3182745,
+    "seen": 1789639730.1677527,
+    "ast_hash": "afda00e9103880c8414361e18229c00c",
     "semantic_hash": ""
   },
   "src/components/ide/SystemModal.tsx": {
@@ -2604,9 +2604,9 @@
     "semantic_hash": ""
   },
   "src/components/settings/OpenRouterSection.tsx": {
-    "mtime": 1788522314.7756846,
-    "seen": 1788909309.990902,
-    "ast_hash": "9e136ed01fc7d7fd18fb65348323e4e2",
+    "mtime": 1789639123.989217,
+    "seen": 1789639730.184706,
+    "ast_hash": "0cf5a90adcab18f43332d8e102efb31f",
     "semantic_hash": ""
   },
   "src/components/settings/ProfileSection.tsx": {
@@ -2820,9 +2820,9 @@
     "semantic_hash": ""
   },
   "src/context/UserProfileContext.tsx": {
-    "mtime": 1788689501.8194325,
-    "seen": 1788909309.9909477,
-    "ast_hash": "f09bd8006742fa23e316708b19cdc59d",
+    "mtime": 1789639123.989217,
+    "seen": 1789639730.1930509,
+    "ast_hash": "98b12427df18228d7a596212cd9e8be3",
     "semantic_hash": ""
   },
   "src/hooks/index.ts": {
@@ -3162,9 +3162,9 @@
     "semantic_hash": ""
   },
   "src/views/SettingsView.tsx": {
-    "mtime": 1789638332.2472265,
-    "seen": 1789638423.8453696,
-    "ast_hash": "c89f886d256bb56f02c6bd2926c058cb",
+    "mtime": 1789639558.9597151,
+    "seen": 1789639730.2048712,
+    "ast_hash": "04bdef0e903598030437b4a562b2adcc",
     "semantic_hash": ""
   },
   "src/vite-env.d.ts": {
@@ -3576,8 +3576,8 @@
     "semantic_hash": ""
   },
   ".Leanna-telegram.json": {
-    "mtime": 1789638332.2109096,
-    "seen": 1789638423.6941586,
+    "mtime": 1789639716.9875095,
+    "seen": 1789639730.0555532,
     "ast_hash": "302bce4a7cca4912f36db5d1b34b0a5a",
     "semantic_hash": ""
   },
@@ -3660,15 +3660,21 @@
     "semantic_hash": ""
   },
   "src/components/settings/TelegramSection.tsx": {
-    "mtime": 1789638332.2442262,
-    "seen": 1789638423.8190324,
-    "ast_hash": "55fe19974fe0aadd2b2e33f8076b9853",
+    "mtime": 1789639576.108032,
+    "seen": 1789639730.1868203,
+    "ast_hash": "d81590f9773fc2562ca636abc2ed457a",
     "semantic_hash": ""
   },
   "plan_integration_telegram.md": {
     "mtime": 1789638332.2219787,
     "seen": 1789638423.8529358,
     "ast_hash": "4570de03530796d7bd6f9288034dd2ee",
+    "semantic_hash": ""
+  },
+  "src/components/ide/TelegramStatusModal.tsx": {
+    "mtime": 1789639468.7258096,
+    "seen": 1789639730.1681287,
+    "ast_hash": "156ab51ca534446a285dcf510c469636",
     "semantic_hash": ""
   }
 }
