@@ -547,6 +547,37 @@ export class AgentOrchestrator {
 
     return { totalTasks: allTasks.length, byStatus, byRole: byRole as Record<AgentRole, number>, activeOrchestrations };
   }
+
+  // ─── Agent Brain (Cerveau Central Leanna) ──────────────────────────────────
+
+  private brainInstance: any = null;
+
+  /**
+   * Retourne l'instance de l'Agent Brain (cerveau central Leanna)
+   */
+  async getBrain() {
+    if (!this.brainInstance) {
+      const { AgentBrain } = await import("./brain/AgentBrain.js");
+      this.brainInstance = new AgentBrain(this);
+    }
+    return this.brainInstance;
+  }
+
+  /**
+   * Planifie dynamiquement un objectif utilisateur via l'Agent Brain
+   */
+  async brainPlan(input: import("./brain/types.js").BrainGoalInput) {
+    const brain = await this.getBrain();
+    return brain.planGoal(input);
+  }
+
+  /**
+   * Exécute de bout en bout un objectif utilisateur via l'Agent Brain
+   */
+  async brainExecute(input: import("./brain/types.js").BrainGoalInput) {
+    const brain = await this.getBrain();
+    return brain.executeGoal(input);
+  }
 }
 
 // ─── Singleton ────────────────────────────────────────────────────────────────

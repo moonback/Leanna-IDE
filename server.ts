@@ -276,6 +276,9 @@ import { documentKnowledgeSkill } from "./server/skills/documentKnowledge.js";
 import { richDocumentSkill } from "./server/skills/richDocument.js";
 import { graphifySkill } from "./server/skills/graphify.js";
 import { hierarchicalMemorySkill } from "./server/skills/hierarchicalMemory.js";
+import { telegramSkill } from "./server/skills/telegram.js";
+import { telegramService } from "./server/telegram/TelegramService.js";
+import { createTelegramRouter } from "./server/routes/telegram.js";
 import { createSmartSkills } from "./server/autonomy/SmartSkills.js";
 
 const { runtime, skillManager } = bootstrapRuntimeSync({
@@ -285,7 +288,7 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
     memorySkill, hierarchicalMemorySkill, reasoningSkill, systemSkill, timeSkill,
     verifySkill, securityAuditSkill, weatherSkill, projectSkill, agentsSkill,
     missionSkill, aiStudioDirectivesSkill, documentLinkerSkill,
-    documentKnowledgeSkill, richDocumentSkill, graphifySkill,
+    documentKnowledgeSkill, richDocumentSkill, graphifySkill, telegramSkill,
     createSmartSkills((name: string, args: any) => skillManager.handleToolCall(name, args)),
   ],
   onReady: async (r, sm) => {
@@ -535,6 +538,7 @@ async function startServer() {
   app.use("/api/browser", createBrowserRouter(browserReadPending, browserActionPending));
   app.use("/api/export", createExportRouter());
   app.use("/api", createVerifyExitCodeRouter());
+  app.use("/api/telegram", createTelegramRouter());
 
   // ── Fin routeurs extraits Sprint 1 ──────────────────────────────────────
 
@@ -689,6 +693,16 @@ async function startServer() {
         try { client.send(payload); } catch { /* ignore */ }
       }
     }
+
+    // Notification Telegram si activée
+    if (event?.event === "task_completed" || event?.event === "task_failed") {
+      const statusIcon = event.event === "task_completed" ? "✅" : "❌";
+      telegramService.notify(
+        `Agent *${event.agentName || event.role || "système"}* : Tâche ${statusIcon}\n` +
+        `• *Titre :* ${event.title || "Tâche"}\n` +
+        (event.detail ? `• *Détail :* ${event.detail}\n` : "")
+      ).catch(() => {});
+    }
   });
 
   // ── Mission System: broadcaster d'événements missions vers les clients WebSocket ──
@@ -789,7 +803,16 @@ async function startServer() {
     stopAllWorkflowTimers,
     stopAllScheduledTasks,
     stopCustomSkillsHotReload: () => skillManager.stopCustomSkillsHotReload(),
+    stopTelegramBot: () => telegramService.stop(),
   });
+
+  // ── Démarrage automatique du bot Telegram si configuré ──
+  const tgStatus = telegramService.getStatus();
+  if (tgStatus.autoStart && tgStatus.isConfigured) {
+    telegramService.start().catch((err) => {
+      console.warn("[Telegram] Erreur démarrage automatique :", err.message);
+    });
+  }
 }
 
 startServer();

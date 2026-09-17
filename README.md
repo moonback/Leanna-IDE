@@ -1,6 +1,6 @@
 # Leanna — AI Operating System
 
-Leanna est un environnement de développement augmenté par IA, conçu pour les développeurs qui veulent déléguer des tâches complexes à une IA multimodale en temps réel. Il intègre un éditeur de code (Monaco), un terminal interactif, un système d'agents autonomes, et une interaction vocale via l'API Gemini Live — le tout dans une application web ou desktop (Electron).
+Leanna est un environnement de développement augmenté par IA, conçu pour les développeurs qui veulent déléguer des tâches complexes à une IA multimodale en temps réel. Il intègre un éditeur de code (Monaco), un terminal interactif, un système d'agents autonomes avec un **cerveau central dynamique (Agent Brain)**, et une interaction vocale via l'API Gemini Live — le tout dans une application web ou desktop (Electron).
 
 Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un assistant IA local, sécurisé, capable de lire, écrire et exécuter du code dans leur propre workspace, sans envoyer leurs fichiers vers des services tiers non contrôlés.
 
@@ -36,16 +36,58 @@ Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un as
 
 ## Fonctionnalités principales
 
+### 🧠 Agent Brain — Cerveau Central Leanna *(nouveau)*
+
+L'**Agent Brain** est la couche cognitive supérieure de Leanna. Il transforme un objectif utilisateur de haut niveau en un graphe d'exécution dynamique, sans aucun workflow codé en dur.
+
+```
+Utilisateur
+    ↓ « Modernise mon site et rends le header responsive »
+Agent Brain
+    ├─ 1. Compréhension de l'objectif  (intention, stack, critères de succès)
+    ├─ 2. Décomposition dynamique      (graphe DAG de sous-objectifs)
+    ├─ 3. Choix des agents             (Researcher → Architect → Coder → Vision → Tester → Reviewer)
+    ├─ 4. Choix des skills & outils    (allocation ciblée par étape)
+    ├─ 5. Exécution orchestrée         (suivi temps réel dans l'interface)
+    ├─ 6. Vérification multi-niveaux   (syntaxe, tests, visuel, sémantique)
+    └─ 7. Correction autonome          (boucle auto-réparation bornée)
+          ↓
+    Résultat final avec rapport complet
+```
+
+**Déclenchement vocal ou textuel :**
+```
+« Modernise mon site et rends le header responsive »
+→ agent_brain est appelé automatiquement
+→ Le Brain analyse, planifie, exécute et valide sans workflow figé
+```
+
+**Modes :**
+- `plan_first` : génère et affiche le plan pour approbation avant exécution
+- `auto` : exécution complète de bout en bout
+
+**API REST :**
+```
+POST /api/agents/brain/plan      # Visualiser le plan sans l'exécuter
+POST /api/agents/brain/execute   # Exécution complète Brain
+GET  /api/agents/brain/status/:id # Suivi d'avancement
+```
+
+---
+
 ### Utilisateur
 - **Interaction vocale en temps réel** via Gemini Live API (WebSocket `/live`) avec choix de voix
 - **Éditeur de code Monaco** avec coloration syntaxique, multi-onglets, et arborescence de fichiers
 - **Terminal interactif** intégré dans l'interface
-- **Agents autonomes** : délégation de tâches à des agents spécialisés (coder, architect, refactor, test, docs, security, review)
+- **Agent Brain** : cerveau central qui décompose et exécute des objectifs complexes dynamiquement *(nouveau)*
+- **Agents autonomes** : délégation de tâches à des agents spécialisés (coder, architect, refactor, tester, debugger, reviewer, researcher, vision, security, writer, planner…)
+- **Orchestration multi-agents** avec gestion des dépendances (DAG) et collaboration par patterns
+- **Boucle d'auto-correction** : les agents détectent et réparent leurs propres erreurs de façon autonome
 - **Sandbox sécurisé** : toutes les modifications de l'IA sont isolées et soumises à validation avant application
 - **Partage d'écran et webcam** vers le modèle Gemini pour interaction visuelle
 - **Notebooks RAG** : ingestion de documents (PDF, texte) et chat contextuel avec recherche sémantique
 - **Historique des conversations** persisté dans Supabase avec recherche full-text
-- **Mémoire long-terme** via Supabase (pgvector) avec recherche par similarité sémantique
+- **Mémoire hiérarchique** : court-terme (session), moyen-terme (projet), long-terme (Supabase pgvector)
 - **Listes intelligentes** créées et gérées par l'IA
 - **Workflows automatisés** planifiables (ex : toutes les 24h, 30m…)
 - **Tâches planifiées** (automation) avec intervalles configurables
@@ -65,6 +107,44 @@ Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un as
 - **OpenRouter** : support de modèles alternatifs (GPT-4o-mini, etc.)
 - **Text-to-Speech** intégré pour les réponses vocales
 - **Checkpoint Git** : sauvegarde automatique avant chaque modification critique
+
+---
+
+## Architecture des Agents
+
+Leanna dispose d'un système multi-agents complet organisé en 3 couches :
+
+```
+┌─────────────────────────────────────────────┐
+│              Agent Brain (nouveau)          │
+│   Compréhension → Décomposition → Planif.  │
+│   → Sélection agents/skills/outils         │
+│   → Exécution → Vérification → Correction  │
+└────────────────┬────────────────────────────┘
+                 │ orchestre dynamiquement
+┌────────────────▼────────────────────────────┐
+│           AgentOrchestrator                 │
+│   delegateTask · orchestrate · brainPlan   │
+│   collaborateByPattern · brainExecute      │
+└────────────────┬────────────────────────────┘
+                 │ exécute via
+┌────────────────▼────────────────────────────┐
+│       Agents spécialisés (15 rôles)         │
+│                                             │
+│  Code & Ingénierie    │  Rédaction & Docs   │
+│  ─────────────────    │  ──────────────────  │
+│  coder                │  writer             │
+│  refactor             │  formatter          │
+│  debugger             │  researcher         │
+│  reviewer             │  proofreader        │
+│  tester               │  translator         │
+│  security             │  summarizer         │
+│  architect            │  planner            │
+│  vision               │                     │
+└─────────────────────────────────────────────┘
+```
+
+**Délégation dynamique** (via matrice de délégation) : `coder` → `tester` → `reviewer` ; `planner` → `coder, researcher, writer` ; etc.
 
 ---
 
@@ -188,17 +268,22 @@ npm run dist:win
 # Lancer tous les tests
 npm test
 
+# Tests Agent Brain uniquement
+node --import tsx --test server/agents/brain/AgentBrain.test.ts
+
 # Lancer les tests d'un module spécifique
 npm test -- server/skills/browser.test.ts
 
 # Lancer uniquement les tests d'intégration des routes
 npm test -- server/routes/*.test.ts
-
-# Lancer les tests avec couverture
-npm test -- --coverage
 ```
 
 **Couverture de tests :**
+- ✅ `server/agents/brain/` : **20 tests unitaires** Agent Brain (100% pass)
+  - GoalUnderstandingEngine : détection de domaine et complexité
+  - DynamicPlanner : séquence dynamique par type d'objectif
+  - BrainVerifier : vérification multi-niveaux
+  - BrainCorrectionLoop : boucle d'auto-correction bornée
 - ✅ `server/skills/` : ≥60% de couverture
   - 136+ tests unitaires sur les skills critiques
   - Validation exhaustive des schemas Zod
@@ -208,7 +293,6 @@ npm test -- --coverage
   - Validation des schémas de requêtes/réponses
   - Gestion des erreurs 400/404/500/503
   - Tests d'authentification et autorisation
-  - Tests de rate limiting et validation de fichiers
 
 ---
 
@@ -222,6 +306,20 @@ leanna/
 │   └── splash.html         # Splash screen de démarrage
 ├── server/                 # Backend Express (Node.js)
 │   ├── agents/             # Orchestrateur et flotte d'agents autonomes
+│   │   ├── brain/          # 🧠 Agent Brain (nouveau)
+│   │   │   ├── types.ts                 # Types et interfaces Brain
+│   │   │   ├── GoalUnderstandingEngine.ts # Compréhension de l'objectif
+│   │   │   ├── DynamicPlanner.ts        # Décomposition DAG dynamique
+│   │   │   ├── BrainVerifier.ts         # Vérification multi-niveaux
+│   │   │   ├── BrainCorrectionLoop.ts   # Boucle d'auto-correction
+│   │   │   ├── AgentBrain.ts            # Coordinateur central
+│   │   │   └── AgentBrain.test.ts       # 20 tests unitaires
+│   │   ├── AgentOrchestrator.ts         # Façade orchestration + Brain
+│   │   ├── AgentExecutor.ts             # Exécution de tâches
+│   │   ├── DelegationManager.ts         # Délégation structurée JSON
+│   │   ├── AutonomousAgent.ts           # Base class agents autonomes
+│   │   ├── AgentCommunication.ts        # Matrice de délégation
+│   │   └── roles.ts                     # Définitions des 15 rôles
 │   ├── autonomy/           # SmartSkills et boucle autonome
 │   ├── config/             # Rate limiters, configuration serveur
 │   ├── export/             # Export de données
@@ -234,8 +332,9 @@ leanna/
 │   ├── notebooks/          # RAG : ingestion, embeddings, recherche
 │   ├── prompts/            # System instructions Gemini
 │   ├── routes/             # Routeurs REST (40+ modules)
+│   │   └── agents.ts       # API REST agents + /brain/plan /brain/execute
 │   ├── runtime/            # SkillManagerV2, ToolRegistry, Observability
-│   ├── skills/             # Skills natifs (25+) avec tests unitaires (≥60% couverture)
+│   ├── skills/             # Skills natifs (25+) dont agent_brain
 │   ├── utils/              # Sandbox, crypto, checkpoint, selfRoot…
 │   └── workflows/          # Moteur de workflows planifiés
 ├── src/                    # Frontend React
@@ -257,6 +356,47 @@ leanna/
 ├── vite.config.ts          # Configuration Vite
 ├── tsconfig.json           # Configuration TypeScript
 └── package.json            # Dépendances et scripts npm
+```
+
+---
+
+## Utiliser l'Agent Brain
+
+### Via l'interface vocale
+
+Dites simplement votre objectif à Leanna :
+> *« Modernise mon site et rends le header responsive »*
+> *« Corrige le crash au démarrage de l'application »*
+> *« Refactorise le module authentication pour respecter les principes SOLID »*
+
+Leanna invoque automatiquement `agent_brain` qui planifie et exécute dynamiquement.
+
+### Via l'outil direct (mode plan_first)
+
+```
+agent_brain({
+  goal: "Modernise mon site et rends le header responsive",
+  mode: "plan_first"
+})
+```
+
+Retourne le plan complet pour inspection avant exécution.
+
+### Via l'API REST
+
+```bash
+# Générer un plan sans exécuter
+curl -X POST http://localhost:4000/api/agents/brain/plan \
+  -H "Content-Type: application/json" \
+  -d '{"goal": "Modernise mon site et rends le header responsive"}'
+
+# Exécuter de bout en bout
+curl -X POST http://localhost:4000/api/agents/brain/execute \
+  -H "Content-Type: application/json" \
+  -d '{"goal": "Fix le crash au démarrage", "maxCorrectionAttempts": 3}'
+
+# Suivre l'avancement
+curl http://localhost:4000/api/agents/brain/status/<planId>
 ```
 
 ---

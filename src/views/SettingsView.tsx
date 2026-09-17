@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, RotateCcw, Save, ChevronRight, Settings2,
   User, Cpu, Globe, SlidersHorizontal, Languages,
-  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen, Layers
+  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen, Layers, Send
 } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip.js';
 import { useProfile } from '../context/UserProfileContext.js';
@@ -27,6 +27,7 @@ import {
   SystemPromptSection,
   SkillsDocumentationSection,
   HierarchicalMemorySection,
+  TelegramSection,
 } from '../components/settings/index.js';
 
 // ─── Nav Groups (4 catégories — Phase 4c du plan) ─────────────────────────────
@@ -47,6 +48,7 @@ const NAV_GROUPS = [
       { id: 'agents-settings', icon: Bot, label: 'Agents', keywords: 'agent multi-agents coder test docs refactor security review architect délégation solo' },
       { id: 'custom-skills-settings', icon: Code2, label: 'Skills custom', keywords: 'skill personnalisé custom outil tool instruction prompt automatisation' },
       { id: 'skills-doc-settings', icon: BookOpen, label: 'Documentation Skills', keywords: 'documentation doc skills outils tools paramètres schéma tester interactif auto-généré' },
+      { id: 'telegram-settings', icon: Send, label: 'Bot Telegram', keywords: 'telegram bot mobile smartphone distant notifications token polling' },
       { id: 'openrouter-settings', icon: Globe, label: 'Modèles & API', keywords: 'openrouter cles providers gpt gemini claude modèle' },
       { id: 'model-settings', icon: SlidersHorizontal, label: 'Hyperparamètres', keywords: 'temperature top p créativité précis équilibré preset' },
       { id: 'tokens-settings', icon: Key, label: 'Tokens API', keywords: 'cle api gemini tokens pool rotation' },
@@ -385,6 +387,7 @@ export default function SettingsView() {
                 {activeSection === 'data-settings' && <DataSection />}
                 {activeSection === 'skills-doc-settings' && <SkillsDocumentationSection />}
                 {activeSection === 'hierarchical-memory-settings' && <HierarchicalMemorySection />}
+                {activeSection === 'telegram-settings' && <TelegramSection />}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -415,6 +418,7 @@ function getSectionDescription(id: string): string {
     'data-settings': 'Supprimez l\'historique des conversations et la mémoire.',
     'skills-doc-settings': 'Documentation interactive des skills et outils, auto-générée depuis leurs déclarations TypeScript.',
     'hierarchical-memory-settings': 'Orchestrez la mémoire à 3 niveaux : court-terme (session), moyen-terme (projet) et long-terme (Supabase).',
+    'telegram-settings': 'Contrôlez Leanna depuis votre smartphone : chat IA, exécution de tâches agents et notifications.',
   };
   return descriptions[id] || 'Configurez les préférences de cette section.';
 }
