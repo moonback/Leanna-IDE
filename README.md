@@ -620,3 +620,5 @@ Consultez [CONTRIBUTING.md](CONTRIBUTING.md) pour le workflow Git, les conventio
 Ce projet est distribué sous licence **BUSL 1.1** (Business Source License 1.1).
 
 Voir le fichier [LICENSE](LICENSE) pour les conditions complètes.
+
+code2prompt "C:\Users\Mayss\Desktop\Jarvis-os-ori" --exclude="*.txt,node_modules/**,.git/**,dist/**,build/**,.next/**,coverage/**,.Leanna/**" -O "output.md"
