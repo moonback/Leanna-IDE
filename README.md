@@ -13,25 +13,35 @@ Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un as
 | Technologie | Rôle | Version |
 |---|---|---|
 | React | UI frontend | ^19.0.1 |
+| React Router DOM | Routage frontend | ^7.18.1 |
 | Vite | Bundler / dev server | ^6.2.3 |
 | TypeScript | Langage principal (front + back) | ^5.0.0 |
 | TailwindCSS | Styles utilitaires | ^4.1.14 |
 | Express | Serveur HTTP / API REST | ^4.21.2 |
 | Node.js | Runtime backend | ≥ 20 |
+| tsx | Dev runner TypeScript ESM | ^4.23.1 |
+| esbuild | Build serveur (CJS bundle) | ^0.25.0 |
 | WebSocket (`ws`) | Temps réel (Gemini Live, terminal, sandbox) | ^8.21.0 |
 | Electron | Application desktop (Windows) | ^43.1.0 |
 | Monaco Editor | Éditeur de code intégré | ^0.53.0 |
 | Google GenAI | Modèles Gemini (texte + voix) | ^2.4.0 |
 | Supabase | Base de données PostgreSQL + pgvector | ^2.110.2 |
+| Redis | Cache (optionnel, rate limits / sessions) | ^6.2.1 |
 | Zod | Validation de schémas | ^3.25.76 |
 | Puppeteer | Automatisation navigateur | ^25.3.0 |
 | Recharts | Graphiques / dashboards | 3.10.1 |
 | Motion | Animations UI | ^12.23.24 |
+| Lucide React | Icônes | ^0.546.0 |
+| Mermaid | Diagrammes dans notebooks | ^11.4.1 |
+| Marked | Rendu Markdown | 15.0.12 |
 | Tree-sitter | Parsing AST (TypeScript, JavaScript) | ^0.27.0 |
 | pdf-parse | Extraction de documents PDF | ^2.4.5 |
 | basic-ftp | Connexions FTP | 6.2.1 |
-| grammy | Framework Bot Telegram (Long Polling) | ^1.35.0 |
-| esbuild | Build serveur (CJS bundle) | ^0.25.0 |
+| grammy | Framework Bot Telegram (Long Polling) | ^1.46.0 |
+| PM2 | Superviseur de process (production) | 7.x |
+| express-rate-limit | Rate limiting API | ^8.6.0 |
+| Multer | Upload de fichiers | ^2.2.0 |
+| Compression | Compression gzip/brotli | ^1.8.1 |
 
 ---
 
@@ -109,66 +119,84 @@ Bot Telegram Leanna (Polling local)
 - **Agents autonomes** : délégation de tâches à des agents spécialisés (coder, architect, refactor, tester, debugger, reviewer, researcher, vision, security, writer, planner…)
 - **Orchestration multi-agents** avec gestion des dépendances (DAG) et collaboration par patterns
 - **Boucle d'auto-correction** : les agents détectent et réparent leurs propres erreurs de façon autonome
+- **Runtime V2 (SkillManagerV2)** : nouvelle génération du moteur de skills avec `ToolRegistry`, `StateMachine`, `WorkflowEngine`, `Observability`, `PromptRegistry`, et agents spécialisés formatter/planner/proofreader/researcher/summarizer/translator/writer
+- **Système de Missions (long-running)** : tâches longues persistées avec Planner + Executor + Reflection + SkillScorer
+- **Supervision autonome (SmartSkills + Supervisor)** : boucle d'autonomie avec scoring de compétences et auto-adaptation
 - **Sandbox sécurisé** : toutes les modifications de l'IA sont isolées et soumises à validation avant application
 - **Partage d'écran et webcam** vers le modèle Gemini pour interaction visuelle
-- **Notebooks RAG** : ingestion de documents (PDF, texte) et chat contextuel avec recherche sémantique
+- **Notebooks RAG** : ingestion de documents (PDF, texte), chat contextuel avec recherche sémantique, **diagrammes Mermaid**, **aperçu slides**, **audio TTS**, **génération de contenu**
 - **Historique des conversations** persisté dans Supabase avec recherche full-text
 - **Mémoire hiérarchique** : court-terme (session), moyen-terme (projet), long-terme (Supabase pgvector)
 - **Listes intelligentes** créées et gérées par l'IA
-- **Workflows automatisés** planifiables (ex : toutes les 24h, 30m…)
+- **Workflows automatisés** planifiables (ex : toutes les 24h, 30m…) avec builder visuel
 - **Tâches planifiées** (automation) avec intervalles configurables
 - **Intégration GitHub** : statut Git, commits, push, issues, PRs depuis l'interface
 - **Contrôle à distance via Telegram** : chat IA, lancement d'agents et alertes sur smartphone *(nouveau)*
 - **Gestion de documents** : upload de PDF/DOCX, extraction et indexation
 - **Thème dark/light** et couleur d'accent personnalisable
+- **Panel PM2 intégré** : monitoring en temps réel des process (status, CPU, RAM, uptime, restart), actions (start/stop/restart/reload/flush), logs des apps supervisées *(nouveau)*
+- **Checkpoints Git automatiques** : sauvegarde avant modification critique, rollback en 1 clic
+- **Palette de commandes** (Ctrl+K) avec accès rapide à toutes les fonctionnalités
+- **Global Search** : recherche full-text dans le workspace avec virtualisation
 
 ### Administrateur / Développeur
-- **Knowledge Graph** du workspace : indexation incrémentale des fichiers, entités, dépendances
+- **Knowledge Graph** du workspace : indexation incrémentielle des fichiers, entités, dépendances (AST Call Graph, Dependency Graph, Impact Analyzer)
 - **Custom Skills** : création d'outils IA personnalisés via une interface dédiée
-- **Marketplace de skills et d'agents** : catalogue extensible
+- **Marketplace de skills et d'agents** : catalogue extensible (`marketplace-installs.json`)
 - **Rotation de clés Gemini** : pool de clés avec failover automatique sur erreur 429
-- **MCP (Model Context Protocol)** : intégration de serveurs MCP externes
-- **Audit log** : traçabilité de toutes les opérations sur les fichiers
-- **Export** de conversations et données
+- **MCP (Model Context Protocol)** : intégration de serveurs MCP externes avec `McpBridge` et `McpClient`
+- **Audit log** : traçabilité de toutes les opérations sur les fichiers (workflow d'audit automatique)
+- **Export** de conversations et données (PDF, DOCX, HTML)
 - **FTP** : connexion à des serveurs FTP distants depuis l'IA
 - **OpenRouter** : support de modèles alternatifs (GPT-4o-mini, etc.)
 - **Text-to-Speech** intégré pour les réponses vocales
 - **Checkpoint Git** : sauvegarde automatique avant chaque modification critique
+- **Safeguards module** : garde-fous configurables contre actions dangereuses
+- **Token optimization** : résumé automatique du contexte pour éviter l'overflow de tokens
+- **Sandbox Watch** : suivi en temps réel des modifications du sandbox avec diff viewer
+- **Hierarchical Memory Engine** : moteur de mémoire hiérarchisé avec service dédié
+- **Serveur de métriques V2** : observabilité du Runtime V2 (`/api/v2/metrics`)
 
 ---
 
 ## Architecture des Agents
 
-Leanna dispose d'un système multi-agents complet organisé en 3 couches :
+Leanna dispose d'un système multi-agents complet organisé en 4 couches :
 
 ```
-┌─────────────────────────────────────────────┐
-│              Agent Brain (nouveau)          │
-│   Compréhension → Décomposition → Planif.  │
-│   → Sélection agents/skills/outils         │
-│   → Exécution → Vérification → Correction  │
-└────────────────┬────────────────────────────┘
-                 │ orchestre dynamiquement
-┌────────────────▼────────────────────────────┐
-│           AgentOrchestrator                 │
-│   delegateTask · orchestrate · brainPlan   │
-│   collaborateByPattern · brainExecute      │
-└────────────────┬────────────────────────────┘
-                 │ exécute via
-┌────────────────▼────────────────────────────┐
-│       Agents spécialisés (15 rôles)         │
-│                                             │
-│  Code & Ingénierie    │  Rédaction & Docs   │
-│  ─────────────────    │  ──────────────────  │
-│  coder                │  writer             │
-│  refactor             │  formatter          │
-│  debugger             │  researcher         │
-│  reviewer             │  proofreader        │
-│  tester               │  translator         │
-│  security             │  summarizer         │
-│  architect            │  planner            │
-│  vision               │                     │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│              Agent Brain (nouveau)               │
+│   Compréhension → Décomposition → Planif.       │
+│   → Sélection agents/skills/outils              │
+│   → Exécution → Vérification → Correction       │
+└────────────────────┬─────────────────────────────┘
+                     │ orchestre dynamiquement
+┌────────────────────▼─────────────────────────────┐
+│           AgentOrchestrator                      │
+│   delegateTask · orchestrate · brainPlan        │
+│   collaborateByPattern · brainExecute           │
+└────────────────────┬─────────────────────────────┘
+                     │ utilise
+┌────────────────────▼─────────────────────────────┐
+│     Runtime V2 · SkillManagerV2 (nouveau)        │
+│  ToolRegistry · StateMachine · WorkflowEngine   │
+│  Observability · PromptRegistry · 8 agents V2   │
+└────────────────────┬─────────────────────────────┘
+                     │ exécute via
+┌────────────────────▼─────────────────────────────┐
+│       Agents spécialisés (15 rôles + 8 V2)       │
+│                                                  │
+│  Code & Ingénierie    │  Rédaction & Docs        │
+│  ─────────────────    │  ──────────────────      │
+│  coder                │  writer + V2             │
+│  refactor             │  formatter + V2          │
+│  debugger             │  researcher + V2         │
+│  reviewer             │  proofreader + V2        │
+│  tester               │  translator + V2         │
+│  security             │  summarizer + V2         │
+│  architect            │  planner + V2            │
+│  vision               │                          │
+└──────────────────────────────────────────────────┘
 ```
 
 **Délégation dynamique** (via matrice de délégation) : `coder` → `tester` → `reviewer` ; `planner` → `coder, researcher, writer` ; etc.
@@ -182,6 +210,7 @@ Leanna dispose d'un système multi-agents complet organisé en 3 couches :
 | Node.js | 20.x |
 | npm | 10.x |
 | Git | 2.x |
+| PM2 (optionnel, supervision) | 7.x |
 | Compte Google AI Studio | Pour obtenir `GEMINI_API_KEY` |
 | Compte Supabase (optionnel) | Pour la persistance (mémoire, historique, workflows) |
 | Compte OpenRouter (optionnel) | Pour les modèles alternatifs |
@@ -257,6 +286,7 @@ Toutes les variables sont lues depuis `.env` (ou `.env.local` s'il existe, avec 
 | `ALLOW_FTP_PRIVATE_IPS` | Autorise les connexions FTP vers IPs privées | `false` | ❌ |
 | `Leanna_LISTEN_HOST` | Interface d'écoute du serveur | `127.0.0.1` | ❌ |
 | `NODE_ENV` | Environnement d'exécution | `development` | ❌ |
+| `REDIS_URL` | URL de connexion Redis (pour rate limits partagés) | `redis://localhost:6379` | ❌ |
 
 ---
 
@@ -270,11 +300,44 @@ npm run dev
 
 Démarre le serveur Express avec Vite en middleware (HMR activé) sur `http://127.0.0.1:4000`.
 
-### Mode production
+### Mode production (Node direct)
 
 ```bash
 npm run build
 npm start
+```
+
+### Mode production supervisé (PM2 — recommandé)
+
+Le fichier `ecosystem.config.cjs` est inclus à la racine. Il définit une app `leanna` avec :
+- `script: ./dist/server.cjs` (le bundle produit par `npm run build`)
+- `exec_mode: fork` (1 instance), `autorestart: true`, `max_memory_restart: 1G`
+- `kill_timeout: 3000`, `shutdown_with_message: true` pour une extinction propre
+
+```bash
+# 1. Build le bundle
+npm run build
+
+# 2. Démarrer via ecosystem.config.cjs
+pm2 start ecosystem.config.cjs
+
+# 3. Vérifier le statut dans le terminal ou via l'IDE (Panel PM2)
+pm2 status
+pm2 logs leanna
+
+# 4. Sauvegarder le process list pour démarrage au boot
+pm2 save
+pm2 startup    # (copier/coller la commande générée)
+```
+
+Endpoints `/api/pm2/*` exposés par le serveur (monitoring et contrôle) :
+```
+GET    /api/pm2/status           # Statut global (apps + daemon + host)
+POST   /api/pm2/:name/restart    # Redémarrer une app
+POST   /api/pm2/:name/stop       # Arrêter une app
+POST   /api/pm2/reload?file=ecosystem.config.cjs
+POST   /api/pm2/flush            # Vider les logs
+GET    /api/pm2/logs/:name?lines=120
 ```
 
 ### Mode desktop (Electron)
@@ -312,6 +375,7 @@ npm test -- server/routes/*.test.ts
   - DynamicPlanner : séquence dynamique par type d'objectif
   - BrainVerifier : vérification multi-niveaux
   - BrainCorrectionLoop : boucle d'auto-correction bornée
+- ✅ `server/runtime/` : Runtime V2 + HierarchicalMemoryService
 - ✅ `server/skills/` : ≥60% de couverture
   - 136+ tests unitaires sur les skills critiques
   - Validation exhaustive des schemas Zod
@@ -331,63 +395,113 @@ leanna/
 ├── electron/               # Application desktop Electron
 │   ├── main.cjs            # Processus principal Electron
 │   ├── preload.cjs         # Preload script (IPC bridge)
+│   ├── splash.css          # Styles splash screen
 │   └── splash.html         # Splash screen de démarrage
 ├── server/                 # Backend Express (Node.js)
 │   ├── agents/             # Orchestrateur et flotte d'agents autonomes
-│   │   ├── brain/          # 🧠 Agent Brain (nouveau)
+│   │   ├── brain/          # 🧠 Agent Brain
 │   │   │   ├── types.ts                 # Types et interfaces Brain
 │   │   │   ├── GoalUnderstandingEngine.ts # Compréhension de l'objectif
 │   │   │   ├── DynamicPlanner.ts        # Décomposition DAG dynamique
 │   │   │   ├── BrainVerifier.ts         # Vérification multi-niveaux
 │   │   │   ├── BrainCorrectionLoop.ts   # Boucle d'auto-correction
 │   │   │   ├── AgentBrain.ts            # Coordinateur central
-│   │   │   └── AgentBrain.test.ts       # 20 tests unitaires
+│   │   │   └── AgentBrain.test.ts       # Tests unitaires
 │   │   ├── AgentOrchestrator.ts         # Façade orchestration + Brain
 │   │   ├── AgentExecutor.ts             # Exécution de tâches
 │   │   ├── DelegationManager.ts         # Délégation structurée JSON
 │   │   ├── AutonomousAgent.ts           # Base class agents autonomes
 │   │   ├── AgentCommunication.ts        # Matrice de délégation
+│   │   ├── AgentPersistence.ts          # Persistance tâches agents
 │   │   └── roles.ts                     # Définitions des 15 rôles
-│   ├── autonomy/           # SmartSkills et boucle autonome
+│   ├── autonomy/           # SmartSkills + Supervisor (boucle autonome)
 │   ├── config/             # Rate limiters, configuration serveur
-│   ├── export/             # Export de données
-│   ├── knowledge/          # Knowledge Graph, indexation du workspace
+│   ├── export/             # Export PDF/DOCX/HTML
+│   ├── knowledge/          # Knowledge Graph (indexation workspace, RAG)
+│   │   └── document-system/ # Extraction / analyse / mémoire documents
 │   ├── live/               # Handler WebSocket Gemini Live
 │   ├── marketplace/        # Catalogue skills/agents
-│   ├── mcp/                # Bridge Model Context Protocol
-│   ├── middleware/         # Middlewares Express
-│   ├── mission/            # Système de missions (tâches longues)
-│   ├── notebooks/          # RAG : ingestion, embeddings, recherche
-│   ├── prompts/            # System instructions Gemini
+│   ├── mcp/                # Bridge + Client MCP (Model Context Protocol)
+│   ├── middleware/         # Middlewares Express (validateBody…)
+│   ├── mission/            # Système de missions longues (Planner/Executor/Reflection)
+│   ├── notebooks/          # RAG : ingestion + embeddings + RAGEngine
+│   ├── prompts/            # System instructions + SystemPromptBuilder
 │   ├── routes/             # Routeurs REST (40+ modules)
+│   │   ├── pm2.ts          # Endpoints monitoring/contrôle PM2
+│   │   ├── safeguards.ts   # Garde-fous sécurité
+│   │   ├── checkpoint.ts   # Sauvegardes Git avant modifs
+│   │   ├── mcp.ts          # Configuration MCP
+│   │   ├── automation.ts   # Tâches planifiées
+│   │   ├── workflows.ts    # Moteur de workflows
+│   │   ├── audit.ts        # Audit log
 │   │   ├── agents.ts       # API REST agents + /brain/plan /brain/execute
-│   │   └── telegram.ts     # API de gestion du bot Telegram (status, config, start, stop, test)
-│   ├── runtime/            # SkillManagerV2, ToolRegistry, Observability
+│   │   └── telegram.ts     # API de gestion du bot Telegram
+│   ├── runtime/            # ⚡ Runtime V2 — SkillManagerV2
+│   │   ├── agents/         # 8 agents V2 spécialisés (formatter, planner, proofreader, researcher, summarizer, translator, writer)
+│   │   ├── compat/         # LegacyBridge + SkillAdapter
+│   │   ├── prompts/        # PromptRegistry (base, chat, browser, autonomy…)
+│   │   ├── routes/         # /api/v2/agents + /api/v2/metrics
+│   │   ├── workflows/      # Workflows JSON prédéfinis (feature, refactor-safe, security-audit)
+│   │   ├── ToolRegistry.ts · StateMachine.ts · WorkflowEngine.ts
+│   │   ├── EventBus.ts · Observability.ts · AgentRuntime.ts
+│   │   └── HierarchicalMemoryService.ts
 │   ├── skills/             # Skills natifs (25+) dont agent_brain et telegram
-│   ├── telegram/           # Service Bot Telegram (grammy, whitelist, chat IA, commandes)
+│   ├── telegram/           # Service Bot Telegram (grammy, whitelist, chat IA)
 │   │   ├── TelegramService.ts
 │   │   └── types.ts
-│   ├── utils/              # Sandbox, crypto, checkpoint, selfRoot…
-│   └── workflows/          # Moteur de workflows planifiés
+│   ├── utils/              # Sandbox, crypto, checkpoint, selfRoot, serverRestart…
+│   ├── workflows/          # Moteur de workflows planifiés + audit-workflow
+│   ├── audit.ts            # Module d'audit global
+│   ├── security.ts         # Authentification (token), validation, rate limiter
+│   └── lifecycle.ts        # Graceful shutdown
 ├── src/                    # Frontend React
-│   ├── components/         # Composants UI (IDE, panels, sidebar…)
-│   ├── context/            # Contextes React (LiveAPI, Profile, ScreenShare)
-│   ├── hooks/              # Hooks personnalisés
-│   ├── services/           # Clients API (ideApi, sandboxApi, supabase)
+│   ├── components/
+│   │   ├── ide/            # Composants IDE (Monaco, sidebar, file explorer, terminal…)
+│   │   ├── panels/         # Panels spécialisés
+│   │   │   ├── PM2StatusPanel.tsx     # Monitoring + contrôle PM2
+│   │   │   ├── AgentFleetPanel.tsx    # Flotte d'agents V2
+│   │   │   ├── MissionPanel.tsx       # Système de missions
+│   │   │   ├── CheckpointPanel.tsx    # Checkpoints Git
+│   │   │   ├── AgentBuilderPanel.tsx  # Création d'agents custom
+│   │   │   ├── McpPanel.tsx           # Config MCP
+│   │   │   ├── WorkflowsPanel.tsx     # Gestion workflows
+│   │   │   ├── SandboxPanel.tsx       # Sandbox viewer + diff
+│   │   │   ├── AutomationPanel.tsx    # Tâches planifiées
+│   │   │   ├── AuditPanel.tsx         # Audit log
+│   │   │   ├── MarketplacePanel.tsx   # Marketplace skills/agents
+│   │   │   └── ... (BrowserPanel, TerminalPanel, Notebooks…)
+│   │   ├── notebooks/      # Panels notebooks RAG + Mermaid + slides
+│   │   ├── settings/       # Sections paramètres (Agents, AI, Apparence, Mémoire, Telegram…)
+│   │   └── ui/             # Composants UI atomiques (Panel, Toast, Modal…)
+│   ├── context/            # Contextes React (LiveAPI, Profile, ScreenShare, Theme)
+│   ├── hooks/              # Hooks personnalisés (useLiveAPI, useFileMention, useToken…)
+│   ├── services/           # Clients API (ideApi, pm2Api, workspaceApi, notebookApi…)
+│   ├── config/             # Config sidebar, templates
 │   ├── stores/             # État global
 │   ├── types/              # Types TypeScript partagés
 │   ├── utils/              # Utilitaires frontend
 │   ├── views/              # Pages (IdeView, NotebooksView, GitHubView…)
+│   ├── index.css           # Tailwind + tokens globaux
 │   └── main.tsx            # Point d'entrée React
+├── scripts/                # Scripts utilitaires (lint, start-desktop, analyze-tooltips…)
+├── assets/                 # Images, icônes, vidéos splash
+├── ecosystem.config.cjs    # Configuration PM2 (app leanna)
 ├── supabase/               # Schémas SQL et migrations Supabase
-├── assets/                 # Images, icônes
-├── docs/                   # Documentation complémentaire
-├── scripts/                # Scripts de build et lint
 ├── server.ts               # Point d'entrée du serveur Express
 ├── server-bootstrap.ts     # Bootstrap (env, déchiffrement, démarrage)
 ├── vite.config.ts          # Configuration Vite
 ├── tsconfig.json           # Configuration TypeScript
-└── package.json            # Dépendances et scripts npm
+├── package.json            # Dépendances et scripts npm
+├── .env.example            # Template variables d'environnement
+├── API_DOCS.md             # Référence API REST + WebSocket
+├── ARCHITECTURE.md         # Architecture technique détaillée
+├── DB_SCHEMA.md            # Schéma de base de données
+├── GEMINI.md               # Guide d'utilisation Gemini
+├── SELF_IDE.md             # Auto-hébergement & développement avec Leanna
+├── ROADMAP.md              # Feuille de route
+├── CHANGELOG.md            # Historique des versions
+├── CLAUDE.md · CONTRIBUTING.md
+└── LICENSE                 # BUSL 1.1
 ```
 
 ---
@@ -420,29 +534,78 @@ Retourne le plan complet pour inspection avant exécution.
 # Générer un plan sans exécuter
 curl -X POST http://localhost:4000/api/agents/brain/plan \
   -H "Content-Type: application/json" \
+  -H "x-leanna-token: <Leanna_API_TOKEN>" \
   -d '{"goal": "Modernise mon site et rends le header responsive"}'
 
 # Exécuter de bout en bout
 curl -X POST http://localhost:4000/api/agents/brain/execute \
   -H "Content-Type: application/json" \
+  -H "x-leanna-token: <Leanna_API_TOKEN>" \
   -d '{"goal": "Fix le crash au démarrage", "maxCorrectionAttempts": 3}'
 
 # Suivre l'avancement
-curl http://localhost:4000/api/agents/brain/status/<planId>
+curl -H "x-leanna-token: <Leanna_API_TOKEN>" \
+  http://localhost:4000/api/agents/brain/status/<planId>
 ```
+
+---
+
+## Dépannage (Troubleshooting)
+
+### `GET /api/pm2/status 503 Service Unavailable`
+
+Le serveur ne peut pas invoquer la CLI `pm2`. Causes les plus fréquentes :
+
+1. **PM2 n'est pas installé (global)**
+   ```bash
+   npm install -g pm2
+   pm2 --version   # doit afficher 7.x
+   ```
+
+2. **PM2 n'est pas dans le PATH du process serveur (Windows)**
+   - Symptôme : `pm2 jlist` fonctionne dans PowerShell mais pas via le serveur.
+   - Solution : Le code a un fallback `exec()` avec shell qui résout `pm2` via `PATH/PATHEXT`. Si le problème persiste, redémarrer le terminal / l'IDE pour rafraîchir `PATH`.
+   - Sur Windows avec PowerShell, PM2 s'installe typiquement en `%APPDATA%\npm\pm2.cmd` et `%APPDATA%\npm\pm2.ps1`.
+
+3. **Le daemon PM2 n'a jamais été démarré (aucune app)**
+   ```bash
+   pm2 ping          # doit retourner pong
+   pm2 list          # affiche la liste (vide OK)
+   pm2 resurrect     # restore la dernière liste sauvegardée
+   ```
+
+4. **Inspecter le log backend**
+   Le serveur log désormais `[PM2] GET /status failed: <message> (code=...)` directement dans la console du process. Ce message donne la cause exacte (ENOENT, EINVAL, CMD introuvable, etc.).
+
+### Erreur 401 Unauthorized sur /api/*
+
+Si `Leanna_API_TOKEN` est défini dans `.env`, TOUTES les routes `/api/*` (sauf `/api/health`) nécessitent le header :
+
+```
+x-leanna-token: <valeur de Leanna_API_TOKEN>
+```
+
+Le frontend doit stocker ce token dans `localStorage['Leanna_api_token']` (le login / setup s'en occupe). Les clients API (`ideApi`, `pm2Api`, etc.) l'ajoutent automatiquement via `getAuthHeaders()`.
+
+### Gemini Live échoue immédiatement (Quota dépassé)
+
+- Vérifiez que `INITIAL_PROMPT_MAX_TOKENS` et la limite d'injection notebooks sont bien appliqués.
+- Si vous injectez beaucoup de notebooks : préférer `summary` à `rawText`.
+- Activer le key pool : définissez plusieurs `GEMINI_API_KEY_N` (rotation + failover 429).
 
 ---
 
 ## Documentation
 
-- [README.md](README.md) — Vue d'ensemble et installation
+- [README.md](README.md) — Vue d'ensemble et installation (ce fichier)
 - [API_DOCS.md](API_DOCS.md) — Référence complète de l'API REST et WebSockets
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Architecture technique détaillée
 - [CONTRIBUTING.md](CONTRIBUTING.md) — Guide de contribution et conventions
-- [TESTING.md](TESTING.md) — Stratégie de test, patterns et couverture
 - [DB_SCHEMA.md](DB_SCHEMA.md) — Schéma de base de données Supabase
-- [ROADMAP.md](ROADMAP.md) — Feuille de route du projet
+- [GEMINI.md](GEMINI.md) — Guide d'intégration et troubleshooting Gemini
 - [SELF_IDE.md](SELF_IDE.md) — Auto-hébergement et développement de Leanna avec Leanna
+- [ROADMAP.md](ROADMAP.md) — Feuille de route du projet
+- [CHANGELOG.md](CHANGELOG.md) — Historique des versions
 
 ---
 
