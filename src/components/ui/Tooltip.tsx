@@ -149,7 +149,7 @@ export const Tooltip = forwardRef<HTMLElement, TooltipProps>(function Tooltip(
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.12, ease: 'easeOut' }}
             className={clsx(
-              'absolute z-[200] pointer-events-none',
+              'absolute pointer-events-none',
               'whitespace-nowrap px-2.5 py-1.5 rounded-lg',
               'text-xs font-medium',
               'shadow-lg backdrop-blur-sm',
@@ -157,6 +157,7 @@ export const Tooltip = forwardRef<HTMLElement, TooltipProps>(function Tooltip(
               positionStyles[position],
             )}
             style={{
+              zIndex: 'var(--z-tooltip)' as any,
               backgroundColor: 'var(--bg-elevated)',
               color: 'var(--text-primary)',
               border: '1px solid var(--border-base)',

@@ -710,7 +710,8 @@ export const StatusBar = memo(function StatusBar({
 
       {showResetConfirm && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-sm bg-black/40"
+          className="fixed inset-0 flex items-center justify-center p-4 backdrop-blur-sm bg-black/40"
+          style={{ zIndex: 'var(--z-modal)' as any }}
           onClick={() => {
             setShowResetConfirm(false);
             setResetCode('');

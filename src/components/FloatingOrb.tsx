@@ -38,7 +38,8 @@ export function FloatingOrb() {
       {/* Invisible full-screen constraint boundary */}
       <div
         ref={constraintRef}
-        className="fixed inset-0 pointer-events-none z-[9998]"
+        className="fixed inset-0 pointer-events-none"
+        style={{ zIndex: 'var(--z-orb-constraint)' as any }}
         aria-hidden
       />
 
@@ -52,12 +53,8 @@ export function FloatingOrb() {
         whileDrag={{ scale: 1.08, cursor: 'grabbing' }}
         onDragEnd={handleDragEnd}
         onClick={toggleConnection}
-        className="fixed z-[9999] pointer-events-auto select-none"
-        style={{
-          bottom: 24,
-          right: 24,
-          cursor: isConnecting ? 'wait' : 'grab',
-        }}
+        className="fixed pointer-events-auto select-none"
+        style={{ zIndex: 'var(--z-orb)' as any, bottom: 24, right: 24, cursor: isConnecting ? 'wait' : 'grab' }}
         title={`Leanna — ${statusLabel}. Cliquer pour ${isConnected ? 'déconnecter' : 'connecter'}. Glisser pour déplacer.`}
         role="button"
         aria-label={`Leanna ${statusLabel}`}

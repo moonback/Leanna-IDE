@@ -1,17 +1,15 @@
 import { useState, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Search, Zap, Check, Globe, BrainCircuit } from 'lucide-react';
+import { Search, Zap, Check, BrainCircuit } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { OPENROUTER_MODELS } from '../settings/OpenRouterSection.js';
 import type { AIProvider } from '../../context/UserProfileContext.js';
-
-// ── Types ──────────────────────────────────────────────────────────────────
+import { Modal } from '../ui/Modal.js';
+import { Button } from '../ui/Button.js';
 
 interface ModelPickerModalProps {
   onClose: () => void;
 }
-
-// ── Component ──────────────────────────────────────────────────────────────
 
 export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: ModelPickerModalProps) {
   const { profile, setField, save } = useProfile();
@@ -39,53 +37,29 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
     : 'Gemini Live';
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-sm bg-black/40"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="model-picker-title"
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ duration: 0.2 }}
-        className="w-full max-w-md max-h-[80vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden"
-        style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
-          <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)' }}
-            >
-              <BrainCircuit className="w-4.5 h-4.5" style={{ color: 'var(--accent-primary)' }} />
-            </div>
-            <div>
-              <h3 id="model-picker-title" className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Changer de modèle
-              </h3>
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Actuel : {currentModelName}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-white/10 transition"
-            style={{ color: 'var(--text-muted)' }}
-            aria-label="Fermer"
+    <Modal open onClose={onClose} size="md" tone="default">
+      <Modal.Header>
+        <div className="flex items-center gap-3">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)' }}
           >
-            <X size={16} />
-          </button>
+            <BrainCircuit className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Changer de modèle
+            </h3>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Actuel : {currentModelName}
+            </p>
+          </div>
         </div>
+      </Modal.Header>
 
+      <Modal.Body>
         {/* Provider Toggle */}
-        <div className="px-5 pt-4 pb-2">
+        <div className="mb-4">
           <div className="grid grid-cols-2 gap-2">
             {([
               { id: 'gemini' as AIProvider, label: '🔮 Gemini', desc: 'Google AI (Live voice)' },
@@ -113,17 +87,18 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
           </div>
         </div>
 
-        {/* Model List (OpenRouter) */}
+        {/* Model content — AnimatePresence inside Modal.Body */}
         <AnimatePresence mode="wait">
           {selectedProvider === 'openrouter' && (
             <motion.div
+              key="openrouter"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="flex-1 flex flex-col overflow-hidden px-5 pb-2"
+              className="flex flex-col gap-2"
             >
               {/* Search */}
-              <div className="relative my-2">
+              <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: 'var(--text-dimmed)' }} />
                 <input
                   type="text"
@@ -133,11 +108,12 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
                   className="w-full rounded-lg pl-8 pr-3 py-2 text-xs outline-none transition-all duration-200"
                   style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                   autoFocus
+                  aria-label="Rechercher un modèle"
                 />
               </div>
 
-              {/* Models */}
-              <div className="flex-1 overflow-y-auto max-h-[300px] space-y-1 pr-1 custom-scrollbar">
+              {/* Models list */}
+              <div className="overflow-y-auto max-h-52 space-y-1 pr-1 custom-scrollbar">
                 {filteredModels.map(model => {
                   const active = selectedModel === model.id;
                   return (
@@ -182,8 +158,8 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
                 )}
               </div>
 
-              {/* Custom Model Input */}
-              <div className="mt-2 pt-2 border-t" style={{ borderColor: 'var(--border-base)' }}>
+              {/* Custom ID */}
+              <div className="pt-2 border-t" style={{ borderColor: 'var(--border-base)' }}>
                 <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>
                   Ou ID personnalisé :
                 </label>
@@ -194,18 +170,14 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
                   placeholder="ex: anthropic/claude-sonnet-4"
                   className="w-full rounded-lg px-3 py-1.5 text-sm font-mono outline-none transition-all duration-200"
                   style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                  aria-label="ID de modèle personnalisé"
                 />
               </div>
             </motion.div>
           )}
 
           {selectedProvider === 'gemini' && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="px-5 py-4"
-            >
+            <motion.div key="gemini" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="rounded-xl p-4 text-center" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
                 <div className="text-2xl mb-2">🔮</div>
                 <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Gemini 2.0 Flash (Live)</p>
@@ -216,32 +188,17 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
             </motion.div>
           )}
         </AnimatePresence>
+      </Modal.Body>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t" style={{ borderColor: 'var(--border-base)' }}>
-          <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
-            💡 La voix Live utilise toujours Gemini.
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border px-3 py-1.5 text-xs font-medium transition hover:bg-white/10"
-              style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium transition text-white"
-              style={{ backgroundColor: 'var(--accent-primary)' }}
-            >
-              Appliquer
-            </button>
-          </div>
+      <Modal.Footer align="between">
+        <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+          💡 La voix Live utilise toujours Gemini.
+        </p>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}>Annuler</Button>
+          <Button variant="primary" size="sm" onClick={handleConfirm}>Appliquer</Button>
         </div>
-      </motion.div>
-    </div>
+      </Modal.Footer>
+    </Modal>
   );
 });

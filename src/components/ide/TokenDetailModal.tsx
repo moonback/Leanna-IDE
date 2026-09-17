@@ -1,32 +1,17 @@
 import {
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  useMemo,
-  useTransition,
+  useState, useCallback, useEffect, useRef, useMemo, useTransition,
 } from 'react';
 import {
-  TrendingUp,
-  ArrowUp,
-  ArrowDown,
-  Zap,
-  X,
-  Loader2,
-  AlertTriangle,
-  Gauge,
-  Sparkles,
-  Clock,
-  Hash,
-  Brain,
-  AlertCircle,
-  MessageSquare,
+  TrendingUp, ArrowUp, ArrowDown, Zap, Loader2, AlertTriangle,
+  Gauge, Sparkles, Clock, Hash, Brain, AlertCircle, MessageSquare,
 } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { formatExactTokenCount, formatTokenCount } from '../../utils/tokenFormatting.js';
+import { Modal } from '../ui/Modal.js';
 
-// ===== Types =====
+// ── Types ──────────────────────────────────────────────────────────────────
+
 interface OptimizationData {
   systemPromptTokens: number;
   memoryTokens: number;
@@ -42,17 +27,19 @@ interface TokenDetailModalProps {
   onClose: () => void;
 }
 
-// ===== Helpers =====
+// ── Helpers ────────────────────────────────────────────────────────────────
+
 const timeAgo = (date: Date): string => {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 10) return 'à l\'instant';
+  if (seconds < 10) return "à l'instant";
   if (seconds < 60) return `il y a ${seconds}s`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `il y a ${minutes}min`;
   return `il y a ${Math.floor(minutes / 60)}h`;
 };
 
-// ===== Composant =====
+// ── Component ──────────────────────────────────────────────────────────────
+
 export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
   const { tokenUsage, promptContext } = useLiveAPIContext();
   const { profile, setField, save } = useProfile();
@@ -63,233 +50,99 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
   const [isPending, startTransition] = useTransition();
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const modalRef = useRef<HTMLDivElement>(null);
 
-  // Derived data from context
   const { totalTokens, totalPromptTokens, totalCompletionTokens, history } = tokenUsage;
 
-  // Memoized formatted values to avoid recalculations
-  const formatted = useMemo(
-    () => ({
-      total: formatTokenCount(totalTokens),
-      totalExact: formatExactTokenCount(totalTokens),
-      prompt: formatTokenCount(totalPromptTokens),
-      completion: formatTokenCount(totalCompletionTokens),
-    }),
-    [totalTokens, totalPromptTokens, totalCompletionTokens]
-  );
+  const formatted = useMemo(() => ({
+    total:       formatTokenCount(totalTokens),
+    totalExact:  formatExactTokenCount(totalTokens),
+    prompt:      formatTokenCount(totalPromptTokens),
+    completion:  formatTokenCount(totalCompletionTokens),
+  }), [totalTokens, totalPromptTokens, totalCompletionTokens]);
 
-  // Load optimization with abort support
   const loadOptimization = useCallback(async () => {
-    // Cancel previous request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    if (abortControllerRef.current) abortControllerRef.current.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
-
-    setLoadingOpt(true);
-    setOptError(null);
-
+    setLoadingOpt(true); setOptError(null);
     try {
-      const res = await fetch('/api/tokens/optimization', {
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        throw new Error(`Erreur HTTP ${res.status}`);
-      }
+      const res = await fetch('/api/tokens/optimization', { signal: controller.signal });
+      if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
       const data = await res.json();
-      if (data.status === 'success') {
-        setOptimization(data.optimization);
-      } else {
-        throw new Error(data.message || 'Erreur inconnue');
-      }
+      if (data.status === 'success') setOptimization(data.optimization);
+      else throw new Error(data.message || 'Erreur inconnue');
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
-      console.error('Optimization fetch error:', err);
       setOptError("Impossible de charger les données d'optimisation");
     } finally {
-      if (abortControllerRef.current === controller) {
-        setLoadingOpt(false);
-      }
+      if (abortControllerRef.current === controller) setLoadingOpt(false);
     }
   }, []);
 
-  // Load on mount
   useEffect(() => {
     loadOptimization();
-    return () => {
-      abortControllerRef.current?.abort();
-    };
+    return () => { abortControllerRef.current?.abort(); };
   }, [loadOptimization]);
 
-  // Toggle compact mode with optimistic update and safe reload
   const handleToggleCompact = useCallback(async () => {
     const newValue = !profile.compactPrompt;
     setField('compactPrompt', newValue);
     try {
       await save();
-      // Reload optimization in a transition to avoid blocking UI
-      startTransition(() => {
-        loadOptimization();
-      });
-    } catch (error) {
-      console.error('Save failed:', error);
-      // Rollback optimistic update if save fails (optional)
+      startTransition(() => { loadOptimization(); });
+    } catch {
       setField('compactPrompt', profile.compactPrompt);
     }
   }, [profile.compactPrompt, setField, save, loadOptimization]);
 
-  // Focus trap and ESC key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'Tab') {
-        // Simple focus trap: keep focus inside modal
-        const focusable = modalRef.current?.querySelectorAll(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        if (!focusable?.length) return;
-        const first = focusable[0] as HTMLElement;
-        const last = focusable[focusable.length - 1] as HTMLElement;
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    // Focus first interactive element after mount
-    setTimeout(() => {
-      const firstButton = modalRef.current?.querySelector('button');
-      firstButton?.focus();
-    }, 50);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  // ---- Rendu ----
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center px-3 py-3"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-title"
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-
-      {/* Modal panel */}
-      <div
-        ref={modalRef}
-        className="relative w-full max-w-2xl max-h-[84vh] overflow-hidden flex flex-col rounded-2xl shadow-2xl"
-        style={{
-          background: 'var(--bg-secondary)',
-          border: '1px solid var(--border-base)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
-          <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 16%, transparent)' }}
-            >
-              <TrendingUp className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} aria-hidden="true" />
-            </div>
-            <div>
-              <h2 id="modal-title" className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                Détails du Système
-              </h2>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Contexte & tokens • {history.length} requêtes
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-accent-primary"
-            style={{ color: 'var(--text-muted)', backgroundColor: 'transparent' }}
-            aria-label="Fermer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Contenu scrollable */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 scrollbar-thin">
-
-          {/* ── Section : Contexte du Prompt ──────────────────────────── */}
+    // Modal handles focus-trap, scroll-lock, Escape, backdrop — no manual useEffect needed
+    <Modal open onClose={onClose} size="lg" tone="default">
+      <Modal.Header>
+        <div className="flex items-center gap-3">
           <div
-            className="rounded-3xl p-4 space-y-3"
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.02)',
-              border: '1px solid var(--border-base)',
-            }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 16%, transparent)' }}
           >
+            <TrendingUp className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} aria-hidden />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Détails du Système</h2>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Contexte &amp; tokens • {history.length} requêtes</p>
+          </div>
+        </div>
+      </Modal.Header>
+
+      <Modal.Body>
+        <div className="space-y-5">
+
+          {/* ── Contexte du Prompt ── */}
+          <section className="rounded-3xl p-4 space-y-3" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-base)' }}>
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
-                <Brain
-                  className="w-4 h-4"
-                  style={{
-                    color:
-                      promptContext.level === 'critical'
-                        ? 'var(--color-error)'
-                        : promptContext.level === 'warn'
-                          ? 'var(--color-warning)'
-                          : 'var(--color-success)',
-                  }}
-                  aria-hidden="true"
-                />
-                <span
-                  className="text-xs font-bold uppercase tracking-wider"
-                  style={{ color: 'var(--text-secondary, var(--text-muted))' }}
-                >
-                  Contexte du Prompt
-                </span>
+                <Brain className="w-4 h-4" style={{ color: promptContext.level === 'critical' ? 'var(--color-error)' : promptContext.level === 'warn' ? 'var(--color-warning)' : 'var(--color-success)' }} aria-hidden />
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Contexte du Prompt</span>
               </div>
               <div className="flex items-center gap-1.5">
-                {promptContext.level !== 'ok' && (
-                  promptContext.level === 'critical'
-                    ? <AlertCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} aria-hidden="true" />
-                    : <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
-                )}
-                <span
-                  className="text-sm font-bold tabular-nums"
-                  style={{
-                    color:
-                      promptContext.level === 'critical'
-                        ? 'var(--color-error)'
-                        : promptContext.level === 'warn'
-                          ? 'var(--color-warning)'
-                          : 'var(--color-success)',
-                  }}
-                >
+                {promptContext.level !== 'ok' && (promptContext.level === 'critical'
+                  ? <AlertCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} aria-hidden />
+                  : <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} aria-hidden />)}
+                <span className="text-sm font-bold tabular-nums" style={{ color: promptContext.level === 'critical' ? 'var(--color-error)' : promptContext.level === 'warn' ? 'var(--color-warning)' : 'var(--color-success)' }}>
                   {promptContext.percent}%
                 </span>
               </div>
             </div>
-
-            {/* Progress bar */}
             <div>
-              <div
-                className="h-2.5 rounded-full overflow-hidden"
-                style={{ backgroundColor: 'color-mix(in srgb, var(--bg-base) 78%, transparent)' }}
-              >
+              <div className="h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-base) 78%, transparent)' }}>
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{
                     width: `${Math.min(100, promptContext.percent)}%`,
-                    background:
-                      promptContext.level === 'critical'
-                        ? 'linear-gradient(90deg, var(--color-error), var(--color-error))'
-                        : promptContext.level === 'warn'
-                          ? 'linear-gradient(90deg, var(--color-warning), var(--color-warning))'
-                          : 'linear-gradient(90deg, var(--color-success), var(--accent-secondary))',
+                    background: promptContext.level === 'critical'
+                      ? 'var(--color-error)'
+                      : promptContext.level === 'warn'
+                        ? 'var(--color-warning)'
+                        : 'linear-gradient(90deg, var(--color-success), var(--accent-secondary))',
                   }}
                   role="progressbar"
                   aria-valuenow={Math.min(100, promptContext.percent)}
@@ -298,120 +151,66 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                   aria-label="Utilisation du contexte"
                 />
               </div>
-              <div
-                className="flex justify-between mt-1 text-xs"
-                style={{ color: 'var(--text-dimmed, var(--text-muted))' }}
-              >
+              <div className="flex justify-between mt-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                 <span>{formatTokenCount(promptContext.currentSize)} utilisés</span>
                 <span>{formatTokenCount(promptContext.maxSize)} max</span>
               </div>
             </div>
-
-            {/* Turns */}
             {promptContext.turns > 0 && (
               <div className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--text-muted)' }}>
-                <MessageSquare className="w-3 h-3" aria-hidden="true" />
+                <MessageSquare className="w-3 h-3" aria-hidden />
                 <span>{promptContext.turns} tour{promptContext.turns > 1 ? 's' : ''} dans le contexte</span>
               </div>
             )}
-
-            {/* Suggestion */}
             {promptContext.suggestion ? (
-              <div
-                className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg"
-                style={{
-                  color: 'var(--color-warning)',
-                  backgroundColor: 'color-mix(in srgb, var(--color-warning) 12%, transparent)',
-                }}
-              >
-                <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-warning)', backgroundColor: 'var(--color-warning-subtle)' }}>
+                <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" aria-hidden />
                 <span className="text-sm">{promptContext.suggestion}</span>
               </div>
             ) : promptContext.level === 'ok' && promptContext.currentSize > 0 ? (
-              <div
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
-                style={{
-                  color: 'var(--color-success)',
-                  backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)',
-                }}
-              >
-                <Sparkles className="w-3 h-3" aria-hidden="true" />
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-success)', backgroundColor: 'var(--color-success-subtle)' }}>
+                <Sparkles className="w-3 h-3" aria-hidden />
                 <span className="text-sm">Contexte en bonne santé</span>
               </div>
             ) : null}
-          </div>
+          </section>
 
-          {/* ── Section : Utilisation des Tokens ──────────────────────── */}
-
-          {/* Total tokens */}
+          {/* ── Total tokens ── */}
           <div className="text-center">
             <div className="flex items-center gap-2 justify-center mb-2">
-              <TrendingUp className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} aria-hidden="true" />
-              <span
-                className="text-xs font-bold uppercase tracking-wider"
-                style={{ color: 'var(--text-secondary, var(--text-muted))' }}
-              >
-                Utilisation des Tokens
-              </span>
+              <TrendingUp className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} aria-hidden />
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Utilisation des Tokens</span>
             </div>
-            <p className="text-3xl font-black tabular-nums" style={{ color: 'var(--text-primary)' }}>
-              {formatted.total}
-            </p>
-            <p className="text-sm font-mono" style={{ color: 'var(--text-dimmed)' }} title="Valeur exacte">
-              {formatted.totalExact} exact
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              tokens utilisés cette session
-            </p>
+            <p className="text-3xl font-black tabular-nums" style={{ color: 'var(--text-primary)' }}>{formatted.total}</p>
+            <p className="text-sm font-mono" style={{ color: 'var(--text-dimmed)' }} title="Valeur exacte">{formatted.totalExact} exact</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>tokens utilisés cette session</p>
           </div>
 
-          {/* Prompt vs Completion */}
+          {/* ── Prompt vs Completion ── */}
           <div className="grid grid-cols-2 gap-3">
-            <div
-              className="rounded-3xl p-4 border"
-              style={{
-                backgroundColor: 'rgba(14,165,233,0.08)',
-                borderColor: 'rgba(14,165,233,0.16)',
-              }}
-            >
+            <div className="rounded-3xl p-4 border" style={{ backgroundColor: 'var(--color-info-subtle)', borderColor: 'color-mix(in srgb, var(--color-info) 16%, transparent)' }}>
               <div className="flex items-center gap-1.5 mb-1">
-                <ArrowUp className="w-3.5 h-3.5" style={{ color: 'var(--color-info)' }} aria-hidden="true" />
+                <ArrowUp className="w-3.5 h-3.5" style={{ color: 'var(--color-info)' }} aria-hidden />
                 <span className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--color-info)' }}>Prompt</span>
               </div>
               <p className="text-lg font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{formatted.prompt}</p>
             </div>
-            <div
-              className="rounded-3xl p-4 border"
-              style={{
-                backgroundColor: 'rgba(16,185,129,0.08)',
-                borderColor: 'rgba(16,185,129,0.16)',
-              }}
-            >
+            <div className="rounded-3xl p-4 border" style={{ backgroundColor: 'var(--color-success-subtle)', borderColor: 'color-mix(in srgb, var(--color-success) 16%, transparent)' }}>
               <div className="flex items-center gap-1.5 mb-1">
-                <ArrowDown className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} aria-hidden="true" />
+                <ArrowDown className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} aria-hidden />
                 <span className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--color-success)' }}>Réponse</span>
               </div>
               <p className="text-lg font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{formatted.completion}</p>
             </div>
           </div>
 
-          {/* Optimisation */}
+          {/* ── Optimisation ── */}
           {optimization && (
-            <div
-              className="rounded-3xl p-4 space-y-3"
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.02)',
-                border: '1px solid var(--border-base)',
-              }}
-            >
+            <section className="rounded-3xl p-4 space-y-3" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-base)' }}>
               <div className="flex items-center gap-2 mb-2">
-                <Gauge className="w-4 h-4 text-cyan-400" aria-hidden="true" />
-                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary, var(--text-muted))' }}>
-                  Contexte
-                </span>
+                <Gauge className="w-4 h-4" style={{ color: 'var(--color-info)' }} aria-hidden />
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Contexte</span>
               </div>
-
-              {/* Barre de progression */}
               <div>
                 <div className="flex justify-between text-sm mb-1" style={{ color: 'var(--text-muted)' }}>
                   <span>Base: {formatTokenCount(optimization.totalBaseTokens)}</span>
@@ -422,73 +221,46 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
                     className="h-full rounded-full transition-all duration-500"
                     style={{
                       width: `${Math.min(100, (optimization.totalBaseTokens / optimization.modelBudget.maxTotal) * 100)}%`,
-                      background:
-                        optimization.totalBaseTokens / optimization.modelBudget.maxTotal > 0.7
-                          ? 'linear-gradient(90deg, var(--color-warning), var(--color-error))'
-                          : 'linear-gradient(90deg, var(--color-success), var(--accent-secondary))',
+                      background: optimization.totalBaseTokens / optimization.modelBudget.maxTotal > 0.7
+                        ? 'linear-gradient(90deg, var(--color-warning), var(--color-error))'
+                        : 'linear-gradient(90deg, var(--color-success), var(--accent-secondary))',
                     }}
                     role="progressbar"
                     aria-valuenow={Math.min(100, (optimization.totalBaseTokens / optimization.modelBudget.maxTotal) * 100)}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
+                    aria-valuemin={0} aria-valuemax={100}
                   />
                 </div>
-                <div className="flex justify-between mt-1 text-xs" style={{ color: 'var(--text-dimmed, var(--text-muted))' }}>
+                <div className="flex justify-between mt-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                   <span>Prompt sys: {formatTokenCount(optimization.systemPromptTokens)}</span>
                   <span>Mémoire: {formatTokenCount(optimization.memoryTokens)}</span>
                   <span>Dispo: {formatTokenCount(optimization.availableForConversation)}</span>
                 </div>
               </div>
-
-              {/* Économies */}
               {optimization.compactEnabled && optimization.savedTokens && optimization.savedTokens > 0 && (
-                <div
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
-                  style={{
-                    color: 'var(--color-success)',
-                    backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)',
-                  }}
-                >
-                  <Zap className="w-3 h-3" aria-hidden="true" />
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-success)', backgroundColor: 'var(--color-success-subtle)' }}>
+                  <Zap className="w-3 h-3" aria-hidden />
                   <span className="text-sm font-semibold">−{formatTokenCount(optimization.savedTokens)} économisés (mode compact)</span>
                 </div>
               )}
-
-              {/* Suggestions */}
               {optimization.suggestions.length > 0 && (
                 <div className="space-y-1 mt-2">
-                  {optimization.suggestions.map((suggestion, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg"
-                      style={{
-                        color: 'var(--color-warning)',
-                        backgroundColor: 'color-mix(in srgb, var(--color-warning) 12%, transparent)',
-                      }}
-                    >
-                      <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" aria-hidden="true" />
-                      <span className="text-sm">{suggestion}</span>
+                  {optimization.suggestions.map((s, idx) => (
+                    <div key={idx} className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-warning)', backgroundColor: 'var(--color-warning-subtle)' }}>
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" aria-hidden />
+                      <span className="text-sm">{s}</span>
                     </div>
                   ))}
                 </div>
               )}
-
               {optimization.suggestions.length === 0 && !optimization.compactEnabled && (
-                <div
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
-                  style={{
-                    color: 'var(--color-success)',
-                    backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)',
-                  }}
-                >
-                  <Sparkles className="w-3 h-3" aria-hidden="true" />
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-success)', backgroundColor: 'var(--color-success-subtle)' }}>
+                  <Sparkles className="w-3 h-3" aria-hidden />
                   <span className="text-sm">Utilisation optimale</span>
                 </div>
               )}
-            </div>
+            </section>
           )}
 
-          {/* État de chargement / erreur optimisation */}
           {loadingOpt && (
             <div className="flex items-center justify-center py-3" aria-live="polite">
               <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--text-muted)' }} />
@@ -496,39 +268,39 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
             </div>
           )}
           {optError && (
-            <div
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-              style={{
-                color: 'var(--color-error)',
-                backgroundColor: 'color-mix(in srgb, var(--color-error) 12%, transparent)',
-              }}
-            >
-              <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ color: 'var(--color-error)', backgroundColor: 'var(--color-error-subtle)' }}>
+              <AlertTriangle className="w-4 h-4" aria-hidden />
               <span>{optError}</span>
             </div>
           )}
 
-          {/* Toggle compact */}
+          {/* ── Toggle compact ── */}
           <button
             type="button"
             onClick={handleToggleCompact}
             disabled={isPending}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-3xl text-xs font-medium transition-all ${isPending ? 'opacity-60 cursor-wait' : 'hover:shadow-sm'}`}
             style={{
-              border: profile.compactPrompt ? '1px solid rgba(16,185,129,0.24)' : '1px solid var(--border-base)',
-              backgroundColor: profile.compactPrompt ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)',
+              border: profile.compactPrompt
+                ? '1px solid color-mix(in srgb, var(--color-success) 24%, transparent)'
+                : '1px solid var(--border-base)',
+              backgroundColor: profile.compactPrompt
+                ? 'var(--color-success-subtle)'
+                : 'rgba(255,255,255,0.03)',
               color: profile.compactPrompt ? 'var(--color-success)' : 'var(--text-secondary)',
             }}
             aria-pressed={profile.compactPrompt}
           >
             <span className="flex items-center gap-2">
-              <Zap className="w-4 h-4" aria-hidden="true" />
+              <Zap className="w-4 h-4" aria-hidden />
               Mode compact (−40% tokens prompt)
             </span>
             <span
               className="px-2 py-0.5 rounded text-xs font-bold uppercase"
               style={{
-                backgroundColor: profile.compactPrompt ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.08)',
+                backgroundColor: profile.compactPrompt
+                  ? 'var(--color-success-subtle)'
+                  : 'rgba(255,255,255,0.08)',
                 color: profile.compactPrompt ? 'var(--color-success)' : 'var(--text-muted)',
               }}
             >
@@ -536,52 +308,37 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
             </span>
           </button>
 
-          {/* Historique */}
-          {history.length > 0 && (
+          {/* ── Historique ── */}
+          {history.length > 0 ? (
             <div>
               <p className="text-sm font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
                 Dernières requêtes ({history.length})
               </p>
-              <div className="space-y-1 max-h-48 overflow-y-auto scrollbar-thin pr-1">
-                {[...history]
-                  .reverse()
-                  .slice(0, 25)
-                  .map((usage, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors"
-                      style={{ backgroundColor: 'color-mix(in srgb, var(--bg-input) 80%, transparent)' }}
-                    >
-                      <div className="flex-1 flex items-center gap-2 text-xs tabular-nums">
-                        <span className="font-medium" style={{ color: 'var(--color-info)' }}>↑{formatTokenCount(usage.promptTokens)}</span>
-                        <span className="font-medium" style={{ color: 'var(--color-success)' }}>↓{formatTokenCount(usage.completionTokens)}</span>
-                        <span className="font-bold" style={{ color: 'var(--text-primary)' }}>
-                          Σ{formatTokenCount(usage.totalTokens)}
-                        </span>
-                      </div>
-                      <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
-                        <Clock className="w-2.5 h-2.5" aria-hidden="true" />
-                        {timeAgo(usage.timestamp)}
-                      </span>
+              <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                {[...history].reverse().slice(0, 25).map((usage, idx) => (
+                  <div key={idx} className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-input) 80%, transparent)' }}>
+                    <div className="flex-1 flex items-center gap-2 text-xs tabular-nums">
+                      <span className="font-medium" style={{ color: 'var(--color-info)' }}>↑{formatTokenCount(usage.promptTokens)}</span>
+                      <span className="font-medium" style={{ color: 'var(--color-success)' }}>↓{formatTokenCount(usage.completionTokens)}</span>
+                      <span className="font-bold" style={{ color: 'var(--text-primary)' }}>Σ{formatTokenCount(usage.totalTokens)}</span>
                     </div>
-                  ))}
+                    <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                      <Clock className="w-2.5 h-2.5" aria-hidden />
+                      {timeAgo(usage.timestamp)}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-          )}
-
-          {history.length === 0 && (
+          ) : (
             <div className="text-center py-6">
-              <Hash className="w-8 h-8 mx-auto mb-2 opacity-20" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Aucune requête enregistrée
-              </p>
-              <p className="text-sm mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
-                Les tokens apparaîtront après la première interaction
-              </p>
+              <Hash className="w-8 h-8 mx-auto mb-2 opacity-20" style={{ color: 'var(--text-muted)' }} aria-hidden />
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Aucune requête enregistrée</p>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--text-dimmed)' }}>Les tokens apparaîtront après la première interaction</p>
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </Modal.Body>
+    </Modal>
   );
 }

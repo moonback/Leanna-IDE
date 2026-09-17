@@ -23,7 +23,7 @@ export function SkillsDocModal({ isOpen, onClose, initialToolName }: SkillsDocMo
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md">
+        <div className="fixed inset-0 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-sm" style={{ zIndex: 'var(--z-modal)' as any }}>
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}

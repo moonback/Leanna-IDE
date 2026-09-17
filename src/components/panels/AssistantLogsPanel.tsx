@@ -76,7 +76,7 @@ export function AssistantLogsPanel({ onClose }: AssistantLogsPanelProps) {
   }, [entries, filter]);
 
   return (
-    <div className="fixed inset-0 z-[9995] flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 'var(--z-modal)' as any }} onMouseDown={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <section
         role="dialog"

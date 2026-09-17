@@ -1208,7 +1208,8 @@ function SaveModal({
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center z-[99999]"
+      className="fixed inset-0 flex items-center justify-center"
+      style={{ zIndex: 'var(--z-critical)' as any }}
       style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
