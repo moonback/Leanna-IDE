@@ -1,25 +1,85 @@
 import { Router, Request, Response } from 'express';
-import { execFile } from 'child_process';
+import { execFile, exec } from 'child_process';
+import os from 'os';
 
 const router = Router();
 
+function escapeShellArg(arg: string): string {
+  if (process.platform === 'win32') {
+    if (/[\s"]/.test(arg)) {
+      return '"' + arg.replace(/"/g, '""') + '"';
+    }
+    return arg;
+  }
+  if (/[^\w@%+=:,./-]/.test(arg)) {
+    return "'" + arg.replace(/'/g, "'\\''") + "'";
+  }
+  return arg;
+}
+
 function runPm2(args: string[]): Promise<string> {
+  const timeout = 15_000;
+  const maxBuffer = 10 * 1024 * 1024;
+  const argLine = args.map(escapeShellArg).join(' ');
+
   return new Promise((resolve, reject) => {
-    const timeout = 15_000;
-    const child = execFile(
-      'pm2',
-      args,
-      { timeout, maxBuffer: 10 * 1024 * 1024, windowsHide: true },
-      (err, stdout, stderr) => {
-        if (err) {
-          const hint = stderr?.toString()?.trim() || '';
-          reject(new Error(hint || (err as Error).message || `pm2 ${args.join(' ')} failed`));
-          return;
-        }
-        resolve(stdout.toString());
-      },
-    );
-    child.on('error', reject);
+    let finished = false;
+    const done = (err: Error | null, out?: string) => {
+      if (finished) return;
+      finished = true;
+      if (err) reject(err);
+      else resolve(out ?? '');
+    };
+
+    const tryUnix = () => {
+      const cmd = process.platform === 'win32' ? 'pm2.cmd' : 'pm2';
+      let child;
+      try {
+        child = execFile(
+          cmd,
+          args,
+          { timeout, maxBuffer, windowsHide: true },
+          (err, stdout, stderr) => {
+            if (err) {
+              if (process.platform === 'win32') return tryShell();
+              const hint = stderr?.toString()?.trim() || '';
+              return done(new Error(hint || (err as Error).message || `pm2 ${args.join(' ')} failed`));
+            }
+            done(null, stdout.toString());
+          },
+        );
+      } catch (e: any) {
+        if (process.platform === 'win32') return tryShell();
+        return done(e);
+      }
+      child.on('error', (e: any) => {
+        if (process.platform === 'win32') return tryShell();
+        done(e);
+      });
+    };
+
+    const tryShell = () => {
+      const cmdStr = 'pm2 ' + argLine;
+      let child;
+      try {
+        child = exec(
+          cmdStr,
+          { timeout, maxBuffer, windowsHide: true },
+          (err, stdout, stderr) => {
+            if (err) {
+              const hint = stderr?.toString()?.trim() || '';
+              return done(new Error(hint || (err as Error).message || `pm2 ${args.join(' ')} failed`));
+            }
+            done(null, stdout.toString());
+          },
+        );
+      } catch (e: any) {
+        return done(e);
+      }
+      child.on('error', done);
+    };
+
+    tryUnix();
   });
 }
 
@@ -168,10 +228,10 @@ router.get('/status', async (_req: Request, res: Response): Promise<void> => {
 
     const apps = normalizeProcesses(list);
     const osHost = {
-      hostname: process.env.COMPUTERNAME || process.env.HOSTNAME || require('os').hostname(),
+      hostname: process.env.COMPUTERNAME || process.env.HOSTNAME || os.hostname(),
       arch: process.arch,
       platform: process.platform,
-      cores: require('os').cpus().length,
+      cores: os.cpus().length,
     };
 
     res.json({
@@ -183,6 +243,7 @@ router.get('/status', async (_req: Request, res: Response): Promise<void> => {
     } satisfies Pm2StatusResponse);
   } catch (e: any) {
     const msg = e?.message || String(e) || 'PM2 indisponible';
+    console.error('[PM2] GET /status failed:', msg, e?.code ? `(code=${e.code})` : '');
     res.status(503).json({ status: 'error', error: msg });
   }
 });

@@ -51,6 +51,7 @@ import { createSelfRootRouter } from "./server/routes/self-root.js";
 import { createFtpRouter } from "./server/routes/ftp.js";
 import safeguardsRouter from "./server/routes/safeguards.js";
 import pm2Router from "./server/routes/pm2.js";
+import { initSandboxWatchWSS } from "./server/routes/sandbox-watch.js";
 import { createUploadDocumentRouter } from "./server/routes/upload-document.js";
 import { createDocumentsRouter } from "./server/routes/documents.js";
 import skillsRouter, { createSkillsRouter } from "./server/routes/skills.js";
@@ -681,7 +682,7 @@ async function startServer() {
   });
 
   // WebSocket server for Sandbox file watching (real-time)
-  const sandboxWss = new WebSocketServer({ noServer: true });
+  const sandboxWss = initSandboxWatchWSS();
 
   // WebSocket server for Terminal (PTY-like)
   const terminalWss = new WebSocketServer({ noServer: true });

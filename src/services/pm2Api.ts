@@ -2,6 +2,21 @@
 // Respecte le style de ideApi.ts : throw en cas de statut non-ok,
 // mais sans cache car les données PM2 doivent être fraîches.
 
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('Leanna_api_token');
+  return token ? { 'x-Leanna-token': token } : {};
+}
+
+function mergeAuthHeaders(init?: RequestInit): RequestInit {
+  return {
+    ...init,
+    headers: {
+      ...(init?.headers || {}),
+      ...getAuthHeaders(),
+    },
+  };
+}
+
 export interface Pm2AppStatus {
   id: number;
   pid: number | null;
@@ -65,36 +80,36 @@ async function parseJson<T>(res: Response): Promise<T> {
 
 export const pm2Api = {
   async getStatus(): Promise<Pm2StatusResponse> {
-    const res = await fetch('/api/pm2/status', { cache: 'no-store' });
+    const res = await fetch('/api/pm2/status', mergeAuthHeaders({ cache: 'no-store' }));
     return parseJson<Pm2StatusResponse>(res);
   },
 
   async restart(name: string): Promise<Pm2ActionResponse> {
-    const res = await fetch(`/api/pm2/${encodeURIComponent(name)}/restart`, { method: 'POST' });
+    const res = await fetch(`/api/pm2/${encodeURIComponent(name)}/restart`, mergeAuthHeaders({ method: 'POST' }));
     return parseJson<Pm2ActionResponse>(res);
   },
 
   async stop(name: string): Promise<Pm2ActionResponse> {
-    const res = await fetch(`/api/pm2/${encodeURIComponent(name)}/stop`, { method: 'POST' });
+    const res = await fetch(`/api/pm2/${encodeURIComponent(name)}/stop`, mergeAuthHeaders({ method: 'POST' }));
     return parseJson<Pm2ActionResponse>(res);
   },
 
   async reload(file = 'ecosystem.config.cjs'): Promise<Pm2ActionResponse> {
     const url = new URL('/api/pm2/reload', window.location.origin);
     if (file) url.searchParams.set('file', file);
-    const res = await fetch(url.toString(), { method: 'POST' });
+    const res = await fetch(url.toString(), mergeAuthHeaders({ method: 'POST' }));
     return parseJson<Pm2ActionResponse>(res);
   },
 
   async flush(): Promise<Pm2ActionResponse> {
-    const res = await fetch('/api/pm2/flush', { method: 'POST' });
+    const res = await fetch('/api/pm2/flush', mergeAuthHeaders({ method: 'POST' }));
     return parseJson<Pm2ActionResponse>(res);
   },
 
   async getLogs(name: string, opts: { lines?: number } = {}): Promise<Pm2LogsResponse> {
     const url = new URL(`/api/pm2/logs/${encodeURIComponent(name)}`, window.location.origin);
     if (typeof opts.lines === 'number') url.searchParams.set('lines', String(opts.lines));
-    const res = await fetch(url.toString(), { cache: 'no-store' });
+    const res = await fetch(url.toString(), mergeAuthHeaders({ cache: 'no-store' }));
     return parseJson<Pm2LogsResponse>(res);
   },
 };
