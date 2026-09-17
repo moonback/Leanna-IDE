@@ -22,6 +22,7 @@ export interface GracefulShutdownDeps {
   stopAllWorkflowTimers: () => void;
   stopAllScheduledTasks: () => void;
   stopCustomSkillsHotReload: () => void;
+  stopTelegramBot?: () => Promise<void>;
 }
 
 export type GracefulShutdownFn = (reason: string) => Promise<void>;
@@ -64,6 +65,11 @@ export function setupGracefulShutdown(deps: GracefulShutdownDeps): GracefulShutd
 
     // 3d. Arrêter le runtime V2
     try { await deps.runtimeV2.stop(); deps.observability.detach(); console.log('[Lifecycle] RuntimeV2 arrêté.'); } catch {}
+
+    // 3e. Arrêter le bot Telegram si actif
+    if (deps.stopTelegramBot) {
+      try { await deps.stopTelegramBot(); console.log('[Lifecycle] Bot Telegram arrêté.'); } catch {}
+    }
 
     // 4. Fermer le serveur HTTP
     await new Promise<void>(resolve => deps.server.close(() => resolve()));
