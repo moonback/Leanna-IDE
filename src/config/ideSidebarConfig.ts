@@ -16,7 +16,7 @@ import {
   GitBranch, Github, Camera, Monitor, Boxes,
   FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Container, Bot, Crosshair, Database,
-  Activity, Wrench, Users,
+  Activity, Wrench, Users, Zap,
   Wand2, BookOpen, Globe, Terminal, Store,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -308,6 +308,15 @@ export const sidebarSections: SidebarSectionConfig[] = [
         label: 'Missions',
         stateKey: 'showMissions',
         actionKey: 'onToggleMissions',
+        requiresAssistant: true,
+      },
+      {
+        id: 'autonomous-core',
+        type: 'button',
+        icon: Zap,
+        label: 'Autonomous Core',
+        stateKey: 'showAutonomous',
+        actionKey: 'onToggleAutonomous',
         requiresAssistant: true,
       },
       {

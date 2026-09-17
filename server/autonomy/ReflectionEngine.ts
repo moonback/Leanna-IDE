@@ -227,16 +227,14 @@ export class ReflectionEngine {
 
     // Sauvegarder le résultat de la mission en mémoire projet
     const content = [
-      `Mission "${mission.title}" réussie.`,
+      `Mission autonome "${mission.title}" réussie.`,
       ...lessons.slice(0, 2),
     ].join(" ");
 
     projectMemory.addFact({
-      type: "episodic",
-      category: "architecture",
+      category: "workflow",
       content,
-      importance: 2,
-      source: "autonomous_core",
+      confidence: 0.7,
       tags: ["mission", "autonomous", mission.goalId],
     });
   }

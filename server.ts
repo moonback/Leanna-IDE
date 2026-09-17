@@ -502,6 +502,7 @@ async function startServer() {
   app.use("/api/git", githubRouter);
   app.use("/api/github", githubRouter);
   app.use("/api/agents", createAgentsRouter(skillManager));
+  app.use("/api/agents/autonomous", (await import("./server/routes/autonomous.js")).default);
 
   // ─── Routes Runtime V2 (nouveau système, coexistence) ────────────────────
   const { createAgentsRouterV2 } = await import("./server/runtime/routes/agents.js");
@@ -756,8 +757,6 @@ async function startServer() {
       });
     } else {
       console.log("[AutonomousRuntime] ⏸️ Aucun projet actif — démarrage différé");
-      // Écouter la sélection d'un projet pour démarrer automatiquement
-      const { default: express } = await import("express");
       // Le démarrage différé est géré dans /api/self-root/change (createSelfRootRouter)
     }
   }
@@ -846,7 +845,7 @@ async function startServer() {
   });
 
   // ── Graceful shutdown — extrait dans server/lifecycle.ts ────────────────
-  const gracefulShutdown = setupGracefulShutdown({
+  setupGracefulShutdown({
     server,
     wss,
     runtimeV2,

@@ -211,22 +211,12 @@ export class PerceptionLoop {
   // ─── Connexion Runtime EventBus ──────────────────────────────────────────
 
   private _connectRuntimeEventBus(): void {
-    // Import dynamique pour éviter les dépendances circulaires
-    import("../runtime/AgentRuntime.js")
-      .then(({ AgentRuntime }) => {
-        // L'AgentRuntime expose un EventBus via runtime.events
-        // On écoute les événements de tasks et d'agents
-        // Note : on utilise l'import dynamique car le runtime peut ne pas
-        // encore être initialisé au moment du démarrage de la PerceptionLoop
-
-        // Pour l'instant on s'abonne via le bus d'agents (déjà disponible)
-        return import("../agents/AgentMessageBus.js");
-      })
+    // S'abonner aux broadcasts du bus d'agents (AgentMessageBus)
+    import("../agents/AgentMessageBus.js")
       .then((module) => {
         if (!module?.agentMessageBus) return;
         const bus = module.agentMessageBus;
 
-        // S'abonner aux broadcasts du bus d'agents
         bus.on("message", (msg: any) => {
           this._handleAgentMessage(msg);
         });

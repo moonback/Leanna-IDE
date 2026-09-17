@@ -52,6 +52,7 @@ import { MissionPanel } from '../components/panels/MissionPanel.js';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard.js';
 import { PM2StatusPanel } from '../components/panels/PM2StatusPanel.js';
 import { AgentFleetPanel } from '../components/panels/AgentFleetPanel.js';
+import { AutonomousCorePanel } from '../components/panels/AutonomousCorePanel.js';
 import { AssistantLogsPanel } from '../components/panels/AssistantLogsPanel.js';
 import { AgentActivityOverlay } from '../components/ide/AgentActivityOverlay.js';
 import { TemplateSelectorModal } from '../components/templates/TemplateSelectorModal.js';
@@ -170,6 +171,7 @@ export default function IdeView() {
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [showSkillsDoc, setShowSkillsDoc] = useState(false);
   const [showFleet, setShowFleet] = useState(false);
+  const [showAutonomous, setShowAutonomous] = useState(false);
   const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
   const [showKnowledge, setShowKnowledge] = useState(false);
