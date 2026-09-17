@@ -231,6 +231,21 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         console.log(`[KnowledgeGraph] Rechargement pour: ${newRoot}`);
       } catch { /* silent */ }
 
+      // 4. (Re)démarrer l'AutonomousRuntime V2 pour le nouveau projet
+      try {
+        const { autonomousRuntime } = await import('../autonomy/AutonomousRuntime.js');
+        // Arrêter l'instance précédente si active
+        if (autonomousRuntime.running) {
+          autonomousRuntime.stop();
+        }
+        // Redémarrer avec le nouveau SELF_ROOT
+        autonomousRuntime.start().then((started) => {
+          if (started) console.log(`[AutonomousRuntime] ✅ Redémarré pour: ${newRoot}`);
+        }).catch((err: Error) => {
+          console.warn(`[AutonomousRuntime] Redémarrage échoué: ${err.message}`);
+        });
+      } catch { /* non bloquant */ }
+
       return res.json({ status: 'success', newRoot, siteUrl: siteUrl ?? '' });
     } catch (e: any) {
       return res.status(400).json({ error: e.message });

@@ -726,6 +726,42 @@ async function startServer() {
     }
   });
 
+  // ── Autonomous Core V2 — démarrage du runtime autonome ──────────────────
+  // Câbler le broadcaster WebSocket, puis démarrer la boucle persistante.
+  // Le runtime s'abonne aux PerceptionEvents, au DecisionEngine et au
+  // MissionManager dès que start() est appelé.
+  {
+    const { autonomousRuntime } = await import("./server/autonomy/AutonomousRuntime.js");
+
+    // Broadcaster partagé → tous les clients WebSocket /live
+    const autonomousBroadcaster = (event: object) => {
+      const payload = JSON.stringify(event);
+      for (const client of wss.clients) {
+        if (client.readyState === WebSocket.OPEN) {
+          try { client.send(payload); } catch { /* ignore */ }
+        }
+      }
+    };
+
+    autonomousRuntime.setBroadcaster(autonomousBroadcaster);
+
+    // Démarrer seulement si un projet est actif (SELF_ROOT connu)
+    if (hasProject()) {
+      autonomousRuntime.start().then((started) => {
+        if (started) {
+          console.log("[AutonomousRuntime] ✅ Autonomous Core V2 actif");
+        }
+      }).catch((err) => {
+        console.error("[AutonomousRuntime] ❌ Erreur démarrage:", err.message);
+      });
+    } else {
+      console.log("[AutonomousRuntime] ⏸️ Aucun projet actif — démarrage différé");
+      // Écouter la sélection d'un projet pour démarrer automatiquement
+      const { default: express } = await import("express");
+      // Le démarrage différé est géré dans /api/self-root/change (createSelfRootRouter)
+    }
+  }
+
   // ── Mission System: broadcaster d'événements missions vers les clients WebSocket ──
   // registerDynSkills est asynchrone, on utilise un intervalle pour connecter dès que prêt
   const missionBroadcasterInterval = setInterval(() => {
@@ -810,7 +846,7 @@ async function startServer() {
   });
 
   // ── Graceful shutdown — extrait dans server/lifecycle.ts ────────────────
-  setupGracefulShutdown({
+  const gracefulShutdown = setupGracefulShutdown({
     server,
     wss,
     runtimeV2,
@@ -826,6 +862,23 @@ async function startServer() {
     stopCustomSkillsHotReload: () => skillManager.stopCustomSkillsHotReload(),
     stopTelegramBot: () => telegramService.stop(),
   });
+
+  // ── Autonomous Core V2 — arrêt gracieux ──────────────────────────────────
+  // Enregistrer le shutdown de l'AutonomousRuntime APRÈS le shutdown principal
+  // pour qu'il soit appelé lors des signaux process.
+  try {
+    const { autonomousRuntime } = await import("./server/autonomy/AutonomousRuntime.js");
+    const originalShutdown = (process as any).__LeannaShutdown;
+    if (typeof originalShutdown === "function") {
+      (process as any).__LeannaShutdown = async (reason: string) => {
+        try {
+          autonomousRuntime.stop();
+          console.log("[Lifecycle] AutonomousRuntime V2 arrêté.");
+        } catch { /* non bloquant */ }
+        return originalShutdown(reason);
+      };
+    }
+  } catch { /* non bloquant */ }
 
   // ── Démarrage automatique du bot Telegram si configuré ──
   const tgStatus = telegramService.getStatus();
