@@ -431,6 +431,20 @@ async function startServer() {
   const rateBundle = createRateLimitBundle(rateLimitDeps);
   applyGlobalRateLimits(app, rateBundle, rateLimitDeps);
 
+  // ── Content Security Policy (CSP) ─────────────────────────────────────────
+  // Sépare dev/prod pour éliminer unsafe-eval en production
+  const { getCSPForEnvironment } = await import("./server/config/csp.js");
+  app.use((req, res, next) => {
+    const csp = getCSPForEnvironment(isDev);
+    res.setHeader('Content-Security-Policy', csp);
+    // Headers de sécurité additionnels
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+  });
+
   // Dynamic workspace: returns sandbox root when sandbox mode is active,
   // otherwise returns the main repo root. This affects the file explorer,
   // file read/write API routes, terminal cwd, and search.
@@ -509,6 +523,10 @@ async function startServer() {
   app.use("/api/documents", createDocumentsRouter(() => currentProfile));
   app.use("/api/skills", createSkillsRouter(skillManager, runtime));
   app.use("/api/mcp", mcpRouter);
+  
+  // ── Tools Registry (diagnostic unifié) ───────────────────────────────────
+  const { createToolsRegistryRouter } = await import("./server/routes/tools-registry.js");
+  app.use("/api/tools", createToolsRegistryRouter(runtimeV2, skillManager, mcpBridge));
   app.use("/api/memories", memoriesRouter);
   app.use("/api/memory/hierarchical", hierarchicalMemoryRouter);
   app.use("/api/conversations", conversationsRouter);

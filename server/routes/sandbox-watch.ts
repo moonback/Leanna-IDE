@@ -6,18 +6,25 @@ import { isSandboxActive } from '../utils/sandbox.js';
 let sandboxWss: WebSocketServer | null = null;
 
 export function initSandboxWatchWSS(): WebSocketServer {
+  // Éviter la création multiple du serveur WebSocket
+  if (sandboxWss) {
+    console.log('[SandboxWatch] Réutilisation du serveur WebSocket existant');
+    return sandboxWss;
+  }
+
   sandboxWss = new WebSocketServer({ noServer: true });
   
-  sandboxWss.on('connection', async (clientWs, req) => {
-    const { addWatchClient, startWatching } = await import('../utils/sandboxWatcher');
+  sandboxWss.on('connection', (clientWs, req) => {
     console.log('[SandboxWatch] Client connecté');
     addWatchClient(clientWs);
+    
     // Démarrer la surveillance si le sandbox est actif
     if (isSandboxActive()) {
       startWatching();
     }
   });
 
+  console.log('[SandboxWatch] Serveur WebSocket initialisé');
   return sandboxWss;
 }
 

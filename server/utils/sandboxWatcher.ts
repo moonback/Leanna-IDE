@@ -43,8 +43,23 @@ const IGNORE_PATTERNS = [
  */
 export function addWatchClient(ws: WebSocket): void {
   connectedClients.add(ws);
-  ws.on("close", () => connectedClients.delete(ws));
-  ws.on("error", () => connectedClients.delete(ws));
+  
+  const handleDisconnect = () => {
+    connectedClients.delete(ws);
+    console.log(`[SandboxWatcher] Client déconnecté (${connectedClients.size} restant(s))`);
+    
+    // Si plus aucun client, arrêter la surveillance pour économiser les ressources
+    if (connectedClients.size === 0 && watcher) {
+      console.log('[SandboxWatcher] Plus de clients, arrêt de la surveillance');
+      stopWatching();
+    }
+  };
+  
+  ws.on("close", handleDisconnect);
+  ws.on("error", (err) => {
+    console.error('[SandboxWatcher] Erreur client WebSocket:', err.message);
+    handleDisconnect();
+  });
 
   // Envoyer l'état initial
   ws.send(JSON.stringify({
@@ -52,6 +67,8 @@ export function addWatchClient(ws: WebSocket): void {
     active: isSandboxActive(),
     watching: watcher !== null,
   }));
+  
+  console.log(`[SandboxWatcher] ✅ Client ajouté (${connectedClients.size} total)`);
 }
 
 /**
@@ -59,10 +76,16 @@ export function addWatchClient(ws: WebSocket): void {
  * Appelé automatiquement lors de l'activation du sandbox.
  */
 export function startWatching(): void {
-  if (watcher) return; // déjà actif
+  if (watcher) {
+    console.log('[SandboxWatcher] Surveillance déjà active, ignoré');
+    return; // déjà actif
+  }
 
   const sandboxRoot = getSandboxRoot();
-  if (!fs.existsSync(sandboxRoot)) return;
+  if (!fs.existsSync(sandboxRoot)) {
+    console.log('[SandboxWatcher] Dossier sandbox inexistant:', sandboxRoot);
+    return;
+  }
 
   try {
     watcher = fs.watch(sandboxRoot, { recursive: true }, (eventType, filename) => {
@@ -83,9 +106,9 @@ export function startWatching(): void {
       }, DEBOUNCE_MS));
     });
 
-    console.log("[SandboxWatcher] Surveillance démarrée:", sandboxRoot);
+    console.log(`[SandboxWatcher] ✅ Surveillance démarrée: ${sandboxRoot} (${connectedClients.size} client(s))`);
   } catch (e: any) {
-    console.error("[SandboxWatcher] Erreur lors du démarrage:", e.message);
+    console.error("[SandboxWatcher] ❌ Erreur lors du démarrage:", e.message);
   }
 }
 
@@ -93,10 +116,13 @@ export function startWatching(): void {
  * Arrête la surveillance.
  */
 export function stopWatching(): void {
-  if (watcher) {
-    watcher.close();
-    watcher = null;
+  if (!watcher) {
+    console.log('[SandboxWatcher] Aucune surveillance active, ignoré');
+    return;
   }
+
+  watcher.close();
+  watcher = null;
 
   // Nettoyer les debounce timers
   for (const timer of debounceTimers.values()) {
@@ -104,7 +130,7 @@ export function stopWatching(): void {
   }
   debounceTimers.clear();
 
-  console.log("[SandboxWatcher] Surveillance arrêtée.");
+  console.log(`[SandboxWatcher] ✅ Surveillance arrêtée (${connectedClients.size} client(s) restant(s))`);
 }
 
 /**

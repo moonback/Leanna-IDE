@@ -396,6 +396,10 @@ export function attachLiveWebSocket(
         // Graphify — Graphe de connaissances et architecture
         'graphify_query', 'graphify_path', 'graphify_explain', 'graphify_affected',
         'graphify_god_nodes', 'graphify_read_report', 'graphify_update',
+        // Telegram — Envoi de messages et notifications
+        'telegram_notify', 'telegram_send_message', 'telegram_send_photo',
+        'telegram_send_document', 'telegram_send_from_workspace', 'telegram_broadcast',
+        'telegram_get_status', 'telegram_list_users', 'telegram_get_chat_info',
       ]);
 
       const ASK_MODE_ALLOWED_TOOLS = new Set([
@@ -419,6 +423,8 @@ export function attachLiveWebSocket(
         // Graphify — interrogeable en mode question (lecture seule sécurisée)
         'graphify_query', 'graphify_path', 'graphify_explain', 'graphify_affected',
         'graphify_god_nodes', 'graphify_read_report', 'graphify_update',
+        // Telegram — statut et notifications en mode ask
+        'telegram_notify', 'telegram_send_message', 'telegram_get_status', 'telegram_list_users',
       ]);
 
       let filteredDeclarations: typeof declarations;
