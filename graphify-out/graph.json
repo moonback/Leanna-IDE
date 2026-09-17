@@ -90914,7 +90914,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/ide/ChatPanel.tsx",
-      "source_location": "L766",
+      "source_location": "L770",
       "weight": 1.0
     },
     {
@@ -90926,7 +90926,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/ide/ChatPanel.tsx",
-      "source_location": "L836",
+      "source_location": "L840",
       "weight": 1.0
     },
     {
@@ -90938,7 +90938,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/ide/ChatPanel.tsx",
-      "source_location": "L842",
+      "source_location": "L846",
       "weight": 1.0
     },
     {
@@ -202601,5 +202601,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "419ea964811020c2156f86788d369f5b4fb888ae"
+  "built_at_commit": "19126fda2a8377dbcf8d27064535681bdd8b4dca"
 }

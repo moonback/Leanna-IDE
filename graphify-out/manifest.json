@@ -2058,9 +2058,9 @@
     "semantic_hash": ""
   },
   "src/components/ide/ChatPanel.tsx": {
-    "mtime": 1788594624.18986,
-    "seen": 1788909309.9907851,
-    "ast_hash": "8e02d39bc5434d0ce68287f32090cce8",
+    "mtime": 1789634834.487791,
+    "seen": 1789634977.3346186,
+    "ast_hash": "030214ac7a9389fa6d6615406e1e006b",
     "semantic_hash": ""
   },
   "src/components/ide/CheckpointPanel.tsx": {
