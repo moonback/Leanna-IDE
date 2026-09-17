@@ -50,6 +50,7 @@ import { SkillsDocModal } from '../components/skills-doc/SkillsDocModal.js';
 import { initActivityStore, destroyActivityStore, syncActiveTasksFromServer } from '../stores/agentActivityStore.js';
 import { MissionPanel } from '../components/panels/MissionPanel.js';
 import { SystemHealthDashboard } from '../components/panels/SystemHealthDashboard.js';
+import { PM2StatusPanel } from '../components/panels/PM2StatusPanel.js';
 import { AgentFleetPanel } from '../components/panels/AgentFleetPanel.js';
 import { AssistantLogsPanel } from '../components/panels/AssistantLogsPanel.js';
 import { AgentActivityOverlay } from '../components/ide/AgentActivityOverlay.js';
@@ -196,6 +197,7 @@ export default function IdeView() {
     setSelectedSandboxDiffFile(null);
   }, []);
   const [showSystemHealth, setShowSystemHealth] = useState(false);
+  const [showPM2, setShowPM2] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
@@ -841,6 +843,7 @@ export default function IdeView() {
         showKnowledge={showKnowledge}
         showNotebooks={showNotebooks}
         showSystemHealth={showSystemHealth}
+        showPM2={showPM2}
         showMcp={showMcp}
         showBrowser={showBrowser}
         assistantConnected={connected}
@@ -881,6 +884,7 @@ export default function IdeView() {
           });
         }}
         onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
+        onTogglePM2={() => setShowPM2(v => !v)}
         onToggleMcp={() => setShowMcp(v => !v)}
         onToggleBrowser={() => openUrlInNewTab(BROWSER_HOME_URL)}
         onToggleVision={() => setVisionEnabled(v => !v)}
@@ -1164,6 +1168,11 @@ export default function IdeView() {
                         {/* System Health Dashboard */}
                         {showSystemHealth && (
                           <SystemHealthDashboard onClose={() => setShowSystemHealth(false)} />
+                        )}
+
+                        {/* PM2 Status Panel */}
+                        {showPM2 && (
+                          <PM2StatusPanel onClose={() => setShowPM2(false)} />
                         )}
 
                         {/* Vision Panel */}

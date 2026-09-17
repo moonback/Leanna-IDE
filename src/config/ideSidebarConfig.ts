@@ -13,7 +13,7 @@
 
 import {
   Search,
-  GitBranch, Github, Camera, Monitor,
+  GitBranch, Github, Camera, Monitor, Boxes,
   FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Container, Bot, Crosshair, Database,
   Activity, Wrench, Users,
@@ -187,6 +187,14 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Santé système',
             stateKey: 'showSystemHealth',
             actionKey: 'onToggleSystemHealth',
+          },
+          {
+            id: 'pm2-monitor',
+            type: 'button',
+            icon: Boxes,
+            label: 'PM2 · Processus',
+            stateKey: 'showPM2',
+            actionKey: 'onTogglePM2',
           },
           // {
           //   id: 'mcp',

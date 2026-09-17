@@ -50,6 +50,7 @@ import { createWorkspaceRouter } from "./server/routes/workspace.js";
 import { createSelfRootRouter } from "./server/routes/self-root.js";
 import { createFtpRouter } from "./server/routes/ftp.js";
 import safeguardsRouter from "./server/routes/safeguards.js";
+import pm2Router from "./server/routes/pm2.js";
 import { createUploadDocumentRouter } from "./server/routes/upload-document.js";
 import { createDocumentsRouter } from "./server/routes/documents.js";
 import skillsRouter, { createSkillsRouter } from "./server/routes/skills.js";
@@ -478,6 +479,7 @@ async function startServer() {
   //   - Routeurs dont les routes internes incluent déjà le nom (/profile, /workspace...) restent sur "/api"
   //   - Routeurs dont les routes internes sont génériques (/status, /, /config...) requièrent "/api/<prefix>"
   app.use("/api/audit", auditRouter);
+  app.use("/api/pm2", pm2Router);
   app.use("/api/automation", automationRouter);
   app.use("/api/workflows", workflowsRouter);
   app.use("/api/custom-skills", createCustomSkillsRouter(skillManager));

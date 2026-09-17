@@ -28,6 +28,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     showKnowledge: props.showKnowledge ?? false,
     showNotebooks: props.showNotebooks ?? false,
     showSystemHealth: props.showSystemHealth ?? false,
+    showPM2: props.showPM2 ?? false,
     showMcp: props.showMcp ?? false,
     showFleet: props.showFleet ?? false,
     showBrowser: props.showBrowser ?? false,
@@ -39,7 +40,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.showSettings, props.showRunMenu,
     props.showSandbox, props.showGitHub, props.showWorkflow, props.showSkillsMonitor,
     props.showChat, props.showAgents, props.showAgentBuilder, props.showMarketplace, props.showSkillsDoc, props.showMissions,
-    props.showKnowledge, props.showNotebooks, props.showSystemHealth, props.showMcp,
+    props.showKnowledge, props.showNotebooks, props.showSystemHealth, props.showPM2, props.showMcp,
     props.showFleet, props.showBrowser, props.showTerminal,
     props.visionEnabled, props.screenShareEnabled,
   ]);
@@ -62,6 +63,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     onToggleKnowledge: props.onToggleKnowledge ?? noop,
     onToggleNotebooks: props.onToggleNotebooks ?? noop,
     onToggleSystemHealth: props.onToggleSystemHealth ?? noop,
+    onTogglePM2: props.onTogglePM2 ?? noop,
     onToggleMcp: props.onToggleMcp ?? noop,
     onToggleFleet: props.onToggleFleet ?? noop,
     onToggleBrowser: props.onToggleBrowser ?? noop,
@@ -73,7 +75,7 @@ export function useIDEState(props: UnifiedSidebarProps) {
     props.onToggleSettings, props.onToggleRunMenu,
     props.onToggleSandbox, props.onToggleGitHub, props.onToggleWorkflow, props.onToggleSkillsMonitor,
     props.onToggleChat, props.onToggleAgents, props.onToggleAgentBuilder, props.onToggleMarketplace, props.onToggleSkillsDoc, props.onToggleMissions,
-    props.onToggleKnowledge, props.onToggleNotebooks, props.onToggleSystemHealth, props.onToggleMcp,
+    props.onToggleKnowledge, props.onToggleNotebooks, props.onToggleSystemHealth, props.onTogglePM2, props.onToggleMcp,
     props.onToggleFleet, props.onToggleBrowser, props.onToggleTerminal,
     props.onToggleVision, props.onToggleScreenShare,
   ]);

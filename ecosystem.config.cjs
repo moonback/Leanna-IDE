@@ -2,14 +2,15 @@ module.exports = {
   apps : [{
     name: "leanna",
     script: "./dist/server.cjs",
-    instances: "max", // Ou un nombre fixe de processeurs
-    exec_mode: "cluster",
+    cwd: __dirname,
+    instances: 1,
+    exec_mode: "fork",
     watch: false,
     autorestart: true,
     exp_backoff_restart_delay: 100,
-    max_memory_restart: '1G', // Ajuste selon tes besoins
-    shutdown_with_message: true, // Pour un arrêt gracieux
-    kill_timeout: 3000, // Temps laissé pour fermer proprement (ms)
+    max_memory_restart: '1G',
+    shutdown_with_message: true,
+    kill_timeout: 3000,
     env: {
       NODE_ENV: "production",
     }
