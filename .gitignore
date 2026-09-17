@@ -22,3 +22,4 @@ graphify-out/
 # Ne jamais commiter ces fichiers — ils sont recréés par l'indexeur
 .project-knowledge.json
 .project-memory.json
+.Leanna-telegram.json
