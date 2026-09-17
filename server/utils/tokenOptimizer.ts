@@ -196,7 +196,7 @@ export const MODEL_BUDGETS: Record<string, TokenBudget> = {
     conversationHistory: 170_000,
     responseReserve: 16_000,
   },
-  'google/gemini-2.5-flash': {
+  'google/gemini-3.6-flash': {
     maxTotal: 1_000_000,
     systemPrompt: 5_000,
     memory: 3_000,

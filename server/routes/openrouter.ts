@@ -21,7 +21,7 @@ export function createOpenRouterRouter(getProfile: () => any): Router {
           'X-Title': process.env.OPENROUTER_TITLE || 'Leanna',
         },
         body: JSON.stringify({
-          model: model || 'google/gemini-2.5-flash',
+          model: model || 'google/gemini-3.6-flash',
           messages: [{ role: 'user', content: 'Say hi in 3 words.' }],
           max_tokens: 20,
         }),
@@ -66,7 +66,7 @@ export function createOpenRouterRouter(getProfile: () => any): Router {
           'X-Title': process.env.OPENROUTER_TITLE || 'Leanna',
         },
         body: JSON.stringify({
-          model: model || 'google/gemini-2.5-flash',
+          model: model || 'google/gemini-3.6-flash',
           messages: optimizedMessages,
           temperature: temperature ?? 0.9,
           top_p: topP ?? 0.95,

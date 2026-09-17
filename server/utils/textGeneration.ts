@@ -171,7 +171,7 @@ async function streamWithOpenRouter(options: GenerateTextStreamOptions): Promise
     return streamWithGemini(options);
   }
 
-  const model = options.openrouterModel || _profile.openrouterModel || 'google/gemini-2.5-flash';
+  const model = options.openrouterModel || _profile.openrouterModel || 'google/gemini-3.6-flash';
 
   const messages: any[] = [];
   if (options.systemPrompt) {
@@ -341,7 +341,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions): Promise<Gen
     return generateWithGemini(options);
   }
 
-  const model = options.openrouterModel || _profile.openrouterModel || 'google/gemini-2.5-flash';
+  const model = options.openrouterModel || _profile.openrouterModel || 'google/gemini-3.6-flash';
 
   const messages: any[] = [];
   if (options.systemPrompt) {

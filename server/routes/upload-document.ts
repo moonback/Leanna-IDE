@@ -115,7 +115,7 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
           res.status(400).json({ error: 'Aucune clé API OpenRouter disponible. Configurez-la dans les réglages.' });
           return;
         }
-        const orModel = (profile as any).openrouterModel || 'google/gemini-2.5-flash';
+        const orModel = (profile as any).openrouterModel || 'google/gemini-3.6-flash';
 
         let messages: any[];
         if (file.mimetype.startsWith('image/')) {

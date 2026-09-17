@@ -852,7 +852,7 @@ export const reasoningSkill: Skill = {
         };
         // Force l'autre provider comme fallback
         if (activeProvider === 'gemini') {
-          fallbackOptions.openrouterModel = 'google/gemini-2.5-flash';
+          fallbackOptions.openrouterModel = 'google/gemini-3.6-flash';
         } else {
           fallbackOptions.geminiModel = 'gemini-2.5-flash';
         }

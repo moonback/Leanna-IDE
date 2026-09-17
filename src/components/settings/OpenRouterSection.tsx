@@ -31,7 +31,7 @@ export const OPENROUTER_MODELS = [
 // ─── Modèles de génération d'images disponibles via OpenRouter ────────────────
 
 export const OPENROUTER_IMAGE_MODELS = [
-  { id: 'google/gemini-2.5-flash-image',       name: 'Gemini 2.5 Flash Image',    free: true,  desc: 'Google — génération d\'images rapide et gratuite' },
+  { id: 'google/gemini-3.6-flash-image',       name: 'Gemini 2.5 Flash Image',    free: true,  desc: 'Google — génération d\'images rapide et gratuite' },
   { id: 'google/gemini-3.1-flash-image-preview',         name: 'Gemini 3.1 Flash Image Preview',      free: false, desc: 'Google — qualité supérieure, détails fins' },
   { id: 'bytedance-seed/seedream-4.5',         name: 'SeedReam 4.5',              free: true,  desc: 'ByteDance — haute qualité, rapide' },
   { id: 'black-forest-labs/flux-schnell',      name: 'FLUX Schnell',              free: true,  desc: 'Black Forest Labs — ultra-rapide, léger' },
@@ -272,7 +272,7 @@ export function OpenRouterSection() {
           type="text"
           value={profile.openrouterImageModel}
           onChange={e => setField('openrouterImageModel', e.target.value)}
-          placeholder="ex: google/gemini-2.5-flash-image"
+          placeholder="ex: google/gemini-3.6-flash-image"
           className="mt-2 w-full rounded-lg px-3 py-2 text-xs font-mono outline-none transition-all duration-200"
           style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
           onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; }}

@@ -582,7 +582,7 @@ async function callLLMForAnalysis(prompt: string, context?: any): Promise<string
       throw new Error("Aucune clé API OpenRouter disponible.");
     }
 
-    const orModel = profile?.openrouterModel || "google/gemini-2.5-flash";
+    const orModel = profile?.openrouterModel || "google/gemini-3.6-flash";
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90_000);
