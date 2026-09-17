@@ -1,4 +1,4 @@
-const { app, BrowserWindow, systemPreferences, Notification, ipcMain, shell, dialog, desktopCapturer, nativeTheme } = require('electron');
+const { app, BrowserWindow, systemPreferences, Notification, ipcMain, shell, dialog, desktopCapturer, nativeTheme, Tray, Menu } = require('electron');
 nativeTheme.themeSource = 'dark';
 
 const fs = require('fs');
@@ -197,6 +197,52 @@ function createWindow(splash, splashMinEnd) {
   return win;
 }
 
+// ── System Tray ─────────────────────────────────────────────────────────────
+
+let tray = null;
+
+function createTray(win) {
+  const iconPath = path.join(__dirname, '../assets/images/icon-sombre.png');
+  tray = new Tray(iconPath);
+  tray.setToolTip('Leanna');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Afficher',
+      click: () => {
+        win.show();
+        win.focus();
+      },
+    },
+    {
+      label: 'Masquer',
+      click: () => {
+        win.hide();
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Quitter',
+      click: () => {
+        app.isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  // Double-clic sur l'icône tray → afficher/masquer la fenêtre
+  tray.on('double-click', () => {
+    if (win.isVisible()) {
+      win.hide();
+    } else {
+      win.show();
+      win.focus();
+    }
+  });
+}
+
 app.whenReady().then(() => {
   const splash = createSplashWindow();
   const splashMinEnd = Date.now() + 5000; // splash visible au moins 5 secondes
@@ -206,7 +252,24 @@ app.whenReady().then(() => {
     startBackendServer();
   }
 
-  createWindow(splash, splashMinEnd);
+  const win = createWindow(splash, splashMinEnd);
+
+  // Créer le tray une fois la fenêtre prête
+  createTray(win);
+
+  // Intercepter la fermeture : réduire dans le tray plutôt que quitter
+  win.on('close', (event) => {
+    if (!app.isQuitting) {
+      event.preventDefault();
+      win.hide();
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'Leanna',
+          body: 'Leanna tourne en arrière-plan. Double-cliquez sur l\'icône pour rouvrir.',
+        }).show();
+      }
+    }
+  });
 
   // --- IPC Handlers (inchangé) ---
 
@@ -342,6 +405,9 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow(null, 0);
+    } else {
+      win.show();
+      win.focus();
     }
   });
 
@@ -351,7 +417,8 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') {
+  // Ne pas quitter si on réduit dans le tray
+  if (app.isQuitting && process.platform !== 'darwin') {
     app.quit();
   }
 });

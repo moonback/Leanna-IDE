@@ -148,7 +148,7 @@ Améliorations de qualité, performance et DX ciblées sur les frictions identif
 | Variables d'environnement validées au démarrage avec messages d'erreur clairs | ✅ Fait |
 | Hot-reload des custom skills sans redémarrage serveur | ✅ Fait |
 | Export/Import complet du profil (skills, workflows, agents) | 📋 Planifié |
-| Documentation interactive des skills (auto-générée depuis les déclarations) | 📋 Planifié |
+| Documentation interactive des skills (auto-générée depuis les déclarations) | ✅ Fait |
 
 ### Sécurité
 | Fonctionnalité | Statut |
