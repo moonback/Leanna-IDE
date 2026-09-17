@@ -252,6 +252,23 @@ export const agentsSkill: Skill = {
         required: [],
       },
     },
+    {
+      name: "agent_brain",
+      description:
+        "Agent Brain — Cerveau central Leanna pour objectifs complexes. Comprend l'intention, " +
+        "décompose dynamiquement en étapes, sélectionne les agents et leurs outils sans workflow figé, " +
+        "exécute le DAG, valide les résultats et applique une boucle d'auto-correction.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          goal: { type: "STRING", description: "L'objectif global de haut niveau (ex: « Modernise mon site et rends le header responsive »)" },
+          contextFiles: { type: "ARRAY", items: { type: "STRING" }, description: "Fichiers pertinents connus (optionnel)" },
+          instructions: { type: "STRING", description: "Consignes spécifiques (optionnel)" },
+          mode: { type: "STRING", description: "Mode d'exécution : 'auto' (complet) ou 'plan_first' (planification préalable)" },
+        },
+        required: ["goal"],
+      },
+    },
   ],
 
   inputSchemas: {
@@ -271,6 +288,12 @@ export const agentsSkill: Skill = {
     agent_message_history:            z.object({
       limit: z.number().int().min(1).max(100).optional().default(20),
     }),
+    agent_brain:                      z.object({
+      goal: z.string().min(1, "L'objectif est requis").trim(),
+      contextFiles: z.array(z.string()).optional().default([]),
+      instructions: z.string().optional(),
+      mode: z.enum(["auto", "plan_first"]).optional().default("auto"),
+    }),
   },
 
   async handleToolCall(name: string, args: any): Promise<any> {
@@ -278,6 +301,56 @@ export const agentsSkill: Skill = {
     log.info(`Outil assistant exécuté: ${name}`);
 
     switch (name) {
+
+      // ── Agent Brain ───────────────────────────────────────────────────────
+
+      case "agent_brain": {
+        const v = validateArgs((this.inputSchemas as any).agent_brain, args, name);
+        if (v.mode === "plan_first") {
+          const plan = await agentOrchestrator.brainPlan({
+            goal: v.goal,
+            contextFiles: v.contextFiles,
+            instructions: v.instructions,
+            mode: "plan_first",
+          });
+          return {
+            success: true,
+            mode: "plan_first",
+            planId: plan.id,
+            understanding: plan.understanding,
+            stages: plan.stages.map((s: any) => ({
+              id: s.id,
+              role: s.agentRole,
+              title: s.title,
+              reason: s.agentReason,
+              tools: s.tools,
+              dependsOn: s.dependsOn,
+            })),
+            rationale: plan.architectureRationale,
+          };
+        } else {
+          const result = await agentOrchestrator.brainExecute({
+            goal: v.goal,
+            contextFiles: v.contextFiles,
+            instructions: v.instructions,
+            mode: "auto",
+          });
+          return {
+            success: result.success,
+            mode: "auto",
+            planId: result.planId,
+            summary: result.summary,
+            stagesExecuted: result.stages.map((s: any) => ({
+              role: s.stage.agentRole,
+              title: s.stage.title,
+              durationMs: s.durationMs,
+            })),
+            filesModified: result.filesModified,
+            deliverables: result.deliverables,
+            totalDurationMs: result.totalDurationMs,
+          };
+        }
+      }
 
       // ── Outils existants ─────────────────────────────────────────────────
 

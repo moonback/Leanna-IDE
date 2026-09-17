@@ -106,3 +106,21 @@ export type {
   MessageFlowEdge,
   MessageFlowGraph
 } from "./MessageBusMonitor.js";
+
+// Agent Brain — Cerveau central dynamique Leanna
+export { AgentBrain, agentBrain } from "./brain/AgentBrain.js";
+export { GoalUnderstandingEngine } from "./brain/GoalUnderstandingEngine.js";
+export { DynamicPlanner } from "./brain/DynamicPlanner.js";
+export { BrainVerifier } from "./brain/BrainVerifier.js";
+export { BrainCorrectionLoop } from "./brain/BrainCorrectionLoop.js";
+export type {
+  BrainGoalInput,
+  GoalUnderstanding,
+  BrainPlan,
+  BrainStage,
+  BrainExecutionResult,
+  StageVerification,
+  BrainCorrectionAttempt,
+  ProjectDomain,
+  ComplexityLevel,
+} from "./brain/types.js";

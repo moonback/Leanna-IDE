@@ -193,6 +193,127 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
     }
   });
 
+  // ── Agent Brain REST API ──────────────────────────────────────────────────
+
+  const BrainPlanSchema = z.object({
+    goal: z.string().min(1, "goal requis").trim(),
+    contextFiles: z.array(z.string()).optional().default([]),
+    instructions: z.string().optional(),
+  });
+
+  const BrainExecuteSchema = BrainPlanSchema.extend({
+    maxCorrectionAttempts: z.number().int().min(0).max(5).optional().default(3),
+    preferences: z.object({
+      visualValidation: z.boolean().optional(),
+      skipTests: z.boolean().optional(),
+      strictMode: z.boolean().optional(),
+    }).optional(),
+  });
+
+  /**
+   * POST /api/agents/brain/plan
+   * Génère un plan dynamique (compréhension + décomposition en DAG) sans exécuter.
+   * Body: { goal, contextFiles?, instructions? }
+   */
+  router.post('/brain/plan', async (req: Request, res: Response) => {
+    try {
+      const parsed = BrainPlanSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: 'Corps de requête invalide.',
+          details: parsed.error.errors.map((e) => ({ field: e.path.join('.') || '(root)', message: e.message })),
+        });
+      }
+      const plan = await agentOrchestrator.brainPlan({ ...parsed.data, mode: 'plan_first' });
+      return res.status(200).json({
+        planId: plan.id,
+        goal: plan.goal,
+        understanding: plan.understanding,
+        stages: plan.stages.map((s) => ({
+          id: s.id,
+          role: s.agentRole,
+          title: s.title,
+          reason: s.agentReason,
+          tools: s.tools,
+          skills: s.skills,
+          dependsOn: s.dependsOn,
+        })),
+        estimatedDurationMs: plan.estimatedDurationMs,
+        rationale: plan.architectureRationale,
+        createdAt: plan.createdAt,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * POST /api/agents/brain/execute
+   * Exécute un objectif de bout en bout via l'Agent Brain.
+   * Body: { goal, contextFiles?, instructions?, maxCorrectionAttempts?, preferences? }
+   */
+  router.post('/brain/execute', async (req: Request, res: Response) => {
+    try {
+      const parsed = BrainExecuteSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: 'Corps de requête invalide.',
+          details: parsed.error.errors.map((e) => ({ field: e.path.join('.') || '(root)', message: e.message })),
+        });
+      }
+      const result = await agentOrchestrator.brainExecute({ ...parsed.data, mode: 'auto' });
+      return res.status(result.success ? 200 : 207).json({
+        planId: result.planId,
+        success: result.success,
+        summary: result.summary,
+        stagesExecuted: result.stages.map((s) => ({
+          role: s.stage.agentRole,
+          title: s.stage.title,
+          status: s.stage.status,
+          durationMs: s.durationMs,
+        })),
+        filesModified: result.filesModified,
+        correctionsApplied: result.corrections.length,
+        totalDurationMs: result.totalDurationMs,
+        deliverables: result.deliverables,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * GET /api/agents/brain/status/:planId
+   * État d'avancement d'un run Brain.
+   */
+  router.get('/brain/status/:planId', async (req: Request, res: Response) => {
+    try {
+      const brain = await agentOrchestrator.getBrain();
+      const plan = brain.getPlan(req.params.planId);
+      const result = brain.getResult(req.params.planId);
+      if (!plan) {
+        return res.status(404).json({ error: `Plan ${req.params.planId} introuvable.` });
+      }
+      return res.json({
+        planId: plan.id,
+        goal: plan.goal,
+        status: plan.status,
+        stages: plan.stages.map((s: any) => ({
+          id: s.id, role: s.agentRole, title: s.title, status: s.status,
+          durationMs: s.durationMs,
+        })),
+        result: result ? {
+          success: result.success,
+          summary: result.summary,
+          filesModified: result.filesModified,
+          totalDurationMs: result.totalDurationMs,
+        } : null,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
   /**
    * GET /api/agents/events
    * Flux SSE des événements de progression des agents.
