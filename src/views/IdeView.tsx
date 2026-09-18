@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useMemo, useState, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 // Monaco Editor - lazy loaded to reduce initial bundle
-const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.Editor })));
+// Pass the bundled monaco instance directly to avoid CDN loader (fixes CSP violations)
+const MonacoEditor = lazy(() =>
+  Promise.all([
+    import('@monaco-editor/react'),
+    import('monaco-editor'),
+  ]).then(([monacoReact, monacoInstance]) => {
+    monacoReact.loader.config({ monaco: monacoInstance });
+    return { default: monacoReact.Editor };
+  })
+);
 const DiffViewer = lazy(() => import('../components/ide/DiffViewer.js').then(m => ({ default: m.DiffViewer })));
 // Panels - lazy loaded
 const VisionPanel = lazy(() => import('../components/panels/VisionPanel.js').then(m => ({ default: m.VisionPanel })));

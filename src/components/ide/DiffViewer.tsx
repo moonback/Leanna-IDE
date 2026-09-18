@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { DiffEditor } from '@monaco-editor/react';
+import { DiffEditor, loader } from '@monaco-editor/react';
+import * as monacoInstance from 'monaco-editor';
+// Use the bundled monaco instance to avoid CDN loader (fixes CSP violations)
+loader.config({ monaco: monacoInstance });
 import { X, RefreshCcw, RotateCcw } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────
