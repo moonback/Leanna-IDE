@@ -375,9 +375,9 @@ export class MissionManager {
       if (task.status === "failed" || task.status === "cancelled") {
         return task.result ?? {
           success: false,
-          outcome: "failed",
+          outcome: "failed" as const,
           summary: `Tâche ${task.status}`,
-          error: task.result?.error ?? task.status,
+          error: String(task.status),
           durationMs: Date.now() - start,
         };
       }

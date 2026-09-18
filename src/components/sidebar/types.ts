@@ -121,6 +121,7 @@ export interface UnifiedSidebarProps {
   showMcp?: boolean;
   showFleet?: boolean;
   showBrowser?: boolean;
+  showAutonomous?: boolean;
   showTerminal?: boolean;
   assistantConnected?: boolean;
   assistantWorking?: boolean;
@@ -151,6 +152,7 @@ export interface UnifiedSidebarProps {
   onToggleMcp?: () => void;
   onToggleFleet?: () => void;
   onToggleBrowser?: () => void;
+  onToggleAutonomous?: () => void;
   onToggleTerminal?: () => void;
   onToggleVision?: () => void;
   onToggleScreenShare?: () => void;

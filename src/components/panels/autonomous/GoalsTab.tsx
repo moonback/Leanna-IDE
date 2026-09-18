@@ -4,8 +4,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Target, Plus, Pause, Play, Trash2, Loader2,
-  ChevronDown, ChevronRight, AlertTriangle, CheckCircle2,
-  Clock, Zap, RefreshCw,
+  ChevronDown, ChevronRight, AlertTriangle,
+  Clock, RefreshCw,
 } from 'lucide-react';
 import { autonomousApi } from '../../../services/autonomousApi.js';
 import type { Goal, GoalCreateInput, GoalStatus } from '../../../services/autonomousApi.js';
