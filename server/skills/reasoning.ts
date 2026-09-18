@@ -928,7 +928,7 @@ export const reasoningSkill: Skill = {
       };
       const complexityText = complexityLabels[complexity] || complexity;
       const reasonExplanation = buildReasoningExplanation(prompt, chosenStrategy, complexity);
-      let announcementText = `J'active mon raisonnement ${reasonLabel}, la tâche est ${complexityText}. ${reasonExplanation}`;
+      let announcementText = `Raisonnement ${reasonLabel}, la tâche est ${complexityText}. ${reasonExplanation}`;
       if (announcementText.length > ANNOUNCEMENT_MAX_CHARS) {
         announcementText = announcementText.slice(0, ANNOUNCEMENT_MAX_CHARS - 1).trimEnd() + "…";
       }

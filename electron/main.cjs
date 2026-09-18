@@ -326,6 +326,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('electron/quit', function () {
+    app.isQuitting = true;
     app.quit();
   });
 
@@ -434,30 +435,77 @@ let isShuttingDown = false;
 
 app.on('before-quit', function (event) {
   if (isShuttingDown) return; // Éviter les appels multiples
-  const shutdown = process.__LeannaShutdown;
-  if (typeof shutdown !== 'function') return; // dev mode : server.ts non chargé ici
-
   isShuttingDown = true;
-  event.preventDefault();
-  log('[Lifecycle] before-quit : déclenchement du graceful shutdown...');
 
-  shutdown('before-quit').then(function () {
-    log('[Lifecycle] Shutdown complet, fermeture Electron.');
-  }).catch(function (err) {
-    log('[Lifecycle] Erreur shutdown:', err && err.message ? err.message : String(err));
-  }).finally(function () {
-    // Tuer tous les processus enfants restants sur Windows
-    killChildProcesses();
-    app.exit(0);
-  });
+  const shutdown = process.__LeannaShutdown;
 
-  // Sécurité : forcer la fermeture après 5s si le shutdown n'aboutit pas
-  setTimeout(function () {
-    log('[Lifecycle] Timeout shutdown (5s), forçage fermeture.');
-    killChildProcesses();
-    app.exit(0);
-  }, 5000);
+  // Mode packagé : le serveur tourne dans le même process → graceful shutdown
+  if (typeof shutdown === 'function') {
+    event.preventDefault();
+    log('[Lifecycle] before-quit : déclenchement du graceful shutdown...');
+
+    shutdown('before-quit').then(function () {
+      log('[Lifecycle] Shutdown complet, fermeture Electron.');
+    }).catch(function (err) {
+      log('[Lifecycle] Erreur shutdown:', err && err.message ? err.message : String(err));
+    }).finally(function () {
+      killChildProcesses();
+      app.exit(0);
+    });
+
+    // Sécurité : forcer la fermeture après 5s si le shutdown n'aboutit pas
+    setTimeout(function () {
+      log('[Lifecycle] Timeout shutdown (5s), forçage fermeture.');
+      killChildProcesses();
+      app.exit(0);
+    }, 5000);
+
+  } else {
+    // Mode dev : le serveur est un process séparé lancé par concurrently.
+    // On tue le process qui écoute sur le port du serveur avant de quitter.
+    log('[Lifecycle] before-quit (dev) : arrêt du serveur dev sur le port...');
+    killDevServer();
+    // Pas de preventDefault() — Electron peut se fermer immédiatement
+  }
 });
+
+// Tue le serveur dev (process séparé lancé par concurrently en mode dev).
+// Cherche le PID qui écoute sur le port du serveur et le termine.
+function killDevServer() {
+  const port = process.env.VITE_SERVER_PORT || '4000';
+  try {
+    const { execSync } = require('child_process');
+    if (process.platform === 'win32') {
+      // netstat donne le PID pour le port donné
+      const output = execSync(
+        'netstat -ano | findstr :' + port + ' | findstr LISTENING',
+        { encoding: 'utf-8', windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] }
+      ).trim();
+      // Extraire le dernier token (PID) de la première ligne
+      const firstLine = output.split('\n')[0];
+      const pid = firstLine && firstLine.trim().split(/\s+/).pop();
+      if (pid && /^\d+$/.test(pid) && parseInt(pid) !== process.pid) {
+        log('[Lifecycle] Arrêt serveur dev PID:', pid, 'port:', port);
+        execSync('taskkill /PID ' + pid + ' /T /F', { stdio: 'ignore', windowsHide: true });
+      }
+    } else {
+      // Linux/macOS : lsof
+      const output = execSync(
+        'lsof -ti tcp:' + port,
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
+      ).trim();
+      output.split('\n').forEach(function (pid) {
+        pid = pid.trim();
+        if (pid && /^\d+$/.test(pid) && parseInt(pid) !== process.pid) {
+          log('[Lifecycle] Arrêt serveur dev PID:', pid, 'port:', port);
+          try { process.kill(parseInt(pid), 'SIGTERM'); } catch (_) {}
+        }
+      });
+    }
+  } catch (_) {
+    // Pas de process sur ce port, ou commande indisponible — on continue
+  }
+}
 
 // Sur Windows, app.exit() ne tue pas toujours les child processes (MCP, etc.)
 // On utilise taskkill pour nettoyer l'arbre de processus.
