@@ -275,7 +275,6 @@ export class MissionManager {
       this._setStatus(mission, "failed");
       log.error(`Mission "${mission.title}" exception: ${(err as Error).message}`);
     } finally {
-      // Notifier le DecisionEngine de la fin
       this.onMissionFinished?.(mission.goalId);
       // Notifier les handlers de complétion (ReflectionEngine)
       this._notifyCompletion(mission);

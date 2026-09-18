@@ -501,8 +501,9 @@ async function startServer() {
   const githubRouter = createGithubRouter(skillManager);
   app.use("/api/git", githubRouter);
   app.use("/api/github", githubRouter);
-  app.use("/api/agents", createAgentsRouter(skillManager));
+  // ── Autonomous Core V2 — routes montées AVANT /api/agents (sinon capturées) ──
   app.use("/api/agents/autonomous", (await import("./server/routes/autonomous.js")).default);
+  app.use("/api/agents", createAgentsRouter(skillManager));
 
   // ─── Routes Runtime V2 (nouveau système, coexistence) ────────────────────
   const { createAgentsRouterV2 } = await import("./server/runtime/routes/agents.js");

@@ -30,6 +30,9 @@ const log = createLogger("DecisionEngine");
 /** Cooldown minimal entre deux missions du même objectif (ms) */
 const DEFAULT_MISSION_COOLDOWN_MS = 5 * 60 * 1000; // 5 min
 
+/** Cooldown après échec — beaucoup plus long pour éviter les boucles */
+const FAILURE_COOLDOWN_MS = 20 * 60 * 1000; // 20 min
+
 /** Score de confiance minimal pour créer une mission */
 const MIN_CONFIDENCE = 0.35;
 
@@ -75,6 +78,9 @@ export class DecisionEngine {
 
   /** Nombre de missions actives par goalId */
   private activeMissionCount: Map<string, number> = new Map();
+
+  /** Dernière mission s'est-elle soldée par un échec ? */
+  private lastMissionFailed: Map<string, boolean> = new Map();
 
   // ─── Abonnement ────────────────────────────────────────────────────────────
 
@@ -127,10 +133,18 @@ export class DecisionEngine {
 
   /**
    * Signale qu'une mission s'est terminée pour un objectif.
+   * @param failed true si la mission a échoué
    */
-  missionFinished(goalId: string): void {
+  missionFinished(goalId: string, failed = false): void {
     const current = this.activeMissionCount.get(goalId) ?? 0;
     this.activeMissionCount.set(goalId, Math.max(0, current - 1));
+    // Après un échec, mettre à jour lastDecisionAt pour déclencher le cooldown long
+    if (failed) {
+      this.lastMissionFailed.set(goalId, true);
+      this.lastDecisionAt.set(goalId, Date.now());
+    } else {
+      this.lastMissionFailed.delete(goalId);
+    }
   }
 
   // ─── Logique d'évaluation ────────────────────────────────────────────────
@@ -152,9 +166,14 @@ export class DecisionEngine {
 
     // 3. Vérifier le cooldown entre missions
     const lastDecision = this.lastDecisionAt.get(goal.id) ?? 0;
-    const cooldown = DEFAULT_MISSION_COOLDOWN_MS;
+    // Cooldown plus long si la dernière mission a échoué
+    const hasFailed = this.lastMissionFailed.get(goal.id) ?? false;
+    const cooldown = hasFailed ? FAILURE_COOLDOWN_MS : DEFAULT_MISSION_COOLDOWN_MS;
     if (Date.now() - lastDecision < cooldown) {
-      log.debug(`Goal "${goal.title}" en cooldown (${Math.round((cooldown - (Date.now() - lastDecision)) / 1000)}s restant)`);
+      log.debug(
+        `Goal "${goal.title}" en cooldown ${hasFailed ? "(post-échec) " : ""}` +
+        `(${Math.round((cooldown - (Date.now() - lastDecision)) / 1000)}s restant)`
+      );
       return null;
     }
 
@@ -235,18 +254,35 @@ export class DecisionEngine {
     const goalCheckTypes = goal.checks.map((c) => c.type);
     const activeChecks = goalCheckTypes.filter((t) => relevantCheckTypes.includes(t));
 
+    // Pour les ticks planifiés : agents analytiques uniquement (lecture seule)
+    // Évite que le debugger/coder soit envoyé pour une simple vérification périodique,
+    // ce qui se solde toujours par un échec car aucun fichier n'est modifié.
+    const isScheduledTick = event.type === "scheduler.tick";
+
+    // Mapping restreint pour les ticks : analyse uniquement
+    const TICK_CHECK_AGENTS: Record<string, AgentRole[]> = {
+      typescript: ["reviewer"],
+      tests:      ["reviewer"],
+      security:   ["security"],
+      dependencies: ["researcher"],
+      git_status: ["reviewer"],
+      architecture: ["architect"],
+      tech_debt:  ["researcher"],
+      documentation: ["writer"],
+      custom:     ["researcher"],
+    };
+
     // Agents recommandés basés sur les checks actifs
     const agentSet = new Set<AgentRole>();
+    const agentMap = isScheduledTick ? TICK_CHECK_AGENTS : CHECK_AGENTS;
     for (const checkType of activeChecks.slice(0, 3)) {
-      const agents = CHECK_AGENTS[checkType] ?? [];
-      agents.slice(0, 2).forEach((a) => agentSet.add(a));
+      const agents = agentMap[checkType] ?? [];
+      agents.slice(0, 1).forEach((a) => agentSet.add(a));
     }
 
-    // Toujours inclure reviewer si plusieurs agents
-    if (agentSet.size > 1) agentSet.add("reviewer");
-
-    const agents: AgentRole[] = Array.from(agentSet).slice(0, 3);
-    if (agents.length === 0) agents.push("coder");
+    // Pour les ticks : un seul agent (évite l'orchestration séquentielle bloquante)
+    const agents: AgentRole[] = Array.from(agentSet).slice(0, isScheduledTick ? 1 : 3);
+    if (agents.length === 0) agents.push(isScheduledTick ? "reviewer" : "coder");
 
     // Priorité selon confiance et priorité de l'objectif
     let priority: TaskPriority = "low";
