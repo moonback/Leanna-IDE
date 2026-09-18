@@ -509,6 +509,10 @@ async function startServer() {
   app.use("/api/v2/agents", createAgentsRouterV2(runtimeV2));
   app.use("/api/v2/metrics", createMetricsRouter(runtimeV2));
 
+  // ─── Observability & Telemetry (OpenTelemetry + Cost Dashboard) ──────────
+  const observabilityRouter = (await import("./server/routes/observability.js")).default;
+  app.use("/api/observability", observabilityRouter);
+
   app.use("/api", createProfileRouter(() => currentProfile, (p) => { currentProfile = p; setTextGenerationProfile(p); }, saveProfile, getWorkspaceRoot, updateEnvFile));
   app.use("/api", createTokensRouter(updateEnvFile, async () => { await loadGeminiKeys(); }));
   app.use("/api/openrouter", createOpenRouterRouter(() => currentProfile));
