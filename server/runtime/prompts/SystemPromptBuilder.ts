@@ -1,21 +1,52 @@
 /**
- * SystemPromptBuilder — Construit le prompt système depuis le PromptRegistry
- * 
- * Remplace les 12 fichiers de l'ancien système (buildSystemInstruction + 11 modules)
- * par un seul builder qui compose les sections depuis le registry.
- * 
- * Avantages :
- * - Un seul fichier à maintenir
- * - Sections activées/désactivées dynamiquement
- * - Variables injectées uniformément
- * - Mode compact automatique
- * - Extensible sans modification du builder
+ * SystemPromptBuilder — Orchestrateur du pipeline de compilation de prompt
+ *
+ * Évolution : d'un simple assembleur de sections vers un compilateur de politique.
+ *
+ * Pipeline interne :
+ *   SystemPromptConfig
+ *       ↓ ContextResolver
+ *   PromptContext
+ *       ↓ RuleRegistry  (CORE_RULES + règles chargées depuis .md)
+ *   PromptRule[]  (candidates filtrées par scope/when)
+ *       ↓ ConflictResolver
+ *   PromptRule[]  (après résolution P0–P7)
+ *       ↓ SectionRegistry  (sections .md sélectionnées par contexte)
+ *   PromptSection[]
+ *       ↓ PromptCompiler
+ *   BuiltPrompt  { content, rules, sections, conflicts, metadata }
+ *
+ * Rétrocompatibilité totale :
+ *   - build(config): string            → inchangé
+ *   - buildSystemPrompt(config): string → inchangé
+ *   - getSystemPromptBuilder()         → inchangé
+ *   - buildSystemInstructionV3()       → inchangé (@deprecated)
+ *   - getRegistry()                    → inchangé
+ *   - loadTemplates()                  → inchangé
+ *
+ * Nouvelles API :
+ *   - buildFull(config): BuiltPrompt   → prompt + audit complet
+ *   - explain(config): string          → explication lisible du build
  */
 
-import { PromptRegistry } from "../PromptRegistry.js";
-import { loadPromptTemplates } from "./loader.js";
+import * as fs   from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+
+import { PromptRegistry }   from "../PromptRegistry.js";
+import { loadPromptTemplates } from "./loader.js";
+import { ContextResolver }  from "./ContextResolver.js";
+import { RuleRegistry }     from "./RuleRegistry.js";
+import { ConflictResolver } from "./ConflictResolver.js";
+import { SectionRegistry }  from "./SectionRegistry.js";
+import { PromptCompiler }   from "./PromptCompiler.js";
+import { CORE_RULES }       from "./rules/core.js";
+
+import type { BuiltPrompt }   from "./types/builder.js";
+import type { PromptSection } from "./types/builder.js";
+import type { PromptContext } from "./types/context.js";
+import type { RuleScope }     from "./types/rules.js";
+
 import {
   SystemPromptConfig,
   AgentRole,
@@ -23,151 +54,313 @@ import {
   LANG_INSTRUCTIONS_FR,
   STYLE_INSTRUCTIONS_FR,
 } from "./types.js";
+import type { TaskType } from "./types/context.js";
 
-const __dirname_compat = typeof __dirname !== 'undefined'
+const __dirname_compat = typeof __dirname !== "undefined"
   ? __dirname
   : path.dirname(fileURLToPath(import.meta.url));
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Builder
+// SystemPromptBuilder
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export class SystemPromptBuilder {
-  private registry: PromptRegistry;
+  // ── Pipeline components ───────────────────────────────────────────────────
+
+  private readonly contextResolver  = new ContextResolver();
+  private readonly ruleRegistry     = new RuleRegistry();
+  private readonly conflictResolver = new ConflictResolver();
+  private readonly sectionRegistry  = new SectionRegistry();
+  private readonly compiler         = new PromptCompiler();
+
+  // ── Legacy PromptRegistry (templates Markdown) ───────────────────────────
+  // Conservé pour la rétrocompatibilité de getRegistry() et du rendu compact.
+
+  private readonly legacyRegistry: PromptRegistry;
   private loaded = false;
 
   constructor(registry?: PromptRegistry) {
-    this.registry = registry ?? new PromptRegistry();
+    this.legacyRegistry = registry ?? new PromptRegistry();
+
+    // Charger les règles core au démarrage
+    this.ruleRegistry.registerAll(CORE_RULES);
   }
 
+  // ─── Chargement des templates .md ─────────────────────────────────────────
+
   /**
-   * Charge les templates depuis les fichiers .md.
-   * Appeler une seule fois au démarrage.
+   * Charge les fichiers .md dans le legacy PromptRegistry ET
+   * enregistre les sections dans le SectionRegistry pour le nouveau pipeline.
+   *
+   * Appeler une seule fois au démarrage (ou laisser build() le faire lazily).
    */
   loadTemplates(promptsDir?: string): void {
     const dir = promptsDir ?? __dirname_compat;
-    loadPromptTemplates(this.registry, dir);
+    loadPromptTemplates(this.legacyRegistry, dir);
+    this.syncSectionsFromLegacy(dir);
     this.loaded = true;
   }
 
+  // ─── API principale ───────────────────────────────────────────────────────
+
   /**
    * Construit le prompt système complet.
+   *
+   * Rétrocompatible : même signature et même type de retour qu'avant.
+   * Utilise désormais le nouveau pipeline en interne.
    */
-  build(config: SystemPromptConfig = {}): string {
+  build(config: SystemPromptConfig & { taskType?: TaskType } = {}): string {
+    return this.buildFull(config).content;
+  }
+
+  /**
+   * Construit le prompt et retourne le résultat complet (contenu + audit).
+   *
+   * Nouvelle API — permet au runtime d'inspecter rules/sections/conflicts.
+   */
+  buildFull(config: SystemPromptConfig & { taskType?: TaskType } = {}): BuiltPrompt {
     if (!this.loaded) {
       this.loadTemplates();
     }
 
-    const variables: Record<string, string> = {
-      aiName: config.aiName ?? "Leanna",
-      userName: config.userName ?? "",
-      userRole: config.userRole ?? "",
-    };
+    const startMs = Date.now();
 
-    const opts = { 
-      compact: true,           // Mode compact activé par défaut
-      ...config 
-    };
+    // ── 1. Résoudre le contexte ──
+    const context = this.contextResolver.resolve(config);
 
-    const renderOpts = {
-      variables,
-      compact: opts.compact,
-      exclude: opts.excludeSections,
-    };
+    // ── 2. Filtrer les règles candidates (scope + when) ──
+    const candidates = this.ruleRegistry
+      .all()
+      .filter(rule => this.isRuleActive(rule, context));
 
-    const isAskMode = config.mode === "ask";
+    // ── 3. Résoudre les conflits ──
+    const { rules: resolvedRules, conflicts } =
+      this.conflictResolver.resolve(candidates);
 
-    // Assembler les sections dans l'ordre
-    const sections: string[] = [];
+    // ── 4. Trier les règles par priorité ──
+    const orderedRules = [...resolvedRules].sort(
+      (a, b) => a.priority - b.priority,
+    );
 
-    if (isAskMode) {
-      // ── Mode Chat/Ask : prompt optimisé pour le Q&A documentaire ──
+    // ── 5. Sélectionner les sections contextuelles (nouveau pipeline) ──
+    const sections = this.sectionRegistry.select(context);
 
-      // 1. Sécurité avant toute politique opérationnelle
-      if (this.registry.has("safety")) {
-        sections.push(this.registry.render("safety", renderOpts));
-      }
+    // ── 6. Ajouter les sections additionnelles du legacy pipeline ──
+    //   (workspace, extra sections, footer) pour la rétrocompatibilité.
+    const legacySections = this.buildLegacySections(config, context);
+    const allSections = [...sections, ...legacySections];
 
-      // 2. Chat prompt (analyse documentaire, Q&A contextuel)
-      if (this.registry.has("chat")) {
-        sections.push(this.registry.render("chat", renderOpts));
-      }
+    // ── 7. Compiler ──
+    const built = this.compiler.compile(
+      context,
+      orderedRules,
+      allSections,
+      conflicts,
+      startMs,
+    );
 
-      // 3. Efficacité des outils (lecture seule en ask mode)
-      if (this.registry.has("efficiency")) {
-        sections.push(this.registry.render("efficiency", renderOpts));
-      }
-
-    } else {
-      // ── Mode Full : prompt agent complet ──
-
-      // 1. Identité, périmètre et politique de tâche
-      if (this.registry.has("base")) {
-        sections.push(this.registry.render("base", renderOpts));
-      }
-
-      // 2. Autorité et garde-fous : avant les instructions d'exécution
-      if (this.registry.has("safety")) {
-        sections.push(this.registry.render("safety", renderOpts));
-      }
-
-      // 3. Directives de politique technique et comportementale
-      if (this.registry.has("ai-studio-directives")) {
-        sections.push(this.registry.render("ai-studio-directives", renderOpts));
-      }
-
-      // 4. Politique d'utilisation des outils
-      if (this.registry.has("efficiency")) {
-        sections.push(this.registry.render("efficiency", renderOpts));
-      }
-
-      // 5. Navigateur web intégré (comportement conversationnel)
-      if (this.registry.has("browser")) {
-        sections.push(this.registry.render("browser", renderOpts));
-      }
-
-      // 6. Système multi-agents (conditionnel selon config.agents)
-      const agentsEnabled = config.agents?.enabled !== false; // activé par défaut
-      if (agentsEnabled && this.registry.has("agents-system")) {
-        const allowedRoles = config.agents?.allowedRoles as AgentRole[] | undefined;
-        if (allowedRoles && allowedRoles.length > 0) {
-          // Injecter un prompt agents filtré avec seulement les rôles autorisés
-          sections.push(this.buildFilteredAgentsPrompt(allowedRoles, renderOpts));
-        } else {
-          // Tous les agents actifs
-          sections.push(this.registry.render("agents-system", renderOpts));
-        }
-      } else if (!agentsEnabled) {
-        // Agents désactivés : l'assistant agit seul, peut écrire directement
-        sections.push(this.buildSoloModePrompt());
-      }
-
-      // 7. Boucle d'autonomie : après les règles et les capacités disponibles
-      if (this.registry.has("autonomy")) {
-        sections.push(this.registry.render("autonomy", renderOpts));
-      }
+    // ── 8. Si aucune règle n'est active (cas edge), fallback sur le
+    //   legacy pipeline pour garantir la rétrocompatibilité totale. ──
+    if (orderedRules.length === 0 && allSections.length === 0) {
+      const legacyContent = this.buildLegacy(config);
+      return {
+        content:   legacyContent,
+        rules:     [],
+        sections:  [],
+        conflicts: [],
+        metadata: {
+          mode:          context.mode,
+          taskType:      context.taskType,
+          ruleCount:     0,
+          sectionCount:  0,
+          conflictCount: 0,
+          buildTimeMs:   Date.now() - startMs,
+        },
+      };
     }
 
-    // 7. Contexte du Workspace (projet actif vs mode sans projet)
-    sections.push(this.buildWorkspaceSection(config.workspace));
-
-    // 8. Sections additionnelles (extensibilité) — les deux modes
-    if (config.extraSections) {
-      for (const section of config.extraSections) {
-        sections.push(section.content);
-      }
-    }
-
-    // 9. Instructions de langue et style
-    const footer = this.buildFooter(config);
-    if (footer) sections.push(footer);
-
-    return sections.filter(Boolean).join("\n\n");
+    return built;
   }
 
   /**
-   * Construit la section d'instructions relative à l'état du workspace.
+   * Retourne une explication lisible du build — utile pour le debugging.
+   *
+   *   console.log(builder.explain({ mode: "full", taskType: "debugging" }))
    */
+  explain(config: SystemPromptConfig & { taskType?: TaskType } = {}): string {
+    const built = this.buildFull(config);
+    return this.compiler.explain(built);
+  }
+
+  /**
+   * Retourne le legacy PromptRegistry pour enregistrer des templates additionnels.
+   * Conservé pour la rétrocompatibilité.
+   */
+  getRegistry(): PromptRegistry {
+    return this.legacyRegistry;
+  }
+
+  /**
+   * Retourne le RuleRegistry pour enregistrer des règles additionnelles.
+   */
+  getRuleRegistry(): RuleRegistry {
+    return this.ruleRegistry;
+  }
+
+  /**
+   * Retourne le SectionRegistry pour enregistrer des sections additionnelles.
+   */
+  getSectionRegistry(): SectionRegistry {
+    return this.sectionRegistry;
+  }
+
+  // ─── Synchronisation Legacy → SectionRegistry ─────────────────────────────
+
+  /**
+   * Lit les fichiers .md et les enregistre comme PromptSection dans le
+   * SectionRegistry, avec les métadonnées de scope/priority du front-matter.
+   */
+  private syncSectionsFromLegacy(promptsDir: string): void {
+    if (!fs.existsSync(promptsDir)) return;
+
+    const files = fs.readdirSync(promptsDir).filter((f: string) => f.endsWith(".md"));
+
+    const SECTION_SCOPE_MAP: Record<string, RuleScope[]> = {
+      "base":                ["full"],
+      "safety":              ["global"],
+      "ai-studio-directives":["full", "coding"],
+      "efficiency":          ["global"],
+      "browser":             ["browser", "full"],
+      "agents-system":       ["agent", "full"],
+      "autonomy":            ["full"],
+      "chat":                ["ask"],
+    };
+
+    const SECTION_PRIORITY_MAP: Record<string, number> = {
+      "base":                 10,
+      "safety":               20,
+      "ai-studio-directives": 30,
+      "efficiency":           40,
+      "browser":              50,
+      "agents-system":        60,
+      "autonomy":             70,
+      "chat":                 15,
+    };
+
+    for (const file of files) {
+      const id = file.replace(/\.md$/, "");
+      if (this.sectionRegistry.has(id)) continue; // déjà enregistrée
+
+      try {
+        const filePath = path.join(promptsDir, file);
+        const raw      = fs.readFileSync(filePath, "utf-8");
+        const content  = this.legacyRegistry.has(id)
+          ? this.legacyRegistry.render(id, { compact: true })
+          : raw;
+
+        const section: PromptSection = {
+          id,
+          content,
+          scope:    SECTION_SCOPE_MAP[id] ?? ["global"],
+          priority: SECTION_PRIORITY_MAP[id] ?? 100,
+          source:   file,
+        };
+
+        // Conditions dynamiques pour les sections agents
+        if (id === "agents-system") {
+          section.when = ctx => ctx.agents.enabled;
+        }
+
+        this.sectionRegistry.set(section);
+      } catch {
+        // Silently skip unreadable files
+      }
+    }
+  }
+
+  // ─── Legacy sections (workspace + extra + footer) ─────────────────────────
+
+  /**
+   * Construit les sections legacy qui ne font pas partie des fichiers .md :
+   *   - Workspace section (dynamique, dépend du path)
+   *   - Extra sections (fournies par le runtime)
+   *   - Footer (langue + style)
+   * Ces sections ont une priority élevée (> 200) pour apparaître en dernier.
+   */
+  private buildLegacySections(
+    config:  SystemPromptConfig,
+    _context: PromptContext,
+  ): PromptSection[] {
+    const sections: PromptSection[] = [];
+
+    // ── Workspace ──
+    sections.push({
+      id:       "workspace",
+      priority: 200,
+      content:  this.buildWorkspaceSection(config.workspace),
+      source:   "SystemPromptBuilder (dynamic)",
+    });
+
+    // ── Extra sections du runtime ──
+    if (config.extraSections) {
+      for (const [i, s] of config.extraSections.entries()) {
+        sections.push({
+          id:       s.id,
+          priority: 210 + i,
+          content:  s.content,
+          source:   "config.extraSections",
+        });
+      }
+    }
+
+    // ── Agents filtrés (si allowedRoles défini) ──
+    const agentsEnabled  = config.agents?.enabled !== false;
+    const allowedRoles   = config.agents?.allowedRoles as AgentRole[] | undefined;
+    if (agentsEnabled && allowedRoles && allowedRoles.length > 0) {
+      // Remplacer la section agents-system générique par la version filtrée
+      sections.push({
+        id:       "agents-system-filtered",
+        priority: 61, // juste après agents-system (60)
+        content:  this.buildFilteredAgentsPrompt(allowedRoles),
+        source:   "SystemPromptBuilder (filtered agents)",
+        when:     ctx => ctx.agents.enabled,
+      });
+    }
+
+    // ── Footer (langue + style) ──
+    const footer = this.buildFooter(config);
+    if (footer) {
+      sections.push({
+        id:       "footer",
+        priority: 300,
+        content:  footer,
+        source:   "SystemPromptBuilder (footer)",
+      });
+    }
+
+    return sections;
+  }
+
+  // ─── Scope matching (miroir de SectionRegistry) ───────────────────────────
+
+  private isRuleActive(
+    rule:    { scope: RuleScope[]; when?: (ctx: PromptContext) => boolean },
+    context: PromptContext,
+  ): boolean {
+    if (rule.when && !rule.when(context)) return false;
+    return rule.scope.some(scope => this.matchesScope(scope, context));
+  }
+
+  private matchesScope(scope: RuleScope, context: PromptContext): boolean {
+    if (scope === "global")                             return true;
+    if (scope === context.mode)                        return true;
+    if (scope === context.taskType)                    return true;
+    if (scope === "agent" && context.agents.enabled)   return true;
+    return false;
+  }
+
+  // ─── Workspace section (inchangée) ────────────────────────────────────────
+
   private buildWorkspaceSection(workspace?: string): string {
     const trimmed = workspace?.trim();
     if (trimmed) {
@@ -189,43 +382,22 @@ export class SystemPromptBuilder {
     ].join("\n");
   }
 
-  /**
-   * Retourne le registry pour enregistrer des templates additionnels.
-   */
-  getRegistry(): PromptRegistry {
-    return this.registry;
-  }
+  // ─── Agents filtrés (inchangé) ────────────────────────────────────────────
 
-  // ─── Privé ───────────────────────────────────────────────────────────────
-
-  /**
-   * Construit un prompt agents filtré avec uniquement les rôles autorisés.
-   */
-  private buildFilteredAgentsPrompt(allowedRoles: AgentRole[], _renderOpts: any): string {
+  private buildFilteredAgentsPrompt(allowedRoles: AgentRole[]): string {
     const lines: string[] = [];
     lines.push("# Système Multi-Agents");
     lines.push("");
     lines.push("Tu fais partie du système multi-agents Leanna, couvrant l'ingénierie de code et la rédaction.");
     lines.push(`**Agents activés :** ${allowedRoles.join(", ")}`);
     lines.push("");
-
-    // Règles de délégation conditionnelles
     lines.push("## ⚠️ RÈGLES DE DÉLÉGATION");
     lines.push("");
-    if (allowedRoles.includes("coder")) {
-      lines.push("- **Code & Développement :** Délègue l'écriture et les modifications de code à `coder` via `agent_delegate`.");
-    }
-    if (allowedRoles.includes("refactor")) {
-      lines.push("- **Refactoring :** Délègue le Clean Code et le découpage de modules à `refactor`.");
-    }
-    if (allowedRoles.includes("debugger")) {
-      lines.push("- **Débogage :** Délègue la résolution d'erreurs et de stacktraces à `debugger`.");
-    }
-    if (allowedRoles.includes("writer")) {
-      lines.push("- **Rédaction :** Délègue la rédaction de documents à `writer`.");
-    }
+    if (allowedRoles.includes("coder"))    lines.push("- **Code & Développement :** Délègue l'écriture et les modifications de code à `coder` via `agent_delegate`.");
+    if (allowedRoles.includes("refactor")) lines.push("- **Refactoring :** Délègue le Clean Code et le découpage de modules à `refactor`.");
+    if (allowedRoles.includes("debugger")) lines.push("- **Débogage :** Délègue la résolution d'erreurs et de stacktraces à `debugger`.");
+    if (allowedRoles.includes("writer"))   lines.push("- **Rédaction :** Délègue la rédaction de documents à `writer`.");
     lines.push("");
-
     lines.push("## Agents disponibles");
     lines.push("");
     lines.push("| Rôle | Description | Écriture |");
@@ -233,19 +405,96 @@ export class SystemPromptBuilder {
     for (const role of allowedRoles) {
       const info = AGENT_ROLES_INFO[role];
       if (info) {
-        const writeCol = info.write ? "✅ OUI" : "❌ Lecture seule";
-        lines.push(`| **${role}** | ${info.description} | ${writeCol} |`);
+        lines.push(`| **${role}** | ${info.description} | ${info.write ? "✅ OUI" : "❌ Lecture seule"} |`);
       }
     }
     lines.push("");
-    lines.push(`**Agents NON disponibles :** les rôles non listés ci-dessus sont désactivés. Ne tente pas de déléguer à un agent non autorisé.`);
-
+    lines.push("**Agents NON disponibles :** les rôles non listés ci-dessus sont désactivés. Ne tente pas de déléguer à un agent non autorisé.");
     return lines.join("\n");
   }
 
+  // ─── Footer (inchangé) ────────────────────────────────────────────────────
+
+  private buildFooter(config: SystemPromptConfig): string {
+    const parts: string[] = [];
+    if (config.language && config.language !== "fr") {
+      const inst = LANG_INSTRUCTIONS_FR[config.language];
+      if (inst) parts.push(inst);
+    }
+    if (config.responseStyle) {
+      const inst = STYLE_INSTRUCTIONS_FR[config.responseStyle];
+      if (inst) parts.push(inst);
+    }
+    return parts.length > 0
+      ? `## Instructions de communication\n\n${parts.join("\n")}`
+      : "";
+  }
+
+  // ─── Fallback legacy complet ──────────────────────────────────────────────
+
   /**
-   * Prompt pour le mode solo (agents désactivés) : l'assistant peut agir directement.
+   * Pipeline legacy (pré-refactoring) — utilisé comme fallback si le nouveau
+   * pipeline ne produit rien (edge case : registry vide, tests isolés…).
+   *
+   * Identique au build() d'origine, garanti de fonctionner sans le nouveau
+   * pipeline.
    */
+  private buildLegacy(config: SystemPromptConfig): string {
+    const variables: Record<string, string> = {
+      aiName:   config.aiName   ?? "Leanna",
+      userName: config.userName ?? "",
+      userRole: config.userRole ?? "",
+    };
+
+    const renderOpts = {
+      variables,
+      compact:  config.compact !== false,
+      exclude:  config.excludeSections,
+    };
+
+    const isAskMode = config.mode === "ask";
+    const sections:  string[] = [];
+
+    if (isAskMode) {
+      if (this.legacyRegistry.has("safety"))     sections.push(this.legacyRegistry.render("safety",     renderOpts));
+      if (this.legacyRegistry.has("chat"))       sections.push(this.legacyRegistry.render("chat",       renderOpts));
+      if (this.legacyRegistry.has("efficiency")) sections.push(this.legacyRegistry.render("efficiency", renderOpts));
+    } else {
+      if (this.legacyRegistry.has("base"))                  sections.push(this.legacyRegistry.render("base",                  renderOpts));
+      if (this.legacyRegistry.has("safety"))                sections.push(this.legacyRegistry.render("safety",                renderOpts));
+      if (this.legacyRegistry.has("ai-studio-directives"))  sections.push(this.legacyRegistry.render("ai-studio-directives",  renderOpts));
+      if (this.legacyRegistry.has("efficiency"))            sections.push(this.legacyRegistry.render("efficiency",            renderOpts));
+      if (this.legacyRegistry.has("browser"))               sections.push(this.legacyRegistry.render("browser",              renderOpts));
+
+      const agentsEnabled = config.agents?.enabled !== false;
+      if (agentsEnabled && this.legacyRegistry.has("agents-system")) {
+        const allowedRoles = config.agents?.allowedRoles as AgentRole[] | undefined;
+        sections.push(
+          allowedRoles && allowedRoles.length > 0
+            ? this.buildFilteredAgentsPrompt(allowedRoles)
+            : this.legacyRegistry.render("agents-system", renderOpts),
+        );
+      } else if (!agentsEnabled) {
+        sections.push(this.buildSoloModePrompt());
+      }
+
+      if (this.legacyRegistry.has("autonomy")) sections.push(this.legacyRegistry.render("autonomy", renderOpts));
+    }
+
+    sections.push(this.buildWorkspaceSection(config.workspace));
+
+    if (config.extraSections) {
+      for (const s of config.extraSections) sections.push(s.content);
+    }
+
+    const footer = this.buildFooter(config);
+    if (footer) sections.push(footer);
+
+    return sections.filter(Boolean).join("\n\n");
+  }
+
+  // ─── Solo mode (inchangé) ─────────────────────────────────────────────────
+
   private buildSoloModePrompt(): string {
     return [
       "# Mode Solo — Agents désactivés",
@@ -267,26 +516,10 @@ export class SystemPromptBuilder {
       "```",
     ].join("\n");
   }
-
-  private buildFooter(config: SystemPromptConfig): string {
-    const parts: string[] = [];
-
-    if (config.language && config.language !== "fr") {
-      const langInstructions = LANG_INSTRUCTIONS_FR[config.language];
-      if (langInstructions) parts.push(langInstructions);
-    }
-
-    if (config.responseStyle) {
-      const styleInstructions = STYLE_INSTRUCTIONS_FR[config.responseStyle];
-      if (styleInstructions) parts.push(styleInstructions);
-    }
-
-    return parts.length > 0 ? `## Instructions de communication\n\n${parts.join("\n")}` : "";
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Singleton pour usage simple
+// Singleton — API publique inchangée
 // ═══════════════════════════════════════════════════════════════════════════════
 
 let _builder: SystemPromptBuilder | null = null;
@@ -304,12 +537,17 @@ export function getSystemPromptBuilder(): SystemPromptBuilder {
 
 /**
  * Source canonique de construction du prompt système.
+ * Rétrocompatible — retourne toujours un string.
  */
-export function buildSystemPrompt(config: SystemPromptConfig = {}): string {
+export function buildSystemPrompt(
+  config: SystemPromptConfig & { taskType?: TaskType } = {},
+): string {
   return getSystemPromptBuilder().build(config);
 }
 
 /** @deprecated Utiliser buildSystemPrompt. */
-export function buildSystemInstructionV3(config: SystemPromptConfig = {}): string {
+export function buildSystemInstructionV3(
+  config: SystemPromptConfig = {},
+): string {
   return buildSystemPrompt(config);
 }
