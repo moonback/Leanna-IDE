@@ -1,6 +1,6 @@
 # Roadmap — Leanna AI Operating System
 
-> Dernière mise à jour : Septembre 2026 · Version courante : **1.0.0** · Licence BUSL 1.1
+> Dernière mise à jour : Septembre 2026 · Version courante : **1.1.0** · Licence BUSL 1.1
 
 Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonomes et une mémoire long-terme réunis dans une seule application desktop. Cette roadmap décrit où va le produit, avec quelles priorités et selon quels critères de succès.
 
