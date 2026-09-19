@@ -455,6 +455,7 @@ leanna/
 │   │   ├── routes/         # /api/v2/agents + /api/v2/metrics
 │   │   ├── workflows/      # Workflows JSON prédéfinis (feature, refactor-safe, security-audit)
 │   │   ├── ToolRegistry.ts · StateMachine.ts · WorkflowEngine.ts
+│   │   ├── PermissionPolicy.ts · DryRun.ts   # Permissions par skill + dry-run global
 │   │   ├── EventBus.ts · Observability.ts · AgentRuntime.ts
 │   │   └── HierarchicalMemoryService.ts
 │   ├── skills/             # Skills natifs (35+) dont agent_brain et telegram
@@ -559,6 +560,75 @@ curl -X POST http://localhost:4000/api/agents/brain/execute \
 curl -H "x-leanna-token: <Leanna_API_TOKEN>" \
   http://localhost:4000/api/agents/brain/status/<planId>
 ```
+
+---
+
+## Sécurité de l'agent : permissions & dry-run
+
+Deux garde-fous complémentaires contrôlent ce que l'agent peut réellement faire.
+
+### Modèle de permissions par skill
+
+Chaque skill (et chaque outil) déclare les permissions qu'il requiert, dans le vocabulaire de la roadmap :
+
+| Permission | Signification |
+|---|---|
+| `read` | Lecture de fichiers / ressources |
+| `write` | Écriture, création ou suppression de fichiers |
+| `network` | Accès réseau sortant (API, git remote…) |
+| `exec` | Exécution de commandes shell / processus |
+
+Les permissions sont déclarées sur le skill, appliquées au runtime par le `ToolRegistry` à **chaque appel d'outil** (missions, agents, chat). Exemple de déclaration :
+
+```ts
+export const systemSkill: Skill = {
+  name: "system",
+  permissions: ["exec"],                 // défaut du skill
+  toolPermissions: {                     // surcharge par outil
+    system_info: ["read"],
+    run_project_command: ["exec"],
+  },
+  // …
+};
+```
+
+À défaut de déclaration explicite, les permissions sont **déduites** du nom de l'outil (fallback historique).
+
+**Modes d'application** (`Leanna_PERMISSION_MODE`) :
+- `enforce` (défaut) : un appel réclamant une permission non accordée est **refusé** (`PermissionDeniedError`).
+- `audit` : l'appel passe mais l'usage est **journalisé** (utile pour cartographier avant de restreindre).
+- `off` : aucune vérification (comportement legacy).
+
+Le jeu de permissions accordées globalement se règle via `Leanna_GRANTED_PERMISSIONS` (CSV). Par exemple, pour interdire toute exécution shell et tout accès réseau :
+
+```env
+Leanna_PERMISSION_MODE=enforce
+Leanna_GRANTED_PERMISSIONS=read,write
+```
+
+### Dry-run global (simulation sans effet de bord)
+
+Le dry-run exécute une mission complète **en simulation** : les outils en lecture seule (`read`) s'exécutent normalement — pour que l'agent puisse lire, chercher et planifier — mais tout outil à effet de bord (`write` / `exec` / `network`) est **intercepté** et **non exécuté**. Un résultat simulé est renvoyé et l'effet évité est enregistré dans un rapport.
+
+**Par mission** (via le skill `mission`) :
+```
+mission_create({
+  title: "Refactor auth",
+  description: "…",
+  dryRun: true          // simulation, aucun effet de bord réel
+})
+```
+Puis, pour voir ce qui aurait été fait :
+```
+mission_dryrun_report()   // liste des écritures / exécutions / appels réseau simulés
+```
+
+**Globalement** (au démarrage) via l'environnement :
+```env
+Leanna_DRY_RUN=true
+```
+
+Le dry-run s'appuie sur les mêmes permissions déclarées : la classification d'un outil comme « effet de bord » est cohérente avec le contrôle d'accès.
 
 ---
 
