@@ -31,7 +31,7 @@ graph TD
         end
 
         subgraph AGENTS["Agent Orchestrator"]
-            FLEET["Agent Fleet\n(coder/architect/test…)"]
+            FLEET["Agent Fleet\n(coder/architect/tester…)"]
             BUS["Message Bus"]
             PERSIST["Agent Persistence"]
         end
@@ -188,6 +188,10 @@ server.ts                    # 2. Initialise tout et démarre le serveur HTTP
 5. **Routeurs modulaires** — un fichier par domaine dans `server/routes/`
 6. **Error handler global** — catch-all Express en fin de chaîne
 
+Domaines d'API montés (voir [API_DOCS.md](API_DOCS.md) pour le détail des endpoints) :
+
+`/api/health` · `/api/ide` · `/api/sandbox` · `/api/agents` (+ `/api/v2/agents`, `/api/v2/metrics`) · `/api/agent-builder` · `/api/agent-registration` · `/api/custom-agents` · `/api/workflows` · `/api/conversations` · `/api/memories` · `/api/memory/hierarchical` · `/api/skills` · `/api/custom-skills` · `/api/git` · `/api/github` · `/api/profile` + `/api/tokens` · `/api/openrouter` · `/api/gemini-keys` · `/api/notebooks` · `/api/documents` · `/api/upload-document` · `/api/automation` · `/api/terminal` · `/api/browser` · `/api/tts` · `/api/knowledge` · `/api/tools` · `/api/observability` · `/api/audit` · `/api/checkpoint` · `/api/safeguards` · `/api/self-root` · `/api/workspace` · `/api/lists` · `/api/telegram` · `/api/pm2` · `/api/mcp` · `/api/export` · `/api/ftp` · `/api/marketplace`
+
 ### Runtime et Skill System
 
 ```
@@ -231,6 +235,13 @@ server/agents/
 ```
 
 L'orchestrateur implémente une boucle **Observe → Decide → Act** par rôle. Les agents communiquent via le `MessageBus` interne. Chaque tâche peut être sous-déléguée automatiquement (`delegateAutonomously`).
+
+**Rôles statiques** (définis dans `server/agents/roles.ts`, 15 au total) :
+
+- *Code & ingénierie* : `coder`, `refactor`, `debugger`, `reviewer`, `tester`, `security`, `architect`, `vision`
+- *Rédaction & documents* : `writer`, `formatter`, `researcher`, `proofreader`, `translator`, `summarizer`, `planner`
+
+Des rôles **dynamiques** supplémentaires peuvent être enregistrés à l'exécution via l'Agent Builder (`POST /api/agent-registration/register`).
 
 ### Authentification
 
@@ -339,7 +350,7 @@ Leanna utilise le **Node.js test runner natif** (`node:test`) pour tous les test
 
 **Couverture actuelle :**
 - ✅ **Skills** : ≥60% de couverture (136+ tests unitaires)
-- ✅ **Routes REST** : 74 tests d'intégration
+- ✅ **Routes REST** : 103 tests d'intégration (19 fichiers `server/routes/*.test.ts`)
 
 ### Tests unitaires (Skills)
 
@@ -370,16 +381,24 @@ Fichiers : `server/routes/*.test.ts`
 |---|---|---|
 | Agents | 15 | Statut, tâches, rôles, flotte, bus de messages, collaboration, persistance, tool-mapping, tool-categories |
 | Marketplace | 13 | Recherche, featured, installed, stats, installation, publication, rating, sécurité, export |
-| Workflows | 7 | Liste, création, exécution, toggle, suppression |
-| Browser | 7 | Validation requêtes, résolution promesses, actions |
-| Upload Document | 7 | Validation types fichiers, rate limiting, contexte |
 | Conversations | 7 | Liste, recherche, messages, mise à jour titre, suppression |
-| Skills | 6 | Liste, propriétés requises, core skills, statut Supabase |
+| Skills | 7 | Liste, propriétés requises, core skills, statut Supabase |
+| Workflows | 7 | Liste, création, exécution, toggle, suppression |
+| Browser | 6 | Validation requêtes, résolution promesses, actions |
+| Upload Document | 6 | Validation types fichiers, rate limiting, contexte |
 | Profile & Tokens | 6 | GET/POST profile, GET/POST tokens, validation clés |
 | Terminal | 5 | Configuration, sessions actives, authentification |
+| Sandbox | 5 | Statut, init/activate, validation TSC, diff |
+| GitHub | 5 | Repos, issues, PRs, recherche |
+| Self-Root | 4 | Statut, workspaces, validation, changement de projet |
+| Export | 3 | Formats d'export, validation |
+| IDE | 3 | Arbre, lecture/écriture fichiers |
 | Memories | 3 | Liste, suppression globale, suppression par ID |
+| Telegram | 3 | Statut, configuration, envoi |
 | Workspace | 3 | Info workspace, verrouillage POST |
+| Mémoire hiérarchique | 1 | Endpoint stats |
 | Health | 1 | Health check |
+| **Total** | **103** | **19 fichiers** |
 
 ### Exécution des tests
 

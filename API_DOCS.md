@@ -35,18 +35,31 @@ Les WebSockets `/live` et `/sandbox-watch` valident le token via le **cookie** `
 - [IDE — Système de fichiers](#ide--système-de-fichiers)
 - [Sandbox](#sandbox)
 - [Agents](#agents)
+- [Agents dynamiques (Builder / Registration / Custom)](#agents-dynamiques-builder--registration--custom)
 - [Workflows](#workflows)
 - [Conversations](#conversations)
 - [Mémoires](#mémoires)
+- [Mémoire hiérarchique](#mémoire-hiérarchique)
 - [Compétences (Skills)](#compétences-skills)
 - [Git / GitHub](#git--github)
 - [Profil & Tokens](#profil--tokens)
+- [Optimisation des tokens](#optimisation-des-tokens)
+- [OpenRouter](#openrouter)
 - [Notebooks (RAG)](#notebooks-rag)
 - [Documents](#documents)
 - [Automatisation](#automatisation)
 - [Terminal](#terminal)
+- [Navigateur intégré](#navigateur-intégré)
+- [TTS (synthèse vocale)](#tts-synthèse-vocale)
 - [Knowledge Graph](#knowledge-graph)
+- [Tools Registry](#tools-registry)
+- [Observabilité & coûts](#observabilité--coûts)
 - [Audit](#audit)
+- [Sauvegardes (Checkpoint & Safeguards)](#sauvegardes-checkpoint--safeguards)
+- [Workspace & Self-Root](#workspace--self-root)
+- [Listes](#listes)
+- [Telegram](#telegram)
+- [PM2](#pm2)
 - [MCP](#mcp)
 - [Export](#export)
 - [FTP](#ftp)
@@ -511,11 +524,21 @@ Liste les 50 dernières tâches agents (en cours et terminées).
 
 ### `GET /api/agents/roles`
 
-Liste tous les rôles d'agents disponibles.
+Liste tous les rôles d'agents disponibles (statiques + dynamiques enregistrés à l'exécution).
 
 **Authentification :** Oui
 
-**Réponse 200 :** `{ "roles": ["coder", "architect", "refactor", "test", "docs", "security", "review"] }`
+**Réponse 200 :**
+```json
+{
+  "roles": [
+    "coder", "refactor", "debugger", "reviewer", "tester", "security", "architect", "vision",
+    "writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner"
+  ]
+}
+```
+
+Les 15 rôles ci-dessus sont **statiques** (définis dans `server/agents/roles.ts`, toujours disponibles). Des rôles **dynamiques** additionnels peuvent apparaître s'ils ont été créés via l'Agent Builder / `POST /api/agent-registration/register`.
 
 ---
 
@@ -655,6 +678,82 @@ Liste tous les outils disponibles pour un rôle donné.
 ### `GET /api/v2/agents/*` · `GET /api/v2/metrics`
 
 Endpoints du runtime V2 (nouveau système coexistant). Même logique, nouveau ToolRegistry.
+
+**Authentification :** Oui
+
+---
+
+## Agents dynamiques (Builder / Registration / Custom)
+
+Trois routeurs gèrent le cycle de vie des agents créés à l'exécution (au-delà des 15 rôles statiques).
+
+### `POST /api/agent-builder/generate`
+
+Génère la définition d'un agent dynamique à partir d'une description en langage naturel.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/agent-registration/register`
+
+Enregistre un nouvel agent dynamique dans le registre.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/agent-registration/list` · `GET /api/agent-registration/list/all`
+
+Liste les agents dynamiques (`/list`) ou l'ensemble statiques + dynamiques (`/list/all`).
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/agent-registration/check/:role`
+
+Indique si un rôle (statique ou dynamique) existe.
+
+**Authentification :** Oui · **Path params :** `role` (string)
+
+---
+
+### `POST /api/agent-registration/:role/start` · `POST /api/agent-registration/:role/stop`
+
+Démarre ou arrête un agent dynamique déjà enregistré.
+
+**Authentification :** Oui
+
+---
+
+### `DELETE /api/agent-registration/:role`
+
+Supprime un agent dynamique.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/agent-registration/stats`
+
+Statistiques des agents dynamiques.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/custom-agents` · `POST /api/custom-agents` · `PUT /api/custom-agents/:id` · `DELETE /api/custom-agents/:id`
+
+CRUD des agents personnalisés persistés.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/custom-agents/import`
+
+Importe un lot d'agents personnalisés.
 
 **Authentification :** Oui
 
@@ -830,6 +929,58 @@ Supprime toutes les mémoires.
 **Authentification :** Oui
 
 **Réponse 200 :** `{ "status": "success", "deleted": 15 }`
+
+---
+
+## Mémoire hiérarchique
+
+Mémoire organisée par niveaux (`session`, puis niveaux supérieurs) avec promotion entre tiers. Montée sur `/api/memory/hierarchical`.
+
+### `GET /api/memory/hierarchical/stats`
+
+Statistiques par tier.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/memory/hierarchical/search`
+
+Recherche dans la mémoire hiérarchique.
+
+**Authentification :** Oui · **Query params :** `query` (string)
+
+---
+
+### `GET /api/memory/hierarchical/list`
+
+Liste les entrées d'un tier.
+
+**Authentification :** Oui · **Query params :** `tier` (défaut `session`)
+
+---
+
+### `POST /api/memory/hierarchical/store`
+
+Stocke une entrée.
+
+**Authentification :** Oui · **Body :** `{ "tier", "content", "category?", "tags?", "confidence?", "ttl?", "key?" }`
+
+---
+
+### `POST /api/memory/hierarchical/promote`
+
+Promeut une entrée vers un tier supérieur.
+
+**Authentification :** Oui · **Body :** `{ "id", "fromTier", "toTier", "category?", "tags?", "removeSource?" }`
+
+---
+
+### `DELETE /api/memory/hierarchical/:tier/:id` · `DELETE /api/memory/hierarchical/:tier/clear`
+
+Supprime une entrée précise ou vide un tier entier.
+
+**Authentification :** Oui
 
 ---
 
@@ -1086,6 +1237,54 @@ Ajoute ou supprime une clé du pool Gemini.
 
 ---
 
+## Optimisation des tokens
+
+### `GET /api/tokens/optimization`
+
+Retourne l'estimation de consommation de tokens et le budget par modèle.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/tokens/summarize-context`
+
+Résume un transcript de conversation en conservant les derniers tours, pour réduire l'empreinte contextuelle.
+
+**Authentification :** Oui
+
+**Body :** `{ "transcript": [...], "keepTurns": 8 }`
+
+---
+
+## OpenRouter
+
+Proxy vers l'API OpenRouter (modèles alternatifs). Monté sur `/api/openrouter`.
+
+### `POST /api/openrouter/test`
+
+Teste la validité d'une clé OpenRouter.
+
+**Authentification :** Oui · **Body :** `{ "apiKey", "model?" }`
+
+---
+
+### `POST /api/openrouter/chat`
+
+Complétion de chat via OpenRouter.
+
+**Authentification :** Oui · **Body :** `{ "apiKey", "model", "messages", "temperature?", "topP?", "maxTokens?" }`
+
+---
+
+### `GET /api/openrouter/models`
+
+Liste les modèles OpenRouter disponibles.
+
+**Authentification :** Oui · **Query params :** `apiKey` (optionnel, sinon `OPENROUTER_API_KEY`)
+
+---
+
 ## Notebooks (RAG)
 
 ### `GET /api/notebooks`
@@ -1245,6 +1444,54 @@ La policy réseau est `PUBLIC_WEB_AND_LOCALHOST` : `localhost` et les sous-domai
 
 ---
 
+## Navigateur intégré
+
+Le routeur `/api/browser` relaie les actions du navigateur Electron intégré (outils `browser_*`). Les requêtes de contenu et d'action sont résolues de manière asynchrone via des promesses côté serveur, puis renvoyées à l'appelant.
+
+**Authentification :** Oui
+
+> Le comportement fonctionnel (normalisation des liens, filtrage, classement, policy `PUBLIC_WEB_AND_LOCALHOST`) est décrit dans la section [Navigation web intégrée](#navigation-web-intégrée) ci-dessus.
+
+---
+
+## TTS (synthèse vocale)
+
+Synthèse vocale via Gemini TTS avec cache. Montée sur `/api/tts`.
+
+### `POST /api/tts/speak`
+
+Synthétise un texte en audio.
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "audio": "<base64 PCM>", "cached": false }`
+
+---
+
+### `POST /api/tts/speak-stream`
+
+Synthèse en streaming (Server-Sent Events, chunks audio).
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/tts/stats`
+
+Métriques du cache / de la file / du provider TTS.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/tts/cache/clear`
+
+Vide le cache TTS.
+
+**Authentification :** Oui · **Réponse 200 :** `{ "status": "ok", "message": "Cache TTS vidé." }`
+
+---
+
 ## Knowledge Graph
 
 ### `GET /api/knowledge/status`
@@ -1279,6 +1526,70 @@ Retourne la compréhension contextuelle d'un fichier ou d'un symbole.
 
 ---
 
+## Tools Registry
+
+Diagnostic unifié du registre d'outils (runtime V2 + SkillManager + MCP). Monté sur `/api/tools`.
+
+### `GET /api/tools/registry`
+
+Retourne l'inventaire complet des outils enregistrés avec leur source.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/tools/count`
+
+Nombre d'outils enregistrés par source.
+
+**Authentification :** Oui
+
+---
+
+## Observabilité & coûts
+
+Télémétrie OpenTelemetry, statistiques d'usage et budgets par mission. Montée sur `/api/observability`.
+
+### `GET /api/observability/dashboard`
+
+Statistiques agrégées pour le tableau de bord (fenêtre : jour).
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/observability/usage`
+
+Usage détaillé (tokens, coûts).
+
+**Authentification :** Oui · **Query params :** `missionId`, `agentRole`, `provider`, `limit`
+
+---
+
+### `GET /api/observability/budget/:missionId` · `POST /api/observability/budget/:missionId` · `DELETE /api/observability/budget/:missionId`
+
+Consulte, définit ou supprime les garde-fous de budget d'une mission.
+
+**Authentification :** Oui · **Body (POST) :** `{ "maxTokens?", "maxCostUsd?" }`
+
+---
+
+### `GET /api/observability/stats/day` · `GET /api/observability/stats/hour`
+
+Statistiques agrégées sur les dernières 24 h ou la dernière heure.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/observability/health` · `POST /api/observability/flush`
+
+État du service de télémétrie · déclenche un flush vers Supabase.
+
+**Authentification :** Oui
+
+---
+
 ## Audit
 
 ### `GET /api/audit`
@@ -1301,6 +1612,266 @@ Retourne le log d'audit des opérations sur les fichiers.
   ]
 }
 ```
+
+---
+
+## Sauvegardes (Checkpoint & Safeguards)
+
+Deux routeurs gèrent les points de restauration Git et les garde-fous de build.
+
+### `POST /api/checkpoint/create`
+
+Crée un checkpoint (point de restauration).
+
+**Authentification :** Oui · **Body :** `{ "reason?": "checkpoint manuel" }`
+
+---
+
+### `POST /api/checkpoint/rollback`
+
+Restaure le workspace à un checkpoint donné.
+
+**Authentification :** Oui · **Body :** `{ "hash": "abc123" }`
+
+---
+
+### `GET /api/checkpoint/list`
+
+Liste les checkpoints disponibles.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/checkpoint/validate`
+
+Valide le build courant.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/safeguards/config` · `POST /api/safeguards/config`
+
+Lit ou met à jour la configuration des garde-fous (`.Leanna/safeguards.json`).
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/safeguards/checkpoints` · `POST /api/safeguards/validate` · `POST /api/safeguards/rollback`
+
+Liste les checkpoints, valide le build, ou effectue un rollback via les garde-fous.
+
+**Authentification :** Oui
+
+---
+
+## Workspace & Self-Root
+
+Gestion du workspace actif et de l'historique des dépôts (`SELF_ROOT`).
+
+### `GET /api/self-root/status`
+
+État du workspace racine courant.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/self-root/workspaces`
+
+Liste tous les dépôts enregistrés dans l'historique.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/self-root/workspaces/validate`
+
+Pré-valide un chemin avant ouverture.
+
+**Authentification :** Oui
+
+---
+
+### `PATCH /api/self-root/workspaces/:id` · `DELETE /api/self-root/workspaces/:id`
+
+Met à jour (nom, siteUrl) ou retire un workspace de l'historique (sans supprimer les fichiers sur disque).
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/self-root/change`
+
+Change le workspace actif.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/self-root/new`
+
+Crée un projet vierge et l'active.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/self-root/clear`
+
+Efface le projet persisté (pour re-sélection).
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/self-root/scaffold` · `POST /api/self-root/clone`
+
+Échafaude un nouveau projet (framework au choix) ou clone un dépôt distant. Les deux **streament** leur progression via Server-Sent Events.
+
+**Authentification :** Oui
+
+---
+
+### `PATCH /api/self-root/site-url`
+
+Met à jour uniquement l'URL du site du workspace.
+
+**Authentification :** Oui
+
+---
+
+## Listes
+
+Listes intelligentes simples (nom → items). Montées sur `/api/lists`.
+
+### `GET /api/lists` · `POST /api/lists`
+
+Liste toutes les listes · crée une liste.
+
+**Authentification :** Oui · **Body (POST) :** `{ "name", "items?": [] }`
+
+---
+
+### `GET /api/lists/:name`
+
+Récupère une liste par son nom.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/lists/:name/items` · `DELETE /api/lists/:name/items`
+
+Ajoute ou retire des items d'une liste.
+
+**Authentification :** Oui
+
+---
+
+### `DELETE /api/lists/:name`
+
+Supprime une liste entière.
+
+**Authentification :** Oui
+
+---
+
+## Telegram
+
+Intégration bot Telegram (notifications, envoi de fichiers). Montée sur `/api/telegram`.
+
+### `GET /api/telegram/status` · `GET /api/telegram/config` · `POST /api/telegram/config`
+
+État du bot · lecture / mise à jour de la configuration (token, utilisateurs autorisés, auto-start…).
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/telegram/start` · `POST /api/telegram/stop`
+
+Démarre ou arrête le bot.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/telegram/test`
+
+Envoie un message de test.
+
+**Authentification :** Oui · **Body :** `{ "chatId" }`
+
+---
+
+### `POST /api/telegram/send` · `POST /api/telegram/photo` · `POST /api/telegram/document`
+
+Envoie un message texte, une photo ou un document.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/telegram/broadcast`
+
+Diffuse un message à tous les utilisateurs autorisés.
+
+**Authentification :** Oui · **Body :** `{ "message", "parseMode?", "onlyNumericIds?" }`
+
+---
+
+### `GET /api/telegram/users` · `POST /api/telegram/chat-info`
+
+Liste les utilisateurs autorisés · récupère les informations d'un chat.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/telegram/send-from-workspace`
+
+Envoie un fichier du workspace projet.
+
+**Authentification :** Oui · **Body :** `{ "chatId", "path", "caption?", "parseMode?" }`
+
+---
+
+## PM2
+
+Contrôle du gestionnaire de processus PM2 (déploiements en production). Monté sur `/api/pm2`.
+
+### `GET /api/pm2/status`
+
+État des processus PM2 (`pm2 jlist`).
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/pm2/:name/restart` · `POST /api/pm2/:name/stop`
+
+Redémarre ou arrête un processus par nom.
+
+**Authentification :** Oui
+
+---
+
+### `POST /api/pm2/reload` · `POST /api/pm2/flush`
+
+Recharge (`?file=ecosystem.config.cjs`) ou vide les logs.
+
+**Authentification :** Oui
+
+---
+
+### `GET /api/pm2/logs/:name`
+
+Récupère les logs d'un processus.
+
+**Authentification :** Oui · **Query params :** `lines` (défaut 50), `type` (`out`/`err`/`all`)
 
 ---
 
@@ -1436,7 +2007,7 @@ Terminal PTY interactif.
 
 Tous les endpoints REST disposent de tests d'intégration dans `server/routes/*.test.ts`.
 
-**Couverture actuelle : 74 tests d'intégration**
+**Couverture actuelle : 103 tests d'intégration répartis sur 19 fichiers**
 
 ### Tests par routeur
 
@@ -1444,15 +2015,22 @@ Tous les endpoints REST disposent de tests d'intégration dans `server/routes/*.
 |---|---|---|---|
 | Agents | `agents.test.ts` | 15 | Statut, tâches, rôles, flotte, bus, collaboration, persistance, mapping |
 | Marketplace | `marketplace.test.ts` | 13 | Recherche, featured, installation, publication, sécurité |
-| Workflows | `workflows.test.ts` | 7 | CRUD, exécution, toggle |
-| Browser | `browser.test.ts` | 7 | Content requests, actions, promesses |
-| Upload Document | `upload-document.test.ts` | 7 | Validation fichiers, types supportés, rate limiting |
 | Conversations | `conversations.test.ts` | 7 | Liste, recherche, messages, CRUD |
-| Skills | `skills.test.ts` | 6 | Liste, propriétés, statut Supabase |
+| Skills | `skills.test.ts` | 7 | Liste, propriétés, core skills, statut Supabase |
+| Workflows | `workflows.test.ts` | 7 | CRUD, exécution, toggle |
+| Browser | `browser.test.ts` | 6 | Content requests, actions, promesses |
+| Upload Document | `upload-document.test.ts` | 6 | Validation fichiers, types supportés, rate limiting |
 | Profile | `profile.test.ts` | 6 | GET/POST profile, GET/POST tokens |
 | Terminal | `terminal.test.ts` | 5 | Configuration, sessions, authentification |
+| Sandbox | `sandbox.test.ts` | 5 | Statut, init/activate, validation, diff |
+| Self-Root | `self-root.test.ts` | 4 | Statut, workspaces, validation, changement |
+| Export | `export.test.ts` | 3 | Formats d'export, validation |
+| GitHub | `github.test.ts` | 5 | Repos, issues, PRs, recherche |
+| IDE | `ide.test.ts` | 3 | Arbre, lecture/écriture fichiers |
 | Memories | `memories.test.ts` | 3 | GET, DELETE (Supabase) |
+| Telegram | `telegram.test.ts` | 3 | Statut, configuration, envoi |
 | Workspace | `workspace.test.ts` | 3 | GET info, POST interdit |
+| Mémoire hiérarchique | `hierarchicalMemory.test.ts` | 1 | Endpoint stats |
 | Health | `health.test.ts` | 1 | Health check |
 
 ### Exécuter les tests d'intégration

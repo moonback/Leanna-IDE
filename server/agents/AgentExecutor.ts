@@ -10,16 +10,18 @@
  * 6. **Parse et déclenchement des délégations autonomes (via DelegationParser)**
  * 7. Notification de progression (via ProgressNotifier)
  */
-import { randomUUID, createHash } from "crypto";
+import { createHash } from "crypto";
 import type { AgentTask } from "./types.js";
-import { getAgentDefinition, getAgentDefinitionOrThrow, hasAgent } from "./roles.js";
+import { getAgentDefinitionOrThrow, hasAgent } from "./roles.js";
 import { PromptBuilder } from "./PromptBuilder.js";
 import { GeneratedFileWriter } from "./GeneratedFileWriter.js";
 import { ResultParser } from "./ResultParser.js";
-import { DelegationParser, type ParsedDelegation } from "./DelegationParser.js";
 import { ProgressNotifier } from "./ProgressNotifier.js";
-import { agentMessageBus } from "./AgentMessageBus.js";
-import type { TaskRequestPayload } from "./AgentCommunication.js";
+import { extractToolCalls, type AgentToolCall } from "./ToolCallParser.js";
+import { AgentContextResolver } from "./AgentContextResolver.js";
+import { AgentEvidenceEvaluator } from "./AgentEvidenceEvaluator.js";
+import { DelegationDispatcher } from "./DelegationDispatcher.js";
+import type { ToolExecutionState } from "./AgentExecutionTypes.js";
 import { createLogger } from "../utils/logger.js";
 import { WorkspaceState, type VerificationRecord, type VerificationIssue } from "./WorkspaceState.js";
 import { AgentRepairLoop } from "./AgentRepairLoop.js";
@@ -31,48 +33,6 @@ const log = createLogger("AgentExecutor");
 
 /** Handler externe pour exécuter les actions d'un agent */
 export type SkillHandler<TArgs = unknown, TResult = unknown> = (name: string, args: TArgs) => Promise<TResult>;
-
-interface AgentToolCall {
-  name: string;
-  parameters: Record<string, unknown>;
-}
-
-interface ToolExecutionState {
-  resultText: string;
-  toolsExecuted: string[];
-  filesRead: string[];
-  filesModified: string[];
-  errors: string[];
-  observations: string[];
-  /** Every successful or rejected write; completion gates all of these files. */
-  touchedFiles: Set<string>;
-  /** Bounded, progress-aware repair policies, isolated per file. */
-  repairLoops: Map<string, AgentRepairLoop>;
-  blockedFiles: Set<string>;
-  /** Authoritative disk observations and hash-bound verification evidence. */
-  workspace: WorkspaceState;
-  fileSnapshots: Map<string, string>;
-  /** Snapshots des fichiers au tour précédent pour le diff incrémental */
-  previousFileSnapshots: Map<string, string>;
-  /** Fichiers nouvellement lus ou modifiés dans ce tour */
-  newlyTouchedFiles: Set<string>;
-  /**
-   * Nombre de tours consécutifs où l'agent a lu des fichiers sans en modifier aucun.
-   * Réinitialisé à 0 dès qu'une écriture est confirmée.
-   * Utilisé par le no-progress guard.
-   */
-  consecutiveReadOnlyTurns: number;
-  /**
-   * Vrai si la boucle a été interrompue par le no-progress guard.
-   * Permet à collectEvidence de produire outcome="no_change" ou outcome="blocked".
-   */
-  noProgressAbort: boolean;
-  /**
-   * Erreurs de compilation/vérification préexistantes (détectées avant tout write).
-   * Permet de distinguer une erreur introduite par l'agent d'une erreur préexistante.
-   */
-  preexistingErrors: string[];
-}
 
 // Seuls les appels structurés correspondant à des skills du workspace sont
 // exécutables. Un faux appel `bash` généré par le modèle n'est jamais exécuté.
@@ -115,16 +75,13 @@ export class AgentExecutor {
   private promptBuilder = new PromptBuilder();
   private fileWriter: GeneratedFileWriter;
   private resultParser = new ResultParser();
-  private delegationParser = new DelegationParser();
+  private contextResolver = new AgentContextResolver((toolName, args) => this.callToolWithTimeout(toolName, args));
+  private evidenceEvaluator = new AgentEvidenceEvaluator(this.resultParser);
+  private delegationDispatcher = new DelegationDispatcher();
   private notifier: ProgressNotifier;
 
   /** Compteur de tâches en cours par rôle */
   private runningCount: Map<string, number> = new Map();
-  
-  /**
-   * Limite de profondeur maximale pour les délégations (évite les cascades infinies)
-   */
-  private static readonly MAX_DELEGATION_DEPTH = 4;
   
   /**
    * Timeouts par outil (ms) - optimisé pour éviter les timeouts prématurés
@@ -172,12 +129,6 @@ export class AgentExecutor {
     // Timeout par défaut pour les outils inconnus
     'default': 120_000,
   };
-  
-  /**
-   * Map pour suivre les chaînes de délégation actives et détecter les cycles
-   * Clé: parentTaskId, Valeur: Set des rôles déjà rencontrés dans cette chaîne
-   */
-  private delegationChains: Map<string, Set<string>> = new Map();
 
   constructor(notifier: ProgressNotifier) {
     this.notifier = notifier;
@@ -301,8 +252,8 @@ export class AgentExecutor {
     try {
       // ── Étape 1: Découverte puis lecture bornée du contexte ──
       log.debug(`[task:${taskShortId}] [${agent.name}] 📂 Étape 1/5 — Résolution des fichiers de contexte...`);
-      const contextFiles = await this.resolveContextFiles(task, agent.capabilities);
-      const fileContents = await this.readContextFiles(contextFiles);
+      const contextFiles = await this.contextResolver.resolveContextFiles(task, agent.capabilities);
+      const fileContents = await this.contextResolver.readContextFiles(contextFiles);
       notifyProgress(1, "Contexte résolu");
       log.debug(`[task:${taskShortId}] [${agent.name}] 📂 Contexte résolu — ${contextFiles.length} fichier(s) chargé(s): [${contextFiles.slice(0, 4).join(", ")}${contextFiles.length > 4 ? ` +${contextFiles.length - 4}` : ""}]`);
 
@@ -351,12 +302,12 @@ export class AgentExecutor {
         errors: [...toolExecution.errors.map((error) => ({ path: "tool-call", error })), ...generatedWriteResult.errors, ...generatedRegistration.errors],
       };
       const durationMs = Date.now() - startTime;
-      const evidence = this.collectEvidence(task, fileContents, writeResult, resultText, toolExecution);
-      const incompleteReason = this.getIncompleteReason(task, resultText, evidence);
+      const evidence = this.evidenceEvaluator.collectEvidence(task, fileContents, writeResult, resultText, toolExecution);
+      const incompleteReason = this.evidenceEvaluator.getIncompleteReason(task, resultText, evidence);
       const success = incompleteReason === null;
 
       // Extraire les opérations de mémoire projet des observations
-      const memoryOperations = this.extractMemoryOperations(toolExecution.observations);
+      const memoryOperations = this.evidenceEvaluator.extractMemoryOperations(toolExecution.observations);
       notifyProgress(5, "Résultat évalué");
 
       log.debug(`[task:${taskShortId}] [${agent.name}] 🔍 Étape 5/5 — Évaluation des preuves d'exécution...`);
@@ -407,7 +358,7 @@ export class AgentExecutor {
       }
 
       // ── Étape 5: Les délégations ne partent qu'après une exécution vérifiée ──
-      const subTaskIds = await this.dispatchDelegations(task, resultText);
+      const subTaskIds = await this.delegationDispatcher.dispatchDelegations(task, resultText);
       if (subTaskIds.length > 0) {
         task.result!.delegatedSubTasks = subTaskIds;
         log.info(`[task:${taskShortId}] [${agent.name}] 🔀 ${subTaskIds.length} sous-tâche(s) déléguée(s): [${subTaskIds.map(id => id.slice(0, 8)).join(", ")}]`);
@@ -499,7 +450,7 @@ export class AgentExecutor {
     };
 
     for (let turn = 0; turn < AgentExecutor.MAX_TOOL_TURNS; turn++) {
-      const calls = this.extractToolCalls(state.resultText);
+      const calls = extractToolCalls(state.resultText);
       if (calls.length === 0) {
         if (turn === 0) {
           log.debug(`[${agent.name}] Aucun appel d'outil détecté — réponse directe sans outil`);
@@ -615,7 +566,7 @@ export class AgentExecutor {
       // Ne s'applique QUE pour les rôles qui doivent produire des modifications.
       const NO_PROGRESS_THRESHOLD = 5;
       const isWriteRequiredForGuard = ["coder", "refactor", "debugger", "writer", "formatter", "proofreader", "translator"].includes(task.role)
-        && !this.isAnalysisOnlyTask(task);
+        && !this.evidenceEvaluator.isAnalysisOnlyTask(task);
       if (
         isWriteRequiredForGuard &&
         !isLastAllowedTurn &&
@@ -657,7 +608,7 @@ export class AgentExecutor {
         // ── Exécuter les tool_calls d'écriture présents dans la réponse forcée ──
         // L'agent répond souvent avec un write_project_file après le forçage.
         // Sans cette étape, le tool_call reste en texte brut et n'est jamais appliqué.
-        const pendingWriteCalls = this.extractToolCalls(state.resultText).filter(c =>
+        const pendingWriteCalls = extractToolCalls(state.resultText).filter(c =>
           ["write_project_file", "modify_project_file", "patch_project_file", "apply_patch"].includes(c.name)
         );
         if (pendingWriteCalls.length > 0) {
@@ -704,73 +655,12 @@ export class AgentExecutor {
 
     // Si on sort de la boucle à MAX_TOOL_TURNS et que le résultat contient encore des tool_calls,
     // logger un avertissement — le modèle est en boucle
-    if (this.extractToolCalls(state.resultText).length > 0) {
+    if (extractToolCalls(state.resultText).length > 0) {
       log.warn(`[${agent.name}] Boucle de tool calls interrompue après ${AgentExecutor.MAX_TOOL_TURNS} tours. Forçage de synthèse.`);
       state.errors.push(`Boucle de tool calls interrompue après ${AgentExecutor.MAX_TOOL_TURNS} tours.`);
     }
 
     return state;
-  }
-
-  private extractToolCalls(resultText: string): AgentToolCall[] {
-    // Format 1: JSON structuré {"tool_calls": [...]}
-    try {
-      const parsed = JSON.parse(resultText.trim());
-      if (Array.isArray(parsed?.tool_calls)) {
-        const rawCalls: unknown[] = parsed.tool_calls;
-        const calls = rawCalls
-          .filter((call): call is { name: string; parameters?: unknown; arguments?: unknown } => Boolean(call && typeof call === "object" && typeof (call as { name?: unknown }).name === "string"))
-          .slice(0, 6)
-          .map((call: { name: string; parameters?: unknown; arguments?: unknown }) => ({
-            name: call.name,
-            parameters: this.extractCallParams(call),
-          }));
-        if (calls.length > 0) return calls;
-      }
-    } catch { /* not JSON */ }
-
-    // Format 2: <|tool_call>call:tool_name{"param":"value"} ou variantes provider
-    const providerPattern = /<\|tool_call>call:(\w+)\s*(\{[^}]*\})?/gi;
-    const providerCalls: AgentToolCall[] = [];
-    let providerMatch: RegExpExecArray | null;
-    while ((providerMatch = providerPattern.exec(resultText)) !== null && providerCalls.length < 6) {
-      const name = providerMatch[1];
-      let parameters: Record<string, unknown> = {};
-      if (providerMatch[2]) {
-        try { parameters = JSON.parse(providerMatch[2]); } catch { /* malformed */ }
-      }
-      providerCalls.push({ name, parameters });
-    }
-    if (providerCalls.length > 0) return providerCalls;
-
-    // Format 3: {"name": "tool", "parameters"|"arguments": {...}} en ligne (certains providers)
-    // Utilise un parsing JSON-aware au lieu d'un regex fragile pour capturer les objets imbriqués
-    const inlineCalls: AgentToolCall[] = [];
-    const inlinePattern = /\{\s*"name"\s*:\s*"(\w+)"\s*,\s*"(?:parameters|arguments)"\s*:\s*/gi;
-    let inlineMatch: RegExpExecArray | null;
-    while ((inlineMatch = inlinePattern.exec(resultText)) !== null && inlineCalls.length < 6) {
-      const name = inlineMatch[1];
-      // Extraire l'objet JSON à partir de la position après "parameters":
-      const paramsStartIdx = resultText.indexOf('{', inlineMatch.index! + inlineMatch[0].length - 1);
-      const params = this.extractJsonObject(resultText, paramsStartIdx);
-      if (params !== null) {
-        inlineCalls.push({ name, parameters: params });
-      }
-    }
-    return inlineCalls;
-  }
-
-  /** Extrait les paramètres d'un appel, acceptant "parameters" ou "arguments" (format OpenAI). */
-  private extractCallParams(call: { parameters?: unknown; arguments?: unknown; args?: unknown }): Record<string, unknown> {
-    const raw = call.parameters ?? call.arguments ?? call.args;
-    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-      return raw as Record<string, unknown>;
-    }
-    // Si c'est une string JSON, tenter de la parser
-    if (typeof raw === "string") {
-      try { return JSON.parse(raw); } catch { /* not valid JSON */ }
-    }
-    return {};
   }
 
   /**
@@ -847,33 +737,6 @@ ${truncated}
    */
   private computeContentHash(content: string): string {
     return createHash('sha256').update(content).digest('hex');
-  }
-
-  /** Parse un objet JSON en respectant les accolades imbriquées. */
-  private extractJsonObject(text: string, startIdx: number): Record<string, unknown> | null {
-    if (startIdx < 0 || text[startIdx] !== '{') return null;
-    let depth = 0;
-    let inString = false;
-    let escape = false;
-    for (let i = startIdx; i < text.length && i < startIdx + 2000; i++) {
-      const ch = text[i];
-      if (escape) { escape = false; continue; }
-      if (ch === '\\' && inString) { escape = true; continue; }
-      if (ch === '"') { inString = !inString; continue; }
-      if (inString) continue;
-      if (ch === '{') depth++;
-      else if (ch === '}') {
-        depth--;
-        if (depth === 0) {
-          try {
-            return JSON.parse(text.slice(startIdx, i + 1));
-          } catch {
-            return null;
-          }
-        }
-      }
-    }
-    return null;
   }
 
   /** Sérialise une observation sans tronquer le contenu des lectures complètes. */
@@ -1176,536 +1039,6 @@ ${truncated}
         state.observations.push(`- ${call.name}: erreur — ${message}`);
       }
     }
-  }
-
-  /** Construit les preuves à partir des appels réellement effectués par l'exécuteur. */
-  private collectEvidence(
-    task: AgentTask,
-    fileContents: string[],
-    writeResult: { written: string[]; errors: { path: string; error: string }[] },
-    resultText: string,
-    toolExecution: ToolExecutionState
-  ) {
-    const filesRead = [...new Set([
-      ...fileContents
-        .map((content) => content.match(/^--- (.+) ---/m)?.[1])
-        .filter((path): path is string => Boolean(path)),
-      ...toolExecution.filesRead,
-    ])];
-    const toolsExecuted = [...new Set([
-      "agent_execute",
-      ...(task.context.metadata?.projectContextDiscovered === true ? ["list_project_files"] : []),
-      ...(filesRead.length > 0 ? ["read_project_file"] : []),
-      ...toolExecution.toolsExecuted,
-      ...(writeResult.written.length > 0 ? ["write_project_file/modify_project_file/patch_project_file puis verify_file"] : []),
-    ])];
-    const findings = this.extractFindings(resultText);
-    const completion = toolExecution.workspace.completionReport(writeResult.written);
-    const writeRequired = ["writer", "formatter", "proofreader", "translator", "coder", "refactor", "debugger"].includes(task.role)
-      && !this.isAnalysisOnlyTask(task);
-    const readEvidenceRequired = ["researcher", "planner"].includes(task.role);
-    const planningOnly = this.isPlanningOnly(resultText);
-    const declaredFailure = this.resultParser.detectFailure(resultText);
-
-    // ── Détection d'erreur préexistante (P1) ────────────────────────────────
-    // Une erreur est considérée préexistante si :
-    // (a) elle a été détectée avant tout write (enregistrée dans preexistingErrors), OU
-    // (b) le no-progress guard a été déclenché ET la sortie mentionne un module/import manquant, OU
-    // (c) l'agent a lui-même déclaré un "## Blocage partiel" dans sa réponse finale
-    //
-    // IMPORTANT : une erreur préexistante n'est pertinente QUE pour les tâches write-required.
-    // Pour une tâche d'analyse/lecture, voir une erreur de compilation est normal et attendu
-    // (l'agent lit le fichier, voit l'erreur, la signale dans son rapport — c'est un succès).
-    const compileErrorPattern = /(?:cannot find module|module not found|error ts\d{3,4}:?|ts\d{4,}:)/i;
-    const agentDeclaredPartialBlock = /##\s*blocage\s*partiel/i.test(resultText);
-    const hasPreexistingError = writeRequired && (
-      toolExecution.preexistingErrors.length > 0 ||
-      agentDeclaredPartialBlock ||
-      (toolExecution.noProgressAbort && compileErrorPattern.test(
-        toolExecution.observations.join("\n") + " " + resultText
-      ))
-    );
-
-    // ── Détermination de l'outcome ───────────────────────────────────────────
-    // Logique de classification :
-    //   1. Agent a modifié des fichiers avec validations OK → success ou partial
-    //   2. Agent bloqué par une erreur préexistante → blocked
-    //   3. Agent write-required, 0 modification, no-progress abort → no_change
-    //   4. Agent write-required, 0 modification, pas de no-progress (tâche analyse?) → géré par errors
-    //   5. Erreur outil/exception → failed (géré par le catch dans execute())
-    let outcome: import("./types.js").TaskOutcome;
-    let blockReason: string | undefined;
-
-    if (writeResult.written.length > 0 && writeResult.errors.length === 0) {
-      outcome = "success";
-    } else if (writeResult.written.length > 0 && writeResult.errors.length > 0) {
-      outcome = "partial";
-    } else if (hasPreexistingError) {
-      outcome = "blocked";
-      // Extraire la cause depuis la section ## Blocage partiel si disponible
-      const blockSection = resultText.match(/##\s*blocage\s*partiel\s*\n([\s\S]*?)(?=\n##|$)/i)?.[1]?.trim();
-      blockReason = blockSection?.slice(0, 300) ??
-        toolExecution.preexistingErrors[0] ??
-        toolExecution.observations.find(o => compileErrorPattern.test(o))?.slice(0, 200) ??
-        "Erreur de compilation préexistante détectée";
-    } else if (writeRequired && writeResult.written.length === 0 && toolExecution.noProgressAbort) {
-      outcome = "no_change";
-    } else if (writeRequired && writeResult.written.length === 0) {
-      outcome = "no_change";
-    } else {
-      // Tâche analytique sans écriture requise (researcher, planner, etc.)
-      outcome = findings.length > 0 || filesRead.length > 0 ? "success" : "no_change";
-    }
-
-    const errors = [
-      ...writeResult.errors.map((error) => `${error.path}: ${error.error}`),
-      ...completion.errors,
-      ...(declaredFailure ? [`Le rapport final déclare un échec : ${declaredFailure}`] : []),
-      ...(planningOnly ? ["La sortie décrit un plan sans résultat d'exécution."] : []),
-      // no_change pour une tâche write-required → erreur (empêche le faux succès)
-      ...(writeRequired && writeResult.written.length === 0 && outcome !== "blocked"
-        ? [toolExecution.noProgressAbort
-            ? `Agent interrompu après ${toolExecution.consecutiveReadOnlyTurns} tours sans modification (${toolExecution.filesRead.length} fichier(s) lu(s), 0 modifié).`
-            : "Aucun fichier confirmé par write_project_file, modify_project_file ou patch_project_file puis verify_file."
-          ]
-        : []),
-      // blocked : avertissement non-bloquant — la tâche n'est pas un succès mais le problème est externe
-      ...(outcome === "blocked" ? [`Bloqué par erreur préexistante : ${blockReason ?? "inconnue"}`] : []),
-      ...(readEvidenceRequired && filesRead.length === 0 ? ["Aucun fichier lu : audit impossible à vérifier."] : []),
-      ...(readEvidenceRequired && findings.length === 0 ? ["Aucun constat concret fourni."] : []),
-    ];
-
-    return {
-      filesRead,
-      filesModified: writeResult.written,
-      toolsExecuted,
-      commandsExecuted: [],
-      findings,
-      workspaceCompletion: completion,
-      outcome,
-      blockReason,
-      verification: {
-        passed: errors.length === 0,
-        checks: [
-          "agent_execute exécuté",
-          ...(filesRead.length > 0 ? [`${filesRead.length} fichier(s) lu(s)`] : []),
-          ...(writeResult.written.length > 0 ? [`${writeResult.written.length} fichier(s) écrit(s) et vérifié(s)`] : []),
-        ],
-        errors,
-      },
-    };
-  }
-
-  private getIncompleteReason(
-    task: AgentTask,
-    resultText: string,
-    evidence: ReturnType<AgentExecutor["collectEvidence"]>
-  ): string | null {
-    if (evidence.verification.passed) return null;
-    const firstError = evidence.verification.errors[0] ?? "preuves d'exécution insuffisantes";
-    return `Tâche "${task.title}" incomplète : ${firstError} Sortie: ${resultText.slice(0, 180).replace(/\s+/g, " ")}`;
-  }
-
-  /** Extrait des constats opérationnels, pas les sections de planification. */
-  private extractFindings(resultText: string): string[] {
-    const section = resultText.match(
-      /##\s*(?:Résultats vérifiés|Findings|Constats|Détails|Details|Synthèse|Synthese|Propositions?|Recommandations?|Analyse|Audit)\s*\n([\s\S]*?)(?=\n##|$)/i
-    )?.[1] ?? "";
-    const findings = section
-      .split("\n")
-      .map((line) => line.replace(/^\s*(?:[-*]|\d+[.)]|#{1,4})\s*/, "").trim())
-      .filter((line) => line.length >= 12)
-      .filter((line) => !/^(?:je vais|je dois|il faut|je commencerai|i will|i need to)/i.test(line))
-      .slice(0, 20);
-
-    if (findings.length > 0) return findings;
-
-    // Si aucune section spécifique n'a matché, extraire les lignes informatives du résultat
-    return resultText
-      .split("\n")
-      .map((line) => line.replace(/^\s*(?:[-*]|\d+[.)]|#{1,4})\s*/, "").trim())
-      .filter((line) => line.length >= 15)
-      .filter((line) => !/^(?:je vais|je dois|il faut|je commencerai|i will|i need to)/i.test(line))
-      .filter((line) => !line.startsWith("{") && !line.startsWith("<|tool_call>"))
-      .slice(0, 20);
-  }
-
-  /**
-   * Extrait les opérations knowledge_memory_add des observations d'outils.
-   * Retourne un tableau d'opérations réussies avec leur fact_id et détails.
-   */
-  private extractMemoryOperations(observations: string[]): Array<{
-    tool: string;
-    fact_id: string;
-    message: string;
-    timestamp: string;
-  }> {
-    const operations: Array<{ tool: string; fact_id: string; message: string; timestamp: string }> = [];
-    
-    // Pattern plus robuste qui gère les variations d'espaces et d'ordre des clés
-    const memoryAddPattern = /- knowledge_memory_add: succès — \{[^}]*"status"\s*:\s*"success"[^}]*"fact_id"\s*:\s*"([^"]+)"[^}]*"message"\s*:\s*"([^"]+)"[^}]*\}/g;
-    
-    for (const obs of observations) {
-      let match: RegExpExecArray | null;
-      while ((match = memoryAddPattern.exec(obs)) !== null) {
-        operations.push({
-          tool: "knowledge_memory_add",
-          fact_id: match[1],
-          message: match[2],
-          timestamp: new Date().toISOString(),
-        });
-      }
-    }
-    
-    return operations;
-  }
-
-  /**
-   * Détecte si une tâche est purement analytique/lecture/rédactionnelle et ne requiert donc pas d'écriture de fichier de code.
-   * Utilisé pour assouplir le vérificateur writeRequired.
-   */
-  private isAnalysisOnlyTask(task: AgentTask): boolean {
-    const text = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.toLowerCase();
-    // Si le titre/description mentionne explicitement une modification/écriture de code ou contenu
-    const writingSignal = /\b(?:modifier|écriture|écrire|amélio|refactor|implément|créer|créa|ajust|corriger|correct|optimis|rédig|fix|update|write|patch|modify|create|improve|write_project_file|apply_patch|patch_project_file|modify_project_file)\b/i;
-    if (writingSignal.test(text)) return false;
-    // Mots-clés indiquant une tâche d'analyse pure, proposition, synthèse, rapport, recommandation, audit
-    const analysisSignal = /\b(?:analys|inspect|audit|review|check|read|lire|analyser|examin|rapport|report|résumé|summary|checkpoint\s+git|identifier|propos|proposition|suggestion|recommand|conseil|avis)\b/i;
-    return analysisSignal.test(text);
-  }
-
-  private isPlanningOnly(resultText: string): boolean {
-    const prose = resultText.replace(/^\s*#{1,6}.*$/gm, "").trim();
-    // Si le texte contient un appel d'outil (JSON ou format provider), ce n'est pas un plan seul
-    if (/\{"tool_calls"\s*:|<\|tool_call>|```[\w]*:[^\n]+\n/i.test(resultText)) return false;
-    const planningSignal = /\b(?:je vais|je dois|je commencerai|il faut|je vais commencer|i will|i need to|i should)\b/i;
-    const executionSignal = /\b(?:corrig(?:é|ée|és|ées)?|modifi(?:é|ée|és|ées)?|cré(?:é|ée|és|ées)?|écrit|exécut(?:é|ée|és|ées)?|vérifi(?:é|ée|és|ées)?|lu|analys(?:é|ée|és|ées)?|identifi(?:é|ée|és|ées)?|trouv(?:é|ée|és|ées)?|fixed|modified|created|wrote|ran|verified|read|reviewed)\b/i;
-    return planningSignal.test(prose) && !executionSignal.test(prose);
-  }
-
-  /**
-   * Parse la sortie de l'agent, extrait les blocs ## DÉLÉGATION
-   * et envoie des task_request sur le bus pour chaque délégation valide.
-   *
-   * Les sous-tâches sont lancées en parallèle (fire-and-forget) :
-   * elles s'exécutent indépendamment et leurs résultats sont loggés.
-   * On retourne les IDs des tâches déléguées pour la traçabilité.
-   */
-  private async dispatchDelegations(
-    parentTask: AgentTask,
-    resultText: string,
-    depth: number = 0
-  ): Promise<string[]> {
-    const { delegations, warnings } = this.delegationParser.parse(
-      resultText,
-      parentTask.role
-    );
-
-    // Logger les avertissements de parsing
-    for (const w of warnings) {
-      log.warn(`[DelegationParser] ${w}`);
-    }
-
-    if (delegations.length === 0) return [];
-
-    const agent = getAgentDefinition(parentTask.role);
-    if (!agent) {
-      log.error(`[dispatchDelegations] Agent "${parentTask.role}" introuvable`);
-      return [];
-    }
-    log.info(
-      `🔀 [${agent.name}] ${delegations.length} délégation(s) détectée(s) à profondeur ${depth} — dispatch en cours...`
-    );
-
-    const subTaskIds: string[] = [];
-    const nextDepth = depth + 1;
-
-    try {
-      // Lancer toutes les délégations en parallèle (fire-and-forget)
-      const dispatches = delegations.map((delegation: ParsedDelegation) =>
-        this.sendDelegation(parentTask, delegation, nextDepth).then((taskId) => {
-          if (taskId) subTaskIds.push(taskId);
-        })
-      );
-
-      await Promise.allSettled(dispatches);
-
-      log.info(
-        `[${agent.name}] ${subTaskIds.length}/${delegations.length} délégation(s) envoyée(s) sur le bus (profondeur: ${nextDepth})`
-      );
-
-      return subTaskIds;
-    } finally {
-      // Nettoyer la chaîne seulement une fois tous les dispatches de ce parent terminés
-      this.delegationChains.delete(parentTask.id);
-    }
-  }
-
-  /**
-   * Envoie une délégation unique sur le bus de messages.
-   * Retourne l'ID de la sous-tâche créée, ou null en cas d'erreur.
-   * 
-   * Implémente :
-   * - Détection de cycle : empêche A -> B -> A
-   * - Limite de profondeur : max 4 niveaux de délégation
-   */
-  private async sendDelegation(
-    parentTask: AgentTask,
-    delegation: ParsedDelegation,
-    depth: number = 0
-  ): Promise<string | null> {
-    const taskId = randomUUID();
-    const agent = getAgentDefinition(parentTask.role);
-    if (!agent) {
-      log.error(`[sendDelegation] Agent "${parentTask.role}" introuvable`);
-      return null;
-    }
-    
-    // Vérifier la limite de profondeur
-    if (depth >= AgentExecutor.MAX_DELEGATION_DEPTH) {
-      log.warn(
-        `[${agent.name}] Délégation rejetée : profondeur maximale atteinte (${AgentExecutor.MAX_DELEGATION_DEPTH}) - ` +
-        `chaîne: ${this.formatDelegationChain(parentTask.id)}`
-      );
-      return null;
-    }
-    
-    // Vérifier les cycles dans la chaîne de délégation
-    const chain = this.getDelegationChain(parentTask.id);
-    if (chain.has(delegation.targetRole)) {
-      log.warn(
-        `[${agent.name}] Délégation rejetée : cycle détecté - ${delegation.targetRole} est déjà dans la chaîne: ` +
-        `${Array.from(chain).join(' -> ')} -> ${delegation.targetRole}`
-      );
-      return null;
-    }
-    
-    // Enregistrer cette délégation dans la chaîne
-    this.addToDelegationChain(parentTask.id, delegation.targetRole);
-
-    // Construire une description enrichie avec le contexte du parent
-    const description = [
-      `Sous-tâche déléguée par [${agent.name}]`,
-      ``,
-      `Raison : ${delegation.reason}`,
-      ``,
-      `Contexte de la tâche parent :`,
-      `- Titre : ${parentTask.title}`,
-      `- Description : ${parentTask.description.slice(0, 300)}`,
-      ...(parentTask.result?.summary
-        ? [`- Résultat parent : ${parentTask.result.summary}`]
-        : []),
-    ].join("\n");
-
-    const message = {
-      id: randomUUID(),
-      type: "task_request" as const,
-      from: parentTask.role,
-      to: delegation.targetRole,
-      priority: delegation.priority as "low" | "medium" | "high" | "critical",
-      timestamp: new Date().toISOString(),
-      payload: {
-        type: "task_request",
-        taskId,
-        title: `[Sous-tâche] ${delegation.reason.slice(0, 80)}`,
-        description,
-        files: [
-          ...delegation.files,
-          // Inclure aussi les fichiers du parent qui sont pertinents
-          ...(parentTask.result?.filesModified ?? []),
-        ].filter((v, i, arr) => arr.indexOf(v) === i), // dédupliquer
-        instructions: delegation.instructions,
-      } as TaskRequestPayload,
-      metadata: {
-        parentTaskId: parentTask.id,
-        parentRole: parentTask.role,
-        delegationBlockIndex: delegation.blockIndex,
-        autonomous: true,
-      },
-    };
-
-    try {
-      // Publish fire-and-forget (pas d'await de réponse — la sous-tâche s'exécute de manière autonome)
-      await agentMessageBus.publish(message);
-
-      log.info(
-        `📤 [${agent.name}] Délégation envoyée → [${delegation.targetRole}]: "${delegation.reason.slice(0, 60)}" (task: ${taskId.slice(0, 8)})`
-      );
-      return taskId;
-    } catch (err) {
-      log.error(
-        `[${agent.name}] Échec envoi délégation → [${delegation.targetRole}]: ${(err as Error).message}`
-      );
-      return null;
-    }
-  }
-
-  /**
-   * Récupère la chaîne de délégation pour une tâche
-   */
-  private getDelegationChain(taskId: string): Set<string> {
-    let chain = this.delegationChains.get(taskId);
-    if (!chain) {
-      chain = new Set<string>();
-      this.delegationChains.set(taskId, chain);
-    }
-    return chain;
-  }
-
-  /**
-   * Ajoute un rôle à la chaîne de délégation
-   */
-  private addToDelegationChain(taskId: string, role: string): void {
-    let chain = this.delegationChains.get(taskId);
-    if (!chain) {
-      chain = new Set<string>();
-      this.delegationChains.set(taskId, chain);
-    }
-    chain.add(role);
-  }
-
-  /**
-   * Formate la chaîne de délégation pour le log
-   */
-  private formatDelegationChain(taskId: string): string {
-    const chain = this.delegationChains.get(taskId);
-    return chain ? Array.from(chain).join(' -> ') : taskId;
-  }
-
-  /**
-   * Résout un contexte explicite, ou découvre une sélection bornée et stable du
-   * dépôt pour les audits. La découverte est réservée aux agents autorisés à
-   * lister le projet et ne modifie jamais les fichiers.
-   */
-  private async resolveContextFiles(task: AgentTask, capabilities: string[]): Promise<string[]> {
-    const mentionedFiles = this.extractMentionedFiles(task);
-    const hardExplicitFiles: string[] = [...new Set(task.context.files)].filter(Boolean) as string[];
-
-    // Si des fichiers explicites sont fournis par l'appelant (pas extraits), les utiliser directement
-    if (hardExplicitFiles.length > 0 && !capabilities.includes("list_project_files")) {
-      return hardExplicitFiles.slice(0, 10) as string[];
-    }
-
-    // Toujours découvrir l'inventaire pour résoudre les noms partiels/fuzzy
-    if (!capabilities.includes("list_project_files")) {
-      return hardExplicitFiles.slice(0, 10) as string[];
-    }
-
-    try {
-      const inventory = await this.callToolWithTimeout("list_project_files", { path: ".", recursive: true });
-      if (inventory?.status !== "success" || !Array.isArray(inventory.files)) {
-        log.warn(`[${task.id.slice(0, 8)}] Découverte de contexte indisponible: ${inventory?.error ?? inventory?.message ?? "réponse invalide"}`);
-        return hardExplicitFiles.slice(0, 10) as string[];
-      }
-
-      const allFiles: string[] = inventory.files;
-
-      // Résoudre les fichiers mentionnés via fuzzy matching dans l'inventaire
-      const resolvedMentioned = mentionedFiles
-        .map((mentioned) => this.fuzzyResolveFile(mentioned, allFiles))
-        .filter(Boolean) as string[];
-
-      // Combiner : fichiers explicites + fichiers résolus + sélection structurante
-      const priorityFiles = [...new Set([...hardExplicitFiles, ...resolvedMentioned])];
-
-      if (priorityFiles.length >= 10) {
-        const selected: string[] = priorityFiles.slice(0, 10);
-        task.context.files = selected;
-        log.info(`[${task.id.slice(0, 8)}] Contexte explicite résolu: ${selected.length} fichier(s)`);
-        return selected;
-      }
-
-      const selectedFiles = this.selectProjectFiles(allFiles, task, resolvedMentioned);
-      task.context.files = selectedFiles;
-      task.context.metadata = {
-        ...task.context.metadata,
-        projectContextDiscovered: true,
-        projectFileCount: inventory.count,
-      };
-      log.info(`[${task.id.slice(0, 8)}] Contexte projet découvert: ${selectedFiles.length}/${inventory.count} fichier(s) sélectionné(s)`);
-      return selectedFiles as string[];
-    } catch (error) {
-      log.warn(`[${task.id.slice(0, 8)}] Échec de découverte du contexte: ${(error as Error).message}`);
-      return hardExplicitFiles.slice(0, 10) as string[];
-    }
-  }
-
-  /** Résout un nom de fichier partiel ou casé différemment dans l'inventaire. */
-  private fuzzyResolveFile(mentioned: string, allFiles: string[]): string | null {
-    const normalized = mentioned.replace(/\\/g, "/").toLowerCase();
-    // Exact match
-    const exact = allFiles.find((file) => file.replace(/\\/g, "/") === mentioned);
-    if (exact) return exact;
-    // Case-insensitive suffix match
-    const suffixMatch = allFiles.find((file) => {
-      const fileLower = file.replace(/\\/g, "/").toLowerCase();
-      return fileLower.endsWith("/" + normalized) || fileLower === normalized;
-    });
-    return suffixMatch ?? null;
-  }
-
-  /** Extrait les chemins de fichiers mentionnés dans le titre et la description de la tâche. */
-  private extractMentionedFiles(task: AgentTask): string[] {
-    const text = `${task.title} ${task.description} ${task.context.instructions ?? ""}`;
-    // Chercher des patterns de fichiers courants (avec extension)
-    const filePattern = /(?:^|\s|["'`([\]])([a-zA-Z0-9_/\\.-]+\.(?:ts|tsx|js|jsx|json|md|css|scss|html|vue|py|rs|go))\b/gi;
-    const matches: string[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = filePattern.exec(text)) !== null) {
-      const candidate = match[1].replace(/\\/g, "/");
-      if (!candidate.startsWith(".") && !candidate.includes("node_modules")) {
-        matches.push(candidate);
-      }
-    }
-    return [...new Set(matches)];
-  }
-
-  /** Conserve les fichiers d'entrée utiles sans dépasser le budget de contexte. */
-  private selectProjectFiles(files: string[], _task: AgentTask, resolvedMentioned: string[] = []): string[] {
-    const preferredFiles = [
-      ...resolvedMentioned,
-      "package.json",
-      "tsconfig.json",
-      "README.md",
-      "server-bootstrap.ts",
-      "server.ts",
-      "server/agents/AgentExecutor.ts",
-      "server/agents/AgentOrchestrator.ts",
-      "server/skills/agents.ts",
-    ];
-    const preferredRank = new Map(preferredFiles.map((file, index) => [file.replace(/\\/g, "/"), index]));
-    const normalizedFiles = [...new Set(files.map((file) => file.replace(/\\/g, "/"))) ]
-      .filter((file) => !file.startsWith(".git/") && !file.startsWith(".Leanna/") && !file.includes("/node_modules/"));
-
-    return normalizedFiles
-      .sort((left, right) => {
-        const leftRank = preferredRank.get(left) ?? preferredFiles.length + 999;
-        const rightRank = preferredRank.get(right) ?? preferredFiles.length + 999;
-        return leftRank - rightRank || left.localeCompare(right);
-      })
-      .slice(0, 10);
-  }
-
-  private async readContextFiles(files: string[]): Promise<string[]> {
-    const fileContents: string[] = [];
-    for (const [index, file] of files.slice(0, 10).entries()) {
-      try {
-        // Le premier fichier est le fichier principal résolu par la tâche :
-        // injecter son contenu complet évite que le modèle travaille sur une
-        // simple fenêtre startLine/endLine ou sur les 50 premières lignes.
-        const content = await this.callToolWithTimeout("read_project_file", {
-          path: file,
-          ...(index === 0 ? { full: true } : {}),
-        });
-        if (content && typeof content === "object" && content.content) {
-          fileContents.push(`--- ${file} ---\n${content.content}`);
-        }
-      } catch (err) {
-        log.debug(`Échec lecture: ${file} — ${(err as Error).message}`);
-      }
-    }
-    log.debug(`Fichiers lus: ${fileContents.length}/${files.length}; principal=${files[0] ?? "aucun"}`);
-    return fileContents;
   }
 
   private incrementRunning(role: string): void {
