@@ -102,11 +102,18 @@ Bot Telegram Leanna (Polling local)
 - **Commandes intégrées** :
   - `/status` : État du système, projet actif, moteur IA, mémoire et uptime.
   - `/agent <tâche>` : Lancement d'une mission autonome par les agents.
+  - `/tasks [statut]` : Liste des tâches agents, filtrable par statut (`pending`, `running`, `completed`, `incomplete`, `failed`, `cancelled`).
+  - `/task <id>` : Détail complet d'une tâche (statut, priorité, timestamps, résumé, fichiers modifiés, erreurs).
+  - `/cancel <id>` : Annulation d'une tâche agent en cours.
   - `/cmd <commande>` : Exécution sécurisée d'une commande dans le terminal du projet.
+  - `/ls [dossier]` : Liste le contenu d'un dossier du projet actif.
+  - `/read <chemin>` : Affiche le contenu d'un fichier (les gros fichiers > 64 Ko sont envoyés en pièce jointe).
+  - `/project [chemin]` : Affiche le projet actif et les workspaces connus, ou bascule vers un autre projet.
   - `/clear` : Réinitialisation de la mémoire conversationnelle Telegram.
   - `/help` : Guide complet des commandes.
-- **Sécurité renforcée** : Seuls les identifiants configurés dans la liste blanche (User IDs / usernames) sont autorisés.
+- **Sécurité renforcée** : Seuls les identifiants configurés dans la liste blanche (User IDs / usernames) sont autorisés. Les commandes `/read` et `/ls` sont protégées contre le _path traversal_ (aucun accès hors du projet actif), et `/cmd` filtre les commandes destructrices.
 - **Notifications d'agents** : Réception automatique d'un ping Telegram lorsqu'un agent termine ou échoue une tâche.
+- **Outils Telegram pour l'IA** : Leanna peut elle-même envoyer des messages, photos, documents ou fichiers du workspace via des skills dédiés (`telegram_notify`, `telegram_send_message`, `telegram_send_photo`, `telegram_send_document`, `telegram_send_from_workspace`, `telegram_broadcast`, `telegram_get_status`, `telegram_list_users`, `telegram_get_chat_info`).
 - **Interface dédiée dans l'IDE** : Onglet Paramètres > Bot Telegram pour gérer le token, démarrer/arrêter le bot, et tester la liaison.
 
 ---
@@ -131,7 +138,7 @@ Bot Telegram Leanna (Polling local)
 - **Workflows automatisés** planifiables (ex : toutes les 24h, 30m…) avec builder visuel
 - **Tâches planifiées** (automation) avec intervalles configurables
 - **Intégration GitHub** : statut Git, commits, push, issues, PRs depuis l'interface
-- **Contrôle à distance via Telegram** : chat IA, lancement d'agents et alertes sur smartphone *(nouveau)*
+- **Contrôle à distance via Telegram** : chat IA, lancement et suivi d'agents (`/tasks`, `/task`, `/cancel`), exploration du projet (`/ls`, `/read`, `/project`), exécution de commandes et alertes sur smartphone *(nouveau)*
 - **Gestion de documents** : upload de PDF/DOCX, extraction et indexation
 - **Thème dark/light** et couleur d'accent personnalisable
 - **Panel PM2 intégré** : monitoring en temps réel des process (status, CPU, RAM, uptime, restart), actions (start/stop/restart/reload/flush), logs des apps supervisées *(nouveau)*
@@ -445,7 +452,7 @@ leanna/
 │   │   ├── ToolRegistry.ts · StateMachine.ts · WorkflowEngine.ts
 │   │   ├── EventBus.ts · Observability.ts · AgentRuntime.ts
 │   │   └── HierarchicalMemoryService.ts
-│   ├── skills/             # Skills natifs (25+) dont agent_brain et telegram
+│   ├── skills/             # Skills natifs (35+) dont agent_brain et telegram
 │   ├── telegram/           # Service Bot Telegram (grammy, whitelist, chat IA)
 │   │   ├── TelegramService.ts
 │   │   └── types.ts
