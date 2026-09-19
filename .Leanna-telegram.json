@@ -1,7 +1,6 @@
 {
-  "botToken": "gcm:07a35dc4c5be754faedbcb86:ef5d5595a75f4fa21025d2f191adad9b:f25c08053920741723b1684e013fa06fcedadde66d33924f0e6fd45a7cb54123a5ac46a8cc03c5260252cfe5f2a7",
+  "botToken": "gcm:2fad0f26beb9fd81759c5298:ce465eb11b5609b4cd6893f0320fe3db:47a1d6a7267b8b1e358c7c178910019840794b1ca92ba487f77c5b883e754058db7f8cd02db30c0d0035c4392b16",
   "allowedUsers": [
-    "user_test_42",
     "8367779354"
   ],
   "autoStart": true,
