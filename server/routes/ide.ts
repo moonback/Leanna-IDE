@@ -2,22 +2,21 @@ import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { isSandboxActive, getSandboxRoot, markFileModified, assertSandboxReady, SandboxGuardError } from '../utils/sandbox.js';
-import { resolveWorkspacePath, getDefaultWorkspaceRoot } from '../security.js';
+import { resolveWorkspacePath, getDefaultWorkspaceRoot, isExcludedWorkspaceEntry } from '../security.js';
 import { appendAuditEvent } from '../audit.js';
 
 const router = Router();
-
-const EXCLUDED_TREE_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'build', 'out']);
 
 async function countFilesRecursively(directory: string): Promise<number> {
   const entries = await fs.promises.readdir(directory, { withFileTypes: true });
   let count = 0;
 
   for (const entry of entries) {
+    if (isExcludedWorkspaceEntry(entry.name)) {
+      continue;
+    }
     if (entry.isDirectory()) {
-      if (!EXCLUDED_TREE_DIRECTORIES.has(entry.name)) {
-        count += await countFilesRecursively(path.join(directory, entry.name));
-      }
+      count += await countFilesRecursively(path.join(directory, entry.name));
     } else if (entry.isFile()) {
       count += 1;
     }
@@ -73,9 +72,9 @@ router.get('/tree', async (req: Request, res: Response) => {
     // Read entries at this directory level only
     const entries = fs.readdirSync(targetDir, { withFileTypes: true });
     
-    // Filter excluded directories
+    // Filter excluded directories and sensitive files
     const filteredEntries = entries.filter(entry =>
-      !EXCLUDED_TREE_DIRECTORIES.has(entry.name)
+      !isExcludedWorkspaceEntry(entry.name)
     );
 
     // Sort: directories first, then alphabetical
@@ -190,9 +189,9 @@ router.get('/tree-workspace', async (req: Request, res: Response) => {
     // Read entries at this directory level only
     const entries = fs.readdirSync(targetDir, { withFileTypes: true });
     
-    // Filter excluded directories
+    // Filter excluded directories and sensitive files
     const filteredEntries = entries.filter(entry =>
-      !['node_modules', '.git', 'dist', 'build', 'out', '.Leanna'].includes(entry.name)
+      !isExcludedWorkspaceEntry(entry.name)
     );
 
     // Sort: directories first, then alphabetical
@@ -485,7 +484,7 @@ router.post('/search', async (req: Request, res: Response) => {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
 
       for (const entry of entries) {
-        if (['node_modules', '.git', 'dist', 'build', 'out', '.next', '.vscode'].includes(entry.name)) {
+        if (isExcludedWorkspaceEntry(entry.name) || ['.next', '.vscode'].includes(entry.name)) {
           continue;
         }
 
