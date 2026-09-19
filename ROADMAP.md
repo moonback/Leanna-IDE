@@ -221,7 +221,7 @@ Fonctionnalités déjà présentes dans le code source.
 ### Sécurité & contrôle de l'agent 🆕
 | Fonctionnalité | Prio | Effort | Statut |
 |---|---|---|---|
-| **Modèle de permissions par skill** (`read` / `write` / `network` / `exec`) déclaré et appliqué au runtime | P0 | L | 📋 Planifié |
+| **Modèle de permissions par skill** (`read` / `write` / `network` / `exec`) déclaré et appliqué au runtime | P0 | L | ✅ Fait |
 | **Mode approbation humaine** : validation requise avant écriture hors sandbox, `git push`, commande shell | P0 | M | 📋 Planifié |
 | **Dry-run global** : exécuter une mission complète en simulation, sans effet de bord | P1 | M | 📋 Planifié |
 | **Liste d'exclusion de chemins** (`.leannaignore`) : dossiers interdits en écriture à l'agent | P1 | S | 📋 Planifié |
