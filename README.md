@@ -159,6 +159,8 @@ Bot Telegram Leanna (Polling local)
 - **Text-to-Speech** intégré pour les réponses vocales
 - **Checkpoint Git** : sauvegarde automatique avant chaque modification critique
 - **Safeguards module** : garde-fous configurables contre actions dangereuses
+- **Modèle de permissions par skill** : chaque skill/outil déclare les permissions requises (`read` / `write` / `network` / `exec`), appliquées au runtime par le `ToolRegistry` (modes `enforce` / `audit` / `off`) *(nouveau)*
+- **Dry-run global** : exécution d'une mission complète en simulation, sans effet de bord (aucune écriture, exécution shell ou mutation réseau) — les lectures/analyses s'exécutent normalement *(nouveau)*
 - **Token optimization** : résumé automatique du contexte pour éviter l'overflow de tokens
 - **Sandbox Watch** : suivi en temps réel des modifications du sandbox avec diff viewer
 - **Hierarchical Memory Engine** : moteur de mémoire hiérarchisé avec service dédié
@@ -288,6 +290,9 @@ Toutes les variables sont lues depuis `.env` (ou `.env.local` s'il existe, avec 
 | `ENABLE_CHAIN_OF_THOUGHT` | Active l'affichage de la chaîne de pensée | `true` | ❌ |
 | `FORCE_TIERED_TOOLS` | Force le mode outils par tiers | `true` | ❌ |
 | `SELF_HEAL_READONLY` | Mode auto-correction lecture seule | `false` | ❌ |
+| `Leanna_PERMISSION_MODE` | Application des permissions par skill : `enforce` (refuse), `audit` (journalise), `off` (désactive) | `enforce` | ❌ |
+| `Leanna_GRANTED_PERMISSIONS` | Permissions accordées globalement au runtime (CSV). Toutes par défaut. | `read,write,network` | ❌ |
+| `Leanna_DRY_RUN` | Active la simulation globale au démarrage (aucun effet de bord réel) | `false` | ❌ |
 | `SANDBOX_EXIT_CODE` | Code à 6 chiffres pour sortir du sandbox | `123456` | ❌ |
 | `TELEGRAM_BOT_TOKEN` | Token d'API Bot Telegram (obtenu auprès de @BotFather) | `123456:ABC...` | ❌ |
 | `ALLOW_FTP_PRIVATE_IPS` | Autorise les connexions FTP vers IPs privées | `false` | ❌ |
