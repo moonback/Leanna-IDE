@@ -777,24 +777,11 @@ const FileExplorer = memo(function FileExplorer({
           </button>
           <div className="min-w-0">
             <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Explorer
+              Projet 
             </span>
-            <div
-              className="text-xs truncate font-mono"
-              style={{ color: 'var(--text-muted)' }}
-              title={currentDir || 'Racine'}
-            >
-              {currentDir === '.' ? '~/projet' : currentDir}
-            </div>
+            
           </div>
-          {!loading && (
-            <span
-              className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ color: 'var(--text-dimmed)', background: 'var(--bg-input)' }}
-            >
-              {displayedFileCount}
-            </span>
-          )}
+          
         </div>
         <div className="flex items-center gap-1">
           {currentDir && currentDir !== '.' && (
