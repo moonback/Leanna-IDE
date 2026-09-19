@@ -56,6 +56,51 @@ export function createRateLimiter(limit: number, windowMs: number): RateLimiter 
   };
 }
 
+/**
+ * Directory names that must never be exposed through the IDE tree, search,
+ * file-count, or read/write path resolution. These hold local state, secrets,
+ * or generated artefacts that should stay out of the workspace surface.
+ */
+export const EXCLUDED_WORKSPACE_DIRECTORIES = new Set<string>([
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'out',
+  '.Leanna',
+]);
+
+/**
+ * Exact file names that must never be exposed (sensitive credentials/config).
+ */
+export const EXCLUDED_WORKSPACE_FILES = new Set<string>([
+  '.gemini-keys.json',
+]);
+
+/**
+ * Returns true when a single path segment (directory or file name) should be
+ * hidden from the workspace surface. Covers the excluded directory/file sets
+ * plus any `.env` / `.env.*` variant.
+ */
+export function isExcludedWorkspaceEntry(name: string): boolean {
+  if (EXCLUDED_WORKSPACE_DIRECTORIES.has(name)) return true;
+  if (EXCLUDED_WORKSPACE_FILES.has(name)) return true;
+  // .env, .env.local, .env.example, .env.production, ...
+  if (name === '.env' || name.startsWith('.env.')) return true;
+  return false;
+}
+
+/**
+ * Returns true when any segment of a workspace-relative path is excluded.
+ */
+export function isExcludedWorkspacePath(relativePath: string): boolean {
+  const normalized = relativePath.replace(/\\/g, '/');
+  return normalized
+    .split('/')
+    .filter(Boolean)
+    .some((segment) => isExcludedWorkspaceEntry(segment));
+}
+
 export function resolveWorkspacePath(requestedPath: string, workspaceRoot: string): { ok: true; absolutePath: string } | { ok: false; status: number; error: string } {
   const absolutePath = path.resolve(workspaceRoot, requestedPath);
   const normalizedRoot = path.resolve(workspaceRoot);
@@ -63,6 +108,13 @@ export function resolveWorkspacePath(requestedPath: string, workspaceRoot: strin
 
   if (!normalizedTarget.startsWith(normalizedRoot + path.sep) && normalizedTarget !== normalizedRoot) {
     return { ok: false, status: 403, error: 'Path outside workspace' };
+  }
+
+  // Central filter: block access to excluded/sensitive entries even when the
+  // path itself is inside the workspace.
+  const relativeToRoot = path.relative(normalizedRoot, normalizedTarget);
+  if (relativeToRoot && isExcludedWorkspacePath(relativeToRoot)) {
+    return { ok: false, status: 403, error: 'Path excluded from workspace' };
   }
 
   return { ok: true, absolutePath: normalizedTarget };

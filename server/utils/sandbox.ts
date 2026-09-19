@@ -32,6 +32,16 @@ export function getSandboxRoot(): string {
   return path.join(SELF_ROOT, ".Leanna", SANDBOX_DIR_NAME);
 }
 
+/**
+ * Retourne le chemin canonique (realpath) de la racine du sandbox.
+ * À utiliser pour dériver un chemin relatif destiné à `assertSafeSandboxPath`,
+ * afin que les deux emplois partagent exactement la même racine résolue.
+ * @throws si la racine du sandbox est introuvable.
+ */
+export function getRealSandboxRoot(): string {
+  return fs.realpathSync(getSandboxRoot());
+}
+
 // Dossiers/fichiers à exclure de la copie (trop volumineux ou inutiles dans le sandbox)
 const EXCLUDE_PATTERNS = [
   "node_modules",
@@ -195,6 +205,28 @@ export function getSandboxState(): SandboxState {
  * @throws SandboxGuardError si l'opération ne doit pas écrire.
  */
 export function assertSandboxReady(requestedPath: string): string {
+  return assertSafeSandboxPath(requestedPath);
+}
+
+/**
+ * Autorité unique de validation d'un chemin sandbox (lecture ou écriture).
+ *
+ * Cette fonction centralise les trois vérifications de sécurité :
+ *   1. résout le chemin absolu à partir de la racine réelle du sandbox ;
+ *   2. vérifie qu'il reste strictement sous cette racine (pas d'échappement) ;
+ *   3. remonte la chaîne des parents existants et rejette tout lien symbolique
+ *      rencontré sur le trajet — pas seulement la cible finale.
+ *
+ * Elle exige également que le sandbox soit à l'état READY et refuse les chemins
+ * absolus. Toute résolution passe par `getSandboxRoot()` au moment de l'appel :
+ * la racine n'est lue qu'une seule fois ici, éliminant la fenêtre de confusion
+ * où `getSandboxRoot()` pourrait changer entre une résolution et sa revalidation.
+ *
+ * @param requestedPath Chemin relatif au sandbox.
+ * @returns Le chemin absolu canonique validé.
+ * @throws SandboxGuardError si l'opération ne doit pas être autorisée.
+ */
+export function assertSafeSandboxPath(requestedPath: string): string {
   if (sandboxState !== "READY") {
     throw new SandboxGuardError(
       "SANDBOX_NOT_READY",
