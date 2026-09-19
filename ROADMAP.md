@@ -209,9 +209,9 @@ Fonctionnalités déjà présentes dans le code source.
 | Fonctionnalité | Prio | Effort | Statut |
 |---|---|---|---|
 | Logging structuré JSON avec niveaux (`debug`/`info`/`warn`/`error`) et `correlationId` par requête | P0 | M | 📋 Planifié |
-| **Tracing OpenTelemetry** : une trace par mission, un span par étape/outil/appel modèle | P1 | L | 📋 Planifié |
-| **Tableau de bord Coûts & Tokens** : consommation par modèle, agent, mission et jour | P0 | L | 📋 Planifié |
-| **Budget guardrails** : plafond de tokens/€ par mission, arrêt automatique au dépassement | P0 | M | 📋 Planifié |
+| **Tracing OpenTelemetry** : une trace par mission, un span par étape/outil/appel modèle | P1 | L | ✅ Fait |
+| **Tableau de bord Coûts & Tokens** : consommation par modèle, agent, mission et jour | P0 | L | ✅ Fait |
+| **Budget guardrails** : plafond de tokens/€ par mission, arrêt automatique au dépassement | P0 | M | ✅ Fait |
 | Health check enrichi (`/api/health`) : Supabase, Gemini, pgvector, mémoire, uptime, version | P0 | S | 📋 Planifié |
 | **Endpoint `/api/metrics` format Prometheus** (latences, erreurs, files d'attente) | P2 | M | 📋 Planifié |
 | **Timeline de mission rejouable** : chaque décision, outil appelé, diff produit, horodaté | P1 | L | 📋 Planifié |
