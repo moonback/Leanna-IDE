@@ -22,6 +22,7 @@ import type {
 } from "./types.js";
 import type { EventBus } from "./EventBus.js";
 import { PermissionPolicy, PermissionDeniedError } from "./PermissionPolicy.js";
+import { DryRunController } from "./DryRun.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -43,6 +44,12 @@ export interface ToolCallOptions {
   callerPermissions?: ToolPermission[];
   /** Contexte à passer au handler (pour compatibilité avec les skills legacy) */
   context?: any;
+  /**
+   * Force (true) ou désactive (false) la simulation pour cet appel précis,
+   * en surchargeant l'état global du DryRunController. Laisser indéfini pour
+   * suivre l'état global.
+   */
+  dryRun?: boolean;
 }
 
 export interface ToolRegistryConfig {
@@ -58,6 +65,11 @@ export interface ToolRegistryConfig {
    * (Leanna_PERMISSION_MODE / Leanna_GRANTED_PERMISSIONS).
    */
   permissionPolicy?: PermissionPolicy;
+  /**
+   * Contrôleur de simulation (dry-run global).
+   * Si absent, un contrôleur désactivé est créé.
+   */
+  dryRun?: DryRunController;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -73,6 +85,7 @@ export class ToolRegistry {
   private static readonly MAX_HISTORY = 500;
   private readCache = new Map<string, { value: any; expires: number }>();
   private permissionPolicy: PermissionPolicy;
+  private dryRun: DryRunController;
 
   constructor(config: ToolRegistryConfig = {}) {
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 120_000;
@@ -80,6 +93,7 @@ export class ToolRegistry {
     this.eventBus = config.eventBus;
     this.permissionPolicy =
       config.permissionPolicy ?? PermissionPolicy.fromEnv(process.env, { eventBus: config.eventBus });
+    this.dryRun = config.dryRun ?? new DryRunController({ eventBus: config.eventBus });
   }
 
   /** Retourne la politique de permissions appliquée au runtime. */
@@ -90,6 +104,16 @@ export class ToolRegistry {
   /** Remplace la politique de permissions (utile pour les tests / reconfiguration). */
   setPermissionPolicy(policy: PermissionPolicy): void {
     this.permissionPolicy = policy;
+  }
+
+  /** Retourne le contrôleur de simulation (dry-run global). */
+  getDryRun(): DryRunController {
+    return this.dryRun;
+  }
+
+  /** Remplace le contrôleur de simulation. */
+  setDryRun(controller: DryRunController): void {
+    this.dryRun = controller;
   }
 
   // ─── Enregistrement ────────────────────────────────────────────────────────
@@ -247,6 +271,23 @@ export class ToolRegistry {
     // Vérification additionnelle des permissions de l'appelant (le cas échéant).
     if (entry.definition.permissions?.length) {
       this.checkPermissions(name, entry.definition.permissions, options.callerPermissions);
+    }
+
+    // Dry-run global : intercepte les outils à effet de bord avant toute
+    // exécution. Un override par appel (options.dryRun) prime sur l'état global.
+    const dryRunActive = options.dryRun ?? this.dryRun.isEnabled();
+    if (dryRunActive && this.dryRun.hasSideEffect(entry.definition.permissions)) {
+      // On enregistre l'appel dans les métriques comme un succès simulé,
+      // sans exécuter le handler.
+      const simulated = this.dryRun.simulate(
+        name,
+        entry.definition.permissions,
+        args,
+        options.agentId
+      );
+      this.recordMetrics(entry, name, 0, true, options.agentId);
+      this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs: 0, success: true });
+      return simulated;
     }
 
     const timeoutMs = options.timeoutMs ?? entry.definition.timeoutMs ?? this.defaultTimeoutMs;

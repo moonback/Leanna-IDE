@@ -107,17 +107,30 @@ export class Executor {
     priority?: "low" | "medium" | "high" | "critical";
     availableSkills: string[];
     budget?: { maxTokens?: number; maxCostUsd?: number };
+    /** Exécuter la mission entière en simulation, sans effet de bord. */
+    dryRun?: boolean;
   }): Promise<Mission> {
     if (!this.skillHandler) {
       throw new Error("SkillHandler not configured. Call setSkillHandler first.");
     }
 
+    // Config spécifique à la mission : le dry-run peut être activé par mission.
+    const missionConfig: MissionConfig = {
+      ...this.config,
+      dryRun: params.dryRun ?? this.config.dryRun,
+    };
+
     const mission = new Mission(
       params.title,
       params.description,
       params.priority ?? "medium",
-      this.config
+      missionConfig
     );
+
+    if (missionConfig.dryRun) {
+      console.log(`[Executor] 🧪 Mission "${params.title}" lancée en DRY-RUN (simulation, sans effet de bord).`);
+      this.emit("mission_dryrun", { missionId: mission.id, title: params.title });
+    }
 
     // Start OpenTelemetry trace for this mission
     telemetryService.startMissionTrace(mission.id, params.title);
@@ -438,7 +451,8 @@ export class Executor {
     let error: string | undefined = undefined;
 
     try {
-      result = await this.skillHandler!(action.skillName, action.args);
+      const dryRun = mission.getConfig().dryRun;
+      result = await this.skillHandler!(action.skillName, action.args, { dryRun });
       success = !!(
         result === null ||
         result === undefined ||
@@ -570,8 +584,18 @@ export class Executor {
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+/** Options d'exécution transmises au handler de skill. */
+export interface SkillHandlerOptions {
+  /** Exécuter en simulation (dry-run), sans effet de bord. */
+  dryRun?: boolean;
+}
+
 /** Handler pour exécuter un skill */
-export type SkillHandlerFn = (name: string, args: any) => Promise<any>;
+export type SkillHandlerFn = (
+  name: string,
+  args: any,
+  options?: SkillHandlerOptions
+) => Promise<any>;
 
 /** Émetteur d'événements pour le frontend */
 export type ExecutorEventEmitter = (event: string, data: Record<string, unknown>) => void;

@@ -86,7 +86,12 @@ export class SkillManagerV2 {
    * Appelle un outil par son nom.
    * Interface identique à l'ancien SkillManager.handleToolCall().
    */
-  async handleToolCall(name: string, args: any, context?: any): Promise<any> {
+  async handleToolCall(
+    name: string,
+    args: any,
+    context?: any,
+    options?: { dryRun?: boolean }
+  ): Promise<any> {
     // Normalisation du nom (compatibilité Gemini qui préfixe)
     let normalizedName = name;
     if (name.includes(":")) {
@@ -111,13 +116,21 @@ export class SkillManagerV2 {
       for (const skill of this.skills) {
         const tool = skill.declarations.find(d => d.name === normalizedName);
         if (tool) {
+          // En dry-run, on ne court-circuite PAS vers le handler direct pour les
+          // outils à effet de bord : on les intercepte via le registre pour
+          // garantir la simulation. Les outils en lecture seule passent en direct.
+          const dryRunActive = options?.dryRun ?? this.registry.getDryRun().isEnabled();
+          const def = this.registry.getDefinition(normalizedName);
+          if (dryRunActive && def && this.registry.getDryRun().hasSideEffect(def.permissions)) {
+            return this.registry.call(normalizedName, args ?? {}, { context, dryRun: true });
+          }
           return skill.handleToolCall(normalizedName, args, context);
         }
       }
     }
 
     // Sinon, utiliser le ToolRegistry normal
-    return this.registry.call(normalizedName, args ?? {}, { context });
+    return this.registry.call(normalizedName, args ?? {}, { context, dryRun: options?.dryRun });
   }
 
   /**

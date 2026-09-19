@@ -27,6 +27,7 @@ import { ToolRegistry } from "./ToolRegistry.js";
 import { Memory } from "./Memory.js";
 import { HierarchicalMemoryService } from "./HierarchicalMemoryService.js";
 import { PermissionPolicy } from "./PermissionPolicy.js";
+import { DryRunController } from "./DryRun.js";
 import type {
   Task,
   TaskResult,
@@ -81,7 +82,10 @@ export class AgentRuntime {
   private started = false;
   private startPromise: Promise<void> | null = null;
 
-  constructor(config: Partial<RuntimeConfig> = {}, options: { permissionPolicy?: PermissionPolicy } = {}) {
+  constructor(
+    config: Partial<RuntimeConfig> = {},
+    options: { permissionPolicy?: PermissionPolicy; dryRun?: DryRunController } = {}
+  ) {
     this.config = { ...DEFAULT_RUNTIME_CONFIG, ...config };
 
     // Initialisation des composants centraux
@@ -91,6 +95,7 @@ export class AgentRuntime {
       eventBus: this.events,
       defaultTimeoutMs: 180_000, // 3 minutes pour les tâches agent (aligné avec AgentExecutor)
       permissionPolicy: options.permissionPolicy ?? PermissionPolicy.fromEnv(process.env, { eventBus: this.events }),
+      dryRun: options.dryRun ?? DryRunController.fromEnv(process.env, { eventBus: this.events }),
     });
     this.memory = new Memory({ eventBus: this.events });
     this.hierarchicalMemory = new HierarchicalMemoryService({

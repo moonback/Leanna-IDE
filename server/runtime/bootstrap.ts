@@ -16,6 +16,7 @@ import { AgentRuntime } from "./AgentRuntime.js";
 import { SkillManagerV2 } from "./compat/SkillManagerV2.js";
 import { PromptRegistry } from "./PromptRegistry.js";
 import { PermissionPolicy } from "./PermissionPolicy.js";
+import { DryRunController } from "./DryRun.js";
 import { loadPromptTemplates } from "./prompts/loader.js";
 import { defaultAgents } from "./agents/index.js";
 import type { RuntimeConfig } from "./types.js";
@@ -40,6 +41,11 @@ export interface BootstrapConfig {
    * (Leanna_PERMISSION_MODE / Leanna_GRANTED_PERMISSIONS).
    */
   permissionPolicy?: PermissionPolicy;
+  /**
+   * Contrôleur de simulation globale (dry-run).
+   * Si absent, construit depuis l'environnement (Leanna_DRY_RUN).
+   */
+  dryRun?: DryRunController;
   /** Skills à enregistrer (toutes les skills existantes) */
   skills?: LegacySkill[];
   /** Désactiver les agents par défaut */
@@ -74,9 +80,10 @@ export interface BootstrapResult {
 export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<BootstrapResult> {
   const startTime = Date.now();
 
-  // 1. Créer le runtime (avec la politique de permissions)
+  // 1. Créer le runtime (avec la politique de permissions et le dry-run)
   const permissionPolicy = config.permissionPolicy ?? PermissionPolicy.fromEnv();
-  const runtime = new AgentRuntime(config.runtime, { permissionPolicy });
+  const dryRun = config.dryRun ?? DryRunController.fromEnv();
+  const runtime = new AgentRuntime(config.runtime, { permissionPolicy, dryRun });
 
   // 1.5. Configurer l'AgentOrchestrator pour utiliser le ToolRegistry du runtime (timeout corrigé)
   // Import dynamique pour éviter la dépendance circulaire
@@ -125,6 +132,9 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
     `[Bootstrap] Permissions runtime — mode="${permissionPolicy.getMode()}", ` +
     `accordées=[${permissionPolicy.getGranted().join(", ")}]`
   );
+  if (dryRun.isEnabled()) {
+    console.log(`[Bootstrap] 🧪 Dry-run global ACTIVÉ — aucun effet de bord ne sera réellement exécuté.`);
+  }
 
   return { runtime, skillManager, prompts };
 }
@@ -135,7 +145,8 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
  */
 export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapResult {
   const permissionPolicy = config.permissionPolicy ?? PermissionPolicy.fromEnv();
-  const runtime = new AgentRuntime(config.runtime, { permissionPolicy });
+  const dryRun = config.dryRun ?? DryRunController.fromEnv();
+  const runtime = new AgentRuntime(config.runtime, { permissionPolicy, dryRun });
   const skillManager = new SkillManagerV2({
     eventBus: runtime.events,
     registry: runtime.tools,
@@ -144,6 +155,9 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
     `[Bootstrap] Permissions runtime — mode="${permissionPolicy.getMode()}", ` +
     `accordées=[${permissionPolicy.getGranted().join(", ")}]`
   );
+  if (dryRun.isEnabled()) {
+    console.log(`[Bootstrap] 🧪 Dry-run global ACTIVÉ — aucun effet de bord ne sera réellement exécuté.`);
+  }
 
   // Charger les prompts
   const prompts = new PromptRegistry();

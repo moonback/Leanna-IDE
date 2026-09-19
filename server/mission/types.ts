@@ -199,6 +199,12 @@ export interface MissionConfig {
   enableMemoryLearning: boolean;
   /** Seuil de score minimum pour sélectionner un skill */
   minSkillScore: number;
+  /**
+   * Mode simulation globale : la mission s'exécute sans effet de bord
+   * (aucune écriture, exécution shell ou mutation réseau réelle).
+   * Les outils en lecture seule continuent de s'exécuter normalement.
+   */
+  dryRun: boolean;
 }
 
 // ─── Schemas Zod ──────────────────────────────────────────────────────────────
@@ -226,4 +232,5 @@ export const DEFAULT_MISSION_CONFIG: MissionConfig = {
   enableReflection: true,
   enableMemoryLearning: true,
   minSkillScore: 25,
+  dryRun: false,
 };

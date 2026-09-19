@@ -18,6 +18,8 @@ export { StateMachine } from "./StateMachine.js";
 export { ToolRegistry, ToolNotFoundError, ToolTimeoutError, ToolPermissionError } from "./ToolRegistry.js";
 export { PermissionPolicy, PermissionDeniedError, ALL_PERMISSIONS } from "./PermissionPolicy.js";
 export type { PermissionMode, PermissionDecision, PermissionPolicyConfig } from "./PermissionPolicy.js";
+export { DryRunController, SIDE_EFFECT_PERMISSIONS } from "./DryRun.js";
+export type { DryRunConfig, DryRunResult, DryRunReport, SimulatedEffect } from "./DryRun.js";
 export { Memory } from "./Memory.js";
 export { HierarchicalMemoryService, hierarchicalMemoryService } from "./HierarchicalMemoryService.js";
 export type { HierarchicalTier, HierarchicalMemoryItem, HierarchicalStats, HierarchicalSearchOptions, HierarchicalStoreInput } from "./HierarchicalMemoryService.js";

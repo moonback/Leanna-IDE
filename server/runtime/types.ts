@@ -185,6 +185,12 @@ export type RuntimeEvent =
       enforced: boolean;
       agentId?: string;
     }
+  | {
+      type: "tool:simulated";
+      toolName: string;
+      effects: ToolPermission[];
+      agentId?: string;
+    }
   | { type: "agent:registered"; agentId: string }
   | { type: "agent:busy"; agentId: string; taskId: string }
   | { type: "agent:idle"; agentId: string }

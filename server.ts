@@ -303,11 +303,14 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
     try {
       const missionModule = await import("./server/mission/index.js");
       const { Executor } = missionModule;
-      const { initMissionSystem } = await import("./server/skills/mission.js");
+      const { initMissionSystem, setDryRunReportProvider } = await import("./server/skills/mission.js");
       const executor = new Executor();
-      executor.setSkillHandler((name: string, args: any) => sm.handleToolCall(name, args));
+      executor.setSkillHandler((name: string, args: any, opts?: { dryRun?: boolean }) =>
+        sm.handleToolCall(name, args, undefined, opts));
       const skillNames = sm.getToolDeclarations().map((d: any) => d.name);
       initMissionSystem(executor, skillNames);
+      // Exposer le rapport dry-run (effets simulés) au skill mission.
+      setDryRunReportProvider(() => r.tools.getDryRun().getReport());
       // Stocker le missionExecutor dans le skillManager
       (sm as any)._missionExecutor = executor;
       console.log(`[Bootstrap] ✓ Mission System initialisé.`);

@@ -24,6 +24,9 @@ let executor: Executor | null = null;
 /** Référence vers les skills disponibles (injectée au démarrage) */
 let availableSkillNames: string[] = [];
 
+/** Fournisseur du rapport dry-run (injecté depuis le runtime). */
+let dryRunReportProvider: (() => unknown) | null = null;
+
 /**
  * Configure l'executor du Mission System.
  * Appelé par le SkillManager au démarrage.
@@ -32,6 +35,13 @@ export function initMissionSystem(exec: Executor, skills: string[]): void {
   executor = exec;
   availableSkillNames = skills;
   console.log(`[MissionSkill] ✓ Mission System initialisé (${skills.length} skills disponibles)`);
+}
+
+/**
+ * Injecte le fournisseur de rapport dry-run (le DryRunController du runtime).
+ */
+export function setDryRunReportProvider(provider: () => unknown): void {
+  dryRunReportProvider = provider;
 }
 
 /**
@@ -62,6 +72,11 @@ export const missionSkill: Skill = {
             type: "STRING",
             description: "Priorité: low, medium, high, critical",
             enum: ["low", "medium", "high", "critical"],
+          },
+          dryRun: {
+            type: "BOOLEAN",
+            description:
+              "Si true, exécute la mission en SIMULATION (dry-run global) : aucun effet de bord réel (pas d'écriture de fichier, pas d'exécution shell, pas de mutation réseau). Les lectures/analyses s'exécutent normalement. Utile pour prévisualiser ce que l'agent ferait avant de valider.",
           },
         },
         required: ["title", "description"],
@@ -104,6 +119,17 @@ export const missionSkill: Skill = {
       },
     },
     {
+      name: "mission_dryrun_report",
+      description:
+        "Retourne le rapport de simulation (dry-run global) : la liste des effets de bord qui AURAIENT eu lieu " +
+        "(écritures de fichiers, exécutions shell, mutations réseau) sans avoir été réellement exécutés. " +
+        "À utiliser après une mission lancée avec dryRun:true pour prévisualiser l'impact.",
+      parameters: {
+        type: "OBJECT",
+        properties: {},
+      },
+    },
+    {
       name: "mission_reflect",
       description:
         "Génère un bilan complet de mission : leçons apprises, échecs, succès, tendance de confiance, boucles détectées. " +
@@ -126,6 +152,7 @@ export const missionSkill: Skill = {
       title: z.string().min(1).trim(),
       description: z.string().min(1).trim(),
       priority: z.enum(["low", "medium", "high", "critical"]).optional().default("medium"),
+      dryRun: z.boolean().optional().default(false),
     }),
     mission_status: z.object({
       missionId: z.string().min(1),
@@ -134,6 +161,7 @@ export const missionSkill: Skill = {
     mission_cancel: z.object({
       missionId: z.string().min(1),
     }),
+    mission_dryrun_report: z.object({}),
     mission_reflect: z.object({
       missionId: z.string().optional(),
     }),
@@ -148,7 +176,7 @@ export const missionSkill: Skill = {
 
     switch (name) {
       case "mission_create": {
-        const { title, description, priority } = validateArgs(
+        const { title, description, priority, dryRun } = validateArgs(
           missionSkill.inputSchemas!["mission_create"],
           args
         );
@@ -158,13 +186,17 @@ export const missionSkill: Skill = {
           description,
           priority,
           availableSkills: availableSkillNames,
+          dryRun,
         });
 
         return {
           missionId: mission.id,
           title: mission.getState().title,
           status: mission.status,
-          message: `Mission créée et lancée. L'exécution est en cours en arrière-plan. Utilise mission_status pour suivre la progression.`,
+          dryRun,
+          message: dryRun
+            ? `Mission créée en DRY-RUN (simulation, sans effet de bord). L'exécution simule les actions ; consulte mission_status puis mission_dryrun_report pour voir ce qui aurait été fait.`
+            : `Mission créée et lancée. L'exécution est en cours en arrière-plan. Utilise mission_status pour suivre la progression.`,
           summary: mission.toContextSummary(),
         };
       }
@@ -255,6 +287,28 @@ export const missionSkill: Skill = {
           message: success
             ? `Mission ${missionId} annulée.`
             : `Mission ${missionId} non trouvée ou déjà terminée.`,
+        };
+      }
+
+      case "mission_dryrun_report": {
+        if (!dryRunReportProvider) {
+          return { error: "Rapport dry-run indisponible (contrôleur non injecté)." };
+        }
+        const report = dryRunReportProvider() as {
+          totalSimulated: number;
+          byTool: Record<string, number>;
+          byEffect: Record<string, number>;
+          effects: Array<{ toolName: string; effects: string[]; args: Record<string, unknown> }>;
+        };
+        return {
+          totalSimulated: report.totalSimulated,
+          byTool: report.byTool,
+          byEffect: report.byEffect,
+          effects: report.effects.slice(-50),
+          message:
+            report.totalSimulated === 0
+              ? "Aucun effet de bord simulé (aucune mission dry-run n'a produit d'action à effet de bord)."
+              : `${report.totalSimulated} action(s) à effet de bord simulée(s) — aucune n'a été réellement exécutée.`,
         };
       }
 
