@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { isSandboxActive, getSandboxRoot, markFileModified, assertSandboxReady, SandboxGuardError } from '../utils/sandbox.js';
+import { isSandboxActive, getSandboxRoot, getRealSandboxRoot, markFileModified, assertSafeSandboxPath, SandboxGuardError } from '../utils/sandbox.js';
 import { resolveWorkspacePath, getDefaultWorkspaceRoot, isExcludedWorkspaceEntry } from '../security.js';
 import { appendAuditEvent } from '../audit.js';
 
@@ -431,9 +431,19 @@ router.post('/copy', async (req: Request, res: Response) => {
     finalDest = `${base}_copy${i > 1 ? i : ''}${ext}`;
   }
 
-  const finalDestRelative = path.relative(getSandboxRoot(), finalDest);
+  // Revalider la destination finale via l'autorité unique. Le chemin relatif
+  // est dérivé de la racine RÉELLE (realpath) du sandbox, la même que celle
+  // utilisée par assertSafeSandboxPath, afin d'éliminer toute fenêtre où
+  // getSandboxRoot() pourrait diverger entre la résolution et la revalidation.
+  let realSandboxRoot: string;
   try {
-    finalDest = assertSandboxReady(finalDestRelative);
+    realSandboxRoot = getRealSandboxRoot();
+  } catch (error: any) {
+    return res.status(503).json({ error: 'Racine du sandbox introuvable.' });
+  }
+  const finalDestRelative = path.relative(realSandboxRoot, finalDest);
+  try {
+    finalDest = assertSafeSandboxPath(finalDestRelative);
   } catch (error: any) {
     return res.status(error?.code === 'SANDBOX_NOT_READY' ? 503 : 403).json({ error: error?.message ?? 'Destination hors sandbox.' });
   }
@@ -457,7 +467,7 @@ router.post('/copy', async (req: Request, res: Response) => {
   };
 
   await copyRecursive(resolvedSrc.absolutePath, finalDest);
-  const finalRelative = path.relative(getSandboxRoot(), finalDest).replace(/\\/g, '/');
+  const finalRelative = path.relative(realSandboxRoot, finalDest).replace(/\\/g, '/');
   markFileModified(finalRelative);
   await appendAuditEvent({ action: 'copy', target: srcPath, details: `→ ${destPath}`, actor: 'user' });
   res.json({ status: 'success', srcPath, destPath: finalRelative });
@@ -614,7 +624,7 @@ function getWorkspaceRoot(req: Request): string {
 
 function resolveRequestedWritePath(requestedPath: string): { ok: boolean; absolutePath: string; status?: number; error?: string } {
   try {
-    return { ok: true, absolutePath: assertSandboxReady(requestedPath) };
+    return { ok: true, absolutePath: assertSafeSandboxPath(requestedPath) };
   } catch (error: any) {
     const guardError = error as SandboxGuardError;
     return {
