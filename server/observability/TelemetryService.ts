@@ -10,7 +10,7 @@
 
 import { trace, context, type Span, type Tracer, SpanStatusCode } from '@opentelemetry/api';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
-import { Resource } from '@opentelemetry/resources';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { BatchSpanProcessor, ConsoleSpanExporter } from '@opentelemetry/sdk-trace-base';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -89,6 +89,13 @@ export class TelemetryService {
   /** In-memory token usage store (flush périodique) */
   private usageStore: TokenUsage[] = [];
   private flushInterval: NodeJS.Timeout | null = null;
+  /**
+   * Persistance désactivée à chaud si la table `token_usage` est absente
+   * (PGRST205) ou si Supabase refuse durablement les écritures. Le dashboard
+   * continue de fonctionner en mémoire — dégradation silencieuse, cohérente
+   * avec le reste de l'application quand Supabase n'est pas provisionné.
+   */
+  private persistenceDisabled = false;
   
   /** Budget tracking per mission */
   private missionBudgets = new Map<string, BudgetConfig>();
@@ -101,19 +108,25 @@ export class TelemetryService {
   private static readonly MAX_IN_MEMORY = 1000;
 
   constructor() {
-    // Initialize OpenTelemetry provider
+    // Initialize OpenTelemetry provider.
+    // OTel SDK v2 API: span processors are passed via the constructor
+    // (addSpanProcessor was removed), and resources are built with
+    // resourceFromAttributes (the Resource class constructor was removed).
+    const exportSpans = process.env.OTEL_CONSOLE_EXPORT === '1'
+      || process.env.OTEL_CONSOLE_EXPORT === 'true';
+
     this.provider = new NodeTracerProvider({
-      resource: new Resource({
+      resource: resourceFromAttributes({
         [ATTR_SERVICE_NAME]: 'leanna-os',
         [ATTR_SERVICE_VERSION]: '1.0.0',
       }),
+      // Console export is opt-in (verbose). Traces are still created and can
+      // be wired to an OTLP/Jaeger exporter by adding a processor here.
+      spanProcessors: exportSpans
+        ? [new BatchSpanProcessor(new ConsoleSpanExporter())]
+        : [],
     });
-    
-    // Use console exporter for now (can be replaced with Jaeger/Zipkin/OTLP)
-    this.provider.addSpanProcessor(
-      new BatchSpanProcessor(new ConsoleSpanExporter())
-    );
-    
+
     this.provider.register();
     this.tracer = trace.getTracer('leanna-telemetry', '1.0.0');
     
@@ -456,7 +469,7 @@ export class TelemetryService {
   // ─── Persistence ───────────────────────────────────────────────────────────
 
   private async flushToSupabase(): Promise<void> {
-    if (!this.supabase || this.usageStore.length === 0) return;
+    if (!this.supabase || this.persistenceDisabled || this.usageStore.length === 0) return;
     
     const toFlush = this.usageStore.splice(0, 500); // Flush up to 500 at a time
     
@@ -479,15 +492,36 @@ export class TelemetryService {
         })));
       
       if (error) {
+        // Table absente : désactiver la persistance pour éviter d'inonder les
+        // logs et de re-empiler indéfiniment les mêmes enregistrements.
+        if (error.code === 'PGRST205' || /Could not find the table/i.test(error.message ?? '')) {
+          this.persistenceDisabled = true;
+          console.warn(
+            "[TelemetryService] ⚠️ Table 'token_usage' introuvable — persistance désactivée. " +
+            "Exécutez supabase/token_usage_schema.sql dans Supabase pour l'activer. " +
+            "Le dashboard continue de fonctionner en mémoire."
+          );
+          return; // On abandonne ce lot (pas de re-empilement)
+        }
         console.error('[TelemetryService] Supabase insert error:', error);
-        // Put records back at the front if flush failed
-        this.usageStore.unshift(...toFlush);
+        // Erreur transitoire : ré-empiler pour retenter au prochain flush,
+        // en bornant la taille du store pour éviter une croissance mémoire.
+        this.requeue(toFlush);
       } else {
         console.log(`[TelemetryService] ✓ Flushed ${toFlush.length} token usage records to Supabase`);
       }
     } catch (err) {
       console.error('[TelemetryService] Flush exception:', err);
-      this.usageStore.unshift(...toFlush);
+      this.requeue(toFlush);
+    }
+  }
+
+  /** Ré-empile un lot en tête, en bornant la taille totale du store. */
+  private requeue(batch: TokenUsage[]): void {
+    this.usageStore.unshift(...batch);
+    if (this.usageStore.length > TelemetryService.MAX_IN_MEMORY) {
+      // Conserver les plus récents (fin du tableau), abandonner les plus anciens.
+      this.usageStore.splice(0, this.usageStore.length - TelemetryService.MAX_IN_MEMORY);
     }
   }
 

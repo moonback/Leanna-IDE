@@ -438,17 +438,18 @@ async function generateWithOpenRouter(options: GenerateTextOptions): Promise<Gen
     span.setAttribute('system_prompt.length', options.systemPrompt.length);
   }
 
+  // Declared outside the try so the catch block can clear the timeout.
+  const controller = new AbortController();
+  // 120s au lieu de 60s : les agents font des sorties longues (code complet, analyses, délégations)
+  // qui peuvent nécessiter plus d'une minute sur des modèles OpenRouter sous charge.
+  const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
   try {
     const messages: any[] = [];
     if (options.systemPrompt) {
       messages.push({ role: 'system', content: options.systemPrompt });
     }
     messages.push({ role: 'user', content: options.prompt });
-
-    const controller = new AbortController();
-    // 120s au lieu de 60s : les agents font des sorties longues (code complet, analyses, délégations)
-    // qui peuvent nécessiter plus d'une minute sur des modèles OpenRouter sous charge.
-    const timeoutId = setTimeout(() => controller.abort(), 120_000);
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
