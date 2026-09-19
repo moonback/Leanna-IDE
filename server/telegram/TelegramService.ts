@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { Leanna_APP_ROOT, SELF_ROOT, hasProject } from "../utils/selfRoot.js";
+import { Leanna_APP_ROOT, SELF_ROOT, hasProject, setSelfRoot, listWorkspaces } from "../utils/selfRoot.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { generateText, getActiveProvider } from "../utils/textGeneration.js";
 import { buildSystemInstruction } from "../prompts/systemInstruction.js";
@@ -224,7 +224,13 @@ export class TelegramService {
           `• \`/help\` — Guide et liste des commandes\n` +
           `• \`/status\` — État du système et projet actif\n` +
           `• \`/agent <mission>\` — Lancer une mission autonome\n` +
+          `• \`/tasks [statut]\` — Lister les tâches agents\n` +
+          `• \`/task <id>\` — Détail d'une tâche\n` +
+          `• \`/cancel <id>\` — Annuler une tâche\n` +
           `• \`/cmd <commande>\` — Exécuter dans le terminal\n` +
+          `• \`/ls [dossier]\` — Lister un dossier du projet\n` +
+          `• \`/read <chemin>\` — Lire un fichier du projet\n` +
+          `• \`/project [chemin]\` — Voir ou changer le projet actif\n` +
           `• \`/clear\` — Réinitialiser la mémoire du chat\n\n` +
           `💬 Vous pouvez aussi m'envoyer un message directement pour échanger !`,
           { parse_mode: "Markdown" }
@@ -239,9 +245,14 @@ export class TelegramService {
           `Envoyez simplement vos questions, idées ou instructions. Je réponds avec le contexte de votre projet actif.\n\n` +
           `*2. Agents Autonomes*\n` +
           `Tapez \`/agent Développer une fonction de calcul de TVA\` pour déléguer la mission à la flotte d'agents.\n\n` +
+          `Vous pouvez suivre l'avancement avec \`/tasks\` (liste) et \`/task <id>\` (détail d'une tâche, avec résumé et fichiers modifiés), et arrêter une tâche en cours avec \`/cancel <id>\`.\n\n` +
           `*3. Commandes Système*\n` +
           `Tapez \`/cmd npm test\` ou \`/cmd git status\` pour exécuter une commande dans la racine du projet.\n\n` +
-          `*4. Statut & Mémoire*\n` +
+          `*4. Explorer le projet*\n` +
+          `• \`/project\` pour voir le projet actif et la liste des workspaces, ou \`/project <chemin>\` pour en changer.\n` +
+          `• \`/ls\` ou \`/ls src\` pour lister les fichiers d'un dossier.\n` +
+          `• \`/read package.json\` pour afficher le contenu d'un fichier (les gros fichiers sont envoyés en pièce jointe).\n\n` +
+          `*5. Statut & Mémoire*\n` +
           `• \`/status\` pour voir le projet actif et la santé du système.\n` +
           `• \`/clear\` pour effacer l'historique du chat Telegram.`,
           { parse_mode: "Markdown" }
@@ -337,6 +348,303 @@ export class TelegramService {
           await ctx.reply(`✅ Tâche initialisée (ID: \`${task.id}\`). L'agent travaille dessus...`, { parse_mode: "Markdown" });
         } catch (e) {
           await ctx.reply(`❌ Erreur lors du lancement de l'agent : ${(e as Error).message}`);
+        }
+      });
+
+      // /tasks — Liste les tâches agents (optionnellement filtrées par statut)
+      this.bot.command("tasks", async (ctx) => {
+        const statusFilter = ctx.match?.trim().toLowerCase();
+        const validStatuses = ["pending", "running", "completed", "incomplete", "failed", "cancelled"];
+
+        const filters: { status?: any; limit: number } = { limit: 15 };
+        if (statusFilter) {
+          if (!validStatuses.includes(statusFilter)) {
+            await ctx.reply(
+              `Statut inconnu : \`${statusFilter}\`\n` +
+              `Valeurs possibles : ${validStatuses.map((s) => `\`${s}\``).join(", ")}`,
+              { parse_mode: "Markdown" }
+            );
+            return;
+          }
+          filters.status = statusFilter;
+        }
+
+        const tasks = agentOrchestrator.listTasks(filters);
+
+        if (tasks.length === 0) {
+          await ctx.reply(
+            statusFilter
+              ? `📭 Aucune tâche avec le statut \`${statusFilter}\`.`
+              : "📭 Aucune tâche agent enregistrée pour le moment.",
+            { parse_mode: "Markdown" }
+          );
+          return;
+        }
+
+        const statusEmoji: Record<string, string> = {
+          pending: "⏳",
+          running: "🔄",
+          completed: "✅",
+          incomplete: "⚠️",
+          failed: "❌",
+          cancelled: "🚫",
+        };
+
+        const lines = tasks.map((t) => {
+          const emoji = statusEmoji[t.status] || "•";
+          return `${emoji} \`${t.id.slice(0, 8)}\` — *${t.role}* — ${t.title}`;
+        });
+
+        await this.sendLongMessage(
+          ctx.chat.id,
+          `📋 *Tâches agents${statusFilter ? ` (${statusFilter})` : ""}* — ${tasks.length} résultat(s)\n\n` +
+          lines.join("\n") +
+          `\n\n_Astuce : \`/task <id>\` pour le détail d'une tâche._`,
+          { parse_mode: "Markdown" }
+        );
+      });
+
+      // /task <id> — Détail d'une tâche agent
+      this.bot.command("task", async (ctx) => {
+        const taskIdInput = ctx.match?.trim();
+        if (!taskIdInput) {
+          await ctx.reply("Usage : `/task <id>`\nExemple : `/task a1b2c3d4`", { parse_mode: "Markdown" });
+          return;
+        }
+
+        // Correspondance exacte, ou par préfixe court (8 premiers caractères)
+        let task = agentOrchestrator.getTask(taskIdInput);
+        if (!task) {
+          const match = agentOrchestrator
+            .listTasks()
+            .find((t) => t.id.startsWith(taskIdInput));
+          task = match ?? undefined;
+        }
+
+        if (!task) {
+          await ctx.reply(`🔍 Aucune tâche trouvée pour l'identifiant \`${taskIdInput}\`.`, { parse_mode: "Markdown" });
+          return;
+        }
+
+        const statusEmoji: Record<string, string> = {
+          pending: "⏳",
+          running: "🔄",
+          completed: "✅",
+          incomplete: "⚠️",
+          failed: "❌",
+          cancelled: "🚫",
+        };
+
+        let msg =
+          `${statusEmoji[task.status] || "•"} *Tâche* \`${task.id}\`\n\n` +
+          `*Titre :* ${task.title}\n` +
+          `*Rôle :* \`${task.role}\`\n` +
+          `*Statut :* \`${task.status}\`\n` +
+          `*Priorité :* \`${task.priority}\`\n` +
+          `*Créée :* \`${task.createdAt}\`\n`;
+
+        if (task.startedAt) msg += `*Démarrée :* \`${task.startedAt}\`\n`;
+        if (task.completedAt) msg += `*Terminée :* \`${task.completedAt}\`\n`;
+
+        msg += `\n*Description :*\n${task.description}\n`;
+
+        if (task.result) {
+          const r = task.result;
+          msg += `\n─────────────\n*Résultat :* ${r.success ? "✅ succès" : "❌ échec"} (\`${r.outcome}\`)\n`;
+          if (r.blockReason) msg += `*Cause du blocage :* \`${r.blockReason}\`\n`;
+          if (r.summary) msg += `*Résumé :* ${r.summary}\n`;
+          if (typeof r.durationMs === "number") msg += `*Durée :* \`${Math.round(r.durationMs / 1000)}s\`\n`;
+          if (r.filesModified?.length) {
+            msg += `*Fichiers modifiés :*\n${r.filesModified.map((f) => `• \`${f}\``).join("\n")}\n`;
+          }
+          if (r.error) msg += `*Erreur :* \`${r.error}\`\n`;
+        }
+
+        await this.sendLongMessage(ctx.chat.id, msg, { parse_mode: "Markdown" });
+      });
+
+      // /read <chemin> — Lit un fichier du projet actif et renvoie son contenu
+      this.bot.command("read", async (ctx) => {
+        const relPath = ctx.match?.trim();
+        if (!relPath) {
+          await ctx.reply("Usage : `/read <chemin>`\nExemple : `/read package.json`", { parse_mode: "Markdown" });
+          return;
+        }
+
+        const rootDir = hasProject() ? SELF_ROOT : process.cwd();
+        const resolved = this.resolveInsideRoot(rootDir, relPath);
+        if (!resolved) {
+          await ctx.reply("⛔ Chemin refusé : l'accès en dehors du projet n'est pas autorisé.");
+          return;
+        }
+
+        try {
+          const stat = await fs.promises.stat(resolved);
+          if (stat.isDirectory()) {
+            await ctx.reply(`📁 \`${relPath}\` est un dossier. Utilisez \`/ls ${relPath}\` pour le lister.`, { parse_mode: "Markdown" });
+            return;
+          }
+
+          const maxBytes = 64 * 1024; // 64 Ko
+          if (stat.size > maxBytes) {
+            await ctx.reply(
+              `📦 Fichier trop volumineux pour l'affichage (\`${Math.round(stat.size / 1024)} Ko\`). ` +
+              `Envoi en pièce jointe...`,
+              { parse_mode: "Markdown" }
+            );
+            await this.sendFromWorkspace(String(ctx.chat.id), relPath, {});
+            return;
+          }
+
+          const content = await fs.promises.readFile(resolved, "utf-8");
+          const ext = path.extname(resolved).replace(".", "") || "";
+          const body = content.trim() || "(fichier vide)";
+          await this.sendLongMessage(
+            ctx.chat.id,
+            `📄 *${relPath}*\n\`\`\`${ext}\n${body}\n\`\`\``,
+            { parse_mode: "Markdown" }
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          await ctx.reply(`❌ Impossible de lire \`${relPath}\` : ${message}`, { parse_mode: "Markdown" });
+        }
+      });
+
+      // /ls [dossier] — Liste le contenu d'un dossier du projet actif
+      this.bot.command("ls", async (ctx) => {
+        const relPath = ctx.match?.trim() || ".";
+        const rootDir = hasProject() ? SELF_ROOT : process.cwd();
+        const resolved = this.resolveInsideRoot(rootDir, relPath);
+        if (!resolved) {
+          await ctx.reply("⛔ Chemin refusé : l'accès en dehors du projet n'est pas autorisé.");
+          return;
+        }
+
+        try {
+          const stat = await fs.promises.stat(resolved);
+          if (!stat.isDirectory()) {
+            await ctx.reply(`📄 \`${relPath}\` est un fichier. Utilisez \`/read ${relPath}\` pour le lire.`, { parse_mode: "Markdown" });
+            return;
+          }
+
+          const entries = await fs.promises.readdir(resolved, { withFileTypes: true });
+          if (entries.length === 0) {
+            await ctx.reply(`📂 \`${relPath}\` est vide.`, { parse_mode: "Markdown" });
+            return;
+          }
+
+          const sorted = entries
+            .filter((e) => !e.name.startsWith(".") || relPath !== ".")
+            .sort((a, b) => {
+              // Dossiers d'abord, puis alphabétique
+              if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+              return a.name.localeCompare(b.name);
+            });
+
+          const MAX_ENTRIES = 100;
+          const shown = sorted.slice(0, MAX_ENTRIES);
+          const lines = shown.map((e) => (e.isDirectory() ? `📁 ${e.name}/` : `📄 ${e.name}`));
+
+          let footer = "";
+          if (sorted.length > MAX_ENTRIES) {
+            footer = `\n\n_… et ${sorted.length - MAX_ENTRIES} autre(s) élément(s)._`;
+          }
+
+          await this.sendLongMessage(
+            ctx.chat.id,
+            `📂 *${relPath}* — ${sorted.length} élément(s)\n\n${lines.join("\n")}${footer}`,
+            { parse_mode: "Markdown" }
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          await ctx.reply(`❌ Impossible de lister \`${relPath}\` : ${message}`, { parse_mode: "Markdown" });
+        }
+      });
+
+      // /cancel <id> — Annule une tâche agent
+      this.bot.command("cancel", async (ctx) => {
+        const taskIdInput = ctx.match?.trim();
+        if (!taskIdInput) {
+          await ctx.reply("Usage : `/cancel <id>`\nExemple : `/cancel a1b2c3d4`", { parse_mode: "Markdown" });
+          return;
+        }
+
+        // Correspondance exacte, ou par préfixe court (comme /task)
+        let task = agentOrchestrator.getTask(taskIdInput);
+        if (!task) {
+          const match = agentOrchestrator.listTasks().find((t) => t.id.startsWith(taskIdInput));
+          task = match ?? undefined;
+        }
+
+        if (!task) {
+          await ctx.reply(`🔍 Aucune tâche trouvée pour l'identifiant \`${taskIdInput}\`.`, { parse_mode: "Markdown" });
+          return;
+        }
+
+        // Statuts terminaux : rien à annuler
+        const terminalStatuses = ["completed", "failed", "cancelled", "incomplete"];
+        if (terminalStatuses.includes(task.status)) {
+          await ctx.reply(
+            `ℹ️ La tâche \`${task.id.slice(0, 8)}\` est déjà terminée (\`${task.status}\`) — rien à annuler.`,
+            { parse_mode: "Markdown" }
+          );
+          return;
+        }
+
+        const cancelled = agentOrchestrator.cancelTask(task.id);
+        if (cancelled) {
+          await ctx.reply(
+            `🚫 *Tâche annulée*\n\`${task.id.slice(0, 8)}\` — ${task.title}`,
+            { parse_mode: "Markdown" }
+          );
+        } else {
+          await ctx.reply(
+            `⚠️ Impossible d'annuler la tâche \`${task.id.slice(0, 8)}\` (statut actuel : \`${task.status}\`).`,
+            { parse_mode: "Markdown" }
+          );
+        }
+      });
+
+      // /project [chemin] — Affiche ou change le projet actif
+      this.bot.command("project", async (ctx) => {
+        const target = ctx.match?.trim();
+
+        // Sans argument : afficher le projet actif + les workspaces connus
+        if (!target) {
+          const current = hasProject() ? SELF_ROOT : null;
+          const workspaces = listWorkspaces();
+
+          let msg = current
+            ? `📁 *Projet actif :*\n\`${current}\`\n`
+            : `📭 *Aucun projet actif actuellement.*\n`;
+
+          if (workspaces.length > 0) {
+            const lines = workspaces.slice(0, 15).map((w) => {
+              const isActive = current && path.resolve(w.path) === path.resolve(current);
+              const marker = isActive ? "✅ " : "• ";
+              return `${marker}*${w.name}*\n   \`${w.path}\``;
+            });
+            msg +=
+              `\n*Workspaces connus :*\n${lines.join("\n")}\n\n` +
+              `_Pour changer : \`/project <chemin complet>\`_`;
+          } else {
+            msg += `\n_Pour définir un projet : \`/project <chemin complet>\`_`;
+          }
+
+          await this.sendLongMessage(ctx.chat.id, msg, { parse_mode: "Markdown" });
+          return;
+        }
+
+        // Avec argument : changer de projet actif
+        try {
+          const newRoot = setSelfRoot(target);
+          await ctx.reply(
+            `✅ *Projet actif changé*\n\`${newRoot}\``,
+            { parse_mode: "Markdown" }
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          await ctx.reply(`❌ Impossible de changer de projet : ${message}`, { parse_mode: "Markdown" });
         }
       });
 
@@ -445,6 +753,23 @@ export class TelegramService {
       this.bot = null;
       this.isRunning = false;
     }
+  }
+
+  /**
+   * Résout un chemin relatif à l'intérieur d'un répertoire racine, en empêchant
+   * toute évasion hors de la racine (protection contre le path traversal `../`).
+   * Retourne le chemin absolu résolu, ou `null` si le chemin sort de la racine.
+   */
+  private resolveInsideRoot(rootDir: string, relPath: string): string | null {
+    const normalizedRoot = path.resolve(rootDir);
+    const resolved = path.resolve(normalizedRoot, relPath);
+    const rootWithSep = normalizedRoot.endsWith(path.sep)
+      ? normalizedRoot
+      : normalizedRoot + path.sep;
+    if (resolved !== normalizedRoot && !resolved.startsWith(rootWithSep)) {
+      return null;
+    }
+    return resolved;
   }
 
   /**

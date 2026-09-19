@@ -28,6 +28,7 @@ const HistoryView = lazy(() => import('./views/HistoryView.js'));
 const GitHubView = lazy(() => import('./views/GitHubView.js'));
 const DocumentsView = lazy(() => import('./views/DocumentsView.js'));
 const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
+const ObservabilityView = lazy(() => import('./views/ObservabilityView.js'));
 import './index.css';
 
 const configuredApiToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_Leanna_API_TOKEN?.trim();
@@ -455,7 +456,6 @@ function NavSidebar() {
   // Don't show on IDE (it has its own UnifiedSidebar in context='ide')
   // Don't show on Settings (SettingsView has its own left nav)
   if (isIde || isSettings) return null;
-
   return <UnifiedSidebar context="global" />;
 }
 
@@ -480,16 +480,17 @@ function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path="/"           element={<Navigate to="/ide" replace />} />
-        <Route path="/ide"        element={wrap(<IdeView />)} />
-        <Route path="/memories"   element={wrap(<MemoriesView />)} />
-        <Route path="/history"    element={wrap(<HistoryView />)} />
-        <Route path="/settings"   element={wrap(<SettingsView />)} />
-        <Route path="/lists"      element={wrap(<ListsView />)} />
-        <Route path="/github"     element={wrap(<GitHubView />)} />
-        <Route path="/automation" element={wrap(<AutomationView />)} />
-        <Route path="/documents"  element={wrap(<DocumentsView />)} />
-        <Route path="/notebooks"  element={wrap(<NotebooksView />)} />
+        <Route path="/"              element={<Navigate to="/ide" replace />} />
+        <Route path="/ide"           element={wrap(<IdeView />)} />
+        <Route path="/memories"      element={wrap(<MemoriesView />)} />
+        <Route path="/history"       element={wrap(<HistoryView />)} />
+        <Route path="/settings"      element={wrap(<SettingsView />)} />
+        <Route path="/lists"         element={wrap(<ListsView />)} />
+        <Route path="/github"        element={wrap(<GitHubView />)} />
+        <Route path="/automation"    element={wrap(<AutomationView />)} />
+        <Route path="/documents"     element={wrap(<DocumentsView />)} />
+        <Route path="/notebooks"     element={wrap(<NotebooksView />)} />
+        <Route path="/observability" element={wrap(<ObservabilityView />)} />
       </Routes>
     </AnimatePresence>
   );

@@ -23,6 +23,8 @@ import type { TaskRequestPayload } from "./AgentCommunication.js";
 import { createLogger } from "../utils/logger.js";
 import { WorkspaceState, type VerificationRecord, type VerificationIssue } from "./WorkspaceState.js";
 import { AgentRepairLoop } from "./AgentRepairLoop.js";
+import { telemetryService } from "../observability/TelemetryService.js";
+import { setTelemetryContext, clearTelemetryContext } from "../utils/textGeneration.js";
 // import { promptCache } from "../utils/promptCache.js"; // Prêt pour intégration future
 
 const log = createLogger("AgentExecutor");
@@ -272,6 +274,18 @@ export class AgentExecutor {
 
     const startTime = Date.now();
 
+    // Start OpenTelemetry span for this task
+    const missionId = (task.context as any).missionId; // Extract if available
+    telemetryService.startTaskSpan(task.id, task.role, task.title, missionId);
+    
+    // Set telemetry context for all model calls in this task
+    setTelemetryContext({
+      taskId: task.id,
+      missionId,
+      agentRole: task.role,
+      toolName: 'agent_execute',
+    });
+
     const notifyProgress = (current: number, label: string) => {
       this.notifier.notify(task, "progress", { current, total: 5, label });
     };
@@ -401,6 +415,10 @@ export class AgentExecutor {
 
       log.info(`[task:${taskShortId}] ✅ [${agent.name}] Terminé en ${(durationMs / 1000).toFixed(1)}s — ${writeResult.written.length} fichier(s) modifié(s) — ${task.result!.summary}`);
       this.notifier.notify(task, "completed");
+      
+      // End task span with success
+      telemetryService.endTaskSpan(task.id, true);
+      clearTelemetryContext();
     } catch (error) {
       const durationMs = Date.now() - startTime;
       task.status = "failed";
@@ -418,6 +436,11 @@ export class AgentExecutor {
       if ((error as Error).stack) {
         log.debug(`[task:${taskShortId}] [${agent.name}] Stack: ${(error as Error).stack?.split("\n").slice(0, 4).join(" | ")}`);
       }
+      
+      // End task span with failure
+      telemetryService.endTaskSpan(task.id, false);
+      clearTelemetryContext();
+      
       this.notifier.notify(task, "failed");
     } finally {
       this.decrementRunning(task.role);

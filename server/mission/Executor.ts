@@ -7,6 +7,8 @@ import type {  PlannedAction,  ReflectionResult,
   MissionPlan,
 } from "./types.js";
 import { DEFAULT_MISSION_CONFIG } from "./types.js";
+import { telemetryService } from "../observability/TelemetryService.js";
+import { setTelemetryContext, clearTelemetryContext } from "../utils/textGeneration.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Executor — Boucle plan → agir → vérifier → corriger
@@ -104,6 +106,7 @@ export class Executor {
     description: string;
     priority?: "low" | "medium" | "high" | "critical";
     availableSkills: string[];
+    budget?: { maxTokens?: number; maxCostUsd?: number };
   }): Promise<Mission> {
     if (!this.skillHandler) {
       throw new Error("SkillHandler not configured. Call setSkillHandler first.");
@@ -115,6 +118,17 @@ export class Executor {
       params.priority ?? "medium",
       this.config
     );
+
+    // Start OpenTelemetry trace for this mission
+    telemetryService.startMissionTrace(mission.id, params.title);
+
+    // Set up budget guardrails if provided
+    if (params.budget) {
+      telemetryService.setMissionBudget(mission.id, params.budget);
+    }
+
+    // Set telemetry context for all model calls in this mission
+    setTelemetryContext({ missionId: mission.id });
 
     const plan = await this.preparePlan(mission, params.availableSkills);
 
@@ -129,6 +143,7 @@ export class Executor {
     // Lancer l'exécution en arrière-plan
     this.executeMission(mission, params.availableSkills).catch((err) => {
       console.error(`[Executor] Mission ${mission.id} failed:`, err);
+      telemetryService.endMissionTrace(mission.id, false);
       this.emit("mission_failed", { missionId: mission.id, error: String(err) });
     });
 
@@ -209,6 +224,12 @@ export class Executor {
     });
 
     this.finalizeMission(mission);
+    
+    // End trace and clear telemetry
+    telemetryService.endMissionTrace(missionId, false);
+    telemetryService.clearMissionBudget(missionId);
+    clearTelemetryContext();
+    
     this.emit("mission_cancelled", { missionId });
     return true;
   }
@@ -276,10 +297,17 @@ export class Executor {
     }
 
     this.finalizeMission(mission);
+    
+    // End trace with success status
+    const success = mission.status === "completed";
+    telemetryService.endMissionTrace(mission.id, success);
+    telemetryService.clearMissionBudget(mission.id);
+    clearTelemetryContext();
+    
     console.log(`[Executor] ✓ Mission terminée: ${mission.status}`);
     this.emit("mission_completed", {
       missionId: mission.id,
-      success: mission.status === "completed",
+      success,
     });
   }
 
@@ -385,6 +413,25 @@ export class Executor {
     });
 
     console.log(`[Executor]    ▶ ${action.skillName} (score: ${action.score})`);
+
+    // Check budget before executing action
+    const budgetStatus = telemetryService.checkBudget(mission.id);
+    if (budgetStatus.exceeded) {
+      console.warn(`[Executor] ⚠️ Budget exceeded for mission ${mission.id}: ${budgetStatus.reason}`);
+      mission.recordActionResult(action.id, { error: budgetStatus.reason }, false);
+      
+      return {
+        actionId: action.id,
+        timestamp: new Date().toISOString(),
+        observation: `Budget exceeded: ${budgetStatus.reason}`,
+        success: null,
+        failure: budgetStatus.reason || "Budget limit reached",
+        hypothesis: null,
+        confidence: 0,
+        decision: "abort",
+        reasoning: "Mission budget exceeded, stopping execution to prevent cost overrun.",
+      };
+    }
 
     let success = false;
     let result: unknown = undefined;

@@ -186,6 +186,37 @@ Skills IA personnalisés créés par l'utilisateur via l'interface.
 
 ---
 
+### `token_usage`
+
+Suivi des coûts et de la consommation de tokens (Observabilité V1.1). Chaque appel modèle (Gemini / OpenRouter) est enregistré par `TelemetryService` puis flushé périodiquement. Source du tableau de bord Coûts & Tokens (`/api/observability`).
+
+| Colonne | Type | Contraintes | Description |
+|---|---|---|---|
+| `id` | `text` | PK | Identifiant unique généré par `TelemetryService` |
+| `mission_id` | `text` | nullable | Mission à laquelle l'appel est rattaché |
+| `task_id` | `text` | nullable | Tâche agent à l'origine de l'appel |
+| `agent_role` | `text` | nullable | Rôle de l'agent (coder, debugger…) |
+| `tool_name` | `text` | nullable | Outil ayant déclenché l'appel |
+| `provider` | `text` | NOT NULL | `gemini` ou `openrouter` |
+| `model` | `text` | NOT NULL | Modèle utilisé (ex: `gemini-2.5-flash`) |
+| `input_tokens` | `integer` | NOT NULL, default `0` | Tokens en entrée (prompt) |
+| `output_tokens` | `integer` | NOT NULL, default `0` | Tokens en sortie (complétion) |
+| `total_tokens` | `integer` | NOT NULL, default `0` | Total des tokens |
+| `cost_usd` | `double precision` | NOT NULL, default `0` | Coût estimé en USD |
+| `created_at` | `timestamptz` | NOT NULL, default `now()` | Date de l'appel |
+
+**Index :**
+- `token_usage_created_at_idx` — `(created_at desc)` — agrégations par période
+- `token_usage_mission_id_idx` — `(mission_id)` — coût par mission
+- `token_usage_agent_role_idx` — `(agent_role)` — coût par agent
+- `token_usage_model_idx` — `(model)` — coût par modèle
+
+**Vues :** `token_usage_daily_by_model` (coût quotidien par modèle) et `token_usage_by_mission` (coût par mission).
+
+**RLS :** `service_role` — accès total.
+
+---
+
 ## Relations
 
 ```
@@ -213,6 +244,7 @@ supabase/conversations_schema.sql     # conversations + conversation_messages
 supabase/workflows_schema.sql         # workflows
 supabase/scheduled_tasks_schema.sql   # scheduled_tasks
 supabase/custom_skills_schema.sql     # custom_skills
+supabase/token_usage_schema.sql       # token_usage (observabilité coûts & tokens)
 ```
 
 Pour la persistance des agents (optionnel), exécuter le SQL retourné par :

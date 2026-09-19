@@ -22,6 +22,7 @@ import {
   BookOpen,
   Menu,
   FolderOpen,
+  BarChart2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -586,6 +587,7 @@ function GlobalNavSection({
     { id: 'automation', path: '/automation', icon: Zap, label: 'Tâches', active: showAutomation, onClick: onToggleAutomation },
     { id: 'documents', path: '/documents', icon: FileText, label: 'Documents', active: currentPath === '/documents', onClick: () => navigate('/documents') },
     { id: 'notebooks', path: '/notebooks', icon: BookOpen, label: 'Notebooks', active: showNotebooks, onClick: onToggleNotebooks },
+    { id: 'observability', path: '/observability', icon: BarChart2, label: 'Coûts & Tokens', active: currentPath === '/observability', onClick: () => navigate('/observability') },
   ];
 
   const anyActive = subItems.some(item =>

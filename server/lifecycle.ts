@@ -7,6 +7,7 @@ import type { KnowledgeGraph } from "./knowledge/KnowledgeGraph.js";
 import type { McpBridge } from "./mcp/McpBridge.js";
 import type { NotebookManager } from "./notebooks/NotebookManager.js";
 import type { EmbeddingStore } from "./notebooks/EmbeddingStore.js";
+import { telemetryService } from "./observability/TelemetryService.js";
 
 export interface GracefulShutdownDeps {
   server: HttpServer;
@@ -70,6 +71,9 @@ export function setupGracefulShutdown(deps: GracefulShutdownDeps): GracefulShutd
     if (deps.stopTelegramBot) {
       try { await deps.stopTelegramBot(); console.log('[Lifecycle] Bot Telegram arrêté.'); } catch {}
     }
+
+    // 3f. Flush telemetry (token usage records) to Supabase
+    try { await telemetryService.shutdown(); console.log('[Lifecycle] TelemetryService flushé.'); } catch {}
 
     // 4. Fermer le serveur HTTP
     await new Promise<void>(resolve => deps.server.close(() => resolve()));

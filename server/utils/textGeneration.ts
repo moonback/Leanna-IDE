@@ -12,6 +12,7 @@
 import { withGeminiRetry } from "./geminiKeyPool.js";
 import { getNextGeminiKey } from "./geminiKeyPool.js";
 import { GoogleGenAI } from "@google/genai";
+import { telemetryService } from "../observability/TelemetryService.js";
 
 // ── Profile interface (minimal subset needed here) ──────────────────────────
 
@@ -66,6 +67,12 @@ export interface GenerateTextResult {
   text: string;
   provider: 'gemini' | 'openrouter';
   model: string;
+  /** Token usage (captured from API response) */
+  tokenUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+  };
 }
 
 /**
@@ -79,6 +86,37 @@ export async function generateText(options: GenerateTextOptions): Promise<Genera
     return generateWithOpenRouter(options);
   }
   return generateWithGemini(options);
+}
+
+// Internal context for telemetry correlation (set by skills/agents)
+let _currentTaskId: string | undefined;
+let _currentMissionId: string | undefined;
+let _currentAgentRole: string | undefined;
+let _currentToolName: string | undefined;
+
+/**
+ * Set telemetry context for model calls (called by AgentExecutor/Mission system).
+ */
+export function setTelemetryContext(context: {
+  taskId?: string;
+  missionId?: string;
+  agentRole?: string;
+  toolName?: string;
+}): void {
+  _currentTaskId = context.taskId;
+  _currentMissionId = context.missionId;
+  _currentAgentRole = context.agentRole;
+  _currentToolName = context.toolName;
+}
+
+/**
+ * Clear telemetry context (called after task/mission completion).
+ */
+export function clearTelemetryContext(): void {
+  _currentTaskId = undefined;
+  _currentMissionId = undefined;
+  _currentAgentRole = undefined;
+  _currentToolName = undefined;
 }
 
 // ── Streaming support ───────────────────────────────────────────────────────
@@ -261,71 +299,121 @@ async function streamWithOpenRouter(options: GenerateTextStreamOptions): Promise
 async function generateWithGemini(options: GenerateTextOptions): Promise<GenerateTextResult> {
   const model = options.geminiModel || 'gemini-2.5-flash';
 
-  // Build parts — if custom geminiParts provided, use those; otherwise text-only
-  const parts = options.geminiParts
-    ? options.geminiParts
-    : [{ text: options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt }];
-
-  // Timeout de 120s pour éviter que l'AgentExecutor se bloque indéfiniment
-  // sur un appel Gemini suspendu (réseau lent, modèle surchargé).
-  const GEMINI_TIMEOUT_MS = 120_000;
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`Gemini timeout après ${GEMINI_TIMEOUT_MS / 1000}s`)), GEMINI_TIMEOUT_MS)
-  );
-
-  const response = await Promise.race([
-    withGeminiRetry((ai) =>
-      ai.models.generateContent({
-        model,
-        contents: [{ role: 'user', parts }],
-        config: {
-          temperature: options.temperature ?? 0.5,
-          // maxOutputTokens est la clé "native" Gemini ; maxTokens est le nom
-          // générique utilisé par les appelants (ex. chainOfThought.ts) qui
-          // partagent le même code avec OpenRouter. Sans ce repli, un appel
-          // ne fournissant que `maxTokens` n'appliquait AUCUNE limite sur
-          // Gemini (le provider par défaut), ce qui rendait les budgets de
-          // tokens du module CoT inopérants dans le cas le plus courant.
-          ...(options.maxOutputTokens !== undefined
-            ? { maxOutputTokens: options.maxOutputTokens }
-            : options.maxTokens !== undefined
-              ? { maxOutputTokens: options.maxTokens }
-              : {}),
-          ...(options.thinkingBudget !== undefined
-            ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } }
-            : {}),
-        },
-      })
-    ),
-    timeoutPromise,
-  ]);
-
-  const rawResponse = response as {
-    text?: string;
-    candidates?: Array<{
-      finishReason?: string;
-      content?: { parts?: Array<{ text?: string; thought?: boolean }> };
-    }>;
-  };
-  const visibleParts = (rawResponse.candidates ?? [])
-    .flatMap((candidate) => candidate.content?.parts ?? [])
-    .filter((part) => !part.thought && typeof part.text === "string")
-    .map((part) => part.text!.trim())
-    .filter(Boolean);
-  const text = rawResponse.text?.trim() || visibleParts.join("\n");
-
-  if (!text) {
-    const finishReasons = (rawResponse.candidates ?? [])
-      .map((candidate) => candidate.finishReason ?? "unknown")
-      .join(", ");
-    console.warn(`[TextGen] Gemini n'a renvoyé aucun texte visible (finish: ${finishReasons || "aucun"}).`);
+  // Start OTel span for this model call
+  const span = telemetryService.startModelCallSpan('gemini', model, _currentTaskId);
+  span.setAttribute('prompt.length', options.prompt.length);
+  if (options.systemPrompt) {
+    span.setAttribute('system_prompt.length', options.systemPrompt.length);
   }
 
-  return {
-    text,
-    provider: 'gemini',
-    model,
-  };
+  try {
+    // Build parts — if custom geminiParts provided, use those; otherwise text-only
+    const parts = options.geminiParts
+      ? options.geminiParts
+      : [{ text: options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt }];
+
+    // Timeout de 120s pour éviter que l'AgentExecutor se bloque indéfiniment
+    // sur un appel Gemini suspendu (réseau lent, modèle surchargé).
+    const GEMINI_TIMEOUT_MS = 120_000;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Gemini timeout après ${GEMINI_TIMEOUT_MS / 1000}s`)), GEMINI_TIMEOUT_MS)
+    );
+
+    const response = await Promise.race([
+      withGeminiRetry((ai) =>
+        ai.models.generateContent({
+          model,
+          contents: [{ role: 'user', parts }],
+          config: {
+            temperature: options.temperature ?? 0.5,
+            // maxOutputTokens est la clé "native" Gemini ; maxTokens est le nom
+            // générique utilisé par les appelants (ex. chainOfThought.ts) qui
+            // partagent le même code avec OpenRouter. Sans ce repli, un appel
+            // ne fournissant que `maxTokens` n'appliquait AUCUNE limite sur
+            // Gemini (le provider par défaut), ce qui rendait les budgets de
+            // tokens du module CoT inopérants dans le cas le plus courant.
+            ...(options.maxOutputTokens !== undefined
+              ? { maxOutputTokens: options.maxOutputTokens }
+              : options.maxTokens !== undefined
+                ? { maxOutputTokens: options.maxTokens }
+                : {}),
+            ...(options.thinkingBudget !== undefined
+              ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } }
+              : {}),
+          },
+        })
+      ),
+      timeoutPromise,
+    ]);
+
+    const rawResponse = response as {
+      text?: string;
+      candidates?: Array<{
+        finishReason?: string;
+        content?: { parts?: Array<{ text?: string; thought?: boolean }> };
+      }>;
+      usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        totalTokenCount?: number;
+      };
+    };
+    const visibleParts = (rawResponse.candidates ?? [])
+      .flatMap((candidate) => candidate.content?.parts ?? [])
+      .filter((part) => !part.thought && typeof part.text === "string")
+      .map((part) => part.text!.trim())
+      .filter(Boolean);
+    const text = rawResponse.text?.trim() || visibleParts.join("\n");
+
+    if (!text) {
+      const finishReasons = (rawResponse.candidates ?? [])
+        .map((candidate) => candidate.finishReason ?? "unknown")
+        .join(", ");
+      console.warn(`[TextGen] Gemini n'a renvoyé aucun texte visible (finish: ${finishReasons || "aucun"}).`);
+    }
+
+    // Extract token usage from usageMetadata
+    const usage = rawResponse.usageMetadata;
+    const tokenUsage = usage ? {
+      inputTokens: usage.promptTokenCount || 0,
+      outputTokens: usage.candidatesTokenCount || 0,
+      totalTokens: usage.totalTokenCount || 0,
+    } : undefined;
+
+    // Record tokens in telemetry service
+    if (tokenUsage) {
+      const cost = telemetryService.recordTokenUsage({
+        missionId: _currentMissionId,
+        taskId: _currentTaskId,
+        agentRole: _currentAgentRole,
+        toolName: _currentToolName,
+        provider: 'gemini',
+        model,
+        inputTokens: tokenUsage.inputTokens,
+        outputTokens: tokenUsage.outputTokens,
+      });
+
+      span.setAttribute('tokens.input', tokenUsage.inputTokens);
+      span.setAttribute('tokens.output', tokenUsage.outputTokens);
+      span.setAttribute('tokens.total', tokenUsage.totalTokens);
+      span.setAttribute('cost.usd', cost);
+    }
+
+    span.setStatus({ code: 0 }); // OK
+    span.end();
+
+    return {
+      text,
+      provider: 'gemini',
+      model,
+      tokenUsage,
+    };
+  } catch (error) {
+    span.recordException(error as Error);
+    span.setStatus({ code: 2, message: (error as Error).message }); // ERROR
+    span.end();
+    throw error;
+  }
 }
 
 // ── OpenRouter implementation ───────────────────────────────────────────────
@@ -343,18 +431,26 @@ async function generateWithOpenRouter(options: GenerateTextOptions): Promise<Gen
 
   const model = options.openrouterModel || _profile.openrouterModel || 'google/gemini-3.6-flash';
 
-  const messages: any[] = [];
+  // Start OTel span for this model call
+  const span = telemetryService.startModelCallSpan('openrouter', model, _currentTaskId);
+  span.setAttribute('prompt.length', options.prompt.length);
   if (options.systemPrompt) {
-    messages.push({ role: 'system', content: options.systemPrompt });
+    span.setAttribute('system_prompt.length', options.systemPrompt.length);
   }
-  messages.push({ role: 'user', content: options.prompt });
 
+  // Declared outside the try so the catch block can clear the timeout.
   const controller = new AbortController();
   // 120s au lieu de 60s : les agents font des sorties longues (code complet, analyses, délégations)
   // qui peuvent nécessiter plus d'une minute sur des modèles OpenRouter sous charge.
   const timeoutId = setTimeout(() => controller.abort(), 120_000);
 
   try {
+    const messages: any[] = [];
+    if (options.systemPrompt) {
+      messages.push({ role: 'system', content: options.systemPrompt });
+    }
+    messages.push({ role: 'user', content: options.prompt });
+
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -383,9 +479,44 @@ async function generateWithOpenRouter(options: GenerateTextOptions): Promise<Gen
     const data = await response.json();
     const text = data.choices?.[0]?.message?.content || '';
 
-    return { text, provider: 'openrouter', model };
+    // Extract token usage from OpenRouter response
+    const usage = data.usage;
+    const tokenUsage = usage ? {
+      inputTokens: usage.prompt_tokens || 0,
+      outputTokens: usage.completion_tokens || 0,
+      totalTokens: usage.total_tokens || 0,
+    } : undefined;
+
+    // Record tokens in telemetry service
+    if (tokenUsage) {
+      const cost = telemetryService.recordTokenUsage({
+        missionId: _currentMissionId,
+        taskId: _currentTaskId,
+        agentRole: _currentAgentRole,
+        toolName: _currentToolName,
+        provider: 'openrouter',
+        model,
+        inputTokens: tokenUsage.inputTokens,
+        outputTokens: tokenUsage.outputTokens,
+      });
+
+      span.setAttribute('tokens.input', tokenUsage.inputTokens);
+      span.setAttribute('tokens.output', tokenUsage.outputTokens);
+      span.setAttribute('tokens.total', tokenUsage.totalTokens);
+      span.setAttribute('cost.usd', cost);
+    }
+
+    span.setStatus({ code: 0 }); // OK
+    span.end();
+
+    return { text, provider: 'openrouter', model, tokenUsage };
   } catch (e: any) {
     clearTimeout(timeoutId);
+    
+    span.recordException(e);
+    span.setStatus({ code: 2, message: e.message }); // ERROR
+    span.end();
+
     // On network error, fallback to Gemini
     if (e.name === 'AbortError' || e.message?.includes('fetch')) {
       console.warn(`[TextGen] OpenRouter error (${e.message}), fallback Gemini`);
