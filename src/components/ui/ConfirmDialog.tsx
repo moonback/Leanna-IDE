@@ -121,8 +121,8 @@ function ConfirmDialogProvider({ children }: { children: React.ReactNode }) {
       {state.open && (
         <div
           className="fixed inset-0 flex items-center justify-center"
-          style={{ zIndex: 'var(--z-modal)' as any }}
           style={{
+            zIndex: 'var(--z-modal)' as any,
             backgroundColor: 'rgba(0, 0, 0, 0.6)',
             backdropFilter: 'blur(2px)',
           }}
