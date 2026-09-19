@@ -26,6 +26,7 @@ import { StateMachine } from "./StateMachine.js";
 import { ToolRegistry } from "./ToolRegistry.js";
 import { Memory } from "./Memory.js";
 import { HierarchicalMemoryService } from "./HierarchicalMemoryService.js";
+import { PermissionPolicy } from "./PermissionPolicy.js";
 import type {
   Task,
   TaskResult,
@@ -80,7 +81,7 @@ export class AgentRuntime {
   private started = false;
   private startPromise: Promise<void> | null = null;
 
-  constructor(config: Partial<RuntimeConfig> = {}) {
+  constructor(config: Partial<RuntimeConfig> = {}, options: { permissionPolicy?: PermissionPolicy } = {}) {
     this.config = { ...DEFAULT_RUNTIME_CONFIG, ...config };
 
     // Initialisation des composants centraux
@@ -89,6 +90,7 @@ export class AgentRuntime {
       enableMetrics: this.config.enableMetrics,
       eventBus: this.events,
       defaultTimeoutMs: 180_000, // 3 minutes pour les tâches agent (aligné avec AgentExecutor)
+      permissionPolicy: options.permissionPolicy ?? PermissionPolicy.fromEnv(process.env, { eventBus: this.events }),
     });
     this.memory = new Memory({ eventBus: this.events });
     this.hierarchicalMemory = new HierarchicalMemoryService({

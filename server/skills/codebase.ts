@@ -25,6 +25,28 @@ import {
 
 export const codebaseSkill: Skill = {
   name: "codebase",
+  // Permissions déclarées explicitement, appliquées au runtime par le ToolRegistry.
+  // Par défaut lecture ; les outils modifiant le workspace requièrent "write".
+  permissions: ["read"],
+  toolPermissions: {
+    generate_codebase_markdown: ["read", "write"],
+    open_ide: ["read"],
+    open_project_file: ["read"],
+    list_project_files: ["read"],
+    read_project_file: ["read"],
+    read_file_outline: ["read"],
+    search_in_files: ["read"],
+    analyze_project_file: ["read"],
+    get_workspace_info: ["read"],
+    write_project_file: ["write"],
+    modify_project_file: ["write"],
+    apply_patch: ["write"],
+    patch_project_file: ["write"],
+    rename_project_file: ["write"],
+    delete_project_file: ["write"],
+    delete_project_folder: ["write"],
+    create_project_directory: ["write"],
+  },
   declarations: [
     {
       name: "generate_codebase_markdown",

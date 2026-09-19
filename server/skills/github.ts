@@ -88,6 +88,13 @@ function truncate(str: string, max = 3000): string {
 
 export const githubSkill: Skill = {
   name: "github",
+  // Accès réseau sortant vers l'API GitHub ; certains outils écrivent aussi
+  // (issues distantes, ingestion dans la base de connaissances).
+  permissions: ["network"],
+  toolPermissions: {
+    create_github_issue: ["network", "write"],
+    ingest_github_repository: ["network", "write"],
+  },
   declarations: [
     {
       name: "get_github_user",

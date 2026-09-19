@@ -317,6 +317,8 @@ export class SkillManagerV2 {
         name: managementSkill.name,
         declarations: managementSkill.declarations,
         handleToolCall: managementSkill.handleToolCall.bind(managementSkill),
+        permissions: managementSkill.permissions as any,
+        toolPermissions: managementSkill.toolPermissions as any,
       });
 
       // Charger les déclarations des custom skills actifs

@@ -15,6 +15,7 @@
 import { AgentRuntime } from "./AgentRuntime.js";
 import { SkillManagerV2 } from "./compat/SkillManagerV2.js";
 import { PromptRegistry } from "./PromptRegistry.js";
+import { PermissionPolicy } from "./PermissionPolicy.js";
 import { loadPromptTemplates } from "./prompts/loader.js";
 import { defaultAgents } from "./agents/index.js";
 import type { RuntimeConfig } from "./types.js";
@@ -33,6 +34,12 @@ const __dirname_compat = typeof __dirname !== 'undefined'
 export interface BootstrapConfig {
   /** Configuration du runtime */
   runtime?: Partial<RuntimeConfig>;
+  /**
+   * Politique de permissions appliquée au runtime.
+   * Si absente, construite depuis l'environnement
+   * (Leanna_PERMISSION_MODE / Leanna_GRANTED_PERMISSIONS).
+   */
+  permissionPolicy?: PermissionPolicy;
   /** Skills à enregistrer (toutes les skills existantes) */
   skills?: LegacySkill[];
   /** Désactiver les agents par défaut */
@@ -67,8 +74,9 @@ export interface BootstrapResult {
 export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<BootstrapResult> {
   const startTime = Date.now();
 
-  // 1. Créer le runtime
-  const runtime = new AgentRuntime(config.runtime);
+  // 1. Créer le runtime (avec la politique de permissions)
+  const permissionPolicy = config.permissionPolicy ?? PermissionPolicy.fromEnv();
+  const runtime = new AgentRuntime(config.runtime, { permissionPolicy });
 
   // 1.5. Configurer l'AgentOrchestrator pour utiliser le ToolRegistry du runtime (timeout corrigé)
   // Import dynamique pour éviter la dépendance circulaire
@@ -113,6 +121,10 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
     `[Bootstrap] Runtime initialisé en ${elapsed}ms — ` +
     `${runtime.tools.size} outils, ${runtime.listAgents().length} agents, ${promptCount} prompts`
   );
+  console.log(
+    `[Bootstrap] Permissions runtime — mode="${permissionPolicy.getMode()}", ` +
+    `accordées=[${permissionPolicy.getGranted().join(", ")}]`
+  );
 
   return { runtime, skillManager, prompts };
 }
@@ -122,11 +134,16 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
  * Retourne les instances immédiatement, l'initialisation async se fait en arrière-plan.
  */
 export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapResult {
-  const runtime = new AgentRuntime(config.runtime);
+  const permissionPolicy = config.permissionPolicy ?? PermissionPolicy.fromEnv();
+  const runtime = new AgentRuntime(config.runtime, { permissionPolicy });
   const skillManager = new SkillManagerV2({
     eventBus: runtime.events,
     registry: runtime.tools,
   });
+  console.log(
+    `[Bootstrap] Permissions runtime — mode="${permissionPolicy.getMode()}", ` +
+    `accordées=[${permissionPolicy.getGranted().join(", ")}]`
+  );
 
   // Charger les prompts
   const prompts = new PromptRegistry();

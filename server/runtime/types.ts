@@ -111,7 +111,50 @@ export interface ToolDefinition {
 
 export type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;
 
-export type ToolPermission = "read" | "write" | "execute" | "network" | "dangerous";
+/**
+ * Permissions d'un outil/skill.
+ *
+ * Vocabulaire canonique de la roadmap V1.1 :
+ *   - `read`    : lecture de fichiers / ressources
+ *   - `write`   : modification / création / suppression de fichiers
+ *   - `network` : accès réseau sortant (HTTP, git remote, API tierces…)
+ *   - `exec`    : exécution de commandes shell / processus
+ *
+ * `execute` est un alias historique de `exec` et `dangerous` un marqueur
+ * additionnel pour les opérations destructrices. `normalizePermission()`
+ * ramène toujours `execute` → `exec`.
+ */
+export type ToolPermission = "read" | "write" | "network" | "exec" | "execute" | "dangerous";
+
+/** Les quatre permissions déclarables par skill (vocabulaire roadmap). */
+export type SkillPermission = "read" | "write" | "network" | "exec";
+
+/** Ordre canonique utilisé pour l'affichage et la comparaison. */
+export const CANONICAL_PERMISSIONS: readonly ToolPermission[] = [
+  "read",
+  "write",
+  "network",
+  "exec",
+  "dangerous",
+] as const;
+
+/**
+ * Normalise une permission vers sa forme canonique.
+ * `execute` (legacy) → `exec`.
+ */
+export function normalizePermission(permission: ToolPermission): ToolPermission {
+  return permission === "execute" ? "exec" : permission;
+}
+
+/** Normalise et dédoublonne une liste de permissions. */
+export function normalizePermissions(
+  permissions: readonly ToolPermission[] | undefined
+): ToolPermission[] {
+  if (!permissions?.length) return [];
+  const seen = new Set<ToolPermission>();
+  for (const p of permissions) seen.add(normalizePermission(p));
+  return CANONICAL_PERMISSIONS.filter((p) => seen.has(p));
+}
 
 export interface ToolCallMetrics {
   toolName: string;
@@ -133,6 +176,15 @@ export type RuntimeEvent =
   | { type: "task:failed"; taskId: string; error: string }
   | { type: "tool:called"; toolName: string; agentId?: string }
   | { type: "tool:completed"; toolName: string; durationMs: number; success: boolean }
+  | {
+      type: "tool:permissionDenied";
+      toolName: string;
+      required: ToolPermission[];
+      missing: ToolPermission[];
+      mode: "enforce" | "audit" | "off";
+      enforced: boolean;
+      agentId?: string;
+    }
   | { type: "agent:registered"; agentId: string }
   | { type: "agent:busy"; agentId: string; taskId: string }
   | { type: "agent:idle"; agentId: string }

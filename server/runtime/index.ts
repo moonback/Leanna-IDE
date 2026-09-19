@@ -16,6 +16,8 @@ export type { AgentPlugin } from "./AgentRuntime.js";
 export { EventBus } from "./EventBus.js";
 export { StateMachine } from "./StateMachine.js";
 export { ToolRegistry, ToolNotFoundError, ToolTimeoutError, ToolPermissionError } from "./ToolRegistry.js";
+export { PermissionPolicy, PermissionDeniedError, ALL_PERMISSIONS } from "./PermissionPolicy.js";
+export type { PermissionMode, PermissionDecision, PermissionPolicyConfig } from "./PermissionPolicy.js";
 export { Memory } from "./Memory.js";
 export { HierarchicalMemoryService, hierarchicalMemoryService } from "./HierarchicalMemoryService.js";
 export type { HierarchicalTier, HierarchicalMemoryItem, HierarchicalStats, HierarchicalSearchOptions, HierarchicalStoreInput } from "./HierarchicalMemoryService.js";
@@ -36,6 +38,7 @@ export type {
   ToolDefinition,
   ToolHandler,
   ToolPermission,
+  SkillPermission,
   ToolCallMetrics,
   RuntimeEvent,
   RuntimeEventType,
@@ -48,7 +51,7 @@ export type {
   PromptTemplate,
   RuntimeConfig,
 } from "./types.js";
-export { DEFAULT_RUNTIME_CONFIG, VALID_TRANSITIONS } from "./types.js";
+export { DEFAULT_RUNTIME_CONFIG, VALID_TRANSITIONS, CANONICAL_PERMISSIONS, normalizePermission, normalizePermissions } from "./types.js";
 
 // Agents (plugins)
 export { defaultAgents, defineAgent } from "./agents/index.js";

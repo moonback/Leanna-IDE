@@ -13,7 +13,8 @@
  *   Nouveau runtime
  */
 
-import type { ToolDefinition, ToolDeclaration } from "../types.js";
+import type { ToolDefinition, ToolDeclaration, ToolPermission } from "../types.js";
+import { normalizePermissions } from "../types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Interface Legacy Skill (contractuelle, pas d'import depuis l'ancien code)
@@ -27,12 +28,18 @@ export interface LegacySkillDeclaration {
     properties?: Record<string, unknown>;
     required?: string[];
   };
+  /** Permissions déclarées au niveau de la déclaration d'outil. */
+  permissions?: ToolPermission[];
 }
 
 export interface LegacySkill {
   name: string;
   declarations: LegacySkillDeclaration[];
   handleToolCall: (name: string, args: any, context?: any) => Promise<any> | any;
+  /** Permissions par défaut pour tous les outils de ce skill. */
+  permissions?: ToolPermission[];
+  /** Permissions par outil (surcharge `permissions`). */
+  toolPermissions?: Record<string, ToolPermission[]>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -71,8 +78,34 @@ function adaptDeclaration(
     },
     category: options.category ?? skill.name,
     timeoutMs: options.timeoutMs ?? inferTimeout(decl.name),
-    permissions: options.permissions ?? inferPermissions(decl.name, skill.name),
+    permissions: resolvePermissions(skill, decl, options),
   };
+}
+
+/**
+ * Résout les permissions d'un outil selon l'ordre de priorité :
+ *   1. override explicite fourni à l'adaptateur (options.permissions)
+ *   2. permissions déclarées sur la déclaration d'outil (decl.permissions)
+ *   3. permissions par outil déclarées sur le skill (skill.toolPermissions)
+ *   4. permissions par défaut du skill (skill.permissions)
+ *   5. déduction depuis le nom de l'outil (fallback historique)
+ */
+function resolvePermissions(
+  skill: LegacySkill,
+  decl: LegacySkillDeclaration,
+  options: AdaptOptions
+): ToolPermission[] {
+  const declared =
+    options.permissions ??
+    decl.permissions ??
+    skill.toolPermissions?.[decl.name] ??
+    skill.permissions;
+
+  if (declared?.length) {
+    return normalizePermissions(declared);
+  }
+
+  return normalizePermissions(inferPermissions(decl.name, skill.name));
 }
 
 const ADAPTED_TOOL_TIMEOUTS: Record<string, number> = {

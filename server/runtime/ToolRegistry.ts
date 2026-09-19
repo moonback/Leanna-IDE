@@ -21,6 +21,7 @@ import type {
   ToolCallMetrics,
 } from "./types.js";
 import type { EventBus } from "./EventBus.js";
+import { PermissionPolicy, PermissionDeniedError } from "./PermissionPolicy.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -51,6 +52,12 @@ export interface ToolRegistryConfig {
   enableMetrics?: boolean;
   /** EventBus pour les notifications */
   eventBus?: EventBus;
+  /**
+   * Politique de permissions appliquée au runtime.
+   * Si absente, une politique est construite depuis l'environnement
+   * (Leanna_PERMISSION_MODE / Leanna_GRANTED_PERMISSIONS).
+   */
+  permissionPolicy?: PermissionPolicy;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -65,11 +72,24 @@ export class ToolRegistry {
   private callHistory: ToolCallMetrics[] = [];
   private static readonly MAX_HISTORY = 500;
   private readCache = new Map<string, { value: any; expires: number }>();
+  private permissionPolicy: PermissionPolicy;
 
   constructor(config: ToolRegistryConfig = {}) {
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 120_000;
     this.enableMetrics = config.enableMetrics ?? true;
     this.eventBus = config.eventBus;
+    this.permissionPolicy =
+      config.permissionPolicy ?? PermissionPolicy.fromEnv(process.env, { eventBus: config.eventBus });
+  }
+
+  /** Retourne la politique de permissions appliquée au runtime. */
+  getPermissionPolicy(): PermissionPolicy {
+    return this.permissionPolicy;
+  }
+
+  /** Remplace la politique de permissions (utile pour les tests / reconfiguration). */
+  setPermissionPolicy(policy: PermissionPolicy): void {
+    this.permissionPolicy = policy;
   }
 
   // ─── Enregistrement ────────────────────────────────────────────────────────
@@ -212,7 +232,19 @@ export class ToolRegistry {
       throw new ToolNotFoundError(name, this.getSuggestions(name));
     }
 
-    // Vérification des permissions
+    // Application de la politique de permissions au runtime.
+    // Contrairement à checkPermissions (basé sur l'appelant), la politique
+    // s'applique TOUJOURS — c'est l'exigence « appliqué au runtime ».
+    const decision = this.permissionPolicy.enforce(
+      name,
+      entry.definition.permissions,
+      options.agentId
+    );
+    if (!decision.allowed) {
+      throw new PermissionDeniedError(decision);
+    }
+
+    // Vérification additionnelle des permissions de l'appelant (le cas échéant).
     if (entry.definition.permissions?.length) {
       this.checkPermissions(name, entry.definition.permissions, options.callerPermissions);
     }
@@ -335,8 +367,11 @@ export class ToolRegistry {
   ): void {
     if (!caller) return; // Pas de restrictions si aucune permission déclarée par l'appelant
 
+    const normalize = (p: ToolPermission): ToolPermission => (p === "execute" ? "exec" : p);
+    const callerSet = new Set(caller.map(normalize));
+
     for (const perm of required) {
-      if (!caller.includes(perm)) {
+      if (!callerSet.has(normalize(perm))) {
         throw new ToolPermissionError(toolName, perm);
       }
     }

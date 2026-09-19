@@ -300,6 +300,15 @@ async function runNpmSubcommand(
 
 export const systemSkill: Skill = {
     name: "system",
+    // Permissions déclarées explicitement, appliquées au runtime par le ToolRegistry.
+    permissions: ["exec"],
+    toolPermissions: {
+        system_info: ["read"],
+        system_notify: ["read"],
+        system_open: ["exec"],
+        run_project_command: ["exec"],
+        system_execute_command: ["exec"],
+    },
     declarations: [
         {
             name: "system_open",

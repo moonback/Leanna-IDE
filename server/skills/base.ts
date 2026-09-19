@@ -1,6 +1,19 @@
 import { z } from "zod";
 
 /**
+ * Permission déclarable par un skill / outil.
+ *
+ * Vocabulaire de la roadmap V1.1 « Modèle de permissions par skill » :
+ *   - `read`    : lecture de fichiers / ressources
+ *   - `write`   : écriture / création / suppression
+ *   - `network` : accès réseau sortant
+ *   - `exec`    : exécution de commandes / processus
+ *
+ * Doit rester aligné avec `SkillPermission` de `server/runtime/types.ts`.
+ */
+export type SkillPermission = "read" | "write" | "network" | "exec";
+
+/**
  * Contexte enrichi passé à chaque appel de skill.
  * Contient l'état du projet, de la tâche courante, et les préférences utilisateur.
  */
@@ -112,6 +125,17 @@ export interface Skill {
   handleToolCall: (name: string, args: any, context?: SkillContext) => Promise<any> | any
   /** Actions internes chaînées (optionnel) - pour logique complexe multi-étapes */
   chainedActions?: Record<string, ChainedAction[]>;
+  /**
+   * Permissions requises par défaut pour tous les outils de ce skill.
+   * Déclarées explicitement, appliquées au runtime par le ToolRegistry.
+   * Si absent, les permissions sont déduites du nom de l'outil (fallback).
+   */
+  permissions?: SkillPermission[];
+  /**
+   * Permissions par outil (surcharge `permissions` pour un outil précis).
+   * Clé = nom de l'outil (déclaration), valeur = permissions requises.
+   */
+  toolPermissions?: Record<string, SkillPermission[]>;
   /** Métadonnées du skill */
   metadata?: {
     version: string;
@@ -136,6 +160,8 @@ export interface ToolDeclaration {
   mutating?: boolean;
   /** Timeout spécifique à cet outil */
   timeoutMs?: number;
+  /** Permissions requises par cet outil (déclarées, appliquées au runtime) */
+  permissions?: SkillPermission[];
 }
 
 /**
