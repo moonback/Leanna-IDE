@@ -23,9 +23,8 @@ import { isSandboxActive } from '../utils/sandbox.js';
 import { subscribeToValidation } from '../utils/postEditValidator.js';
 import { estimateTokens, summarizeWithLLM } from '../utils/tokenOptimizer.js';
 import { knowledgeGraph, projectMemory, understandingEngine } from '../knowledge/index.js';
-import { notebookManager } from '../notebooks/index.js';
 import { Supervisor } from '../autonomy/index.js';
-import { WORKSPACE_SITE_URL, SELF_ROOT } from '../utils/selfRoot.js';
+import { WORKSPACE_SITE_URL } from '../utils/selfRoot.js';
 import type { BrowserPendingEntry, BrowserActionPendingEntry } from '../routes/browser.js';
 
 // Type compatible avec l'ancien SkillManager pour une migration progressive
@@ -512,7 +511,6 @@ export function attachLiveWebSocket(
       const topP = currentProfile.topP ?? 0.95;
       const memoryBudgetTokens = 2000;
       const knowledgeBudgetTokens = 3000;
-      const notebookBudgetTokens = 15_000;
       const maxMemories = currentProfile.temperature !== undefined && currentProfile.temperature < 0.5 ? 5 : 10;
       const maxConversations = 3;
       const INITIAL_PROMPT_MAX_TOKENS = 60_000;
@@ -585,43 +583,12 @@ export function attachLiveWebSocket(
       } catch { /* module indisponible */ }
 
       // ── Notebooks context ────────────────────────────────────────────
+      // NOTE: L'agent (Leanna) n'a plus accès au contenu des notebooks.
+      // Les sources des notebooks ne sont volontairement plus injectées dans
+      // le contexte du modèle. Les notebooks restent gérables par l'utilisateur
+      // via l'UI et l'API /api/notebooks, mais leur contenu n'est jamais
+      // transmis à l'agent.
       let notebookContext = '';
-      let notebookUsedChars = 0;
-      const NOTEBOOK_HEADER_CHARS = 120;
-      const MAX_SOURCES_PER_NOTEBOOK = 5;
-      const MAX_NOTEBOOKS_TOTAL = 5;
-      const MAX_CHARS_PER_SOURCE = 5_000;
-      const notebookBudgetChars = notebookBudgetTokens * 4;
-      try {
-        const allNotebooks = notebookManager.getAllNotebooks(SELF_ROOT || undefined);
-        if (allNotebooks.length > 0) {
-          const sections: string[] = [];
-          const selectedNotebooks = allNotebooks.slice(0, MAX_NOTEBOOKS_TOTAL);
-          for (const nb of selectedNotebooks) {
-            if (notebookUsedChars + NOTEBOOK_HEADER_CHARS > notebookBudgetChars) break;
-            if (!nb.sources || nb.sources.length === 0) continue;
-            const sourcesToUse = nb.sources.slice(0, MAX_SOURCES_PER_NOTEBOOK);
-            const sourceTexts: string[] = [];
-            const nbHeader = `## 📓 Notebook : ${nb.title || 'Sans titre'}\n\n`;
-            for (const s of sourcesToUse) {
-              const title = (s.title || s.origin || 'Source').slice(0, 120);
-              const raw = s.summary && s.summary.length > 50 ? s.summary : (s.rawText || s.summary || '');
-              const maxCharsForSource = Math.max(200, Math.min(MAX_CHARS_PER_SOURCE, notebookBudgetChars - notebookUsedChars - nbHeader.length - 50));
-              const text = raw.length > maxCharsForSource ? raw.slice(0, maxCharsForSource) + '\n…[tronqué]' : raw;
-              const block = `### ${title}\n${text}`;
-              if (notebookUsedChars + nbHeader.length + block.length + 20 > notebookBudgetChars) break;
-              sourceTexts.push(block);
-            }
-            if (sourceTexts.length > 0) {
-              sections.push(nbHeader + sourceTexts.join('\n\n'));
-              notebookUsedChars += nbHeader.length + sourceTexts.reduce((sum, t) => sum + t.length + 2, 0);
-            }
-          }
-          if (sections.length > 0) {
-            notebookContext = '\n\n[Notebooks — Sources sélectionnées]\n\n' + sections.join('\n\n---\n\n');
-          }
-        }
-      } catch { /* module indisponible */ }
 
       // ── Hard cap final ───────────────────────────────────────────────
       const buildCombined = () => systemText + memoryContext + knowledgeContext + notebookContext;

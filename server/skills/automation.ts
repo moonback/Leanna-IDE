@@ -803,7 +803,7 @@ export const automationSkill: Skill = {
           name,
           "automation",
           durationMs,
-          ["notebook_ingest_source"] // Peut vouloir ingérer le fichier téléchargé
+          [] // Pas de suggestion notebook : l'agent n'a plus accès aux notebooks
         );
       }
 

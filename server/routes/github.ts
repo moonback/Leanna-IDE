@@ -178,22 +178,46 @@ export function createGithubRouter(skillManager: SkillManager): Router {
 
       console.log(`[GitHub] Ingestion repo API: ${owner}/${repo} vers notebook ${notebook_id}`);
 
-      const result = await skillManager.handleToolCall('ingest_github_repository', {
-        owner,
-        repo,
-        notebook_id,
-        branch: branch || undefined,
-        max_files: max_files || 100,
-        file_extensions: file_extensions || undefined,
-      });
+      // Chemin UTILISATEUR uniquement. L'agent n'a plus accès aux notebooks, donc
+      // l'ingestion n'est plus exposée comme outil (skillManager). On appelle
+      // directement les modules notebooks côté serveur.
+      try {
+        const { sourceIngester, notebookManager } = await import('../notebooks/index.js');
 
-      if (result?.error) {
-        console.warn(`[GitHub] ingestion repo échec: ${result.error}`);
-        return res.status(200).json({ status: 'error', error: result.error });
+        const options: any = {
+          maxFiles: Math.min(max_files || 100, 200),
+          fileExtensions: file_extensions || ['.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.go', '.rs', '.cpp', '.c', '.h', '.hpp', '.md', '.txt', '.json', '.yaml', '.yml'],
+          branch: branch || undefined,
+        };
+
+        const source = await sourceIngester.ingestFromGitHubRepository(owner, repo, notebook_id, options);
+
+        const updatedNb = notebookManager.addSource(notebook_id, source);
+        if (!updatedNb) {
+          return res.status(404).json({ status: 'error', error: `Notebook ${notebook_id} introuvable.` });
+        }
+
+        console.log(`[GitHub] ingestion repo OK: ${owner}/${repo}`);
+        res.json({
+          status: 'success',
+          source: {
+            id: source.id,
+            title: source.title,
+            type: source.type,
+            origin: source.origin,
+            wordCount: source.wordCount,
+            fileCount: source.metadata?.githubRepo?.fileCount || 0,
+            chunks: source.chunks.length,
+            summary: source.summary,
+            keywords: source.keywords,
+          },
+          notebook_id,
+          repository: `${owner}/${repo}`,
+        });
+      } catch (ingestErr: any) {
+        console.warn(`[GitHub] ingestion repo échec: ${ingestErr.message}`);
+        return res.status(200).json({ status: 'error', error: `Échec de l'ingestion: ${ingestErr.message}` });
       }
-
-      console.log(`[GitHub] ingestion repo OK: ${result.repository}`);
-      res.json(result);
     } catch (e: any) {
       res.status(500).json({ error: e.message || 'Erreur serveur lors de l\'ingestion du dépôt GitHub.' });
     }

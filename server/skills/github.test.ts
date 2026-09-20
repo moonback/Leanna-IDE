@@ -8,7 +8,8 @@ test('githubSkill: metadata', () => {
   assert.ok(declNames.includes('get_github_user'));
   assert.ok(declNames.includes('get_github_repo'));
   assert.ok(declNames.includes('list_github_repo_files'));
-  assert.ok(declNames.includes('ingest_github_repository'));
+  // 'ingest_github_repository' a été retiré : l'agent n'a plus accès aux notebooks.
+  assert.ok(!declNames.includes('ingest_github_repository'));
 });
 
 test('githubSkill: list_github_repo_files declaration', () => {
@@ -20,13 +21,7 @@ test('githubSkill: list_github_repo_files declaration', () => {
   assert.equal(listFilesDecl.parameters.required[1], 'repo');
 });
 
-test('githubSkill: ingest_github_repository declaration', () => {
+test('githubSkill: ingest_github_repository est retiré (pas d\'accès notebooks)', () => {
   const ingestDecl = githubSkill.declarations.find((d: any) => d.name === 'ingest_github_repository');
-  assert.ok(ingestDecl);
-  assert.equal(ingestDecl.parameters.properties.owner.type, 'STRING');
-  assert.equal(ingestDecl.parameters.properties.repo.type, 'STRING');
-  assert.equal(ingestDecl.parameters.properties.notebook_id.type, 'STRING');
-  assert.equal(ingestDecl.parameters.required[0], 'owner');
-  assert.equal(ingestDecl.parameters.required[1], 'repo');
-  assert.equal(ingestDecl.parameters.required[2], 'notebook_id');
+  assert.equal(ingestDecl, undefined);
 });

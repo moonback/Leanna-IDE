@@ -93,7 +93,6 @@ export const githubSkill: Skill = {
   permissions: ["network"],
   toolPermissions: {
     create_github_issue: ["network", "write"],
-    ingest_github_repository: ["network", "write"],
   },
   declarations: [
     {
@@ -229,26 +228,10 @@ export const githubSkill: Skill = {
         required: ["owner", "repo"],
       },
     },
-    {
-      name: "ingest_github_repository",
-      description: "Ingérer un dépôt GitHub public entier dans le système de connaissances (nécessite notebookId).",
-      parameters: {
-        type: "OBJECT",
-        properties: {
-          owner: { type: "STRING", description: "Le propriétaire du dépôt" },
-          repo: { type: "STRING", description: "Le nom du dépôt" },
-          notebook_id: { type: "STRING", description: "L'ID du notebook où stocker les données ingérées" },
-          branch: { type: "STRING", description: "Branche à ingérer (défaut: branche par défaut du repo)" },
-          max_files: { type: "NUMBER", description: "Nombre max de fichiers à ingérer (défaut: 100, max: 200)" },
-          file_extensions: { 
-            type: "ARRAY", 
-            items: { type: "STRING" }, 
-            description: "Filtrer par extensions de fichiers (défaut: extensions de code courantes)" 
-          },
-        },
-        required: ["owner", "repo", "notebook_id"],
-      },
-    },
+    // NOTE: L'outil "ingest_github_repository" a été retiré volontairement.
+    // L'agent ne doit plus pouvoir voir ni intervenir sur les notebooks
+    // (ingestion de sources incluse). L'ingestion de dépôts vers un notebook
+    // reste possible uniquement via l'UI / l'API /api/notebooks côté utilisateur.
   ],
 
   handleToolCall: async (name, args: Record<string, any>) => {
@@ -573,62 +556,9 @@ export const githubSkill: Skill = {
           };
         }
 
-        // ─── Ingest GitHub Repository ────────────────────────────────────────
-        case "ingest_github_repository": {
-          const { owner, repo, notebook_id, branch, max_files, file_extensions } = args;
-          if (!owner || !repo || !notebook_id) {
-            return { error: "owner, repo et notebook_id sont requis." };
-          }
-
-          console.log(`[GitHub] Ingestion repo: ${owner}/${repo} vers notebook ${notebook_id.slice(0, 8)}...`);
-
-          try {
-            // Importer dynamiquement SourceIngester et notebookManager pour éviter les dépendances circulaires
-            const { sourceIngester, notebookManager } = await import('../notebooks/index.js');
-            
-            const options: any = {
-              maxFiles: Math.min(max_files || 100, 200),
-              fileExtensions: file_extensions || ['.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.go', '.rs', '.cpp', '.c', '.h', '.hpp', '.md', '.txt', '.json', '.yaml', '.yml'],
-              branch: branch,
-            };
-
-            const source = await sourceIngester.ingestFromGitHubRepository(
-              owner,
-              repo,
-              notebook_id,
-              options
-            );
-
-            // Ajouter la source au notebook et persister sur le disque
-            const updatedNb = notebookManager.addSource(notebook_id, source);
-            if (!updatedNb) {
-              console.warn(`[GitHub] Notebook ${notebook_id} introuvable lors de l'ajout de la source`);
-            } else {
-              console.log(`[GitHub] Source ajoutée au notebook ${notebook_id} : "${source.title}" (total: ${updatedNb.sources.length} sources)`);
-            }
-
-            console.log(`[GitHub] ingest_github_repository OK: ${source.title} [${Date.now() - startTime}ms]`);
-            return {
-              status: "success",
-              source: {
-                id: source.id,
-                title: source.title,
-                type: source.type,
-                origin: source.origin,
-                wordCount: source.wordCount,
-                fileCount: source.metadata?.githubRepo?.fileCount || 0,
-                chunks: source.chunks.length,
-                summary: source.summary,
-                keywords: source.keywords,
-              },
-              notebook_id,
-              repository: `${owner}/${repo}`,
-            };
-          } catch (e: any) {
-            console.error(`[GitHub] ingest_github_repository échec: ${e.message}`);
-            return { error: `Échec de l'ingestion: ${e.message}` };
-          }
-        }
+        // ─── Ingest GitHub Repository (RETIRÉ) ───────────────────────────────
+        // L'agent n'a plus accès aux notebooks : l'ingestion de dépôts vers un
+        // notebook n'est plus exposée comme outil. Voir l'UI / l'API /api/notebooks.
 
         default:
           console.warn(`[GitHub] Outil inconnu appelé: ${name}`);
