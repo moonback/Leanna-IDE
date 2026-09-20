@@ -298,7 +298,49 @@ Toutes les variables sont lues depuis `.env` (ou `.env.local` s'il existe, avec 
 | `ALLOW_FTP_PRIVATE_IPS` | Autorise les connexions FTP vers IPs privées | `false` | ❌ |
 | `Leanna_LISTEN_HOST` | Interface d'écoute du serveur | `127.0.0.1` | ❌ |
 | `NODE_ENV` | Environnement d'exécution | `development` | ❌ |
-| `REDIS_URL` | URL de connexion Redis (pour rate limits partagés) | `redis://localhost:6379` | ❌ |
+| `REDIS_URL` | URL de connexion Redis (cache Knowledge Graph, verrou, bus). Sans URL : mémoire process + persistance disque | `redis://localhost:6379` | ❌ |
+| `PUPPETEER_EXECUTABLE_PATH` | Chemin vers un binaire Chrome/Chromium pour Puppeteer | `C:\...\chrome.exe` | ❌ |
+
+### Fallback inter-providers (Gemini ↔ OpenRouter)
+
+| Variable | Description | Défaut | Obligatoire |
+|---|---|---|---|
+| `LEANNA_PROVIDER_FALLBACK` | Bascule automatique vers l'autre provider si le principal échoue (quota, timeout, indisponibilité) | `true` | ❌ |
+| `LEANNA_PROVIDER_BREAKER_THRESHOLD` | Nombre d'échecs consécutifs avant d'ignorer un provider (disjoncteur) | `3` | ❌ |
+| `LEANNA_PROVIDER_BREAKER_COOLDOWN_MS` | Durée (ms) pendant laquelle le provider est ignoré après ouverture du disjoncteur | `60000` | ❌ |
+
+### Observabilité & cache
+
+| Variable | Description | Défaut | Obligatoire |
+|---|---|---|---|
+| `OTEL_CONSOLE_EXPORT` | Exporte les spans OpenTelemetry vers la console (`1`/`true`). Les traces sont toujours créées ; cette variable ne contrôle que l'export verbeux | *(vide)* | ❌ |
+| `LEANNA_KNOWLEDGE_CACHE_TTL_SECONDS` | TTL (s) du cache partagé du Knowledge Graph | `86400` | ❌ |
+
+### Coordination multi-instance (optionnel, Redis)
+
+| Variable | Description | Défaut | Obligatoire |
+|---|---|---|---|
+| `LEANNA_LOCK_REDIS_URL` | Redis dédié au verrou distribué. Sans Redis : verrou correct au sein d'un seul process (repli in-process) | *(REDIS_URL)* | ❌ |
+| `LEANNA_EVENTBUS_REDIS_URL` | Redis pour le bus d'événements durable (Redis Streams). Sans Redis : EventBus strictement in-process | *(REDIS_URL)* | ❌ |
+| `LEANNA_EVENTBUS_STREAM` | Nom du Redis Stream de l'EventBus | `leanna:eventbus` | ❌ |
+| `LEANNA_EVENTBUS_MAXLEN` | Longueur max approximative du stream | `10000` | ❌ |
+
+### Runtime autonome (heartbeat & TaskManager, valeurs en ms)
+
+| Variable | Description | Défaut | Obligatoire |
+|---|---|---|---|
+| `LEANNA_HEARTBEAT_ACTIVE_MS` | Intervalle du heartbeat en état actif | `15000` | ❌ |
+| `LEANNA_HEARTBEAT_IDLE_MS` | Intervalle du heartbeat en état idle | `60000` | ❌ |
+| `LEANNA_HEARTBEAT_SLEEP_MS` | Intervalle du heartbeat en état sleeping | `300000` | ❌ |
+| `LEANNA_HEARTBEAT_IDLE_AFTER_MS` | Délai d'inactivité avant de passer en idle | `300000` | ❌ |
+| `LEANNA_AUTONOMY_MAX_CONCURRENCY` | Nombre max de tâches autonomes simultanées | `2` | ❌ |
+| `LEANNA_AUTONOMY_MAX_QUEUE_SIZE` | Taille max de la file d'attente des tâches | `100` | ❌ |
+| `LEANNA_AUTONOMY_DEDUPE_TTL_MS` | Fenêtre (ms) de déduplication des tâches | `300000` | ❌ |
+| `LEANNA_AUTONOMY_RETRY_DELAY_MS` | Délai de base entre retries (backoff exponentiel) | `1000` | ❌ |
+| `LEANNA_AUTONOMY_MAX_RETRIES` | Nombre max de retries par tâche | `3` | ❌ |
+| `LEANNA_AUTONOMY_TASK_TIMEOUT_MS` | Timeout (ms) d'exécution d'une tâche autonome | `60000` | ❌ |
+| `LEANNA_AUTONOMY_CIRCUIT_BREAKER_THRESHOLD` | Échecs consécutifs avant ouverture du circuit breaker | `5` | ❌ |
+| `LEANNA_AUTONOMY_CIRCUIT_BREAKER_COOLDOWN_MS` | Durée (ms) du cooldown du circuit breaker | `300000` | ❌ |
 
 ---
 
@@ -732,5 +774,3 @@ Consultez [CONTRIBUTING.md](CONTRIBUTING.md) pour le workflow Git, les conventio
 Ce projet est distribué sous licence **BUSL 1.1** (Business Source License 1.1).
 
 Voir le fichier [LICENSE](LICENSE) pour les conditions complètes.
-
-code2prompt "C:\Users\Mayss\Desktop\Jarvis-os-ori" --exclude="*.txt,node_modules/**,.git/**,dist/**,build/**,.next/**,coverage/**,.Leanna/**" -O "output.md"
