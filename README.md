@@ -317,6 +317,17 @@ Leanna inclut une fondation d’autonomie **événementielle**, pas une boucle `
 
 Les variables `LEANNA_HEARTBEAT_*` et `LEANNA_AUTONOMY_*` de `.env.example` règlent les intervalles, la backpressure, la déduplication, les retries, timeouts et le circuit breaker.
 
+**Couches optionnelles (dégradation propre sans Redis/Supabase) :**
+
+- **Task store durable** — checkpoint/reprise des tâches autonomes après un crash (Supabase).
+- **Timeline temps réel** — événements `autonomy:*` diffusés sur le canal WebSocket dédié `/autonomy`, visualisés dans l’UI via la route `/autonomy` (`AutonomyView`).
+- **Fallback inter-providers** — bascule automatique Gemini ↔ OpenRouter avec disjoncteur (`LEANNA_PROVIDER_FALLBACK`).
+- **Verrou distribué** — coordination mono-instance entre processus (`LEANNA_LOCK_REDIS_URL`, repli in-process).
+- **Bus multi-processus** — pont Redis Streams pour diffuser l’`EventBus` entre instances (`LEANNA_EVENTBUS_*`).
+- **Test de charge** — `npm run test:soak` valide le `TaskManager` sous charge soutenue.
+
+Sans Redis/Supabase configurés, chacune de ces couches reste inactive et le runtime fonctionne exactement comme en mono-instance in-process. Détails complets dans [AUTONOMY.md](AUTONOMY.md).
+
 ---
 
 ## Lancement

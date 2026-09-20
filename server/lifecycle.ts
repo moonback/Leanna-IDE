@@ -15,6 +15,7 @@ export interface GracefulShutdownDeps {
   wss: WebSocketServer;
   runtimeV2: AgentRuntime;
   autonomyCore?: LeannaCore;
+  eventBridge?: { stop(): Promise<void> };
   observability: Observability;
   activeGeminiSessions: Set<{ close(): void }>;
   projectMemory: ProjectMemory;
@@ -68,6 +69,9 @@ export function setupGracefulShutdown(deps: GracefulShutdownDeps): GracefulShutd
 
     // 3d. Stop accepting autonomous work before stopping the shared runtime.
     try { await deps.autonomyCore?.stop(); console.log('[Lifecycle] Autonomy core arrêté.'); } catch {}
+
+    // 3d-bis. Détacher le pont Redis Streams (arrête la consommation et ferme les connexions).
+    try { await deps.eventBridge?.stop(); console.log('[Lifecycle] EventBus Redis bridge arrêté.'); } catch {}
 
     // 3e. Arrêter le runtime V2
     try { await deps.runtimeV2.stop(); deps.observability.detach(); console.log('[Lifecycle] RuntimeV2 arrêté.'); } catch {}

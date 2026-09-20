@@ -28,21 +28,6 @@ function reasoningBudget(complexity: ComplexityLevel): { thinkingBudget: number;
   return { thinkingBudget: 512, maxOutputTokens: 4_096 };
 }
 
-async function generateWithProviderFallback(options: Parameters<typeof generateText>[0]): Promise<GenerateTextResult> {
-  try {
-    return await generateText(options);
-  } catch (primaryError) {
-    const fallbackProvider = getActiveProvider() === "gemini" ? "openrouter" : "gemini";
-    try {
-      return await generateText({ ...options, forceProvider: fallbackProvider });
-    } catch (fallbackError) {
-      throw new Error(
-        `Provider principal indisponible (${(primaryError as Error).message}); fallback échoué (${(fallbackError as Error).message})`
-      );
-    }
-  }
-}
-
 function extractConfidence(text: string): "low" | "medium" | "high" | null {
   const match = /(?:niveau de confiance|confidence level)\s*[:\-]?\s*(élev[ée]e?|high|moyenne?|medium|faible|low)/i.exec(text);
   if (!match) return null;
@@ -72,7 +57,7 @@ async function runTreeOfThought(prompt: string, budget: ReturnType<typeof reason
   // en parallèle) et donc le plus exposé au risque de panne partielle.
   const settled = await Promise.allSettled(
     temperatures.map((temperature, index) =>
-      generateWithProviderFallback({
+      generateText({
         prompt: branchPrompt(index + 1),
         systemPrompt: THINKING_STRATEGIES.tree_of_thought.systemPrompt,
         temperature,
@@ -109,7 +94,7 @@ async function runTreeOfThought(prompt: string, budget: ReturnType<typeof reason
   const evaluationPrompt = branches
     .map(({ index, result }) => `APPROCHE ${index + 1}:\n${result.text}`)
     .join("\n\n");
-  const evaluation = await generateWithProviderFallback({
+  const evaluation = await generateText({
     prompt: `Évalue ces approches indépendantes (${branches.length} sur 3 disponibles${branchErrors.length ? "; " + branchErrors.join(" | ") : ""}). Réponds d'abord en JSON strict {"winner":1|2|3,"reasoning":"..."} en utilisant le numéro d'approche indiqué ci-dessous, puis explique brièvement le choix. Note faisabilité, risques, complexité et réversibilité.\n\n${evaluationPrompt}`,
     systemPrompt: "Tu es un évaluateur indépendant et exigeant. Sélectionne la meilleure approche, sans réécrire les branches.",
     temperature: 0.2,
@@ -122,14 +107,14 @@ async function runTreeOfThought(prompt: string, budget: ReturnType<typeof reason
 
 async function runSelfCritique(prompt: string, initial: GenerateTextResult, budget: ReturnType<typeof reasoningBudget>): Promise<GenerateTextResult> {
   const critiqueProvider = getActiveProvider() === "gemini" ? "openrouter" : "gemini";
-  const critique = await generateWithProviderFallback({
+  const critique = await generateText({
     prompt: `Critique indépendamment la solution suivante. Identifie les erreurs factuelles, hypothèses non vérifiées, cas limites et omissions. Ne propose pas encore de réécriture.\n\nPROBLÈME :\n${prompt}\n\nSOLUTION :\n${initial.text}`,
     systemPrompt: "Tu es un réviseur indépendant, sceptique et précis.",
     temperature: 0.4,
     forceProvider: critiqueProvider,
     ...budget,
   });
-  return generateWithProviderFallback({
+  return generateText({
     prompt: `Corrige la solution à partir de la critique indépendante. Retourne uniquement la solution finale complète, avec un niveau de confiance explicite.\n\nPROBLÈME :\n${prompt}\n\nSOLUTION INITIALE :\n${initial.text}\n\nCRITIQUE :\n${critique.text}`,
     systemPrompt: "Tu es un expert chargé de produire la version corrigée et directement exploitable.",
     temperature: 0.3,
@@ -1027,7 +1012,7 @@ export const reasoningSkill: Skill = {
                   model: getActiveProvider() === "gemini" ? "gemini-2.5-flash" : "openrouter",
                 };
               } catch {
-                response = await generateWithProviderFallback({
+                response = await generateText({
                   prompt: fullPrompt,
                   systemPrompt: config.systemPrompt,
                   temperature: 0.3,
@@ -1035,7 +1020,7 @@ export const reasoningSkill: Skill = {
                 });
               }
             } else {
-              response = await generateWithProviderFallback({
+              response = await generateText({
                 prompt: fullPrompt,
                 systemPrompt: config.systemPrompt,
                 temperature: 0.3,

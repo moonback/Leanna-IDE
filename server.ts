@@ -285,6 +285,7 @@ import { createTelegramRouter } from "./server/routes/telegram.js";
 import { createSmartSkills } from "./server/autonomy/SmartSkills.js";
 import { LeannaCore } from "./server/autonomy/LeannaCore.js";
 import { AutonomyPersistence } from "./server/autonomy/AutonomyPersistence.js";
+import { RedisEventBridge } from "./server/runtime/RedisEventBridge.js";
 
 const { runtime, skillManager } = bootstrapRuntimeSync({
   skills: [
@@ -380,6 +381,10 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
 const runtimeV2 = runtime;
 const observability = new Observability();
 observability.attach(runtime.events);
+// Optional Redis Streams bridge: makes the in-process EventBus multi-process
+// durable across instances. No-op (bus stays in-process) when Redis is absent.
+const eventBridge = new RedisEventBridge(runtime.events);
+void eventBridge.start();
 // Durable task store enabling checkpoint/resume of autonomy tasks after a crash.
 // Degrades silently to in-memory only when Supabase is not configured.
 const autonomyPersistence = new AutonomyPersistence();
@@ -927,6 +932,7 @@ async function startServer() {
     wss,
     runtimeV2,
     autonomyCore: leannaCore,
+    eventBridge,
     observability,
     activeGeminiSessions,
     projectMemory,

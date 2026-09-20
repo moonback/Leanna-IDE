@@ -157,7 +157,7 @@ pm2 save
 pm2 startup
 ```
 
-La configuration PM2 existante utilise une seule instance, un redémarrage automatique, un backoff de redémarrage, une limite mémoire de 1 Go et un délai d’arrêt gracieux. Une seule instance est importante : le `EventBus` et le `TaskManager` autonomes actuels sont locaux au processus.
+La configuration PM2 existante utilise une seule instance, un redémarrage automatique, un backoff de redémarrage, une limite mémoire de 1 Go et un délai d’arrêt gracieux. Une seule instance est importante : le `EventBus` et le `TaskManager` autonomes actuels sont locaux au processus. Pour coordonner un travail sensible entre plusieurs instances, un verrou distribué optionnel est désormais disponible (voir « Verrou distribué (multi-instance) »).
 
 ### Vérifier l’état
 
@@ -172,6 +172,58 @@ curl -H "x-leanna-token: $Leanna_API_TOKEN" \
 ```
 
 Le premier endpoint retourne l’état, les tâches récentes (maximum 100) et les erreurs terminales. Les logs PM2 complètent les métriques runtime.
+
+### Test de charge et soak
+
+Un test dédié valide le `TaskManager` sous charge soutenue : débit, backpressure, borne du cache de déduplication, retries + circuit breaker + timeout sous charge, et arrêt propre sans timer résiduel. Il vit dans `server/autonomy/TaskManager.soak.test.ts`.
+
+```bash
+# Variante rapide (borne réduite, incluse dans `npm test`)
+node --import tsx --test server/autonomy/TaskManager.soak.test.ts
+
+# Variante soak lourde (charge soutenue prolongée)
+npm run test:soak
+```
+
+La variante soak (`LEANNA_SOAK=1`) soumet le travail par vagues successives — comme le fait la charge réelle, où les événements arrivent en flux plutôt qu’en un seul burst massif. Elle affiche le débit soutenu mesuré (de l’ordre de plusieurs milliers de tâches/s en mémoire) et vérifie qu’aucune tâche acceptée n’est perdue ni exécutée deux fois. À noter : la file de priorité est re-triée à chaque défilement, donc un burst unique très volumineux est un pire cas plutôt qu’un régime nominal ; l’usage réel (petites vagues d’événements) reste efficace.
+
+### Verrou distribué (multi-instance)
+
+Un verrou mutuel optionnellement distribué (`server/utils/DistributedLock.ts`) permet de garantir qu’un travail sensible au multi-instance (par ex. un scheduler ou une reprise de tâches) ne s’exécute que sur un seul processus à la fois. C’est la brique nécessaire pour lever à terme la contrainte « une seule instance PM2 ».
+
+- **Backend Redis** (quand `REDIS_URL` ou `LEANNA_LOCK_REDIS_URL` est défini) : acquisition atomique via `SET key token NX PX ttl`, libération via un script Lua compare-and-delete qui ne supprime la clé que si le token nous appartient — jamais le verrou d’un autre détenteur après expiration ou renouvellement.
+- **Repli in-process** (sans Redis) : le verrou reste correct au sein d’un même processus, comme les autres intégrations optionnelles (Supabase, cache).
+- **Anti-deadlock** : chaque verrou porte un TTL qui l’auto-expire si le détenteur crashe ; `renew()` prolonge le TTL tant que le verrou est détenu.
+
+```ts
+import { distributedLock } from "./server/utils/DistributedLock.js";
+
+const outcome = await distributedLock.withLock(
+  "leanna:autonomy:scheduler",
+  async () => { /* section critique mono-instance */ },
+  { ttlMs: 30_000, waitMs: 0 }, // waitMs: 0 = non bloquant
+);
+if (!outcome.acquired) {
+  // Une autre instance détient déjà le verrou : ne rien faire ici.
+}
+```
+
+Le verrou seul ne rend pas l’`EventBus`/`TaskManager` multi-processus ; il fournit la primitive de coordination. Le transport d’événements multi-processus est traité par le pont Redis Streams ci-dessous.
+
+### Bus d’événements multi-processus (Redis Streams)
+
+Un pont optionnel (`server/runtime/RedisEventBridge.ts`) rend l’`EventBus` in-process effectivement multi-processus et durable, **sans réécrire son cœur ni changer son comportement local**. Le pont :
+
+1. publie chaque événement local sur un Redis Stream (`XADD`, avec trim `MAXLEN ~`) ;
+2. consomme le stream en tâche de fond (`XREAD BLOCK`) et ré-émet localement les événements provenant des **autres** instances.
+
+Sans `REDIS_URL` (ou `LEANNA_EVENTBUS_REDIS_URL`), `start()` est un no-op : le bus reste strictement in-process, exactement comme avant.
+
+- **Prévention des boucles** : chaque instance porte un `instanceId` unique ; le consommateur ignore ses propres entrées, et les événements ré-émis par le pont sont marqués (WeakSet) pour ne jamais être republiés. Sans ce garde, un événement étranger ré-émis serait aussitôt republié → boucle infinie.
+- **Connexions dédiées** : une connexion pour publier, une connexion dupliquée pour la lecture bloquante (`XREAD BLOCK`), afin que la consommation ne bloque pas les publications.
+- **Arrêt propre** : le lifecycle appelle `stop()` (arrêt de la consommation + fermeture des connexions) avant l’arrêt du runtime partagé.
+
+Variables : `LEANNA_EVENTBUS_REDIS_URL`, `LEANNA_EVENTBUS_STREAM` (défaut `leanna:eventbus`), `LEANNA_EVENTBUS_MAXLEN` (défaut 10000). Combiné au verrou distribué (pour n’exécuter le travail mono-instance qu’une fois) et au task store durable, ce pont ouvre la voie à un déploiement multi-instance ; un durcissement (groupes de consommateurs `XREADGROUP`, accusés de réception, tests d’intégration multi-instance) reste à mener avant un usage à grande échelle.
 
 ### Arrêter proprement et récupérer
 
@@ -218,4 +270,12 @@ Le task store durable et la reprise des tâches autonomes génériques sont dés
 
 La timeline temps réel des événements `autonomy:*` est désormais diffusée sur un canal WebSocket dédié `/autonomy` et consommée par un composant frontend (`useAutonomyTimeline` + `AutonomyTimeline`). Voir « Timeline temps réel (WebSocket) ».
 
-Cette fondation ne prétend pas encore fournir : Redis Streams, locks distribués, fallbacks de providers, ni test de charge/soak. Ces étapes exigent de choisir et d’intégrer un contrat de coordination multi-processus sans dupliquer les systèmes de missions, queues ou permissions existants.
+Le fallback inter-providers pour la génération de texte est désormais disponible : `generateText` (dans `server/utils/textGeneration.ts`) bascule automatiquement vers l’autre provider (Gemini ↔ OpenRouter) en cas d’échec du provider principal, avec un disjoncteur par provider pour éviter d’ajouter de la latence pendant une panne prolongée. Il est piloté par `LEANNA_PROVIDER_FALLBACK`, `LEANNA_PROVIDER_BREAKER_THRESHOLD` et `LEANNA_PROVIDER_BREAKER_COOLDOWN_MS`. La rotation de clés Gemini (`withGeminiRetry`) reste en place sous cette couche ; un appel forçant explicitement un provider (`forceProvider`) reste sans fallback (par ex. la critique indépendante du module de raisonnement).
+
+Un test de charge/soak du `TaskManager` est désormais disponible (voir « Test de charge et soak »).
+
+Un verrou distribué optionnel (Redis, avec repli in-process) est désormais disponible pour coordonner un travail mono-instance entre plusieurs processus (voir « Verrou distribué (multi-instance) »).
+
+Un bus d’événements durable multi-processus (Redis Streams) est désormais disponible via un pont optionnel qui dégrade proprement vers l’in-process sans Redis (voir « Bus d’événements multi-processus (Redis Streams) »).
+
+Les briques initialement listées comme prochaines étapes (task store durable, checkpoint/reprise, fallbacks de providers, timeline WebSocket + frontend, test de charge/soak, verrou distribué, Redis Streams) sont désormais en place, chacune optionnelle et à dégradation propre. Le durcissement pour un usage multi-instance à grande échelle reste recommandé : groupes de consommateurs Redis avec accusés de réception, et tests d’intégration multi-instance de bout en bout. Aucune de ces couches ne contourne les politiques de permissions, dry-run, sandbox ou approbation existantes.

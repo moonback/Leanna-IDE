@@ -90,7 +90,7 @@ La couche `LeannaCore` utilise le `Runtime EventBus` existant pour créer des t�
 
 ### `GET /api/v2/metrics/autonomy`
 
-Retourne l’état courant du runtime autonome et les tâches récentes. La liste est limitée aux 100 tâches les plus récentes ; elle n’est pas une persistance durable.
+Retourne l’état courant du runtime autonome et les tâches récentes. La liste est limitée aux 100 tâches les plus récentes. Cet endpoint reflète l’état en mémoire ; la persistance durable des tâches (checkpoint/reprise après crash) est assurée séparément par `AutonomyPersistence` quand Supabase est configuré (voir [AUTONOMY.md](AUTONOMY.md)). La timeline temps réel des événements `autonomy:*` est par ailleurs diffusée sur le canal WebSocket dédié `/autonomy`.
 
 **Authentification :** Oui (`x-leanna-token`)
 

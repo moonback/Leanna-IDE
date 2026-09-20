@@ -75,17 +75,105 @@ export interface GenerateTextResult {
   };
 }
 
+// ── Cross-provider fallback + circuit breaker ───────────────────────────────
+
+type Provider = 'gemini' | 'openrouter';
+
 /**
- * Generate text using the configured provider (Gemini or OpenRouter).
- * Automatically respects the user's profile textProvider setting.
+ * Lightweight per-provider circuit breaker. After a run of consecutive
+ * failures, a provider is skipped for a cooldown so the fallback path is not
+ * spent probing a provider that is clearly down. Purely in-process, mirroring
+ * the autonomy TaskManager breaker but scoped to LLM providers.
+ */
+const providerBreaker: Record<Provider, { failures: number; openedAt?: number }> = {
+  gemini: { failures: 0 },
+  openrouter: { failures: 0 },
+};
+
+const boolEnv = (value: string | undefined, fallback: boolean): boolean => {
+  if (value === undefined) return fallback;
+  return value === '1' || value.toLowerCase() === 'true';
+};
+
+const positiveEnv = (value: string | undefined, fallback: number): number => {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
+const fallbackConfig = () => ({
+  enabled: boolEnv(process.env.LEANNA_PROVIDER_FALLBACK, true),
+  breakerThreshold: positiveEnv(process.env.LEANNA_PROVIDER_BREAKER_THRESHOLD, 3),
+  breakerCooldownMs: positiveEnv(process.env.LEANNA_PROVIDER_BREAKER_COOLDOWN_MS, 60_000),
+});
+
+function isBreakerOpen(provider: Provider, cooldownMs: number): boolean {
+  const state = providerBreaker[provider];
+  if (state.openedAt === undefined) return false;
+  if (Date.now() - state.openedAt >= cooldownMs) {
+    providerBreaker[provider] = { failures: 0 };
+    return false;
+  }
+  return true;
+}
+
+function recordProviderResult(provider: Provider, ok: boolean, threshold: number): void {
+  const state = providerBreaker[provider];
+  if (ok) {
+    providerBreaker[provider] = { failures: 0 };
+    return;
+  }
+  const failures = state.failures + 1;
+  providerBreaker[provider] = { failures, openedAt: failures >= threshold ? Date.now() : state.openedAt };
+}
+
+/** Dispatch to a single provider implementation with no fallback. */
+async function generateOnce(provider: Provider, options: GenerateTextOptions): Promise<GenerateTextResult> {
+  return provider === 'openrouter' ? generateWithOpenRouter(options) : generateWithGemini(options);
+}
+
+/**
+ * Generate text using the configured provider (Gemini or OpenRouter), with
+ * automatic cross-provider fallback.
+ *
+ * Order of resolution:
+ *  1. Primary provider = options.forceProvider || profile.textProvider || 'gemini'.
+ *  2. On failure, if fallback is enabled, retry once on the other provider.
+ *  3. A per-provider circuit breaker skips a provider that recently failed
+ *     repeatedly, so a sustained outage does not add latency to every call.
+ *
+ * The inner layers are preserved: Gemini keeps its key-pool rotation
+ * (withGeminiRetry) and OpenRouter keeps its own timeout handling. This wrapper
+ * only adds cross-provider failover on errors those layers rethrow.
  */
 export async function generateText(options: GenerateTextOptions): Promise<GenerateTextResult> {
-  const provider = options.forceProvider || _profile.textProvider || 'gemini';
+  const primary: Provider = options.forceProvider || _profile.textProvider || 'gemini';
+  const { enabled, breakerThreshold, breakerCooldownMs } = fallbackConfig();
 
-  if (provider === 'openrouter') {
-    return generateWithOpenRouter(options);
+  // A caller that forces a provider opts out of cross-provider fallback.
+  if (!enabled || options.forceProvider) {
+    return generateOnce(primary, options);
   }
-  return generateWithGemini(options);
+
+  const secondary: Provider = primary === 'gemini' ? 'openrouter' : 'gemini';
+  const order: Provider[] = [primary, secondary];
+  const errors: string[] = [];
+
+  for (const provider of order) {
+    if (isBreakerOpen(provider, breakerCooldownMs) && provider !== order[order.length - 1]) {
+      errors.push(`${provider}: circuit ouvert (récemment en échec)`);
+      continue;
+    }
+    try {
+      const result = await generateOnce(provider, { ...options, forceProvider: provider });
+      recordProviderResult(provider, true, breakerThreshold);
+      return result;
+    } catch (error) {
+      recordProviderResult(provider, false, breakerThreshold);
+      errors.push(`${provider}: ${(error as Error).message}`);
+    }
+  }
+
+  throw new Error(`Tous les providers ont échoué. ${errors.join(' | ')}`);
 }
 
 // Internal context for telemetry correlation (set by skills/agents)
@@ -424,9 +512,13 @@ async function generateWithOpenRouter(options: GenerateTextOptions): Promise<Gen
     || process.env.OPENROUTER_FREE_API_KEY;
 
   if (!orKey) {
-    // Fallback to Gemini if no OpenRouter key available
-    console.warn('[TextGen] OpenRouter configuré mais aucune clé disponible, fallback Gemini');
-    return generateWithGemini(options);
+    // No cross-provider fallback here: generateText() owns failover and will
+    // route to Gemini when OpenRouter is unavailable. Throwing keeps a single
+    // failover path and lets a direct forceProvider:'openrouter' caller see a
+    // clear error rather than a silent provider switch.
+    const error = new Error('OpenRouter configuré mais aucune clé disponible.');
+    (error as any).status = 401;
+    throw error;
   }
 
   const model = options.openrouterModel || _profile.openrouterModel || 'google/gemini-3.6-flash';
@@ -517,11 +609,10 @@ async function generateWithOpenRouter(options: GenerateTextOptions): Promise<Gen
     span.setStatus({ code: 2, message: e.message }); // ERROR
     span.end();
 
-    // On network error, fallback to Gemini
-    if (e.name === 'AbortError' || e.message?.includes('fetch')) {
-      console.warn(`[TextGen] OpenRouter error (${e.message}), fallback Gemini`);
-      return generateWithGemini(options);
-    }
+    // Cross-provider fallback is now owned by generateText() (central layer):
+    // rethrow so it can decide whether to fail over to Gemini, apply the
+    // circuit breaker and avoid a redundant double call. This keeps failover
+    // in one place instead of two competing mechanisms.
     throw e;
   }
 }
