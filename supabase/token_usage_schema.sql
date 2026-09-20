@@ -37,6 +37,10 @@ create index if not exists token_usage_model_idx
 -- ── Row Level Security : seul le backend (service_role) a accès ────────────
 alter table public.token_usage enable row level security;
 
+-- Idempotent : on supprime la policy si elle existe déjà avant de la recréer
+-- (CREATE POLICY n'accepte pas IF NOT EXISTS en Postgres).
+drop policy if exists "Le backend a un accès total à token_usage" on public.token_usage;
+
 create policy "Le backend a un accès total à token_usage"
 on public.token_usage
 for all

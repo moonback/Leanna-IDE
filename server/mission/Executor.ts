@@ -432,8 +432,15 @@ export class Executor {
 
       const result = await this.executeAction(mission, goalId, action, availableSkills);
 
-      // Décider de la suite selon la réflexion
-      if (result.decision === "abort") {
+      // Une action RÉUSSIE est terminale : la réflexion ne peut pas la "défaire".
+      // On ignore donc retry/replan/escalate/abort quand l'action a réussi
+      // (le statut completed a déjà été posé par recordActionResult, qui mute
+      // l'objet action de façon invisible pour l'inférence de types).
+      const actionSucceeded = (mission.getGoal(goalId)?.plannedActions
+        .find((a) => a.id === action.id)?.status) === "completed";
+
+      // Décider de la suite selon la réflexion (uniquement en cas d'échec).
+      if (!actionSucceeded && result.decision === "abort") {
         mission.completeGoal(goalId, {
           success: false,
           summary: `Abandonné: ${result.reasoning}`,
@@ -441,7 +448,7 @@ export class Executor {
         return;
       }
 
-      if (result.decision === "escalate") {
+      if (!actionSucceeded && result.decision === "escalate") {
         // Marquer l'objectif comme bloqué et laisser le niveau supérieur gérer
         mission.blockGoal(goalId, result.reasoning);
         this.emit("goal_escalated", {
@@ -452,7 +459,7 @@ export class Executor {
         return;
       }
 
-      if (result.decision === "replan") {
+      if (!actionSucceeded && result.decision === "replan") {
         // Replanifier avec les infos accumulées
         console.log(`[Executor]    🔄 Replanification...`);
         actions = await this.planner.replan(
@@ -868,11 +875,11 @@ JSON:`;
       result: this.summarizeResult(a.result),
     }));
 
-    const prompt = `Tu es un vérificateur qualité. Détermine si l'objectif est RÉELLEMENT atteint.
+    const prompt = `Tu es un vérificateur qualité. Évalue si l'objectif est atteint au vu des preuves.
 
 OBJECTIF: ${goal.title}
 DÉTAIL: ${goal.description}
-CRITÈRES DE SUCCÈS (tous doivent être satisfaits):
+CRITÈRES DE SUCCÈS:
 ${goal.successCriteria.map((c) => `  - ${c}`).join("\n")}
 
 ACTIONS EXÉCUTÉES ET RÉSULTATS:
@@ -880,21 +887,34 @@ ${JSON.stringify(actionsSummary, null, 2)}
 
 INSTRUCTIONS:
 - Juge uniquement à partir des preuves ci-dessus.
-- Ne considère PAS l'objectif atteint si les résultats ne démontrent pas chaque critère.
-- Réponds STRICTEMENT en JSON: {"passed": true|false, "reasoning": "..."}
+- "passed": true si les critères semblent satisfaits.
+- "blocking": true UNIQUEMENT si tu as une preuve claire d'un échec réel
+  (une action a renvoyé une erreur, un résultat contredit un critère). En cas
+  de simple doute ou d'information manquante, "blocking" doit être false.
+- Réponds STRICTEMENT en JSON: {"passed": true|false, "blocking": true|false, "reasoning": "..."}
 
 JSON:`;
 
     try {
       const raw = await this.withTimeout(this.llmVerify(prompt), 20_000, "verify");
       const parsed = this.parseJsonObject(raw);
-      return {
-        passed: parsed.passed === true,
-        reasoning:
-          typeof parsed.reasoning === "string"
-            ? parsed.reasoning
-            : "Vérification LLM effectuée.",
-      };
+      const passed = parsed.passed === true;
+      const blocking = parsed.blocking === true;
+      const reasoning =
+        typeof parsed.reasoning === "string" ? parsed.reasoning : "Vérification LLM effectuée.";
+
+      // Tolérance : si toutes les actions ont réussi, un verdict négatif du LLM
+      // ne fait échouer l'objectif QUE s'il signale un problème réellement
+      // bloquant. Sinon, on considère l'objectif atteint (évite de bloquer les
+      // dépendances sur un LLM trop strict ou une réponse ambiguë).
+      if (!passed && allSuccess && !blocking) {
+        return {
+          passed: true,
+          reasoning: `Toutes les actions ont réussi ; verdict LLM non bloquant retenu comme succès. (${reasoning})`,
+        };
+      }
+
+      return { passed, reasoning };
     } catch (err) {
       console.warn(
         `[Executor]    ⚠️ Vérification des critères échouée, repli heuristique: ${(err as Error).message}`
