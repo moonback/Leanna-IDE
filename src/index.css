@@ -5,14 +5,14 @@
   /* Typography */
 --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
 --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-/* Typography Scale (REM-based, 16px = 1rem) */
---text-xs:    0.625rem;   /* 10px  - Captions, hints */
---text-sm:    0.75rem;    /* 12px  - Secondary text */
---text-base:  0.875rem;   /* 14px  - Body (markdown) */
---text-lg:    1rem;       /* 16px  - Default */
---text-xl:    1.125rem;   /* 18px  - Headings */
---text-2xl:   1.25rem;    /* 20px  - Titres */
---text-3xl:   1.5rem;     /* 24px  - Grandes sections */
+/* Typography Scale (REM-based, 16px = 1rem)
+   Aligned with DESIGN_TOKENS.md v2.0.0 — six standardized levels. */
+--text-xs:    0.75rem;    /* 12px  - Micro-labels, badges, tags */
+--text-sm:    0.875rem;   /* 14px  - Secondary text, captions */
+--text-base:  1rem;       /* 16px  - Body, forms, lists */
+--text-lg:    1.125rem;   /* 18px  - Section headings, panel headers */
+--text-xl:    1.25rem;    /* 20px  - View titles, secondary dialogs */
+--text-2xl:   1.5rem;     /* 24px  - Primary titles, important modals */
 
 /* Font weights */
 --font-light: 300;
@@ -25,13 +25,14 @@
 --leading-tight: 1.25;
 --leading-normal: 1.5;
 --leading-relaxed: 1.75;
-  /* Border radius scale — IDE-pro feel (tight, technical) */
+  /* Border radius scale — aligned with DESIGN_TOKENS.md v2.0.0 §5
+     md: Button/Input/Badge · lg: Card/Panel · xl: Popover/Dropdown/Tooltip · 2xl: Modal/Dialog */
   --radius-xs:   4px;
   --radius-sm:   6px;
-  --radius-md:   10px;
-  --radius-lg:   14px;
-  --radius-xl:   18px;
-  --radius-2xl:  24px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   12px;
+  --radius-2xl:  16px;
   --radius-full: 9999px;
 
   /* Spacing scale (4px base) */
@@ -159,6 +160,16 @@
   --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
   --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
 
+  /* Bordures sémantiques subtiles (DESIGN_TOKENS.md §14.2) */
+  --border-success-subtle: color-mix(in srgb, var(--color-success) 25%, transparent);
+  --border-warning-subtle: color-mix(in srgb, var(--color-warning) 25%, transparent);
+  --border-error-subtle:   color-mix(in srgb, var(--color-error) 25%, transparent);
+  --border-info-subtle:    color-mix(in srgb, var(--color-info) 25%, transparent);
+
+  /* Accent alternatif — Maysson orange */
+  --color-accent-alt: #ff8c00;
+  --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
+
   /* Orb – avec le bleu foncé en halo */
   --orb-glow-active: rgba(0, 194, 255, 0.50);
   --gradient-from:   rgba(0, 194, 255, 0.10);
@@ -264,6 +275,12 @@
   --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
   --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
 
+  /* Semantic borders — subtle variants (DESIGN_TOKENS.md §14.2) */
+  --border-success-subtle: color-mix(in srgb, var(--color-success) 25%, transparent);
+  --border-warning-subtle: color-mix(in srgb, var(--color-warning) 25%, transparent);
+  --border-error-subtle:   color-mix(in srgb, var(--color-error) 25%, transparent);
+  --border-info-subtle:    color-mix(in srgb, var(--color-info) 25%, transparent);
+
   /* Accent alternative — Maysson orange (#ff8c00) */
   --color-accent-alt: #ff8c00;
   --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
@@ -368,6 +385,12 @@
   --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
   --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
 
+  /* Semantic borders — subtle variants (DESIGN_TOKENS.md §14.2) */
+  --border-success-subtle: color-mix(in srgb, var(--color-success) 25%, transparent);
+  --border-warning-subtle: color-mix(in srgb, var(--color-warning) 25%, transparent);
+  --border-error-subtle:   color-mix(in srgb, var(--color-error) 25%, transparent);
+  --border-info-subtle:    color-mix(in srgb, var(--color-info) 25%, transparent);
+
   /* Accent alternative — secondary highlight color */
   --color-accent-alt: #e056fd;
   --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
@@ -454,6 +477,12 @@
   --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
   --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
 
+  /* Semantic borders — subtle variants (DESIGN_TOKENS.md §14.2) */
+  --border-success-subtle: color-mix(in srgb, var(--color-success) 25%, transparent);
+  --border-warning-subtle: color-mix(in srgb, var(--color-warning) 25%, transparent);
+  --border-error-subtle:   color-mix(in srgb, var(--color-error) 25%, transparent);
+  --border-info-subtle:    color-mix(in srgb, var(--color-info) 25%, transparent);
+
   /* Accent alternative — secondary highlight color */
   --color-accent-alt: #6c71c4;
   --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
@@ -539,6 +568,12 @@
   --color-warning-subtle: color-mix(in srgb, var(--color-warning) 12%, transparent);
   --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
   --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
+
+  /* Semantic borders — subtle variants (DESIGN_TOKENS.md §14.2) — full opacity for contrast */
+  --border-success-subtle: var(--color-success);
+  --border-warning-subtle: var(--color-warning);
+  --border-error-subtle:   var(--color-error);
+  --border-info-subtle:    var(--color-info);
 
   /* Accent alternative — secondary highlight color */
   --color-accent-alt: #ff00ff;
@@ -951,6 +986,7 @@ button {
 /* ── Info ── */
 .text-info            { color: var(--color-info); }
 .bg-info-subtle       { background-color: color-mix(in srgb, var(--color-info) 10%, transparent); }
+.border-info-subtle   { border-color: color-mix(in srgb, var(--color-info) 25%, transparent); }
 .badge-info {
   background-color: color-mix(in srgb, var(--color-info) 12%, transparent);
   color: var(--color-info);
