@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Target, Loader2, CheckCircle2, XCircle, AlertTriangle,
   ChevronRight, Brain, Zap, RotateCcw, Pause, Play,
-  TrendingUp, TrendingDown, Minus, Clock, Plus,
+  TrendingUp, TrendingDown, Minus, Clock, Plus, Trash2, X,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
 
@@ -57,7 +57,7 @@ interface MissionPlan {
 interface MissionEntry {
   id: string;
   title: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked' | 'paused';
   priority: string;
   goals: GoalEntry[];
   activeGoalId: string | null;
@@ -109,6 +109,7 @@ function statusIcon(status: string, size = 10) {
     case 'completed': return <CheckCircle2 size={size} style={{ color: 'var(--color-success)' }} />;
     case 'failed': return <XCircle size={size} style={{ color: 'var(--color-error)' }} />;
     case 'blocked': return <AlertTriangle size={size} style={{ color: 'var(--color-warning)' }} />;
+    case 'paused': return <Pause size={size} style={{ color: 'var(--color-warning)' }} />;
     default: return <Clock size={size} style={{ color: 'var(--text-dimmed)' }} />;
   }
 }
@@ -152,6 +153,7 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
   const [approvals, setApprovals] = useState<PendingApproval[]>([]);
   const [resolving, setResolving] = useState<string | null>(null);
+  const [busyMission, setBusyMission] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -205,6 +207,40 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
       console.error('[MissionPanel] Échec de résolution d\'approbation:', err);
     } finally {
       setResolving(null);
+    }
+  }, []);
+
+  // Met en pause / reprend / annule / supprime une mission via l'API.
+  // La liste locale est ensuite mise à jour par les événements WebSocket,
+  // mais on applique aussi une mise à jour optimiste pour la réactivité.
+  const controlMission = useCallback(async (
+    missionId: string,
+    action: 'pause' | 'resume' | 'cancel' | 'delete',
+  ) => {
+    setBusyMission(missionId);
+    try {
+      const isDelete = action === 'delete';
+      const res = await fetch(
+        isDelete ? `/api/missions/${missionId}` : `/api/missions/${missionId}/${action}`,
+        { method: isDelete ? 'DELETE' : 'POST' },
+      );
+      if (!res.ok && res.status !== 404) return;
+
+      // Mise à jour optimiste locale.
+      setMissions(prev => {
+        if (action === 'delete') return prev.filter(m => m.id !== missionId);
+        return prev.map(m => {
+          if (m.id !== missionId) return m;
+          if (action === 'pause') return { ...m, status: 'paused' as const };
+          if (action === 'resume') return { ...m, status: 'in_progress' as const };
+          if (action === 'cancel') return { ...m, status: 'failed' as const };
+          return m;
+        });
+      });
+    } catch (err) {
+      console.error(`[MissionPanel] Échec de l'action "${action}":`, err);
+    } finally {
+      setBusyMission(null);
     }
   }, []);
 
@@ -411,6 +447,21 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
               return { ...m, status: 'failed' as const };
             });
 
+          case 'mission_paused':
+            return prev.map(m => {
+              if (m.id !== detail.missionId) return m;
+              return { ...m, status: 'paused' as const };
+            });
+
+          case 'mission_resumed':
+            return prev.map(m => {
+              if (m.id !== detail.missionId) return m;
+              return { ...m, status: 'in_progress' as const };
+            });
+
+          case 'mission_deleted':
+            return prev.filter(m => m.id !== detail.missionId);
+
           default:
             return prev;
         }
@@ -429,7 +480,7 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
     }
   }, [missions, expandedMission]);
 
-  const activeMissions = missions.filter(m => m.status === 'in_progress' || m.status === 'blocked');
+  const activeMissions = missions.filter(m => m.status === 'in_progress' || m.status === 'blocked' || m.status === 'paused');
   const completedMissions = missions.filter(m => m.status === 'completed' || m.status === 'failed');
 
   const content = (
@@ -536,8 +587,13 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
                 mission={mission}
                 expanded={expandedMission === mission.id}
                 expandedGoal={expandedGoal}
+                busy={busyMission === mission.id}
                 onToggle={() => setExpandedMission(prev => prev === mission.id ? null : mission.id)}
                 onToggleGoal={(goalId) => setExpandedGoal(prev => prev === goalId ? null : goalId)}
+                onPause={() => controlMission(mission.id, 'pause')}
+                onResume={() => controlMission(mission.id, 'resume')}
+                onCancel={() => controlMission(mission.id, 'cancel')}
+                onDelete={() => controlMission(mission.id, 'delete')}
               />
             ))}
           </AnimatePresence>
@@ -652,20 +708,62 @@ function ApprovalCard({
   );
 }
 
+function MissionControlButton({
+  title,
+  onClick,
+  disabled,
+  color,
+  icon,
+}: {
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  color: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      disabled={disabled}
+      className="flex items-center justify-center w-6 h-6 rounded-md transition disabled:opacity-40 cursor-pointer hover:bg-white/10"
+      style={{ color }}
+    >
+      {icon}
+    </button>
+  );
+}
+
 function MissionCard({
   mission,
   expanded,
   expandedGoal,
+  busy,
   onToggle,
   onToggleGoal,
+  onPause,
+  onResume,
+  onCancel,
+  onDelete,
 }: {
   mission: MissionEntry;
   expanded: boolean;
   expandedGoal: string | null;
+  busy: boolean;
   onToggle: () => void;
   onToggleGoal: (goalId: string) => void;
+  onPause: () => void;
+  onResume: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
 }) {
   const isActive = mission.status === 'in_progress';
+  const isPaused = mission.status === 'paused';
+  const isRunning = isActive || isPaused || mission.status === 'blocked';
+  const isTerminal = mission.status === 'completed' || mission.status === 'failed';
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const confColor = confidenceColor(mission.confidence);
   const progress = mission.metrics.totalActions > 0
     ? Math.round((mission.metrics.successfulActions / mission.metrics.totalActions) * 100)
@@ -678,14 +776,27 @@ function MissionCard({
       exit={{ opacity: 0, height: 0 }}
       className="rounded-xl overflow-hidden"
       style={{
-        backgroundColor: isActive ? 'color-mix(in srgb, var(--color-info) 4%, transparent)' : 'var(--bg-input)',
-        border: `1px solid ${isActive ? 'color-mix(in srgb, var(--color-info) 20%, transparent)' : 'var(--border-base)'}`,
+        backgroundColor: isPaused
+          ? 'color-mix(in srgb, var(--color-warning) 5%, transparent)'
+          : isActive
+          ? 'color-mix(in srgb, var(--color-info) 4%, transparent)'
+          : 'var(--bg-input)',
+        border: `1px solid ${
+          isPaused
+            ? 'color-mix(in srgb, var(--color-warning) 25%, transparent)'
+            : isActive
+            ? 'color-mix(in srgb, var(--color-info) 20%, transparent)'
+            : 'var(--border-base)'
+        }`,
       }}
     >
       {/* Mission header */}
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left cursor-pointer hover:bg-white/5 transition"
         onClick={onToggle}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
       >
         {/* Status icon */}
         <div className="flex-shrink-0">
@@ -717,10 +828,72 @@ function MissionCard({
           </div>
         </div>
 
+        {/* Contrôles : pause/reprise · annuler · supprimer */}
+        <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          {isRunning && (
+            isPaused ? (
+              <MissionControlButton
+                title="Reprendre la mission"
+                onClick={onResume}
+                disabled={busy}
+                color="var(--color-success)"
+                icon={<Play size={12} />}
+              />
+            ) : (
+              <MissionControlButton
+                title="Mettre en pause"
+                onClick={onPause}
+                disabled={busy}
+                color="var(--color-warning)"
+                icon={<Pause size={12} />}
+              />
+            )
+          )}
+
+          {isRunning && (
+            <MissionControlButton
+              title="Annuler la mission"
+              onClick={onCancel}
+              disabled={busy}
+              color="var(--color-error)"
+              icon={<XCircle size={12} />}
+            />
+          )}
+
+          {(isTerminal || isRunning) && (
+            confirmDelete ? (
+              <>
+                <MissionControlButton
+                  title="Confirmer la suppression"
+                  onClick={() => { setConfirmDelete(false); onDelete(); }}
+                  disabled={busy}
+                  color="var(--color-error)"
+                  icon={busy ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                />
+                <MissionControlButton
+                  title="Annuler la suppression"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={busy}
+                  color="var(--text-dimmed)"
+                  icon={<X size={12} />}
+                />
+              </>
+            ) : (
+              <MissionControlButton
+                title="Supprimer la mission"
+                onClick={() => setConfirmDelete(true)}
+                disabled={busy}
+                color="var(--text-dimmed)"
+                icon={<Trash2 size={12} />}
+              />
+            )
+          )}
+        </div>
+
         <motion.div animate={{ rotate: expanded ? 90 : 0 }} className="flex-shrink-0">
           <ChevronRight size={12} style={{ color: 'var(--text-dimmed)' }} />
         </motion.div>
-      </button>
+      </div>
 
       {/* Expanded: Goal Stack */}
       <AnimatePresence>

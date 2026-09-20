@@ -71,6 +71,15 @@ export class Executor {
   private completedMissions: Mission[] = [];
   private static readonly MAX_COMPLETED = 50;
 
+  /**
+   * Missions mises en pause par l'utilisateur.
+   * L'exécution boucle sur un point de contrôle tant que l'ID est présent ici.
+   */
+  private pausedMissions: Set<string> = new Set();
+
+  /** Intervalle de sondage de l'état de pause (ms). */
+  private static readonly PAUSE_POLL_MS = 500;
+
   constructor(config: Partial<MissionConfig> = {}) {
     this.config = { ...DEFAULT_MISSION_CONFIG, ...config };
     this.scorer = new SkillScorer();
@@ -340,8 +349,82 @@ export class Executor {
     telemetryService.clearMissionBudget(missionId);
     clearTelemetryContext();
     
+    this.pausedMissions.delete(missionId);
     this.emit("mission_cancelled", { missionId });
     return true;
+  }
+
+  /**
+   * Met en pause une mission active. L'exécution s'arrête au prochain point de
+   * contrôle (entre deux actions/vagues) et reste suspendue jusqu'à reprise ou
+   * annulation. Retourne false si la mission n'est pas active ou déjà en pause.
+   */
+  pauseMission(missionId: string): boolean {
+    if (!this.activeMissions.has(missionId)) return false;
+    if (this.pausedMissions.has(missionId)) return false;
+    this.pausedMissions.add(missionId);
+    this.emit("mission_paused", { missionId });
+    return true;
+  }
+
+  /**
+   * Reprend une mission mise en pause. Retourne false si elle n'était pas en pause.
+   */
+  resumeMission(missionId: string): boolean {
+    if (!this.pausedMissions.has(missionId)) return false;
+    this.pausedMissions.delete(missionId);
+    this.emit("mission_resumed", { missionId });
+    return true;
+  }
+
+  /** Indique si une mission est actuellement en pause. */
+  isPaused(missionId: string): boolean {
+    return this.pausedMissions.has(missionId);
+  }
+
+  /**
+   * Supprime définitivement une mission.
+   * - Si elle est active, elle est d'abord annulée.
+   * - Elle est retirée de l'historique en mémoire et du store persistant.
+   * Retourne false si aucune mission (active ou complétée) ne correspond.
+   */
+  deleteMission(missionId: string): boolean {
+    const wasActive = this.activeMissions.has(missionId);
+    if (wasActive) {
+      // Annule proprement (finalise + émet mission_cancelled).
+      this.cancelMission(missionId);
+    }
+
+    const beforeLen = this.completedMissions.length;
+    this.completedMissions = this.completedMissions.filter((m) => m.id !== missionId);
+    const removedFromHistory = this.completedMissions.length < beforeLen;
+
+    this.pausedMissions.delete(missionId);
+
+    // Nettoyage du store persistant (no-op si aucun store branché).
+    if (this.store) {
+      void this.store.delete(missionId);
+    }
+
+    const existed = wasActive || removedFromHistory;
+    if (existed) {
+      this.emit("mission_deleted", { missionId });
+    }
+    return existed;
+  }
+
+  /**
+   * Point de contrôle de pause : suspend l'exécution tant que la mission est en
+   * pause. Se débloque à la reprise, à l'annulation, ou si la mission n'est plus
+   * active. Ne fait rien si la mission n'est pas en pause.
+   */
+  private async waitIfPaused(missionId: string): Promise<void> {
+    while (
+      this.pausedMissions.has(missionId) &&
+      this.activeMissions.has(missionId)
+    ) {
+      await new Promise((r) => setTimeout(r, Executor.PAUSE_POLL_MS));
+    }
   }
 
   // ─── Boucle d'exécution ───────────────────────────────────────────────────
@@ -429,6 +512,10 @@ export class Executor {
     for (const action of actions) {
       if (mission.isCompleted()) break;
       if (action.status !== "pending") continue;
+
+      // Point de contrôle : suspend si la mission est en pause.
+      await this.waitIfPaused(mission.id);
+      if (mission.isCompleted() || !this.activeMissions.has(mission.id)) break;
 
       const result = await this.executeAction(mission, goalId, action, availableSkills);
 
@@ -529,6 +616,10 @@ export class Executor {
       mission.getGoal(id)?.status === "completed";
 
     while (remaining.size > 0 && !mission.isCompleted() && !criticalFailure) {
+      // Point de contrôle : suspend au début de chaque vague si en pause.
+      await this.waitIfPaused(mission.id);
+      if (mission.isCompleted() || !this.activeMissions.has(mission.id)) break;
+
       // Sélectionner les objectifs exécutables : dépendances toutes complétées.
       const runnable: string[] = [];
       for (const id of remaining) {

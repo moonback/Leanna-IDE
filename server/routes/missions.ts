@@ -131,6 +131,67 @@ export function createMissionsRouter(
     return res.json({ ok: true, actionId, approved });
   });
 
+  // ── Mettre une mission en pause ──────────────────────────────────────────
+  router.post("/missions/:id/pause", (req: Request, res: Response) => {
+    const executor = requireExecutor(res);
+    if (!executor) return;
+
+    const missionId = req.params.id;
+    const ok = executor.pauseMission?.(missionId) ?? false;
+    if (!ok) {
+      return res.status(404).json({
+        error: "Mission introuvable, déjà en pause, ou non active.",
+        missionId,
+      });
+    }
+    return res.json({ ok: true, missionId, status: "paused" });
+  });
+
+  // ── Reprendre une mission en pause ───────────────────────────────────────
+  router.post("/missions/:id/resume", (req: Request, res: Response) => {
+    const executor = requireExecutor(res);
+    if (!executor) return;
+
+    const missionId = req.params.id;
+    const ok = executor.resumeMission?.(missionId) ?? false;
+    if (!ok) {
+      return res.status(404).json({
+        error: "Mission introuvable ou non en pause.",
+        missionId,
+      });
+    }
+    return res.json({ ok: true, missionId, status: "in_progress" });
+  });
+
+  // ── Annuler une mission active ───────────────────────────────────────────
+  router.post("/missions/:id/cancel", (req: Request, res: Response) => {
+    const executor = requireExecutor(res);
+    if (!executor) return;
+
+    const missionId = req.params.id;
+    const ok = executor.cancelMission?.(missionId) ?? false;
+    if (!ok) {
+      return res.status(404).json({
+        error: "Mission introuvable ou déjà terminée.",
+        missionId,
+      });
+    }
+    return res.json({ ok: true, missionId, status: "cancelled" });
+  });
+
+  // ── Supprimer une mission (active → annulée puis retirée, ou historique) ──
+  router.delete("/missions/:id", (req: Request, res: Response) => {
+    const executor = requireExecutor(res);
+    if (!executor) return;
+
+    const missionId = req.params.id;
+    const ok = executor.deleteMission?.(missionId) ?? false;
+    if (!ok) {
+      return res.status(404).json({ error: "Mission introuvable.", missionId });
+    }
+    return res.json({ ok: true, missionId, deleted: true });
+  });
+
   // ── Lister les approbations en attente ───────────────────────────────────
   router.get("/missions/pending-approvals", (_req: Request, res: Response) => {
     const executor = requireExecutor(res);
