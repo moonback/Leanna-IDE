@@ -202,10 +202,30 @@ server/runtime/
 ├── compat/SkillManagerV2.ts # Adaptateur de compatibilité (migration progressive)
 └── routes/
     ├── agents.ts            # GET/POST /api/v2/agents/*
-    └── metrics.ts           # GET /api/v2/metrics
+    └── metrics.ts           # GET /api/v2/metrics (+ /autonomy)
 ```
 
 Les 25+ skills natifs (`server/skills/`) sont enregistrés une seule fois au démarrage via `bootstrapRuntimeSync`. Les custom skills sont chargés depuis Supabase (`sm.loadCustomSkills()`).
+
+### Runtime autonome événementiel
+
+`LeannaCore` est une couche d’orchestration légère placée au-dessus du `AgentRuntime` existant. Elle ne remplace ni l’`EventBus`, ni les queues d’agents, ni les missions, ni les workflows. Son `TaskManager` est limité aux unités de travail **créées par l’autonomie** ; la queue d’agents reste la responsabilité de `AgentRuntime`.
+
+```text
+Runtime EventBus → PerceptionEngine → TaskManager → handler sûr → Memory
+                       ↑                    ↓
+                 règles locales       priorité / déduplication /
+                                      timeout / retry / circuit breaker
+                 HeartbeatService ← santé et inactivité
+```
+
+Le `HeartbeatService` possède un seul timer adaptatif et émet les états `active`, `idle` et `sleep`. Un événement appelle `wake()` sans attendre le prochain tick. Le `PerceptionEngine` détermine l’importance et les actions possibles sans LLM. Le cœur ignore les événements `autonomy:*` quand il observe le bus, afin de ne pas s’auto-déclencher.
+
+Une tâche terminalement échouée devient `dead_letter`, est visible avec l’état du runtime dans `GET /api/v2/metrics/autonomy` et dégrade la santé du core. La queue limite la concurrence et sa capacité ; elle applique le vieillissement des priorités afin qu’une tâche basse priorité ne soit pas indéfiniment repoussée. Les données sont en mémoire de processus : la persistance et les locks distribués doivent rester une évolution séparée, choisie avec Redis/Supabase sans dupliquer les primitives de mission.
+
+Le handler d’intégration actuel stocke une observation à TTL en mémoire de session. Il ne déclenche ni outil ni mission directement. Si un dispatcher de missions est ajouté, il doit passer par `ToolRegistry`, `PermissionPolicy`, `DryRunController` et l’`AutonomyPolicy` existante.
+
+La procédure d’exploitation, les variables de configuration et les limites sont documentées dans [AUTONOMY.md](AUTONOMY.md).
 
 ### Prompt, policy et exécution
 

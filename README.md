@@ -302,6 +302,23 @@ Toutes les variables sont lues depuis `.env` (ou `.env.local` s'il existe, avec 
 
 ---
 
+## Runtime autonome 24/7
+
+Leanna inclut une fondation d’autonomie **événementielle**, pas une boucle `while(true)` qui interroge un modèle. `LeannaCore` reçoit les événements du `EventBus` existant, les classe localement, crée au besoin une tâche `maintenance`/`reactive` dédupliquée et laisse le heartbeat passer en `watching`, `idle` puis `sleeping` lorsque rien ne requiert d’attention.
+
+- Aucun appel LLM n’est effectué par le heartbeat ni par la perception.
+- Les tâches sont bornées par la concurrence, une queue maximale, le timeout, les retries exponentiels, le circuit breaker et une dead-letter queue visible.
+- Les permissions par skill, le dry-run, le sandbox, les approbations et `.leannaignore` restent obligatoires : cette couche n’accorde ni ne contourne de permission.
+- Consultez [AUTONOMY.md](AUTONOMY.md) pour le cycle complet, le tuning 24/7, la procédure d’arrêt/reprise et les limites connues.
+
+**Démarrage prudent :** conservez `Leanna_PERMISSION_MODE="enforce"`, activez `Leanna_DRY_RUN="true"` pour une première validation et commencez avec `LEANNA_AUTONOMY_MAX_CONCURRENCY="1"`.
+
+**Monitoring :** après démarrage, consultez `GET /api/v2/metrics/autonomy` avec le header `x-leanna-token`. Il expose l’état, la santé, les échecs récents et les 100 dernières tâches autonomes. `GET /api/health` reste accessible sans authentification.
+
+Les variables `LEANNA_HEARTBEAT_*` et `LEANNA_AUTONOMY_*` de `.env.example` règlent les intervalles, la backpressure, la déduplication, les retries, timeouts et le circuit breaker.
+
+---
+
 ## Lancement
 
 ### Mode développement
@@ -426,7 +443,7 @@ leanna/
 │   │   ├── AgentCommunication.ts        # Matrice de délégation
 │   │   ├── AgentPersistence.ts          # Persistance tâches agents
 │   │   └── roles.ts                     # Définitions des 15 rôles
-│   ├── autonomy/           # SmartSkills + Supervisor (boucle autonome)
+│   ├── autonomy/           # Supervisor, SmartSkills + LeannaCore événementiel
 │   ├── config/             # Rate limiters, configuration serveur
 │   ├── export/             # Export PDF/DOCX/HTML
 │   ├── knowledge/          # Knowledge Graph (indexation workspace, RAG)
@@ -452,7 +469,7 @@ leanna/
 │   │   ├── agents/         # 8 agents V2 spécialisés (formatter, planner, proofreader, researcher, summarizer, translator, writer)
 │   │   ├── compat/         # LegacyBridge + SkillAdapter
 │   │   ├── prompts/        # PromptRegistry (base, chat, browser, autonomy…)
-│   │   ├── routes/         # /api/v2/agents + /api/v2/metrics
+│   │   ├── routes/         # /api/v2/agents + /api/v2/metrics (+ /autonomy)
 │   │   ├── workflows/      # Workflows JSON prédéfinis (feature, refactor-safe, security-audit)
 │   │   ├── ToolRegistry.ts · StateMachine.ts · WorkflowEngine.ts
 │   │   ├── PermissionPolicy.ts · DryRun.ts   # Permissions par skill + dry-run global
@@ -681,6 +698,8 @@ Le frontend doit stocker ce token dans `localStorage['Leanna_api_token']` (le lo
 
 - [README.md](README.md) — Vue d'ensemble et installation (ce fichier)
 - [API_DOCS.md](API_DOCS.md) — Référence complète de l'API REST et WebSockets
+- [AUTONOMY.md](AUTONOMY.md) — Fonctionnement, exploitation 24/7, supervision, arrêt et récupération du runtime autonome
+- [AUTONOMY_AUDIT.md](AUTONOMY_AUDIT.md) — Audit des composants réutilisés et des limites de l’architecture
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Architecture technique détaillée
 - [CONTRIBUTING.md](CONTRIBUTING.md) — Guide de contribution et conventions
 - [DB_SCHEMA.md](DB_SCHEMA.md) — Schéma de base de données Supabase

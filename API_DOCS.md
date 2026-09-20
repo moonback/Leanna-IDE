@@ -32,6 +32,7 @@ Les WebSockets `/live` et `/sandbox-watch` valident le token via le **cookie** `
 ## Domaines fonctionnels
 
 - [Santé](#santé)
+- [Runtime autonome](#runtime-autonome)
 - [IDE — Système de fichiers](#ide--système-de-fichiers)
 - [Sandbox](#sandbox)
 - [Agents](#agents)
@@ -80,6 +81,49 @@ Vérifie que le serveur est opérationnel. Seule route ne nécessitant **pas** d
 ```json
 { "status": "ok" }
 ```
+
+---
+
+## Runtime autonome
+
+La couche `LeannaCore` utilise le `Runtime EventBus` existant pour créer des tâches de maintenance/réaction observables et bornées. Elle n’exécute aucun LLM depuis le heartbeat ou la perception et ne contourne pas `PermissionPolicy`, `DryRunController`, sandbox, approbations ou `AutonomyPolicy`.
+
+### `GET /api/v2/metrics/autonomy`
+
+Retourne l’état courant du runtime autonome et les tâches récentes. La liste est limitée aux 100 tâches les plus récentes ; elle n’est pas une persistance durable.
+
+**Authentification :** Oui (`x-leanna-token`)
+
+**Réponse 200 :**
+```json
+{
+  "state": {
+    "status": "watching",
+    "activeTasks": 0,
+    "pendingEvents": 0,
+    "lastWakeAt": 1760000000000,
+    "health": "healthy",
+    "recentFailures": []
+  },
+  "tasks": [
+    {
+      "id": "uuid",
+      "type": "maintenance",
+      "priority": "high",
+      "status": "completed",
+      "attempts": 1,
+      "maxRetries": 3,
+      "timeoutMs": 60000
+    }
+  ]
+}
+```
+
+Les statuts de tâche sont `pending`, `running`, `completed`, `dead_letter` et `cancelled`. Une tâche peut être refusée avant création en cas de backpressure, déduplication ou circuit breaker ouvert ; ce refus ne produit pas d’entrée dans `tasks`.
+
+**Erreurs :** `503` si le runtime autonome n’est pas injecté dans le routeur de métriques.
+
+Voir [AUTONOMY.md](AUTONOMY.md) pour la configuration, l’arrêt propre et la récupération.
 
 ---
 
