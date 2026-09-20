@@ -7,8 +7,9 @@
 
 import { Router, Request, Response } from "express";
 import type { AgentRuntime } from "../AgentRuntime.js";
+import type { LeannaCore } from "../../autonomy/LeannaCore.js";
 
-export function createMetricsRouter(runtime: AgentRuntime): Router {
+export function createMetricsRouter(runtime: AgentRuntime, autonomy?: LeannaCore): Router {
   const router = Router();
 
   // GET /api/v2/metrics
@@ -45,6 +46,12 @@ export function createMetricsRouter(runtime: AgentRuntime): Router {
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
+  });
+
+  // GET /api/v2/metrics/autonomy — current autonomous runtime state and bounded task timeline.
+  router.get("/autonomy", (_req: Request, res: Response) => {
+    if (!autonomy) return res.status(503).json({ error: "Autonomy runtime unavailable" });
+    return res.json({ state: autonomy.getState(), tasks: autonomy.getTasks().slice(0, 100) });
   });
 
   // GET /api/v2/metrics/tools

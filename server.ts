@@ -283,6 +283,7 @@ import { telegramSkill } from "./server/skills/telegram.js";
 import { telegramService } from "./server/telegram/TelegramService.js";
 import { createTelegramRouter } from "./server/routes/telegram.js";
 import { createSmartSkills } from "./server/autonomy/SmartSkills.js";
+import { LeannaCore } from "./server/autonomy/LeannaCore.js";
 
 const { runtime, skillManager } = bootstrapRuntimeSync({
   skills: [
@@ -378,6 +379,16 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
 const runtimeV2 = runtime;
 const observability = new Observability();
 observability.attach(runtime.events);
+const leannaCore = new LeannaCore(runtimeV2, {
+  onTask: async (task) => {
+    // Autonomous tasks remain observable and use existing runtime memory; no tool
+    // or mission action bypasses PermissionPolicy, DryRun or AutonomyPolicy.
+    await runtimeV2.memory.set("session", `autonomy:task:${task.id}`, {
+      type: task.type, sourceEventId: task.sourceEventId, metadata: task.metadata,
+    }, { ttl: 24 * 60 * 60 * 1000, tags: ["autonomy", task.type] });
+  },
+});
+leannaCore.start();
 
 // Connecter l'AgentOrchestrator au nouveau skillManager (compatible avec l'ancien)
 // L'ancien SkillManager faisait cela dans son constructeur, maintenant on le fait explicitement
@@ -562,7 +573,7 @@ async function startServer() {
   const { createAgentsRouterV2 } = await import("./server/runtime/routes/agents.js");
   const { createMetricsRouter } = await import("./server/runtime/routes/metrics.js");
   app.use("/api/v2/agents", createAgentsRouterV2(runtimeV2));
-  app.use("/api/v2/metrics", createMetricsRouter(runtimeV2));
+  app.use("/api/v2/metrics", createMetricsRouter(runtimeV2, leannaCore));
 
   // ─── Observability & Telemetry (OpenTelemetry + Cost Dashboard) ──────────
   const observabilityRouter = (await import("./server/routes/observability.js")).default;
@@ -877,6 +888,7 @@ async function startServer() {
     server,
     wss,
     runtimeV2,
+    autonomyCore: leannaCore,
     observability,
     activeGeminiSessions,
     projectMemory,

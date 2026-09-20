@@ -2,6 +2,7 @@ import type { Server as HttpServer } from "http";
 import type { WebSocketServer } from "ws";
 import type { AgentRuntime } from "./runtime/AgentRuntime.js";
 import type { Observability } from "./runtime/Observability.js";
+import type { LeannaCore } from "./autonomy/LeannaCore.js";
 import type { ProjectMemory } from "./knowledge/ProjectMemory.js";
 import type { KnowledgeGraph } from "./knowledge/KnowledgeGraph.js";
 import type { McpBridge } from "./mcp/McpBridge.js";
@@ -13,6 +14,7 @@ export interface GracefulShutdownDeps {
   server: HttpServer;
   wss: WebSocketServer;
   runtimeV2: AgentRuntime;
+  autonomyCore?: LeannaCore;
   observability: Observability;
   activeGeminiSessions: Set<{ close(): void }>;
   projectMemory: ProjectMemory;
@@ -64,15 +66,18 @@ export function setupGracefulShutdown(deps: GracefulShutdownDeps): GracefulShutd
     try { (deps.notebookManager as any).flushAll?.(); console.log('[Lifecycle] NotebookManager flushé.'); } catch {}
     try { deps.embeddingStore.flushAll(); console.log('[Lifecycle] EmbeddingStore flushé.'); } catch {}
 
-    // 3d. Arrêter le runtime V2
+    // 3d. Stop accepting autonomous work before stopping the shared runtime.
+    try { await deps.autonomyCore?.stop(); console.log('[Lifecycle] Autonomy core arrêté.'); } catch {}
+
+    // 3e. Arrêter le runtime V2
     try { await deps.runtimeV2.stop(); deps.observability.detach(); console.log('[Lifecycle] RuntimeV2 arrêté.'); } catch {}
 
-    // 3e. Arrêter le bot Telegram si actif
+    // 3f. Arrêter le bot Telegram si actif
     if (deps.stopTelegramBot) {
       try { await deps.stopTelegramBot(); console.log('[Lifecycle] Bot Telegram arrêté.'); } catch {}
     }
 
-    // 3f. Flush telemetry (token usage records) to Supabase
+    // 3g. Flush telemetry (token usage records) to Supabase
     try { await telemetryService.shutdown(); console.log('[Lifecycle] TelemetryService flushé.'); } catch {}
 
     // 4. Fermer le serveur HTTP
