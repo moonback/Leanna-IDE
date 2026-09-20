@@ -19,7 +19,7 @@ import { knowledgeGraph, projectIndexer, projectMemory } from "./server/knowledg
 
 import { loadGeminiKeys, createGeminiClient } from "./server/utils/geminiKeyPool.js";
 import { encrypt } from "./server/utils/crypto.js";
-import { setTextGenerationProfile } from "./server/utils/textGeneration.js";
+import { setTextGenerationProfile, generateText } from "./server/utils/textGeneration.js";
 
 // Routeurs modulaires
 import healthRouter from "./server/routes/health.js";
@@ -47,6 +47,7 @@ import { createOpenRouterRouter } from "./server/routes/openrouter.js";
 import { createTokensOptimizationRouter } from "./server/routes/tokens-optimization.js";
 import { createSummarizeContextRouter } from "./server/routes/summarize-context.js";
 import { createWorkspaceRouter } from "./server/routes/workspace.js";
+import { createMissionsRouter } from "./server/routes/missions.js";
 import { createSelfRootRouter } from "./server/routes/self-root.js";
 import { createFtpRouter } from "./server/routes/ftp.js";
 import safeguardsRouter from "./server/routes/safeguards.js";
@@ -302,18 +303,69 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
     // Initialiser le Mission System (doit être fait après que les outils soient enregistrés)
     try {
       const missionModule = await import("./server/mission/index.js");
-      const { Executor } = missionModule;
+      const { Executor, MissionStore, AutonomyPolicy } = missionModule;
       const { initMissionSystem, setDryRunReportProvider } = await import("./server/skills/mission.js");
       const executor = new Executor();
       executor.setSkillHandler((name: string, args: any, opts?: { dryRun?: boolean }) =>
         sm.handleToolCall(name, args, undefined, opts));
-      const skillNames = sm.getToolDeclarations().map((d: any) => d.name);
+
+      // Brancher le LLM sur les missions : décomposition, réflexion,
+      // génération d'arguments et validation des critères de succès.
+      const llmText = async (prompt: string): Promise<string> => {
+        const { text } = await generateText({ prompt, temperature: 0.3 });
+        return text;
+      };
+      executor.setLLMDecompose(llmText);
+      executor.setLLMReflect(llmText);
+      executor.setLLMArgGen(llmText);
+      executor.setLLMVerify(llmText);
+
+      // Fournir les schémas d'outils (name/description/parameters) pour permettre
+      // la génération d'arguments valides au moment de l'exécution.
+      const declarations = sm.getToolDeclarations();
+      executor.setToolSchemas(
+        declarations.map((d: any) => ({
+          name: d.name,
+          description: d.description,
+          parameters: d.parameters,
+        }))
+      );
+
+      const skillNames = declarations.map((d: any) => d.name);
+
+      // Persistance des missions (Supabase). No-op si non configuré.
+      const missionStore = new MissionStore();
+      executor.setStore(missionStore);
+
+      // Curseur d'autonomie (suggest/ask/auto) + .leannaignore.
+      const rawMode = (process.env.LEANNA_AUTONOMY_MODE || "ask").toLowerCase();
+      const autonomyMode = (["suggest", "ask", "auto"].includes(rawMode) ? rawMode : "ask") as
+        | "suggest"
+        | "ask"
+        | "auto";
+      const autonomyPolicy = new AutonomyPolicy({ mode: autonomyMode, workspaceRoot: SELF_ROOT });
+      // Fournir les permissions par outil (pour classer lecture vs effet de bord).
+      autonomyPolicy.setToolPermissions(
+        r.tools.getDefinitions().map((def: any) => ({
+          name: def.declaration?.name ?? def.name,
+          permissions: def.permissions,
+        }))
+      );
+      executor.setAutonomyPolicy(autonomyPolicy);
+      console.log(`[Bootstrap] ✓ Curseur d'autonomie: mode "${autonomyMode}".`);
+
       initMissionSystem(executor, skillNames);
       // Exposer le rapport dry-run (effets simulés) au skill mission.
       setDryRunReportProvider(() => r.tools.getDryRun().getReport());
       // Stocker le missionExecutor dans le skillManager
       (sm as any)._missionExecutor = executor;
       console.log(`[Bootstrap] ✓ Mission System initialisé.`);
+
+      // Reprendre les missions interrompues (crash/redémarrage) en arrière-plan.
+      executor
+        .resumePending(skillNames)
+        .then((n) => { if (n > 0) console.log(`[Bootstrap] ♻️ ${n} mission(s) reprise(s).`); })
+        .catch((e) => console.warn(`[Bootstrap] ⚠️ Reprise des missions échouée:`, e));
     } catch (error) {
       console.warn(`[Bootstrap] ⚠️ Erreur initialisation Mission System:`, error);
     }
@@ -522,6 +574,10 @@ async function startServer() {
   app.use("/api/tokens", createTokensOptimizationRouter(() => currentProfile, getWorkspaceRoot));
   app.use("/api/tokens", createSummarizeContextRouter());
   app.use("/api", createWorkspaceRouter(getWorkspaceRoot));
+  app.use("/api", createMissionsRouter(
+    () => skillManager.missionExecutor,
+    (name: string, args: any) => skillManager.handleToolCall(name, args),
+  ));
   app.use("/api/self-root", createSelfRootRouter(() => wss));
   app.use("/api/ftp", createFtpRouter());
   app.use("/api/safeguards", safeguardsRouter);

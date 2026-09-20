@@ -2,9 +2,12 @@ import { Mission } from "./Mission.js";
 import { Planner } from "./Planner.js";
 import { ReflectionEngine, type ReflectionInput } from "./Reflection.js";
 import { SkillScorer } from "./SkillScorer.js";
+import { MissionStore } from "./MissionStore.js";
+import { AutonomyPolicy } from "./AutonomyPolicy.js";
 import type {  PlannedAction,  ReflectionResult,
   MissionConfig,
   MissionPlan,
+  Goal,
 } from "./types.js";
 import { DEFAULT_MISSION_CONFIG } from "./types.js";
 import { telemetryService } from "../observability/TelemetryService.js";
@@ -36,6 +39,30 @@ export class Executor {
   private skillHandler: SkillHandlerFn | null = null;
   private config: MissionConfig;
   private eventEmitter: ExecutorEventEmitter | null = null;
+
+  /** Fonction LLM pour générer les arguments d'un skill au moment de l'exécution. */
+  private llmArgGen: LLMTextFn | null = null;
+
+  /** Fonction LLM pour valider les critères de succès d'un objectif. */
+  private llmVerify: LLMTextFn | null = null;
+
+  /** Schémas des outils (name → { description, parameters }) pour la génération d'arguments. */
+  private toolSchemas: Map<string, ToolSchema> = new Map();
+
+  /** Store de persistance (optionnel). */
+  private store: MissionStore | null = null;
+
+  /** Curseur d'autonomie (optionnel). */
+  private autonomy: AutonomyPolicy | null = null;
+
+  /** Approbations en attente : actionId → resolver de décision. */
+  private pendingApprovals: Map<string, {
+    resolve: (approved: boolean) => void;
+    timer: NodeJS.Timeout;
+  }> = new Map();
+
+  /** Délai d'attente d'une approbation avant refus par défaut (ms). */
+  private approvalTimeoutMs = 5 * 60 * 1000;
 
   /** Missions actives */
   private activeMissions: Map<string, Mission> = new Map();
@@ -72,6 +99,75 @@ export class Executor {
    */
   setLLMReflect(fn: (prompt: string) => Promise<string>): void {
     this.reflection.setReflectFunction(fn);
+  }
+
+  /**
+   * Injecte la fonction LLM utilisée pour générer les arguments d'un skill
+   * au moment de l'exécution (quand le Planner n'a pas rempli action.args).
+   */
+  setLLMArgGen(fn: LLMTextFn): void {
+    this.llmArgGen = fn;
+  }
+
+  /**
+   * Injecte la fonction LLM utilisée pour valider les critères de succès
+   * d'un objectif à partir des actions exécutées et de leurs résultats.
+   */
+  setLLMVerify(fn: LLMTextFn): void {
+    this.llmVerify = fn;
+  }
+
+  /**
+   * Enregistre les schémas des outils disponibles (name/description/parameters).
+   * Utilisé pour générer des arguments valides via le LLM.
+   */
+  setToolSchemas(schemas: ToolSchema[]): void {
+    this.toolSchemas.clear();
+    for (const schema of schemas) {
+      if (schema && schema.name) this.toolSchemas.set(schema.name, schema);
+    }
+  }
+
+  /**
+   * Injecte le store de persistance des missions (Supabase).
+   */
+  setStore(store: MissionStore): void {
+    this.store = store;
+  }
+
+  /**
+   * Injecte le curseur d'autonomie (suggest/ask/auto + .leannaignore).
+   */
+  setAutonomyPolicy(policy: AutonomyPolicy): void {
+    this.autonomy = policy;
+  }
+
+  /** Configure le délai d'attente d'une approbation (ms). */
+  setApprovalTimeout(ms: number): void {
+    if (Number.isFinite(ms) && ms > 0) this.approvalTimeoutMs = ms;
+  }
+
+  /**
+   * Résout une demande d'approbation en attente (appelé depuis le frontend).
+   * Retourne true si une demande correspondante existait.
+   */
+  resolveApproval(actionId: string, approved: boolean): boolean {
+    const pending = this.pendingApprovals.get(actionId);
+    if (!pending) return false;
+    clearTimeout(pending.timer);
+    this.pendingApprovals.delete(actionId);
+    pending.resolve(approved);
+    return true;
+  }
+
+  /** Liste les IDs d'actions en attente d'approbation. */
+  listPendingApprovals(): string[] {
+    return Array.from(this.pendingApprovals.keys());
+  }
+
+  /** Accès au curseur d'autonomie (pour lire/modifier le mode à chaud). */
+  getAutonomyPolicy(): AutonomyPolicy | null {
+    return this.autonomy;
   }
 
   /**
@@ -146,6 +242,7 @@ export class Executor {
     const plan = await this.preparePlan(mission, params.availableSkills);
 
     this.activeMissions.set(mission.id, mission);
+    await this.persist(mission);
     this.emit("mission_plan", {
       missionId: mission.id,
       title: params.title,
@@ -257,40 +354,19 @@ export class Executor {
     console.log(`[Executor] 🚀 Mission démarrée: "${mission.getState().title}"`);
     console.log(`[Executor] ═══════════════════════════════════════════`);
 
-    // Le plan a été préparé avant l'événement mission_started.
-    const subGoals = Object.values(mission.getState().goals).filter(
-      (goal) => goal.parentId === rootGoal.id
-    );
+    // Les sous-objectifs ont déjà été créés lors de preparePlan.
+    // On les récupère depuis l'état (sans les recréer).
+    const subGoalIds = Object.values(mission.getState().goals)
+      .filter((goal) => goal.parentId === rootGoal.id)
+      .map((goal) => goal.id);
 
-    if (subGoals.length === 0) {
+    if (subGoalIds.length === 0) {
       // Pas de décomposition → exécuter directement
       await this.executeGoalDirectly(mission, rootGoal.id, availableSkills);
     } else {
-      // Créer les sous-objectifs dans la mission
-      const goalIds = this.createSubGoals(mission, rootGoal.id, subGoals);
-
-      // Exécuter chaque sous-objectif séquentiellement
-      for (const goalId of goalIds) {
-        if (mission.isCompleted()) break;
-
-        const goal = mission.getGoal(goalId);
-        if (!goal || goal.status === "cancelled") continue;
-
-        mission.pushGoal(goalId);
-        this.emit("goal_started", { missionId: mission.id, goalId, title: goal.title });
-
-        await this.executeGoalDirectly(mission, goalId, availableSkills);
-
-        // Vérifier si on doit s'arrêter
-        if (goal.status === "failed" && goal.priority === "critical") {
-          console.log(`[Executor] ❌ Objectif critique échoué. Arrêt de la mission.`);
-          mission.completeActiveGoal({
-            success: false,
-            summary: `Objectif critique échoué: "${goal.title}"`,
-          });
-          break;
-        }
-      }
+      // Ordonnancement par vagues : exécuter en parallèle les objectifs dont
+      // toutes les dépendances (dependsOn) sont déjà complétées.
+      await this.executeGoalsScheduled(mission, subGoalIds, availableSkills);
     }
 
     // Compléter la mission si pas déjà fait
@@ -341,11 +417,11 @@ export class Executor {
     let actions = goal.plannedActions.length > 0
       ? goal.plannedActions
       : await this.planner.planActions(mission, goalId, availableSkills);
-    mission.setPlan(actions);
+    mission.setPlanForGoal(goalId, actions);
 
     if (actions.length === 0) {
       console.log(`[Executor]    Aucune action planifiée. Objectif marqué complété.`);
-      mission.completeActiveGoal({ success: true, summary: "Aucune action nécessaire." });
+      mission.completeGoal(goalId, { success: true, summary: "Aucune action nécessaire." });
       return;
     }
 
@@ -358,7 +434,7 @@ export class Executor {
 
       // Décider de la suite selon la réflexion
       if (result.decision === "abort") {
-        mission.completeActiveGoal({
+        mission.completeGoal(goalId, {
           success: false,
           summary: `Abandonné: ${result.reasoning}`,
         });
@@ -386,21 +462,132 @@ export class Executor {
           result.failure ?? "Erreur inconnue",
           availableSkills
         );
-        mission.setPlan(actions);
+        mission.setPlanForGoal(goalId, actions);
         // La boucle for reprendra avec les nouvelles actions
       }
     }
 
-    // Vérifier si l'objectif est complété
+    // Ne valider l'objectif qu'une fois toutes les actions traitées.
     const allDone = goal.plannedActions.every(
-      (a) => a.status === "completed" || a.status === "cancelled"
+      (a) => a.status === "completed" || a.status === "cancelled" || a.status === "failed"
     );
-    const anySuccess = goal.plannedActions.some((a) => a.status === "completed");
+    if (!allDone) return;
 
-    if (allDone || anySuccess) {
-      mission.completeActiveGoal({
-        success: anySuccess,
-        summary: `Objectif "${goal.title}" ${anySuccess ? "complété" : "partiellement échoué"}.`,
+    // Valider l'objectif au regard de ses critères de succès (et non plus
+    // dès qu'une seule action a réussi).
+    const verdict = await this.verifyGoalCriteria(mission, goal);
+
+    this.emit("goal_verified", {
+      missionId: mission.id,
+      goalId,
+      passed: verdict.passed,
+      reasoning: verdict.reasoning,
+    });
+
+    console.log(
+      `[Executor]    ${verdict.passed ? "✓" : "✗"} Critères de "${goal.title}": ${verdict.reasoning}`
+    );
+
+    mission.completeGoal(goalId, {
+      success: verdict.passed,
+      summary: `Objectif "${goal.title}" ${verdict.passed ? "atteint" : "non atteint"} — ${verdict.reasoning}`,
+    });
+  }
+
+  /**
+   * Ordonnance les sous-objectifs par vagues selon leurs dépendances.
+   * Chaque vague exécute EN PARALLÈLE tous les objectifs dont les dépendances
+   * (dependsOn) sont déjà complétées. S'arrête si un objectif critique échoue.
+   */
+  private async executeGoalsScheduled(
+    mission: Mission,
+    goalIds: string[],
+    availableSkills: string[]
+  ): Promise<void> {
+    const maxConcurrency = Math.max(1, this.config.maxConcurrentGoals ?? 3);
+    // Ne garder que les objectifs non terminaux (utile pour les missions reprises).
+    const remaining = new Set(
+      goalIds.filter((id) => {
+        const g = mission.getGoal(id);
+        return g && g.status !== "completed" && g.status !== "cancelled";
+      })
+    );
+    let criticalFailure = false;
+
+    const isDone = (id: string): boolean => {
+      const g = mission.getGoal(id);
+      return !!g && (g.status === "completed" || g.status === "failed" || g.status === "cancelled");
+    };
+    const isCompleted = (id: string): boolean =>
+      mission.getGoal(id)?.status === "completed";
+
+    while (remaining.size > 0 && !mission.isCompleted() && !criticalFailure) {
+      // Sélectionner les objectifs exécutables : dépendances toutes complétées.
+      const runnable: string[] = [];
+      for (const id of remaining) {
+        const goal = mission.getGoal(id);
+        if (!goal) { remaining.delete(id); continue; }
+        if (goal.status === "cancelled") { remaining.delete(id); continue; }
+
+        const deps = (goal.dependsOn ?? []).filter((d) => goalIds.includes(d));
+        const depsSatisfied = deps.every((d) => isCompleted(d));
+        // Si une dépendance a échoué, l'objectif ne pourra jamais démarrer.
+        const depFailed = deps.some((d) => {
+          const dg = mission.getGoal(d);
+          return dg && (dg.status === "failed" || dg.status === "cancelled");
+        });
+
+        if (depFailed) {
+          mission.blockGoal(id, "Dépendance échouée ou annulée.");
+          remaining.delete(id);
+          this.emit("goal_blocked", { missionId: mission.id, goalId: id, reason: "Dépendance échouée." });
+          continue;
+        }
+        if (depsSatisfied) runnable.push(id);
+      }
+
+      if (runnable.length === 0) {
+        // Aucun objectif exécutable alors qu'il en reste : cycle ou blocage.
+        console.warn(`[Executor] ⚠️ Aucun objectif exécutable (dépendances circulaires ?). Objectifs restants marqués bloqués.`);
+        for (const id of remaining) {
+          mission.blockGoal(id, "Dépendances non satisfaites (cycle ou blocage).");
+        }
+        break;
+      }
+
+      // Limiter la concurrence de la vague.
+      const wave = runnable.slice(0, maxConcurrency);
+      console.log(`[Executor] ▶ Vague de ${wave.length} objectif(s) en parallèle.`);
+
+      await Promise.all(
+        wave.map(async (goalId) => {
+          const goal = mission.getGoal(goalId);
+          if (!goal) return;
+          mission.pushGoal(goalId);
+          this.emit("goal_started", { missionId: mission.id, goalId, title: goal.title });
+          await this.executeGoalDirectly(mission, goalId, availableSkills);
+          remaining.delete(goalId);
+
+          if (goal.status === "failed" && goal.priority === "critical") {
+            console.log(`[Executor] ❌ Objectif critique échoué: "${goal.title}". Arrêt de la mission.`);
+            criticalFailure = true;
+          }
+        })
+      );
+
+      // Sécurité : retirer de `remaining` tout ce qui est terminé.
+      for (const id of [...remaining]) {
+        if (isDone(id)) remaining.delete(id);
+      }
+
+      // Persister l'avancement après chaque vague (si un store est branché).
+      await this.persist(mission);
+    }
+
+    if (criticalFailure && !mission.isCompleted()) {
+      mission.completeGoal(mission.rootGoal.id, {
+        success: false,
+        summary: "Arrêt : un objectif critique a échoué.",
       });
     }
   }
@@ -449,6 +636,56 @@ export class Executor {
     let success = false;
     let result: unknown = undefined;
     let error: string | undefined = undefined;
+
+    // Générer les arguments du skill au moment de l'exécution si le Planner
+    // ne les a pas remplis (ils sont vides par défaut). On utilise le LLM avec
+    // le schéma de l'outil, le contexte de l'objectif et les résultats déjà obtenus.
+    if (this.needsArgs(action)) {
+      try {
+        action.args = await this.generateArgs(mission, goal, action);
+      } catch (err) {
+        console.warn(
+          `[Executor]    ⚠️ Génération d'arguments échouée pour ${action.skillName}: ${(err as Error).message}`
+        );
+      }
+    }
+
+    // Curseur d'autonomie : décider si l'action peut s'exécuter, doit être
+    // approuvée, ou est refusée (mode suggest/ask/auto + .leannaignore).
+    if (this.autonomy) {
+      const verdict = this.autonomy.decide(action.skillName, action.args);
+      let allowed = verdict.decision === "allow";
+
+      if (verdict.decision === "deny") {
+        console.log(`[Executor]    ⛔ ${action.skillName} refusé: ${verdict.reason}`);
+        mission.recordActionResult(action.id, { error: verdict.reason }, false);
+        this.emit("action_denied", {
+          missionId: mission.id,
+          goalId,
+          actionId: action.id,
+          skill: action.skillName,
+          reason: verdict.reason,
+        });
+        return this.createDefaultReflection(action.id, false);
+      }
+
+      if (verdict.decision === "ask") {
+        console.log(`[Executor]    ⏸️ ${action.skillName} en attente d'approbation: ${verdict.reason}`);
+        allowed = await this.requestApproval(mission, goalId, action, verdict.reason);
+        if (!allowed) {
+          const reason = "Action refusée ou non approuvée dans le délai imparti.";
+          mission.recordActionResult(action.id, { error: reason }, false);
+          this.emit("action_denied", {
+            missionId: mission.id,
+            goalId,
+            actionId: action.id,
+            skill: action.skillName,
+            reason,
+          });
+          return this.createDefaultReflection(action.id, false);
+        }
+      }
+    }
 
     try {
       const dryRun = mission.getConfig().dryRun;
@@ -511,10 +748,206 @@ export class Executor {
     return reflection;
   }
 
+  // ─── Génération d'arguments ────────────────────────────────────────────────
+
+  /** Une action a besoin d'arguments si le Planner ne les a pas remplis. */
+  private needsArgs(action: PlannedAction): boolean {
+    if (!this.llmArgGen) return false;
+    const schema = this.toolSchemas.get(action.skillName);
+    // Outil sans paramètres : rien à générer.
+    if (schema && !this.schemaHasProperties(schema)) return false;
+    return !action.args || Object.keys(action.args).length === 0;
+  }
+
+  private schemaHasProperties(schema: ToolSchema): boolean {
+    const params = schema.parameters as any;
+    if (!params || typeof params !== "object") return false;
+    const props = params.properties;
+    return !!props && typeof props === "object" && Object.keys(props).length > 0;
+  }
+
+  /**
+   * Génère les arguments d'un skill via le LLM, en s'appuyant sur:
+   *   - le schéma de paramètres de l'outil
+   *   - le but courant (titre, description, critères)
+   *   - les fichiers pertinents et les résultats des actions déjà exécutées
+   */
+  private async generateArgs(
+    mission: Mission,
+    goal: Goal,
+    action: PlannedAction
+  ): Promise<Record<string, unknown>> {
+    if (!this.llmArgGen) return action.args ?? {};
+
+    const schema = this.toolSchemas.get(action.skillName);
+    const context = mission.getContext();
+
+    const previousResults = goal.plannedActions
+      .filter((a) => a.status === "completed" && a.id !== action.id)
+      .slice(-3)
+      .map((a) => ({
+        skill: a.skillName,
+        result: this.summarizeResult(a.result),
+      }));
+
+    const prompt = `Tu génères les ARGUMENTS d'un outil pour accomplir une étape précise.
+
+OUTIL: ${action.skillName}
+DESCRIPTION: ${schema?.description ?? "(non documentée)"}
+SCHÉMA DES PARAMÈTRES (JSON Schema):
+${JSON.stringify(schema?.parameters ?? {}, null, 2)}
+
+OBJECTIF COURANT: ${goal.title}
+DÉTAIL: ${goal.description}
+CRITÈRES DE SUCCÈS:
+${goal.successCriteria.map((c) => `  - ${c}`).join("\n")}
+JUSTIFICATION DE CET OUTIL: ${action.rationale}
+
+CONTEXTE:
+- Fichiers pertinents: ${context.relevantFiles.slice(0, 10).join(", ") || "aucun"}
+- Mission: ${mission.getState().title} — ${mission.getState().description}
+- Résultats précédents: ${previousResults.length > 0 ? JSON.stringify(previousResults) : "aucun"}
+
+INSTRUCTIONS:
+- Retourne UNIQUEMENT un objet JSON correspondant au schéma des paramètres.
+- N'invente pas de champs absents du schéma.
+- Si un paramètre est optionnel et inutile, ne l'inclus pas.
+- Réponds STRICTEMENT en JSON, sans texte autour.
+
+JSON:`;
+
+    const raw = await this.withTimeout(this.llmArgGen(prompt), 20_000, "arg-gen");
+    const args = this.parseJsonObject(raw);
+    console.log(
+      `[Executor]    🧩 Arguments générés pour ${action.skillName}: ${JSON.stringify(args).slice(0, 200)}`
+    );
+    return args;
+  }
+
+  // ─── Validation par critères de succès ──────────────────────────────────────
+
+  /**
+   * Valide qu'un objectif est réellement atteint au regard de ses
+   * successCriteria, à partir des actions exécutées et de leurs résultats.
+   * Utilise le LLM si disponible, sinon une heuristique conservatrice.
+   */
+  private async verifyGoalCriteria(_mission: Mission, goal: Goal): Promise<{
+    passed: boolean;
+    reasoning: string;
+  }> {
+    const executed = goal.plannedActions.filter(
+      (a) => a.status === "completed" || a.status === "failed"
+    );
+    const anySuccess = executed.some((a) => a.status === "completed");
+    const allSuccess =
+      executed.length > 0 && executed.every((a) => a.status === "completed");
+
+    // Sans critères explicites, on retombe sur le succès des actions.
+    if (!goal.successCriteria || goal.successCriteria.length === 0) {
+      return {
+        passed: anySuccess,
+        reasoning: anySuccess
+          ? "Aucun critère explicite ; au moins une action a réussi."
+          : "Aucun critère explicite et aucune action réussie.",
+      };
+    }
+
+    // Sans LLM : validation conservatrice — toutes les actions doivent réussir.
+    if (!this.llmVerify) {
+      return {
+        passed: allSuccess,
+        reasoning: allSuccess
+          ? "Toutes les actions planifiées ont réussi (validation heuristique)."
+          : "Certaines actions ont échoué ; critères non confirmés (validation heuristique).",
+      };
+    }
+
+    const actionsSummary = executed.map((a) => ({
+      skill: a.skillName,
+      status: a.status,
+      result: this.summarizeResult(a.result),
+    }));
+
+    const prompt = `Tu es un vérificateur qualité. Détermine si l'objectif est RÉELLEMENT atteint.
+
+OBJECTIF: ${goal.title}
+DÉTAIL: ${goal.description}
+CRITÈRES DE SUCCÈS (tous doivent être satisfaits):
+${goal.successCriteria.map((c) => `  - ${c}`).join("\n")}
+
+ACTIONS EXÉCUTÉES ET RÉSULTATS:
+${JSON.stringify(actionsSummary, null, 2)}
+
+INSTRUCTIONS:
+- Juge uniquement à partir des preuves ci-dessus.
+- Ne considère PAS l'objectif atteint si les résultats ne démontrent pas chaque critère.
+- Réponds STRICTEMENT en JSON: {"passed": true|false, "reasoning": "..."}
+
+JSON:`;
+
+    try {
+      const raw = await this.withTimeout(this.llmVerify(prompt), 20_000, "verify");
+      const parsed = this.parseJsonObject(raw);
+      return {
+        passed: parsed.passed === true,
+        reasoning:
+          typeof parsed.reasoning === "string"
+            ? parsed.reasoning
+            : "Vérification LLM effectuée.",
+      };
+    } catch (err) {
+      console.warn(
+        `[Executor]    ⚠️ Vérification des critères échouée, repli heuristique: ${(err as Error).message}`
+      );
+      return {
+        passed: allSuccess,
+        reasoning: "Vérification LLM indisponible ; repli sur le succès de toutes les actions.",
+      };
+    }
+  }
+
+  private summarizeResult(result: unknown): string {
+    if (result === null || result === undefined) return "ok (vide)";
+    if (typeof result === "string") return result.slice(0, 300);
+    try {
+      return JSON.stringify(result).slice(0, 300);
+    } catch {
+      return String(result).slice(0, 300);
+    }
+  }
+
+  private parseJsonObject(raw: string): Record<string, unknown> {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("Aucun objet JSON trouvé dans la réponse LLM");
+    const parsed = JSON.parse(match[0]);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new Error("La réponse LLM n'est pas un objet JSON");
+    }
+    return parsed as Record<string, unknown>;
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    let timeoutId: NodeJS.Timeout | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(`LLM ${label} timeout (${ms}ms)`)), ms);
+    });
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  private createSubGoals(mission: Mission, parentId: string, plans: Array<{ title: string; description: string; successCriteria: string[]; priority: string }>): string[] {
+  private createSubGoals(
+    mission: Mission,
+    parentId: string,
+    plans: Array<{ title: string; description: string; successCriteria: string[]; priority: string; dependsOn?: string[] }>
+  ): string[] {
     const ids: string[] = [];
+    // 1re passe : créer tous les objectifs et mémoriser le mapping titre → id.
+    const titleToId = new Map<string, string>();
 
     for (const plan of plans) {
       const id = mission.addSubGoal({
@@ -525,7 +958,19 @@ export class Executor {
         priority: plan.priority as import("./types.js").GoalPriority,
       });
       ids.push(id);
+      titleToId.set(plan.title.trim().toLowerCase(), id);
     }
+
+    // 2e passe : résoudre les dépendances (exprimées par titre) en IDs de goals.
+    plans.forEach((plan, index) => {
+      const deps = plan.dependsOn ?? [];
+      if (deps.length === 0) return;
+      const goal = mission.getGoal(ids[index]);
+      if (!goal) return;
+      goal.dependsOn = deps
+        .map((d) => titleToId.get(String(d).trim().toLowerCase()))
+        .filter((id): id is string => !!id && id !== ids[index]);
+    });
 
     return ids;
   }
@@ -573,6 +1018,92 @@ export class Executor {
     if (this.completedMissions.length > Executor.MAX_COMPLETED) {
       this.completedMissions.shift();
     }
+    // Persistance finale (statut terminal).
+    void this.persist(mission);
+  }
+
+  /**
+   * Émet une demande d'approbation et attend sa résolution.
+   * Résout `false` (refus) si le délai expire sans réponse.
+   */
+  private requestApproval(
+    mission: Mission,
+    goalId: string,
+    action: PlannedAction,
+    reason: string
+  ): Promise<boolean> {
+    this.emit("approval_required", {
+      missionId: mission.id,
+      goalId,
+      actionId: action.id,
+      skill: action.skillName,
+      args: action.args,
+      reason,
+      timeoutMs: this.approvalTimeoutMs,
+    });
+
+    return new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => {
+        this.pendingApprovals.delete(action.id);
+        console.log(`[Executor]    ⌛ Approbation expirée pour ${action.skillName} — refus par défaut.`);
+        this.emit("approval_timeout", {
+          missionId: mission.id,
+          goalId,
+          actionId: action.id,
+          skill: action.skillName,
+        });
+        resolve(false);
+      }, this.approvalTimeoutMs);
+
+      this.pendingApprovals.set(action.id, { resolve, timer });
+    });
+  }
+
+  /** Sauvegarde l'état courant de la mission (no-op si aucun store branché). */
+  private async persist(mission: Mission): Promise<void> {
+    if (!this.store) return;
+    try {
+      await this.store.save(mission.toJSON());
+    } catch (err) {
+      console.warn(`[Executor] ⚠️ Persistance mission ${mission.id} échouée: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * Reprend les missions interrompues (statut pending/in_progress) au démarrage.
+   * Recharge leur état depuis le store et relance leur exécution en arrière-plan.
+   * Ne fait rien si aucun store n'est branché ou si le SkillHandler manque.
+   */
+  async resumePending(availableSkills: string[]): Promise<number> {
+    if (!this.store || !this.store.isEnabled()) return 0;
+    if (!this.skillHandler) {
+      console.warn(`[Executor] resumePending appelé sans SkillHandler configuré.`);
+      return 0;
+    }
+
+    const states = await this.store.listByStatus(["pending", "in_progress"]);
+    if (states.length === 0) return 0;
+
+    let resumed = 0;
+    for (const state of states) {
+      // Éviter de reprendre une mission déjà active en mémoire.
+      if (this.activeMissions.has(state.id)) continue;
+
+      const mission = Mission.fromJSON(state);
+      this.activeMissions.set(mission.id, mission);
+
+      console.log(`[Executor] ♻️ Reprise de la mission "${state.title}" (${state.id}).`);
+      this.emit("mission_resumed", { missionId: mission.id, title: state.title });
+
+      this.executeMission(mission, availableSkills).catch((err) => {
+        console.error(`[Executor] Reprise mission ${mission.id} échouée:`, err);
+        this.emit("mission_failed", { missionId: mission.id, error: String(err) });
+      });
+      resumed++;
+    }
+
+    console.log(`[Executor] ♻️ ${resumed} mission(s) reprise(s) depuis le store.`);
+    return resumed;
   }
 
   private emit(event: string, data: Record<string, unknown>): void {
@@ -599,3 +1130,13 @@ export type SkillHandlerFn = (
 
 /** Émetteur d'événements pour le frontend */
 export type ExecutorEventEmitter = (event: string, data: Record<string, unknown>) => void;
+
+/** Fonction LLM générique: prompt → texte. */
+export type LLMTextFn = (prompt: string) => Promise<string>;
+
+/** Schéma d'un outil, utilisé pour générer les arguments. */
+export interface ToolSchema {
+  name: string;
+  description?: string;
+  parameters?: unknown;
+}

@@ -319,7 +319,7 @@ export const missionSkill: Skill = {
         );
 
         // Récupère l'état de la mission si un ID est fourni
-        let missionState: import("../mission/types").MissionState | undefined;
+        let missionState: import("../mission/types.js").MissionState | undefined;
         if (missionId) {
           const mission =
             executor.getMission(missionId) ??

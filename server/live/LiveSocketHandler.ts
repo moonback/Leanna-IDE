@@ -385,6 +385,8 @@ export function attachLiveWebSocket(
         'browser_fill_form', 'browser_select_option',
         'reasoning_think',
         'agent_orchestrate', 'agent_status',
+        // Missions autonomes — tâches complexes multi-étapes
+        'mission_create', 'mission_status',
         'knowledge_search_entities', 'knowledge_status',
         'knowledge_memory_add', 'knowledge_memory_list',
         'knowledge_impact_analyze', 'knowledge_reindex',

@@ -142,6 +142,7 @@ export class Mission {
     description: string;
     successCriteria: string[];
     priority?: GoalPriority;
+    dependsOn?: string[];
   }): string {
     const parent = this.state.goals[params.parentId];
     if (!parent) {
@@ -169,6 +170,7 @@ export class Mission {
       priority: params.priority ?? parent.priority,
       status: "pending",
       children: [],
+      dependsOn: params.dependsOn ?? [],
       plannedActions: [],
       attempts: 0,
       maxAttempts: this.config.maxRetries,
@@ -219,6 +221,34 @@ export class Mission {
         : null;
 
     // Si c'était l'objectif racine → mission terminée
+    if (goal.parentId === null) {
+      this.state.status = result.success ? "completed" : "failed";
+      this.state.completedAt = new Date().toISOString();
+    }
+
+    this.state.updatedAt = new Date().toISOString();
+  }
+
+  /**
+   * Complète un objectif désigné par son ID (sans dépendre de la Goal Stack).
+   * Sûr pour l'exécution parallèle de sous-objectifs indépendants.
+   */
+  completeGoal(goalId: string, result: GoalResult): void {
+    const goal = this.state.goals[goalId];
+    if (!goal) throw new Error(`Goal ${goalId} not found`);
+
+    goal.status = result.success ? "completed" : "failed";
+    goal.result = result;
+    goal.completedAt = new Date().toISOString();
+
+    // Retirer de la pile si présent, et recalculer l'objectif actif.
+    this.state.goalStack = this.state.goalStack.filter((id) => id !== goalId);
+    this.state.activeGoalId =
+      this.state.goalStack.length > 0
+        ? this.state.goalStack[this.state.goalStack.length - 1]
+        : null;
+
+    // Objectif racine → statut global de la mission.
     if (goal.parentId === null) {
       this.state.status = result.success ? "completed" : "failed";
       this.state.completedAt = new Date().toISOString();
