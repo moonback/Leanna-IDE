@@ -19,15 +19,13 @@ Principes :
 
 ### TypeScript
 - TypeScript strict obligatoire.
-- Imports au top-level uniquement, nommés (pas de déstructuration).
+- Imports au top-level uniquement. Utiliser des imports nommés (`import { x } from "..."`) ; éviter `import * as ns` et les imports par défaut sauf quand la bibliothèque n'expose qu'un export par défaut.
 - `import type` interdit pour les valeurs d'enum.
 - `enum` standard uniquement. `const enum` interdit.
 
 ### Styling
-- Tailwind CSS (classes utilitaires) exclusivement.
+- Tailwind CSS uniquement. Dans un composant existant, ne convertis pas ses styles inline, sa structure DOM ni ses `className` ; corrige seulement ce qui est demandé, en préservant les classes et le layout existants et sans inventer de nuance Tailwind arbitraire.
 - Config : `@import "tailwindcss";` dans le CSS global.
-- Interdit : CSS-in-JS, attributs `style` inline sauf lorsqu’un composant existant est corrigé localement : ne pas supprimer ou convertir rétroactivement ses styles inline, sa structure DOM ou ses className pour satisfaire cette règle.
-- Lors d’une correction ciblée, préserver les classes et le layout existants; ne pas inventer de nuance Tailwind arbitraire.
 
 ### Bibliothèques
 - Bibliothèques réelles et populaires uniquement.

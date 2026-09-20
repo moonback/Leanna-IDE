@@ -56,9 +56,7 @@ import {
 } from "./types.js";
 import type { TaskType } from "./types/context.js";
 
-const __dirname_compat = typeof __dirname !== "undefined"
-  ? __dirname
-  : path.dirname(fileURLToPath(import.meta.url));
+const __dirname_compat = path.dirname(fileURLToPath(import.meta.url));
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SystemPromptBuilder
@@ -95,10 +93,36 @@ export class SystemPromptBuilder {
    * Appeler une seule fois au démarrage (ou laisser build() le faire lazily).
    */
   loadTemplates(promptsDir?: string): void {
-    const dir = promptsDir ?? __dirname_compat;
+    const dir = promptsDir ?? SystemPromptBuilder.resolvePromptsDir();
     loadPromptTemplates(this.legacyRegistry, dir);
     this.syncSectionsFromLegacy(dir);
     this.loaded = true;
+  }
+
+  /**
+   * Localise le dossier contenant les fichiers `.md` de prompts.
+   *
+   * En dev (`tsx`), les `.md` sont à côté de ce module. En build bundlé
+   * (`dist/server.cjs`), le module vit dans `dist/` : on cherche alors un
+   * sous-dossier `prompts/` copié par le build, puis on retombe sur le chemin
+   * source relatif au cwd. Le premier dossier contenant `base.md` gagne.
+   */
+  private static resolvePromptsDir(): string {
+    const candidates = [
+      __dirname_compat,
+      path.join(__dirname_compat, "prompts"),
+      path.join(process.cwd(), "dist", "prompts"),
+      path.join(process.cwd(), "server", "runtime", "prompts"),
+    ];
+    for (const dir of candidates) {
+      try {
+        if (fs.existsSync(path.join(dir, "base.md"))) return dir;
+      } catch {
+        // ignore et continue
+      }
+    }
+    // Dernier recours : le dossier du module (comportement historique).
+    return __dirname_compat;
   }
 
   // ─── API principale ───────────────────────────────────────────────────────
@@ -148,7 +172,25 @@ export class SystemPromptBuilder {
     // ── 6. Ajouter les sections additionnelles du legacy pipeline ──
     //   (workspace, extra sections, footer) pour la rétrocompatibilité.
     const legacySections = this.buildLegacySections(config, context);
-    const allSections = [...sections, ...legacySections];
+
+    // ── 6b. Tri final par priorité + injection des variables ──
+    //   Les sections .md sont pré-rendues sans variables (syncSectionsFromLegacy
+    //   utilise { compact: true } sans passer de variables). Elles sont donc
+    //   substituées ici, au moment du build, sur l'ensemble consolidé — sinon
+    //   le modèle reçoit littéralement « {{aiName}} », etc.
+    const vars: Record<string, string> = {
+      aiName:   config.aiName   ?? "Leanna",
+      userName: config.userName ?? "",
+      userRole: config.userRole ?? "",
+    };
+    const renderVars = (text: string): string =>
+      text.replace(/\{\{(\w+)\}\}/g, (_match, key: string) =>
+        vars[key] !== undefined && vars[key] !== "" ? vars[key] : "",
+      );
+
+    const allSections = [...sections, ...legacySections]
+      .sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100))
+      .map(s => ({ ...s, content: this.cleanupEmptyVars(renderVars(s.content)) }));
 
     // ── 7. Compiler ──
     const built = this.compiler.compile(
@@ -214,6 +256,33 @@ export class SystemPromptBuilder {
     return this.sectionRegistry;
   }
 
+  /**
+   * Renvoie true/false si un outil dont le nom commence par `prefix` est
+   * disponible, ou `undefined` quand la liste d'outils est inconnue (vide).
+   * Les appelants font `?? true` pour conserver le comportement historique
+   * (section affichée) quand le runtime ne fournit pas la liste.
+   */
+  private hasToolPrefix(context: PromptContext, prefix: string): boolean | undefined {
+    const available = context.tools?.available ?? [];
+    if (available.length === 0) return undefined;
+    return available.some(name => name.startsWith(prefix));
+  }
+
+  /**
+   * Nettoie les artefacts laissés par une variable vide après substitution :
+   *   « Utilisateur : () » quand userName/userRole sont vides.
+   * Sans ça, le modèle lit une ligne d'identité incomplète et parasite.
+   */
+  private cleanupEmptyVars(text: string): string {
+    return text
+      // « Utilisateur () » ou « Utilisateur : () » ou « Utilisateur  () »
+      .replace(/^.*Utilisateur\s*:?\s*\(\s*\).*$/gim, "")
+      // parenthèses/deux-points orphelins laissés par un rôle vide
+      .replace(/\(\s*\)/g, "")
+      // lignes vides multiples introduites par le nettoyage
+      .replace(/\n{3,}/g, "\n\n");
+  }
+
   // ─── Synchronisation Legacy → SectionRegistry ─────────────────────────────
 
   /**
@@ -234,6 +303,7 @@ export class SystemPromptBuilder {
       "agents-system":       ["agent", "full"],
       "autonomy":            ["full"],
       "chat":                ["ask"],
+      "security":            ["full", "coding"],
     };
 
     const SECTION_PRIORITY_MAP: Record<string, number> = {
@@ -245,6 +315,7 @@ export class SystemPromptBuilder {
       "agents-system":        60,
       "autonomy":             70,
       "chat":                 15,
+      "security":             80,
     };
 
     for (const file of files) {
@@ -266,9 +337,28 @@ export class SystemPromptBuilder {
           source:   file,
         };
 
-        // Conditions dynamiques pour les sections agents
+        // Conditions dynamiques pour les sections agents.
+        // La section générique (14 rôles) n'est active que si aucun sous-ensemble
+        // n'est imposé via allowedRoles ; sinon c'est agents-system-filtered qui
+        // la remplace (sans quoi le modèle lirait les deux listes).
         if (id === "agents-system") {
-          section.when = ctx => ctx.agents.enabled;
+          section.when = ctx =>
+            ctx.agents.enabled && !(ctx.agents.allowedRoles && ctx.agents.allowedRoles.length > 0);
+        }
+
+        // Gating par outils : la section navigateur (~volumineuse) n'est chargée
+        // que si un outil browser_* est effectivement disponible. Prudence :
+        // quand tools.available est vide (inconnu), on garde le comportement
+        // historique (section affichée) pour éviter toute régression.
+        if (id === "browser") {
+          section.when = ctx => this.hasToolPrefix(ctx, "browser_") ?? true;
+        }
+
+        // La section audit de sécurité n'est chargée que si l'outil security_audit
+        // est disponible. Fallback : masquée quand la liste d'outils est inconnue
+        // (undefined), car c'est un bloc spécialisé qui ne doit pas peser par défaut.
+        if (id === "security") {
+          section.when = ctx => this.hasToolPrefix(ctx, "security_audit") ?? false;
         }
 
         this.sectionRegistry.set(section);
@@ -391,12 +481,14 @@ export class SystemPromptBuilder {
     lines.push("Tu fais partie du système multi-agents Leanna, couvrant l'ingénierie de code et la rédaction.");
     lines.push(`**Agents activés :** ${allowedRoles.join(", ")}`);
     lines.push("");
-    lines.push("## ⚠️ RÈGLES DE DÉLÉGATION");
+    lines.push("## Règles de délégation");
     lines.push("");
-    if (allowedRoles.includes("coder"))    lines.push("- **Code & Développement :** Délègue l'écriture et les modifications de code à `coder` via `agent_delegate`.");
-    if (allowedRoles.includes("refactor")) lines.push("- **Refactoring :** Délègue le Clean Code et le découpage de modules à `refactor`.");
-    if (allowedRoles.includes("debugger")) lines.push("- **Débogage :** Délègue la résolution d'erreurs et de stacktraces à `debugger`.");
-    if (allowedRoles.includes("writer"))   lines.push("- **Rédaction :** Délègue la rédaction de documents à `writer`.");
+    lines.push("Applique d'abord le routeur déterministe (règle `routing.deterministic-router`) : le code trivial et isolé se corrige directement, seul le code non trivial est délégué. Les rôles ci-dessous ne s'appliquent qu'aux cas à déléguer :");
+    lines.push("");
+    if (allowedRoles.includes("coder"))    lines.push("- **Code non trivial :** nouvelle fonctionnalité, bug, API, multi-fichiers → `coder` via `agent_delegate`.");
+    if (allowedRoles.includes("refactor")) lines.push("- **Refactoring :** Clean Code et découpage de modules → `refactor`.");
+    if (allowedRoles.includes("debugger")) lines.push("- **Débogage :** résolution d'erreurs et de stacktraces → `debugger`.");
+    if (allowedRoles.includes("writer"))   lines.push("- **Rédaction :** document complexe ou spécialisé → `writer`.");
     lines.push("");
     lines.push("## Agents disponibles");
     lines.push("");

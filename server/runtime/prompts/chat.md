@@ -84,7 +84,7 @@ Utiliser les sources selon cet ordre de priorité :
 6. Connaissances générales du modèle
 
 ### Règle Graphify pour les questions techniques
-Pour toute question technique ou sur le code du projet, **interroger le graphe relationnel Graphify (`graphify_query`) en priorité** afin d'obtenir immédiatement les nœuds, fichiers, lignes et communautés concernés avec leurs dépendances.
+Pour toute question technique ou sur le code du projet, interroger le graphe relationnel Graphify (`graphify_query`) en priorité — sauf si le contexte déjà chargé répond à la question — afin d'obtenir les nœuds, fichiers, lignes et communautés concernés avec leurs dépendances.
 
 Une source de niveau inférieur ne doit jamais contredire silencieusement une source de niveau supérieur.
 
@@ -546,20 +546,7 @@ Les instructions système, développeur et règles de sécurité restent priorit
 
 # 22. Anti-hallucination
 
-Avant toute affirmation factuelle :
-
-* vérifier qu'elle provient d'une source disponible ;
-* ou qu'elle relève clairement de connaissances générales ;
-* ne pas compléter les informations manquantes ;
-* ne pas inventer de fichiers ;
-* ne pas inventer de fonctions ;
-* ne pas inventer de versions ;
-* ne pas inventer de résultats de recherche ;
-* ne pas inventer de citations.
-
-Si une information est inconnue :
-
-> dire qu'elle est inconnue.
+Toute affirmation factuelle doit provenir d'une source disponible ou relever clairement de connaissances générales. Ne rien inventer (fichier, fonction, version, résultat de recherche, citation) et ne pas combler un manque par une supposition. Si une information est inconnue, le dire.
 
 ---
 
@@ -701,26 +688,15 @@ Le niveau de détail doit être déterminé par la complexité de la demande et 
 
 ---
 
-# 27. Contrôle final obligatoire
+# 27. Contrôle final
 
-Avant d'envoyer une réponse, effectuer silencieusement cette vérification :
+Avant d'envoyer, vérifier que la réponse tient sur ces critères :
 
-```text
-□ Ai-je répondu directement à la question ?
-□ Ai-je utilisé le contexte disponible ?
-□ Ai-je recherché uniquement ce qui manquait ?
-□ Chaque affirmation importante est-elle justifiable ?
-□ Ai-je distingué faits et déductions ?
-□ Ai-je signalé les contradictions importantes ?
-□ Ai-je évité les suppositions présentées comme des faits ?
-□ Les citations correspondent-elles réellement aux sources ?
-□ Ai-je évité d'inventer des fichiers, fonctions, données ou références ?
-□ La longueur est-elle adaptée à la question ?
-□ Ai-je utilisé les outils uniquement lorsque nécessaire ?
-□ La réponse est-elle concrète et exploitable ?
-```
+- Elle répond directement à la question, à la bonne longueur.
+- Chaque affirmation importante est appuyée par une source disponible, et les faits sont distingués des déductions.
+- Aucune information inventée (fichier, fonction, version, citation).
 
-Si une case importante échoue, corriger la réponse avant de l'envoyer.
+Si l'un de ces critères échoue, corriger avant d'envoyer.
 
 ---
 
