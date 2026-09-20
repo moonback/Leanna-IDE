@@ -38,16 +38,16 @@ const TRANSITIONS = {
 
 const BUBBLE_STYLES = {
   assistant: {
-    bg:           'var(--bg-secondary)',
+    bg:           'color-mix(in srgb, var(--bg-secondary) 85%, transparent)',
     border:       'var(--border-base)',
     borderRadius: `4px ${RADII.lg} ${RADII.lg} ${RADII.lg}`,
-    shadow:       '0 2px 8px rgba(0,0,0,0.08)',
+    shadow:       '0 2px 10px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.03)',
   },
   user: {
-    bg:           'var(--accent-subtle)',
-    border:       'color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+    bg:           'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 22%, transparent), color-mix(in srgb, var(--accent-primary) 12%, transparent))',
+    border:       'color-mix(in srgb, var(--accent-primary) 38%, transparent)',
     borderRadius: `${RADII.lg} 4px ${RADII.lg} ${RADII.lg}`,
-    shadow:       '0 2px 8px rgba(0,0,0,0.06)',
+    shadow:       '0 2px 12px color-mix(in srgb, var(--accent-primary) 18%, transparent)',
   },
 } as const;
 
@@ -81,10 +81,11 @@ const Toast = memo(function Toast({ message, icon, onDone }: ToastProps) {
       className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-2.5
                  px-4 py-2.5 rounded-full text-sm font-medium shadow-lg pointer-events-none"
       style={{
-        backgroundColor: 'var(--bg-panel)',
+        backgroundColor: 'color-mix(in srgb, var(--bg-panel) 88%, transparent)',
         border: '1px solid var(--border-base)',
         color: 'var(--text-primary)',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.06)',
+        boxShadow: '0 12px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05), 0 0 20px var(--accent-glow)',
+        backdropFilter: 'blur(20px)',
       }}
     >
       {icon}
@@ -250,13 +251,14 @@ const ChatMessage = memo(function ChatMessage({
       {/* Content */}
       <div className={`max-w-[86%] flex flex-col ${isAssistant ? 'items-start' : 'items-end'}`}>
         <div
-          className="px-4 py-3 text-sm leading-relaxed inline-block text-left transition-shadow duration-200"
+          className="px-4 py-3 text-sm leading-relaxed inline-block text-left transition-shadow duration-200 hover:shadow-lg"
           style={{
-            backgroundColor: bubbleStyle.bg,
+            background: bubbleStyle.bg,
             border: `1px solid ${bubbleStyle.border}`,
             borderRadius: bubbleStyle.borderRadius,
             color: 'var(--text-primary)',
             boxShadow: bubbleStyle.shadow,
+            backdropFilter: 'blur(8px)',
           }}
         >
           {isAssistant ? <ChatMarkdown text={entry.text} /> : (
@@ -583,8 +585,8 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
           backgroundColor: 'var(--bg-input)',
           border: `1px solid ${isFocused ? 'var(--accent-primary)' : 'var(--border-base)'}`,
           boxShadow: isFocused
-            ? '0 0 0 3px color-mix(in srgb, var(--accent-primary) 15%, transparent), inset 0 1px 2px rgba(0,0,0,0.04)'
-            : 'inset 0 1px 2px rgba(0,0,0,0.04)',
+            ? '0 0 0 3px color-mix(in srgb, var(--accent-primary) 18%, transparent), 0 0 20px var(--accent-glow), inset 0 1px 2px rgba(0,0,0,0.15)'
+            : 'inset 0 1px 2px rgba(0,0,0,0.15)',
         }}
       >
 
@@ -634,10 +636,11 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
               className="p-2 rounded-lg transition-all duration-150 disabled:opacity-30 focus:outline-none
                          focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/40"
               style={{
-                backgroundColor: input.trim() && canSend
-                  ? 'color-mix(in srgb, var(--accent-primary) 15%, transparent)'
+                background: input.trim() && canSend
+                  ? 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover))'
                   : 'transparent',
-                color: 'var(--accent-primary)',
+                color: input.trim() && canSend ? '#0a1628' : 'var(--accent-primary)',
+                boxShadow: input.trim() && canSend ? '0 2px 12px var(--accent-glow)' : 'none',
               }}
               title="Envoyer (Enter)"
               aria-label="Envoyer le message"
@@ -1188,10 +1191,10 @@ export function ChatPanel({
           boxShadow: fullscreen
             ? 'none'
             : docked
-              ? '-4px 0 32px rgba(0,0,0,0.22), -1px 0 0 var(--border-base)'
+              ? '-4px 0 32px rgba(0,0,0,0.28), -1px 0 0 var(--border-base), inset 1px 0 0 rgba(255,255,255,0.03)'
               : isDraggingPanel
-                ? '0 28px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)'
-                : '0 16px 56px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05)',
+                ? '0 28px 80px rgba(0,0,0,0.55), 0 0 0 1px var(--border-base), 0 0 40px var(--accent-glow)'
+                : '0 16px 56px rgba(0,0,0,0.4), 0 0 0 1px var(--border-base), 0 0 24px color-mix(in srgb, var(--accent-primary) 8%, transparent)',
           transition: reduceMotion || isDraggingPanel || isResizing
             ? 'box-shadow 0.15s'
             : 'top 0.3s cubic-bezier(0.22,1,0.36,1), right 0.3s cubic-bezier(0.22,1,0.36,1), width 0.3s cubic-bezier(0.22,1,0.36,1), height 0.3s cubic-bezier(0.22,1,0.36,1), bottom 0.3s cubic-bezier(0.22,1,0.36,1), border-radius 0.3s',
@@ -1226,7 +1229,7 @@ export function ChatPanel({
           className="flex items-center gap-2 px-3 py-2.5 flex-shrink-0 relative"
           style={{
             borderBottom: '1px solid var(--border-base)',
-            background: 'linear-gradient(to bottom, color-mix(in srgb, var(--accent-primary) 4%, var(--bg-panel)) 0%, var(--bg-panel) 100%)',
+            background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 7%, var(--bg-panel)) 0%, var(--bg-panel) 55%, color-mix(in srgb, var(--accent-secondary) 4%, var(--bg-panel)) 100%)',
             cursor: docked || fullscreen ? 'default' : (isDraggingPanel ? 'grabbing' : 'grab'),
             touchAction: docked || fullscreen ? undefined : 'none',
           }}
@@ -1244,11 +1247,11 @@ export function ChatPanel({
             <div
               className="w-8 h-8 rounded-xl flex items-center justify-center"
               style={{
-                backgroundColor: connected
-                  ? 'color-mix(in srgb, var(--accent-primary) 12%, transparent)'
+                background: connected
+                  ? 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 18%, transparent), color-mix(in srgb, var(--accent-secondary) 8%, transparent))'
                   : 'color-mix(in srgb, var(--text-muted) 8%, transparent)',
                 border: `1px solid ${connected ? 'color-mix(in srgb, var(--accent-primary) 25%, transparent)' : 'var(--border-base)'}`,
-                boxShadow: connected ? '0 0 14px color-mix(in srgb, var(--accent-primary) 20%, transparent)' : 'none',
+                boxShadow: connected ? '0 0 14px color-mix(in srgb, var(--accent-primary) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.06)' : 'none',
               }}
             >
               <Bot size={16} style={{ color: connected ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
@@ -1498,11 +1501,15 @@ export function ChatPanel({
                       {/* Glowing orb icon */}
                       <div className="relative">
                         <div
-                          className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                          className="w-16 h-16 rounded-2xl flex items-center justify-center relative overflow-hidden"
                           style={{
-                            backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
-                            border: '1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent)',
-                            boxShadow: '0 0 32px color-mix(in srgb, var(--accent-primary) 15%, transparent)',
+                            background: connected
+                              ? 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 16%, transparent), color-mix(in srgb, var(--accent-secondary) 10%, transparent))'
+                              : 'color-mix(in srgb, var(--text-muted) 8%, transparent)',
+                            border: `1px solid ${connected ? 'color-mix(in srgb, var(--accent-primary) 28%, transparent)' : 'var(--border-base)'}`,
+                            boxShadow: connected
+                              ? '0 0 36px color-mix(in srgb, var(--accent-primary) 22%, transparent), inset 0 1px 0 rgba(255,255,255,0.08)'
+                              : 'none',
                           }}
                         >
                           {connected
@@ -1510,14 +1517,22 @@ export function ChatPanel({
                             : <Bot size={26} style={{ color: 'var(--text-muted)' }} />
                           }
                         </div>
-                        {/* Pulse ring */}
+                        {/* Pulse rings (dual, staggered) */}
                         {connected && !reduceMotion && (
-                          <motion.div
-                            className="absolute inset-0 rounded-2xl"
-                            style={{ border: '2px solid color-mix(in srgb, var(--accent-primary) 30%, transparent)' }}
-                            animate={{ scale: [1, 1.18], opacity: [0.8, 0] }}
-                            transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
-                          />
+                          <>
+                            <motion.div
+                              className="absolute inset-0 rounded-2xl"
+                              style={{ border: '2px solid color-mix(in srgb, var(--accent-primary) 35%, transparent)' }}
+                              animate={{ scale: [1, 1.22], opacity: [0.8, 0] }}
+                              transition={{ duration: 2.2, repeat: Infinity, ease: 'easeOut' }}
+                            />
+                            <motion.div
+                              className="absolute inset-0 rounded-2xl"
+                              style={{ border: '1px solid color-mix(in srgb, var(--accent-secondary) 30%, transparent)' }}
+                              animate={{ scale: [1, 1.35], opacity: [0.5, 0] }}
+                              transition={{ duration: 2.2, repeat: Infinity, ease: 'easeOut', delay: 0.6 }}
+                            />
+                          </>
                         )}
                       </div>
 

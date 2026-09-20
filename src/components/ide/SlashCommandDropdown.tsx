@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import { Zap } from 'lucide-react';
 import type { SlashCommandSuggestion } from '../../hooks/useSlashCommand.js';
 
@@ -12,72 +13,91 @@ interface SlashCommandDropdownProps {
 
 /**
  * Dropdown autocomplete pour les commandes /skill dans le chat.
+ * Aligné sur le langage visuel du ChatPanel (glassmorphism, accent cyan, glow).
  */
 export function SlashCommandDropdown({ suggestions, selectedIndex, onSelect, onHover, query }: SlashCommandDropdownProps) {
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Scroll selected item into view
+  // Scroll selected item into view (+1 for header)
   useEffect(() => {
-    const el = listRef.current?.children[selectedIndex + 1] as HTMLElement | undefined; // +1 for header
+    const el = listRef.current?.children[selectedIndex + 1] as HTMLElement | undefined;
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
 
   if (suggestions.length === 0) return null;
 
   return (
-    <div
+    <motion.div
       ref={listRef}
-      className="absolute bottom-full left-0 right-0 mb-1 rounded-lg overflow-hidden z-50 max-h-[220px] overflow-y-auto custom-scrollbar"
+      initial={{ opacity: 0, y: 6, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+      className="absolute bottom-full left-0 right-0 mb-2 rounded-xl overflow-hidden z-50 max-h-[220px] overflow-y-auto custom-scrollbar"
       style={{
-        backgroundColor: 'var(--bg-ctrl)',
-        border: '1px solid var(--border-strong)',
-        boxShadow: 'var(--shadow-lg)',
+        backgroundColor: 'color-mix(in srgb, var(--bg-ctrl) 92%, transparent)',
+        border: '1px solid var(--border-base)',
+        boxShadow: '0 16px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04), 0 0 24px var(--accent-glow)',
+        backdropFilter: 'blur(20px)',
       }}
     >
       {/* Header */}
       <div
-        className="px-3 py-1.5 text-xs uppercase font-bold tracking-wider flex items-center gap-1.5"
-        style={{ color: 'var(--text-dimmed)', borderBottom: '1px solid var(--border-base)' }}
+        className="sticky top-0 z-10 px-3 py-2 text-[10px] uppercase font-semibold tracking-widest flex items-center gap-1.5"
+        style={{
+          color: 'var(--text-dimmed)',
+          borderBottom: '1px solid var(--border-base)',
+          background: 'linear-gradient(to bottom, color-mix(in srgb, var(--accent-primary) 6%, var(--bg-ctrl)), var(--bg-ctrl))',
+        }}
       >
-        <Zap size={9} />
+        <Zap size={10} style={{ color: 'var(--accent-secondary)' }} />
         Skills disponibles
       </div>
 
-      {suggestions.map((item, index) => (
-        <button
-          key={item.name}
-          onClick={() => onSelect(item)}
-          onMouseEnter={() => onHover(index)}
-          className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
-          style={{
-            backgroundColor: index === selectedIndex ? 'var(--accent-subtle)' : 'transparent',
-          }}
-        >
-          <div
-            className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-            style={{
-              backgroundColor: index === selectedIndex ? 'var(--accent-primary)' : 'var(--bg-input)',
-              border: '1px solid var(--border-base)',
-            }}
+      {suggestions.map((item, index) => {
+        const active = index === selectedIndex;
+        return (
+          <button
+            key={item.name}
+            onClick={() => onSelect(item)}
+            onMouseEnter={() => onHover(index)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors relative"
+            style={{ backgroundColor: active ? 'var(--accent-subtle)' : 'transparent' }}
           >
-            <span
-              className="text-sm font-bold"
-              style={{ color: index === selectedIndex ? 'white' : 'var(--text-muted)' }}
+            {/* Active accent bar */}
+            {active && (
+              <span
+                className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full"
+                style={{ backgroundColor: 'var(--accent-primary)', boxShadow: '0 0 8px var(--accent-glow)' }}
+              />
+            )}
+            <div
+              className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-colors"
+              style={{
+                backgroundColor: active
+                  ? 'color-mix(in srgb, var(--accent-primary) 20%, transparent)'
+                  : 'var(--bg-input)',
+                border: '1px solid var(--border-base)',
+              }}
             >
-              /
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <span className="text-xs font-medium block truncate" style={{ color: 'var(--text-primary)' }}>
-              <HighlightMatch text={item.name} query={query} />
-            </span>
-            <span className="text-xs block truncate" style={{ color: 'var(--text-dimmed)' }}>
-              {item.description}
-            </span>
-          </div>
-        </button>
-      ))}
-    </div>
+              <span
+                className="text-sm font-bold leading-none"
+                style={{ color: active ? 'var(--accent-primary)' : 'var(--text-muted)' }}
+              >
+                /
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-medium block truncate" style={{ color: 'var(--text-primary)' }}>
+                <HighlightMatch text={item.name} query={query} />
+              </span>
+              <span className="text-[11px] block truncate" style={{ color: 'var(--text-dimmed)' }}>
+                {item.description}
+              </span>
+            </div>
+          </button>
+        );
+      })}
+    </motion.div>
   );
 }
 
