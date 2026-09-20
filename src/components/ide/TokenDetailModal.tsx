@@ -3,7 +3,7 @@ import {
 } from 'react';
 import {
   TrendingUp, ArrowUp, ArrowDown, Zap, Loader2, AlertTriangle,
-  Gauge, Sparkles, Clock, Hash, Brain, AlertCircle, MessageSquare,
+  Gauge, Sparkles, Clock, Hash, Brain, AlertCircle, MessageSquare, X,
 } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
@@ -25,6 +25,8 @@ interface OptimizationData {
 
 interface TokenDetailModalProps {
   onClose: () => void;
+  /** Rendu en panneau latéral docké (sans le chrome Modal). */
+  docked?: boolean;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -40,7 +42,7 @@ const timeAgo = (date: Date): string => {
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
+export function TokenDetailModal({ onClose, docked = false }: TokenDetailModalProps) {
   const { tokenUsage, promptContext } = useLiveAPIContext();
   const { profile, setField, save } = useProfile();
 
@@ -95,10 +97,7 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
     }
   }, [profile.compactPrompt, setField, save, loadOptimization]);
 
-  return (
-    // Modal handles focus-trap, scroll-lock, Escape, backdrop — no manual useEffect needed
-    <Modal open onClose={onClose} size="lg" tone="default">
-      <Modal.Header>
+  const headerContent = (
         <div className="flex items-center gap-3">
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center"
@@ -111,9 +110,9 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Contexte &amp; tokens • {history.length} requêtes</p>
           </div>
         </div>
-      </Modal.Header>
+  );
 
-      <Modal.Body>
+  const bodyContent = (
         <div className="space-y-5">
 
           {/* ── Contexte du Prompt ── */}
@@ -338,6 +337,46 @@ export function TokenDetailModal({ onClose }: TokenDetailModalProps) {
             </div>
           )}
         </div>
+  );
+
+  // ── Rendu docké (panneau latéral, sans chrome Modal) ────────────────────────
+  if (docked) {
+    return (
+      <div className="flex flex-col h-full">
+        <div
+          className="flex items-center justify-between gap-2 px-3 py-2 flex-shrink-0"
+          style={{ borderBottom: '1px solid var(--border-base)' }}
+        >
+          {headerContent}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-white/10 flex-shrink-0"
+              style={{ color: 'var(--text-muted)' }}
+              aria-label="Fermer"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-3 py-3">
+          {bodyContent}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    // Modal handles focus-trap, scroll-lock, Escape, backdrop — no manual useEffect needed
+    <Modal open onClose={onClose} size="lg" tone="default">
+      <Modal.Header>
+        {headerContent}
+      </Modal.Header>
+
+      <Modal.Body>
+        {bodyContent}
       </Modal.Body>
     </Modal>
   );

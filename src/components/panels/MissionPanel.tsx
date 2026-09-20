@@ -3,10 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Target, Loader2, CheckCircle2, XCircle, AlertTriangle,
   ChevronRight, Brain, Zap, RotateCcw, Pause, Play,
-  TrendingUp, TrendingDown, Minus, Clock, Layers,
+  TrendingUp, TrendingDown, Minus, Clock, Plus, Trash2, X,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
-import { IconButton } from '../ui/IconButton.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -30,6 +29,20 @@ interface MissionEvent {
   error?: string;
   timestamp: string;
   plan?: MissionPlan;
+  /** Arguments de l'action (pour les demandes d'approbation). */
+  args?: Record<string, unknown>;
+  /** Délai avant refus automatique d'une approbation (ms). */
+  timeoutMs?: number;
+}
+
+/** Demande d'approbation en attente pour une action à effet de bord. */
+interface PendingApproval {
+  actionId: string;
+  missionId: string;
+  skill: string;
+  reason: string;
+  args?: Record<string, unknown>;
+  requestedAt: number;
 }
 
 interface MissionPlan {
@@ -44,7 +57,7 @@ interface MissionPlan {
 interface MissionEntry {
   id: string;
   title: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked' | 'paused';
   priority: string;
   goals: GoalEntry[];
   activeGoalId: string | null;
@@ -96,6 +109,7 @@ function statusIcon(status: string, size = 10) {
     case 'completed': return <CheckCircle2 size={size} style={{ color: 'var(--color-success)' }} />;
     case 'failed': return <XCircle size={size} style={{ color: 'var(--color-error)' }} />;
     case 'blocked': return <AlertTriangle size={size} style={{ color: 'var(--color-warning)' }} />;
+    case 'paused': return <Pause size={size} style={{ color: 'var(--color-warning)' }} />;
     default: return <Clock size={size} style={{ color: 'var(--text-dimmed)' }} />;
   }
 }
@@ -137,12 +151,155 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
   const [missions, setMissions] = useState<MissionEntry[]>([]);
   const [expandedMission, setExpandedMission] = useState<string | null>(null);
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
+  const [approvals, setApprovals] = useState<PendingApproval[]>([]);
+  const [resolving, setResolving] = useState<string | null>(null);
+  const [busyMission, setBusyMission] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  // Crée une mission via la route déterministe (indépendante du LLM).
+  const createMission = useCallback(async () => {
+    if (!newTitle.trim() || !newDescription.trim()) {
+      setCreateError('Titre et description requis.');
+      return;
+    }
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const res = await fetch('/api/missions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle.trim(), description: newDescription.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCreateError(data?.error ?? `Erreur ${res.status}`);
+        return;
+      }
+      // Réinitialiser le formulaire ; la carte apparaîtra via l'événement mission_plan/started.
+      setNewTitle('');
+      setNewDescription('');
+      setShowCreate(false);
+    } catch (err) {
+      setCreateError((err as Error).message);
+    } finally {
+      setCreating(false);
+    }
+  }, [newTitle, newDescription]);
+
+  // Résout une approbation (approuve ou refuse) via l'API.
+  const resolveApproval = useCallback(async (missionId: string, actionId: string, approved: boolean) => {
+    setResolving(actionId);
+    try {
+      const res = await fetch(`/api/missions/${missionId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actionId, approved }),
+      });
+      // Qu'elle réussisse ou expire côté serveur, on retire la demande localement.
+      if (res.ok || res.status === 404) {
+        setApprovals(prev => prev.filter(a => a.actionId !== actionId));
+      }
+    } catch (err) {
+      console.error('[MissionPanel] Échec de résolution d\'approbation:', err);
+    } finally {
+      setResolving(null);
+    }
+  }, []);
+
+  // Met en pause / reprend / annule / supprime une mission via l'API.
+  // La liste locale est ensuite mise à jour par les événements WebSocket,
+  // mais on applique aussi une mise à jour optimiste pour la réactivité.
+  const controlMission = useCallback(async (
+    missionId: string,
+    action: 'pause' | 'resume' | 'cancel' | 'delete',
+  ) => {
+    setBusyMission(missionId);
+    try {
+      const isDelete = action === 'delete';
+      const res = await fetch(
+        isDelete ? `/api/missions/${missionId}` : `/api/missions/${missionId}/${action}`,
+        { method: isDelete ? 'DELETE' : 'POST' },
+      );
+      if (!res.ok && res.status !== 404) return;
+
+      // Mise à jour optimiste locale.
+      setMissions(prev => {
+        if (action === 'delete') return prev.filter(m => m.id !== missionId);
+        return prev.map(m => {
+          if (m.id !== missionId) return m;
+          if (action === 'pause') return { ...m, status: 'paused' as const };
+          if (action === 'resume') return { ...m, status: 'in_progress' as const };
+          if (action === 'cancel') return { ...m, status: 'failed' as const };
+          return m;
+        });
+      });
+    } catch (err) {
+      console.error(`[MissionPanel] Échec de l'action "${action}":`, err);
+    } finally {
+      setBusyMission(null);
+    }
+  }, []);
+
+  // Charger l'état initial des missions depuis le serveur (au montage).
+  // Le panneau est ensuite mis à jour en temps réel par les événements WebSocket.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/missions')
+      .then(res => (res.ok ? res.json() : { missions: [] }))
+      .then((data: { missions?: any[] }) => {
+        if (cancelled || !Array.isArray(data.missions)) return;
+        setMissions(data.missions.map((m): MissionEntry => ({
+          id: m.id,
+          title: m.title ?? 'Mission',
+          status: m.status ?? 'pending',
+          priority: m.priority ?? 'medium',
+          goals: Array.isArray(m.goals) ? m.goals : [],
+          activeGoalId: m.activeGoalId ?? null,
+          confidence: typeof m.confidence === 'number' ? m.confidence : 0.5,
+          metrics: {
+            totalActions: m.metrics?.totalActions ?? 0,
+            successfulActions: m.metrics?.successfulActions ?? 0,
+            failedActions: m.metrics?.failedActions ?? 0,
+          },
+          createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
+        })));
+      })
+      .catch(() => { /* pas de mission system dispo — panneau vide, normal */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // Listen for mission events
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<MissionEvent>).detail;
       if (!detail || detail.type !== 'mission_event') return;
+
+      // ── Gestion des demandes d'approbation (état séparé) ──
+      if (detail.event === 'approval_required' && detail.actionId) {
+        setApprovals(prev => {
+          if (prev.some(a => a.actionId === detail.actionId)) return prev;
+          return [...prev, {
+            actionId: detail.actionId!,
+            missionId: detail.missionId,
+            skill: detail.skill ?? '?',
+            reason: detail.reason ?? 'Approbation requise.',
+            args: detail.args,
+            requestedAt: Date.now(),
+          }];
+        });
+      } else if (
+        detail.actionId &&
+        (detail.event === 'action_denied' ||
+          detail.event === 'approval_timeout' ||
+          detail.event === 'action_completed')
+      ) {
+        // L'action est résolue d'une manière ou d'une autre → retirer la demande.
+        setApprovals(prev => prev.filter(a => a.actionId !== detail.actionId));
+      }
 
       setMissions(prev => {
         const existing = prev.find(m => m.id === detail.missionId);
@@ -251,7 +408,25 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
               };
             });
 
+          case 'action_denied':
+            return prev.map(m => {
+              if (m.id !== detail.missionId) return m;
+              return {
+                ...m,
+                goals: m.goals.map(g => {
+                  if (g.id !== detail.goalId) return g;
+                  return {
+                    ...g,
+                    actions: g.actions.map(a =>
+                      a.id === detail.actionId ? { ...a, status: 'failed' as const } : a
+                    ),
+                  };
+                }),
+              };
+            });
+
           case 'goal_escalated':
+          case 'goal_blocked':
             return prev.map(m => {
               if (m.id !== detail.missionId) return m;
               return {
@@ -272,6 +447,21 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
               return { ...m, status: 'failed' as const };
             });
 
+          case 'mission_paused':
+            return prev.map(m => {
+              if (m.id !== detail.missionId) return m;
+              return { ...m, status: 'paused' as const };
+            });
+
+          case 'mission_resumed':
+            return prev.map(m => {
+              if (m.id !== detail.missionId) return m;
+              return { ...m, status: 'in_progress' as const };
+            });
+
+          case 'mission_deleted':
+            return prev.filter(m => m.id !== detail.missionId);
+
           default:
             return prev;
         }
@@ -290,7 +480,7 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
     }
   }, [missions, expandedMission]);
 
-  const activeMissions = missions.filter(m => m.status === 'in_progress' || m.status === 'blocked');
+  const activeMissions = missions.filter(m => m.status === 'in_progress' || m.status === 'blocked' || m.status === 'paused');
   const completedMissions = missions.filter(m => m.status === 'completed' || m.status === 'failed');
 
   const content = (
@@ -302,7 +492,88 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
           <StatChip count={completedMissions.filter(m => m.status === 'completed').length} label="ok" color="var(--color-success)" />
           <StatChip count={completedMissions.filter(m => m.status === 'failed').length} label="err" color="var(--color-error)" />
         </div>
+        <button
+          onClick={() => { setShowCreate(v => !v); setCreateError(null); }}
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold transition cursor-pointer hover:opacity-80"
+          style={{ color: 'var(--color-info)', backgroundColor: 'color-mix(in srgb, var(--color-info) 10%, transparent)' }}
+          title="Créer une mission"
+        >
+          <Plus size={12} /> Nouvelle
+        </button>
       </div>
+
+      {/* Formulaire de création */}
+      <AnimatePresence>
+        {showCreate && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden flex-shrink-0"
+            style={{ borderBottom: '1px solid var(--border-base)' }}
+          >
+            <div className="px-3 py-2.5 space-y-2">
+              <input
+                type="text"
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                placeholder="Titre de la mission"
+                disabled={creating}
+                className="w-full px-2 py-1.5 rounded-md text-xs outline-none"
+                style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-base)' }}
+              />
+              <textarea
+                value={newDescription}
+                onChange={e => setNewDescription(e.target.value)}
+                placeholder="Décris la tâche complexe à accomplir…"
+                disabled={creating}
+                rows={2}
+                className="w-full px-2 py-1.5 rounded-md text-xs outline-none resize-none"
+                style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-base)' }}
+              />
+              {createError && (
+                <p className="text-xs" style={{ color: 'var(--color-error)' }}>{createError}</p>
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={createMission}
+                  disabled={creating || !newTitle.trim() || !newDescription.trim()}
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
+                  style={{ color: 'var(--color-info)', backgroundColor: 'color-mix(in srgb, var(--color-info) 12%, transparent)' }}
+                >
+                  {creating ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} />}
+                  Lancer
+                </button>
+                <button
+                  onClick={() => { setShowCreate(false); setCreateError(null); }}
+                  disabled={creating}
+                  className="px-2 py-1.5 rounded-md text-xs font-medium transition disabled:opacity-50 cursor-pointer"
+                  style={{ color: 'var(--text-dimmed)', backgroundColor: 'var(--bg-input)' }}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Approbations en attente */}
+      {approvals.length > 0 && (
+        <div className="px-2 pt-2 space-y-1.5 flex-shrink-0">
+          <AnimatePresence initial={false}>
+            {approvals.map(approval => (
+              <ApprovalCard
+                key={approval.actionId}
+                approval={approval}
+                resolving={resolving === approval.actionId}
+                onApprove={() => resolveApproval(approval.missionId, approval.actionId, true)}
+                onReject={() => resolveApproval(approval.missionId, approval.actionId, false)}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Mission list */}
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-2 custom-scrollbar">
@@ -316,8 +587,13 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
                 mission={mission}
                 expanded={expandedMission === mission.id}
                 expandedGoal={expandedGoal}
+                busy={busyMission === mission.id}
                 onToggle={() => setExpandedMission(prev => prev === mission.id ? null : mission.id)}
                 onToggleGoal={(goalId) => setExpandedGoal(prev => prev === goalId ? null : goalId)}
+                onPause={() => controlMission(mission.id, 'pause')}
+                onResume={() => controlMission(mission.id, 'resume')}
+                onCancel={() => controlMission(mission.id, 'cancel')}
+                onDelete={() => controlMission(mission.id, 'delete')}
               />
             ))}
           </AnimatePresence>
@@ -359,20 +635,135 @@ function StatChip({ count, label, color }: { count: number; label: string; color
   );
 }
 
+function ApprovalCard({
+  approval,
+  resolving,
+  onApprove,
+  onReject,
+}: {
+  approval: PendingApproval;
+  resolving: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const argsPreview = approval.args && Object.keys(approval.args).length > 0
+    ? JSON.stringify(approval.args)
+    : null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, height: 0 }}
+      className="rounded-xl overflow-hidden"
+      style={{
+        backgroundColor: 'color-mix(in srgb, var(--color-warning) 8%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)',
+      }}
+    >
+      <div className="px-3 py-2.5">
+        <div className="flex items-center gap-2 mb-1.5">
+          <Pause size={13} style={{ color: 'var(--color-warning)' }} className="flex-shrink-0" />
+          <span className="text-xs font-bold uppercase tracking-wide flex-1" style={{ color: 'var(--color-warning)' }}>
+            Approbation requise
+          </span>
+          <span className="text-xs font-mono px-1 py-0.5 rounded flex items-center gap-1"
+            style={{ color: 'var(--accent-primary)', backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)' }}>
+            <Zap size={9} /> {approval.skill}
+          </span>
+        </div>
+
+        <p className="text-xs leading-relaxed mb-1" style={{ color: 'var(--text-muted)' }}>
+          {approval.reason}
+        </p>
+
+        {argsPreview && (
+          <p className="text-xs font-mono truncate mb-2 opacity-70" style={{ color: 'var(--text-dimmed)' }} title={argsPreview}>
+            {argsPreview}
+          </p>
+        )}
+
+        <div className="flex items-center gap-2 mt-2">
+          <button
+            onClick={onApprove}
+            disabled={resolving}
+            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
+            style={{ color: 'var(--color-success)', backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)' }}
+          >
+            {resolving ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} />}
+            Approuver
+          </button>
+          <button
+            onClick={onReject}
+            disabled={resolving}
+            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
+            style={{ color: 'var(--color-error)', backgroundColor: 'color-mix(in srgb, var(--color-error) 12%, transparent)' }}
+          >
+            <XCircle size={11} />
+            Refuser
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function MissionControlButton({
+  title,
+  onClick,
+  disabled,
+  color,
+  icon,
+}: {
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  color: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      disabled={disabled}
+      className="flex items-center justify-center w-6 h-6 rounded-md transition disabled:opacity-40 cursor-pointer hover:bg-white/10"
+      style={{ color }}
+    >
+      {icon}
+    </button>
+  );
+}
+
 function MissionCard({
   mission,
   expanded,
   expandedGoal,
+  busy,
   onToggle,
   onToggleGoal,
+  onPause,
+  onResume,
+  onCancel,
+  onDelete,
 }: {
   mission: MissionEntry;
   expanded: boolean;
   expandedGoal: string | null;
+  busy: boolean;
   onToggle: () => void;
   onToggleGoal: (goalId: string) => void;
+  onPause: () => void;
+  onResume: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
 }) {
   const isActive = mission.status === 'in_progress';
+  const isPaused = mission.status === 'paused';
+  const isRunning = isActive || isPaused || mission.status === 'blocked';
+  const isTerminal = mission.status === 'completed' || mission.status === 'failed';
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const confColor = confidenceColor(mission.confidence);
   const progress = mission.metrics.totalActions > 0
     ? Math.round((mission.metrics.successfulActions / mission.metrics.totalActions) * 100)
@@ -385,14 +776,27 @@ function MissionCard({
       exit={{ opacity: 0, height: 0 }}
       className="rounded-xl overflow-hidden"
       style={{
-        backgroundColor: isActive ? 'color-mix(in srgb, var(--color-info) 4%, transparent)' : 'var(--bg-input)',
-        border: `1px solid ${isActive ? 'color-mix(in srgb, var(--color-info) 20%, transparent)' : 'var(--border-base)'}`,
+        backgroundColor: isPaused
+          ? 'color-mix(in srgb, var(--color-warning) 5%, transparent)'
+          : isActive
+          ? 'color-mix(in srgb, var(--color-info) 4%, transparent)'
+          : 'var(--bg-input)',
+        border: `1px solid ${
+          isPaused
+            ? 'color-mix(in srgb, var(--color-warning) 25%, transparent)'
+            : isActive
+            ? 'color-mix(in srgb, var(--color-info) 20%, transparent)'
+            : 'var(--border-base)'
+        }`,
       }}
     >
       {/* Mission header */}
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left cursor-pointer hover:bg-white/5 transition"
         onClick={onToggle}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
       >
         {/* Status icon */}
         <div className="flex-shrink-0">
@@ -424,10 +828,72 @@ function MissionCard({
           </div>
         </div>
 
+        {/* Contrôles : pause/reprise · annuler · supprimer */}
+        <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          {isRunning && (
+            isPaused ? (
+              <MissionControlButton
+                title="Reprendre la mission"
+                onClick={onResume}
+                disabled={busy}
+                color="var(--color-success)"
+                icon={<Play size={12} />}
+              />
+            ) : (
+              <MissionControlButton
+                title="Mettre en pause"
+                onClick={onPause}
+                disabled={busy}
+                color="var(--color-warning)"
+                icon={<Pause size={12} />}
+              />
+            )
+          )}
+
+          {isRunning && (
+            <MissionControlButton
+              title="Annuler la mission"
+              onClick={onCancel}
+              disabled={busy}
+              color="var(--color-error)"
+              icon={<XCircle size={12} />}
+            />
+          )}
+
+          {(isTerminal || isRunning) && (
+            confirmDelete ? (
+              <>
+                <MissionControlButton
+                  title="Confirmer la suppression"
+                  onClick={() => { setConfirmDelete(false); onDelete(); }}
+                  disabled={busy}
+                  color="var(--color-error)"
+                  icon={busy ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                />
+                <MissionControlButton
+                  title="Annuler la suppression"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={busy}
+                  color="var(--text-dimmed)"
+                  icon={<X size={12} />}
+                />
+              </>
+            ) : (
+              <MissionControlButton
+                title="Supprimer la mission"
+                onClick={() => setConfirmDelete(true)}
+                disabled={busy}
+                color="var(--text-dimmed)"
+                icon={<Trash2 size={12} />}
+              />
+            )
+          )}
+        </div>
+
         <motion.div animate={{ rotate: expanded ? 90 : 0 }} className="flex-shrink-0">
           <ChevronRight size={12} style={{ color: 'var(--text-dimmed)' }} />
         </motion.div>
-      </button>
+      </div>
 
       {/* Expanded: Goal Stack */}
       <AnimatePresence>

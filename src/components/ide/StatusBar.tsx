@@ -17,12 +17,13 @@ import {
   Send,
   Play,
   Square,
+  Target,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
-import { TokenDetailModal } from './TokenDetailModal.js';
-import { ModelPickerModal } from './ModelPickerModal.js';
-import { TelegramStatusModal, type TelegramStatus } from './TelegramStatusModal.js';
+
+
+import { type TelegramStatus } from './TelegramStatusModal.js';
 import { formatExactTokenCount, formatTokenCount } from '../../utils/tokenFormatting.js';
 import { getAgentTasks, getToolActivities, subscribe as subscribeActivity } from '../../stores/agentActivityStore.js';
 
@@ -42,6 +43,10 @@ interface StatusBarProps {
   onToggleFleet?: () => void;
   onToggleLogs?: () => void;
   onToggleGitHub?: () => void;
+  onToggleMissions?: () => void;
+  onToggleTelegram?: () => void;
+  onToggleModelPicker?: () => void;
+  onToggleTokenDetail?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -65,13 +70,15 @@ export const StatusBar = memo(function StatusBar({
   onToggleFleet,
   onToggleLogs,
   onToggleGitHub,
+  onToggleMissions,
+  onToggleTelegram,
+  onToggleModelPicker,
+  onToggleTokenDetail,
 }: StatusBarProps) {
   const { tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
 
 
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showModelPicker, setShowModelPicker] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetCode, setResetCode] = useState('');
   const [resetError, setResetError] = useState<string | null>(null);
@@ -81,8 +88,13 @@ export const StatusBar = memo(function StatusBar({
   const [sandboxActive, setSandboxActive] = useState(false);
   const [sandboxModifiedCount, setSandboxModifiedCount] = useState(0);
 
+  // ── Missions ─────────────────────────────────────────────────────────────
+  // Nombre de missions actives (in_progress). Alimenté par le fetch initial
+  // puis mis à jour en temps réel via les événements 'Leanna-mission-event',
+  // exactement comme le MissionPanel.
+  const [activeMissionCount, setActiveMissionCount] = useState(0);
+
   // ── Telegram ───────────────────────────────────────────────────────────────
-  const [showTelegramModal, setShowTelegramModal] = useState(false);
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
   const [telegramActionLoading, setTelegramActionLoading] = useState(false);
 
@@ -120,6 +132,76 @@ export const StatusBar = memo(function StatusBar({
     return () => {
       cancelled = true;
       clearInterval(interval);
+    };
+  }, []);
+
+  // ── Missions : suivi du nombre de missions actives ─────────────────────────
+
+  useEffect(() => {
+    // statuts par mission, pour recalculer le nombre d'actives à chaque event
+    const statuses = new Map<string, string>();
+    const recompute = () => {
+      let count = 0;
+      for (const s of statuses.values()) {
+        // Ne compter que les missions réellement en cours d'exécution.
+        // 'blocked' (escaladé), 'pending', 'completed' et 'failed' ne sont
+        // PAS des missions actives — les inclure faisait apparaître un badge
+        // fantôme alors qu'aucune mission ne tournait.
+        if (s === 'in_progress' || s === 'paused') count += 1;
+      }
+      setActiveMissionCount(count);
+    };
+
+    let cancelled = false;
+    fetch('/api/missions')
+      .then(res => (res.ok ? res.json() : { missions: [] }))
+      .then((data: { missions?: Array<{ id: string; status?: string }> }) => {
+        if (cancelled || !Array.isArray(data.missions)) return;
+        for (const m of data.missions) statuses.set(m.id, m.status ?? 'pending');
+        recompute();
+      })
+      .catch(() => { /* système de missions indisponible — badge à 0, normal */ });
+
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ type?: string; event?: string; missionId?: string; success?: boolean }>).detail;
+      if (!detail || detail.type !== 'mission_event' || !detail.missionId) return;
+      switch (detail.event) {
+        case 'mission_plan':
+          if (!statuses.has(detail.missionId)) statuses.set(detail.missionId, 'pending');
+          break;
+        case 'mission_started':
+        case 'goal_started':
+        case 'action_started':
+        case 'goal_escalated':
+        case 'goal_blocked':
+          // Un objectif bloqué/escaladé n'arrête pas la mission (d'autres
+          // objectifs peuvent tourner en parallèle) → toujours "en cours".
+          statuses.set(detail.missionId, 'in_progress');
+          break;
+        case 'mission_paused':
+        case 'mission_resumed':
+          // Reste comptée comme active dans les deux cas.
+          statuses.set(detail.missionId, 'in_progress');
+          break;
+        case 'mission_deleted':
+          statuses.delete(detail.missionId);
+          break;
+        case 'mission_completed':
+          statuses.set(detail.missionId, detail.success ? 'completed' : 'failed');
+          break;
+        case 'mission_cancelled':
+          statuses.set(detail.missionId, 'failed');
+          break;
+        default:
+          return;
+      }
+      recompute();
+    };
+
+    window.addEventListener('Leanna-mission-event', handler);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('Leanna-mission-event', handler);
     };
   }, []);
 
@@ -426,7 +508,7 @@ export const StatusBar = memo(function StatusBar({
           {/* AI Model — compact, clickable */}
           <button
             type="button"
-            onClick={() => setShowModelPicker(true)}
+            onClick={() => onToggleModelPicker?.()}
             className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
             style={{ color: 'var(--text-muted)' }}
             title="Changer de modèle IA"
@@ -457,7 +539,7 @@ export const StatusBar = memo(function StatusBar({
           <div className="flex items-center gap-0.5">
             <button
               type="button"
-              onClick={() => setShowTelegramModal(true)}
+              onClick={() => onToggleTelegram?.()}
               className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
               title={
                 !telegramStatus?.isConfigured
@@ -581,6 +663,31 @@ export const StatusBar = memo(function StatusBar({
             <span style={{ color: 'var(--text-muted)' }} className="font-medium">GitHub</span>
           </button>
 
+          {/* Missions — ouvre le panneau des missions */}
+          <button
+            type="button"
+            onClick={onToggleMissions}
+            className="relative flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+            title="Ouvrir le panneau Missions"
+          >
+            <Target size={12} style={{ color: 'var(--color-info)' }} />
+            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Missions</span>
+            {activeMissionCount > 0 && (
+              <motion.span
+                key={activeMissionCount}
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.6, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+                className="absolute -top-1 -right-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full text-[9px] font-bold tabular-nums leading-none px-0.5"
+                style={{ backgroundColor: 'var(--color-info)', color: 'var(--bg-primary)' }}
+                aria-label={`${activeMissionCount} mission${activeMissionCount > 1 ? 's' : ''} active${activeMissionCount > 1 ? 's' : ''}`}
+              >
+                {activeMissionCount > 99 ? '99+' : activeMissionCount}
+              </motion.span>
+            )}
+          </button>
+
           {/* Séparateur */}
           <div className="w-px h-4" style={{ backgroundColor: 'var(--border-base)', opacity: 0.4 }} />
 
@@ -642,7 +749,7 @@ export const StatusBar = memo(function StatusBar({
           {/* Tokens — clickable */}
           <button
             type="button"
-            onClick={() => setShowDetailModal(true)}
+            onClick={() => onToggleTokenDetail?.()}
             className="relative flex items-center gap-2.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
             style={{ color: 'var(--text-muted)' }}
             title={`Tokens : ${formatExactTokenCount(tokenUsage.totalTokens)} · Contexte : ${formatExactTokenCount(promptContext.currentSize)} / ${formatExactTokenCount(promptContext.maxSize)}`}
@@ -802,15 +909,6 @@ export const StatusBar = memo(function StatusBar({
         </div>
       )}
 
-      {showDetailModal && <TokenDetailModal onClose={() => setShowDetailModal(false)} />}
-      {showModelPicker && <ModelPickerModal onClose={() => setShowModelPicker(false)} />}
-      {showTelegramModal && (
-        <TelegramStatusModal
-          status={telegramStatus}
-          onClose={() => setShowTelegramModal(false)}
-          onStatusChange={(newStatus) => setTelegramStatus(newStatus)}
-        />
-      )}
     </>
   );
 });

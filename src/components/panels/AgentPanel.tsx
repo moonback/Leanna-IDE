@@ -185,11 +185,14 @@ function VoiceLatencyBadge({ getLatencyStats }: { getLatencyStats: () => { avg: 
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface AgentPanelProps {
+  /** Rendu en overlay modal centré. */
   inline?: boolean;
+  /** Rendu en panneau latéral docké (comme le panneau Missions). */
+  docked?: boolean;
   onClose?: () => void;
 }
 
-export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
+export function AgentPanel({ inline = false, docked = false, onClose }: AgentPanelProps) {
   // Subscribe to the global store — re-renders on every change
   const toolActivities = useSyncExternalStore(subscribe, getToolActivities);
   const delegatedTasks = useSyncExternalStore(subscribe, getAgentTasks);
@@ -244,8 +247,8 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
   const totalAgents = AGENT_ROSTER.length;
 
   // scrollable area height differs between modal and panel mode
-  const scrollAreaStyle: React.CSSProperties = inline
-    ? { minHeight: 0 }          // inside modal flex container — flex-1 handles it
+  const scrollAreaStyle: React.CSSProperties = (inline || docked)
+    ? { minHeight: 0 }          // conteneur flex (modal ou docké) — flex-1 gère la hauteur
     : { maxHeight: '60vh' };    // standalone Panel — need an explicit cap
 
   const content = (
@@ -303,6 +306,38 @@ export function AgentPanel({ inline = false, onClose }: AgentPanelProps) {
       </div>
     </div>
   );
+
+  if (docked) {
+    // Panneau latéral docké (même comportement que le panneau Missions) :
+    // en-tête compact + contenu plein, sans overlay ni fond assombri.
+    return (
+      <div className="flex flex-col h-full">
+        <div
+          className="flex items-center justify-between px-3 py-2 flex-shrink-0"
+          style={{ borderBottom: '1px solid var(--border-base)' }}
+        >
+          <div className="flex items-center gap-2">
+            <Users size={14} style={{ color: 'var(--accent-primary)' }} />
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Agents</span>
+            <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-dimmed)' }}>
+              {liveRunning + delegatedRunning} actifs
+            </span>
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
+              style={{ color: 'var(--text-muted)' }}
+              aria-label="Fermer"
+            >
+              <XCircle size={15} />
+            </button>
+          )}
+        </div>
+        {content}
+      </div>
+    );
+  }
 
   if (inline) {
     return (

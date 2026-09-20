@@ -54,6 +54,8 @@ export interface Goal {
   status: GoalStatus;
   /** Sous-objectifs */
   children: string[];
+  /** IDs des objectifs dont celui-ci dépend (doivent être complétés avant). */
+  dependsOn?: string[];
   /** Skills/outils planifiés pour cet objectif */
   plannedActions: PlannedAction[];
   /** Résultat si terminé */
@@ -199,6 +201,8 @@ export interface MissionConfig {
   enableMemoryLearning: boolean;
   /** Seuil de score minimum pour sélectionner un skill */
   minSkillScore: number;
+  /** Nombre max de sous-objectifs exécutés en parallèle dans une vague. */
+  maxConcurrentGoals: number;
   /**
    * Mode simulation globale : la mission s'exécute sans effet de bord
    * (aucune écriture, exécution shell ou mutation réseau réelle).
@@ -232,5 +236,6 @@ export const DEFAULT_MISSION_CONFIG: MissionConfig = {
   enableReflection: true,
   enableMemoryLearning: true,
   minSkillScore: 25,
+  maxConcurrentGoals: 3,
   dryRun: false,
 };
