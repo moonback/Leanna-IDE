@@ -235,7 +235,7 @@ describe("BrainVerifier", () => {
 
   it("retourne passed=true quand le résultat de l'étape est succès et aucun fichier modifié", async () => {
     const stage = makeStage("coder");
-    stage.result = { success: true, output: "Implémenté", filesModified: [] };
+    stage.result = { success: true, outcome: "success", summary: "Implémenté", filesModified: [], durationMs: 0 };
 
     const report = await verifier.verifyStage(stage, understanding, []);
     // Sans erreur (ni fichiers corrompus, ni agent failed), doit passer
@@ -244,7 +244,7 @@ describe("BrainVerifier", () => {
 
   it("retourne passed=false et une issue critique si l'agent a retourné success=false", async () => {
     const stage = makeStage("coder");
-    stage.result = { success: false, error: "Compilation échouée", filesModified: [] };
+    stage.result = { success: false, outcome: "failed", summary: "Échec de compilation", error: "Compilation échouée", filesModified: [], durationMs: 0 };
 
     const report = await verifier.verifyStage(stage, understanding, []);
     assert.equal(report.passed, false);
@@ -253,7 +253,7 @@ describe("BrainVerifier", () => {
 
   it("retourne passed=false si l'agent vision a signalé un débordement", async () => {
     const stage = makeStage("vision");
-    stage.result = { success: true, output: "Détection d'un overflow et débordement sur mobile", filesModified: [] };
+    stage.result = { success: true, outcome: "success", summary: "Détection d'un overflow et débordement sur mobile", filesModified: [], durationMs: 0 };
 
     const report = await verifier.verifyStage(stage, understanding, []);
     assert.equal(report.visualCheckOk, false);

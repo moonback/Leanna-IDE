@@ -172,7 +172,7 @@ export function AgentStatusBlock({
 
                 <FlyoutSeparator />
 
-                {aiMenuItems.map((item) => (
+                {/* {aiMenuItems.map((item) => (
                   <FlyoutItem
                     key={item.id}
                     icon={item.icon}
@@ -186,7 +186,7 @@ export function AgentStatusBlock({
                       }
                     }}
                   />
-                ))}
+                ))} */}
               </div>
 
               <FlyoutSeparator />

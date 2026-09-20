@@ -51,6 +51,13 @@ export interface LiveSocketDeps {
   browserActionPending: Map<string, BrowserActionPendingEntry>;
 }
 
+// Plafond de taille (en caractères) appliqué à chaque résultat d'outil injecté
+// dans la session Live. Les gros payloads (generate_codebase_markdown,
+// list_project_files récursif, read_project_file) sont tronqués pour éviter que
+// la fenêtre de contexte du modèle ne déborde ('context_too_long'). ~48k
+// caractères ≈ ~12k tokens, largement suffisant pour un résultat d'outil unique.
+const MAX_TOOL_RESULT_CHARS = 48_000;
+
 // ─── Constantes retry tool calls ─────────────────────────────────────────────
 
 /** Nombre maximum de tentatives supplémentaires pour les erreurs transientes. */
@@ -192,9 +199,14 @@ export function attachLiveWebSocket(
     };
 
     // ── Context window monitoring ────────────────────────────────────────
+    // Seuils proactifs : on déclenche le résumé BIEN avant la limite réelle du
+    // modèle, car un seul gros résultat d'outil (ex. generate_codebase_markdown
+    // sur un projet volumineux) peut faire bondir la taille de session entre deux
+    // mesures. Un seuil critique à 70 % laisse la marge nécessaire pour éviter le
+    // 'context_too_long' côté Gemini.
     const CONTEXT_WINDOW_TOKENS = 1_000_000;
-    const WARNING_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * 0.60);
-    const CRITICAL_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * 0.85);
+    const WARNING_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * 0.50);
+    const CRITICAL_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * 0.70);
 
     const conversationCtx = {
       totalPromptTokens: 0,
@@ -210,8 +222,8 @@ export function attachLiveWebSocket(
     let autoSummarizeContext: (() => Promise<void>) | null = null;
 
     const resolveContextLevel = (percent: number): 'ok' | 'warn' | 'critical' => {
-      if (percent >= 85) return 'critical';
-      if (percent >= 60) return 'warn';
+      if (percent >= 70) return 'critical';
+      if (percent >= 50) return 'warn';
       return 'ok';
     };
 
@@ -708,7 +720,27 @@ export function attachLiveWebSocket(
             if (message.serverContent?.interrupted) clientWs.send(JSON.stringify({ interrupted: true }));
 
             if (message.toolCall) {
-              handleToolCall(message.toolCall, session, clientWs, sessionMode, busyStateRef, voiceName, deps, sessionSupervisor, contextGate).catch(e =>
+              handleToolCall(
+                message.toolCall, session, clientWs, sessionMode, busyStateRef, voiceName,
+                deps, sessionSupervisor, contextGate,
+                // (B) Les résultats d'outils injectés dans la session comptent dans
+                // la fenêtre de contexte, mais n'apparaissent pas dans usageMetadata.
+                // On les remonte ici pour que le moniteur (et donc l'auto-résumé)
+                // se déclenche à temps.
+                (toolTokens: number) => {
+                  conversationCtx.totalPromptTokens += toolTokens;
+                  const cumulative = conversationCtx.totalPromptTokens + conversationCtx.totalCompletionTokens;
+                  const pct = (cumulative / CONTEXT_WINDOW_TOKENS) * 100;
+                  console.debug(`[ContextGuard] +${toolTokens} tokens (résultats d'outils) → cumulatif ${cumulative} (${pct.toFixed(1)}%)`);
+                  sendContextSize(cumulative, { turns: conversationCtx.turns });
+                  if (cumulative >= CRITICAL_THRESHOLD && !conversationCtx.warningsIssued.has('critical')) {
+                    conversationCtx.warningsIssued.add('critical');
+                    conversationCtx.lastAlertLevel = 'critical';
+                    console.warn(`[ContextGuard] 🔴 Seuil critique atteint via résultats d'outils (${pct.toFixed(1)}%) — déclenchement du résumé.`);
+                    autoSummarizeContext?.();
+                  }
+                },
+              ).catch(e =>
                 console.error('[handleToolCall] Erreur non catchée:', e),
               );
             }
@@ -828,8 +860,12 @@ export function attachLiveWebSocket(
       sendContextSize(initialPromptSize, { turns: 0 });
 
       // ── Auto-summarize setup ────────────────────────────────────────
-      const AUTO_SUMMARIZE_COOLDOWN_MS = 120_000; // 5 min → 2 min
-      const MAX_AUTO_SUMMARIZES_PER_SESSION = 3;
+      // Cooldown et plafond réduits/augmentés : pendant une mission autonome, les
+      // outils s'enchaînent en quelques secondes et le contexte grossit vite. Un
+      // cooldown de 30 s et un plafond de 6 résumés/session laissent le résumé
+      // suivre le rythme sans laisser le contexte déborder.
+      const AUTO_SUMMARIZE_COOLDOWN_MS = 30_000;
+      const MAX_AUTO_SUMMARIZES_PER_SESSION = 6;
       const MIN_MESSAGES_FOR_AUTO_SUMMARIZE = 8;
 
       autoSummarizeContext = async () => {
@@ -1186,6 +1222,48 @@ function isContextReady(state: SessionContextGate, toolName?: string, args?: any
   return allRead;
 }
 
+// ── Cap sur la taille des résultats d'outils ─────────────────────────────────
+// Tronque un résultat d'outil trop volumineux avant son injection dans la
+// session Live. On sérialise la réponse, et si elle dépasse le plafond on
+// conserve le début (le plus utile) en ajoutant un marqueur de troncature
+// explicite pour que le modèle sache que le contenu a été coupé.
+function capToolResponse(
+  response: unknown,
+  toolName: string,
+  maxChars = MAX_TOOL_RESULT_CHARS,
+): { response: unknown; truncated: boolean; originalChars: number } {
+  let serialized: string;
+  try {
+    serialized = typeof response === 'string' ? response : JSON.stringify(response);
+  } catch {
+    // Réponse non sérialisable (rare) : on la laisse telle quelle.
+    return { response, truncated: false, originalChars: 0 };
+  }
+
+  const originalChars = serialized.length;
+  if (originalChars <= maxChars) {
+    return { response, truncated: false, originalChars };
+  }
+
+  const kept = serialized.slice(0, maxChars);
+  const marker =
+    `\n\n[…RÉSULTAT TRONQUÉ — outil "${toolName}" : ` +
+    `${originalChars} caractères réduits à ${maxChars}. ` +
+    `Affine la requête (chemin précis, sous-dossier, plage de lignes) pour obtenir le détail manquant.]`;
+
+  return {
+    response: {
+      _truncated: true,
+      _tool: toolName,
+      _originalChars: originalChars,
+      _keptChars: maxChars,
+      content: kept + marker,
+    },
+    truncated: true,
+    originalChars,
+  };
+}
+
 // ── handleToolCall ─────────────────────────────────────────────────────────────
 async function handleToolCall(
   toolCall: any,
@@ -1203,6 +1281,7 @@ async function handleToolCall(
     requiredFiles: new Set(),
     readFiles: new Set(),
   },
+  onToolResultTokens?: (tokens: number) => void,
 ): Promise<void> {
   const functionResponses: any[] = [];
   const skillManager = deps?.skillManager;
@@ -1403,6 +1482,40 @@ async function handleToolCall(
   if (busyStateRef) busyStateRef.activeDescription = null;
 
   if (functionResponses.length > 0) {
+    // ── Cap (C) + comptabilisation des tokens (B) ──────────────────────────
+    // On tronque chaque résultat trop volumineux AVANT injection, puis on
+    // estime les tokens réellement envoyés dans la session pour que le moniteur
+    // de contexte reflète la taille réelle (les payloads d'outils n'apparaissent
+    // pas dans usageMetadata de Gemini).
+    let injectedTokens = 0;
+    for (const fr of functionResponses) {
+      const capped = capToolResponse(fr.response, fr.name);
+      if (capped.truncated) {
+        fr.response = capped.response;
+        console.warn(
+          `[ContextGuard] ✂️ Résultat "${fr.name}" tronqué: ` +
+          `${capped.originalChars} → ${MAX_TOOL_RESULT_CHARS} caractères.`,
+        );
+        try {
+          clientWs.send(JSON.stringify({
+            type: 'tool_result_truncated',
+            tool: fr.name,
+            originalChars: capped.originalChars,
+            keptChars: MAX_TOOL_RESULT_CHARS,
+          }));
+        } catch { /* ignore si WS fermé */ }
+      }
+      try {
+        const serialized = typeof fr.response === 'string' ? fr.response : JSON.stringify(fr.response);
+        injectedTokens += estimateTokens(serialized);
+      } catch { /* non sérialisable : ignoré dans l'estimation */ }
+    }
+
     session.sendToolResponse({ functionResponses });
+
+    // Remonter les tokens injectés au moniteur de contexte de la connexion.
+    if (injectedTokens > 0) {
+      try { onToolResultTokens?.(injectedTokens); } catch { /* ignore */ }
+    }
   }
 }

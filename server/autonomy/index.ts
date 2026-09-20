@@ -12,3 +12,19 @@ export type { SupervisorConfig, MissionObjective, SessionInjector } from "./Supe
 
 export { createSmartSkills } from "./SmartSkills.js";
 export type { SkillHandler } from "./SmartSkills.js";
+
+export { LeannaCore } from "./LeannaCore.js";
+export type {
+  LeannaRuntimeState,
+  LeannaRuntimeStatus,
+  LeannaCoreOptions,
+  AutonomyTaskStore,
+  AutonomyBroadcaster,
+  AutonomyBroadcastMessage,
+  AutonomyEventType,
+} from "./LeannaCore.js";
+export { HeartbeatService, heartbeatConfigFromEnv } from "./HeartbeatService.js";
+export { PerceptionEngine } from "./PerceptionEngine.js";
+export { TaskManager, taskManagerConfigFromEnv } from "./TaskManager.js";
+export type { AutonomousTask, AutonomousTaskStatus, TaskManagerConfig, TaskPersistence } from "./TaskManager.js";
+export { AutonomyPersistence } from "./AutonomyPersistence.js";

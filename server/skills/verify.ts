@@ -512,13 +512,16 @@ async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = 
   const npxBin = isWin ? "npx.cmd" : "npx";
   const npmBin = isWin ? "npm.cmd" : "npm";
 
-  // Sur Node.js 20+, execFile trouve automatiquement les .cmd sur Windows
-  // sans avoir besoin de shell:true (qui génère un avertissement de dépréciation)
+  // Depuis le correctif CVE-2024-27980 (Node 18.20/20.12/21+), lancer un
+  // fichier .cmd/.bat via child_process sans `shell: true` lève EINVAL sur
+  // Windows. On active donc le shell uniquement sur Windows. Les arguments
+  // restent passés sous forme de tableau et le nom de script est déjà validé
+  // contre une liste blanche en amont : pas d'interpolation de valeur non fiable.
   const opts = {
     cwd: root,
     timeout: TIMEOUT_MS,
     maxBuffer: 2 * 1024 * 1024,
-    // Pas de shell: true - Node.js 20+ gère .cmd directement
+    shell: isWin,
     env: { ...process.env },
   };
 

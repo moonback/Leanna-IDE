@@ -55,7 +55,7 @@ import pm2Router from "./server/routes/pm2.js";
 import { initSandboxWatchWSS } from "./server/routes/sandbox-watch.js";
 import { createUploadDocumentRouter } from "./server/routes/upload-document.js";
 import { createDocumentsRouter } from "./server/routes/documents.js";
-import skillsRouter, { createSkillsRouter } from "./server/routes/skills.js";
+import { createSkillsRouter } from "./server/routes/skills.js";
 import mcpRouter from "./server/routes/mcp.js";
 import { createTerminalRouter, setupTerminalWebSocket } from "./server/routes/terminal.js";
 import memoriesRouter from "./server/routes/memories.js";
@@ -283,6 +283,9 @@ import { telegramSkill } from "./server/skills/telegram.js";
 import { telegramService } from "./server/telegram/TelegramService.js";
 import { createTelegramRouter } from "./server/routes/telegram.js";
 import { createSmartSkills } from "./server/autonomy/SmartSkills.js";
+import { LeannaCore } from "./server/autonomy/LeannaCore.js";
+import { AutonomyPersistence } from "./server/autonomy/AutonomyPersistence.js";
+import { RedisEventBridge } from "./server/runtime/RedisEventBridge.js";
 
 const { runtime, skillManager } = bootstrapRuntimeSync({
   skills: [
@@ -378,6 +381,24 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
 const runtimeV2 = runtime;
 const observability = new Observability();
 observability.attach(runtime.events);
+// Optional Redis Streams bridge: makes the in-process EventBus multi-process
+// durable across instances. No-op (bus stays in-process) when Redis is absent.
+const eventBridge = new RedisEventBridge(runtime.events);
+void eventBridge.start();
+// Durable task store enabling checkpoint/resume of autonomy tasks after a crash.
+// Degrades silently to in-memory only when Supabase is not configured.
+const autonomyPersistence = new AutonomyPersistence();
+const leannaCore = new LeannaCore(runtimeV2, {
+  persistence: autonomyPersistence,
+  onTask: async (task) => {
+    // Autonomous tasks remain observable and use existing runtime memory; no tool
+    // or mission action bypasses PermissionPolicy, DryRun or AutonomyPolicy.
+    await runtimeV2.memory.set("session", `autonomy:task:${task.id}`, {
+      type: task.type, sourceEventId: task.sourceEventId, metadata: task.metadata,
+    }, { ttl: 24 * 60 * 60 * 1000, tags: ["autonomy", task.type] });
+  },
+});
+leannaCore.start();
 
 // Connecter l'AgentOrchestrator au nouveau skillManager (compatible avec l'ancien)
 // L'ancien SkillManager faisait cela dans son constructeur, maintenant on le fait explicitement
@@ -489,7 +510,7 @@ async function startServer() {
   // ── Content Security Policy (CSP) ─────────────────────────────────────────
   // Sépare dev/prod pour éliminer unsafe-eval en production
   const { getCSPForEnvironment } = await import("./server/config/csp.js");
-  app.use((req, res, next) => {
+  app.use((_req, res, next) => {
     const csp = getCSPForEnvironment(isDev);
     res.setHeader('Content-Security-Policy', csp);
     // Headers de sécurité additionnels
@@ -562,7 +583,7 @@ async function startServer() {
   const { createAgentsRouterV2 } = await import("./server/runtime/routes/agents.js");
   const { createMetricsRouter } = await import("./server/runtime/routes/metrics.js");
   app.use("/api/v2/agents", createAgentsRouterV2(runtimeV2));
-  app.use("/api/v2/metrics", createMetricsRouter(runtimeV2));
+  app.use("/api/v2/metrics", createMetricsRouter(runtimeV2, leannaCore));
 
   // ─── Observability & Telemetry (OpenTelemetry + Cost Dashboard) ──────────
   const observabilityRouter = (await import("./server/routes/observability.js")).default;
@@ -769,6 +790,22 @@ async function startServer() {
   const terminalWss = new WebSocketServer({ noServer: true });
   setupTerminalWebSocket(terminalWss, apiToken);
 
+  // WebSocket server dédié pour la timeline d'autonomie (lecture seule, aucun
+  // session Gemini — contrairement à /live). Diffuse uniquement les événements
+  // autonomy:* déjà émis par le runtime.
+  const autonomyWss = new WebSocketServer({ noServer: true });
+  autonomyWss.on('connection', (clientWs: WebSocket) => {
+    // Snapshot initial de l'état pour un client qui rejoint en cours de route.
+    try {
+      clientWs.send(JSON.stringify({
+        type: 'autonomy_snapshot',
+        timestamp: new Date().toISOString(),
+        state: leannaCore.getState(),
+        tasks: leannaCore.getTasks().slice(0, 50),
+      }));
+    } catch { /* ignore */ }
+  });
+
   // ── Agent Orchestrator: broadcaster d'événements vers les clients WebSocket ──
   agentOrchestrator.setEventBroadcaster((event: any) => {
     const payload = JSON.stringify(event);
@@ -806,6 +843,19 @@ async function startServer() {
     }
   }, 500);
 
+  // ── Autonomy: broadcaster d'événements autonomy:* vers /autonomy ──
+  // Timeline temps réel de l'état/tâches autonomes sur un canal dédié en lecture
+  // seule (message typé + timestamp ISO), sans impacter les sessions Gemini Live.
+  leannaCore.setBroadcaster((message) => {
+    const payload = JSON.stringify(message);
+    for (const client of autonomyWss.clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        try { client.send(payload); } catch { /* ignore */ }
+      }
+    }
+  });
+  console.log(`[Server] ✓ Autonomy broadcaster connecté au WebSocket dédié (/autonomy).`);
+
   // ── Lifecycle: suivi des sessions Gemini actives ─────────────────────────
   // Permet à gracefulShutdown() de fermer toutes les sessions ouvertes
   // lors d'un hot-reload ou d'une fermeture Electron propre.
@@ -818,7 +868,7 @@ async function startServer() {
     // Sécurité : on exige le même jeton que pour les routes /api (passé en
     // cookie uniquement, plus de fallback par query string pour éviter
     // l'exposition du token dans les logs).
-    if (pathname === '/live' || pathname === '/sandbox-watch') {
+    if (pathname === '/live' || pathname === '/sandbox-watch' || pathname === '/autonomy') {
       const cookieHeader = request.headers.cookie || '';
       const cookies: Record<string, string> = {};
       cookieHeader.split(';').forEach(c => {
@@ -849,6 +899,10 @@ async function startServer() {
       terminalWss.handleUpgrade(request, socket, head, (ws) => {
         terminalWss.emit('connection', ws, request);
       });
+    } else if (pathname === '/autonomy') {
+      autonomyWss.handleUpgrade(request, socket, head, (ws) => {
+        autonomyWss.emit('connection', ws, request);
+      });
     } else {
       // In dev, Vite's own upgrade listener (registered via hmr.server)
       // handles the HMR WebSocket — just return and let it process.
@@ -877,6 +931,8 @@ async function startServer() {
     server,
     wss,
     runtimeV2,
+    autonomyCore: leannaCore,
+    eventBridge,
     observability,
     activeGeminiSessions,
     projectMemory,

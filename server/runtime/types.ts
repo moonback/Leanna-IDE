@@ -199,7 +199,12 @@ export type RuntimeEvent =
   | { type: "workflow:completed"; workflowId: string; success: boolean }
   | { type: "memory:updated"; level: MemoryLevel; key: string }
   | { type: "memory:hierarchical:stored"; tier: string; id: string }
-  | { type: "memory:hierarchical:promoted"; fromTier: string; toTier: string; sourceId: string; newId: string };
+  | { type: "memory:hierarchical:promoted"; fromTier: string; toTier: string; sourceId: string; newId: string }
+  | { type: "autonomy:heartbeat"; attentionRequired: boolean; state: "active" | "idle" | "sleep"; reason: string }
+  | { type: "autonomy:stateChanged"; from: string; to: string; reason: string }
+  | { type: "autonomy:health"; status: "healthy" | "degraded"; reason: string }
+  | { type: "autonomy:taskCreated"; taskId: string; taskType: string; sourceEventId: string }
+  | { type: "autonomy:taskStateChanged"; taskId: string; taskType: string; from: string; to: string; error?: string };
 
 export type RuntimeEventType = RuntimeEvent["type"];
 export type RuntimeEventHandler<T extends RuntimeEventType = RuntimeEventType> =

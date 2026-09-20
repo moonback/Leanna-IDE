@@ -245,6 +245,7 @@ supabase/workflows_schema.sql         # workflows
 supabase/scheduled_tasks_schema.sql   # scheduled_tasks
 supabase/custom_skills_schema.sql     # custom_skills
 supabase/token_usage_schema.sql       # token_usage (observabilité coûts & tokens)
+supabase/autonomy_tasks_schema.sql    # autonomy_tasks (task store durable du TaskManager)
 ```
 
 Pour la persistance des agents (optionnel), exécuter le SQL retourné par :

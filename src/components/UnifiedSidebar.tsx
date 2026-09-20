@@ -23,6 +23,7 @@ import {
   Menu,
   FolderOpen,
   BarChart2,
+  Activity,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -588,6 +589,7 @@ function GlobalNavSection({
     { id: 'documents', path: '/documents', icon: FileText, label: 'Documents', active: currentPath === '/documents', onClick: () => navigate('/documents') },
     { id: 'notebooks', path: '/notebooks', icon: BookOpen, label: 'Notebooks', active: showNotebooks, onClick: onToggleNotebooks },
     { id: 'observability', path: '/observability', icon: BarChart2, label: 'Coûts & Tokens', active: currentPath === '/observability', onClick: () => navigate('/observability') },
+    { id: 'autonomy', path: '/autonomy', icon: Activity, label: 'Autonomie', active: currentPath === '/autonomy', onClick: () => navigate('/autonomy') },
   ];
 
   const anyActive = subItems.some(item =>
@@ -604,7 +606,7 @@ function GlobalNavSection({
           title="Navigation globale"
           hasSubmenu
         />
-        <div className="sidebar-tooltip">Historique · Mémoires · Tâches · Documents</div>
+        <div className="sidebar-tooltip">Historique · Mémoires · Tâches · Documents · Autonomie</div>
       </div>
 
       <AnimatePresence>
