@@ -55,7 +55,7 @@ import pm2Router from "./server/routes/pm2.js";
 import { initSandboxWatchWSS } from "./server/routes/sandbox-watch.js";
 import { createUploadDocumentRouter } from "./server/routes/upload-document.js";
 import { createDocumentsRouter } from "./server/routes/documents.js";
-import skillsRouter, { createSkillsRouter } from "./server/routes/skills.js";
+import { createSkillsRouter } from "./server/routes/skills.js";
 import mcpRouter from "./server/routes/mcp.js";
 import { createTerminalRouter, setupTerminalWebSocket } from "./server/routes/terminal.js";
 import memoriesRouter from "./server/routes/memories.js";
@@ -510,7 +510,7 @@ async function startServer() {
   // ── Content Security Policy (CSP) ─────────────────────────────────────────
   // Sépare dev/prod pour éliminer unsafe-eval en production
   const { getCSPForEnvironment } = await import("./server/config/csp.js");
-  app.use((req, res, next) => {
+  app.use((_req, res, next) => {
     const csp = getCSPForEnvironment(isDev);
     res.setHeader('Content-Security-Policy', csp);
     // Headers de sécurité additionnels
