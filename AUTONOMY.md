@@ -28,7 +28,8 @@ Autonomy-generated events are excluded from input processing, preventing feedbac
 - Existing `PermissionPolicy`, `DryRunController`, sandbox, `AutonomyPolicy`, approvals and `.leannaignore` remain authoritative.
 - The foundation does not execute tools or missions directly. A later dispatcher must call the existing mission/tool APIs so those controls stay on the path.
 - Task retries are bounded, exponential, and terminate in `dead_letter`; a per-task-type circuit breaker blocks new work during cooldown.
-- Queue concurrency, deduplication TTL, timeout, retry count, and circuit-breaker settings are configurable.
+- Queue backpressure rejects new autonomy work after its configured bound, and aging prevents queued lower-priority tasks from permanent starvation.
+- Queue concurrency, queue size, deduplication TTL, timeout, retry count, and circuit-breaker settings are configurable.
 
 ## API and monitoring
 
@@ -39,7 +40,7 @@ Authenticated runtime metrics include `GET /api/v2/metrics/autonomy`, returning 
 All values are milliseconds unless stated otherwise:
 
 - `LEANNA_HEARTBEAT_ACTIVE_MS`, `LEANNA_HEARTBEAT_IDLE_MS`, `LEANNA_HEARTBEAT_SLEEP_MS`, `LEANNA_HEARTBEAT_IDLE_AFTER_MS`
-- `LEANNA_AUTONOMY_MAX_CONCURRENCY`, `LEANNA_AUTONOMY_DEDUPE_TTL_MS`
+- `LEANNA_AUTONOMY_MAX_CONCURRENCY`, `LEANNA_AUTONOMY_MAX_QUEUE_SIZE`, `LEANNA_AUTONOMY_DEDUPE_TTL_MS`
 - `LEANNA_AUTONOMY_RETRY_DELAY_MS`, `LEANNA_AUTONOMY_MAX_RETRIES`, `LEANNA_AUTONOMY_TASK_TIMEOUT_MS`
 - `LEANNA_AUTONOMY_CIRCUIT_BREAKER_THRESHOLD`, `LEANNA_AUTONOMY_CIRCUIT_BREAKER_COOLDOWN_MS`
 

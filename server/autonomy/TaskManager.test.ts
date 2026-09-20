@@ -28,3 +28,13 @@ test("opens a circuit and sends terminal failures to the dead-letter state", asy
   assert.equal(manager.list().find(item => item.id === task.id)?.status, "dead_letter");
   assert.equal(manager.submit({ ...input, fingerprint: "next" }), undefined);
 });
+
+test("applies queue backpressure without discarding already accepted work", () => {
+  let release: (() => void) | undefined;
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  const manager = new TaskManager(async () => blocked, { ...config, maxQueueSize: 1 });
+  assert.ok(manager.submit(input));
+  assert.ok(manager.submit({ ...input, fingerprint: "queued" }));
+  assert.equal(manager.submit({ ...input, fingerprint: "overflow" }), undefined);
+  release?.();
+});
