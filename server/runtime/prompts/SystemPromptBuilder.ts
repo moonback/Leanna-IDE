@@ -32,6 +32,7 @@
 import * as fs   from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import process from "node:process";
 
 import { PromptRegistry }   from "../PromptRegistry.js";
 import { loadPromptTemplates } from "./loader.js";
