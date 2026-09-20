@@ -60,6 +60,22 @@ export const TelegramStatusModal = memo(function TelegramStatusModal({
     finally { setLoading(false); }
   }, [onStatusChange]);
 
+  // Récupère le statut réel à l'ouverture (sinon, sans statut initial, le panneau
+  // affiche « Non configuré » par défaut jusqu'à un rafraîchissement manuel).
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
+
+  // Reste synchronisé avec les changements de statut émis ailleurs (StatusBar, etc.).
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) setStatus(detail);
+    };
+    window.addEventListener('Leanna-telegram-status-changed', handler);
+    return () => window.removeEventListener('Leanna-telegram-status-changed', handler);
+  }, []);
+
   const handleStartBot = async () => {
     setActionLoading(true); setFeedback(null);
     try {
@@ -190,7 +206,13 @@ export const TelegramStatusModal = memo(function TelegramStatusModal({
             </div>
           )}
 
-          {!isConfigured ? (
+          {status === null && loading ? (
+            // Chargement initial : éviter d'afficher « Non configuré » à tort.
+            <div className="flex items-center justify-center py-8 gap-2" style={{ color: 'var(--text-muted)' }}>
+              <LoaderCircle size={16} className="animate-spin" />
+              <span className="text-xs">Chargement du statut…</span>
+            </div>
+          ) : !isConfigured ? (
             <div className="p-4 rounded-xl border space-y-3" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)' }}>
               <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                 Aucun token API de bot Telegram n'est configuré. Pour activer le contrôle à distance et les notifications :
@@ -323,13 +345,12 @@ export const TelegramStatusModal = memo(function TelegramStatusModal({
 
         <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-3 py-3">
           {bodyContent}
-        </div>
 
-        <div
-          className="flex items-center justify-between px-3 py-2 flex-shrink-0"
-          style={{ borderTop: '1px solid var(--border-base)' }}
-        >
-          {footerContent}
+          {/* Lien paramètres — placé sous le contenu (et non collé au bas)
+              pour éviter une grande zone vide dans le panneau docké. */}
+          <div className="mt-4 pt-3 flex items-center" style={{ borderTop: '1px solid var(--border-base)' }}>
+            {footerContent}
+          </div>
         </div>
       </div>
     );

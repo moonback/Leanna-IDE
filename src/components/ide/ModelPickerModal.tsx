@@ -1,6 +1,6 @@
 import { useState, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Zap, Check, BrainCircuit } from 'lucide-react';
+import { Search, Zap, Check, BrainCircuit, X } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { OPENROUTER_MODELS } from '../settings/OpenRouterSection.js';
 import type { AIProvider } from '../../context/UserProfileContext.js';
@@ -9,9 +9,11 @@ import { Button } from '../ui/Button.js';
 
 interface ModelPickerModalProps {
   onClose: () => void;
+  /** Rendu en panneau latéral docké (sans le chrome Modal). */
+  docked?: boolean;
 }
 
-export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: ModelPickerModalProps) {
+export const ModelPickerModal = memo(function ModelPickerModal({ onClose, docked = false }: ModelPickerModalProps) {
   const { profile, setField, save } = useProfile();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>(profile.textProvider);
@@ -36,9 +38,7 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
     ? (OPENROUTER_MODELS.find(m => m.id === selectedModel)?.name || selectedModel.split('/').pop())
     : 'Gemini Live';
 
-  return (
-    <Modal open onClose={onClose} size="md" tone="default">
-      <Modal.Header>
+  const headerContent = (
         <div className="flex items-center gap-3">
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center"
@@ -55,9 +55,10 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
             </p>
           </div>
         </div>
-      </Modal.Header>
+  );
 
-      <Modal.Body>
+  const bodyContent = (
+        <>
         {/* Provider Toggle */}
         <div className="mb-4">
           <div className="grid grid-cols-2 gap-2">
@@ -188,16 +189,72 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose }: Mode
             </motion.div>
           )}
         </AnimatePresence>
-      </Modal.Body>
+        </>
+  );
 
-      <Modal.Footer align="between">
+  const footerHint = (
         <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
           💡 La voix Live utilise toujours Gemini.
         </p>
+  );
+
+  const footerActions = (
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={onClose}>Annuler</Button>
           <Button variant="primary" size="sm" onClick={handleConfirm}>Appliquer</Button>
         </div>
+  );
+
+  // ── Rendu docké (panneau latéral, sans chrome Modal) ────────────────────────
+  if (docked) {
+    return (
+      <div className="flex flex-col h-full">
+        <div
+          className="flex items-center justify-between gap-2 px-3 py-2 flex-shrink-0"
+          style={{ borderBottom: '1px solid var(--border-base)' }}
+        >
+          {headerContent}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-white/10 flex-shrink-0"
+              style={{ color: 'var(--text-muted)' }}
+              aria-label="Fermer"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-3 py-3">
+          {bodyContent}
+        </div>
+
+        <div
+          className="flex flex-col gap-2 px-3 py-2 flex-shrink-0"
+          style={{ borderTop: '1px solid var(--border-base)' }}
+        >
+          {footerHint}
+          {footerActions}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Modal open onClose={onClose} size="md" tone="default">
+      <Modal.Header>
+        {headerContent}
+      </Modal.Header>
+
+      <Modal.Body>
+        {bodyContent}
+      </Modal.Body>
+
+      <Modal.Footer align="between">
+        {footerHint}
+        {footerActions}
       </Modal.Footer>
     </Modal>
   );

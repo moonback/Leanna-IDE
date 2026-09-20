@@ -26,6 +26,8 @@ import { CommandPalette } from '../components/ide/CommandPalette.js';
 import { GlobalSearch } from '../components/ide/GlobalSearch.js';
 import { StatusBar } from '../components/ide/StatusBar.js';
 import { TelegramStatusModal } from '../components/ide/TelegramStatusModal.js';
+import { ModelPickerModal } from '../components/ide/ModelPickerModal.js';
+import { TokenDetailModal } from '../components/ide/TokenDetailModal.js';
 
 import { EditorTabs } from '../components/ide/EditorTabs.js';
 import { HistoryPanel } from '../components/ide/HistoryPanel.js';
@@ -183,6 +185,8 @@ export default function IdeView() {
   const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
   const [showTelegram, setShowTelegram] = useState(false);
+  const [showModelPicker, setShowModelPicker] = useState(false);
+  const [showTokenDetail, setShowTokenDetail] = useState(false);
   const [showKnowledge, setShowKnowledge] = useState(false);
   const [showNotebooks, setShowNotebooks] = useState(false);
   const [showSandbox, setShowSandbox] = useState(false);
@@ -1256,6 +1260,26 @@ export default function IdeView() {
                 <TelegramStatusModal docked status={null} onClose={() => setShowTelegram(false)} />
               </div>
             )}
+
+            {/* Sélecteur de modèle IA — docké comme le panneau Missions */}
+            {showModelPicker && (
+              <div
+                className="border-l flex flex-col min-h-0"
+                style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
+              >
+                <ModelPickerModal docked onClose={() => setShowModelPicker(false)} />
+              </div>
+            )}
+
+            {/* Détails Tokens & Contexte — docké comme le panneau Missions */}
+            {showTokenDetail && (
+              <div
+                className="border-l flex flex-col min-h-0"
+                style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
+              >
+                <TokenDetailModal docked onClose={() => setShowTokenDetail(false)} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -1278,6 +1302,8 @@ export default function IdeView() {
           onToggleGitHub={() => setShowGitHub(v => !v)}
           onToggleMissions={() => setShowMissions(v => !v)}
           onToggleTelegram={() => setShowTelegram(v => !v)}
+          onToggleModelPicker={() => setShowModelPicker(v => !v)}
+          onToggleTokenDetail={() => setShowTokenDetail(v => !v)}
         />
       </div>
 

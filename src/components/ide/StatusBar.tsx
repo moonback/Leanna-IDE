@@ -21,8 +21,8 @@ import {
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
-import { TokenDetailModal } from './TokenDetailModal.js';
-import { ModelPickerModal } from './ModelPickerModal.js';
+
+
 import { type TelegramStatus } from './TelegramStatusModal.js';
 import { formatExactTokenCount, formatTokenCount } from '../../utils/tokenFormatting.js';
 import { getAgentTasks, getToolActivities, subscribe as subscribeActivity } from '../../stores/agentActivityStore.js';
@@ -45,6 +45,8 @@ interface StatusBarProps {
   onToggleGitHub?: () => void;
   onToggleMissions?: () => void;
   onToggleTelegram?: () => void;
+  onToggleModelPicker?: () => void;
+  onToggleTokenDetail?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -70,13 +72,13 @@ export const StatusBar = memo(function StatusBar({
   onToggleGitHub,
   onToggleMissions,
   onToggleTelegram,
+  onToggleModelPicker,
+  onToggleTokenDetail,
 }: StatusBarProps) {
   const { tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
 
 
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showModelPicker, setShowModelPicker] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetCode, setResetCode] = useState('');
   const [resetError, setResetError] = useState<string | null>(null);
@@ -506,7 +508,7 @@ export const StatusBar = memo(function StatusBar({
           {/* AI Model — compact, clickable */}
           <button
             type="button"
-            onClick={() => setShowModelPicker(true)}
+            onClick={() => onToggleModelPicker?.()}
             className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
             style={{ color: 'var(--text-muted)' }}
             title="Changer de modèle IA"
@@ -747,7 +749,7 @@ export const StatusBar = memo(function StatusBar({
           {/* Tokens — clickable */}
           <button
             type="button"
-            onClick={() => setShowDetailModal(true)}
+            onClick={() => onToggleTokenDetail?.()}
             className="relative flex items-center gap-2.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
             style={{ color: 'var(--text-muted)' }}
             title={`Tokens : ${formatExactTokenCount(tokenUsage.totalTokens)} · Contexte : ${formatExactTokenCount(promptContext.currentSize)} / ${formatExactTokenCount(promptContext.maxSize)}`}
@@ -907,8 +909,6 @@ export const StatusBar = memo(function StatusBar({
         </div>
       )}
 
-      {showDetailModal && <TokenDetailModal onClose={() => setShowDetailModal(false)} />}
-      {showModelPicker && <ModelPickerModal onClose={() => setShowModelPicker(false)} />}
     </>
   );
 });
