@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 import {
   Plus, FolderOpen,
-  MessageSquare, Search, KeyRound, AlertCircle,
+  Search, KeyRound, AlertCircle,
   BookOpen, Sparkles,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
@@ -12,7 +12,6 @@ import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { ShortcutsModal } from './ShortcutsModal.js';
 import { SystemModal } from './SystemModal.js';
-import { useTheme } from '../../context/ThemeContext.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -74,7 +73,13 @@ const Kbd = React.memo(function Kbd({
 }) {
   if (tone === 'invert') {
     return (
-      <span className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 rounded text-xs font-mono font-semibold tracking-wide bg-white/15 text-white/85">
+      <span
+        className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 rounded text-xs font-mono font-semibold tracking-wide"
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--primary) 18%, transparent)',
+          color: 'var(--primary)',
+        }}
+      >
         {children}
       </span>
     );
@@ -111,7 +116,7 @@ const CompactActionCard = React.memo(function CompactActionCard({
     <motion.button
       type="button"
       onClick={onClick}
-      className="ai-interactive ai-compact-card group relative flex flex-col items-center gap-3 p-5 text-center rounded-xl"
+      className="ai-interactive ai-compact-card group relative flex flex-col items-center gap-3 p-5 text-center rounded-xl overflow-hidden"
       style={{
         backgroundColor: 'var(--surface)',
         border: '1px solid var(--border)',
@@ -122,8 +127,8 @@ const CompactActionCard = React.memo(function CompactActionCard({
       whileHover={{
         y: -4,
         scale: 1.02,
-        boxShadow: '0 8px 20px rgba(0, 194, 255, 0.1)',
-        borderColor: 'rgba(0, 194, 255, 0.3)',
+        boxShadow: '0 10px 26px color-mix(in srgb, var(--primary) 14%, transparent)',
+        borderColor: 'color-mix(in srgb, var(--primary) 35%, transparent)',
       }}
       whileTap={{ scale: 0.95 }}
       initial={{ opacity: 0, y: 10 }}
@@ -134,16 +139,16 @@ const CompactActionCard = React.memo(function CompactActionCard({
       <div
         className="absolute inset-0 rounded-xl pointer-events-none opacity-0 group-hover:opacity-100"
         style={{
-          background: 'radial-gradient(circle at center, rgba(0, 194, 255, 0.1) 0%, transparent 70%)',
+          background: 'radial-gradient(circle at center, color-mix(in srgb, var(--primary) 12%, transparent) 0%, transparent 70%)',
           transition: 'opacity 0.3s ease',
         }}
       />
 
       <motion.div
-        className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 relative"
+        className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 relative"
         style={{
           backgroundColor: 'var(--surface-soft)',
-          border: '1px solid rgba(0, 194, 255, 0.1)',
+          border: '1px solid color-mix(in srgb, var(--primary) 12%, transparent)',
         }}
         whileHover={{ scale: 1.1, rotate: 5 }}
         transition={{ duration: 0.2 }}
@@ -153,7 +158,7 @@ const CompactActionCard = React.memo(function CompactActionCard({
         <div
           className="absolute inset-0 rounded-xl pointer-events-none opacity-0 group-hover:opacity-100"
           style={{
-            boxShadow: 'inset 0 0 8px rgba(0, 194, 255, 0.2)',
+            boxShadow: 'inset 0 0 10px color-mix(in srgb, var(--primary) 22%, transparent)',
             transition: 'opacity 0.3s ease',
           }}
         />
@@ -230,12 +235,12 @@ function GlobalStyles() {
 
       .ai-compact-card:hover {
         border-color: var(--primary);
-        box-shadow: 0 4px 12px rgba(21, 159, 227, 0.1);
+        box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 12%, transparent);
         transform: translateY(-1px);
       }
 
       .ai-hero:hover {
-        box-shadow: 0 8px 24px rgba(21, 159, 227, 0.15);
+        box-shadow: 0 10px 28px color-mix(in srgb, var(--primary) 16%, transparent);
         transform: translateY(-1px);
       }
 
@@ -318,9 +323,9 @@ interface EmptyEditorStateProps {
 }
 
 export const EmptyEditorState = React.memo(function EmptyEditorState({
-  onOpenFile,
+  onOpenFile: _onOpenFile,
   onCreateFile,
-  onCreateFolder,
+  onCreateFolder: _onCreateFolder,
   onShowSettings,
   onOpenSearch,
   onOpenChat,
@@ -329,7 +334,6 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const ws = useWorkspaceState();
   const { connected, isBusy, connect, clearTranscript, clearActivity } = useLiveAPIContext();
   const { profile } = useProfile();
-  const { theme } = useTheme();
   const prefersReducedMotion = useReducedMotion();
 
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -485,7 +489,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               <span 
                 className="w-1.5 h-1.5 rounded-full flex-shrink-0 ai-status-dot"
                 style={{
-                  backgroundColor: connected ? 'var(--primary)' : 'var(--text-muted)',
+                  backgroundColor: connected ? 'var(--color-success, var(--primary))' : 'var(--text-muted)',
+                  boxShadow: connected ? '0 0 6px var(--color-success, var(--primary))' : undefined,
                 }}
               />
               <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>
@@ -519,18 +524,18 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             className="ai-interactive ai-hero group w-full mx-auto flex items-center gap-4 p-6 mb-5 text-left rounded-[22px]"
             style={{
               backgroundColor: 'var(--surface)',
-              border: '1px solid var(--accent-secondary)',
+              border: '1px solid color-mix(in srgb, var(--accent-secondary) 55%, transparent)',
               height: '112px',
               minHeight: '112px',
               maxWidth: '600px',
-              boxShadow: '0 8px 24px rgba(0, 194, 255, 0.12)',
+              boxShadow: '0 8px 24px color-mix(in srgb, var(--primary) 14%, transparent)',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
             {...makeEntranceProps(0.08)}
             aria-label={connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`}
             whileHover={{
               scale: 1.02,
-              boxShadow: '0 12px 32px rgba(0, 194, 255, 0.18)',
+              boxShadow: '0 14px 36px color-mix(in srgb, var(--primary) 20%, transparent)',
               borderColor: 'var(--accent-hover)',
             }}
             whileTap={{ scale: 0.98 }}
@@ -539,7 +544,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             <div
               className="absolute inset-0 rounded-[20px] pointer-events-none"
               style={{
-                background: 'linear-gradient(135deg, rgba(0, 194, 255, 0.05) 0%, rgba(255, 140, 0, 0.03) 100%)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 6%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 4%, transparent) 100%)',
               }}
             />
 
@@ -547,7 +552,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0 relative"
               style={{
                 backgroundColor: 'var(--surface-soft)',
-                border: '1px solid rgba(0, 194, 255, 0.15)',
+                border: '1px solid color-mix(in srgb, var(--primary) 18%, transparent)',
               }}
             >
               {/* Animated icon container */}
@@ -561,7 +566,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               <div
                 className="absolute inset-0 rounded-xl pointer-events-none"
                 style={{
-                  boxShadow: 'inset 0 0 12px rgba(0, 194, 255, 0.1)',
+                  boxShadow: 'inset 0 0 12px color-mix(in srgb, var(--primary) 12%, transparent)',
                 }}
               />
             </div>

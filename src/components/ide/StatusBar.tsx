@@ -55,6 +55,63 @@ function getModifierKey(): string {
   return navigator.platform.includes('Mac') ? '⌘' : 'Ctrl';
 }
 
+// Style partagé pour tous les boutons de la barre — cohérence visuelle,
+// coins doux, transition sur toutes les propriétés et halo au survol.
+const PILL =
+  'group/pill relative flex items-center gap-1.5 px-2.5 h-[22px] rounded-md ' +
+  'text-[12px] font-medium leading-none transition-all duration-200 ' +
+  'hover:bg-[var(--accent-subtle)] active:scale-[0.97]';
+
+// Petit point d'état avec halo doux.
+function StatusDot({
+  color,
+  pulse,
+  glow = true,
+}: {
+  color: string;
+  pulse?: boolean;
+  glow?: boolean;
+}) {
+  return (
+    <motion.span
+      className="w-2 h-2 rounded-full flex-shrink-0"
+      style={{
+        backgroundColor: color,
+        boxShadow: glow ? `0 0 6px ${color}` : undefined,
+      }}
+      animate={pulse ? { scale: [1, 1.35, 1], opacity: [1, 0.6, 1] } : { scale: 1 }}
+      transition={pulse ? { repeat: Infinity, duration: 2, ease: 'easeInOut' } : { type: 'spring', bounce: 0.5, duration: 0.4 }}
+    />
+  );
+}
+
+// Badge compteur réutilisable (agents, missions, sandbox).
+function CountBadge({ value, color }: { value: number; color: string }) {
+  return (
+    <motion.span
+      key={value}
+      initial={{ scale: 0.6, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.6, opacity: 0 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 18 }}
+      className="min-w-[15px] h-[15px] flex items-center justify-center rounded-full text-[9px] font-bold tabular-nums leading-none px-1"
+      style={{ backgroundColor: color, color: 'var(--bg-primary)', boxShadow: `0 0 8px ${color}` }}
+    >
+      {value > 99 ? '99+' : value}
+    </motion.span>
+  );
+}
+
+// Séparateur vertical léger.
+function Divider() {
+  return (
+    <div
+      className="w-px h-3.5 rounded-full flex-shrink-0"
+      style={{ background: 'linear-gradient(var(--border-base), transparent)', opacity: 0.5 }}
+    />
+  );
+}
+
 // ── StatusBar Component ────────────────────────────────────────────────────
 
 export const StatusBar = memo(function StatusBar({
@@ -462,85 +519,74 @@ export const StatusBar = memo(function StatusBar({
       </AnimatePresence>
 
       <div
-        className="group/bar flex items-center gap-3 px-4 h-8 border-t select-none text-sm"
+        className="group/bar flex items-center gap-2 px-3 h-9 border-t select-none text-sm backdrop-blur"
         style={{
           borderColor: 'var(--border-base)',
-          backgroundColor: 'var(--bg-secondary)',
-          boxShadow: '0 -1px 4px rgba(0,0,0,0.04)',
+          background: 'linear-gradient(to top, var(--bg-secondary), color-mix(in srgb, var(--bg-secondary) 92%, transparent))',
+          boxShadow: '0 -1px 8px rgba(0,0,0,0.12)',
         }}
       >
-        {/* ─── Zone gauche : Sandbox · Build · AI ─────────────────── */}
-        <div className="flex items-center gap-3">
+        {/* ─── Zone gauche : Sandbox · IA · MCP · services ─────────────── */}
+        <div className="flex items-center gap-1">
           {/* Sandbox — dot + label */}
           <button
             type="button"
             onClick={() => onToggleSandbox?.()}
-            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+            className={PILL}
             title={sandboxActive ? 'Sandbox actif' : 'Sandbox inactif'}
           >
-              <motion.div 
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: sandboxActive ? 'var(--color-success)' : 'var(--text-muted)' }}
-                animate={{ scale: sandboxActive ? [1, 1.2, 1] : 1 }}
-                transition={{ type: 'spring', bounce: 0.5, duration: 0.4 }}
-              />
-            <span style={{ color: sandboxActive ? 'var(--color-success)' : 'var(--text-muted)' }} className="font-medium">
+            <StatusDot color={sandboxActive ? 'var(--color-success)' : 'var(--text-muted)'} pulse={sandboxActive} />
+            <span style={{ color: sandboxActive ? 'var(--color-success)' : 'var(--text-muted)' }}>
               {sandboxLabel}
             </span>
             {sandboxModifiedCount > 0 && (
-              <motion.span
-                key={sandboxModifiedCount}
-                initial={{ scale: 0.7, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="min-w-[16px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold tabular-nums"
-                style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--bg-primary)' }}
-                aria-label={`${sandboxModifiedCount} fichier${sandboxModifiedCount > 1 ? 's' : ''} modifié${sandboxModifiedCount > 1 ? 's' : ''} dans la sandbox`}
-              >
-                {sandboxModifiedCount > 99 ? '99+' : sandboxModifiedCount}
-              </motion.span>
+              <CountBadge value={sandboxModifiedCount} color="var(--accent-primary)" />
             )}
           </button>
 
-
-          {/* Séparateur */}
-          <div className="w-px h-4" style={{ backgroundColor: 'var(--border-base)', opacity: 0.4 }} />
+          <Divider />
 
           {/* AI Model — compact, clickable */}
           <button
             type="button"
             onClick={() => onToggleModelPicker?.()}
-            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
-            style={{ color: 'var(--text-muted)' }}
+            className={PILL}
+            style={{ color: 'var(--text-secondary)' }}
             title="Changer de modèle IA"
           >
-            <BrainCircuit size={12} />
-            <span className="font-medium truncate max-w-[100px]">
+            <BrainCircuit size={13} style={{ color: 'var(--accent-primary)' }} />
+            <span className="truncate max-w-[110px]">
               {profile.textProvider === 'openrouter'
                 ? profile.openrouterModel.split('/').pop()
                 : 'Gemini Live'}
             </span>
           </button>
 
-              
           <button
             type="button"
             onClick={onToggleMcp}
-            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+            className={PILL}
+            style={{ color: 'var(--text-muted)' }}
             title={`MCP: ${mcpStatus}`}
           >
-            <div className="w-2 h-2 rounded-full" style={{
-              backgroundColor: mcpStatus === 'ok' ? 'var(--color-success)' :
-              mcpStatus === 'error' ? 'var(--color-error)' : 'var(--text-muted)'
-            }} />
-            <span style={{ color: 'var(--text-muted)' }} className="font-medium">MCP</span>
+            <StatusDot
+              color={
+                mcpStatus === 'ok' ? 'var(--color-success)' :
+                mcpStatus === 'error' ? 'var(--color-error)' : 'var(--text-muted)'
+              }
+              glow={mcpStatus !== 'loading'}
+            />
+            <span>MCP</span>
           </button>
+
+          <Divider />
 
           {/* Telegram Bot */}
           <div className="flex items-center gap-0.5">
             <button
               type="button"
               onClick={() => onToggleTelegram?.()}
-              className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+              className={PILL}
               title={
                 !telegramStatus?.isConfigured
                   ? 'Telegram : Non configuré (cliquer pour configurer)'
@@ -557,25 +603,22 @@ export const StatusBar = memo(function StatusBar({
                   color: telegramStatus?.isRunning ? 'var(--color-success)' : 'var(--text-muted)',
                 }}
               />
-              <motion.div
-                className="w-2 h-2 rounded-full"
-                style={{
-                  backgroundColor: telegramStatus?.isRunning
+              <StatusDot
+                color={
+                  telegramStatus?.isRunning
                     ? 'var(--color-success)'
                     : telegramStatus?.lastError
                     ? 'var(--color-error)'
                     : !telegramStatus?.isConfigured
                     ? 'var(--color-warning)'
-                    : 'var(--text-muted)',
-                }}
-                animate={telegramStatus?.isRunning ? { scale: [1, 1.25, 1] } : undefined}
-                transition={telegramStatus?.isRunning ? { repeat: Infinity, duration: 2 } : undefined}
+                    : 'var(--text-muted)'
+                }
+                pulse={telegramStatus?.isRunning}
               />
               <span
                 style={{
                   color: telegramStatus?.isRunning ? 'var(--color-success)' : 'var(--text-muted)',
                 }}
-                className="font-medium"
               >
                 Telegram
               </span>
@@ -587,43 +630,38 @@ export const StatusBar = memo(function StatusBar({
                 type="button"
                 onClick={handleQuickToggleTelegram}
                 disabled={telegramActionLoading}
-                className="p-1 rounded hover:bg-[var(--bg-hover)] transition-colors opacity-70 hover:opacity-100 disabled:opacity-40"
+                className="p-1 rounded-md hover:bg-[var(--accent-subtle)] transition-all duration-200 opacity-70 hover:opacity-100 active:scale-90 disabled:opacity-40"
                 title={telegramStatus.isRunning ? 'Arrêter le bot Telegram' : 'Démarrer le bot Telegram'}
                 aria-label={telegramStatus.isRunning ? 'Arrêter le bot Telegram' : 'Démarrer le bot Telegram'}
               >
                 {telegramActionLoading ? (
-                  <LoaderCircle size={10} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
+                  <LoaderCircle size={11} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
                 ) : telegramStatus.isRunning ? (
-                  <Square size={10} className="text-rose-400 hover:text-rose-300" fill="currentColor" />
+                  <Square size={11} style={{ color: 'var(--color-error)' }} fill="currentColor" />
                 ) : (
-                  <Play size={10} className="text-emerald-400 hover:text-emerald-300" fill="currentColor" />
+                  <Play size={11} style={{ color: 'var(--color-success)' }} fill="currentColor" />
                 )}
               </button>
             )}
           </div>
+
+          <Divider />
 
           {/* Agents — visible uniquement si activé dans les paramètres */}
           {profile.agents.enabled && (
             <button
               type="button"
               onClick={onToggleAgents}
-              className="relative flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+              className={PILL}
+              style={{ color: 'var(--text-muted)' }}
               title="Ouvrir le panneau Agents"
             >
-              <Users size={12} style={{ color: 'var(--accent-primary)' }} />
-              <span style={{ color: 'var(--text-muted)' }} className="font-medium">Agents</span>
+              <Users size={13} style={{ color: 'var(--accent-primary)' }} />
+              <span>Agents</span>
               {activeAgentCount > 0 && (
-                <motion.span
-                  key={activeAgentCount}
-                  initial={{ scale: 0.6, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.6, opacity: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 18 }}
-                  className="absolute -top-1 -right-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full text-[9px] font-bold tabular-nums leading-none px-0.5"
-                  style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--bg-primary)' }}
-                >
-                  {activeAgentCount > 99 ? '99+' : activeAgentCount}
-                </motion.span>
+                <span className="absolute -top-1 -right-1">
+                  <CountBadge value={activeAgentCount} color="var(--accent-primary)" />
+                </span>
               )}
             </button>
           )}
@@ -633,11 +671,12 @@ export const StatusBar = memo(function StatusBar({
             <button
               type="button"
               onClick={onToggleFleet}
-              className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+              className={PILL}
+              style={{ color: 'var(--text-muted)' }}
               title="Ouvrir la flotte d'agents"
             >
-              <Radio size={12} style={{ color: 'var(--color-accent-alt)' }} />
-              <span style={{ color: 'var(--text-muted)' }} className="font-medium">Flotte</span>
+              <Radio size={13} style={{ color: 'var(--color-accent-alt)' }} />
+              <span>Flotte</span>
             </button>
           )}
 
@@ -645,66 +684,63 @@ export const StatusBar = memo(function StatusBar({
           <button
             type="button"
             onClick={onToggleLogs}
-            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+            className={PILL}
+            style={{ color: 'var(--text-muted)' }}
             title="Ouvrir les logs de l'assistant et des agents"
           >
-            <ScrollText size={12} style={{ color: 'var(--accent-secondary)' }} />
-            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Logs</span>
+            <ScrollText size={13} style={{ color: 'var(--accent-secondary)' }} />
+            <span>Logs</span>
           </button>
 
           {/* GitHub — publication du workspace réel */}
           <button
             type="button"
             onClick={onToggleGitHub}
-            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+            className={PILL}
+            style={{ color: 'var(--text-muted)' }}
             title="Ouvrir GitHub et publier les modifications"
           >
-            <Github size={12} style={{ color: 'var(--accent-primary)' }} />
-            <span style={{ color: 'var(--text-muted)' }} className="font-medium">GitHub</span>
+            <Github size={13} style={{ color: 'var(--accent-primary)' }} />
+            <span>GitHub</span>
           </button>
 
           {/* Missions — ouvre le panneau des missions */}
           <button
             type="button"
             onClick={onToggleMissions}
-            className="relative flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+            className={PILL}
+            style={{ color: 'var(--text-muted)' }}
             title="Ouvrir le panneau Missions"
           >
-            <Target size={12} style={{ color: 'var(--color-info)' }} />
-            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Missions</span>
+            <Target size={13} style={{ color: 'var(--color-info)' }} />
+            <span>Missions</span>
             {activeMissionCount > 0 && (
-              <motion.span
-                key={activeMissionCount}
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.6, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 18 }}
-                className="absolute -top-1 -right-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full text-[9px] font-bold tabular-nums leading-none px-0.5"
-                style={{ backgroundColor: 'var(--color-info)', color: 'var(--bg-primary)' }}
+              <span
+                className="absolute -top-1 -right-1"
                 aria-label={`${activeMissionCount} mission${activeMissionCount > 1 ? 's' : ''} active${activeMissionCount > 1 ? 's' : ''}`}
               >
-                {activeMissionCount > 99 ? '99+' : activeMissionCount}
-              </motion.span>
+                <CountBadge value={activeMissionCount} color="var(--color-info)" />
+              </span>
             )}
           </button>
 
-          {/* Séparateur */}
-          <div className="w-px h-4" style={{ backgroundColor: 'var(--border-base)', opacity: 0.4 }} />
+          <Divider />
 
           {/* Reindex — déclenche un scan complet du KnowledgeGraph */}
           <button
             type="button"
             onClick={handleReindex}
             disabled={reindexing || indexing.active}
-            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
+            className={`${PILL} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent`}
+            style={{ color: 'var(--text-muted)' }}
             title="Réindexer le projet, les documents et les documents extraits"
             aria-label="Réindexer le projet, les documents et les documents extraits"
           >
             {reindexing || (indexing.active && indexing.phase !== 'done')
-              ? <LoaderCircle size={12} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
-              : <DatabaseZap size={12} style={{ color: 'var(--accent-primary)' }} />
+              ? <LoaderCircle size={13} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
+              : <DatabaseZap size={13} style={{ color: 'var(--accent-primary)' }} />
             }
-            <span style={{ color: 'var(--text-muted)' }} className="font-medium">Réindexer</span>
+            <span>Réindexer</span>
           </button>
         </div>
 
@@ -712,63 +748,63 @@ export const StatusBar = memo(function StatusBar({
         <div className="flex-1" />
 
         {/* ─── Zone droite : Tokens · Status · Édition · Shortcut ───────── */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
           {/* Busy indicator */}
-          {assistantBusy && (
-            <span className="flex items-center gap-1.5 font-medium" style={{ color: 'var(--color-warning)' }}>
-              <LoaderCircle size={11} className="animate-spin" />
-              <span>Traitement…</span>
-            </span>
-          )}
+          <AnimatePresence>
+            {assistantBusy && (
+              <motion.span
+                initial={{ opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 8 }}
+                className="flex items-center gap-1.5 px-2.5 h-[22px] rounded-md text-[12px] font-medium leading-none"
+                style={{ color: 'var(--color-warning)', backgroundColor: 'var(--color-warning-subtle)' }}
+              >
+                <LoaderCircle size={12} className="animate-spin" />
+                <span>Traitement…</span>
+              </motion.span>
+            )}
+          </AnimatePresence>
 
           {/* File state */}
           {filePath && (
-            <span className="flex items-center gap-1.5 font-medium">
-              {dirty ? (
-                <>
-                  <div className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span style={{ color: 'var(--color-warning)' }}>Modifié</span>
-                </>
-              ) : (
-                <>
-              <motion.div 
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: dirty ? 'var(--color-warning)' : 'var(--color-success)' }}
-                animate={{ opacity: dirty ? [1, 0.5, 1] : 1 }}
-                transition={dirty ? { repeat: Infinity, duration: 1.5 } : { duration: 0.3 }}
+            <span className="flex items-center gap-1.5 text-[12px] font-medium leading-none px-1">
+              <StatusDot
+                color={dirty ? 'var(--color-warning)' : 'var(--color-success)'}
+                pulse={dirty}
               />
-                  <span style={{ color: 'var(--color-success)' }}>Sauvé</span>
-                </>
-              )}
+              <span style={{ color: dirty ? 'var(--color-warning)' : 'var(--color-success)' }}>
+                {dirty ? 'Modifié' : 'Sauvé'}
+              </span>
             </span>
           )}
-              
-          {/* Séparateur */}
-          <div className="w-px h-4" style={{ backgroundColor: 'var(--border-base)', opacity: 0.4 }} />
+
+          <Divider />
 
           {/* Tokens — clickable */}
           <button
             type="button"
             onClick={() => onToggleTokenDetail?.()}
-            className="relative flex items-center gap-2.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
+            className="group/pill relative flex items-center gap-2.5 px-2.5 h-[22px] rounded-md transition-all duration-200 hover:bg-[var(--accent-subtle)] active:scale-[0.97]"
             style={{ color: 'var(--text-muted)' }}
             title={`Tokens : ${formatExactTokenCount(tokenUsage.totalTokens)} · Contexte : ${formatExactTokenCount(promptContext.currentSize)} / ${formatExactTokenCount(promptContext.maxSize)}`}
           >
-            <span className="flex items-center gap-1 tabular-nums font-semibold">
-              <Hash size={10} className="opacity-50" />
+            <span className="flex items-center gap-1 tabular-nums font-semibold text-[12px] leading-none">
+              <Hash size={11} className="opacity-50" />
               {tokenUsage.totalTokens > 0 ? formatTokenCount(tokenUsage.totalTokens) : '—'}
             </span>
-            <span className="flex items-center gap-1 tabular-nums font-semibold">
-              <FileText size={10} className="opacity-50" />
+            <span className="flex items-center gap-1 tabular-nums font-semibold text-[12px] leading-none">
+              <FileText size={11} className="opacity-50" />
               {formatTokenCount(promptContext.currentSize)}/{formatTokenCount(promptContext.maxSize)}
             </span>
             {suggestion && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--color-warning)' }} />
+              <span
+                className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
+                style={{ backgroundColor: 'var(--color-warning)', boxShadow: '0 0 6px var(--color-warning)' }}
+              />
             )}
           </button>
 
-          {/* Séparateur */}
-          <div className="w-px h-4" style={{ backgroundColor: 'var(--border-base)', opacity: 0.4 }} />
+          <Divider />
 
           {/* Édition */}
           {/* <div className="flex items-center gap-2 font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>
@@ -785,39 +821,51 @@ export const StatusBar = memo(function StatusBar({
             )}
           </div> */}
 
-          {/* Séparateur */}
-          <div className="w-px h-4" style={{ backgroundColor: 'var(--border-base)', opacity: 0.4 }} />
-
           {/* Reset — discret, visible on hover */}
           <button
             type="button"
             onClick={() => setShowResetConfirm(true)}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded opacity-0 group-hover/bar:opacity-100 transition-all duration-300 hover:bg-[var(--color-warning-subtle)]"
+            className="flex items-center gap-1 px-2 h-[22px] rounded-md text-[12px] font-medium leading-none opacity-0 group-hover/bar:opacity-100 transition-all duration-300 hover:bg-[var(--color-warning-subtle)] active:scale-95"
             style={{ color: 'var(--text-muted)' }}
-            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-warning)'}
-            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-warning)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
             title="Réinitialiser le sandbox"
           >
-            <RefreshCcw size={10} strokeWidth={1.8} />
-            <span className="hidden sm:inline font-medium">Reset</span>
+            <RefreshCcw size={11} strokeWidth={1.8} />
+            <span className="hidden sm:inline">Reset</span>
           </button>
 
           {/* Command palette shortcut */}
           <button
             type="button"
             onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true }))}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded font-mono transition-colors duration-150 hover:text-primary"
+            className="flex items-center gap-1 px-2 h-[22px] rounded-md font-mono text-[11px] leading-none transition-all duration-200 hover:bg-[var(--accent-subtle)] active:scale-95"
             style={{ color: 'var(--text-dimmed)' }}
+            title="Palette de commandes"
           >
-            <kbd className="opacity-60">{modifierKey}</kbd>
-            <kbd className="font-semibold">P</kbd>
+            <kbd
+              className="px-1 py-0.5 rounded"
+              style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-muted)' }}
+            >
+              {modifierKey}
+            </kbd>
+            <kbd
+              className="px-1 py-0.5 rounded font-semibold"
+              style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-muted)' }}
+            >
+              P
+            </kbd>
           </button>
         </div>
       </div>
 
+      <AnimatePresence>
       {showResetConfirm && (
-        <div
-          className="fixed inset-0 flex items-center justify-center p-4 backdrop-blur-sm bg-black/40"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 flex items-center justify-center p-4 backdrop-blur-sm bg-black/50"
           style={{ zIndex: 'var(--z-modal)' as any }}
           onClick={() => {
             setShowResetConfirm(false);
@@ -828,8 +876,12 @@ export const StatusBar = memo(function StatusBar({
           aria-modal="true"
           aria-labelledby="reset-confirm-title"
         >
-          <div
-            className="w-full max-w-sm rounded-2xl border shadow-2xl transition-all duration-300"
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 12 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+            className="w-full max-w-sm rounded-2xl border shadow-2xl overflow-hidden"
             style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -850,7 +902,7 @@ export const StatusBar = memo(function StatusBar({
               <button
                 type="button"
                 onClick={() => { setShowResetConfirm(false); setResetCode(''); }}
-                className="p-2 rounded-lg hover:bg-white/10 transition"
+                className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
                 style={{ color: 'var(--text-muted)' }}
                 aria-label="Fermer"
               >
@@ -863,7 +915,7 @@ export const StatusBar = memo(function StatusBar({
                 Entrez le code de confirmation pour valider la réinitialisation du sandbox.
               </p>
               {resetError && (
-                <p className="text-xs text-red-500" style={{ color: 'var(--color-error)' }}>
+                <p className="text-xs" style={{ color: 'var(--color-error)' }}>
                   {resetError}
                 </p>
               )}
@@ -890,7 +942,7 @@ export const StatusBar = memo(function StatusBar({
               <button
                 type="button"
                 onClick={() => { setShowResetConfirm(false); setResetCode(''); setResetError(null); }}
-                className="rounded-lg border px-3 py-1.5 text-sm font-medium transition hover:bg-white/10"
+                className="rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--bg-hover)]"
                 style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
               >
                 Annuler
@@ -899,15 +951,16 @@ export const StatusBar = memo(function StatusBar({
                 type="button"
                 onClick={handleConfirmReset}
                 disabled={resetCode.length !== 6}
-                className="rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ backgroundColor: 'var(--color-warning)', color: 'var(--text-primary)' }}
+                className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+                style={{ backgroundColor: 'var(--color-warning)', color: 'var(--bg-primary)' }}
               >
                 Réinitialiser
               </button>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
     </>
   );
