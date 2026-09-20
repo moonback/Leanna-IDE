@@ -23,7 +23,7 @@ import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { TokenDetailModal } from './TokenDetailModal.js';
 import { ModelPickerModal } from './ModelPickerModal.js';
-import { TelegramStatusModal, type TelegramStatus } from './TelegramStatusModal.js';
+import { type TelegramStatus } from './TelegramStatusModal.js';
 import { formatExactTokenCount, formatTokenCount } from '../../utils/tokenFormatting.js';
 import { getAgentTasks, getToolActivities, subscribe as subscribeActivity } from '../../stores/agentActivityStore.js';
 
@@ -44,6 +44,7 @@ interface StatusBarProps {
   onToggleLogs?: () => void;
   onToggleGitHub?: () => void;
   onToggleMissions?: () => void;
+  onToggleTelegram?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -68,6 +69,7 @@ export const StatusBar = memo(function StatusBar({
   onToggleLogs,
   onToggleGitHub,
   onToggleMissions,
+  onToggleTelegram,
 }: StatusBarProps) {
   const { tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
@@ -91,7 +93,6 @@ export const StatusBar = memo(function StatusBar({
   const [activeMissionCount, setActiveMissionCount] = useState(0);
 
   // ── Telegram ───────────────────────────────────────────────────────────────
-  const [showTelegramModal, setShowTelegramModal] = useState(false);
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
   const [telegramActionLoading, setTelegramActionLoading] = useState(false);
 
@@ -536,7 +537,7 @@ export const StatusBar = memo(function StatusBar({
           <div className="flex items-center gap-0.5">
             <button
               type="button"
-              onClick={() => setShowTelegramModal(true)}
+              onClick={() => onToggleTelegram?.()}
               className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors duration-150 hover:bg-[var(--bg-hover)]"
               title={
                 !telegramStatus?.isConfigured
@@ -908,13 +909,6 @@ export const StatusBar = memo(function StatusBar({
 
       {showDetailModal && <TokenDetailModal onClose={() => setShowDetailModal(false)} />}
       {showModelPicker && <ModelPickerModal onClose={() => setShowModelPicker(false)} />}
-      {showTelegramModal && (
-        <TelegramStatusModal
-          status={telegramStatus}
-          onClose={() => setShowTelegramModal(false)}
-          onStatusChange={(newStatus) => setTelegramStatus(newStatus)}
-        />
-      )}
     </>
   );
 });

@@ -109,11 +109,14 @@ async function fetchJSON<T>(url: string): Promise<T> {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 interface AgentFleetPanelProps {
+  /** Rendu en overlay modal centré. */
   inline?: boolean;
+  /** Rendu en panneau latéral docké (comme le panneau Missions). */
+  docked?: boolean;
   onClose?: () => void;
 }
 
-export function AgentFleetPanel({ inline = false, onClose }: AgentFleetPanelProps) {
+export function AgentFleetPanel({ inline = false, docked = false, onClose }: AgentFleetPanelProps) {
   const [tab, setTab] = useState<'fleet' | 'bus' | 'metrics'>('fleet');
   const [fleet, setFleet] = useState<FleetStatus | null>(null);
   const [messages, setMessages] = useState<BusMessage[]>([]);
@@ -358,6 +361,37 @@ export function AgentFleetPanel({ inline = false, onClose }: AgentFleetPanelProp
       </div>
     </div>
   );
+
+  // ── Render: docké (panneau latéral) ─────────────────────────────────────────
+  if (docked) {
+    return (
+      <div className="flex flex-col h-full">
+        <div
+          className="flex items-center justify-between px-3 py-2 flex-shrink-0"
+          style={{ borderBottom: '1px solid var(--border-base)' }}
+        >
+          <div className="flex items-center gap-2">
+            <Users size={14} style={{ color: 'var(--accent-primary)' }} />
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Flotte d'Agents</span>
+            <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-dimmed)' }}>
+              {totalActive > 0 ? `${totalActive} actif${totalActive > 1 ? 's' : ''}` : 'au repos'}
+            </span>
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
+              style={{ color: 'var(--text-muted)' }}
+              aria-label="Fermer"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+        {panelContent}
+      </div>
+    );
+  }
 
   // ── Render: Modal (inline) or Panel ─────────────────────────────────────────
   if (inline) {

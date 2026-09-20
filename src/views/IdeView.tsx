@@ -25,6 +25,7 @@ import { NotebookPickerModal } from '../components/ide/NotebookPickerModal.js';
 import { CommandPalette } from '../components/ide/CommandPalette.js';
 import { GlobalSearch } from '../components/ide/GlobalSearch.js';
 import { StatusBar } from '../components/ide/StatusBar.js';
+import { TelegramStatusModal } from '../components/ide/TelegramStatusModal.js';
 
 import { EditorTabs } from '../components/ide/EditorTabs.js';
 import { HistoryPanel } from '../components/ide/HistoryPanel.js';
@@ -181,6 +182,7 @@ export default function IdeView() {
   const [showFleet, setShowFleet] = useState(false);
   const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
+  const [showTelegram, setShowTelegram] = useState(false);
   const [showKnowledge, setShowKnowledge] = useState(false);
   const [showNotebooks, setShowNotebooks] = useState(false);
   const [showSandbox, setShowSandbox] = useState(false);
@@ -1224,6 +1226,36 @@ export default function IdeView() {
                 <MissionPanel inline />
               </div>
             )}
+
+            {/* Agents Panel — docké comme le panneau Missions */}
+            {showAgents && (
+              <div
+                className="border-l flex flex-col min-h-0"
+                style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
+              >
+                <AgentPanel docked onClose={() => setShowAgents(false)} />
+              </div>
+            )}
+
+            {/* Agent Fleet Panel — docké comme le panneau Missions */}
+            {showFleet && (
+              <div
+                className="border-l flex flex-col min-h-0"
+                style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
+              >
+                <AgentFleetPanel docked onClose={() => setShowFleet(false)} />
+              </div>
+            )}
+
+            {/* Bot Telegram — docké comme le panneau Missions */}
+            {showTelegram && (
+              <div
+                className="border-l flex flex-col min-h-0"
+                style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
+              >
+                <TelegramStatusModal docked status={null} onClose={() => setShowTelegram(false)} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -1245,6 +1277,7 @@ export default function IdeView() {
           onToggleLogs={() => setShowAssistantLogs(v => !v)}
           onToggleGitHub={() => setShowGitHub(v => !v)}
           onToggleMissions={() => setShowMissions(v => !v)}
+          onToggleTelegram={() => setShowTelegram(v => !v)}
         />
       </div>
 
@@ -1333,11 +1366,6 @@ export default function IdeView() {
         <AssistantLogsPanel onClose={() => setShowAssistantLogs(false)} />
       )}
 
-      {/* Agents Panel — modal overlay */}
-      {showAgents && (
-        <AgentPanel inline onClose={() => setShowAgents(false)} />
-      )}
-
       {/* Agent Builder Panel — modal overlay */}
       {showAgentBuilder && (
         <AgentBuilderPanel inline onClose={() => setShowAgentBuilder(false)} />
@@ -1354,10 +1382,7 @@ export default function IdeView() {
         onClose={() => setShowSkillsDoc(false)}
       />
 
-      {/* Fleet Panel — modal overlay */}
-      {showFleet && (
-        <AgentFleetPanel inline onClose={() => setShowFleet(false)} />
-      )}
+
 
       {/* Terminal Panel — floating overlay */}
       {showTerminal && (

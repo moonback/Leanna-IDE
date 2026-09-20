@@ -29,12 +29,15 @@ interface TelegramStatusModalProps {
   status: TelegramStatus | null;
   onClose: () => void;
   onStatusChange?: (newStatus: TelegramStatus) => void;
+  /** Rendu en panneau latéral docké (sans le chrome Modal). */
+  docked?: boolean;
 }
 
 export const TelegramStatusModal = memo(function TelegramStatusModal({
   status: initialStatus,
   onClose,
   onStatusChange,
+  docked = false,
 }: TelegramStatusModalProps) {
   const navigate = useNavigate();
   const [status, setStatus] = useState<TelegramStatus | null>(initialStatus);
@@ -109,9 +112,7 @@ export const TelegramStatusModal = memo(function TelegramStatusModal({
   // Derive tone from status
   const tone = lastError ? 'danger' : 'default';
 
-  return (
-    <Modal open onClose={onClose} size="sm" tone={tone}>
-      <Modal.Header>
+  const headerContent = (
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -145,7 +146,9 @@ export const TelegramStatusModal = memo(function TelegramStatusModal({
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Contrôle à distance &amp; notifications</p>
           </div>
         </div>
-        {/* Refresh button in header actions area — before the auto-injected × */}
+  );
+
+  const refreshButton = (
         <button
           type="button"
           onClick={fetchStatus}
@@ -158,9 +161,9 @@ export const TelegramStatusModal = memo(function TelegramStatusModal({
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
-      </Modal.Header>
+  );
 
-      <Modal.Body>
+  const bodyContent = (
         <div className="space-y-4 text-xs">
           {/* Feedback alert */}
           {feedback && (
@@ -280,9 +283,9 @@ export const TelegramStatusModal = memo(function TelegramStatusModal({
             </div>
           )}
         </div>
-      </Modal.Body>
+  );
 
-      <Modal.Footer align="between">
+  const footerContent = (
         <button
           type="button"
           onClick={handleGoToSettings}
@@ -291,6 +294,60 @@ export const TelegramStatusModal = memo(function TelegramStatusModal({
         >
           <Settings size={13} /> <span>Paramètres complets</span>
         </button>
+  );
+
+  // ── Rendu docké (panneau latéral, sans chrome Modal) ────────────────────────
+  if (docked) {
+    return (
+      <div className="flex flex-col h-full">
+        <div
+          className="flex items-center justify-between gap-2 px-3 py-2 flex-shrink-0"
+          style={{ borderBottom: '1px solid var(--border-base)' }}
+        >
+          {headerContent}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {refreshButton}
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
+                style={{ color: 'var(--text-muted)' }}
+                aria-label="Fermer"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-3 py-3">
+          {bodyContent}
+        </div>
+
+        <div
+          className="flex items-center justify-between px-3 py-2 flex-shrink-0"
+          style={{ borderTop: '1px solid var(--border-base)' }}
+        >
+          {footerContent}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Modal open onClose={onClose} size="sm" tone={tone}>
+      <Modal.Header>
+        {headerContent}
+        {refreshButton}
+      </Modal.Header>
+
+      <Modal.Body>
+        {bodyContent}
+      </Modal.Body>
+
+      <Modal.Footer align="between">
+        {footerContent}
         <Button variant="ghost" size="sm" onClick={onClose}>Fermer</Button>
       </Modal.Footer>
     </Modal>
