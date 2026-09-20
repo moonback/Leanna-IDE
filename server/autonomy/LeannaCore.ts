@@ -8,6 +8,7 @@ import {
   taskManagerConfigFromEnv,
   type AutonomousTask,
   type AutonomousTaskStatus,
+  type TaskPersistence,
 } from "./TaskManager.js";
 
 export type LeannaRuntimeStatus =
@@ -29,8 +30,44 @@ export interface LeannaRuntimeState {
   recentFailures: string[];
 }
 
+/**
+ * Durable store used for checkpoint / resume of autonomy tasks. Optional: when
+ * absent, the runtime behaves exactly as before (in-memory only). All methods
+ * are best-effort and must swallow their own errors.
+ */
+export interface AutonomyTaskStore extends TaskPersistence {
+  loadPendingTasks(): Promise<AutonomousTask[]>;
+}
+
+/** Autonomy event types forwarded to the real-time timeline. */
+export type AutonomyEventType =
+  | "autonomy:heartbeat"
+  | "autonomy:stateChanged"
+  | "autonomy:health"
+  | "autonomy:taskCreated"
+  | "autonomy:taskStateChanged";
+
+/**
+ * Envelope pushed to WebSocket clients for the autonomy timeline. It mirrors the
+ * shape used by the existing agent/mission broadcasters (typed message + ISO
+ * timestamp) so a single client can consume all real-time channels uniformly.
+ */
+export interface AutonomyBroadcastMessage {
+  type: "autonomy_event";
+  event: AutonomyEventType;
+  timestamp: string;
+  payload: Record<string, unknown>;
+}
+
+/** Consumer of autonomy events, typically a WebSocket fan-out. Best-effort. */
+export type AutonomyBroadcaster = (message: AutonomyBroadcastMessage) => void;
+
 export interface LeannaCoreOptions {
   onTask?: (task: AutonomousTask) => Promise<void>;
+  /** Optional durable task store enabling crash recovery of autonomy tasks. */
+  persistence?: AutonomyTaskStore;
+  /** Optional real-time broadcaster for the autonomy timeline (e.g. WebSocket). */
+  broadcaster?: AutonomyBroadcaster;
 }
 
 const MAX_RECENT_FAILURES = 20;
@@ -45,6 +82,8 @@ export class LeannaCore {
   private readonly taskManager: TaskManager;
   private readonly heartbeat: HeartbeatService;
   private readonly unsubscribers: Array<() => void> = [];
+  private readonly persistence?: AutonomyTaskStore;
+  private broadcaster?: AutonomyBroadcaster;
   private started = false;
   private state: LeannaRuntimeState = {
     status: "starting",
@@ -55,6 +94,8 @@ export class LeannaCore {
   };
 
   constructor(private readonly runtime: AgentRuntime, options: LeannaCoreOptions = {}) {
+    this.persistence = options.persistence;
+    this.broadcaster = options.broadcaster;
     this.taskManager = new TaskManager(
       async (task) => {
         this.setStatus("executing", `Executing ${task.type} task.`);
@@ -62,6 +103,7 @@ export class LeannaCore {
       },
       taskManagerConfigFromEnv(),
       (task, previous) => this.handleTaskStateChange(task, previous),
+      this.persistence,
     );
     this.heartbeat = new HeartbeatService(
       runtime.events,
@@ -76,7 +118,69 @@ export class LeannaCore {
     this.setStatus("watching", "Autonomy runtime started.");
     this.unsubscribers.push(this.events.onAny((event) => this.handleEvent(event)));
     this.unsubscribers.push(this.events.on("autonomy:heartbeat", (event) => this.handleHeartbeat(event.state)));
+    this.subscribeTimeline();
     this.heartbeat.start();
+    void this.resumePersistedTasks();
+  }
+
+  /**
+   * Attach or replace the real-time broadcaster after construction, mirroring the
+   * `setEventBroadcaster` pattern of the agent/mission systems. Safe to call
+   * before or after `start()`.
+   */
+  setBroadcaster(broadcaster: AutonomyBroadcaster | undefined): void {
+    this.broadcaster = broadcaster;
+  }
+
+  /** Forward every autonomy:* event to the timeline broadcaster (best-effort). */
+  private subscribeTimeline(): void {
+    const events: AutonomyEventType[] = [
+      "autonomy:heartbeat",
+      "autonomy:stateChanged",
+      "autonomy:health",
+      "autonomy:taskCreated",
+      "autonomy:taskStateChanged",
+    ];
+    for (const event of events) {
+      this.unsubscribers.push(this.events.on(event, (e) => this.broadcast(e as RuntimeEvent)));
+    }
+  }
+
+  private broadcast(event: RuntimeEvent): void {
+    if (!this.broadcaster) return;
+    const { type, ...payload } = event;
+    try {
+      this.broadcaster({
+        type: "autonomy_event",
+        event: type as AutonomyEventType,
+        timestamp: new Date().toISOString(),
+        payload: payload as Record<string, unknown>,
+      });
+    } catch {
+      /* broadcasting is best-effort and must never affect the runtime */
+    }
+  }
+
+  /**
+   * Checkpoint / resume: reload unfinished tasks from the durable store (if any)
+   * and hand them back to the TaskManager, which re-applies every existing bound
+   * (dedupe, retries, timeout, circuit breaker). Best-effort — a store outage
+   * never blocks startup.
+   */
+  private async resumePersistedTasks(): Promise<void> {
+    if (!this.persistence) return;
+    try {
+      const pending = await this.persistence.loadPendingTasks();
+      if (pending.length === 0) return;
+      const restored = this.taskManager.restore(pending);
+      if (restored > 0) {
+        this.state.lastWakeAt = Date.now();
+        this.heartbeat.wake("autonomy:resume");
+        this.setStatus("watching", `Resumed ${restored} persisted autonomy task(s).`);
+      }
+    } catch {
+      /* recovery is best-effort; the store logs its own errors */
+    }
   }
 
   async stop(): Promise<void> {

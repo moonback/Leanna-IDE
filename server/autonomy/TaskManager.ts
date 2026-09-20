@@ -38,6 +38,16 @@ export interface TaskManagerConfig {
 
 export type TaskStateListener = (task: AutonomousTask, previous: AutonomousTaskStatus) => void;
 
+/**
+ * Optional durable store for autonomy tasks. Every method is best-effort and
+ * must never throw into the TaskManager: implementations should swallow and log
+ * their own errors so persistence outages cannot stall the in-memory queue.
+ */
+export interface TaskPersistence {
+  saveTask(task: AutonomousTask): Promise<void> | void;
+  updateTask(task: AutonomousTask): Promise<void> | void;
+}
+
 export const taskManagerConfigFromEnv = (env: NodeJS.ProcessEnv = process.env): TaskManagerConfig => {
   const positive = (key: string, fallback: number): number => {
     const value = Number(env[key]);
@@ -70,6 +80,7 @@ export class TaskManager {
     private readonly execute: (task: AutonomousTask) => Promise<void>,
     private readonly config = taskManagerConfigFromEnv(),
     private readonly onStateChanged?: TaskStateListener,
+    private readonly persistence?: TaskPersistence,
   ) {}
 
   submit(input: Omit<AutonomousTask, "id" | "createdAt" | "status" | "attempts" | "maxRetries" | "timeoutMs">): AutonomousTask | undefined {
@@ -89,8 +100,32 @@ export class TaskManager {
     this.tasks.set(task.id, task);
     this.dedupe.set(task.fingerprint, Date.now() + this.config.dedupeTtlMs);
     this.queue.push(task.id);
+    void this.persist(task, "save");
     this.pump();
     return task;
+  }
+
+  /**
+   * Rehydrate unfinished tasks after a restart (checkpoint / resume). Tasks are
+   * re-queued as `pending` and revalidated against the current dedupe window and
+   * circuit state, so recovery still respects every existing bound. Returns the
+   * number of tasks actually re-enqueued.
+   */
+  restore(tasks: AutonomousTask[]): number {
+    let restored = 0;
+    for (const source of tasks) {
+      if (!this.accepting || this.queue.length >= this.config.maxQueueSize) break;
+      if (this.tasks.has(source.id) || this.dedupe.has(source.fingerprint) || this.isCircuitOpen(source.type)) continue;
+
+      const task: AutonomousTask = { ...source, status: "pending", error: undefined };
+      this.tasks.set(task.id, task);
+      this.dedupe.set(task.fingerprint, Date.now() + this.config.dedupeTtlMs);
+      this.queue.push(task.id);
+      void this.persist(task, "update");
+      restored++;
+    }
+    if (restored > 0) this.pump();
+    return restored;
   }
 
   list(): AutonomousTask[] {
@@ -164,7 +199,18 @@ export class TaskManager {
   private transition(task: AutonomousTask, next: AutonomousTaskStatus): void {
     const previous = task.status;
     task.status = next;
+    void this.persist(task, "update");
     this.onStateChanged?.(task, previous);
+  }
+
+  /** Best-effort persistence; failures are swallowed by the store, never here. */
+  private async persist(task: AutonomousTask, op: "save" | "update"): Promise<void> {
+    if (!this.persistence) return;
+    try {
+      await (op === "save" ? this.persistence.saveTask(task) : this.persistence.updateTask(task));
+    } catch {
+      /* persistence is best-effort and must not affect the in-memory queue */
+    }
   }
 
   private pruneDedupe(): void {

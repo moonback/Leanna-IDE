@@ -29,6 +29,7 @@ const GitHubView = lazy(() => import('./views/GitHubView.js'));
 const DocumentsView = lazy(() => import('./views/DocumentsView.js'));
 const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
 const ObservabilityView = lazy(() => import('./views/ObservabilityView.js'));
+const AutonomyView = lazy(() => import('./views/AutonomyView.js'));
 import './index.css';
 
 const configuredApiToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_Leanna_API_TOKEN?.trim();
@@ -491,6 +492,7 @@ function AnimatedRoutes() {
         <Route path="/documents"     element={wrap(<DocumentsView />)} />
         <Route path="/notebooks"     element={wrap(<NotebooksView />)} />
         <Route path="/observability" element={wrap(<ObservabilityView />)} />
+        <Route path="/autonomy"      element={wrap(<AutonomyView />)} />
       </Routes>
     </AnimatePresence>
   );

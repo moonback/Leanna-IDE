@@ -284,6 +284,7 @@ import { telegramService } from "./server/telegram/TelegramService.js";
 import { createTelegramRouter } from "./server/routes/telegram.js";
 import { createSmartSkills } from "./server/autonomy/SmartSkills.js";
 import { LeannaCore } from "./server/autonomy/LeannaCore.js";
+import { AutonomyPersistence } from "./server/autonomy/AutonomyPersistence.js";
 
 const { runtime, skillManager } = bootstrapRuntimeSync({
   skills: [
@@ -379,7 +380,11 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
 const runtimeV2 = runtime;
 const observability = new Observability();
 observability.attach(runtime.events);
+// Durable task store enabling checkpoint/resume of autonomy tasks after a crash.
+// Degrades silently to in-memory only when Supabase is not configured.
+const autonomyPersistence = new AutonomyPersistence();
 const leannaCore = new LeannaCore(runtimeV2, {
+  persistence: autonomyPersistence,
   onTask: async (task) => {
     // Autonomous tasks remain observable and use existing runtime memory; no tool
     // or mission action bypasses PermissionPolicy, DryRun or AutonomyPolicy.
@@ -780,6 +785,22 @@ async function startServer() {
   const terminalWss = new WebSocketServer({ noServer: true });
   setupTerminalWebSocket(terminalWss, apiToken);
 
+  // WebSocket server dédié pour la timeline d'autonomie (lecture seule, aucun
+  // session Gemini — contrairement à /live). Diffuse uniquement les événements
+  // autonomy:* déjà émis par le runtime.
+  const autonomyWss = new WebSocketServer({ noServer: true });
+  autonomyWss.on('connection', (clientWs: WebSocket) => {
+    // Snapshot initial de l'état pour un client qui rejoint en cours de route.
+    try {
+      clientWs.send(JSON.stringify({
+        type: 'autonomy_snapshot',
+        timestamp: new Date().toISOString(),
+        state: leannaCore.getState(),
+        tasks: leannaCore.getTasks().slice(0, 50),
+      }));
+    } catch { /* ignore */ }
+  });
+
   // ── Agent Orchestrator: broadcaster d'événements vers les clients WebSocket ──
   agentOrchestrator.setEventBroadcaster((event: any) => {
     const payload = JSON.stringify(event);
@@ -817,6 +838,19 @@ async function startServer() {
     }
   }, 500);
 
+  // ── Autonomy: broadcaster d'événements autonomy:* vers /autonomy ──
+  // Timeline temps réel de l'état/tâches autonomes sur un canal dédié en lecture
+  // seule (message typé + timestamp ISO), sans impacter les sessions Gemini Live.
+  leannaCore.setBroadcaster((message) => {
+    const payload = JSON.stringify(message);
+    for (const client of autonomyWss.clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        try { client.send(payload); } catch { /* ignore */ }
+      }
+    }
+  });
+  console.log(`[Server] ✓ Autonomy broadcaster connecté au WebSocket dédié (/autonomy).`);
+
   // ── Lifecycle: suivi des sessions Gemini actives ─────────────────────────
   // Permet à gracefulShutdown() de fermer toutes les sessions ouvertes
   // lors d'un hot-reload ou d'une fermeture Electron propre.
@@ -829,7 +863,7 @@ async function startServer() {
     // Sécurité : on exige le même jeton que pour les routes /api (passé en
     // cookie uniquement, plus de fallback par query string pour éviter
     // l'exposition du token dans les logs).
-    if (pathname === '/live' || pathname === '/sandbox-watch') {
+    if (pathname === '/live' || pathname === '/sandbox-watch' || pathname === '/autonomy') {
       const cookieHeader = request.headers.cookie || '';
       const cookies: Record<string, string> = {};
       cookieHeader.split(';').forEach(c => {
@@ -859,6 +893,10 @@ async function startServer() {
     } else if (pathname === '/terminal') {
       terminalWss.handleUpgrade(request, socket, head, (ws) => {
         terminalWss.emit('connection', ws, request);
+      });
+    } else if (pathname === '/autonomy') {
+      autonomyWss.handleUpgrade(request, socket, head, (ws) => {
+        autonomyWss.emit('connection', ws, request);
       });
     } else {
       // In dev, Vite's own upgrade listener (registered via hmr.server)

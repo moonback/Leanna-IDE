@@ -50,7 +50,39 @@ Dans cette incrémentation, le handler intégré enregistre un fait compact en m
 | `autonomy:taskCreated` | `LeannaCore` | Tâche autonome acceptée dans la queue. |
 | `autonomy:taskStateChanged` | `TaskManager` via `LeannaCore` | Transition de cycle de vie et erreur terminale éventuelle. |
 
-Les événements restent **in-process**. Ils sont adaptés au réveil immédiat et à l’observabilité d’une instance ; ils ne constituent pas encore un journal durable ni un bus multi-processus.
+Les événements restent **in-process** côté EventBus. Ils sont adaptés au réveil immédiat et à l’observabilité d’une instance ; ils ne constituent pas encore un journal durable ni un bus multi-processus.
+
+### Timeline temps réel (WebSocket)
+
+En plus des métriques HTTP, les cinq événements `autonomy:*` sont diffusés en temps réel sur un **canal WebSocket dédié `/autonomy`**, en lecture seule et sans session Gemini (contrairement à `/live`). Ce canal suit le même modèle `noServer` que `/sandbox-watch` et `/terminal`, exige le même jeton (`Leanna_token` en cookie) et n’accepte aucune commande entrante. `LeannaCore` accepte un broadcaster optionnel (`options.broadcaster` ou `setBroadcaster()`) ; sans broadcaster, le comportement est inchangé.
+
+À la connexion, le client reçoit d’abord un snapshot pour ne pas démarrer vide :
+
+```json
+{
+  "type": "autonomy_snapshot",
+  "timestamp": "2026-09-20T12:00:00.000Z",
+  "state": { "status": "watching", "activeTasks": 0, "health": "healthy", "recentFailures": [] },
+  "tasks": []
+}
+```
+
+Puis chaque événement suit une enveloppe uniforme, cohérente avec les canaux existants :
+
+```json
+{
+  "type": "autonomy_event",
+  "event": "autonomy:taskStateChanged",
+  "timestamp": "2026-09-20T12:00:00.000Z",
+  "payload": { "taskId": "…", "taskType": "reactive", "from": "running", "to": "completed" }
+}
+```
+
+Le champ `event` reprend le type d’origine (`autonomy:heartbeat`, `autonomy:stateChanged`, `autonomy:health`, `autonomy:taskCreated`, `autonomy:taskStateChanged`) et `payload` contient les champs de l’événement sans le champ `type` dupliqué. La diffusion est best-effort : une erreur d’envoi n’affecte jamais le runtime.
+
+Côté frontend, le hook `useAutonomyTimeline` (dans `src/hooks/`) maintient la connexion `/autonomy` avec reconnexion à backoff exponentiel et un tampon d’événements borné, et expose `{ state, tasks, events, connection }`. Le composant `AutonomyTimeline` (dans `src/components/`) affiche une timeline vivante de l’état, de la santé, des tâches en cours et des derniers échecs, sans polling. Ce panneau est purement observationnel : il ne déclenche aucune action.
+
+La vue est accessible dans l’UI via la route `/autonomy` (vue `AutonomyView`), atteignable depuis la navigation globale de la sidebar (entrée « Autonomie »).
 
 ## File, protection contre les boucles et récupération
 
@@ -148,8 +180,42 @@ pm2 stop leanna-server
 # ou, sans PM2 : Ctrl+C / SIGTERM sur npm start
 ```
 
-Le lifecycle arrête d’abord LeannaCore, ses timers et sa queue, puis AgentRuntime, les services externes et le serveur HTTP. Après redémarrage, les missions déjà persistées peuvent être reprises seulement si Supabase et la table `missions` sont configurés. Les tâches génériques du `TaskManager` ne sont pas encore persistées et ne sont donc pas reprises après un crash.
+Le lifecycle arrête d’abord LeannaCore, ses timers et sa queue, puis AgentRuntime, les services externes et le serveur HTTP. Après redémarrage, les missions déjà persistées peuvent être reprises seulement si Supabase et la table `missions` sont configurés.
+
+### Task store durable et reprise des tâches autonomes
+
+Les tâches génériques du `TaskManager` sont désormais persistées quand Supabase est configuré, via `AutonomyPersistence` (table `autonomy_tasks`). La persistance suit le même contrat optionnel qu’`AgentPersistence` :
+
+- **Écritures best-effort** : chaque tâche est enregistrée à la création puis à chaque transition d’état. Les erreurs Supabase sont journalisées et n’interrompent jamais la queue en mémoire.
+- **Mode dégradé silencieux** : sans `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY`, le runtime reste strictement en mémoire, comme auparavant.
+- **Reprise au démarrage** : `LeannaCore.start()` recharge les tâches `pending` et `running` non terminées et les re-soumet au `TaskManager`. Une tâche `running` interrompue par un crash repart en `pending`.
+- **Bornes réappliquées** : les tâches reprises repassent par la déduplication, les retries, le timeout et le circuit breaker existants. La reprise n’accorde aucune permission et ne contourne aucune politique.
+
+Créer la table une fois via `AutonomyPersistence.getMigrationSQL()` (dashboard Supabase ou migration) :
+
+```sql
+CREATE TABLE IF NOT EXISTS autonomy_tasks (
+  id              UUID PRIMARY KEY,
+  type            TEXT NOT NULL,
+  title           TEXT NOT NULL,
+  priority        TEXT NOT NULL DEFAULT 'medium',
+  source_event_id TEXT NOT NULL,
+  fingerprint     TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'pending',
+  attempts        INTEGER NOT NULL DEFAULT 0,
+  max_retries     INTEGER NOT NULL DEFAULT 3,
+  timeout_ms      INTEGER NOT NULL DEFAULT 60000,
+  metadata        JSONB,
+  error           TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
 
 ## Limites connues et prochaines étapes
 
-Cette fondation ne prétend pas encore fournir : Redis Streams, locks distribués, task store durable, checkpoint/reprise des tâches génériques, fallbacks de providers, WebSocket dédié/timeline frontend, ni test de charge/soak. Ces étapes exigent de choisir et d’intégrer un contrat de persistance partagé sans dupliquer les systèmes de missions, queues ou permissions existants.
+Le task store durable et la reprise des tâches autonomes génériques sont désormais disponibles quand Supabase est configuré (voir « Task store durable et reprise des tâches autonomes »). La persistance reste in-process côté file : elle assure la reprise après crash mais ne coordonne pas plusieurs processus.
+
+La timeline temps réel des événements `autonomy:*` est désormais diffusée sur un canal WebSocket dédié `/autonomy` et consommée par un composant frontend (`useAutonomyTimeline` + `AutonomyTimeline`). Voir « Timeline temps réel (WebSocket) ».
+
+Cette fondation ne prétend pas encore fournir : Redis Streams, locks distribués, fallbacks de providers, ni test de charge/soak. Ces étapes exigent de choisir et d’intégrer un contrat de coordination multi-processus sans dupliquer les systèmes de missions, queues ou permissions existants.
