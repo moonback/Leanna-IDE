@@ -1,4 +1,5 @@
 import React from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   Activity,
   AlertTriangle,
@@ -33,42 +34,51 @@ function timeAgo(iso: string): string {
 
 const EVENT_LABELS: Record<AutonomyEventType, string> = {
   'autonomy:heartbeat': 'Heartbeat',
-  'autonomy:stateChanged': 'Changement d\'état',
+  'autonomy:stateChanged': "Changement d'état",
   'autonomy:health': 'Santé',
   'autonomy:taskCreated': 'Tâche créée',
   'autonomy:taskStateChanged': 'Tâche mise à jour',
 };
 
-function eventIcon(event: AutonomyEventType) {
+/** Couleur sémantique (token CSS) associée à un type d'événement. */
+function eventColor(event: AutonomyEventType): string {
   switch (event) {
-    case 'autonomy:heartbeat':
-      return <Heart className="w-3.5 h-3.5 text-pink-500" />;
-    case 'autonomy:stateChanged':
-      return <Activity className="w-3.5 h-3.5 text-indigo-500" />;
-    case 'autonomy:health':
-      return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />;
-    case 'autonomy:taskCreated':
-      return <Plus className="w-3.5 h-3.5 text-blue-500" />;
-    case 'autonomy:taskStateChanged':
-      return <CircleDot className="w-3.5 h-3.5 text-amber-500" />;
-    default:
-      return <CircleDot className="w-3.5 h-3.5 text-gray-400" />;
+    case 'autonomy:heartbeat': return 'var(--accent-secondary)';
+    case 'autonomy:stateChanged': return 'var(--accent-primary)';
+    case 'autonomy:health': return 'var(--color-success)';
+    case 'autonomy:taskCreated': return 'var(--color-info)';
+    case 'autonomy:taskStateChanged': return 'var(--color-warning)';
+    default: return 'var(--text-muted)';
   }
 }
 
-function statusIcon(status: string) {
+function EventIcon({ event }: { event: AutonomyEventType }) {
+  const color = eventColor(event);
+  const cls = 'w-3.5 h-3.5';
+  switch (event) {
+    case 'autonomy:heartbeat': return <Heart className={cls} style={{ color }} />;
+    case 'autonomy:stateChanged': return <Activity className={cls} style={{ color }} />;
+    case 'autonomy:health': return <CheckCircle2 className={cls} style={{ color }} />;
+    case 'autonomy:taskCreated': return <Plus className={cls} style={{ color }} />;
+    case 'autonomy:taskStateChanged': return <CircleDot className={cls} style={{ color }} />;
+    default: return <CircleDot className={cls} style={{ color }} />;
+  }
+}
+
+function StatusIcon({ status }: { status: string }) {
+  const cls = 'w-3.5 h-3.5';
   switch (status) {
     case 'watching':
     case 'executing':
-      return <Play className="w-3.5 h-3.5 text-emerald-500" />;
+      return <Play className={cls} style={{ color: 'var(--color-success)' }} />;
     case 'idle':
-      return <Pause className="w-3.5 h-3.5 text-amber-500" />;
+      return <Pause className={cls} style={{ color: 'var(--color-warning)' }} />;
     case 'sleeping':
-      return <Moon className="w-3.5 h-3.5 text-indigo-400" />;
+      return <Moon className={cls} style={{ color: 'var(--accent-primary)' }} />;
     case 'error':
-      return <AlertTriangle className="w-3.5 h-3.5 text-red-500" />;
+      return <AlertTriangle className={cls} style={{ color: 'var(--color-error)' }} />;
     default:
-      return <CircleDot className="w-3.5 h-3.5 text-gray-400" />;
+      return <CircleDot className={cls} style={{ color: 'var(--text-muted)' }} />;
   }
 }
 
@@ -105,72 +115,96 @@ interface AutonomyTimelineProps {
  * Panneau read-only qui affiche l'état du runtime autonome et la timeline temps
  * réel des événements autonomy:*. Purement observationnel : il ne déclenche
  * aucune action et n'envoie rien au serveur.
+ *
+ * Design : s'appuie exclusivement sur les tokens sémantiques (var(--*)) pour un
+ * rendu cohérent sur tous les thèmes (voir DESIGN_TOKENS.md).
  */
 export function AutonomyTimeline({ enabled = true, className = '' }: AutonomyTimelineProps) {
   const { state, tasks, events, connection } = useAutonomyTimeline({ enabled });
+  const prefersReducedMotion = useReducedMotion();
 
   const runningTasks = tasks.filter((t) => t.status === 'running' || t.status === 'pending');
+  const online = connection === 'open';
+
+  const itemMotion = prefersReducedMotion
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.15 } }
+    : {
+        initial: { opacity: 0, y: -6 },
+        animate: { opacity: 1, y: 0 },
+        transition: { type: 'spring' as const, stiffness: 500, damping: 32 },
+      };
+
+  const sectionLabel = 'text-xs font-semibold uppercase tracking-wider';
 
   return (
     <div className={`flex flex-col h-full min-h-0 ${className}`}>
-      {/* Header : état + connexion */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100/80">
-        <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-indigo-500" />
-          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">Autonomie</h2>
-        </div>
-        <div
-          className="flex items-center gap-1 text-xs font-medium"
-          title={`Connexion timeline : ${connection}`}
-        >
-          {connection === 'open' ? (
-            <Wifi className="w-3.5 h-3.5 text-emerald-500" />
+      {/* Bandeau connexion */}
+      <div
+        className="flex items-center justify-between px-4 py-2.5 border-b"
+        style={{ borderColor: 'var(--border-base)' }}
+      >
+        <span className={sectionLabel} style={{ color: 'var(--text-muted)' }}>
+          Runtime autonome
+        </span>
+        <div className="flex items-center gap-1.5" title={`Connexion timeline : ${connection}`}>
+          {online ? (
+            <Wifi className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
           ) : (
-            <WifiOff className="w-3.5 h-3.5 text-gray-400" />
+            <WifiOff className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
           )}
-          <span className={connection === 'open' ? 'text-emerald-600' : 'text-gray-400'}>
-            {connection === 'open' ? 'En direct' : connection === 'connecting' ? 'Connexion…' : 'Hors ligne'}
+          <span
+            className="text-xs font-medium"
+            style={{ color: online ? 'var(--color-success)' : 'var(--text-muted)' }}
+          >
+            {online ? 'En direct' : connection === 'connecting' ? 'Connexion…' : 'Hors ligne'}
           </span>
         </div>
       </div>
 
       {/* Résumé d'état */}
-      <div className="px-4 py-3 border-b border-gray-100/80 grid grid-cols-3 gap-2">
-        <StatCell
-          label="Statut"
-          icon={statusIcon(state?.status ?? 'starting')}
-          value={state?.status ?? '—'}
-        />
+      <div
+        className="px-4 py-3 border-b grid grid-cols-3 gap-2"
+        style={{ borderColor: 'var(--border-base)' }}
+      >
+        <StatCell label="Statut" icon={<StatusIcon status={state?.status ?? 'starting'} />} value={state?.status ?? '—'} />
         <StatCell
           label="Santé"
           icon={
             state?.health === 'degraded' ? (
-              <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+              <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
             ) : (
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
             )
           }
           value={state?.health ?? '—'}
         />
         <StatCell
           label="Tâches actives"
-          icon={<CircleDot className="w-3.5 h-3.5 text-blue-500" />}
+          icon={<CircleDot className="w-3.5 h-3.5" style={{ color: 'var(--color-info)' }} />}
           value={state ? String(state.activeTasks) : '—'}
         />
       </div>
 
       {/* Tâches en cours */}
       {runningTasks.length > 0 && (
-        <div className="px-4 pt-3 pb-1 border-b border-gray-100/80">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1.5">
+        <div className="px-4 pt-3 pb-1 border-b" style={{ borderColor: 'var(--border-base)' }}>
+          <p className={`${sectionLabel} mb-1.5`} style={{ color: 'var(--text-muted)' }}>
             En cours ({runningTasks.length})
           </p>
           <div className="space-y-1 max-h-28 overflow-y-auto scrollbar-thin pr-1">
             {runningTasks.slice(0, 20).map((task) => (
-              <div key={task.id} className="flex items-center gap-2 text-xs px-2 py-1 rounded-lg bg-gray-50/70">
-                <CircleDot className="w-3 h-3 text-blue-400 flex-shrink-0" />
-                <span className="flex-1 min-w-0 truncate text-gray-700">{task.title}</span>
-                <span className="text-gray-400 uppercase text-[10px] tracking-wide">{task.status}</span>
+              <div
+                key={task.id}
+                className="flex items-center gap-2 text-sm px-2 py-1 rounded-md"
+                style={{ backgroundColor: 'var(--bg-secondary)' }}
+              >
+                <CircleDot className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-info)' }} />
+                <span className="flex-1 min-w-0 truncate" style={{ color: 'var(--text-secondary)' }}>
+                  {task.title}
+                </span>
+                <span className="uppercase text-xs tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                  {task.status}
+                </span>
               </div>
             ))}
           </div>
@@ -181,42 +215,73 @@ export function AutonomyTimeline({ enabled = true, className = '' }: AutonomyTim
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-2 py-2">
         {events.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-4 py-8">
-            <Moon className="w-6 h-6 text-gray-300 mb-2" />
-            <p className="text-sm text-gray-400">Aucun événement pour l'instant</p>
-            <p className="text-xs text-gray-300 mt-0.5">
+            <Moon className="w-6 h-6 mb-2" style={{ color: 'var(--text-dimmed)' }} />
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Aucun événement pour l'instant
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
               Les événements du runtime autonome apparaîtront ici en temps réel
             </p>
           </div>
         ) : (
           <ul className="space-y-0.5">
-            {events.map((entry) => (
-              <li
-                key={entry.id}
-                className="flex items-start gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50/80 transition-colors"
-              >
-                <span className="mt-0.5 flex-shrink-0">{eventIcon(entry.event)}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-gray-700">{EVENT_LABELS[entry.event]}</span>
-                    <span className="text-[10px] text-gray-400">{timeAgo(entry.timestamp)}</span>
+            <AnimatePresence initial={false}>
+              {events.map((entry) => (
+                <motion.li
+                  key={entry.id}
+                  layout={!prefersReducedMotion}
+                  {...itemMotion}
+                  className="flex items-start gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors"
+                  style={{ ['--hover-bg' as string]: 'var(--bg-secondary)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-secondary)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  {/* Pastille colorée par type */}
+                  <span
+                    className="mt-0.5 flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-md"
+                    style={{ backgroundColor: 'var(--accent-subtle)' }}
+                  >
+                    <EventIcon event={entry.event} />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {EVENT_LABELS[entry.event]}
+                      </span>
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {timeAgo(entry.timestamp)}
+                      </span>
+                    </div>
+                    <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
+                      {describeEvent(entry)}
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-500 truncate">{describeEvent(entry)}</p>
-                </div>
-              </li>
-            ))}
+                </motion.li>
+              ))}
+            </AnimatePresence>
           </ul>
         )}
       </div>
 
       {/* Derniers échecs */}
       {state && state.recentFailures.length > 0 && (
-        <div className="px-4 py-2 border-t border-gray-100/80">
-          <p className="text-xs font-bold uppercase tracking-widest text-red-400 mb-1 flex items-center gap-1">
+        <div className="px-4 py-2 border-t" style={{ borderColor: 'var(--border-base)' }}>
+          <p
+            className={`${sectionLabel} mb-1 flex items-center gap-1`}
+            style={{ color: 'var(--color-error)' }}
+          >
             <AlertTriangle className="w-3 h-3" /> Échecs récents ({state.recentFailures.length})
           </p>
           <div className="space-y-0.5 max-h-20 overflow-y-auto scrollbar-thin pr-1">
             {state.recentFailures.slice(0, 5).map((failure, i) => (
-              <p key={i} className="text-xs text-red-600 bg-red-50/60 px-2 py-1 rounded truncate">
+              <p
+                key={i}
+                className="text-xs px-2 py-1 rounded-md truncate"
+                style={{
+                  color: 'var(--color-error)',
+                  backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+                }}
+              >
                 {failure}
               </p>
             ))}
@@ -229,12 +294,16 @@ export function AutonomyTimeline({ enabled = true, className = '' }: AutonomyTim
 
 function StatCell({ label, icon, value }: { label: string; icon: React.ReactNode; value: string }) {
   return (
-    <div className="px-2.5 py-2 rounded-xl bg-gray-50/70">
-      <div className="flex items-center gap-1 text-gray-400 mb-0.5">
+    <div className="px-2.5 py-2 rounded-lg" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+      <div className="flex items-center gap-1 mb-0.5">
         {icon}
-        <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          {label}
+        </span>
       </div>
-      <p className="text-sm font-bold text-gray-800 capitalize truncate">{value}</p>
+      <p className="text-sm font-bold capitalize truncate" style={{ color: 'var(--text-primary)' }}>
+        {value}
+      </p>
     </div>
   );
 }
