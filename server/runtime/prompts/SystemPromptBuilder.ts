@@ -57,7 +57,23 @@ import {
 } from "./types.js";
 import type { TaskType } from "./types/context.js";
 
-const __dirname_compat = path.dirname(fileURLToPath(import.meta.url));
+/**
+ * Dossier du module, robuste en ESM (dev via tsx) comme en CJS (bundle esbuild).
+ * En CJS bundlé, `import.meta.url` est vide et `fileURLToPath("")` lève
+ * ERR_INVALID_URL : on privilégie donc le global `__dirname` (fourni par esbuild)
+ * et on ne recourt à `import.meta.url` que s'il est exploitable, sans jamais
+ * lever au chargement du module.
+ */
+const __dirname_compat: string = (() => {
+  if (typeof __dirname !== "undefined") return __dirname;
+  try {
+    const url = import.meta.url;
+    if (url) return path.dirname(fileURLToPath(url));
+  } catch {
+    // import.meta.url absent/vide en CJS — on retombe sur le cwd
+  }
+  return process.cwd();
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SystemPromptBuilder
