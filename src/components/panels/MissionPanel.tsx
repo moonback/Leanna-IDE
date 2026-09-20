@@ -366,6 +366,20 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
                 ...m,
                 goals: m.goals.map(g => {
                   if (g.id !== detail.goalId) return g;
+                  // Idempotent: an action_started event can fire more than once
+                  // for the same actionId (skill re-run / duplicated event). Avoid
+                  // pushing a duplicate id, which would collide as a React key.
+                  const existing = g.actions.find(a => a.id === detail.actionId);
+                  if (existing) {
+                    return {
+                      ...g,
+                      actions: g.actions.map(a =>
+                        a.id === detail.actionId
+                          ? { ...a, skill: detail.skill ?? a.skill, status: 'in_progress' as const }
+                          : a
+                      ),
+                    };
+                  }
                   return {
                     ...g,
                     actions: [...g.actions, {

@@ -508,10 +508,30 @@ export class Executor {
       return;
     }
 
-    // Exécuter les actions une par une
-    for (const action of actions) {
+    // Exécuter les actions une par une.
+    // On lit systématiquement le plan VIVANT (mission.getGoal(...).plannedActions)
+    // plutôt qu'une copie locale : une replanification remplace ce plan par de
+    // nouvelles actions (nouveaux ids), et itérer sur l'ancienne référence
+    // ferait planter startAction ("Action not found"). On avance donc via un
+    // curseur sur le plan courant, réinitialisé après chaque replanification.
+    let cursor = 0;
+    // Garde-fou anti-boucle : borne le nombre total d'itérations pour éviter
+    // qu'une replanification en boucle ne bloque indéfiniment l'objectif.
+    let iterations = 0;
+    const maxIterations = 100;
+
+    while (iterations++ < maxIterations) {
       if (mission.isCompleted()) break;
-      if (action.status !== "pending") continue;
+
+      const livePlan = mission.getGoal(goalId)?.plannedActions ?? [];
+      // Trouver la prochaine action à exécuter à partir du curseur.
+      let action: PlannedAction | undefined;
+      while (cursor < livePlan.length) {
+        const candidate = livePlan[cursor];
+        if (candidate.status === "pending") { action = candidate; break; }
+        cursor++;
+      }
+      if (!action) break; // plus rien à exécuter
 
       // Point de contrôle : suspend si la mission est en pause.
       await this.waitIfPaused(mission.id);
@@ -547,17 +567,27 @@ export class Executor {
       }
 
       if (!actionSucceeded && result.decision === "replan") {
-        // Replanifier avec les infos accumulées
+        // Replanifier avec les infos accumulées.
         console.log(`[Executor]    🔄 Replanification...`);
-        actions = await this.planner.replan(
+        const replanned = await this.planner.replan(
           mission,
           goalId,
           action,
           result.failure ?? "Erreur inconnue",
           availableSkills
         );
-        mission.setPlanForGoal(goalId, actions);
-        // La boucle for reprendra avec les nouvelles actions
+        // Remplace le plan vivant par les nouvelles actions et repart du début :
+        // le curseur doit pointer sur le nouveau plan, pas sur l'ancien index.
+        mission.setPlanForGoal(goalId, replanned);
+        cursor = 0;
+        continue;
+      }
+
+      // Aucune replanification : avancer le curseur au-delà de l'action courante.
+      // (Une action retentée reste "pending" et sera re-sélectionnée ; une action
+      // terminée est de toute façon ignorée par le filtre de statut ci-dessus.)
+      if (result.decision !== "retry") {
+        cursor++;
       }
     }
 
