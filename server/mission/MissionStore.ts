@@ -139,7 +139,8 @@ export class MissionStore {
       if (!this.tableMissingLogged) {
         console.warn(
           `[MissionStore] ⚠️ Table "${this.table}" absente dans Supabase — persistance ignorée. ` +
-            `Créez-la avec le SQL fourni pour activer la reprise des missions.`
+            `Exécutez supabase/missions_schema.sql dans Supabase (puis NOTIFY pgrst, 'reload schema') ` +
+            `pour activer la reprise des missions.`
         );
         this.tableMissingLogged = true;
       }
@@ -150,19 +151,9 @@ export class MissionStore {
 }
 
 /*
-── SQL de création de table (à exécuter dans Supabase) ─────────────────────────
-
-create table if not exists public.missions (
-  id          uuid primary key,
-  title       text not null,
-  status      text not null,
-  priority    text not null,
-  state       jsonb not null,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
-);
-
-create index if not exists missions_status_idx on public.missions (status);
-create index if not exists missions_updated_at_idx on public.missions (updated_at desc);
-
+── Schéma de la table `missions` ───────────────────────────────────────────────
+Le SQL de création (table + index + RLS) est maintenu dans un fichier dédié :
+    supabase/missions_schema.sql
+À exécuter dans l'éditeur SQL Supabase, puis rafraîchir le cache PostgREST avec :
+    NOTIFY pgrst, 'reload schema';
 ─────────────────────────────────────────────────────────────────────────────── */
