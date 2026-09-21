@@ -7,6 +7,7 @@ import type {
 } from "./types.js";
 import type { AgentRole } from "../types.js";
 import { listAgentDefinitions, hasAgent } from "../roles.js";
+import { getToolsForAgent } from "../toolAgentMapper.js";
 import { generateText } from "../../utils/textGeneration.js";
 import { createLogger } from "../../utils/logger.js";
 
@@ -75,7 +76,10 @@ export class DynamicPlanner {
     }
 
     const estimatedDurationMs = stages.length * 45_000; // ~45s par étape estimée
-    const architectureRationale = `Plan dynamique structuré en ${stages.length} étapes adaptées au domaine '${understanding.domain}'. Agents engagés : ${stages.map((s) => s.agentRole).join(" → ")}.`;
+    const rolesSummary = stages.map((s) => s.agentRole).join(" → ");
+    const architectureRationale =
+      `Plan dynamique structuré en ${stages.length} étapes adaptées au domaine '${understanding.domain}'. ` +
+      `Agents engagés : ${rolesSummary}.`;
 
     return {
       id: planId,
@@ -348,7 +352,7 @@ export class DynamicPlanner {
     ].join("\n");
   }
 
-  private getRoleVerificationCriteria(role: AgentRole, understanding: GoalUnderstanding): string[] {
+  private getRoleVerificationCriteria(role: AgentRole, _understanding: GoalUnderstanding): string[] {
     const criteria: string[] = [];
     if (role === "coder" || role === "refactor" || role === "debugger") {
       criteria.push("Syntaxe valide et absence d'erreur TypeScript");
