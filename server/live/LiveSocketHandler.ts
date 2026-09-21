@@ -12,7 +12,7 @@
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
-import { GoogleGenAI, LiveServerMessage, Modality, ThinkingLevel } from '@google/genai';
+import { GoogleGenAI, LiveServerMessage, Modality, ThinkingLevel, Behavior } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
@@ -51,11 +51,26 @@ export interface LiveSocketDeps {
 }
 
 // Plafond de taille (en caractères) appliqué à chaque résultat d'outil injecté
-// dans la session Live. Les gros payloads (generate_codebase_markdown,
-// list_project_files récursif, read_project_file) sont tronqués pour éviter que
-// la fenêtre de contexte du modèle ne déborde ('context_too_long'). ~48k
-// caractères ≈ ~12k tokens, largement suffisant pour un résultat d'outil unique.
-const MAX_TOOL_RESULT_CHARS = 48_000;
+// dans la session Live. La fenêtre réelle du modèle est 131 072 tokens : un
+// résultat d'outil unique ne doit pas en consommer une part disproportionnée.
+// Plafonds par outil, calibrés selon leur volume typique. ~16k car. ≈ ~5k tokens.
+const TOOL_RESULT_CAPS: Record<string, number> = {
+  read_project_file: 24_000,
+  generate_codebase_markdown: 16_000,
+  list_project_files: 10_000,
+  search_in_files: 10_000,
+  browser_read_content: 14_000,
+  browser_get_accessibility_snapshot: 12_000,
+};
+/** Plafond par défaut (caractères) pour un résultat d'outil sans entrée dédiée. */
+const DEFAULT_TOOL_RESULT_CAP = 16_000;
+/** Plafond global (caractères) pour l'ensemble d'un lot de réponses d'outils. */
+const TOOL_RESULT_BATCH_CAP = 32_000;
+
+/** Plafond applicable à un outil donné. */
+function toolResultCap(toolName: string): number {
+  return TOOL_RESULT_CAPS[toolName] ?? DEFAULT_TOOL_RESULT_CAP;
+}
 
 // ─── Constantes retry tool calls ─────────────────────────────────────────────
 
@@ -66,8 +81,9 @@ const TOOL_RETRY_DELAY_MS = 1000;
 
 // ─── Constantes rate limiting audio ──────────────────────────────────────────
 
-/** Débit audio maximum autorisé par connexion WebSocket, en octets/seconde. */
-const AUDIO_RATE_LIMIT_BYTES_PER_SEC = 100 * 1024; // 100 KB/s
+/** Débit audio maximum autorisé par connexion WebSocket, en octets/seconde.
+ *  Le PCM 16 kHz / 16 bits mono ≈ 31,25 KB/s ; 64 KB/s laisse une marge x2. */
+const AUDIO_RATE_LIMIT_BYTES_PER_SEC = 64 * 1024; // 64 KB/s
 /** Durée de la fenêtre glissante pour mesurer le débit audio, en ms. */
 const AUDIO_RATE_WINDOW_MS = 1000;
 /** Nombre de violations avant de logguer un avertissement groupé. */
@@ -225,14 +241,27 @@ export function attachLiveWebSocket(
     // sur un projet volumineux) peut faire bondir la taille de session entre deux
     // mesures. Un seuil critique à 70 % laisse la marge nécessaire pour éviter le
     // 'context_too_long' côté Gemini.
-    const CONTEXT_WINDOW_TOKENS = 1_000_000;
-    const WARNING_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * 0.50);
-    const CRITICAL_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * 0.70);
+    // La fenêtre réelle du modèle est 131 072 tokens en entrée (65 536 en sortie),
+    // PAS 1M. La compression serveur (contextWindowCompression) agit AVANT nos
+    // seuils UI ; les seuils warn/critical ne sont donc qu'un filet de secours
+    // d'affichage si la compression échoue.
+    const CONTEXT_WINDOW_TOKENS = 131_072;
+    const COMPRESSION_TRIGGER_TOKENS = 90_000; // la compression serveur se déclenche ici
+    const WARNING_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * 0.60);  // ≈ 78k — affichage UI
+    const CRITICAL_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * 0.80); // ≈ 105k — filet de secours
 
     const conversationCtx = {
       totalPromptTokens: 0,
       totalCompletionTokens: 0,
       maxPromptTokensInTurn: 0,
+      // Taille RÉELLE du contexte courant. Dans la Live API, `promptTokenCount`
+      // d'un tour contient DÉJÀ tout l'historique cumulé : il ne faut donc PAS
+      // additionner les tours (sinon on double-compte et on dépasse 100 %).
+      // On mémorise le dernier promptTokenCount comme taille courante, et on y
+      // ajoute les tokens des résultats d'outils injectés DEPUIS cette mesure
+      // (absents d'usageMetadata) jusqu'au prochain rapport.
+      currentContextTokens: 0,
+      pendingToolTokens: 0,
       turns: 0,
       warningsIssued: new Set<string>(),
       lastAlertLevel: '' as '' | 'warn' | 'critical',
@@ -243,8 +272,8 @@ export function attachLiveWebSocket(
     let autoSummarizeContext: (() => Promise<void>) | null = null;
 
     const resolveContextLevel = (percent: number): 'ok' | 'warn' | 'critical' => {
-      if (percent >= 70) return 'critical';
-      if (percent >= 50) return 'warn';
+      if (percent >= 80) return 'critical';
+      if (percent >= 60) return 'warn';
       return 'ok';
     };
 
@@ -269,24 +298,32 @@ export function attachLiveWebSocket(
     };
 
     const monitorConversationContext = (prompt: number, completion: number) => {
+      // Totaux CUMULÉS conservés pour la facturation/télémétrie uniquement.
       conversationCtx.totalPromptTokens += prompt;
       conversationCtx.totalCompletionTokens += completion;
       conversationCtx.maxPromptTokensInTurn = Math.max(conversationCtx.maxPromptTokensInTurn, prompt);
       conversationCtx.turns++;
 
-      const cumulative = conversationCtx.totalPromptTokens + conversationCtx.totalCompletionTokens;
-      const currentPct = (cumulative / CONTEXT_WINDOW_TOKENS) * 100;
+      // Taille RÉELLE du contexte = promptTokenCount du tour courant (il inclut
+      // déjà tout l'historique). On y ajoute la complétion de ce tour, qui fera
+      // partie du prochain prompt. Les tokens d'outils en attente sont remis à
+      // zéro : ils sont maintenant reflétés dans ce promptTokenCount.
+      conversationCtx.pendingToolTokens = 0;
+      const current = prompt + completion;
+      conversationCtx.currentContextTokens = current;
+
+      const currentPct = (current / CONTEXT_WINDOW_TOKENS) * 100;
       const turnPct = (prompt / CONTEXT_WINDOW_TOKENS) * 100;
 
       const baseLog =
         `[ContextMonitor] 🔄 Tour ${conversationCtx.turns}: prompt=${prompt} (${turnPct.toFixed(1)}%)` +
-        ` | cumulatif=${cumulative}/${CONTEXT_WINDOW_TOKENS} (${currentPct.toFixed(1)}%)`;
+        ` | contexte=${current}/${CONTEXT_WINDOW_TOKENS} (${currentPct.toFixed(1)}%)`;
 
-      if (cumulative >= CRITICAL_THRESHOLD && !conversationCtx.warningsIssued.has('critical')) {
+      if (current >= CRITICAL_THRESHOLD && !conversationCtx.warningsIssued.has('critical')) {
         conversationCtx.warningsIssued.add('critical');
         conversationCtx.lastAlertLevel = 'critical';
         console.warn(`[ContextMonitor] 🔴 CRITIQUE: contexte à ${currentPct.toFixed(1)}% !`);
-        sendContextSize(cumulative, {
+        sendContextSize(current, {
           level: 'critical',
           turns: conversationCtx.turns,
           suggestion: 'Contexte proche de la limite. Démarrer une nouvelle conversation ou demander un résumé.',
@@ -295,7 +332,7 @@ export function attachLiveWebSocket(
           clientWs.send(JSON.stringify({
             context_alert: {
               level: 'critical',
-              used_tokens: cumulative,
+              used_tokens: current,
               max_tokens: CONTEXT_WINDOW_TOKENS,
               percent: Math.round(currentPct),
               suggestion: 'Contexte proche de la limite. Démarrer une nouvelle conversation ou demander un résumé.',
@@ -304,11 +341,11 @@ export function attachLiveWebSocket(
           }));
         } catch {}
         autoSummarizeContext?.();
-      } else if (cumulative >= WARNING_THRESHOLD && !conversationCtx.warningsIssued.has('warn')) {
+      } else if (current >= WARNING_THRESHOLD && !conversationCtx.warningsIssued.has('warn')) {
         conversationCtx.warningsIssued.add('warn');
         conversationCtx.lastAlertLevel = 'warn';
         console.warn(`[ContextMonitor] 🟠 AVERTISSEMENT: contexte à ${currentPct.toFixed(1)}%`);
-        sendContextSize(cumulative, {
+        sendContextSize(current, {
           level: 'warn',
           turns: conversationCtx.turns,
           suggestion: 'Conversation longue. Envisager un résumé ou knowledge_memory_add.',
@@ -317,7 +354,7 @@ export function attachLiveWebSocket(
           clientWs.send(JSON.stringify({
             context_alert: {
               level: 'warn',
-              used_tokens: cumulative,
+              used_tokens: current,
               max_tokens: CONTEXT_WINDOW_TOKENS,
               percent: Math.round(currentPct),
               suggestion: 'Conversation longue. Envisager un résumé ou knowledge_memory_add.',
@@ -329,7 +366,7 @@ export function attachLiveWebSocket(
         console.log(baseLog);
       }
 
-      sendContextSize(cumulative, { turns: conversationCtx.turns });
+      sendContextSize(current, { turns: conversationCtx.turns });
     };
 
     const flushAssistantBuffer = async () => {
@@ -510,7 +547,12 @@ export function attachLiveWebSocket(
         filteredDeclarations = filteredDeclarations.filter(d => !d.name.startsWith('reasoning_'));
       }
 
-      const tools = filteredDeclarations.length > 0 ? [{ functionDeclarations: filteredDeclarations }] : undefined;
+      // Toutes les déclarations doivent être NON_BLOCKING : ce modèle traite les
+      // réponses d'outils au fur et à mesure sans figer la conversation. Un outil
+      // laissé en BLOCKING (défaut serveur) empêcherait le modèle de continuer à
+      // parler pendant l'exécution et peut renvoyer une erreur.
+      const nonBlockingDeclarations = filteredDeclarations.map((d) => ({ ...d, behavior: Behavior.NON_BLOCKING }));
+      const tools = nonBlockingDeclarations.length > 0 ? [{ functionDeclarations: nonBlockingDeclarations }] : undefined;
       const toolTokensEstimate = filteredDeclarations.reduce((sum, d) => sum + estimateToolTokens(d), 0);
       const tokensEconomises = estimateToolTokensTotal(skillManager.getToolDeclarations()) - toolTokensEstimate;
 
@@ -535,11 +577,21 @@ export function attachLiveWebSocket(
       // ── Réglage thinking ──────────────────────────────────────────────────
       // includeThoughts → résumés de pensée streamés pour afficher la réflexion.
       const includeThoughts = currentProfile.includeThoughts ?? true;
-      const memoryBudgetTokens = 2000;
-      const knowledgeBudgetTokens = 3000;
+      // Niveau de réflexion : MEDIUM par défaut, HIGH activable via le profil
+      // (missions complexes). Mesure la latence chez toi avant de figer HIGH.
+      const profileThinking = String((currentProfile as any).thinkingLevel ?? '').toLowerCase();
+      const thinkingLevel =
+        profileThinking === 'high' ? ThinkingLevel.HIGH :
+        profileThinking === 'low' ? ThinkingLevel.LOW :
+        ThinkingLevel.MEDIUM;
+      // Le prompt système + mémoire + déclarations d'outils sont renvoyés à CHAQUE
+      // session et comptent dans les 131 072 tokens. On serre donc les budgets :
+      // ~12k tokens pour le prompt initial (au lieu de 60k = 46 % de la fenêtre !).
+      const memoryBudgetTokens = 1000;
+      const knowledgeBudgetTokens = 2000;
       const maxMemories = currentProfile.temperature !== undefined && currentProfile.temperature < 0.5 ? 5 : 10;
       const maxConversations = 3;
-      const INITIAL_PROMPT_MAX_TOKENS = 60_000;
+      const INITIAL_PROMPT_MAX_TOKENS = 12_000;
       const INITIAL_PROMPT_MAX_CHARS = INITIAL_PROMPT_MAX_TOKENS * 4;
 
       // ── RAG: mémoires ────────────────────────────────────────────────
@@ -639,6 +691,14 @@ export function attachLiveWebSocket(
         }
       }
 
+      // ── Session resumption ───────────────────────────────────────────
+      // La session Live n'est valide qu'environ 15 min (WebSocket ~10 min) sans
+      // reprise. On active sessionResumption : le serveur émet des handles que
+      // l'on relaie au client. Sur GoAway, le client reconnecte avec ce handle
+      // (valide ~2 h) au lieu de repartir de zéro — l'état de session est préservé.
+      const resumeHandle = urlParams.get('resume_handle') || undefined;
+      let latestResumeHandle: string | null = resumeHandle ?? null;
+
       // ── GoAway handler ───────────────────────────────────────────────
       let goAwayHandled = false;
       let clientWsClosing = false;
@@ -647,11 +707,14 @@ export function attachLiveWebSocket(
         console.info(`[Gemini Live] 🔄 GoAway reçu — session expire. Turns: ${conversationCtx.turns}`);
         flushAssistantBuffer().catch(() => {});
         clientWs.send(JSON.stringify({
-          type: 'session_restart',
+          // Si un handle de reprise est disponible, on demande une reconnexion
+          // transparente plutôt qu'un redémarrage complet (pas de re-résumé).
+          type: latestResumeHandle ? 'session_resume' : 'session_restart',
           reason: 'goaway',
           detail: goAway,
           conversation_id: conversationId,
           turns_completed: conversationCtx.turns,
+          resume_handle: latestResumeHandle ?? undefined,
         }));
         try { session.close(); } catch {}
         if (!clientWsClosing && clientWs.readyState === WebSocket.OPEN) {
@@ -671,11 +734,11 @@ export function attachLiveWebSocket(
           topP,
           // Niveau de réflexion du modèle gemini-3.8-live-extended-thinking.
           // Valeurs supportées : 'low' | 'medium' | 'high' (MINIMAL non supporté).
-          // 'high' → raisonnement de fond maximal pour les tâches multi-étapes /
-          // multi-outils. includeThoughts → résumés de pensée streamés pour
-          // afficher la réflexion en cours côté client.
+          // Défaut MEDIUM : bon compromis latence/qualité. HIGH réservé aux
+          // missions multi-étapes / multi-outils, activable via le profil.
+          // includeThoughts → résumés de pensée streamés côté client.
           // Voir https://ai.google.dev/gemini-api/docs/live-api/thinking
-          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH, includeThoughts },
+          thinkingConfig: { thinkingLevel, includeThoughts },
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
           systemInstruction: {
             parts: [{ text: systemText + memoryContext + knowledgeContext + notebookContext }],
@@ -683,11 +746,39 @@ export function attachLiveWebSocket(
           tools,
           inputAudioTranscription: {},
           outputAudioTranscription: {},
+          // Compression serveur : mécanisme PRINCIPAL de gestion de la fenêtre.
+          // triggerTokens est une STRING dans le SDK (@google/genai v2.11).
+          // slidingWindow vide → fenêtre glissante par défaut du serveur.
+          contextWindowCompression: {
+            triggerTokens: String(COMPRESSION_TRIGGER_TOKENS),
+            slidingWindow: {},
+          },
+          // Reprise de session : handle passé à la reconnexion (sinon nouvelle
+          // session). Le serveur émettra des sessionResumptionUpdate.
+          sessionResumption: resumeHandle ? { handle: resumeHandle } : {},
         },
         callbacks: {
           onmessage: (message: LiveServerMessage) => {
             lastServerMessage = message;
             if (message.goAway) handleGoAway(message.goAway);
+
+            // Handle de reprise : le serveur en émet un nouveau régulièrement.
+            // On mémorise le dernier handle « resumable » et on le relaie au
+            // client, qui le rejouera via ?resume_handle=… à la reconnexion.
+            const resumeUpdate = message.sessionResumptionUpdate;
+            if (resumeUpdate?.resumable && resumeUpdate.newHandle) {
+              latestResumeHandle = resumeUpdate.newHandle;
+              try { clientWs.send(JSON.stringify({ type: 'session_resume_handle', handle: resumeUpdate.newHandle })); } catch {}
+            }
+
+            // Fin de tour : c'est le vrai signal « le modèle a fini de parler »
+            // (turnComplete) ou « génération terminée » (generationComplete).
+            // On y rattache le flush du transcript assistant plutôt que de
+            // dépendre uniquement du debounce de 2 s ou de la fin d'un tool call.
+            if (message.serverContent?.turnComplete || message.serverContent?.generationComplete) {
+              if (assistantFlushTimer) { clearTimeout(assistantFlushTimer); assistantFlushTimer = null; }
+              flushAssistantBuffer().catch(() => {});
+            }
 
             const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audio) clientWs.send(Buffer.from(audio, 'base64'));
@@ -740,12 +831,15 @@ export function attachLiveWebSocket(
                 // On les remonte ici pour que le moniteur (et donc l'auto-résumé)
                 // se déclenche à temps.
                 (toolTokens: number) => {
-                  conversationCtx.totalPromptTokens += toolTokens;
-                  const cumulative = conversationCtx.totalPromptTokens + conversationCtx.totalCompletionTokens;
-                  const pct = (cumulative / CONTEXT_WINDOW_TOKENS) * 100;
-                  console.debug(`[ContextGuard] +${toolTokens} tokens (résultats d'outils) → cumulatif ${cumulative} (${pct.toFixed(1)}%)`);
-                  sendContextSize(cumulative, { turns: conversationCtx.turns });
-                  if (cumulative >= CRITICAL_THRESHOLD && !conversationCtx.warningsIssued.has('critical')) {
+                  // Les résultats d'outils s'ajoutent au contexte courant mais ne
+                  // sont pas encore reflétés dans un promptTokenCount (le prochain
+                  // usageMetadata les intégrera puis remettra pendingToolTokens à 0).
+                  conversationCtx.pendingToolTokens += toolTokens;
+                  const estimated = conversationCtx.currentContextTokens + conversationCtx.pendingToolTokens;
+                  const pct = (estimated / CONTEXT_WINDOW_TOKENS) * 100;
+                  console.debug(`[ContextGuard] +${toolTokens} tokens (résultats d'outils) → contexte estimé ${estimated} (${pct.toFixed(1)}%)`);
+                  sendContextSize(estimated, { turns: conversationCtx.turns });
+                  if (estimated >= CRITICAL_THRESHOLD && !conversationCtx.warningsIssued.has('critical')) {
                     conversationCtx.warningsIssued.add('critical');
                     conversationCtx.lastAlertLevel = 'critical';
                     console.warn(`[ContextGuard] 🔴 Seuil critique atteint via résultats d'outils (${pct.toFixed(1)}%) — déclenchement du résumé.`);
@@ -768,7 +862,9 @@ export function attachLiveWebSocket(
                 .map((d: any) => ({ modality: d.modality, tokens: d.tokenCount ?? 0 }))
                 .filter((d: any) => d.modality);
               monitorConversationContext(promptTokens, completionTokens);
-              const cumulative = conversationCtx.totalPromptTokens + conversationCtx.totalCompletionTokens;
+              // Lifetime (facturation) vs contexte courant (occupation fenêtre).
+              const lifetimeTotal = conversationCtx.totalPromptTokens + conversationCtx.totalCompletionTokens;
+              const currentContext = conversationCtx.currentContextTokens;
               clientWs.send(JSON.stringify({
                 token_usage: {
                   promptTokens, completionTokens, totalTokens,
@@ -776,9 +872,12 @@ export function attachLiveWebSocket(
                   session: {
                     total_prompt_tokens: conversationCtx.totalPromptTokens,
                     total_completion_tokens: conversationCtx.totalCompletionTokens,
-                    session_total: cumulative,
+                    // Cumul de facturation sur toute la session (peut dépasser la fenêtre).
+                    session_total: lifetimeTotal,
+                    // Occupation RÉELLE de la fenêtre = dernier promptTokenCount (+ complétion).
+                    current_context_tokens: currentContext,
                     context_window: CONTEXT_WINDOW_TOKENS,
-                    context_percent: Math.round((cumulative / CONTEXT_WINDOW_TOKENS) * 100),
+                    context_percent: Math.round((currentContext / CONTEXT_WINDOW_TOKENS) * 100),
                     turns: conversationCtx.turns,
                     alert_level: conversationCtx.lastAlertLevel,
                   },
@@ -883,9 +982,13 @@ export function attachLiveWebSocket(
       // outils s'enchaînent en quelques secondes et le contexte grossit vite. Un
       // cooldown de 30 s et un plafond de 6 résumés/session laissent le résumé
       // suivre le rythme sans laisser le contexte déborder.
-      const AUTO_SUMMARIZE_COOLDOWN_MS = 30_000;
-      const MAX_AUTO_SUMMARIZES_PER_SESSION = 6;
-      const MIN_MESSAGES_FOR_AUTO_SUMMARIZE = 8;
+      // La compression serveur (contextWindowCompression) est désormais le
+      // mécanisme PRINCIPAL. L'auto-résumé n'est qu'un repli : cooldown plus long,
+      // plafond réduit, seuil de messages plus élevé pour éviter les résumés
+      // prématurés qui rajoutent du texte à la session.
+      const AUTO_SUMMARIZE_COOLDOWN_MS = 60_000;
+      const MAX_AUTO_SUMMARIZES_PER_SESSION = 2;
+      const MIN_MESSAGES_FOR_AUTO_SUMMARIZE = 16;
 
       autoSummarizeContext = async () => {
         if (!conversationId) return;
@@ -893,13 +996,13 @@ export function attachLiveWebSocket(
         if (now - conversationCtx.lastAutoSummarizeAt < AUTO_SUMMARIZE_COOLDOWN_MS) return;
         if (conversationCtx.autoSummarizeCount >= MAX_AUTO_SUMMARIZES_PER_SESSION) return;
 
-        const messages = await getConversationMessages(conversationId, 12);
+        const messages = await getConversationMessages(conversationId, 40);
         if (messages.length < MIN_MESSAGES_FOR_AUTO_SUMMARIZE) return;
 
         clientWs.send(JSON.stringify({ type: 'context_summarize_progress', status: 'running', auto: true }));
         try {
           const tokensBefore = conversationCtx.totalPromptTokens + conversationCtx.totalCompletionTokens;
-          const minKeep = 6;       // 2 → 6 (garder plus de messages récents)
+          const minKeep = 8;       // garder les 8 messages les plus récents intacts
           const toSummarize = messages.slice(0, -minKeep);
           const keptMessages = messages.slice(-minKeep);
           const { summary, method } = await summarizeWithLLM(toSummarize.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })));
@@ -911,6 +1014,10 @@ export function attachLiveWebSocket(
           const newSize = summaryTokens + keptTokens + baseTokens;
           conversationCtx.totalPromptTokens = Math.floor(newSize * 0.7);
           conversationCtx.totalCompletionTokens = Math.floor(newSize * 0.3);
+          // Réinitialiser la taille courante estimée : le prochain promptTokenCount
+          // la corrigera avec la valeur réelle post-compression.
+          conversationCtx.currentContextTokens = newSize;
+          conversationCtx.pendingToolTokens = 0;
           conversationCtx.warningsIssued.clear();
           conversationCtx.lastAlertLevel = '';
           conversationCtx.lastAutoSummarizeAt = now;
@@ -983,13 +1090,13 @@ export function attachLiveWebSocket(
             if (msg.openFile) parts.push(`Fichier actif : ${msg.openFile}${msg.language ? ` (${msg.language})` : ''}`);
             if (msg.cursorLine != null) parts.push(`Curseur : ligne ${msg.cursorLine}${msg.cursorColumn != null ? `, colonne ${msg.cursorColumn}` : ''}`);
             if (msg.selection && String(msg.selection).trim().length > 0) {
-              const sel = String(msg.selection).slice(0, 2000); // cap à 2000 chars
+              const sel = String(msg.selection).slice(0, 1200); // cap à 1200 chars (chaque injection s'accumule)
               parts.push(`Sélection en cours :\n\`\`\`\n${sel}\n\`\`\``);
             }
             
             // Fichiers ouverts (contexte élargi)
             if (msg.openFiles && Array.isArray(msg.openFiles) && msg.openFiles.length > 0) {
-              const fileList = msg.openFiles.slice(0, 30).join(', '); // limiter à 30 fichiers
+              const fileList = msg.openFiles.slice(0, 10).join(', '); // limiter à 10 fichiers
               parts.push(`Fichiers ouverts (${msg.openFiles.length}) : ${fileList}`);
             }
             
@@ -1030,8 +1137,11 @@ export function attachLiveWebSocket(
           }
 
           if (msg.text) {
+            // Avec des outils NON_BLOCKING, le modèle génère lui-même ses phrases
+            // d'attente. On n'injecte donc plus de texte parlé ; on informe juste
+            // l'UI de l'activité en cours (statut, pas transcript).
             if (getBusyDescription()) {
-              clientWs.send(JSON.stringify({ text: `Je suis actuellement en train de ${getBusyDescription()}. Je m'occupe de ta demande dès que j'ai terminé.` }));
+              clientWs.send(JSON.stringify({ type: 'busy_status', busyWith: getBusyDescription() }));
             }
             session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: msg.text }] }] });
             (async () => {
@@ -1055,10 +1165,10 @@ export function attachLiveWebSocket(
               try {
                 clientWs.send(JSON.stringify({ type: 'context_summarize_progress', status: 'running' }));
                 if (!conversationId) { clientWs.send(JSON.stringify({ type: 'context_summarized', status: 'error', error: 'Aucune conversation active.' })); return; }
-                const messages = await getConversationMessages(conversationId, 12);
+                const messages = await getConversationMessages(conversationId, 40);
                 if (messages.length < 6) { clientWs.send(JSON.stringify({ type: 'context_summarized', status: 'error', error: 'Conversation trop courte (minimum 6 messages).' })); return; }
                 const tokensBefore = conversationCtx.totalPromptTokens + conversationCtx.totalCompletionTokens;
-                const minKeep = 6;       // 2 → 6 (garder plus de messages récents)
+                const minKeep = 8;       // garder les 8 messages les plus récents intacts
                 const toSummarize = messages.slice(0, -minKeep);
                 const keptMessages = messages.slice(-minKeep);
                 const { summary, method } = await summarizeWithLLM(toSummarize.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })));
@@ -1070,6 +1180,8 @@ export function attachLiveWebSocket(
                 const newSize = summaryTokens + keptTokens + baseTokens;
                 conversationCtx.totalPromptTokens = Math.floor(newSize * 0.7);
                 conversationCtx.totalCompletionTokens = Math.floor(newSize * 0.3);
+                conversationCtx.currentContextTokens = newSize;
+                conversationCtx.pendingToolTokens = 0;
                 conversationCtx.warningsIssued.clear();
                 conversationCtx.lastAlertLevel = '';
                 if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -1253,7 +1365,7 @@ function isContextReady(state: SessionContextGate, toolName?: string, args?: any
 function capToolResponse(
   response: unknown,
   toolName: string,
-  maxChars = MAX_TOOL_RESULT_CHARS,
+  maxChars = toolResultCap(toolName),
 ): { response: unknown; truncated: boolean; originalChars: number } {
   let serialized: string;
   try {
@@ -1268,11 +1380,18 @@ function capToolResponse(
     return { response, truncated: false, originalChars };
   }
 
-  const kept = serialized.slice(0, maxChars);
+  // Troncature tête + queue : on garde 70 % du début (contenu principal) et
+  // 30 % de la fin — les erreurs, résumés et statuts arrivent souvent en fin
+  // de sortie et seraient perdus par une simple coupe du début.
   const marker =
     `\n\n[…RÉSULTAT TRONQUÉ — outil "${toolName}" : ` +
-    `${originalChars} caractères réduits à ${maxChars}. ` +
-    `Affine la requête (chemin précis, sous-dossier, plage de lignes) pour obtenir le détail manquant.]`;
+    `${originalChars} caractères réduits à ${maxChars} (début + fin conservés). ` +
+    `Affine la requête (chemin précis, sous-dossier, plage de lignes) pour le détail manquant.]\n\n`;
+  const budget = Math.max(0, maxChars - marker.length);
+  const headChars = Math.floor(budget * 0.7);
+  const tailChars = budget - headChars;
+  const head = serialized.slice(0, headChars);
+  const tail = tailChars > 0 ? serialized.slice(originalChars - tailChars) : '';
 
   return {
     response: {
@@ -1280,12 +1399,13 @@ function capToolResponse(
       _tool: toolName,
       _originalChars: originalChars,
       _keptChars: maxChars,
-      content: kept + marker,
+      content: head + marker + tail,
     },
     truncated: true,
     originalChars,
   };
 }
+
 
 // ── handleToolCall ─────────────────────────────────────────────────────────────
 async function handleToolCall(
@@ -1505,36 +1625,66 @@ async function handleToolCall(
   if (busyStateRef) busyStateRef.activeDescription = null;
 
   if (functionResponses.length > 0) {
-    // ── Cap (C) + comptabilisation des tokens (B) ──────────────────────────
-    // On tronque chaque résultat trop volumineux AVANT injection, puis on
-    // estime les tokens réellement envoyés dans la session pour que le moniteur
-    // de contexte reflète la taille réelle (les payloads d'outils n'apparaissent
-    // pas dans usageMetadata de Gemini).
+    // ── Cap par outil + enveloppe output/error + comptabilisation tokens ────
+    // Pour chaque réponse :
+    //   1. On tronque le PAYLOAD (pas l'enveloppe) selon le plafond de l'outil.
+    //   2. On l'enveloppe en { output | error } — le SDK distingue succès/erreur
+    //      via ces clés dans `response`.
+    //   3. On estime les tokens réellement injectés (absents d'usageMetadata).
+    // NOTE: le champ `scheduling` (WHEN_IDLE/SILENT/INTERRUPT) N'EST PAS supporté
+    // par gemini-3.8-live-extended-thinking (le serveur renvoie « Function
+    // response scheduling is not supported for this model » et ferme la session).
+    // On déclare donc les outils NON_BLOCKING mais on n'ajoute jamais `scheduling`
+    // aux réponses.
+    // Un plafond global de lot (TOOL_RESULT_BATCH_CAP) empêche qu'un lot de
+    // plusieurs gros résultats ne sature la fenêtre d'un seul coup.
     let injectedTokens = 0;
+    let batchChars = 0;
+    const wrapped: any[] = [];
+
     for (const fr of functionResponses) {
-      const capped = capToolResponse(fr.response, fr.name);
+      // Budget par outil, resserré si le lot approche le plafond global.
+      const remainingBatch = Math.max(2_000, TOOL_RESULT_BATCH_CAP - batchChars);
+      const perToolCap = Math.min(toolResultCap(fr.name), remainingBatch);
+      const capped = capToolResponse(fr.response, fr.name, perToolCap);
+      let payload = capped.response;
+
       if (capped.truncated) {
-        fr.response = capped.response;
         console.warn(
           `[ContextGuard] ✂️ Résultat "${fr.name}" tronqué: ` +
-          `${capped.originalChars} → ${MAX_TOOL_RESULT_CHARS} caractères.`,
+          `${capped.originalChars} → ${perToolCap} caractères.`,
         );
         try {
           clientWs.send(JSON.stringify({
             type: 'tool_result_truncated',
             tool: fr.name,
             originalChars: capped.originalChars,
-            keptChars: MAX_TOOL_RESULT_CHARS,
+            keptChars: perToolCap,
           }));
         } catch { /* ignore si WS fermé */ }
       }
-      try {
-        const serialized = typeof fr.response === 'string' ? fr.response : JSON.stringify(fr.response);
-        injectedTokens += estimateTokens(serialized);
-      } catch { /* non sérialisable : ignoré dans l'estimation */ }
+
+      // Distinguer erreur vs sortie : le SDK lit `error` / `output` dans
+      // `response`. Une réponse tronquée est un objet { content, _truncated… }.
+      const isError = payload !== null && typeof payload === 'object' && 'error' in (payload as any) && !('status' in (payload as any));
+      const responseEnvelope: Record<string, unknown> = isError
+        ? { error: (payload as any).error }
+        : { output: payload };
+
+      const serialized = (() => {
+        try { return JSON.stringify(responseEnvelope); } catch { return ''; }
+      })();
+      batchChars += serialized.length;
+      injectedTokens += estimateTokens(serialized);
+
+      wrapped.push({
+        id: fr.id,
+        name: fr.name,
+        response: responseEnvelope,
+      });
     }
 
-    session.sendToolResponse({ functionResponses });
+    session.sendToolResponse({ functionResponses: wrapped });
 
     // Remonter les tokens injectés au moniteur de contexte de la connexion.
     if (injectedTokens > 0) {
