@@ -134,25 +134,75 @@ export class AgentContextResolver {
       .slice(0, 10);
   }
 
+  /**
+   * Lit les fichiers de contexte en parallèle avec une stratégie Outline-First
+   * pour préserver la fenêtre de contexte de 131k tokens de Gemini 3.8.
+   */
   async readContextFiles(files: string[]): Promise<string[]> {
-    const fileContents: string[] = [];
-    for (const [index, file] of files.slice(0, 10).entries()) {
-      try {
-        // Le premier fichier est le fichier principal résolu par la tâche :
-        // injecter son contenu complet évite que le modèle travaille sur une
-        // simple fenêtre startLine/endLine ou sur les 50 premières lignes.
-        const content = await this.callTool("read_project_file", {
-          path: file,
-          ...(index === 0 ? { full: true } : {}),
-        });
-        if (content && typeof content === "object" && content.content) {
-          fileContents.push(`--- ${file} ---\n${content.content}`);
-        }
-      } catch (err) {
-        log.debug(`Échec lecture: ${file} — ${(err as Error).message}`);
-      }
-    }
-    log.debug(`Fichiers lus: ${fileContents.length}/${files.length}; principal=${files[0] ?? "aucun"}`);
+    const targets = files.slice(0, 10);
+    if (targets.length === 0) return [];
+
+    const readPromises = targets.map((file, index) =>
+      this.readSingleFileContext(file, index === 0)
+    );
+
+    const results = await Promise.all(readPromises);
+    const fileContents = results.filter((content): content is string => content !== null);
+
+    log.debug(`Fichiers résolus et lus: ${fileContents.length}/${targets.length}; principal=${targets[0] ?? "aucun"}`);
     return fileContents;
+  }
+
+  /**
+   * Lit un fichier individuel : lecture complète pour le fichier principal,
+   * ou structure Outline pour les fichiers secondaires volumineux (>= 200 lignes).
+   */
+  private async readSingleFileContext(file: string, isPrimary: boolean): Promise<string | null> {
+    const ext = file.split(".").pop()?.toLowerCase();
+    const isCodeFile = ["ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "rs", "go"].includes(ext ?? "");
+
+    try {
+      // Pour les fichiers secondaires volumineux de code, privilégier l'Outline pour économiser le contexte
+      if (!isPrimary && isCodeFile) {
+        try {
+          const outlineResult = await this.callTool("read_file_outline", { path: file });
+          if (
+            outlineResult &&
+            outlineResult.status === "success" &&
+            typeof outlineResult.totalLines === "number" &&
+            outlineResult.totalLines >= 200 &&
+            Array.isArray(outlineResult.outline) &&
+            outlineResult.outline.length > 0
+          ) {
+            const formattedOutline = outlineResult.outline
+              .slice(0, 40)
+              .map((item: { line: number; type: string; name: string; signature?: string }) =>
+                `  L${item.line}: [${item.type}] ${item.name}${item.signature ? ` — ${item.signature}` : ""}`
+              )
+              .join("\n");
+
+            const header = `--- ${file} (Structure Outline — ${outlineResult.totalLines} lignes) ---`;
+            const note = "[Utiliser read_project_file(startLine, endLine) pour inspecter une section spécifique]";
+            return `${header}\n${formattedOutline}\n${note}`;
+          }
+        } catch {
+          // Fallback sur lecture directe en cas d'indisponibilité de l'outline
+        }
+      }
+
+      // Lecture directe (complète si fichier principal)
+      const content = await this.callTool("read_project_file", {
+        path: file,
+        ...(isPrimary ? { full: true } : {}),
+      });
+
+      if (content && typeof content === "object" && typeof content.content === "string") {
+        return `--- ${file} ---\n${content.content}`;
+      }
+      return null;
+    } catch (err) {
+      log.debug(`Échec lecture: ${file} — ${(err as Error).message}`);
+      return null;
+    }
   }
 }

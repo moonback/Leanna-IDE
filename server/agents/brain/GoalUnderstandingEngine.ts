@@ -42,7 +42,7 @@ export class GoalUnderstandingEngine {
    */
   understandHeuristic(
     goal: string,
-    input: BrainGoalInput,
+    _input: BrainGoalInput,
     projectInfo: { techStack: string[]; hasReact: boolean; hasTypeScript: boolean },
     discoveredFiles: string[]
   ): GoalUnderstanding {
