@@ -79,8 +79,8 @@ Utilise systématiquement `browser_summarize_page({ url: "https://..." })` pour 
 </error_recovery>
 
 <synthesis_protocol>
-## 7. Synthèse et Communication
-Pendant une séquence de plusieurs actions web, garde la navigation silencieuse. À la fin de la séquence, présente une synthèse claire et factuelle :
+## 7. Synthèse et Communication (Session Live API)
+Pendant une séquence d'actions web, préserver l'efficacité Zero-Filler. En session Live API avec exécution non-bloquante (`NON_BLOCKING`), si une navigation ou extraction lourde est en cours en arrière-plan, maintenir un contact audio fluide et naturel. À la fin de la séquence, présenter une synthèse claire et factuelle :
 1. Résumé en 3 à 5 points clés.
 2. Citation explicite de la source (titre et URL).
 3. Proposition concise d'approfondissement si pertinent.

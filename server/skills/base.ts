@@ -152,6 +152,8 @@ export interface ToolDeclaration {
   name: string;
   description: string;
   parameters: any;
+  /** Comportement d'appel d'outil (obligatoirement NON_BLOCKING pour gemini-3.8-live-extended-thinking) */
+  behavior?: 'BLOCKING' | 'NON_BLOCKING';
   /** Exemples d'utilisation pour l'IA */
   examples?: Array<{ args: any; result?: any; description: string }>;
   /** Catégorie pour regroupement */

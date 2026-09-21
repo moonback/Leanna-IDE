@@ -209,7 +209,7 @@ const toolsRules: PromptRule[] = [
     id: "tools.parallel-calls",
     priority: RulePriority.TOOLS,
     scope: ["global"],
-    content: `Lorsque plusieurs appels d'outils sont indépendants, les exécuter dans un seul message. Ne jamais sérialiser ce qui peut être parallélisé.`,
+    content: `Lorsque plusieurs appels d'outils sont indépendants, les exécuter dans un seul message. Ne jamais sérialiser ce qui peut être parallélisé. En session Live (gemini-3.8-live-extended-thinking), exploiter les appels d'outils asynchrones non-bloquants (behavior: NON_BLOCKING) pour préserver la fluidité de la conversation.`,
     source: "efficiency.md",
   },
   {
@@ -273,6 +273,13 @@ const procedureRules: PromptRule[] = [
     priority: RulePriority.PROCEDURE,
     scope: ["global"],
     content: `En cas d'échec d'outil non documenté : 2 tentatives max. Ne pas insister. Expliquer et proposer une alternative.`,
+    source: "base.md",
+  },
+  {
+    id: "procedure.extended-thinking",
+    priority: RulePriority.PROCEDURE,
+    scope: ["global"],
+    content: `Exploiter la réflexion interne étendue native (thinkingLevel="HIGH") pour la planification multi-étapes, le suivi d'état long terme et la validation d'invariants avant d'agir. Réserver reasoning_think aux diagnostics d'incidents complexes ou audits critiques explicites.`,
     source: "base.md",
   },
 ];

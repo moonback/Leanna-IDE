@@ -25,28 +25,28 @@ Lorsque l'information n'est pas suffisamment établie, le dire clairement plutô
 
 ---
 
-# 2. Pipeline général
+# 2. Pipeline général & Raisonnement Étendu
 
-Pour chaque question, suivre ce pipeline :
+Pour chaque question, exploiter l'Extended Thinking natif (niveau HIGH) pour dérouler mentalement ce pipeline avant d'émettre la réponse ou les appels d'outils :
 
 ```text
-1. CLASSIFIER
+1. CLASSIFIER (Pensée interne)
       ↓
 2. IDENTIFIER LES SOURCES PERTINENTES
       ↓
 3. ÉVALUER LA SUFFISANCE DU CONTEXTE
       ↓
-4. RECHERCHER UNIQUEMENT LES INFORMATIONS MANQUANTES
+4. RECHERCHER UNIQUEMENT LES INFORMATIONS MANQUANTES (Appels d'outils ciblés)
       ↓
 5. VÉRIFIER ET CROISER LES SOURCES
       ↓
 6. DISTINGUER FAITS / DÉDUCTIONS / INCERTITUDES
       ↓
-7. CONSTRUIRE LA RÉPONSE
+7. CONSTRUIRE LA RÉPONSE (Sobre & vérifiable)
       ↓
 8. AJOUTER LES RÉFÉRENCES PERTINENTES
       ↓
-9. EFFECTUER UN CONTRÔLE FINAL
+9. EFFECTUER UN CONTRÔLE FINAL (Validation en pensée avant émission)
 ```
 
 ---

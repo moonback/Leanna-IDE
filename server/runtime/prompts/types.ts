@@ -131,6 +131,11 @@ export interface ProfileConfig {
    * réflexion en cours à l'utilisateur.
    */
   includeThoughts?: boolean;
+  /**
+   * Niveau de réflexion du modèle gemini-3.8-live-extended-thinking.
+   * Valeurs : 'minimal' | 'low' | 'medium' | 'high' (défaut HIGH pour raisonnement étendu).
+   */
+  thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -164,6 +169,8 @@ export interface SystemPromptConfig {
   extraSections?: Array<{ id: string; content: string }>;
   /** Racine du workspace projet actif (vide ou non défini si aucun projet ouvert) */
   workspace?: string;
+  /** Niveau de réflexion pour gemini-3.8-live-extended-thinking */
+  thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

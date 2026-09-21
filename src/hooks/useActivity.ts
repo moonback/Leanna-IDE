@@ -43,6 +43,18 @@ export interface ReasoningState {
   totalSteps?: number;
 }
 
+/**
+ * État du flux de "réflexion" (thought summaries) émis par le modèle
+ * extended-thinking de la Live API. Volontairement séparé de ReasoningState
+ * (raisonnement structuré / CoT) pour un panneau UI dédié et distinct.
+ */
+export interface ThoughtStreamState {
+  /** Le modèle est en train de réfléchir (panneau visible). */
+  active: boolean;
+  /** Texte de réflexion accumulé en direct. */
+  text: string;
+}
+
 function toolLabel(tool: string, args?: Record<string, unknown>): string {
   const p = (key: string) => (args?.[key] as string | undefined) ?? '';
   const labels: Record<string, (a: typeof args) => string> = {
@@ -90,6 +102,7 @@ export function useActivity() {
   const [modifiedFiles, setModifiedFiles] = useState<ModifiedFile[]>([]);
   const [isBusy, setIsBusy] = useState(false);
   const [reasoning, setReasoning] = useState<ReasoningState>({ active: false });
+  const [thoughtStream, setThoughtStream] = useState<ThoughtStreamState>({ active: false, text: '' });
 
   const startActivity = useCallback((tool: string, args?: Record<string, unknown>) => {
     const step: ActivityStep = {
@@ -133,6 +146,7 @@ export function useActivity() {
     setModifiedFiles([]);
     setIsBusy(false);
     setReasoning({ active: false });
+    setThoughtStream({ active: false, text: '' });
   }, []);
 
   return {
@@ -140,8 +154,10 @@ export function useActivity() {
     modifiedFiles,
     isBusy,
     reasoning,
+    thoughtStream,
     setIsBusy,
     setReasoning,
+    setThoughtStream,
     startActivity,
     completeActivity,
     clearActivity,

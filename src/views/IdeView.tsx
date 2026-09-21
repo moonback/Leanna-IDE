@@ -44,6 +44,7 @@ import { useScreenShare } from '../context/ScreenShareContext.js';
 import { useSandboxWatcher } from '../hooks/useSandboxWatcher.js';
 import { ideApi } from '../services/ideApi.js';
 import { AgentProgressBar } from '../components/ide/AgentProgressBar.js';
+import { ThoughtStreamContainer } from '../components/ide/ThoughtStream.js';
 import { ChatPanel } from '../components/ide/ChatPanel.js';
 import { LiveSkillsMonitor } from '../components/ide/LiveSkillsMonitor.js';
 import { WorkflowPanel } from '../components/ide/WorkflowPanel.js';
@@ -80,7 +81,7 @@ const SERVER_PORT = Number(_importMeta.env?.VITE_SERVER_PORT) || 5000;
 
 export default function IdeView() {
   const { profile } = useProfile();
-  const { activity, clearActivity, connected, disconnect, connect, muted, toggleMute, isBusy, reasoning, sendVideoFrame, sendRawMessage, sendEditorContext } = useLiveAPIContext();
+  const { activity, clearActivity, connected, disconnect, connect, muted, toggleMute, isBusy, reasoning, thoughtStream, sendVideoFrame, sendRawMessage, sendEditorContext } = useLiveAPIContext();
   const { isSharing: screenShareEnabled, toggleScreenShare } = useScreenShare();
   const navigate = useNavigate();
   const { info: toastInfo } = useToast();
@@ -1282,6 +1283,9 @@ export default function IdeView() {
             )}
           </div>
         </div>
+
+        {/* Thought Stream — panneau dédié aux résumés de pensée (distinct du CoT) */}
+        <ThoughtStreamContainer thought={thoughtStream} />
 
         {/* Agent Progress Bar */}
         <AgentProgressBar steps={activity} connected={connected} onClear={clearActivity} reasoning={reasoning} />

@@ -83,9 +83,9 @@ Ne délègue jamais automatiquement en fin de cycle. Si pertinent, propose la d�
 </post_task_delegations>
 
 <output_contract>
-## 6. Format de Sortie Standard des Agents
+## 6. Format de Sortie Standard des Agents (In-Context Structuring)
 
-Les agents runtime répondent avec un conteneur `<result>` structuré et parsable :
+Le modèle ne supportant pas les schémas de sortie natifs (`responseSchema`), la structure repose entièrement sur le contrat textuel. Les agents runtime répondent obligatoirement avec un conteneur `<result>` XML strict et parsable. Les traces de pensée (`part.thought`) ne doivent jamais polluer ce conteneur :
 
 ```xml
 <result status="success|partial|failed|needs_input" files_modified="a.md,b.md">

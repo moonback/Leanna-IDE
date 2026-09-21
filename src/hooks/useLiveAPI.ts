@@ -7,7 +7,7 @@ import { useAudio } from './useAudio.js';
 import { useWebSocket } from './useWebSocket.js';
 import { useToken, type TokenUsage, type TokenUsageSession, type PromptContextState, type ContextAlertLevel } from './useToken.js';
 import { useTranscript, type TranscriptRole, type TranscriptEntry, type ContextSource } from './useTranscript.js';
-import { useActivity, type ActivityStep, type ModifiedFile, type ReasoningState, type ReasoningStep } from './useActivity.js';
+import { useActivity, type ActivityStep, type ModifiedFile, type ReasoningState, type ReasoningStep, type ThoughtStreamState } from './useActivity.js';
 import { useProfile } from '../context/UserProfileContext.js';
 
 // Re-export types to keep existing component imports functional
@@ -21,7 +21,7 @@ export interface LogEntry {
   timestamp: Date;
 }
 
-export type { TranscriptRole, TranscriptEntry, ContextSource, ActivityStep, ModifiedFile, TokenUsage, TokenUsageSession, ReasoningState, ReasoningStep, PromptContextState, ContextAlertLevel };
+export type { TranscriptRole, TranscriptEntry, ContextSource, ActivityStep, ModifiedFile, TokenUsage, TokenUsageSession, ReasoningState, ReasoningStep, ThoughtStreamState, PromptContextState, ContextAlertLevel };
 
 export function useLiveAPI() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -68,8 +68,10 @@ export function useLiveAPI() {
       activity,
       isBusy,
       reasoning,
+      thoughtStream,
       setIsBusy,
       setReasoning,
+      setThoughtStream,
       startActivity,
       completeActivity,
       clearActivity,
@@ -321,22 +323,15 @@ export function useLiveAPI() {
     }
     // ── Thought summaries (Live API extended-thinking) ─────────────────────
     // Le serveur émet { type: 'thought', text } pendant le raisonnement de fond.
-    // On les accumule dans le panneau "Raisonnement" existant (AgentProgressBar)
-    // pour afficher en direct ce que Leanna réfléchit. Le panneau se ferme quand
-    // la réponse finale (msg.text) arrive.
+    // On les accumule dans un state DÉDIÉ (thoughtStream), séparé du raisonnement
+    // structuré (CoT), affiché par le panneau distinct <ThoughtStream />.
+    // Le panneau se ferme quand la réponse finale (msg.text) arrive.
     if (msg.type === 'thought' && typeof msg.text === 'string' && msg.text.trim()) {
       const chunk = msg.text;
-      setReasoning(prev => {
-        const startsNew = !prev.active || prev.strategy !== 'thinking';
-        return {
-          ...prev,
-          active: true,
-          strategy: 'thinking',
-          strategyLabel: 'Réflexion',
-          announcement: 'Réflexion en cours…',
-          streamText: startsNew ? chunk : `${prev.streamText ?? ''}${chunk}`,
-        };
-      });
+      setThoughtStream(prev => ({
+        active: true,
+        text: prev.active ? `${prev.text}${chunk}` : chunk,
+      }));
     }
     if (msg.type === 'agent_event') {
       const emoji = msg.event === 'task_started' ? '🤖'
@@ -373,9 +368,9 @@ export function useLiveAPI() {
       const sources = pendingSourcesRef.current;
       pendingSourcesRef.current = [];
       addTranscript('assistant', msg.text, sources);
-      // La réponse finale arrive → clore le panneau de réflexion (thinking) s'il
-      // était actif, sans toucher au raisonnement structuré (CoT).
-      setReasoning(prev => (prev.active && prev.strategy === 'thinking' ? { ...prev, active: false } : prev));
+      // La réponse finale arrive → clore le panneau de réflexion s'il était actif
+      // (on conserve le texte pour qu'il reste lisible jusqu'au prochain tour).
+      setThoughtStream(prev => (prev.active ? { ...prev, active: false } : prev));
     }
     if (msg.user_text) {
       addTranscript('user', msg.user_text);
@@ -700,6 +695,7 @@ export function useLiveAPI() {
       activity, clearActivity,
       isBusy,
       reasoning,
+      thoughtStream,
       tokenUsage,
       promptContext,
       summarizeContext,

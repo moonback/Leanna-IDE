@@ -18,6 +18,9 @@ import {
   Play,
   Square,
   Target,
+  Box,
+  Plug,
+  Command,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
@@ -58,7 +61,7 @@ function getModifierKey(): string {
 // Style partagé pour tous les boutons de la barre — cohérence visuelle,
 // coins doux, transition sur toutes les propriétés et halo au survol.
 const PILL =
-  'group/pill relative flex items-center gap-1.5 px-2.5 h-[22px] rounded-md ' +
+  'group/pill relative flex items-center justify-center gap-1.5 px-2 h-[22px] rounded-md ' +
   'text-[12px] font-medium leading-none transition-all duration-200 ' +
   'hover:bg-[var(--accent-subtle)] active:scale-[0.97]';
 
