@@ -9,7 +9,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   BookOpen, Plus, Trash2, Clock, FileText, MessageSquare,
-  Search, SortAsc, SortDesc, X, ArrowRight, Github,
+  Search, SortAsc, SortDesc, ArrowRight, Github, LayoutGrid,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { CreateNotebookModal } from './CreateNotebookModal.js';
@@ -180,13 +180,14 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             {onClose && (
               <motion.button
                 onClick={onClose}
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.92 }}
                 transition={{ duration: 0.1 }}
                 className="notebook-icon-button rounded-lg"
-                aria-label="Fermer"
-                title="Fermer"
+                aria-label="Retour au sélecteur IDE / Notebook"
+                title="Retour au sélecteur IDE / Notebook"
               >
-                <X className="w-4 h-4" />
+                <LayoutGrid className="w-4 h-4" />
               </motion.button>
             )}
           </div>

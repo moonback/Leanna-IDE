@@ -22,6 +22,15 @@ function getNotebookIdFromHash(): string | null {
 export default function NotebooksView({ onClose }: { onClose?: () => void }) {
   const [selectedNotebookId, setSelectedNotebookId] = useState<string | null>(getNotebookIdFromHash);
 
+  // Par défaut, "fermer" la vue Notebooks rouvre le sélecteur IDE / Notebook.
+  const handleCloseToLauncher = useCallback(() => {
+    if (onClose) {
+      onClose();
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('Leanna-open-launcher'));
+  }, [onClose]);
+
   // Sync hash → state (browser back/forward)
   useEffect(() => {
     const onHashChange = () => {
@@ -46,5 +55,5 @@ export default function NotebooksView({ onClose }: { onClose?: () => void }) {
     return <NotebookDetail notebookId={selectedNotebookId} onBack={handleBack} />;
   }
 
-  return <NotebookList onSelectNotebook={handleSelect} onClose={onClose} />;
+  return <NotebookList onSelectNotebook={handleSelect} onClose={handleCloseToLauncher} />;
 }

@@ -15,6 +15,7 @@ import { useLiveAPI } from './hooks/useLiveAPI.js';
 import { FloatingOrb } from './components/FloatingOrb.js';
 import { CriticalEditConfirm } from './components/CriticalEditConfirm.js';
 import { StartupProjectModal } from './components/StartupProjectModal.js';
+import { LauncherModal } from './components/LauncherModal.js';
 import { useProfile } from './context/UserProfileContext.js';
 import { useAgentEventStream } from './hooks/useAgentEventStream.js';
 import { Loader2 } from 'lucide-react';
@@ -564,6 +565,8 @@ function Layout() {
         <CriticalEditConfirm sendMessage={liveAPI.sendRawMessage} />
         {/* Modale de sélection du projet au démarrage */}
         <StartupProjectModal />
+        {/* Écran de choix IDE / Notebook affiché après le splash */}
+        <LauncherModal />
       </ScreenShareProvider>
     </LiveAPIContext.Provider>
   );

@@ -180,9 +180,16 @@ export function StartupProjectModal() {
       setIsOpen(true);
       setError(null);
     };
+    // Le launcher (choix IDE/Notebook) peut activer le mode "sans projet" :
+    // dans ce cas, fermer la modale de sélection de workspace si elle est ouverte.
+    const handleNoWorkspaceMode = () => {
+      setIsOpen(false);
+    };
     window.addEventListener('Leanna-open-workspace-switcher', handleOpenModal);
+    window.addEventListener('Leanna-no-workspace-mode', handleNoWorkspaceMode);
     return () => {
       window.removeEventListener('Leanna-open-workspace-switcher', handleOpenModal);
+      window.removeEventListener('Leanna-no-workspace-mode', handleNoWorkspaceMode);
     };
   }, [fetchWorkspaces]);
 
