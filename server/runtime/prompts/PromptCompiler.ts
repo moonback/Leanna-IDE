@@ -4,16 +4,20 @@
  * Responsabilité unique : prendre les règles résolues et les sections
  * sélectionnées, et produire le string qui sera envoyé au modèle.
  *
- * Le format de sortie est volontairement simple :
+ * Le format de sortie utilise des balises structurées (plutôt que des headings
+ * Markdown qui s'imbriqueraient mal avec les H1/H2 des sections .md) :
  *
- *   ## SYSTEM POLICY
- *   ### Rule: <id>
- *   <content>
+ *   <policy>
+ *   - <contenu de chaque règle, sans son id>
+ *   </policy>
  *
- *   ## CONTEXTUAL INSTRUCTIONS
- *   ### <id>
- *   <content>
+ *   <instructions>
+ *   <section name="<id>">
+ *   <contenu>
+ *   </section>
+ *   </instructions>
  *
+ * Les ids de règles ne sont pas imprimés (audit uniquement, via built.rules).
  * Note : le compilateur n'interprète pas les règles. Il les assemble
  * dans l'ordre déjà établi par le pipeline en amont.
  */
@@ -148,19 +152,22 @@ export class PromptCompiler {
     const parts: string[] = [];
 
     // ── Règles de politique ──
+    //   Les règles sont regroupées sous une balise <policy>. On n'imprime PAS
+    //   les ids (`safety.no-secret-disclosure`, etc.) : ils servent à l'audit
+    //   (conservés dans built.rules) et gaspillent des tokens dans le prompt.
+    //   Les headings Markdown `###` sont remplacés par des balises structurées
+    //   pour éviter que les H1/H2 des .md ne s'imbriquent sous un `### base`.
     if (rules.length > 0) {
-      parts.push("## SYSTEM POLICY");
-      for (const rule of rules) {
-        parts.push(`### Rule: ${rule.id}\n${rule.content.trim()}`);
-      }
+      const body = rules.map(rule => `- ${rule.content.trim()}`).join("\n");
+      parts.push(`<policy>\n${body}\n</policy>`);
     }
 
     // ── Instructions contextuelles ──
     if (sections.length > 0) {
-      parts.push("## CONTEXTUAL INSTRUCTIONS");
-      for (const section of sections) {
-        parts.push(`### ${section.id}\n${section.content.trim()}`);
-      }
+      const body = sections
+        .map(section => `<section name="${section.id}">\n${section.content.trim()}\n</section>`)
+        .join("\n\n");
+      parts.push(`<instructions>\n${body}\n</instructions>`);
     }
 
     return parts.filter(Boolean).join("\n\n");

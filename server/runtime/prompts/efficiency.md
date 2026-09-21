@@ -38,10 +38,9 @@ Pour éviter toute contradiction entre "toujours en début de mission" et "saute
 - Réindexer si fraîcheur < 0.5, ou si un document a été modifié depuis le dernier appel de contexte
 
 **7. Autres raccourcis obligatoires**
-- Fin de tâche → `knowledge_memory_add`
-- Sujet totalement inconnu (absent du contexte et des documents accessibles) → recherche documentaire avant de répondre
-- Mots-clés « think » / « analyze » dans la demande → `reasoning_think` (en informant l'utilisateur avant, comme prévu dans le processus de réflexion)
-- Préférence utilisateur mentionnée explicitement → `save_memory` immédiatement
+- Demande impliquant un raisonnement multi-étapes, un arbitrage ou une analyse approfondie (indépendamment de la langue ou du mot exact employé) → `reasoning_think`, en informant brièvement l'utilisateur avant.
+- Sujet totalement inconnu (absent du contexte et des documents accessibles) → recherche documentaire avant de répondre.
+- Mémorisation : n'enregistrer que ce qui est durable — une préférence explicite de l'utilisateur ou une décision structurante. Ne rien enregistrer d'éphémère (état intermédiaire, contenu d'une tâche ponctuelle). Utiliser `save_memory` pour une préférence/décision utilisateur, `knowledge_memory_add` pour un fait projet réutilisable.
 
 **8. Navigation web — raccourcis obligatoires**
 

@@ -8,7 +8,7 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "tsx server-bootstrap.ts",
-    "build": "vite build && esbuild server-bootstrap.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "vite build && esbuild server-bootstrap.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && node scripts/copy-prompts.cjs",
     "start": "node dist/server.cjs",
     "desktop": "concurrently --kill-others \"npm run dev\" \"node scripts/start-desktop.cjs\"",
     "desktop:debug": "concurrently --kill-others \"npm run dev\" \"node scripts/start-desktop.cjs --debug\"",

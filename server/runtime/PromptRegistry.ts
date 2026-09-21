@@ -288,15 +288,36 @@ export class PromptRegistry {
   }
 
   private compactify(content: string): string {
-    return content
-      .split("\n")
-      .filter((line) => {
-        const trimmed = line.trim();
-        // Supprimer les lignes vides multiples, les commentaires HTML
-        return trimmed !== "" && !trimmed.startsWith("<!--");
-      })
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n");
+    // On préserve intégralement le contenu des blocs de code (```), y compris
+    // leurs lignes vides : les compacter casse l'indentation et la lisibilité.
+    let insideFence = false;
+    const kept = content.split("\n").filter((line) => {
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith("```")) {
+        insideFence = !insideFence;
+        return true; // toujours conserver les délimiteurs de fence
+      }
+      if (insideFence) {
+        return true; // tout conserver à l'intérieur d'un bloc de code
+      }
+
+      // Hors bloc de code : supprimer lignes vides et commentaires HTML
+      return trimmed !== "" && !trimmed.startsWith("<!--");
+    });
+
+    // Le collapse des \n{3,} ne doit pas non plus toucher les blocs de code.
+    return this.collapseBlankLinesOutsideFences(kept.join("\n"));
+  }
+
+  /** Réduit 3+ sauts de ligne consécutifs à 2, hors blocs de code. */
+  private collapseBlankLinesOutsideFences(content: string): string {
+    const segments = content.split(/(```[\s\S]*?```)/g);
+    return segments
+      .map((seg) =>
+        seg.startsWith("```") ? seg : seg.replace(/\n{3,}/g, "\n\n"),
+      )
+      .join("");
   }
 
   private buildCacheKey(id: string, options: RenderOptions): string {
