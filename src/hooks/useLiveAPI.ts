@@ -319,6 +319,25 @@ export function useLiveAPI() {
         addLog(`🧠 Raisonnement activé: ${msg.reasoning.strategyLabel || msg.reasoning.strategy}`, 'info');
       }
     }
+    // ── Thought summaries (Live API extended-thinking) ─────────────────────
+    // Le serveur émet { type: 'thought', text } pendant le raisonnement de fond.
+    // On les accumule dans le panneau "Raisonnement" existant (AgentProgressBar)
+    // pour afficher en direct ce que Leanna réfléchit. Le panneau se ferme quand
+    // la réponse finale (msg.text) arrive.
+    if (msg.type === 'thought' && typeof msg.text === 'string' && msg.text.trim()) {
+      const chunk = msg.text;
+      setReasoning(prev => {
+        const startsNew = !prev.active || prev.strategy !== 'thinking';
+        return {
+          ...prev,
+          active: true,
+          strategy: 'thinking',
+          strategyLabel: 'Réflexion',
+          announcement: 'Réflexion en cours…',
+          streamText: startsNew ? chunk : `${prev.streamText ?? ''}${chunk}`,
+        };
+      });
+    }
     if (msg.type === 'agent_event') {
       const emoji = msg.event === 'task_started' ? '🤖'
         : msg.event === 'task_completed' ? '✅'
@@ -354,6 +373,9 @@ export function useLiveAPI() {
       const sources = pendingSourcesRef.current;
       pendingSourcesRef.current = [];
       addTranscript('assistant', msg.text, sources);
+      // La réponse finale arrive → clore le panneau de réflexion (thinking) s'il
+      // était actif, sans toucher au raisonnement structuré (CoT).
+      setReasoning(prev => (prev.active && prev.strategy === 'thinking' ? { ...prev, active: false } : prev));
     }
     if (msg.user_text) {
       addTranscript('user', msg.user_text);

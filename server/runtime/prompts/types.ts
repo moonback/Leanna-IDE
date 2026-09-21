@@ -123,6 +123,14 @@ export interface ProfileConfig {
   /** Désactiver les annonces vocales TTS pendant le raisonnement */
   /** Custom system prompt (appended to base instructions) */
   customSystemPrompt?: string;
+
+  // ── Live API — raisonnement ───────────────────────────────────────────────
+  /**
+   * Inclure les résumés de pensée du modèle (thinking) dans le flux.
+   * Nécessite un modèle extended-thinking. Utile pour afficher la
+   * réflexion en cours à l'utilisateur.
+   */
+  includeThoughts?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -197,6 +197,28 @@ export function attachLiveWebSocket(
       droppedChunks: 0,         // chunks abandonnés dans la fenêtre courante
     };
 
+    // ── Détection de pause du flux audio ─────────────────────────────────────
+    // Quand le micro se coupe (>1s sans chunk audio), la doc Live API recommande
+    // d'envoyer `audioStreamEnd` pour vider le buffer audio serveur. On arme un
+    // timer à chaque chunk transmis ; s'il expire, on flush et on marque le flux
+    // comme terminé jusqu'au prochain chunk.
+    const AUDIO_STREAM_IDLE_MS = 1000;
+    let audioIdleTimer: ReturnType<typeof setTimeout> | null = null;
+    let audioStreamOpen = false;
+    // La session Gemini est créée plus bas (dans le try). On la référence via ce
+    // holder pour que les closures du timer y accèdent sans souci de portée.
+    const sessionRef = { current: null as any };
+    const markAudioStreamEnd = () => {
+      if (!audioStreamOpen) return;
+      audioStreamOpen = false;
+      try { sessionRef.current?.sendRealtimeInput({ audioStreamEnd: true }); } catch { /* ignore si session fermée */ }
+    };
+    const armAudioIdleTimer = () => {
+      audioStreamOpen = true;
+      if (audioIdleTimer) clearTimeout(audioIdleTimer);
+      audioIdleTimer = setTimeout(markAudioStreamEnd, AUDIO_STREAM_IDLE_MS);
+    };
+
     // ── Context window monitoring ────────────────────────────────────────
     // Seuils proactifs : on déclenche le résumé BIEN avant la limite réelle du
     // modèle, car un seul gros résultat d'outil (ex. generate_codebase_markdown
@@ -509,6 +531,10 @@ export function attachLiveWebSocket(
       const voiceName = currentProfile.aiVoice || 'Aoede';
       const temperature = currentProfile.temperature ?? 0.9;
       const topP = currentProfile.topP ?? 0.95;
+
+      // ── Réglage thinking ──────────────────────────────────────────────────
+      // includeThoughts → résumés de pensée streamés pour afficher la réflexion.
+      const includeThoughts = currentProfile.includeThoughts ?? true;
       const memoryBudgetTokens = 2000;
       const knowledgeBudgetTokens = 3000;
       const maxMemories = currentProfile.temperature !== undefined && currentProfile.temperature < 0.5 ? 5 : 10;
@@ -646,8 +672,10 @@ export function attachLiveWebSocket(
           // Niveau de réflexion du modèle gemini-3.8-live-extended-thinking.
           // Valeurs supportées : 'low' | 'medium' | 'high' (MINIMAL non supporté).
           // 'high' → raisonnement de fond maximal pour les tâches multi-étapes /
-          // multi-outils. Voir https://ai.google.dev/gemini-api/docs/live-api/thinking
-          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+          // multi-outils. includeThoughts → résumés de pensée streamés pour
+          // afficher la réflexion en cours côté client.
+          // Voir https://ai.google.dev/gemini-api/docs/live-api/thinking
+          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH, includeThoughts },
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
           systemInstruction: {
             parts: [{ text: systemText + memoryContext + knowledgeContext + notebookContext }],
@@ -664,7 +692,19 @@ export function attachLiveWebSocket(
             const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audio) clientWs.send(Buffer.from(audio, 'base64'));
 
-            const textPart = message.serverContent?.modelTurn?.parts?.find(p => p.text);
+            // Résumés de pensée (includeThoughts) : parts texte marquées
+            // `thought: true`. On les émet séparément et on ne les ajoute PAS
+            // au transcript assistant (sinon la réflexion polluerait la réponse).
+            const thoughtPart = message.serverContent?.modelTurn?.parts?.find(
+              (p: any) => p.text && p.thought === true,
+            );
+            if (thoughtPart?.text) {
+              try { clientWs.send(JSON.stringify({ type: 'thought', text: thoughtPart.text })); } catch {}
+            }
+
+            const textPart = message.serverContent?.modelTurn?.parts?.find(
+              (p: any) => p.text && p.thought !== true,
+            );
             if (textPart?.text) {
               clientWs.send(JSON.stringify({ text: textPart.text }));
               assistantBuffer += textPart.text;
@@ -722,11 +762,17 @@ export function attachLiveWebSocket(
               const promptTokens = usageMetadata.promptTokenCount ?? 0;
               const completionTokens = usageMetadata.candidatesTokenCount ?? usageMetadata.responseTokenCount ?? 0;
               const totalTokens = usageMetadata.totalTokenCount ?? 0;
+              // Ventilation par modalité (AUDIO vs TEXT) fournie par le serveur.
+              // Utile pour distinguer le coût audio du coût texte dans le moniteur.
+              const modalityBreakdown = (usageMetadata.responseTokensDetails ?? [])
+                .map((d: any) => ({ modality: d.modality, tokens: d.tokenCount ?? 0 }))
+                .filter((d: any) => d.modality);
               monitorConversationContext(promptTokens, completionTokens);
               const cumulative = conversationCtx.totalPromptTokens + conversationCtx.totalCompletionTokens;
               clientWs.send(JSON.stringify({
                 token_usage: {
                   promptTokens, completionTokens, totalTokens,
+                  ...(modalityBreakdown.length > 0 ? { modalityBreakdown } : {}),
                   session: {
                     total_prompt_tokens: conversationCtx.totalPromptTokens,
                     total_completion_tokens: conversationCtx.totalCompletionTokens,
@@ -819,6 +865,7 @@ export function attachLiveWebSocket(
       });
 
       console.log('[Gemini Live] Session connected successfully');
+      sessionRef.current = session;
 
       // ── Inject context resume summary ─────────────────────────────────
       if (contextResumeSummary) {
@@ -915,6 +962,9 @@ export function attachLiveWebSocket(
             } else {
               audioRateState.bytesInWindow += chunkBytes;
               session.sendRealtimeInput({ audio: { data: buf.toString('base64'), mimeType: 'audio/pcm;rate=16000' } });
+              // (Ré)arme le timer d'inactivité : tant que des chunks arrivent, le
+              // flux est considéré ouvert ; après 1s de silence → audioStreamEnd.
+              armAudioIdleTimer();
             }
             return;
           }
@@ -1074,6 +1124,7 @@ export function attachLiveWebSocket(
 
       clientWs.on('close', () => {
         console.log('Client disconnected');
+        if (audioIdleTimer) { clearTimeout(audioIdleTimer); audioIdleTimer = null; }
         activeGeminiSessions.delete(session);
         flushAssistantBuffer();
         if (conversationId) {
