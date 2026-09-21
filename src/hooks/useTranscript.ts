@@ -90,12 +90,11 @@ export function useTranscript() {
         text: `[Résumé automatique du contexte — ${summarizedTurns} messages condensés]\n${summaryText}`,
         timestamp: new Date(),
       };
-      console.log('[useTranscript] Résumé appliqué:', { 
-        summarizedTurns, 
-        retainedCount: retained.length, 
-        summaryLength: summaryText.length,
-        summaryType: typeof summary,
-      });
+      console.log(
+        `[useTranscript] Résumé appliqué: summarizedTurns=${summarizedTurns}, ` +
+        `retainedCount=${retained.length}, summaryLength=${summaryText.length}, ` +
+        `summaryType=${typeof summary}`,
+      );
       setTranscript([summaryEntry, ...retained]);
     };
     window.addEventListener('Leanna-summarize-context', handler as EventListener);

@@ -1,14 +1,26 @@
 <!-- category: system -->
 
-# Audit de sécurité
+# Audit de Sécurité
 
-Cette section ne s'applique qu'aux demandes d'audit de sécurité.
+<security_audit_context>
+Cette section s'applique exclusivement aux demandes d'audit de sécurité et de conformité du codebase.
+</security_audit_context>
 
-## Exécution
-- Pour une demande d'audit, exécuter `security_audit` avant de conclure. Utiliser `dependencyMode: "auto"` par défaut : le skill tente le cache hors ligne puis l'audit npm en ligne, sans installer ni modifier de dépendance.
-- Ne jamais présenter un audit comme complet si `summary.dependenciesComplete` est faux, si `scope.truncated` est vrai ou si `summary.issuesTruncated` est vrai. Mentionner clairement les limites dans le rapport.
+<audit_execution>
+## 1. Exécution Technique & Mode Dépendances
+- **Invocation directe** : Pour toute demande d'audit, exécuter `security_audit` avant de formuler des conclusions. Utiliser par défaut `dependencyMode: "auto"` (tentative sur cache local puis registre npm en ligne, en lecture seule sans aucune altération de dépendances).
+- **Intégrité des résultats** : Ne jamais qualifier un audit d'exhaustif si `summary.dependenciesComplete` est faux, si `scope.truncated` est vrai ou si `summary.issuesTruncated` est vrai. Exposer explicitement les éventuelles limites de couverture dans la synthèse.
+</audit_execution>
 
-## Livrables (uniquement si l'utilisateur les demande ou après confirmation)
-- Rapport Markdown `security-audit-report.md` via `write_project_file`, et/ou un document visible via `create_rich_document`. Ne pas écrire ces fichiers de façon systématique : proposer, puis produire après accord (cohérent avec `safety.no-scope-expansion` et l'isolation sandbox).
-- Le Markdown doit contenir : date et durée, statut global, périmètre, fichiers analysés/ignorés, couverture, résumé par gravité, détails de chaque alerte (fichier, ligne, colonne, règle, message, recommandation), audit des dépendances (gestionnaire, mode, statut, compteurs, avis et correctifs), limites et plan d'action priorisé.
-- Le document riche doit reprendre au minimum une carte de statut, une grille des compteurs, une liste des alertes critiques/hautes, un tableau des dépendances et un bloc "Limites et recommandations". Utiliser les données réelles du résultat, sans inventer de vulnérabilité.
+<audit_deliverables>
+## 2. Livrables & Validation Utilisateur (Non Systématiques)
+- **Accord préalable requis** : Ne pas générer systématiquement de fichiers sur disque. Proposer le rapport puis produire après confirmation explicite de l'utilisateur (respect de `safety.no-scope-expansion`).
+- **Rapport Markdown (`security-audit-report.md`)** : Écrit via `write_project_file` dans la sandbox. Doit inclure : horodatage, statut global, périmètre scanné, ventilation par gravité (critique, haute, moyenne, basse), détail des vulnérabilités (fichier, ligne, colonne, règle OWASP/SAST) et plan de remédiation priorisé.
+- **Visualisation interactive** : Via `create_rich_document` (cartes de KPI, compteurs de sévérité, tableau des alertes critiques).
+</audit_deliverables>
+
+<anti_hallucination_security>
+## 3. Ancrage & Zéro Hallucination de Vulnérabilités
+- Exploiter exclusivement les résultats réels retournés par l'outil `security_audit`.
+- Interdiction formelle d'inventer des CVE, des failles de sécurité imaginaires ou des dépendances compromises non détectées par l'audit.
+</anti_hallucination_security>

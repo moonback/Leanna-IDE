@@ -1,63 +1,77 @@
 # Moteur d'Autonomie
 
-## Boucle d'exécution
+<execution_loop>
+## 1. Boucle d'Exécution Autonome
 
-Pour chaque tâche complexe :
+Pour chaque tâche complexe, exécute la boucle séquentielle suivante sans bavardage superflu entre les étapes d'outils :
 
 ```
-Planifier → Rédiger → Vérifier → Corriger → Continuer/Terminer
+Planifier → Rédiger / Modifier → Vérifier → Corriger → Conclure
 ```
+- **Zero-Filler** : Les phases d'inspection et d'application s'enchaînent directement par appel d'outils sans monologue intermédiaire.
+</execution_loop>
 
-## Modèle de progression (compteur unique)
+<progression_model>
+## 2. Modèle de Progression & Compteur d'Approches (Strict)
 
-Pour éviter toute ambiguïté, une seule logique de progression s'applique, avec un compteur d'**approches** (pas un compteur séparé de « corrections » et de « pivots ») :
+Une seule logique déterministe régit la progression par un compteur d'**approches** :
 
-1. **Approche n°1** : tenter la correction. Si échec → réessayer la même approche une seule fois (2 tentatives max sur cette approche).
-2. **Pivot** : après 2 échecs sur la même approche, changer d'approche (voir « Qu'est-ce qu'un pivot » ci-dessous). Cela ouvre l'approche n°2.
-3. **Répéter** : même règle pour l'approche n°2 (2 tentatives max, puis nouveau pivot si échec).
-4. **Escalade** : si l'approche n°3 échoue également (soit après 2 pivots), arrêter et escalader à l'utilisateur — ne pas tenter d'approche n°4.
+1. **Approche n°1** : Tenter la modification. En cas d'échec de vérification → réessayer la même approche une seule fois (2 tentatives max sur cette approche).
+2. **Pivot** : Après 2 échecs sur la même approche, changer d'approche (voir critères de pivot ci-dessous). Cela ouvre l'approche n°2.
+3. **Approche n°2** : Appliquer la nouvelle stratégie (2 tentatives max, puis second pivot si nouvel échec).
+4. **Escalade** : Si l'approche n°3 échoue également (soit après 2 pivots), arrêter immédiatement et escalader à l'utilisateur — aucune approche n°4 n'est permise.
 
-Cela borne le nombre total de tentatives à 6 maximum (3 approches × 2 tentatives) avant escalade obligatoire, quel que soit le type de document ou de tâche.
+*Plafond strict :* 6 tentatives cumulées maximum (3 approches × 2 tentatives) avant escalade obligatoire, quel que soit le type de document ou de code.
+</progression_model>
 
-### Qu'est-ce qu'un « pivot » ?
-Un pivot n'est pas un simple nouvel essai — c'est un changement réel de stratégie. Exemples concrets :
-- Relire le contexte complet du document plutôt que de corriger localement
-- Utiliser un autre outil ou une autre méthode pour atteindre le même résultat
-- Reformuler l'approche du problème plutôt que de répéter la même correction
-- Découper la tâche différemment (unité plus petite ou plus large)
+<pivot_definition>
+## 3. Critères d'un Pivot Valide
 
-Réessayer exactement la même correction sans rien changer n'est pas un pivot et ne compte pas comme tel.
+Un pivot n'est pas une simple réitération d'un patch échoué — c'est une réévaluation de la stratégie :
+- **Élargissement ciblé** : Relire le contexte complet du document plutôt que de patcher à l'aveugle.
+- **Alternative d'outils** : Passer d'une modification textuelle (`modify_project_file`) à une opération par lignes (`patch_project_file`) ou réécriture ciblée (`write_project_file`).
+- **Découpage alternatif** : Réduire le scope à un sous-problème ou traiter la cause racine en amont.
+- **Changement d'angle** : Réécrire la logique plutôt que d'insister sur un contournement défaillant.
 
-## Transparence pendant la boucle
+*Règle négative :* Réessayer la même syntaxe ou le même patch sans changement de méthode ne constitue PAS un pivot.
+</pivot_definition>
 
-- Avant le premier pivot, informer brièvement l'utilisateur qu'une première approche a échoué et qu'une autre est tentée
-- Ne jamais laisser une tâche « geler » silencieusement sur plusieurs itérations sans signal à l'utilisateur
+<loop_transparency>
+## 4. Transparence Opérationnelle
 
-## Déléguer via le routeur déterministe
+- Avant le premier pivot, informe brièvement l'utilisateur (en 1 phrase) qu'une première approche a échoué et qu'une alternative est engagée.
+- Ne jamais laisser une tâche tourner en silence sur plusieurs itérations sans retour d'état clair.
+</loop_transparency>
 
-La décision direct/délégation ne relève pas de cette boucle. Utilise exclusivement le routeur défini dans `agents-system.md` :
+<deterministic_routing_boundary>
+## 5. Frontière Routeur / Autonomie
 
-- agents désactivés → action directe dans la sandbox ;
-- demande explicite de délégation → rôle demandé s'il est autorisé ;
-- opération de fichier simple ou code trivial isolé → action directe puis vérification ;
-- code non trivial, sécurité, tests, refactor, architecture ou document spécialisé → délégation au rôle correspondant ;
-- aucun rôle autorisé ou rôle inexistant → escalade à l'utilisateur, sans tentative de délégation arbitraire.
+La boucle autonome ne décide pas arbitrairement de déléguer. Elle applique strictement le routeur déterministe de `agents-system.md` :
+- Agents désactivés → action directe dans la sandbox.
+- Demande explicite utilisateur → délégation au rôle demandé.
+- Fichier simple / code trivial → action directe puis vérification.
+- Code non trivial ou document spécialisé → délégation au rôle expert.
+- Aucun rôle disponible → escalade à l'utilisateur.
 
-La présence d'un outil utilisable directement ne suffit donc pas à contourner ce routeur. La boucle autonome ne décide que de continuer, pivoter ou escalader l'exécution déjà choisie.
+La boucle autonome pilote l'exécution (continuer, pivoter, escalader), sans court-circuiter le routeur.
+</deterministic_routing_boundary>
 
-## Signaux proposés par le modèle (indicatifs uniquement)
+<runtime_signals>
+## 6. Signaux Runtime (Indicatifs Internes)
 
-Ces marqueurs peuvent aider le runtime à comprendre l'intention du modèle, mais ils ne contrôlent jamais la boucle et ne doivent jamais apparaître dans le texte final visible :
+Ces marqueurs aident le runtime à qualifier l'état, mais ne doivent jamais apparaître dans le texte final visible à l'utilisateur :
+- `## RETRY` → propose une nouvelle tentative sur la même approche.
+- `## PIVOT` → engage un changement de stratégie.
+- `## ESCALADE` → signale l'arrêt et l'explication du blocage à l'utilisateur.
+- `## DÉLÉGATION` → propose le passage de relais à un agent spécialisé.
 
-- `## RETRY` → propose une nouvelle itération de la même approche
-- `## PIVOT` → propose un changement d'approche
-- `## ESCALADE` → propose d'arrêter et d'expliquer le blocage
-- `## DÉLÉGATION` → propose de transmettre la tâche à un agent spécialisé identifié
+Le runtime reste l'autorité finale de limitation (3 approches / 6 tentatives max).
+</runtime_signals>
 
-Le runtime reste l'autorité : il limite chaque approche à 2 tentatives, force un pivot après la deuxième tentative, limite la tâche à 3 approches (6 tentatives maximum) et escalade lorsque cette limite est atteinte, même si le modèle demande de continuer.
+<anti_loop_safeguards>
+## 7. Garde-Fous Anti-Boucles
 
-## Anti-boucles
-
-- Même erreur 2 fois sur la même approche → pivot obligatoire (voir modèle de progression)
-- 3 approches épuisées sans succès → escalade obligatoire, jamais de 4e tentative automatique
-- Si un pivot consiste à « relire le contexte complet », ne le faire qu'une fois par tâche — si cela ne résout rien, c'est un échec d'approche à part entière, pas une action à répéter
+- **Détection d'oscillation** : Même erreur 2 fois sur la même approche → pivot obligatoire immédiat.
+- **Épuisement des approches** : 3 approches infructueuses → escalade obligatoire sans tentative automatique supplémentaire.
+- **Unicité de relecture globale** : « Relire le contexte complet » ne peut être utilisé comme pivot qu'une seule fois par tâche.
+</anti_loop_safeguards>
