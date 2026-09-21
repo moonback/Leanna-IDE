@@ -6,6 +6,62 @@ Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un as
 
 ![Build](https://img.shields.io/badge/build-passing-brightgreen) ![Version](https://img.shields.io/badge/version-1.1.0-blue) ![License](https://img.shields.io/badge/license-BUSL--1.1-orange) ![Node](https://img.shields.io/badge/node-%3E%3D20-green) ![Electron](https://img.shields.io/badge/electron-43-blueviolet)
 
+> 💡 **Aperçu** : Interface IDE Monaco, terminal interactif, orchestration multi-agents et interaction vocale Gemini Live en temps réel.
+>
+> *(Espace réservé pour capture d'écran / démonstration GIF : `assets/demo.gif`)*
+
+---
+
+## ⚡ Quick Start
+
+Démarrez Leanna en local en 3 commandes :
+
+```bash
+# 1. Cloner et installer les dépendances
+git clone https://github.com/<owner>/leanna.git && cd leanna && npm install
+
+# 2. Configurer la clé minimale dans .env
+cp .env.example .env
+# Éditer .env et renseigner votre GEMINI_API_KEY
+
+# 3. Lancer en développement
+npm run dev
+# Interface accessible immédiatement sur http://127.0.0.1:4000
+```
+
+---
+
+## 📑 Sommaire
+
+- [⚡ Quick Start](#-quick-start)
+- [Stack technique](#stack-technique)
+- [Fonctionnalités principales](#fonctionnalités-principales)
+  - [🧠 Agent Brain](#-agent-brain--cerveau-central-leanna-nouveau)
+  - [📱 Bot Telegram](#-bot-telegram--contrôle-mobile-distant-nouveau)
+  - [Fonctionnalités Utilisateur](#utilisateur)
+  - [Fonctionnalités Administrateur / Développeur](#administrateur--développeur)
+- [Architecture des Agents](#architecture-des-agents)
+- [Prérequis](#prérequis)
+- [Installation](#installation)
+- [Configuration (.env)](#configuration)
+  - [Nomenclature des variables](#nomenclature-des-variables)
+  - [Fallback inter-providers](#fallback-inter-providers-gemini--openrouter)
+  - [Observabilité & cache](#observabilité--cache)
+  - [Coordination multi-instance](#coordination-multi-instance-optionnel-redis)
+  - [Runtime autonome](#runtime-autonome-heartbeat--taskmanager-valeurs-en-ms)
+- [Runtime autonome 24/7](#runtime-autonome-247)
+- [Lancement & Exploitation](#lancement)
+  - [Mode développement](#mode-développement)
+  - [Mode production (PM2)](#mode-production-supervisé-pm2--recommandé)
+  - [Mode desktop Electron](#mode-desktop-electron)
+  - [Tests automatisés](#tests)
+- [Structure du projet](#structure-du-projet)
+- [Utiliser l'Agent Brain](#utiliser-lagent-brain)
+- [Sécurité & Permissions](#sécurité-de-lagent--permissions--dry-run)
+- [Dépannage (Troubleshooting)](#dépannage-troubleshooting)
+- [Documentation complémentaire](#documentation)
+- [Contribution & Licence](#licence)
+
 ---
 
 ## Stack technique
@@ -271,6 +327,12 @@ npm run desktop
 ## Configuration
 
 Toutes les variables sont lues depuis `.env` (ou `.env.local` s'il existe, avec priorité). Les valeurs sensibles sont chiffrées au repos dans le fichier.
+
+### Nomenclature des variables
+
+Le projet adopte deux conventions de nommage selon les couches fonctionnelles :
+- **`Leanna_*`** : Configuration du cœur applicatif, de l'authentification et de la sandbox (`Leanna_API_TOKEN`, `Leanna_MASTER_KEY`, `Leanna_PERMISSION_MODE`, `Leanna_DRY_RUN`, `Leanna_LISTEN_HOST`).
+- **`LEANNA_*`** : Paramètres du runtime autonome 24/7, du fallback des modèles et de l'infrastructure distribuée (`LEANNA_AUTONOMY_*`, `LEANNA_PROVIDER_*`, `LEANNA_EVENTBUS_*`, `LEANNA_LOCK_*`).
 
 | Variable | Description | Exemple | Obligatoire |
 |---|---|---|---|
