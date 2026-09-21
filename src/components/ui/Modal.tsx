@@ -29,7 +29,7 @@
  *     aria-describedby
  */
 
-import React, {
+import {
   createContext,
   useContext,
   useId,
@@ -134,8 +134,8 @@ const LAYER_Z: Record<ModalLayer, string> = {
 
 // ─── Portail cible ──────────────────────────────────────────────────────────────
 
-function getPortalTarget(): HTMLElement {
-  if (typeof document === 'undefined') return document.body;
+function getPortalTarget(): HTMLElement | null {
+  if (typeof document === 'undefined') return null;
   return document.getElementById('modal-root') ?? document.body;
 }
 
@@ -194,7 +194,7 @@ function ModalRoot({
               backdropFilter: 'blur(2px)',
               WebkitBackdropFilter: 'blur(2px)',
             }}
-            {...(backdropProps as React.HTMLAttributes<HTMLDivElement>)}
+            {...(backdropProps as any)}
           >
             {/* Boîte */}
             <motion.div
@@ -243,7 +243,9 @@ function ModalRoot({
     </ModalContext.Provider>
   );
 
-  return createPortal(content, getPortalTarget());
+  const portalTarget = getPortalTarget();
+  if (!portalTarget) return null;
+  return createPortal(content, portalTarget);
 }
 
 // ─── Header interne (utilisé quand `title` prop est fournie) ───────────────────
@@ -411,9 +413,3 @@ export const Modal = Object.assign(ModalRoot, {
   Body:   ModalBody,
   Footer: ModalFooter,
 });
-
-export type {
-  ModalHeaderProps,
-  ModalBodyProps,
-  ModalFooterProps,
-};
