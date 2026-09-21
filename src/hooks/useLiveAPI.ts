@@ -305,6 +305,22 @@ export function useLiveAPI() {
     if (msg.busy !== undefined) {
       setIsBusy(!!msg.busy);
     }
+    // ── Statut d'interaction (modèle extended-thinking) ────────────────────
+    // Le serveur dérive ce statut de generationComplete/waitingForInput (idle)
+    // et des tool calls (in_progress). C'est le VRAI signal de fin de tour :
+    // les "fillers" (turnComplete intermédiaires) ne l'indiquent pas. Sur idle,
+    // on garantit la reprise du micro et on ferme le panneau de réflexion.
+    if (msg.type === 'interaction_status') {
+      if (msg.status === 'idle') {
+        setIsBusy(false);
+        // Fin de tâche : on clôt le panneau et on coupe l'indicateur « en cours ».
+        setThoughtStream(prev => (prev.active || prev.busy ? { ...prev, active: false, busy: false } : prev));
+      } else if (msg.status === 'in_progress') {
+        // Tâche longue en cours : on active l'indicateur « Réflexion en cours… »
+        // même s'il n'y a pas encore de texte de réflexion à afficher.
+        setThoughtStream(prev => ({ active: true, text: prev.text, busy: true }));
+      }
+    }
     if (msg.reasoning) {
       setReasoning(prev => {
         const incoming = msg.reasoning as Partial<ReasoningState>;
@@ -331,6 +347,7 @@ export function useLiveAPI() {
       setThoughtStream(prev => ({
         active: true,
         text: prev.active ? `${prev.text}${chunk}` : chunk,
+        busy: prev.busy,
       }));
     }
     if (msg.type === 'agent_event') {

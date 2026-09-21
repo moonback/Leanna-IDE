@@ -780,6 +780,20 @@ export function attachLiveWebSocket(
               flushAssistantBuffer().catch(() => {});
             }
 
+            // ── Statut d'interaction (fin réelle de tour) ─────────────────────
+            // Le SDK @google/genai v2.11 n'expose PAS `interactionStatus` sur le
+            // flux Live. Les vrais marqueurs de fin de tâche sont :
+            //   - generationComplete : le modèle a fini de générer TOUT le contenu
+            //   - waitingForInput    : le modèle attend l'utilisateur (donc a fini)
+            // À l'inverse, un `turnComplete` seul ne clôt PAS la tâche avec le
+            // modèle extended-thinking : ce n'est qu'une phrase d'attente (filler).
+            // On dérive donc un statut idle/in_progress qu'on relaie au client
+            // pour qu'il ne reste pas bloqué sur un filler.
+            const sc = message.serverContent;
+            if (sc?.generationComplete || (sc as any)?.waitingForInput) {
+              try { clientWs.send(JSON.stringify({ type: 'interaction_status', status: 'idle' })); } catch {}
+            }
+
             const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audio) clientWs.send(Buffer.from(audio, 'base64'));
 
@@ -823,6 +837,8 @@ export function attachLiveWebSocket(
             if (message.serverContent?.interrupted) clientWs.send(JSON.stringify({ interrupted: true }));
 
             if (message.toolCall) {
+              // Le modèle exécute des outils en fond → tour toujours en cours.
+              try { clientWs.send(JSON.stringify({ type: 'interaction_status', status: 'in_progress' })); } catch {}
               handleToolCall(
                 message.toolCall, session, clientWs, sessionMode, busyStateRef, voiceName,
                 deps, sessionSupervisor, contextGate,
@@ -1459,6 +1475,10 @@ async function handleToolCall(
     busyStateRef.activeDescription = `l'exécution de l'outil "${firstCallName}"`;
   }
 
+  // Tout le corps est enveloppé dans try/finally : quoi qu'il arrive (exception
+  // avant la boucle, functionCalls vide/non itérable, etc.), on garantit l'envoi
+  // de { busy: false } pour rétablir le micro et éviter le blocage perçu.
+  try {
   for (const call of toolCall.functionCalls) {
     try {
       // Ask mode guard
@@ -1621,9 +1641,6 @@ async function handleToolCall(
     }
   }
 
-  try { clientWs.send(JSON.stringify({ busy: false })); } catch {}
-  if (busyStateRef) busyStateRef.activeDescription = null;
-
   if (functionResponses.length > 0) {
     // ── Cap par outil + enveloppe output/error + comptabilisation tokens ────
     // Pour chaque réponse :
@@ -1690,5 +1707,12 @@ async function handleToolCall(
     if (injectedTokens > 0) {
       try { onToolResultTokens?.(injectedTokens); } catch { /* ignore */ }
     }
+  }
+  } finally {
+    // Déblocage garanti du micro + description, quel que soit le chemin (succès,
+    // exception avant la boucle, functionCalls vide…). Sans ça, le client peut
+    // rester `isBusy=true` et l'utilisateur perçoit un blocage sur les fillers.
+    try { clientWs.send(JSON.stringify({ busy: false })); } catch {}
+    if (busyStateRef) busyStateRef.activeDescription = null;
   }
 }

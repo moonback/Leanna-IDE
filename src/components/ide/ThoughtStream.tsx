@@ -21,11 +21,14 @@ export default function ThoughtStream({ thought, onClear }: ThoughtStreamProps) 
   const reduceMotion = useReducedMotion();
 
   const text = thought?.text?.trim() ?? '';
-  // On garde le panneau visible tant qu'il y a du texte (même inactif) pour
-  // laisser l'utilisateur lire, mais on masque complètement s'il est vide.
-  if (!thought || !text) return null;
+  const busy = !!thought?.busy;
+  // On affiche le panneau si : soit il y a du texte de réflexion, soit une tâche
+  // est en cours (busy) — ce dernier cas montre l'indicateur « Réflexion en
+  // cours… » pendant les tâches longues silencieuses.
+  if (!thought || (!text && !busy)) return null;
 
   const active = thought.active;
+  const hasText = text.length > 0;
   // Teinte dédiée : indigo/violet, différente de l'accent du raisonnement.
   const accent = 'var(--color-thought, #8b5cf6)';
 
@@ -80,22 +83,48 @@ export default function ThoughtStream({ thought, onClear }: ThoughtStreamProps) 
         )}
       </div>
 
-      {/* Flux de pensée — italique, façon monologue interne */}
-      <div
-        className="mt-1.5 max-h-24 overflow-hidden text-[11px] italic leading-relaxed"
-        style={{ color: 'var(--text-secondary)' }}
-      >
-        {/* On n'affiche que la fin du flux pour rester compact */}
-        {text.slice(-600)}
-        {active ? <span style={{ color: accent }}> ▍</span> : null}
-      </div>
+      {/* Corps : soit le flux de pensée, soit l'indicateur « Réflexion en cours… » */}
+      {hasText ? (
+        <div
+          className="mt-1.5 max-h-24 overflow-hidden text-[11px] italic leading-relaxed"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          {/* On n'affiche que la fin du flux pour rester compact */}
+          {text.slice(-600)}
+          {active ? <span style={{ color: accent }}> ▍</span> : null}
+        </div>
+      ) : (
+        // Tâche longue sans texte de réflexion → indicateur animé.
+        <div
+          className="mt-1.5 flex items-center gap-1.5 text-[11px] italic"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          <span>Réflexion en cours</span>
+          {reduceMotion ? (
+            <span>…</span>
+          ) : (
+            <span className="inline-flex gap-0.5" aria-hidden="true">
+              {[0, 1, 2].map(i => (
+                <motion.span
+                  key={i}
+                  animate={{ opacity: [0.2, 1, 0.2] }}
+                  transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.2 }}
+                  style={{ color: accent }}
+                >
+                  ●
+                </motion.span>
+              ))}
+            </span>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }
 
 // Wrapper avec AnimatePresence pour animer l'apparition/disparition.
 export function ThoughtStreamContainer(props: ThoughtStreamProps) {
-  const visible = !!props.thought && !!props.thought.text?.trim();
+  const visible = !!props.thought && (!!props.thought.text?.trim() || !!props.thought.busy);
   return (
     <AnimatePresence>
       {visible ? <ThoughtStream key="thought-stream" {...props} /> : null}

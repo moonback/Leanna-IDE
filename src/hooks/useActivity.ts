@@ -53,6 +53,12 @@ export interface ThoughtStreamState {
   active: boolean;
   /** Texte de réflexion accumulé en direct. */
   text: string;
+  /**
+   * Tâche en cours (interaction_status = in_progress) même SANS texte de
+   * réflexion : permet d'afficher un indicateur « Réflexion en cours… »
+   * pendant les tâches longues silencieuses.
+   */
+  busy?: boolean;
 }
 
 function toolLabel(tool: string, args?: Record<string, unknown>): string {
@@ -102,7 +108,7 @@ export function useActivity() {
   const [modifiedFiles, setModifiedFiles] = useState<ModifiedFile[]>([]);
   const [isBusy, setIsBusy] = useState(false);
   const [reasoning, setReasoning] = useState<ReasoningState>({ active: false });
-  const [thoughtStream, setThoughtStream] = useState<ThoughtStreamState>({ active: false, text: '' });
+  const [thoughtStream, setThoughtStream] = useState<ThoughtStreamState>({ active: false, text: '', busy: false });
 
   const startActivity = useCallback((tool: string, args?: Record<string, unknown>) => {
     const step: ActivityStep = {
@@ -146,7 +152,7 @@ export function useActivity() {
     setModifiedFiles([]);
     setIsBusy(false);
     setReasoning({ active: false });
-    setThoughtStream({ active: false, text: '' });
+    setThoughtStream({ active: false, text: '', busy: false });
   }, []);
 
   return {
