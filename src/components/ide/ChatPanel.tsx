@@ -17,6 +17,8 @@ import { SlashCommandDropdown } from './SlashCommandDropdown.js';
 import { useFileMention } from '../../hooks/useFileMention.js';
 import { useSlashCommand } from '../../hooks/useSlashCommand.js';
 import { DocumentUpload, DropZoneOverlay, useDocumentDrop, type DocumentResult } from './DocumentUpload.js';
+import { SkillPicker } from './SkillPicker.js';
+import type { CustomSkill } from '../../hooks/useCustomSkills.js';
 import type { TranscriptEntry, ContextSource } from '../../hooks/useLiveAPI.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -495,6 +497,20 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
     }
   }, [input, canSend, onSend]);
 
+  // Activation d'un skill custom : préremplit la saisie avec l'invocation du skill.
+  // L'utilisateur peut alors compléter les arguments avant d'envoyer.
+  const handleSelectSkill = useCallback((skill: CustomSkill) => {
+    const hasParams = skill.parameters && skill.parameters.length > 0;
+    const paramsHint = hasParams
+      ? ` ${skill.parameters.map(p => `${p.name}=`).join(' ')}`
+      : '';
+    const invocation = `/custom_${skill.name}${paramsHint} `;
+    setInput(invocation);
+    const pos = invocation.length;
+    setCursorPos(pos);
+    if (textareaRef.current) setCursorPosition(textareaRef.current, pos);
+  }, []);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (showSlashSuggestions && slashSuggestions.length > 0) {
@@ -627,6 +643,7 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
           />
 
           <div className="flex items-center gap-1 pb-0.5 flex-shrink-0">
+            <SkillPicker onSelect={handleSelectSkill} disabled={!canSend} />
             <DocumentUpload connected={connected} onDocumentAnalyzed={onDocumentAnalyzed} />
 
             <motion.button
