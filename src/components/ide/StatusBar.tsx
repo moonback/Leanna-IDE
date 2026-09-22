@@ -18,6 +18,10 @@ import {
   Play,
   Square,
   Target,
+  Wifi,
+  WifiOff,
+  MoreHorizontal,
+  type LucideIcon,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
@@ -79,8 +83,8 @@ function StatusDot({
         backgroundColor: color,
         boxShadow: glow ? `0 0 6px ${color}` : undefined,
       }}
-      animate={pulse ? { scale: [1, 1.35, 1], opacity: [1, 0.6, 1] } : { scale: 1 }}
-      transition={pulse ? { repeat: Infinity, duration: 2, ease: 'easeInOut' } : { type: 'spring', bounce: 0.5, duration: 0.4 }}
+          animate={pulse ? { scale: [1, 1.35, 1], opacity: [1, 0.6, 1] } : { scale: 1 }}
+          transition={pulse ? { repeat: Infinity, duration: 2, ease: 'easeInOut' } : { duration: 0 }}
     />
   );
 }
@@ -112,6 +116,123 @@ function Divider() {
   );
 }
 
+// ── Menu "Outils" (modal) ──────────────────────────────────────────────────
+// Regroupe les actions occasionnelles (panneaux secondaires) dans une modale
+// centrée, pour garder la barre de statut lisible sans risque de débordement
+// d'écran. Même gabarit que la modale de confirmation Reset plus bas dans ce
+// fichier, pour rester cohérent visuellement.
+
+interface ToolsMenuItem {
+  key: string;
+  icon: LucideIcon;
+  label: string;
+  description?: string;
+  onClick?: () => void;
+  iconColor?: string;
+  iconBg?: string;
+  count?: number;
+  countColor?: string;
+  /** Rendu personnalisé à droite de l'item (ex : bouton start/stop Telegram) */
+  trailing?: React.ReactNode;
+}
+
+function ToolsMenuRow({ item }: { item: ToolsMenuItem }) {
+  const { icon: Icon, label, description, onClick, iconColor, iconBg, count, countColor, trailing } = item;
+  return (
+    <div className="group flex items-center gap-3 px-2.5 py-2 rounded-xl transition-colors duration-150 hover:bg-[var(--bg-hover)]">
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex items-center gap-3 flex-1 min-w-0 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={!onClick}
+      >
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: iconBg ?? 'var(--bg-hover)' }}
+        >
+          <Icon size={16} style={{ color: iconColor ?? 'var(--text-muted)' }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+            {label}
+          </div>
+          {description && (
+            <div className="truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              {description}
+            </div>
+          )}
+        </div>
+      </button>
+      {typeof count === 'number' && count > 0 && (
+        <CountBadge value={count} color={countColor ?? 'var(--accent-primary)'} />
+      )}
+      {trailing}
+    </div>
+  );
+}
+
+function ToolsMenuModal({ items, onClose }: { items: (ToolsMenuItem | 'divider')[]; onClose: () => void }) {
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 flex items-center justify-center p-4 backdrop-blur-sm bg-black/50"
+      style={{ zIndex: 50 as any }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tools-menu-title"
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.94, y: 12 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+        className="w-full max-w-sm rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
+        style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', maxHeight: '80vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="flex items-center justify-between gap-3 px-4 py-3 border-b flex-shrink-0"
+          style={{ borderColor: 'var(--border-base)' }}
+        >
+          <h3 id="tools-menu-title" className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Outils
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
+            style={{ color: 'var(--text-muted)' }}
+            aria-label="Fermer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="p-2 overflow-y-auto min-h-0">
+          {items.map((item, i) =>
+            item === 'divider' ? (
+              <div key={`div-${i}`} className="my-1.5 mx-2 h-px" style={{ backgroundColor: 'var(--border-base)', opacity: 0.6 }} />
+            ) : (
+              <ToolsMenuRow key={item.key} item={item} />
+            )
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ── StatusBar Component ────────────────────────────────────────────────────
 
 export const StatusBar = memo(function StatusBar({
@@ -132,7 +253,7 @@ export const StatusBar = memo(function StatusBar({
   onToggleModelPicker,
   onToggleTokenDetail,
 }: StatusBarProps) {
-  const { tokenUsage, promptContext } = useLiveAPIContext();
+  const { status, tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
 
 
@@ -444,6 +565,9 @@ export const StatusBar = memo(function StatusBar({
 
   const [reindexing, setReindexing] = useState(false);
 
+  // ── Menu Outils ───────────────────────────────────────────────────────────
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
+
   const handleReindex = useCallback(async () => {
     if (reindexing || indexing.active) return;
     setReindexing(true);
@@ -463,6 +587,101 @@ export const StatusBar = memo(function StatusBar({
   // ── Render ──────────────────────────────────────────────────────────────────
 
   const { suggestion } = promptContext;
+
+  // Actions occasionnelles regroupées dans le menu "Outils" — l'ordre suit
+  // la fréquence d'usage estimée (agents/missions en haut, réindexation en bas).
+  const toolsMenuItems: (ToolsMenuItem | 'divider')[] = [
+    {
+      key: 'telegram',
+      icon: Send,
+      label: 'Telegram',
+      description: !telegramStatus?.isConfigured
+        ? 'Non configuré'
+        : telegramStatus.isRunning
+        ? `En ligne (@${telegramStatus.botInfo?.username || 'bot'})`
+        : telegramStatus.lastError
+        ? 'Erreur — cliquer pour voir'
+        : 'Arrêté',
+      onClick: () => { onToggleTelegram?.(); setShowToolsMenu(false); },
+      iconColor: telegramStatus?.isRunning ? 'var(--color-success)' : 'var(--text-muted)',
+      iconBg: telegramStatus?.isRunning ? 'var(--color-success-subtle, var(--bg-hover))' : undefined,
+      trailing: telegramStatus?.isConfigured ? (
+        <button
+          type="button"
+          onClick={handleQuickToggleTelegram}
+          disabled={telegramActionLoading}
+          className="p-1 rounded-md hover:bg-[var(--accent-subtle)] transition-all duration-200 active:scale-90 disabled:opacity-40 flex-shrink-0"
+          title={telegramStatus.isRunning ? 'Arrêter le bot Telegram' : 'Démarrer le bot Telegram'}
+          aria-label={telegramStatus.isRunning ? 'Arrêter le bot Telegram' : 'Démarrer le bot Telegram'}
+        >
+          {telegramActionLoading ? (
+            <LoaderCircle size={11} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
+          ) : telegramStatus.isRunning ? (
+            <Square size={11} style={{ color: 'var(--color-error)' }} fill="currentColor" />
+          ) : (
+            <Play size={11} style={{ color: 'var(--color-success)' }} fill="currentColor" />
+          )}
+        </button>
+      ) : undefined,
+    },
+    'divider',
+    ...(profile.agents.enabled ? [
+      {
+        key: 'agents',
+        icon: Users,
+        label: 'Agents',
+        description: activeAgentCount > 0 ? `${activeAgentCount} en cours` : 'Ouvrir le panneau',
+        onClick: () => { onToggleAgents?.(); setShowToolsMenu(false); },
+        iconColor: 'var(--accent-primary)',
+        count: activeAgentCount,
+      } satisfies ToolsMenuItem,
+      {
+        key: 'fleet',
+        icon: Radio,
+        label: 'Flotte',
+        description: "Flotte d'agents",
+        onClick: () => { onToggleFleet?.(); setShowToolsMenu(false); },
+        iconColor: 'var(--color-accent-alt)',
+      } satisfies ToolsMenuItem,
+    ] : []),
+    {
+      key: 'missions',
+      icon: Target,
+      label: 'Missions',
+      description: activeMissionCount > 0 ? `${activeMissionCount} active${activeMissionCount > 1 ? 's' : ''}` : 'Ouvrir le panneau',
+      onClick: () => { onToggleMissions?.(); setShowToolsMenu(false); },
+      iconColor: 'var(--color-info)',
+      count: activeMissionCount,
+      countColor: 'var(--color-info)',
+    },
+    'divider',
+    {
+      key: 'logs',
+      icon: ScrollText,
+      label: 'Logs',
+      description: "Logs de l'assistant et des agents",
+      onClick: () => { onToggleLogs?.(); setShowToolsMenu(false); },
+      iconColor: 'var(--accent-secondary)',
+    },
+    {
+      key: 'github',
+      icon: Github,
+      label: 'GitHub',
+      description: 'Publier les modifications',
+      onClick: () => { onToggleGitHub?.(); setShowToolsMenu(false); },
+      iconColor: 'var(--accent-primary)',
+    },
+    {
+      key: 'reindex',
+      icon: DatabaseZap,
+      label: reindexing || (indexing.active && indexing.phase !== 'done') ? 'Réindexation…' : 'Réindexer',
+      description: 'Scanner le projet et les documents',
+      onClick: (reindexing || indexing.active) ? undefined : () => { handleReindex(); setShowToolsMenu(false); },
+      iconColor: 'var(--accent-primary)',
+    },
+  ];
+
+  const toolsMenuBadgeCount = activeAgentCount + activeMissionCount;
 
   return (
     <>
@@ -526,7 +745,7 @@ export const StatusBar = memo(function StatusBar({
           boxShadow: '0 -1px 8px rgba(0,0,0,0.12)',
         }}
       >
-        {/* ─── Zone gauche : Sandbox · IA · MCP · services ─────────────── */}
+        {/* ─── Zone gauche : statuts en permanence visibles ──────────────── */}
         <div className="flex items-center gap-1">
           {/* Sandbox — dot + label */}
           <button
@@ -562,6 +781,25 @@ export const StatusBar = memo(function StatusBar({
             </span>
           </button>
 
+          {/* Gemini Live Connection Status */}
+          <button
+            type="button"
+            className={PILL}
+            style={{ color: 'var(--text-secondary)' }}
+            title={`Statut Gemini Live : ${status}`}
+          >
+            {status === 'connected' ? (
+              <Wifi size={13} style={{ color: 'var(--color-success)' }} />
+            ) : status === 'connecting' ? (
+              <LoaderCircle size={13} className="animate-spin" style={{ color: 'var(--color-warning)' }} />
+            ) : (
+              <WifiOff size={13} style={{ color: 'var(--text-muted)' }} />
+            )}
+            <span className="truncate max-w-[110px] capitalize">
+              {status}
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={onToggleMcp}
@@ -581,166 +819,26 @@ export const StatusBar = memo(function StatusBar({
 
           <Divider />
 
-          {/* Telegram Bot */}
-          <div className="flex items-center gap-0.5">
-            <button
-              type="button"
-              onClick={() => onToggleTelegram?.()}
-              className={PILL}
-              title={
-                !telegramStatus?.isConfigured
-                  ? 'Telegram : Non configuré (cliquer pour configurer)'
-                  : telegramStatus.isRunning
-                  ? `Telegram : En ligne (@${telegramStatus.botInfo?.username || 'bot'}) — Cliquer pour gérer`
-                  : telegramStatus.lastError
-                  ? `Telegram : Erreur (${telegramStatus.lastError}) — Cliquer pour voir`
-                  : 'Telegram : Arrêté — Cliquer pour démarrer ou gérer'
-              }
-            >
-              <Send
-                size={12}
-                style={{
-                  color: telegramStatus?.isRunning ? 'var(--color-success)' : 'var(--text-muted)',
-                }}
-              />
-              <StatusDot
-                color={
-                  telegramStatus?.isRunning
-                    ? 'var(--color-success)'
-                    : telegramStatus?.lastError
-                    ? 'var(--color-error)'
-                    : !telegramStatus?.isConfigured
-                    ? 'var(--color-warning)'
-                    : 'var(--text-muted)'
-                }
-                pulse={telegramStatus?.isRunning}
-              />
-              <span
-                style={{
-                  color: telegramStatus?.isRunning ? 'var(--color-success)' : 'var(--text-muted)',
-                }}
-              >
-                Telegram
-              </span>
-            </button>
-
-            {/* Quick toggle start/stop button */}
-            {telegramStatus?.isConfigured && (
-              <button
-                type="button"
-                onClick={handleQuickToggleTelegram}
-                disabled={telegramActionLoading}
-                className="p-1 rounded-md hover:bg-[var(--accent-subtle)] transition-all duration-200 opacity-70 hover:opacity-100 active:scale-90 disabled:opacity-40"
-                title={telegramStatus.isRunning ? 'Arrêter le bot Telegram' : 'Démarrer le bot Telegram'}
-                aria-label={telegramStatus.isRunning ? 'Arrêter le bot Telegram' : 'Démarrer le bot Telegram'}
-              >
-                {telegramActionLoading ? (
-                  <LoaderCircle size={11} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
-                ) : telegramStatus.isRunning ? (
-                  <Square size={11} style={{ color: 'var(--color-error)' }} fill="currentColor" />
-                ) : (
-                  <Play size={11} style={{ color: 'var(--color-success)' }} fill="currentColor" />
-                )}
-              </button>
-            )}
-          </div>
-
-          <Divider />
-
-          {/* Agents — visible uniquement si activé dans les paramètres */}
-          {profile.agents.enabled && (
-            <button
-              type="button"
-              onClick={onToggleAgents}
-              className={PILL}
-              style={{ color: 'var(--text-muted)' }}
-              title="Ouvrir le panneau Agents"
-            >
-              <Users size={13} style={{ color: 'var(--accent-primary)' }} />
-              <span>Agents</span>
-              {activeAgentCount > 0 && (
-                <span className="absolute -top-1 -right-1">
-                  <CountBadge value={activeAgentCount} color="var(--accent-primary)" />
-                </span>
-              )}
-            </button>
-          )}
-
-          {/* Fleet — visible uniquement si agents activés */}
-          {profile.agents.enabled && (
-            <button
-              type="button"
-              onClick={onToggleFleet}
-              className={PILL}
-              style={{ color: 'var(--text-muted)' }}
-              title="Ouvrir la flotte d'agents"
-            >
-              <Radio size={13} style={{ color: 'var(--color-accent-alt)' }} />
-              <span>Flotte</span>
-            </button>
-          )}
-
-          {/* Logs */}
+          {/* Menu "Outils" — regroupe les actions occasionnelles (Telegram,
+              Agents, Flotte, Missions, Logs, GitHub, Réindexer) dans une
+              modale pour garder la barre lisible. Le badge reflète
+              l'activité en cours. */}
           <button
             type="button"
-            onClick={onToggleLogs}
-            className={PILL}
-            style={{ color: 'var(--text-muted)' }}
-            title="Ouvrir les logs de l'assistant et des agents"
+            onClick={() => setShowToolsMenu(true)}
+            className={`${PILL} relative`}
+            style={{ color: showToolsMenu ? 'var(--text-primary)' : 'var(--text-muted)' }}
+            title="Ouvrir le menu Outils"
+            aria-haspopup="dialog"
+            aria-expanded={showToolsMenu}
           >
-            <ScrollText size={13} style={{ color: 'var(--accent-secondary)' }} />
-            <span>Logs</span>
-          </button>
-
-          {/* GitHub — publication du workspace réel */}
-          <button
-            type="button"
-            onClick={onToggleGitHub}
-            className={PILL}
-            style={{ color: 'var(--text-muted)' }}
-            title="Ouvrir GitHub et publier les modifications"
-          >
-            <Github size={13} style={{ color: 'var(--accent-primary)' }} />
-            <span>GitHub</span>
-          </button>
-
-          {/* Missions — ouvre le panneau des missions */}
-          <button
-            type="button"
-            onClick={onToggleMissions}
-            className={PILL}
-            style={{ color: 'var(--text-muted)' }}
-            title="Ouvrir le panneau Missions"
-          >
-            <Target size={13} style={{ color: 'var(--color-info)' }} />
-            <span>Missions</span>
-            {activeMissionCount > 0 && (
-              <span
-                className="absolute -top-1 -right-1"
-                aria-label={`${activeMissionCount} mission${activeMissionCount > 1 ? 's' : ''} active${activeMissionCount > 1 ? 's' : ''}`}
-              >
-                <CountBadge value={activeMissionCount} color="var(--color-info)" />
+            <MoreHorizontal size={13} style={{ color: 'var(--accent-primary)' }} />
+            <span>Outils</span>
+            {toolsMenuBadgeCount > 0 && (
+              <span className="absolute -top-1 -right-1">
+                <CountBadge value={toolsMenuBadgeCount} color="var(--accent-primary)" />
               </span>
             )}
-          </button>
-
-          <Divider />
-
-          {/* Reindex — déclenche un scan complet du KnowledgeGraph */}
-          <button
-            type="button"
-            onClick={handleReindex}
-            disabled={reindexing || indexing.active}
-            className={`${PILL} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent`}
-            style={{ color: 'var(--text-muted)' }}
-            title="Réindexer le projet, les documents et les documents extraits"
-            aria-label="Réindexer le projet, les documents et les documents extraits"
-          >
-            {reindexing || (indexing.active && indexing.phase !== 'done')
-              ? <LoaderCircle size={13} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
-              : <DatabaseZap size={13} style={{ color: 'var(--accent-primary)' }} />
-            }
-            <span>Réindexer</span>
           </button>
         </div>
 
@@ -860,13 +958,19 @@ export const StatusBar = memo(function StatusBar({
       </div>
 
       <AnimatePresence>
+        {showToolsMenu && (
+          <ToolsMenuModal items={toolsMenuItems} onClose={() => setShowToolsMenu(false)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
       {showResetConfirm && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 flex items-center justify-center p-4 backdrop-blur-sm bg-black/50"
-          style={{ zIndex: 'var(--z-modal)' as any }}
+          style={{ zIndex: 50 as any }}
           onClick={() => {
             setShowResetConfirm(false);
             setResetCode('');
