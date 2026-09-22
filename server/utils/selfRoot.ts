@@ -14,6 +14,7 @@
 import * as path from "path";
 import * as fs from "fs";
 import { fileURLToPath } from "url";
+import { isIgnoredForWrite } from "./leannaignore.js";
 
 /**
  * Résout le dossier du module courant de façon robuste.
@@ -589,15 +590,25 @@ export function normalizeSelfPath(target: string): string | null {
 
 /**
  * Vérifie qu'un chemin absolu résolu (après normalisation) ne cible pas
- * un fichier interdit en écriture.
+ * un fichier interdit en écriture. Deux sources d'interdiction :
+ *   1. FORBIDDEN_WRITE_TARGETS — cibles durcies en dur.
+ *   2. `.leannaignore` — liste d'exclusion définie par l'utilisateur à la
+ *      racine du projet (dossiers/motifs que l'agent ne peut pas modifier).
  * Retourne true (interdit) si aucun projet actif.
  */
 export function isWriteForbidden(absolutePath: string): boolean {
   if (!SELF_ROOT) return true;
   const relative = path.relative(SELF_ROOT, absolutePath).replace(/\\/g, "/");
-  return FORBIDDEN_WRITE_TARGETS.some(
+
+  // 1. Cibles interdites en dur (jamais modifiables).
+  const hardForbidden = FORBIDDEN_WRITE_TARGETS.some(
     (pattern) => relative === pattern || relative.startsWith(pattern + "/")
   );
+  if (hardForbidden) return true;
+
+  // 2. Liste d'exclusion utilisateur (.leannaignore à la racine du projet).
+  //    Les dossiers/motifs listés sont interdits en écriture à l'agent.
+  return isIgnoredForWrite(SELF_ROOT, absolutePath);
 }
 
 /**
