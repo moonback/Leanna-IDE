@@ -36,7 +36,7 @@ export type SkillHandler<TArgs = unknown, TResult = unknown> = (name: string, ar
 
 // Seuls les appels structurés correspondant à des skills du workspace sont
 // exécutables. Un faux appel `bash` généré par le modèle n'est jamais exécuté.
-const EXECUTABLE_AGENT_TOOLS = new Set([
+export const EXECUTABLE_AGENT_TOOLS = new Set([
   "list_project_files",
   "read_project_file",
   "read_file_outline",
@@ -63,9 +63,22 @@ const EXECUTABLE_AGENT_TOOLS = new Set([
   "knowledge_memory_add",
   "knowledge_memory_list",
   "knowledge_impact_analyze",
-  "knowledge_graph_query",
   "knowledge_status",
   "knowledge_reindex",
+  // AST Call-Graph (skill knowledge) — analyse d'appels et d'impact
+  "knowledge_ast_callers",
+  "knowledge_ast_callees",
+  "knowledge_ast_call_chain",
+  "knowledge_ast_file_inspect",
+  // Automatisation & vision (skill automation) — capacités de l'agent vision
+  "automation_navigate",
+  "automation_click",
+  "automation_type",
+  "automation_extract",
+  "automation_inspect",
+  "automation_screenshot",
+  "automation_analyze_screenshot",
+  "automation_scroll",
   "reasoning_think",
   "agent_execute",
 ]);
@@ -104,7 +117,6 @@ export class AgentExecutor {
     'analyze_project_file': 90_000,
     'knowledge_build_context': 90_000,
     'knowledge_impact_analyze': 90_000,
-    'knowledge_graph_query': 60_000,
     
     // Outils de vérification (45-60s)
     'verify_file': 60_000,

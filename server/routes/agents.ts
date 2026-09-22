@@ -35,7 +35,7 @@ const DelegateSchema = z.object({
   description: z.string().min(1, "description requis"),
   files: z.array(z.string()).optional(),
   instructions: z.string().optional(),
-  priority: z.enum(["low", "normal", "high", "critical"]).optional(),
+  priority: z.enum(["low", "medium", "high", "critical"]).optional(),
   timeoutMs: z.number().int().min(0).optional(),
 });
 
@@ -240,6 +240,7 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
         })),
         estimatedDurationMs: plan.estimatedDurationMs,
         rationale: plan.architectureRationale,
+        mermaid: plan.mermaid,
         createdAt: plan.createdAt,
       });
     } catch (e: any) {

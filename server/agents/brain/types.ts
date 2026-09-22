@@ -24,6 +24,8 @@ export interface BrainGoalInput {
   instructions?: string;
   mode?: "auto" | "plan_first";
   maxCorrectionAttempts?: number;
+  /** Budget global de réplanifications à chaud du sous-graphe restant (défaut 2). */
+  maxReplans?: number;
   preferences?: {
     visualValidation?: boolean;
     skipTests?: boolean;
@@ -74,7 +76,9 @@ export interface BrainPlan {
   estimatedDurationMs: number;
   architectureRationale: string;
   createdAt: string;
-  status: "planned" | "executing" | "verifying" | "correcting" | "completed" | "failed";
+  status: "planned" | "executing" | "verifying" | "correcting" | "completed" | "incomplete" | "failed";
+  /** Représentation Mermaid (`graph TD`) du DAG des étapes, générée à la planification. */
+  mermaid?: string;
 }
 
 /** Résultat de vérification d'une étape ou du projet global */
@@ -138,6 +142,7 @@ export const brainExecuteSchema = z.object({
   instructions: z.string().optional(),
   mode: z.enum(["auto", "plan_first"]).optional().default("auto"),
   maxCorrectionAttempts: z.number().int().min(0).max(5).optional().default(3),
+  maxReplans: z.number().int().min(0).max(5).optional().default(2),
   preferences: z
     .object({
       visualValidation: z.boolean().optional(),

@@ -10,6 +10,8 @@ import { GoalUnderstandingEngine } from "./GoalUnderstandingEngine.js";
 import { DynamicPlanner } from "./DynamicPlanner.js";
 import { BrainVerifier } from "./BrainVerifier.js";
 import { BrainCorrectionLoop } from "./BrainCorrectionLoop.js";
+import { BrainPlanValidator } from "./BrainPlanValidator.js";
+import { BrainScheduler } from "./BrainScheduler.js";
 import { agentOrchestrator, type AgentOrchestrator } from "../AgentOrchestrator.js";
 import { agentEventStream } from "../AgentEventStream.js";
 import { createLogger } from "../../utils/logger.js";
@@ -17,10 +19,22 @@ import type { AgentTask } from "../types.js";
 
 const log = createLogger("AgentBrain");
 
+/** Contexte d'exécution partagé entre les étapes d'un run (et ses réplanifications). */
+interface BrainRunContext {
+  verifications: StageVerification[];
+  corrections: BrainCorrectionAttempt[];
+  filesModified: Set<string>;
+  stageResults: Map<string, { stage: BrainStage; result?: any; durationMs: number }>;
+  correctionLoop: BrainCorrectionLoop;
+  maxCorrectionAttempts: number;
+  understanding: BrainPlan["understanding"];
+}
+
 export class AgentBrain {
   private understandingEngine = new GoalUnderstandingEngine();
   private planner = new DynamicPlanner();
   private verifier = new BrainVerifier();
+  private validator = new BrainPlanValidator();
   private orchestrator: AgentOrchestrator;
   private activePlans = new Map<string, BrainPlan>();
   private results = new Map<string, BrainExecutionResult>();
@@ -41,6 +55,18 @@ export class AgentBrain {
     // 2. Décomposition dynamique en DAG
     const plan = await this.planner.plan(understanding, input);
 
+    // 3. Validation stricte du DAG produit (Zod + cycles + refs + rôles)
+    const validation = this.validator.validate(plan);
+    if (!validation.ok) {
+      const detail = validation.issues.join(" ; ");
+      log.error(`❌ Plan invalide (${plan.id.slice(0, 8)}) : ${detail}`);
+      plan.status = "failed";
+      throw new Error(`Plan généré invalide : ${detail}`);
+    }
+
+    // 4. Générer la visualisation Mermaid du DAG
+    plan.mermaid = this.validator.toMermaid(plan);
+
     this.activePlans.set(plan.id, plan);
 
     // Émettre un événement pour la visibilité de l'interface
@@ -60,195 +86,67 @@ export class AgentBrain {
   }
 
   /**
-   * Cycle complet : Compréhension → Décomposition → Choix agents/skills/outils →
-   *                 Exécution → Vérification → Correction → Résultat
+   * Cycle complet : Compréhension → Décomposition → Validation →
+   *                 Exécution parallèle (DAG) → Vérification → Correction →
+   *                 Réplanification à chaud → Résultat
    */
   async executeGoal(input: BrainGoalInput): Promise<BrainExecutionResult> {
     const startTime = Date.now();
     log.info(`🚀 Lancement de l'exécution complète par Agent Brain: "${input.goal}"`);
 
-    // Générer le plan dynamique
+    // Générer + valider le plan dynamique
     const plan = await this.planGoal(input);
     plan.status = "executing";
 
-    const stageResults: Array<{ stage: BrainStage; result?: any; durationMs: number }> = [];
-    const allVerifications: StageVerification[] = [];
-    const allCorrections: BrainCorrectionAttempt[] = [];
-    const allFilesModified = new Set<string>();
+    // Contexte partagé accumulé au fil de l'exécution (et des réplanifications)
+    const ctx: BrainRunContext = {
+      verifications: [],
+      corrections: [],
+      filesModified: new Set<string>(),
+      stageResults: new Map<string, { stage: BrainStage; result?: any; durationMs: number }>(),
+      correctionLoop: new BrainCorrectionLoop(input.maxCorrectionAttempts ?? 3),
+      maxCorrectionAttempts: input.maxCorrectionAttempts ?? 3,
+      understanding: plan.understanding,
+    };
 
-    const correctionLoop = new BrainCorrectionLoop(input.maxCorrectionAttempts ?? 3);
+    const scheduler = new BrainScheduler((stage, deps) => this.executeStage(stage, plan, ctx, deps));
 
-    let globalSuccess = true;
+    // Exécution initiale du DAG complet
+    let report = await scheduler.execute(plan.stages);
 
-    // Exécution des étapes selon leurs dépendances
-    for (let i = 0; i < plan.stages.length; i++) {
-      const stage = plan.stages[i];
-      const stageStartTime = Date.now();
-      stage.status = "running";
-      stage.startedAt = new Date().toISOString();
-
-      log.info(`▶️ Exécution étape ${i + 1}/${plan.stages.length}: "${stage.title}" (${stage.agentRole})`);
-
-      agentEventStream.publish({
-        type: "agent_event",
-        event: "task_started",
-        taskId: stage.id,
-        role: stage.agentRole,
-        title: `[Brain Stage ${i + 1}/${plan.stages.length}] ${stage.title}`,
-        status: "running",
-        agentName: stage.agentRole,
-        detail: stage.description,
-        timestamp: new Date().toISOString(),
-      });
-
-      let stageTaskResult: any = null;
-
-      try {
-        // Exécuter la tâche via l'orchestrateur
-        const delegatedTask: AgentTask = await this.orchestrator.delegateTask({
-          role: stage.agentRole,
-          title: stage.title,
-          description: `${stage.description}\n\nOutils autorisés : ${stage.tools.join(", ")}`,
-          files: stage.files,
-          instructions: stage.instructions,
-          priority: stage.priority,
-        });
-
-        // Attendre que la tâche se termine (pooling de complétion du statut)
-        stageTaskResult = await this.awaitTaskCompletion(delegatedTask.id);
-        stage.result = stageTaskResult;
-
-        if (stageTaskResult?.filesModified) {
-          for (const f of stageTaskResult.filesModified) {
-            allFilesModified.add(f);
-          }
-        }
-      } catch (err: any) {
-        log.error(`❌ Erreur d'exécution de l'étape ${stage.id}: ${err.message}`);
-        stageTaskResult = {
-          success: false,
-          outcome: "failed" as const,
-          summary: err.message ?? "Erreur d'exécution",
-          durationMs: Date.now() - stageStartTime,
-          error: err.message,
-          filesModified: [],
-        };
-        stage.result = stageTaskResult;
-      }
-
-      // Étape Vérification
-      let verification = await this.verifier.verifyStage(
-        stage,
-        plan.understanding,
-        Array.from(allFilesModified)
-      );
-      allVerifications.push(verification);
-
-      // Étape Correction autonome si échec
-      let attempt = 1;
-      while (!verification.passed && attempt <= (input.maxCorrectionAttempts ?? 3)) {
-        log.warn(`⚠️ Déclenchement de la correction autonome pour ${stage.id} (tentative ${attempt})`);
-        plan.status = "correcting";
-
-        const correction = correctionLoop.createCorrection(
-          stage,
-          verification,
-          attempt,
-          plan.understanding
-        );
-
-        if (!correction) break;
-
-        allCorrections.push(correction);
-
-        agentEventStream.publish({
-          type: "agent_event",
-          event: "task_progress",
-          taskId: stage.id,
-          role: correction.targetRole,
-          title: `[Auto-Correction ${attempt}] Réparation pour ${stage.title}`,
-          status: "running",
-          agentName: correction.targetRole,
-          detail: correction.diagnostic,
-          timestamp: new Date().toISOString(),
-        });
-
-        try {
-          const fixTask = await this.orchestrator.delegateTask({
-            role: correction.targetRole,
-            title: `[Auto-Correction] Fix pour ${stage.title}`,
-            description: correction.correctiveInstructions,
-            files: correction.filesToFix,
-            priority: "critical",
-          });
-
-          const fixResult = await this.awaitTaskCompletion(fixTask.id);
-          if (fixResult?.filesModified) {
-            for (const f of fixResult.filesModified) {
-              allFilesModified.add(f);
-            }
-          }
-
-          // Re-vérifier
-          verification = await this.verifier.verifyStage(
-            stage,
-            plan.understanding,
-            Array.from(allFilesModified)
-          );
-          allVerifications.push(verification);
-
-          if (verification.passed) {
-            correction.resolved = true;
-            log.info(`✅ Auto-correction réussie pour ${stage.id} à la tentative ${attempt} !`);
-            break;
-          }
-        } catch (corrErr: any) {
-          log.error(`❌ Erreur pendant la correction: ${corrErr.message}`);
-        }
-
-        attempt++;
-      }
-
-      stage.durationMs = Date.now() - stageStartTime;
-      stage.completedAt = new Date().toISOString();
-      stage.status = verification.passed ? "completed" : "failed";
-
-      stageResults.push({
-        stage,
-        result: stage.result,
-        durationMs: stage.durationMs,
-      });
-
-      agentEventStream.publish({
-        type: "agent_event",
-        event: verification.passed ? "task_completed" : "task_failed",
-        taskId: stage.id,
-        role: stage.agentRole,
-        title: `[Brain Stage ${i + 1}/${plan.stages.length}] ${stage.title}`,
-        status: verification.passed ? "completed" : "failed",
-        agentName: stage.agentRole,
-        detail: verification.summary,
-        timestamp: new Date().toISOString(),
-      });
-
-      if (!verification.passed) {
-        globalSuccess = false;
-        log.error(`❌ Échec persistant de l'étape ${stage.id}. Interruption du pipeline.`);
+    // ── Réplanification à chaud du sous-graphe restant (garde-fou anti-boucle) ──
+    const maxReplans = input.maxReplans ?? 2;
+    let replans = 0;
+    while (report.failed.length > 0 && replans < maxReplans) {
+      replans++;
+      const replanned = await this.replanSubgraph(plan, report, ctx, replans, maxReplans);
+      if (!replanned) {
+        log.warn(`🛑 Réplanification impossible — arrêt propre après ${replans} tentative(s)`);
         break;
       }
+      report = await scheduler.execute(plan.stages);
     }
 
+    // ── Synthèse du résultat ────────────────────────────────────────────────
     const totalDurationMs = Date.now() - startTime;
-    plan.status = globalSuccess ? "completed" : "failed";
+    const allCompleted = plan.stages.every((s) => s.status === "completed");
+    const anyCompleted = plan.stages.some((s) => s.status === "completed");
+    const globalSuccess = allCompleted;
 
-    // Synthèse du résultat
+    plan.status = allCompleted ? "completed" : anyCompleted ? "incomplete" : "failed";
+
+    const stageResults = plan.stages.map(
+      (s) => ctx.stageResults.get(s.id) ?? { stage: s, result: s.result, durationMs: s.durationMs ?? 0 }
+    );
+
+    const failedStage = plan.stages.find((s) => s.status === "failed" || s.status === "skipped");
     const summary = globalSuccess
-      ? `Objectif accompli avec succès en ${plan.stages.length} étapes (${plan.stages.map((s) => s.agentRole).join(" → ")}). ${allFilesModified.size} fichier(s) mis à jour, validés et sans régression.`
-      : `L'exécution a rencontré une difficulté sur l'étape : ${stageResults[stageResults.length - 1]?.stage.title ?? "Inconnue"}.`;
+      ? `Objectif accompli avec succès en ${plan.stages.length} étapes (${plan.stages.map((s) => s.agentRole).join(" → ")}). ${ctx.filesModified.size} fichier(s) mis à jour, validés et sans régression.`
+      : `Exécution ${plan.status === "incomplete" ? "partielle" : "en échec"} — difficulté sur l'étape : ${failedStage?.title ?? "inconnue"}${replans > 0 ? ` (après ${replans} réplanification(s))` : ""}.`;
 
     const deliverables = [
-      ...Array.from(allFilesModified).map((f) => `Fichier modifié : ${f}`),
-      ...allVerifications.map((v) => v.summary),
+      ...Array.from(ctx.filesModified).map((f) => `Fichier modifié : ${f}`),
+      ...ctx.verifications.map((v) => v.summary),
     ];
 
     const result: BrainExecutionResult = {
@@ -257,9 +155,9 @@ export class AgentBrain {
       success: globalSuccess,
       understanding: plan.understanding,
       stages: stageResults,
-      filesModified: Array.from(allFilesModified),
-      verifications: allVerifications,
-      corrections: allCorrections,
+      filesModified: Array.from(ctx.filesModified),
+      verifications: ctx.verifications,
+      corrections: ctx.corrections,
       totalDurationMs,
       summary,
       deliverables,
@@ -272,15 +170,271 @@ export class AgentBrain {
       event: "orchestration_completed",
       taskId: plan.id,
       role: "planner",
-      title: `[Agent Brain] ${globalSuccess ? "Objectif validé" : "Échec"} : ${plan.goal}`,
+      title: `[Agent Brain] ${globalSuccess ? "Objectif validé" : plan.status === "incomplete" ? "Partiellement accompli" : "Échec"} : ${plan.goal}`,
       status: globalSuccess ? "completed" : "failed",
       agentName: "Agent Brain",
       detail: summary,
       timestamp: new Date().toISOString(),
     });
 
-    log.info(`🏁 Exécution Brain terminée (${totalDurationMs}ms). Succès: ${globalSuccess}`);
+    log.info(`🏁 Exécution Brain terminée (${totalDurationMs}ms). Statut: ${plan.status} — ${replans} réplanification(s)`);
     return result;
+  }
+
+  /**
+   * Exécute une étape unique : délégation → attente → vérification → boucle de
+   * correction autonome jusqu'au budget. Accumule fichiers/vérifs/corrections
+   * dans le contexte partagé. Renvoie la vérification finale (verdict de l'étape).
+   *
+   * Cette méthode est appelée par le BrainScheduler pour chaque étape prête,
+   * potentiellement en parallèle avec d'autres.
+   */
+  private async executeStage(
+    stage: BrainStage,
+    plan: BrainPlan,
+    ctx: BrainRunContext,
+    _depResults: StageVerification[]
+  ): Promise<StageVerification> {
+    const stageStartTime = Date.now();
+    stage.startedAt = new Date().toISOString();
+
+    log.info(`▶️ Exécution étape "${stage.title}" (${stage.agentRole})`);
+
+    agentEventStream.publish({
+      type: "agent_event",
+      event: "task_started",
+      taskId: stage.id,
+      role: stage.agentRole,
+      title: `[Brain Stage] ${stage.title}`,
+      status: "running",
+      agentName: stage.agentRole,
+      detail: stage.description,
+      timestamp: new Date().toISOString(),
+    });
+
+    let stageTaskResult: any = null;
+
+    try {
+      const delegatedTask: AgentTask = await this.orchestrator.delegateTask({
+        role: stage.agentRole,
+        title: stage.title,
+        description: `${stage.description}\n\nOutils autorisés : ${stage.tools.join(", ")}`,
+        files: stage.files,
+        instructions: stage.instructions,
+        priority: stage.priority,
+      });
+
+      stageTaskResult = await this.awaitTaskCompletion(delegatedTask.id);
+      stage.result = stageTaskResult;
+
+      if (stageTaskResult?.filesModified) {
+        for (const f of stageTaskResult.filesModified) ctx.filesModified.add(f);
+      }
+    } catch (err: any) {
+      log.error(`❌ Erreur d'exécution de l'étape ${stage.id}: ${err.message}`);
+      stageTaskResult = {
+        success: false,
+        outcome: "failed" as const,
+        summary: err.message ?? "Erreur d'exécution",
+        durationMs: Date.now() - stageStartTime,
+        error: err.message,
+        filesModified: [],
+      };
+      stage.result = stageTaskResult;
+    }
+
+    // Vérification
+    let verification = await this.verifier.verifyStage(
+      stage,
+      ctx.understanding,
+      Array.from(ctx.filesModified)
+    );
+    ctx.verifications.push(verification);
+
+    // Boucle de correction autonome bornée
+    let attempt = 1;
+    while (!verification.passed && attempt <= ctx.maxCorrectionAttempts) {
+      log.warn(`⚠️ Correction autonome pour ${stage.id} (tentative ${attempt})`);
+      plan.status = "correcting";
+
+      const correction = ctx.correctionLoop.createCorrection(
+        stage,
+        verification,
+        attempt,
+        ctx.understanding
+      );
+      if (!correction) break;
+      ctx.corrections.push(correction);
+
+      agentEventStream.publish({
+        type: "agent_event",
+        event: "task_progress",
+        taskId: stage.id,
+        role: correction.targetRole,
+        title: `[Auto-Correction ${attempt}] Réparation pour ${stage.title}`,
+        status: "running",
+        agentName: correction.targetRole,
+        detail: correction.diagnostic,
+        timestamp: new Date().toISOString(),
+      });
+
+      try {
+        const fixTask = await this.orchestrator.delegateTask({
+          role: correction.targetRole,
+          title: `[Auto-Correction] Fix pour ${stage.title}`,
+          description: correction.correctiveInstructions,
+          files: correction.filesToFix,
+          priority: "critical",
+        });
+
+        const fixResult = await this.awaitTaskCompletion(fixTask.id);
+        if (fixResult?.filesModified) {
+          for (const f of fixResult.filesModified) ctx.filesModified.add(f);
+        }
+
+        // Reporter le résultat de la correction sur l'étape : la re-vérification
+        // doit refléter l'état corrigé, pas l'échec initial.
+        if (fixResult) {
+          stage.result = fixResult;
+        }
+
+        verification = await this.verifier.verifyStage(
+          stage,
+          ctx.understanding,
+          Array.from(ctx.filesModified)
+        );
+        ctx.verifications.push(verification);
+
+        if (verification.passed) {
+          correction.resolved = true;
+          log.info(`✅ Auto-correction réussie pour ${stage.id} à la tentative ${attempt}`);
+          break;
+        }
+      } catch (corrErr: any) {
+        log.error(`❌ Erreur pendant la correction: ${corrErr.message}`);
+      }
+
+      attempt++;
+    }
+
+    stage.durationMs = Date.now() - stageStartTime;
+    stage.completedAt = new Date().toISOString();
+
+    ctx.stageResults.set(stage.id, {
+      stage,
+      result: stage.result,
+      durationMs: stage.durationMs,
+    });
+
+    agentEventStream.publish({
+      type: "agent_event",
+      event: verification.passed ? "task_completed" : "task_failed",
+      taskId: stage.id,
+      role: stage.agentRole,
+      title: `[Brain Stage] ${stage.title}`,
+      status: verification.passed ? "completed" : "failed",
+      agentName: stage.agentRole,
+      detail: verification.summary,
+      timestamp: new Date().toISOString(),
+    });
+
+    return verification;
+  }
+
+  /**
+   * Réplanifie à chaud le sous-graphe restant après un échec persistant.
+   * Préserve les étapes déjà `completed` et régénère les étapes non terminées
+   * en injectant le contexte d'échec, puis revalide le plan résultant.
+   *
+   * @returns true si un nouveau sous-graphe exécutable a été produit, false sinon.
+   */
+  private async replanSubgraph(
+    plan: BrainPlan,
+    report: import("./BrainScheduler.js").BrainScheduleReport,
+    ctx: BrainRunContext,
+    replanIndex: number,
+    maxReplans: number
+  ): Promise<boolean> {
+    const completedStages = plan.stages.filter((s) => s.status === "completed");
+    const unfinished = plan.stages.filter((s) => s.status !== "completed");
+    if (unfinished.length === 0) return false;
+
+    const failedStage = plan.stages.find((s) => s.id === report.firstFailedStageId) ?? unfinished[0];
+    const failedVerif = ctx.verifications.filter((v) => v.stageId === failedStage.id).pop();
+    const diagnostic = failedVerif?.issues.map((i) => i.message).join(" ; ") || failedVerif?.summary || "échec non diagnostiqué";
+
+    log.warn(`🔄 Réplanification ${replanIndex}/${maxReplans} — sous-graphe de ${unfinished.length} étape(s) non terminée(s). Cause: ${diagnostic}`);
+
+    agentEventStream.publish({
+      type: "agent_event",
+      event: "task_progress",
+      taskId: plan.id,
+      role: "planner",
+      title: `[Agent Brain] Réplanification ${replanIndex}/${maxReplans} du sous-graphe restant`,
+      status: "running",
+      agentName: "Agent Brain",
+      detail: `Cause: ${diagnostic}`,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Régénérer un plan pour les étapes restantes en enrichissant les instructions
+    // avec le contexte de l'échec.
+    const enrichedUnderstanding: typeof plan.understanding = {
+      ...plan.understanding,
+      requirements: [
+        ...plan.understanding.requirements,
+        `Réplanification suite à l'échec de "${failedStage.title}" : ${diagnostic}`,
+      ],
+    };
+
+    let regenerated: BrainStage[];
+    try {
+      const subPlan = await this.planner.plan(enrichedUnderstanding, {
+        goal: plan.goal,
+        contextFiles: plan.understanding.relevantFiles,
+        instructions: `Concentre-toi uniquement sur la finalisation des étapes restantes. Contexte de l'échec précédent : ${diagnostic}`,
+        mode: "auto",
+      });
+      regenerated = subPlan.stages;
+    } catch (err: any) {
+      log.error(`Réplanification échouée (planner) : ${err.message}`);
+      return false;
+    }
+
+    if (!regenerated || regenerated.length === 0) return false;
+
+    // Réindexer les étapes régénérées pour éviter toute collision d'id avec les
+    // étapes déjà complétées, et les faire dépendre du dernier travail préservé.
+    const completedIds = completedStages.map((s) => s.id);
+    const reindexed: BrainStage[] = regenerated.map((s, i) => {
+      const newId = `replan${replanIndex}-${i + 1}-${s.agentRole}`;
+      return { ...s, id: newId, status: "pending" as const, result: undefined };
+    });
+    // Remapper les dépendances internes (anciennes → nouvelles) au sein du sous-plan
+    const idMap = new Map<string, string>();
+    regenerated.forEach((s, i) => idMap.set(s.id, reindexed[i].id));
+    for (const s of reindexed) {
+      s.dependsOn = (s.dependsOn ?? [])
+        .map((d) => idMap.get(d))
+        .filter((d): d is string => Boolean(d));
+      // La première étape du sous-plan reprend après le travail déjà validé
+      if (s.dependsOn.length === 0 && completedIds.length > 0) {
+        s.dependsOn = [completedIds[completedIds.length - 1]];
+      }
+    }
+
+    // Nouveau plan = étapes complétées préservées + sous-graphe régénéré
+    plan.stages = [...completedStages, ...reindexed];
+
+    // Revalider le plan reconstruit
+    const validation = this.validator.validate(plan);
+    if (!validation.ok) {
+      log.error(`Sous-graphe régénéré invalide : ${validation.issues.join(" ; ")}`);
+      return false;
+    }
+    plan.mermaid = this.validator.toMermaid(plan);
+    plan.status = "executing";
+    return true;
   }
 
   /**

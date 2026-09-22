@@ -113,6 +113,8 @@ export { GoalUnderstandingEngine } from "./brain/GoalUnderstandingEngine.js";
 export { DynamicPlanner } from "./brain/DynamicPlanner.js";
 export { BrainVerifier } from "./brain/BrainVerifier.js";
 export { BrainCorrectionLoop } from "./brain/BrainCorrectionLoop.js";
+export { BrainPlanValidator } from "./brain/BrainPlanValidator.js";
+export { BrainScheduler } from "./brain/BrainScheduler.js";
 export type {
   BrainGoalInput,
   GoalUnderstanding,

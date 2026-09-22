@@ -226,6 +226,7 @@ Le bot applique notamment :
 - Gestion de documents.
 - Intégration GitHub.
 - Checkpoints Git et rollback.
+- Liste d'exclusion `.leannaignore` (chemins interdits en écriture à l'agent), éditable depuis l'explorateur.
 - Panel PM2.
 - Contrôle à distance via Telegram.
 
@@ -299,6 +300,34 @@ Puis :
 ```ts
 mission_dryrun_report()
 ```
+
+### Liste d'exclusion de chemins (`.leannaignore`)
+
+Un fichier `.leannaignore` placé à la racine du projet définit les dossiers et fichiers que l'agent ne peut **jamais** modifier (écriture, création, suppression, renommage). C'est un complément aux protections en dur (`.git`, `node_modules`…), entièrement contrôlé par l'utilisateur.
+
+Le format est proche de `.gitignore` :
+
+```gitignore
+# Un chemin par ligne, relatif à la racine du projet
+secrets/                 # bloque le dossier et tout son contenu
+config/*.prod.json       # * = un segment (hors /)
+docs/**                  # ** = récursif
+!docs/CONTRIBUTING.md     # ! = exception (ré-autorise un chemin)
+```
+
+- Un dossier listé bloque tout son contenu récursivement.
+- La dernière règle correspondante l'emporte (placez les `!` après).
+- Les modifications prennent effet immédiatement, sans redémarrage.
+- Le fichier est **miroité dans la sandbox** : la copie isolée sur laquelle l'agent travaille reflète la même liste d'exclusion.
+
+La liste est éditable via un **modal accessible depuis le header de l'explorateur de fichiers** (icône bouclier barré), ou directement via l'API :
+
+```text
+GET  /api/safeguards/ignore      # lit le contenu + l'aperçu des règles
+POST /api/safeguards/ignore      # enregistre le contenu { content: string }
+```
+
+Un modèle documenté est fourni dans [`.leannaignore.example`](.leannaignore.example).
 
 ---
 

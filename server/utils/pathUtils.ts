@@ -32,6 +32,17 @@ export {
 } from "../security.js";
 
 export {
+  LEANNAIGNORE_FILENAME,
+  isIgnoredForWrite,
+  loadIgnoreRules,
+  parseIgnoreContent,
+  compileIgnorePattern,
+  getIgnoreFilePath,
+  clearIgnoreCache,
+  type IgnoreRule,
+} from "./leannaignore.js";
+
+export {
   isSandboxActive,
   getSandboxRoot,
   assertSandboxReady,
