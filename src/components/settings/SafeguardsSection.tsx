@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, History, FileWarning, RotateCcw, Play, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { ShieldCheck, History, FileWarning, RotateCcw, Play, CheckCircle2, XCircle, Clock, Ban, Save, FolderLock } from 'lucide-react';
 import { Section, Field, ToggleSwitch } from './SettingsPrimitives.js';
+
+interface IgnoreRulePreview {
+  pattern: string;
+  negated: boolean;
+}
 
 interface Checkpoint {
   hash: string;
@@ -33,6 +38,14 @@ export function SafeguardsSection() {
   const [loadingCheckpoints, setLoadingCheckpoints] = useState(false);
   const [validationStatus, setValidationStatus] = useState<'idle' | 'running' | 'pass' | 'fail'>('idle');
   const [saving, setSaving] = useState(false);
+
+  // ── .leannaignore (liste d'exclusion écriture) ──
+  const [ignoreContent, setIgnoreContent] = useState('');
+  const [ignoreSaved, setIgnoreSaved] = useState('');
+  const [ignoreRules, setIgnoreRules] = useState<IgnoreRulePreview[]>([]);
+  const [ignoreStatus, setIgnoreStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [noProject, setNoProject] = useState(false);
+
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -40,6 +53,7 @@ export function SafeguardsSection() {
     hasFetched.current = true;
     fetchConfig();
     fetchCheckpoints();
+    fetchIgnore();
   }, []);
 
   const fetchConfig = async () => {
@@ -101,6 +115,52 @@ export function SafeguardsSection() {
     } catch { /* handled by UI */ }
   };
 
+  const fetchIgnore = async () => {
+    try {
+      const res = await fetch('/api/safeguards/ignore');
+      // 409 = aucun projet actif — on affiche un message dédié plutôt qu'une erreur.
+      if (res.status === 409) {
+        setNoProject(true);
+        return;
+      }
+      if (res.ok) {
+        setNoProject(false);
+        const data = await res.json();
+        setIgnoreContent(data.content ?? '');
+        setIgnoreSaved(data.content ?? '');
+        if (Array.isArray(data.rules)) setIgnoreRules(data.rules);
+      }
+    } catch { /* use empty */ }
+  };
+
+  const saveIgnore = async () => {
+    if (noProject) return;
+    setIgnoreStatus('saving');
+    try {
+      const res = await fetch('/api/safeguards/ignore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: ignoreContent }),
+      });
+      if (res.status === 409) {
+        setNoProject(true);
+        setIgnoreStatus('idle');
+        return;
+      }
+      if (!res.ok) throw new Error('save failed');
+      const data = await res.json();
+      if (Array.isArray(data.rules)) setIgnoreRules(data.rules);
+      setIgnoreSaved(ignoreContent);
+      setIgnoreStatus('saved');
+      setTimeout(() => setIgnoreStatus('idle'), 3000);
+    } catch {
+      setIgnoreStatus('error');
+      setTimeout(() => setIgnoreStatus('idle'), 4000);
+    }
+  };
+
+  const ignoreDirty = ignoreContent !== ignoreSaved;
+
   return (
     <Section
       icon={ShieldCheck}
@@ -154,6 +214,121 @@ export function SafeguardsSection() {
             </span>
           ))}
         </div>
+      </Field>
+
+      {/* ─── .leannaignore — liste d'exclusion écriture ─── */}
+      <Field
+        label="Chemins interdits (.leannaignore)"
+        hint="Dossiers et motifs de fichiers que l'agent ne peut jamais modifier. Un chemin par ligne (format proche de .gitignore : *, **, ! pour une exception)."
+      >
+        {noProject ? (
+          <div
+            className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs"
+            style={{
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border-base)',
+              color: 'var(--text-muted)',
+            }}
+          >
+            <FolderLock className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
+            Sélectionnez d'abord un projet (workspace) pour définir sa liste d'exclusion.
+          </div>
+        ) : (
+        <div className="flex flex-col gap-2 w-full">
+          <textarea
+            value={ignoreContent}
+            onChange={e => setIgnoreContent(e.target.value)}
+            spellCheck={false}
+            rows={8}
+            placeholder={'# Ex :\nsecrets/\nconfig/*.prod.json\ndocs/**\n!docs/CONTRIBUTING.md'}
+            className="w-full rounded-xl px-3 py-2 text-xs font-mono outline-none transition-all duration-150 resize-y custom-scrollbar"
+            style={{
+              backgroundColor: 'var(--bg-input)',
+              border: '1px solid var(--border-base)',
+              color: 'var(--text-primary)',
+              minHeight: '9rem',
+            }}
+            onFocus={e => {
+              e.currentTarget.style.borderColor = 'var(--accent-primary)';
+              e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent-subtle)';
+            }}
+            onBlur={e => {
+              e.currentTarget.style.borderColor = 'var(--border-base)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          />
+
+          {/* Aperçu des règles interprétées */}
+          {ignoreRules.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {ignoreRules.map((r, i) => (
+                <span
+                  key={`${r.pattern}-${i}`}
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-mono"
+                  style={{
+                    backgroundColor: r.negated
+                      ? 'color-mix(in srgb, var(--color-success) 10%, transparent)'
+                      : 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+                    border: `1px solid ${r.negated
+                      ? 'color-mix(in srgb, var(--color-success) 25%, transparent)'
+                      : 'color-mix(in srgb, var(--color-error) 25%, transparent)'}`,
+                    color: r.negated ? 'var(--color-success)' : 'var(--color-error)',
+                  }}
+                  title={r.negated ? 'Exception (ré-autorisé)' : 'Interdit en écriture'}
+                >
+                  {r.negated ? <FolderLock className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
+                  {r.negated ? `!${r.pattern}` : r.pattern}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <motion.button
+              type="button"
+              onClick={saveIgnore}
+              disabled={ignoreStatus === 'saving' || !ignoreDirty}
+              whileHover={{ scale: ignoreDirty ? 1.01 : 1 }}
+              whileTap={{ scale: ignoreDirty ? 0.98 : 1 }}
+              className="flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all duration-200 disabled:opacity-50"
+              style={{
+                backgroundColor: ignoreStatus === 'saved'
+                  ? 'color-mix(in srgb, var(--color-success) 12%, transparent)'
+                  : ignoreStatus === 'error'
+                  ? 'color-mix(in srgb, var(--color-error) 12%, transparent)'
+                  : 'var(--accent-subtle)',
+                border: `1px solid ${
+                  ignoreStatus === 'saved' ? 'color-mix(in srgb, var(--color-success) 30%, transparent)'
+                  : ignoreStatus === 'error' ? 'color-mix(in srgb, var(--color-error) 30%, transparent)'
+                  : 'var(--accent-primary)'
+                }`,
+                color: ignoreStatus === 'saved' ? 'var(--color-success)'
+                  : ignoreStatus === 'error' ? 'var(--color-error)'
+                  : 'var(--accent-primary)',
+              }}
+            >
+              {ignoreStatus === 'saving' && (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                  className="w-3.5 h-3.5 border-2 rounded-full"
+                  style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }}
+                />
+              )}
+              {ignoreStatus === 'saved' ? <CheckCircle2 className="w-3.5 h-3.5" />
+                : ignoreStatus === 'error' ? <XCircle className="w-3.5 h-3.5" />
+                : <Save className="w-3.5 h-3.5" />}
+              {ignoreStatus === 'saving' ? 'Enregistrement…'
+                : ignoreStatus === 'saved' ? 'Enregistré ✓'
+                : ignoreStatus === 'error' ? 'Échec — réessayer'
+                : 'Enregistrer la liste'}
+            </motion.button>
+            {ignoreDirty && ignoreStatus === 'idle' && (
+              <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Modifications non enregistrées</span>
+            )}
+          </div>
+        </div>
+        )}
       </Field>
 
       {/* ─── Manual validation trigger ─── */}

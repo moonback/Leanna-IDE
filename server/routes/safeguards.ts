@@ -1,7 +1,13 @@
 import { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
-import { SELF_ROOT, CRITICAL_FILES } from '../utils/selfRoot.js';
+import { SELF_ROOT, CRITICAL_FILES, hasProject } from '../utils/selfRoot.js';
+import {
+  LEANNAIGNORE_FILENAME,
+  getIgnoreFilePath,
+  parseIgnoreContent,
+  clearIgnoreCache,
+} from '../utils/leannaignore.js';
 
 const router = Router();
 
@@ -70,7 +76,7 @@ router.post('/config', (req: Request, res: Response) => {
 // GET /api/safeguards/checkpoints
 router.get('/checkpoints', async (req: Request, res: Response) => {
   try {
-    const { listCheckpoints } = await import('../utils/checkpoint');
+    const { listCheckpoints } = await import('../utils/checkpoint.js');
     const count = parseInt(req.query.limit as string) || 5;
     const checkpoints = await listCheckpoints(count);
     res.json({ checkpoints });
@@ -82,7 +88,7 @@ router.get('/checkpoints', async (req: Request, res: Response) => {
 // POST /api/safeguards/validate
 router.post('/validate', async (_req: Request, res: Response) => {
   try {
-    const { validateBuild } = await import('../utils/checkpoint');
+    const { validateBuild } = await import('../utils/checkpoint.js');
     const result = await validateBuild();
     res.json({ success: result.valid, errors: result.errors });
   } catch (e: any) {
@@ -93,11 +99,74 @@ router.post('/validate', async (_req: Request, res: Response) => {
 // POST /api/safeguards/rollback
 router.post('/rollback', async (req: Request, res: Response) => {
   try {
-    const { rollbackToCheckpoint } = await import('../utils/checkpoint');
+    const { rollbackToCheckpoint } = await import('../utils/checkpoint.js');
     const { hash } = req.body as { hash?: string };
     if (!hash) return res.status(400).json({ error: 'hash est requis.' });
     const ok = await rollbackToCheckpoint(hash);
     res.json({ success: ok });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Liste d'exclusion .leannaignore ──────────────────────────────────────────
+//
+// Dossiers/motifs de fichiers interdits en écriture à l'agent. Le fichier vit
+// à la racine du projet actif (SELF_ROOT/.leannaignore). Les modifications
+// prennent effet immédiatement (isWriteForbidden relit via cache mtime).
+
+// Limite de taille pour éviter d'écrire un fichier démesuré depuis l'UI.
+const MAX_IGNORE_BYTES = 64 * 1024; // 64 Kio
+
+// GET /api/safeguards/ignore
+router.get('/ignore', (_req: Request, res: Response) => {
+  if (!hasProject()) {
+    return res.status(409).json({ error: 'Aucun projet actif.' });
+  }
+  const ignorePath = getIgnoreFilePath(SELF_ROOT);
+  try {
+    let content = '';
+    if (fs.existsSync(ignorePath)) {
+      content = fs.readFileSync(ignorePath, 'utf-8');
+    }
+    const rules = parseIgnoreContent(content);
+    res.json({
+      exists: fs.existsSync(ignorePath),
+      filename: LEANNAIGNORE_FILENAME,
+      content,
+      // Aperçu résolu des règles (motif + négation) pour affichage UI.
+      rules: rules.map((r) => ({ pattern: r.pattern, negated: r.negated })),
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/safeguards/ignore  { content: string }
+router.post('/ignore', (req: Request, res: Response) => {
+  if (!hasProject()) {
+    return res.status(409).json({ error: 'Aucun projet actif.' });
+  }
+  const { content } = req.body as { content?: unknown };
+  if (typeof content !== 'string') {
+    return res.status(400).json({ error: 'Le champ "content" (string) est requis.' });
+  }
+  if (Buffer.byteLength(content, 'utf-8') > MAX_IGNORE_BYTES) {
+    return res.status(413).json({ error: 'Fichier .leannaignore trop volumineux (max 64 Kio).' });
+  }
+
+  const ignorePath = getIgnoreFilePath(SELF_ROOT);
+  try {
+    // Normalise la fin de fichier avec un saut de ligne final unique.
+    const normalized = content.replace(/\r\n/g, '\n').replace(/\s*$/, '') + '\n';
+    fs.writeFileSync(ignorePath, normalized, 'utf-8');
+    // Forcer la relecture immédiate par isWriteForbidden.
+    clearIgnoreCache(SELF_ROOT);
+    const rules = parseIgnoreContent(normalized);
+    res.json({
+      status: 'success',
+      rules: rules.map((r) => ({ pattern: r.pattern, negated: r.negated })),
+    });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
