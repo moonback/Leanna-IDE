@@ -65,7 +65,9 @@ function header(title) {
 }
 
 async function post(path, payload) {
-  const headers = { "Content-Type": "application/json" };
+  // Connection: close empêche undici de garder des sockets keep-alive ouverts,
+  // ce qui évite l'assertion UV_HANDLE_CLOSING de libuv à la fermeture (Windows).
+  const headers = { "Content-Type": "application/json", Connection: "close" };
   // Le serveur attend le header X-Leanna-Token (voir authenticateRequest).
   if (TOKEN) headers["X-Leanna-Token"] = TOKEN;
 
@@ -175,9 +177,10 @@ async function runExecute() {
 
   console.log(c.green("\n✅ Smoke-test terminé.\n"));
 
-  // Sortie explicite : évite l'assertion UV_HANDLE_CLOSING de undici/fetch
-  // qui peut survenir sous Windows quand des sockets keep-alive restent ouverts
-  // au moment où le process se termine naturellement.
+  // Laisser un court instant à undici pour fermer ses sockets (Connection:close),
+  // puis sortir. Combiné à l'en-tête Connection:close, cela évite l'assertion
+  // UV_HANDLE_CLOSING de libuv observée sous Windows à la fermeture du process.
+  await new Promise((resolve) => setTimeout(resolve, 100));
   process.exit(0);
 })().catch((err) => {
   console.error(c.red(`\n❌ Erreur inattendue : ${err?.message ?? err}`));

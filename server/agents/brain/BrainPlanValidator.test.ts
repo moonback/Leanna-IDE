@@ -165,10 +165,17 @@ describe("BrainPlanValidator.toMermaid", () => {
 
   it("échappe les caractères problématiques dans les labels", () => {
     const stage = makeStage("s1", "coder");
-    stage.title = 'Titre avec "guillemets" et [crochets]';
+    stage.title = 'Titre avec "guillemets" et [crochets] (parenthèses) {accolades} <chevrons> |pipe|';
     const plan = makePlan([stage]);
     const mermaid = validator.toMermaid(plan);
-    assert.ok(!mermaid.includes('["Titre avec "guillemets"'), "Les guillemets doubles ne doivent pas casser le label");
-    assert.ok(!/\[crochets\]/.test(mermaid.replace(/^\s*\w+\["/gm, "")), "Les crochets internes doivent être retirés");
+
+    // Le contenu du label (entre les guillemets du nœud) ne doit plus contenir
+    // de métacaractère de forme Mermaid ni de guillemet double.
+    const labelMatch = mermaid.match(/\["([^\n]*)"\]/);
+    assert.ok(labelMatch, "Un label entre guillemets doit être présent");
+    const label = labelMatch![1];
+    assert.ok(!label.includes('"'), "Pas de guillemet double dans le label");
+    assert.ok(!/[\[\]{}<>|]/.test(label), "Pas de crochet/accolade/chevron/pipe dans le label");
+    assert.ok(!/[()]/.test(label), "Pas de parenthèse ASCII (remplacée par pleine largeur)");
   });
 });

@@ -137,13 +137,22 @@ export class BrainPlanValidator {
   }
 
   /**
-   * Échappe les caractères problématiques dans un label Mermaid entre guillemets.
+   * Échappe les caractères problématiques dans un label Mermaid.
+   *
+   * Même entre guillemets doubles, Mermaid v11 casse sur les caractères qui
+   * servent de délimiteurs de forme de nœud : crochets, parenthèses, accolades,
+   * chevrons et barre verticale. On les remplace par des équivalents sûrs.
    */
   private escapeMermaidLabel(label: string): string {
     return label
-      .replace(/"/g, "'")
-      .replace(/[\[\]]/g, "")
       .replace(/[\r\n]+/g, " ")
+      .replace(/"/g, "'")
+      .replace(/[\[\]{}<>|]/g, " ")
+      // Parenthèses pleine largeur : visuellement identiques, mais pas des
+      // métacaractères de forme de nœud pour Mermaid.
+      .replace(/\(/g, "（")
+      .replace(/\)/g, "）")
+      .replace(/\s+/g, " ")
       .trim();
   }
 
