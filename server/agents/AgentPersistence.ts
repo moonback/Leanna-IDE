@@ -359,7 +359,13 @@ export class AgentPersistence {
 CREATE TABLE IF NOT EXISTS agent_tasks (
   id                  UUID PRIMARY KEY,
   orchestration_id    UUID REFERENCES agent_orchestrations(id) ON DELETE SET NULL,
-  role                TEXT NOT NULL CHECK (role IN ('coder','test','docs','refactor','security','review','architect')),
+  -- 'role' est volontairement un TEXT libre (sans CHECK) : l'ensemble des rôles
+  -- est ouvert. En plus des rôles statiques (coder, researcher, debugger, tester,
+  -- reviewer, vision, writer, planner, …), le DynamicPlanner et l'Agent Builder
+  -- peuvent enregistrer des rôles dynamiques à l'exécution. La validation/normalisation
+  -- se fait côté application (normalizeAgentRole + schémas Zod), pas via une liste
+  -- figée en base qui casserait à chaque nouveau rôle.
+  role                TEXT NOT NULL,
   title               TEXT NOT NULL,
   description         TEXT NOT NULL,
   priority            TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low','medium','high','critical')),
@@ -373,6 +379,10 @@ CREATE TABLE IF NOT EXISTS agent_tasks (
   completed_at        TIMESTAMPTZ,
   timeout_ms          INTEGER
 );
+
+-- Migration idempotente pour les bases déjà créées avec l'ancienne contrainte
+-- CHECK (role IN (...)) qui rejetait 'researcher', 'debugger', 'tester', etc.
+ALTER TABLE agent_tasks DROP CONSTRAINT IF EXISTS agent_tasks_role_check;
 
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_status       ON agent_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_role         ON agent_tasks(role);

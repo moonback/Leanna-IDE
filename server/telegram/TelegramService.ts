@@ -291,20 +291,24 @@ export class TelegramService {
       this.bot.command("cmd", async (ctx) => {
         const commandText = ctx.match?.trim();
         if (!commandText) {
-          await ctx.reply("Usage : `/cmd <votre commande>`\nExemple : `/cmd git status`", { parse_mode: "Markdown" });
+          await ctx.reply(
+            "Usage : `/cmd <votre commande>`\nExemple : `/cmd git status`\n\n" +
+            "_Seules des commandes simples sont autorisées : pas d'enchaînement (`&&`, `;`), de pipe (`|`), de redirection (`>`) ni de substitution (`$(…)`)._",
+            { parse_mode: "Markdown" }
+          );
           return;
         }
 
-        // Filtre de sécurité basique
-        const forbiddenPatterns = [
-          /\brm\s+-rf\s+[\/\\]/i,
-          /\bformat\s+[a-z]:/i,
-          /\bdel\s+\/s\s+\/q/i,
-          /\bshutdown\b/i,
-        ];
-
-        if (forbiddenPatterns.some((pattern) => pattern.test(commandText))) {
-          await ctx.reply("⚠️ Commande rejetée par mesure de sécurité.");
+        // ─── Filtre de sécurité ────────────────────────────────────────────
+        // Une liste noire ne peut jamais être exhaustive. On refuse donc d'abord
+        // toute méta-syntaxe shell qui permet d'enchaîner/piper/rediriger des
+        // commandes (le vecteur de contournement le plus courant : `cmd1 && cmd2`,
+        // `curl … | sh`, `$(…)`, redirections), puis quelques motifs franchement
+        // destructeurs. C'est de la défense en profondeur, pas une garantie :
+        // /cmd reste réservé à des commandes simples dans la racine projet.
+        const rejection = this.assessCommandSafety(commandText);
+        if (rejection) {
+          await this.replySafe(ctx, `⚠️ Commande rejetée par mesure de sécurité : ${rejection}`);
           return;
         }
 
@@ -322,7 +326,7 @@ export class TelegramService {
           await this.sendLongMessage(ctx.chat.id, `📋 *Résultat :*\n\`\`\`\n${output}\n\`\`\``, { parse_mode: "Markdown" });
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          await ctx.reply(`❌ *Erreur d'exécution :*\n\`\`\`\n${message}\n\`\`\``, { parse_mode: "Markdown" });
+          await this.replySafe(ctx, `❌ *Erreur d'exécution :*\n\`\`\`\n${message}\n\`\`\``, { parse_mode: "Markdown" });
         }
       });
 
@@ -334,21 +338,47 @@ export class TelegramService {
           return;
         }
 
-        await ctx.reply(`🚀 *Mission agent acceptée !*\nMission : _"${taskDescription}"_\nJe vous notifie dès que l'exécution avance.`, { parse_mode: "Markdown" });
+        const chatId = ctx.chat.id;
+        await this.replySafe(
+          ctx,
+          `🚀 *Mission agent acceptée !*\nMission : _"${this.escapeMarkdown(taskDescription)}"_\nJe passe par le cerveau de Leanna (compréhension de l'objectif + planification dynamique) et je vous notifie dès que c'est terminé.`,
+          { parse_mode: "Markdown" }
+        );
 
-        try {
-          // Créer une orchestration ou tâche
-          const task = await agentOrchestrator.delegateTask({
-            role: "coder",
-            title: `[Telegram] ${taskDescription.slice(0, 50)}`,
-            description: taskDescription,
-            priority: "medium",
+        // On passe par le "cerveau" (GoalUnderstandingEngine + DynamicPlanner) comme
+        // le fait la route web /brain/execute et le skill agents — au lieu de forcer
+        // le rôle "coder". brainExecute() exécute la mission complète jusqu'au bout,
+        // donc on la lance en arrière-plan et on notifie à la fin (le handler de
+        // commande Telegram ne doit pas bloquer le temps d'une mission entière).
+        agentOrchestrator
+          .brainExecute({ goal: taskDescription, mode: "auto" })
+          .then(async (result) => {
+            const header = result.success
+              ? `✅ *Mission terminée*`
+              : `⚠️ *Mission terminée avec des réserves*`;
+            let msg =
+              `${header}\n` +
+              `*Objectif :* ${this.escapeMarkdown(taskDescription)}\n` +
+              `*Domaine :* \`${result.understanding.domain}\`\n` +
+              `*Étapes :* ${result.stages.length} — *Durée :* ${Math.round(result.totalDurationMs / 1000)}s\n`;
+            if (result.summary) msg += `\n*Résumé :*\n${result.summary}\n`;
+            if (result.filesModified?.length) {
+              msg +=
+                `\n*Fichiers modifiés :*\n` +
+                result.filesModified.map((f: string) => `• \`${f}\``).join("\n") +
+                `\n`;
+            }
+            if (result.deliverables?.length) {
+              msg += `\n*Livrables :*\n${result.deliverables.map((d: string) => `• ${d}`).join("\n")}\n`;
+            }
+            await this.sendLongMessage(chatId, msg, { parse_mode: "Markdown" });
+          })
+          .catch(async (e) => {
+            await this.sendLongMessage(
+              chatId,
+              `❌ Erreur lors de l'exécution de la mission : ${(e as Error).message}`
+            );
           });
-
-          await ctx.reply(`✅ Tâche initialisée (ID: \`${task.id}\`). L'agent travaille dessus...`, { parse_mode: "Markdown" });
-        } catch (e) {
-          await ctx.reply(`❌ Erreur lors du lancement de l'agent : ${(e as Error).message}`);
-        }
       });
 
       // /tasks — Liste les tâches agents (optionnellement filtrées par statut)
@@ -506,7 +536,7 @@ export class TelegramService {
           );
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          await ctx.reply(`❌ Impossible de lire \`${relPath}\` : ${message}`, { parse_mode: "Markdown" });
+          await this.replySafe(ctx, `❌ Impossible de lire \`${relPath}\` : ${message}`, { parse_mode: "Markdown" });
         }
       });
 
@@ -557,7 +587,7 @@ export class TelegramService {
           );
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          await ctx.reply(`❌ Impossible de lister \`${relPath}\` : ${message}`, { parse_mode: "Markdown" });
+          await this.replySafe(ctx, `❌ Impossible de lister \`${relPath}\` : ${message}`, { parse_mode: "Markdown" });
         }
       });
 
@@ -638,13 +668,14 @@ export class TelegramService {
         // Avec argument : changer de projet actif
         try {
           const newRoot = setSelfRoot(target);
-          await ctx.reply(
+          await this.replySafe(
+            ctx,
             `✅ *Projet actif changé*\n\`${newRoot}\``,
             { parse_mode: "Markdown" }
           );
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          await ctx.reply(`❌ Impossible de changer de projet : ${message}`, { parse_mode: "Markdown" });
+          await this.replySafe(ctx, `❌ Impossible de changer de projet : ${message}`, { parse_mode: "Markdown" });
         }
       });
 
@@ -707,7 +738,7 @@ export class TelegramService {
           await this.sendLongMessage(chatId, replyText);
         } catch (err) {
           console.error("[Telegram] Erreur lors de la réponse IA :", err);
-          await ctx.reply(`⚠️ Désolé, une erreur est survenue lors de la génération de ma réponse : ${(err as Error).message}`);
+          await this.replySafe(ctx, `⚠️ Désolé, une erreur est survenue lors de la génération de ma réponse : ${(err as Error).message}`);
         }
       });
 
@@ -760,6 +791,45 @@ export class TelegramService {
    * toute évasion hors de la racine (protection contre le path traversal `../`).
    * Retourne le chemin absolu résolu, ou `null` si le chemin sort de la racine.
    */
+  /**
+   * Évalue si une commande /cmd est acceptable. Retourne `null` si elle est
+   * autorisée, sinon une courte raison de refus.
+   *
+   * Stratégie : refuser toute méta-syntaxe shell qui permet de composer/masquer
+   * des commandes (chaînage, pipe, substitution, redirection), puis quelques
+   * motifs explicitement destructeurs. C'est volontairement conservateur.
+   */
+  private assessCommandSafety(command: string): string | null {
+    // 1. Méta-caractères shell qui permettent d'échapper à la commande simple.
+    //    Ex: `git status && rm -rf .`, `curl x | sh`, `cat $(…)`, `echo > .env`.
+    const shellMetaChars = /(\|\||&&|[;|`]|\$\(|\$\{|>>|>|<|\n|\r)/;
+    if (shellMetaChars.test(command)) {
+      return "les enchaînements, pipes, redirections et substitutions shell ne sont pas autorisés.";
+    }
+
+    // 2. Motifs explicitement dangereux (dans n'importe quelle forme).
+    const dangerous: Array<{ re: RegExp; why: string }> = [
+      { re: /\brm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r|-r\b.*-f|-f\b.*-r)/i, why: "suppression récursive forcée (rm -rf)." },
+      { re: /\brm\s+-[a-z]*r/i, why: "suppression récursive (rm -r)." },
+      { re: /\b(rmdir|rd)\s+\/s/i, why: "suppression récursive de dossier." },
+      { re: /\bdel\s+\/[sq]/i, why: "suppression en masse (del /s /q)." },
+      { re: /\bformat\s+[a-z]:/i, why: "formatage de disque." },
+      { re: /\b(shutdown|reboot|halt|poweroff)\b/i, why: "arrêt/redémarrage du système." },
+      { re: /\b(mkfs|dd)\b/i, why: "écriture disque bas niveau." },
+      { re: /:\(\)\s*\{/,  why: "fork bomb suspectée." },
+      { re: /\b(curl|wget|iwr|invoke-webrequest)\b/i, why: "téléchargement réseau (risque de curl | sh)." },
+      { re: /(^|[\\\/\s])\.env(\.|\b)/i, why: "accès à un fichier de secrets (.env)." },
+      { re: /\b(id_rsa|id_ed25519|\.pem|credentials|secrets?)\b/i, why: "accès à des identifiants/clés." },
+      { re: /\bchmod\s+-R\b/i, why: "modification récursive de permissions." },
+    ];
+
+    for (const { re, why } of dangerous) {
+      if (re.test(command)) return why;
+    }
+
+    return null;
+  }
+
   private resolveInsideRoot(rootDir: string, relPath: string): string | null {
     const normalizedRoot = path.resolve(rootDir);
     const resolved = path.resolve(normalizedRoot, relPath);
@@ -775,27 +845,64 @@ export class TelegramService {
   /**
    * Découpe et envoie les messages trop longs (> 4000 caractères)
    */
-  public async sendLongMessage(
-    chatId: number | string,
+  /**
+   * Échappe les caractères spéciaux du Markdown "legacy" de Telegram (`_ * \` [`)
+   * pour un texte utilisateur interpolé dans un message formaté, afin d'éviter
+   * qu'un titre/description contenant `_`, `*` ou `` ` `` ne casse le rendu.
+   */
+  private escapeMarkdown(text: string): string {
+    return text.replace(/([_*`\[])/g, "\\$1");
+  }
+
+  /**
+   * Wrapper autour de ctx.reply qui, en cas d'échec de parsing Markdown/HTML,
+   * renvoie le même texte en clair. Filet de sécurité pour les réponses directes
+   * qui injectent du texte utilisateur (missions, erreurs, chemins…).
+   */
+  private async replySafe(
+    ctx: any,
     text: string,
-    options?: { parse_mode?: "Markdown" | "HTML" }
+    options?: { parse_mode?: "Markdown" | "HTML"; disable_notification?: boolean }
   ): Promise<void> {
-    if (!this.bot) {
-      throw new Error("Bot Telegram non initialisé.");
+    try {
+      await ctx.reply(text, options);
+    } catch {
+      const fallback = options?.disable_notification ? { disable_notification: true } : undefined;
+      await ctx.reply(text, fallback);
     }
+  }
 
-    const MAX_CHUNK = 3900;
+  /**
+   * Applique le réglage global `notificationsEnabled`. Lorsqu'il est désactivé,
+   * on force `disable_notification: true` : le message est bien livré (il a été
+   * demandé explicitement), mais sans faire sonner/vibrer le téléphone. Un
+   * appelant qui a déjà demandé un envoi silencieux le reste.
+   */
+  private applyNotificationPreference<T extends { disable_notification?: boolean }>(
+    options?: T
+  ): T {
+    const merged = { ...(options || {}) } as T;
+    if (!this.config.notificationsEnabled) {
+      merged.disable_notification = true;
+    }
+    return merged;
+  }
+
+  /** Longueur maximale d'un morceau de message Telegram (limite réelle : 4096). */
+  private static readonly MAX_CHUNK = 3900;
+
+  /**
+   * Découpe un texte en morceaux <= MAX_CHUNK, en préférant couper sur un saut
+   * de ligne proche de la fin du morceau pour ne pas casser un paragraphe.
+   * Source unique de vérité pour sendLongMessage et sendLongMessageWithReturn.
+   */
+  private splitMessage(text: string): string[] {
+    const MAX_CHUNK = TelegramService.MAX_CHUNK;
     if (text.length <= MAX_CHUNK) {
-      try {
-        await this.bot.api.sendMessage(chatId, text, options);
-      } catch (err) {
-        // En cas d'erreur de parsing Markdown, envoyer en texte brut
-        await this.bot.api.sendMessage(chatId, text);
-      }
-      return;
+      return [text];
     }
 
-    // Découpage propre par paragraphes ou lignes
+    const chunks: string[] = [];
     let remaining = text;
     while (remaining.length > 0) {
       let chunkSize = Math.min(MAX_CHUNK, remaining.length);
@@ -805,13 +912,31 @@ export class TelegramService {
           chunkSize = lastNewline + 1;
         }
       }
-      const chunk = remaining.slice(0, chunkSize);
+      chunks.push(remaining.slice(0, chunkSize));
       remaining = remaining.slice(chunkSize);
+    }
+    return chunks;
+  }
 
+  public async sendLongMessage(
+    chatId: number | string,
+    text: string,
+    options?: { parse_mode?: "Markdown" | "HTML"; disable_notification?: boolean }
+  ): Promise<void> {
+    if (!this.bot) {
+      throw new Error("Bot Telegram non initialisé.");
+    }
+
+    const fallbackOptions = options?.disable_notification
+      ? { disable_notification: true }
+      : undefined;
+
+    for (const chunk of this.splitMessage(text)) {
       try {
-        await this.bot.api.sendMessage(chatId, chunk, options);
+        await this.bot.api.sendMessage(chatId, chunk, options as any);
       } catch {
-        await this.bot.api.sendMessage(chatId, chunk);
+        // En cas d'erreur de parsing Markdown, renvoyer le morceau en texte brut
+        await this.bot.api.sendMessage(chatId, chunk, fallbackOptions as any);
       }
     }
   }
@@ -865,8 +990,13 @@ export class TelegramService {
       return { success: false, chatId: String(chatId), error: "Le texte du message est vide." };
     }
 
+    // Respecter le réglage "notifications". On ne bloque PAS l'envoi (ce serait un
+    // faux "success" trompeur pour un message adressé explicitement), mais quand
+    // les notifications sont désactivées on force un envoi silencieux.
+    const effectiveOptions = this.applyNotificationPreference(options);
+
     try {
-      const sent = await this.sendLongMessageWithReturn(chatId, text, options);
+      const sent = await this.sendLongMessageWithReturn(chatId, text, effectiveOptions);
       return {
         success: true,
         chatId: String(chatId),
@@ -889,32 +1019,14 @@ export class TelegramService {
   ): Promise<any> {
     if (!this.bot) throw new Error("Bot Telegram non initialisé.");
 
-    const MAX_CHUNK = 3900;
-    if (text.length <= MAX_CHUNK) {
-      try {
-        return await this.bot.api.sendMessage(chatId, text, options as any);
-      } catch (err) {
-        return await this.bot.api.sendMessage(chatId, text, { disable_notification: options?.disable_notification } as any);
-      }
-    }
+    const fallbackOptions = { disable_notification: options?.disable_notification };
 
     let lastMsg: any = null;
-    let remaining = text;
-    while (remaining.length > 0) {
-      let chunkSize = Math.min(MAX_CHUNK, remaining.length);
-      if (chunkSize < remaining.length) {
-        const lastNewline = remaining.lastIndexOf("\n", chunkSize);
-        if (lastNewline > MAX_CHUNK * 0.7) {
-          chunkSize = lastNewline + 1;
-        }
-      }
-      const chunk = remaining.slice(0, chunkSize);
-      remaining = remaining.slice(chunkSize);
-
+    for (const chunk of this.splitMessage(text)) {
       try {
         lastMsg = await this.bot.api.sendMessage(chatId, chunk, options as any);
       } catch {
-        lastMsg = await this.bot.api.sendMessage(chatId, chunk, { disable_notification: options?.disable_notification } as any);
+        lastMsg = await this.bot.api.sendMessage(chatId, chunk, fallbackOptions as any);
       }
     }
     return lastMsg;
@@ -948,7 +1060,8 @@ export class TelegramService {
         return { success: false, chatId: String(chatId), error: "Source de la photo introuvable (URL invalide ou fichier inexistant)." };
       }
 
-      const result = await this.bot.api.sendPhoto(chatId, input as any, options as any);
+      const effectiveOptions = this.applyNotificationPreference(options);
+      const result = await this.bot.api.sendPhoto(chatId, input as any, effectiveOptions as any);
       return {
         success: true,
         chatId: String(chatId),
@@ -1044,9 +1157,11 @@ export class TelegramService {
       return result;
     }
 
+    const effectiveOptions = this.applyNotificationPreference(options);
+
     for (const recipient of recipients) {
       try {
-        await this.sendLongMessage(recipient.trim(), message, options);
+        await this.sendLongMessage(recipient.trim(), message, effectiveOptions);
         result.success++;
       } catch (e) {
         result.failed++;
@@ -1109,11 +1224,11 @@ export class TelegramService {
       return { success: false, chatId: String(chatId), error: "Aucun projet actif dans le workspace." };
     }
 
-    const fullPath = path.resolve(SELF_ROOT, relativePath);
-    const resolved = path.normalize(fullPath);
-    const root = path.normalize(SELF_ROOT);
-
-    if (!resolved.startsWith(root)) {
+    // Même vérification anti-path-traversal que resolveInsideRoot() : on compare
+    // avec un séparateur de fin pour éviter qu'un dossier voisin (ex: "projet-privé"
+    // vs racine "projet") ne passe le simple startsWith(root).
+    const resolved = this.resolveInsideRoot(SELF_ROOT, relativePath);
+    if (!resolved) {
       return { success: false, chatId: String(chatId), error: "Tentative d'accès en dehors du workspace refusée (sécurité)." };
     }
 
