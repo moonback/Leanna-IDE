@@ -318,6 +318,7 @@ docs/**                  # ** = récursif
 - Un dossier listé bloque tout son contenu récursivement.
 - La dernière règle correspondante l'emporte (placez les `!` après).
 - Les modifications prennent effet immédiatement, sans redémarrage.
+- Le fichier est **miroité dans la sandbox** : la copie isolée sur laquelle l'agent travaille reflète la même liste d'exclusion.
 
 La liste est éditable via un **modal accessible depuis le header de l'explorateur de fichiers** (icône bouclier barré), ou directement via l'API :
 

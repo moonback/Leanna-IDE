@@ -8,6 +8,7 @@ import {
   parseIgnoreContent,
   clearIgnoreCache,
 } from '../utils/leannaignore.js';
+import { isSandboxActive, getSandboxRoot } from '../utils/sandbox.js';
 
 const router = Router();
 
@@ -159,12 +160,31 @@ router.post('/ignore', (req: Request, res: Response) => {
   try {
     // Normalise la fin de fichier avec un saut de ligne final unique.
     const normalized = content.replace(/\r\n/g, '\n').replace(/\s*$/, '') + '\n';
+
+    // 1. Écriture dans le projet principal (source de vérité pour isWriteForbidden).
     fs.writeFileSync(ignorePath, normalized, 'utf-8');
-    // Forcer la relecture immédiate par isWriteForbidden.
     clearIgnoreCache(SELF_ROOT);
+
+    // 2. Miroir dans le sandbox actif, afin que la copie isolée sur laquelle
+    //    l'agent travaille reflète immédiatement la même liste d'exclusion.
+    let mirroredToSandbox = false;
+    if (isSandboxActive()) {
+      try {
+        const sandboxIgnorePath = getIgnoreFilePath(getSandboxRoot());
+        fs.writeFileSync(sandboxIgnorePath, normalized, 'utf-8');
+        clearIgnoreCache(getSandboxRoot());
+        mirroredToSandbox = true;
+      } catch (mirrorErr: any) {
+        // Le miroir sandbox est best-effort : l'échec ne doit pas casser
+        // l'enregistrement principal.
+        console.warn('[Safeguards] Miroir .leannaignore vers le sandbox échoué:', mirrorErr?.message);
+      }
+    }
+
     const rules = parseIgnoreContent(normalized);
     res.json({
       status: 'success',
+      mirroredToSandbox,
       rules: rules.map((r) => ({ pattern: r.pattern, negated: r.negated })),
     });
   } catch (e: any) {
