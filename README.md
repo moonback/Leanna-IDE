@@ -1,838 +1,737 @@
 # Leanna — AI Operating System
 
-Leanna est un environnement de développement augmenté par IA, conçu pour les développeurs qui veulent déléguer des tâches complexes à une IA multimodale en temps réel. Il intègre un éditeur de code (Monaco), un terminal interactif, un système d'agents autonomes avec un **cerveau central dynamique (Agent Brain)**, et une interaction vocale via l'API Gemini Live — le tout dans une application web ou desktop (Electron).
+> **Un IDE augmenté par IA pour déléguer, orchestrer et exécuter des tâches complexes directement dans votre workspace.**
 
-Il s'adresse aux développeurs solo et aux petites équipes qui souhaitent un assistant IA local, sécurisé, capable de lire, écrire et exécuter du code dans leur propre workspace, sans envoyer leurs fichiers vers des services tiers non contrôlés.
+Leanna combine un IDE Monaco, un terminal interactif, des agents autonomes, un **Agent Brain** capable de construire dynamiquement des plans d'exécution, une interaction vocale Gemini Live et un runtime autonome 24/7.
 
-![Build](https://img.shields.io/badge/build-passing-brightgreen) ![Version](https://img.shields.io/badge/version-1.1.0-blue) ![License](https://img.shields.io/badge/license-BUSL--1.1-orange) ![Node](https://img.shields.io/badge/node-%3E%3D20-green) ![Electron](https://img.shields.io/badge/electron-43-blueviolet)
+Le projet cible principalement les développeurs solo et les petites équipes qui souhaitent conserver leur code et leur environnement d'exécution dans leur propre workspace.
 
-> 💡 **Aperçu** : Interface IDE Monaco, terminal interactif, orchestration multi-agents et interaction vocale Gemini Live en temps réel.
->
-> *(Espace réservé pour capture d'écran / démonstration GIF : `assets/demo.gif`)*
+![Build](https://img.shields.io/badge/build-passing-brightgreen)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![License](https://img.shields.io/badge/license-BUSL--1.1-orange)
+![Node](https://img.shields.io/badge/node-%3E%3D20-green)
+![Electron](https://img.shields.io/badge/electron-43-blueviolet)
 
----
-
-## ⚡ Quick Start
-
-Démarrez Leanna en local en 3 commandes :
-
-```bash
-# 1. Cloner et installer les dépendances
-git clone https://github.com/<owner>/leanna.git && cd leanna && npm install
-
-# 2. Configurer la clé minimale dans .env
-cp .env.example .env
-# Éditer .env et renseigner votre GEMINI_API_KEY
-
-# 3. Lancer en développement
-npm run dev
-# Interface accessible immédiatement sur http://127.0.0.1:4000
-```
+> **Aperçu :** IDE Monaco + terminal + orchestration multi-agents + Agent Brain + Gemini Live + runtime autonome.
 
 ---
 
-## 📑 Sommaire
+## Sommaire
 
-- [⚡ Quick Start](#-quick-start)
+- [Pourquoi Leanna ?](#pourquoi-leanna)
+- [Fonctionnalités](#fonctionnalités)
+  - [Agent Brain](#agent-brain)
+  - [Agents autonomes](#agents-autonomes)
+  - [Runtime autonome 24/7](#runtime-autonome-247)
+  - [Bot Telegram](#bot-telegram)
+  - [IDE et outils développeur](#ide-et-outils-développeur)
+  - [Sécurité et contrôle](#sécurité-et-contrôle)
+- [Architecture](#architecture)
 - [Stack technique](#stack-technique)
-- [Fonctionnalités principales](#fonctionnalités-principales)
-  - [🧠 Agent Brain](#-agent-brain--cerveau-central-leanna-nouveau)
-  - [📱 Bot Telegram](#-bot-telegram--contrôle-mobile-distant-nouveau)
-  - [Fonctionnalités Utilisateur](#utilisateur)
-  - [Fonctionnalités Administrateur / Développeur](#administrateur--développeur)
-- [Architecture des Agents](#architecture-des-agents)
 - [Prérequis](#prérequis)
 - [Installation](#installation)
-- [Configuration (.env)](#configuration)
-  - [Nomenclature des variables](#nomenclature-des-variables)
-  - [Fallback inter-providers](#fallback-inter-providers-gemini--openrouter)
-  - [Observabilité & cache](#observabilité--cache)
-  - [Coordination multi-instance](#coordination-multi-instance-optionnel-redis)
-  - [Runtime autonome](#runtime-autonome-heartbeat--taskmanager-valeurs-en-ms)
-- [Runtime autonome 24/7](#runtime-autonome-247)
-- [Lancement & Exploitation](#lancement)
-  - [Mode développement](#mode-développement)
-  - [Mode production (PM2)](#mode-production-supervisé-pm2--recommandé)
-  - [Mode desktop Electron](#mode-desktop-electron)
-  - [Tests automatisés](#tests)
+- [Configuration](#configuration)
+- [Lancement et exploitation](#lancement-et-exploitation)
+- [Tests](#tests)
 - [Structure du projet](#structure-du-projet)
 - [Utiliser l'Agent Brain](#utiliser-lagent-brain)
-- [Sécurité & Permissions](#sécurité-de-lagent--permissions--dry-run)
-- [Dépannage (Troubleshooting)](#dépannage-troubleshooting)
-- [Documentation complémentaire](#documentation)
-- [Contribution & Licence](#licence)
+- [Dépannage](#dépannage)
+- [Documentation](#documentation)
+- [Contribution](#contribution)
+- [Licence](#licence)
 
 ---
 
-## Stack technique
+## Pourquoi Leanna ?
 
-| Technologie | Rôle | Version |
-|---|---|---|
-| React | UI frontend | ^19.0.1 |
-| React Router DOM | Routage frontend | ^7.18.1 |
-| Vite | Bundler / dev server | ^6.2.3 |
-| TypeScript | Langage principal (front + back) | ^5.0.0 |
-| TailwindCSS | Styles utilitaires | ^4.1.14 |
-| Express | Serveur HTTP / API REST | ^4.21.2 |
-| Node.js | Runtime backend | ≥ 20 |
-| tsx | Dev runner TypeScript ESM | ^4.23.1 |
-| esbuild | Build serveur (CJS bundle) | ^0.25.0 |
-| WebSocket (`ws`) | Temps réel (Gemini Live, terminal, sandbox) | ^8.21.0 |
-| Electron | Application desktop (Windows) | ^43.1.0 |
-| Monaco Editor | Éditeur de code intégré | ^0.53.0 |
-| Google GenAI | Modèles Gemini (texte + voix) | ^2.4.0 |
-| Supabase | Base de données PostgreSQL + pgvector | ^2.110.2 |
-| Redis | Cache (optionnel, rate limits / sessions) | ^6.2.1 |
-| Zod | Validation de schémas | ^3.25.76 |
-| Puppeteer | Automatisation navigateur | ^25.3.0 |
-| Recharts | Graphiques / dashboards | 3.10.1 |
-| Motion | Animations UI | ^12.23.24 |
-| Lucide React | Icônes | ^0.546.0 |
-| Mermaid | Diagrammes dans notebooks | ^11.4.1 |
-| Marked | Rendu Markdown | 15.0.12 |
-| Tree-sitter | Parsing AST (TypeScript, JavaScript) | ^0.27.0 |
-| pdf-parse | Extraction de documents PDF | ^2.4.5 |
-| basic-ftp | Connexions FTP | 6.2.1 |
-| grammy | Framework Bot Telegram (Long Polling) | ^1.46.0 |
-| PM2 | Superviseur de process (production) | 7.x |
-| express-rate-limit | Rate limiting API | ^8.6.0 |
-| Multer | Upload de fichiers | ^2.2.0 |
-| Compression | Compression gzip/brotli | ^1.8.1 |
+Leanna est conçu autour d'une idée simple : **décrire un objectif plutôt qu'une suite d'actions**.
 
----
+Exemple :
 
-## Fonctionnalités principales
-
-### 🧠 Agent Brain — Cerveau Central Leanna *(nouveau)*
-
-L'**Agent Brain** est la couche cognitive supérieure de Leanna. Il transforme un objectif utilisateur de haut niveau en un graphe d'exécution dynamique, sans aucun workflow codé en dur.
-
-```
-Utilisateur
-    ↓ « Modernise mon site et rends le header responsive »
-Agent Brain
-    ├─ 1. Compréhension de l'objectif  (intention, stack, critères de succès)
-    ├─ 2. Décomposition dynamique      (graphe DAG de sous-objectifs)
-    ├─ 3. Choix des agents             (Researcher → Architect → Coder → Vision → Tester → Reviewer)
-    ├─ 4. Choix des skills & outils    (allocation ciblée par étape)
-    ├─ 5. Exécution orchestrée         (suivi temps réel dans l'interface)
-    ├─ 6. Vérification multi-niveaux   (syntaxe, tests, visuel, sémantique)
-    └─ 7. Correction autonome          (boucle auto-réparation bornée)
-          ↓
-    Résultat final avec rapport complet
-```
-
-**Déclenchement vocal ou textuel :**
-```
+```text
 « Modernise mon site et rends le header responsive »
-→ agent_brain est appelé automatiquement
-→ Le Brain analyse, planifie, exécute et valide sans workflow figé
 ```
 
-**Modes :**
-- `plan_first` : génère et affiche le plan pour approbation avant exécution
-- `auto` : exécution complète de bout en bout
+Leanna peut alors :
 
-**API REST :**
-```
-POST /api/agents/brain/plan      # Visualiser le plan sans l'exécuter
-POST /api/agents/brain/execute   # Exécution complète Brain
-GET  /api/agents/brain/status/:id # Suivi d'avancement
-```
+1. comprendre l'objectif et le contexte ;
+2. le décomposer en sous-objectifs ;
+3. sélectionner les agents et outils nécessaires ;
+4. exécuter les étapes avec leurs dépendances ;
+5. vérifier le résultat ;
+6. corriger certaines erreurs automatiquement ;
+7. produire un rapport final.
 
-### 📱 Bot Telegram — Contrôle Mobile Distant *(nouveau)*
-
-Leanna intègre un service de bot Telegram natif (via `grammy` en mode Long Polling), vous permettant de piloter votre OS IA à distance depuis votre smartphone, sans ouvrir aucun port réseau.
-
-```
-Smartphone (Telegram)
-      ↓ « /agent analyse les performances de la base de données »
-Bot Telegram Leanna (Polling local)
-      ├─ 1. Contrôle de sécurité (Liste blanche d'IDs autorisés)
-      ├─ 2. Routage de la commande vers l'Agent Orchestrator
-      ├─ 3. Exécution de la tâche en tâche de fond dans le workspace
-      └─ 4. Notification proactive du résultat sur votre téléphone 🔔
-```
-
-- **Chat IA contextuel** : Échangez avec Leanna en langage naturel (avec l'historique et le contexte du projet actif).
-- **Commandes intégrées** :
-  - `/status` : État du système, projet actif, moteur IA, mémoire et uptime.
-  - `/agent <tâche>` : Lancement d'une mission autonome par les agents.
-  - `/tasks [statut]` : Liste des tâches agents, filtrable par statut (`pending`, `running`, `completed`, `incomplete`, `failed`, `cancelled`).
-  - `/task <id>` : Détail complet d'une tâche (statut, priorité, timestamps, résumé, fichiers modifiés, erreurs).
-  - `/cancel <id>` : Annulation d'une tâche agent en cours.
-  - `/cmd <commande>` : Exécution sécurisée d'une commande dans le terminal du projet.
-  - `/ls [dossier]` : Liste le contenu d'un dossier du projet actif.
-  - `/read <chemin>` : Affiche le contenu d'un fichier (les gros fichiers > 64 Ko sont envoyés en pièce jointe).
-  - `/project [chemin]` : Affiche le projet actif et les workspaces connus, ou bascule vers un autre projet.
-  - `/clear` : Réinitialisation de la mémoire conversationnelle Telegram.
-  - `/help` : Guide complet des commandes.
-- **Sécurité renforcée** : Seuls les identifiants configurés dans la liste blanche (User IDs / usernames) sont autorisés. Les commandes `/read` et `/ls` sont protégées contre le _path traversal_ (aucun accès hors du projet actif), et `/cmd` filtre les commandes destructrices.
-- **Notifications d'agents** : Réception automatique d'un ping Telegram lorsqu'un agent termine ou échoue une tâche.
-- **Outils Telegram pour l'IA** : Leanna peut elle-même envoyer des messages, photos, documents ou fichiers du workspace via des skills dédiés (`telegram_notify`, `telegram_send_message`, `telegram_send_photo`, `telegram_send_document`, `telegram_send_from_workspace`, `telegram_broadcast`, `telegram_get_status`, `telegram_list_users`, `telegram_get_chat_info`).
-- **Interface dédiée dans l'IDE** : Onglet Paramètres > Bot Telegram pour gérer le token, démarrer/arrêter le bot, et tester la liaison.
+L'objectif est de fournir une expérience proche d'un **environnement de développement piloté par intention**, tout en conservant des garde-fous explicites sur les opérations sensibles.
 
 ---
 
-### Utilisateur
-- **Interaction vocale en temps réel** via Gemini Live API (WebSocket `/live`) avec choix de voix
-- **Éditeur de code Monaco** avec coloration syntaxique, multi-onglets, et arborescence de fichiers
-- **Terminal interactif** intégré dans l'interface
-- **Agent Brain** : cerveau central qui décompose et exécute des objectifs complexes dynamiquement *(nouveau)*
-- **Agents autonomes** : délégation de tâches à des agents spécialisés (coder, architect, refactor, tester, debugger, reviewer, researcher, vision, security, writer, planner…)
-- **Orchestration multi-agents** avec gestion des dépendances (DAG) et collaboration par patterns
-- **Boucle d'auto-correction** : les agents détectent et réparent leurs propres erreurs de façon autonome
-- **Runtime V2 (SkillManagerV2)** : nouvelle génération du moteur de skills avec `ToolRegistry`, `StateMachine`, `WorkflowEngine`, `Observability`, `PromptRegistry`, et agents spécialisés formatter/planner/proofreader/researcher/summarizer/translator/writer
-- **Système de Missions (long-running)** : tâches longues persistées avec Planner + Executor + Reflection + SkillScorer
-- **Supervision autonome (SmartSkills + Supervisor)** : boucle d'autonomie avec scoring de compétences et auto-adaptation
-- **Sandbox sécurisé** : toutes les modifications de l'IA sont isolées et soumises à validation avant application
-- **Partage d'écran et webcam** vers le modèle Gemini pour interaction visuelle
-- **Notebooks RAG** : ingestion de documents (PDF, texte), chat contextuel avec recherche sémantique, **diagrammes Mermaid**, **aperçu slides**, **audio TTS**, **génération de contenu**
-- **Historique des conversations** persisté dans Supabase avec recherche full-text
-- **Mémoire hiérarchique** : court-terme (session), moyen-terme (projet), long-terme (Supabase pgvector)
-- **Listes intelligentes** créées et gérées par l'IA
-- **Workflows automatisés** planifiables (ex : toutes les 24h, 30m…) avec builder visuel
-- **Tâches planifiées** (automation) avec intervalles configurables
-- **Intégration GitHub** : statut Git, commits, push, issues, PRs depuis l'interface
-- **Contrôle à distance via Telegram** : chat IA, lancement et suivi d'agents (`/tasks`, `/task`, `/cancel`), exploration du projet (`/ls`, `/read`, `/project`), exécution de commandes et alertes sur smartphone *(nouveau)*
-- **Gestion de documents** : upload de PDF/DOCX, extraction et indexation
-- **Thème dark/light** et couleur d'accent personnalisable
-- **Panel PM2 intégré** : monitoring en temps réel des process (status, CPU, RAM, uptime, restart), actions (start/stop/restart/reload/flush), logs des apps supervisées *(nouveau)*
-- **Checkpoints Git automatiques** : sauvegarde avant modification critique, rollback en 1 clic
-- **Palette de commandes** (Ctrl+K) avec accès rapide à toutes les fonctionnalités
-- **Global Search** : recherche full-text dans le workspace avec virtualisation
+# Fonctionnalités
 
-### Administrateur / Développeur
-- **Knowledge Graph** du workspace : indexation incrémentielle des fichiers, entités, dépendances (AST Call Graph, Dependency Graph, Impact Analyzer)
-- **Custom Skills** : création d'outils IA personnalisés via une interface dédiée
-- **Marketplace de skills et d'agents** : catalogue extensible (`marketplace-installs.json`)
-- **Rotation de clés Gemini** : pool de clés avec failover automatique sur erreur 429
-- **MCP (Model Context Protocol)** : intégration de serveurs MCP externes avec `McpBridge` et `McpClient`
-- **Audit log** : traçabilité de toutes les opérations sur les fichiers (workflow d'audit automatique)
-- **Export** de conversations et données (PDF, DOCX, HTML)
-- **FTP** : connexion à des serveurs FTP distants depuis l'IA
-- **OpenRouter** : support de modèles alternatifs (GPT-4o-mini, etc.)
-- **Text-to-Speech** intégré pour les réponses vocales
-- **Checkpoint Git** : sauvegarde automatique avant chaque modification critique
-- **Safeguards module** : garde-fous configurables contre actions dangereuses
-- **Modèle de permissions par skill** : chaque skill/outil déclare les permissions requises (`read` / `write` / `network` / `exec`), appliquées au runtime par le `ToolRegistry` (modes `enforce` / `audit` / `off`) *(nouveau)*
-- **Dry-run global** : exécution d'une mission complète en simulation, sans effet de bord (aucune écriture, exécution shell ou mutation réseau) — les lectures/analyses s'exécutent normalement *(nouveau)*
-- **Token optimization** : résumé automatique du contexte pour éviter l'overflow de tokens
-- **Sandbox Watch** : suivi en temps réel des modifications du sandbox avec diff viewer
-- **Hierarchical Memory Engine** : moteur de mémoire hiérarchisé avec service dédié
-- **Serveur de métriques V2** : observabilité du Runtime V2 (`/api/v2/metrics`)
+## Agent Brain
+
+L'**Agent Brain** est la couche d'orchestration cognitive de Leanna. Il transforme un objectif utilisateur en graphe d'exécution dynamique, sans workflow métier figé.
+
+```text
+Utilisateur
+    │
+    │ « Modernise mon site et rends le header responsive »
+    ▼
+Agent Brain
+    ├─ Compréhension de l'objectif
+    ├─ Décomposition dynamique
+    ├─ Sélection des agents
+    ├─ Sélection des skills et outils
+    ├─ Exécution orchestrée
+    ├─ Vérification multi-niveaux
+    └─ Correction autonome bornée
+    │
+    ▼
+Résultat final + rapport
+```
+
+### Modes
+
+- `plan_first` : génère le plan et permet de l'inspecter avant exécution.
+- `auto` : exécute la mission de bout en bout.
+
+### API
+
+```text
+POST /api/agents/brain/plan
+POST /api/agents/brain/execute
+GET  /api/agents/brain/status/:id
+```
 
 ---
 
-## Architecture des Agents
+## Agents autonomes
 
-Leanna dispose d'un système multi-agents complet organisé en 4 couches :
+Leanna dispose d'une flotte d'agents spécialisés, notamment :
 
-```
-┌──────────────────────────────────────────────────┐
-│              Agent Brain (nouveau)               │
-│   Compréhension → Décomposition → Planif.       │
-│   → Sélection agents/skills/outils              │
-│   → Exécution → Vérification → Correction       │
-└────────────────────┬─────────────────────────────┘
-                     │ orchestre dynamiquement
-┌────────────────────▼─────────────────────────────┐
-│           AgentOrchestrator                      │
-│   delegateTask · orchestrate · brainPlan        │
-│   collaborateByPattern · brainExecute           │
-└────────────────────┬─────────────────────────────┘
-                     │ utilise
-┌────────────────────▼─────────────────────────────┐
-│     Runtime V2 · SkillManagerV2 (nouveau)        │
-│  ToolRegistry · StateMachine · WorkflowEngine   │
-│  Observability · PromptRegistry · 8 agents V2   │
-└────────────────────┬─────────────────────────────┘
-                     │ exécute via
-┌────────────────────▼─────────────────────────────┐
-│       Agents spécialisés (15 rôles + 8 V2)       │
-│                                                  │
-│  Code & Ingénierie    │  Rédaction & Docs        │
-│  ─────────────────    │  ──────────────────      │
-│  coder                │  writer + V2             │
-│  refactor             │  formatter + V2          │
-│  debugger             │  researcher + V2         │
-│  reviewer             │  proofreader + V2        │
-│  tester               │  translator + V2         │
-│  security             │  summarizer + V2         │
-│  architect            │  planner + V2            │
-│  vision               │                          │
-└──────────────────────────────────────────────────┘
-```
-
-**Délégation dynamique** (via matrice de délégation) : `coder` → `tester` → `reviewer` ; `planner` → `coder, researcher, writer` ; etc.
-
----
-
-## Prérequis
-
-| Élément | Version minimale |
+| Domaine | Agents |
 |---|---|
-| Node.js | 20.x |
-| npm | 10.x |
-| Git | 2.x |
-| PM2 (optionnel, supervision) | 7.x |
-| Compte Google AI Studio | Pour obtenir `GEMINI_API_KEY` |
-| Compte Supabase (optionnel) | Pour la persistance (mémoire, historique, workflows) |
-| Compte OpenRouter (optionnel) | Pour les modèles alternatifs |
-| Compte GitHub (optionnel) | Pour les fonctionnalités Git/GitHub |
+| Code | `coder`, `refactor`, `debugger` |
+| Architecture | `architect`, `planner` |
+| Qualité | `tester`, `reviewer`, `proofreader` |
+| Recherche | `researcher` |
+| Sécurité | `security` |
+| Vision | `vision` |
+| Rédaction | `writer`, `formatter`, `translator`, `summarizer` |
 
-> ⚠️ **Windows uniquement** pour le build Electron (NSIS installer). Le serveur web fonctionne sur Linux/macOS.
+Les agents peuvent être orchestrés sous forme de DAG et collaborer via une matrice de délégation.
 
----
+Exemple :
 
-## Installation
-
-### 1. Cloner le dépôt
-
-```bash
-git clone https://github.com/<owner>/leanna.git
-cd leanna
+```text
+planner
+   ├── researcher
+   ├── architect
+   └── coder
+          ↓
+       tester
+          ↓
+       reviewer
 ```
-
-### 2. Installer les dépendances
-
-```bash
-npm install
-```
-
-### 3. Configurer les variables d'environnement
-
-```bash
-cp .env.example .env
-```
-
-Ouvrez `.env` et renseignez au minimum `GEMINI_API_KEY` (obligatoire). Les autres variables sont optionnelles au premier démarrage — un token API sera généré automatiquement si `Leanna_API_TOKEN` est vide.
-
-### 4. Lancer en mode développement
-
-```bash
-npm run dev
-```
-
-L'application est disponible sur `http://127.0.0.1:4000`.
-
-### 5. (Optionnel) Lancer en mode desktop Electron
-
-```bash
-npm run desktop
-```
-
----
-
-## Configuration
-
-Toutes les variables sont lues depuis `.env` (ou `.env.local` s'il existe, avec priorité). Les valeurs sensibles sont chiffrées au repos dans le fichier.
-
-### Nomenclature des variables
-
-Le projet adopte deux conventions de nommage selon les couches fonctionnelles :
-- **`Leanna_*`** : Configuration du cœur applicatif, de l'authentification et de la sandbox (`Leanna_API_TOKEN`, `Leanna_MASTER_KEY`, `Leanna_PERMISSION_MODE`, `Leanna_DRY_RUN`, `Leanna_LISTEN_HOST`).
-- **`LEANNA_*`** : Paramètres du runtime autonome 24/7, du fallback des modèles et de l'infrastructure distribuée (`LEANNA_AUTONOMY_*`, `LEANNA_PROVIDER_*`, `LEANNA_EVENTBUS_*`, `LEANNA_LOCK_*`).
-
-| Variable | Description | Exemple | Obligatoire |
-|---|---|---|---|
-| `GEMINI_API_KEY` | Clé API Google Gemini | `AIza...` | ✅ |
-| `Leanna_API_TOKEN` | Token d'authentification pour l'API et les WebSockets. Auto-généré si vide. | `abc123...` | ✅ (auto) |
-| `Leanna_MASTER_KEY` | Clé de chiffrement des données sensibles (base64, 32 octets). Auto-générée si vide. | `base64string==` | ✅ (auto) |
-| `SUPABASE_URL` | URL du projet Supabase | `https://xyz.supabase.co` | ❌ |
-| `SUPABASE_SERVICE_ROLE_KEY` | Clé service Supabase (accès total) | `eyJ...` | ❌ |
-| `OPENROUTER_API_KEY` | Clé API OpenRouter | `sk-or-...` | ❌ |
-| `OPENROUTER_FREE_API_KEY` | Clé API OpenRouter (tier gratuit) | `sk-or-...` | ❌ |
-| `OPENROUTER_MODEL` | Modèle par défaut OpenRouter | `openai/gpt-4o-mini` | ❌ |
-| `OPENROUTER_REFERER` | Referer HTTP pour OpenRouter | `http://localhost:4000` | ❌ |
-| `OPENROUTER_TITLE` | Titre app pour OpenRouter | `Leanna` | ❌ |
-| `GITHUB_TOKEN` | Token GitHub (scope: repo, notifications) | `ghp_...` | ❌ |
-| `APP_URL` | URL publique de l'application | `http://localhost:4000` | ❌ |
-| `VITE_SERVER_PORT` | Port du serveur (défaut: 4000) | `4000` | ❌ |
-| `ENABLE_CHAIN_OF_THOUGHT` | Active l'affichage de la chaîne de pensée | `true` | ❌ |
-| `FORCE_TIERED_TOOLS` | Force le mode outils par tiers | `true` | ❌ |
-| `SELF_HEAL_READONLY` | Mode auto-correction lecture seule | `false` | ❌ |
-| `Leanna_PERMISSION_MODE` | Application des permissions par skill : `enforce` (refuse), `audit` (journalise), `off` (désactive) | `enforce` | ❌ |
-| `Leanna_GRANTED_PERMISSIONS` | Permissions accordées globalement au runtime (CSV). Toutes par défaut. | `read,write,network` | ❌ |
-| `Leanna_DRY_RUN` | Active la simulation globale au démarrage (aucun effet de bord réel) | `false` | ❌ |
-| `SANDBOX_EXIT_CODE` | Code à 6 chiffres pour sortir du sandbox | `123456` | ❌ |
-| `TELEGRAM_BOT_TOKEN` | Token d'API Bot Telegram (obtenu auprès de @BotFather) | `123456:ABC...` | ❌ |
-| `ALLOW_FTP_PRIVATE_IPS` | Autorise les connexions FTP vers IPs privées | `false` | ❌ |
-| `Leanna_LISTEN_HOST` | Interface d'écoute du serveur | `127.0.0.1` | ❌ |
-| `NODE_ENV` | Environnement d'exécution | `development` | ❌ |
-| `REDIS_URL` | URL de connexion Redis (cache Knowledge Graph, verrou, bus). Sans URL : mémoire process + persistance disque | `redis://localhost:6379` | ❌ |
-| `PUPPETEER_EXECUTABLE_PATH` | Chemin vers un binaire Chrome/Chromium pour Puppeteer | `C:\...\chrome.exe` | ❌ |
-
-### Fallback inter-providers (Gemini ↔ OpenRouter)
-
-| Variable | Description | Défaut | Obligatoire |
-|---|---|---|---|
-| `LEANNA_PROVIDER_FALLBACK` | Bascule automatique vers l'autre provider si le principal échoue (quota, timeout, indisponibilité) | `true` | ❌ |
-| `LEANNA_PROVIDER_BREAKER_THRESHOLD` | Nombre d'échecs consécutifs avant d'ignorer un provider (disjoncteur) | `3` | ❌ |
-| `LEANNA_PROVIDER_BREAKER_COOLDOWN_MS` | Durée (ms) pendant laquelle le provider est ignoré après ouverture du disjoncteur | `60000` | ❌ |
-
-### Observabilité & cache
-
-| Variable | Description | Défaut | Obligatoire |
-|---|---|---|---|
-| `OTEL_CONSOLE_EXPORT` | Exporte les spans OpenTelemetry vers la console (`1`/`true`). Les traces sont toujours créées ; cette variable ne contrôle que l'export verbeux | *(vide)* | ❌ |
-| `LEANNA_KNOWLEDGE_CACHE_TTL_SECONDS` | TTL (s) du cache partagé du Knowledge Graph | `86400` | ❌ |
-
-### Coordination multi-instance (optionnel, Redis)
-
-| Variable | Description | Défaut | Obligatoire |
-|---|---|---|---|
-| `LEANNA_LOCK_REDIS_URL` | Redis dédié au verrou distribué. Sans Redis : verrou correct au sein d'un seul process (repli in-process) | *(REDIS_URL)* | ❌ |
-| `LEANNA_EVENTBUS_REDIS_URL` | Redis pour le bus d'événements durable (Redis Streams). Sans Redis : EventBus strictement in-process | *(REDIS_URL)* | ❌ |
-| `LEANNA_EVENTBUS_STREAM` | Nom du Redis Stream de l'EventBus | `leanna:eventbus` | ❌ |
-| `LEANNA_EVENTBUS_MAXLEN` | Longueur max approximative du stream | `10000` | ❌ |
-
-### Runtime autonome (heartbeat & TaskManager, valeurs en ms)
-
-| Variable | Description | Défaut | Obligatoire |
-|---|---|---|---|
-| `LEANNA_HEARTBEAT_ACTIVE_MS` | Intervalle du heartbeat en état actif | `15000` | ❌ |
-| `LEANNA_HEARTBEAT_IDLE_MS` | Intervalle du heartbeat en état idle | `60000` | ❌ |
-| `LEANNA_HEARTBEAT_SLEEP_MS` | Intervalle du heartbeat en état sleeping | `300000` | ❌ |
-| `LEANNA_HEARTBEAT_IDLE_AFTER_MS` | Délai d'inactivité avant de passer en idle | `300000` | ❌ |
-| `LEANNA_AUTONOMY_MAX_CONCURRENCY` | Nombre max de tâches autonomes simultanées | `2` | ❌ |
-| `LEANNA_AUTONOMY_MAX_QUEUE_SIZE` | Taille max de la file d'attente des tâches | `100` | ❌ |
-| `LEANNA_AUTONOMY_DEDUPE_TTL_MS` | Fenêtre (ms) de déduplication des tâches | `300000` | ❌ |
-| `LEANNA_AUTONOMY_RETRY_DELAY_MS` | Délai de base entre retries (backoff exponentiel) | `1000` | ❌ |
-| `LEANNA_AUTONOMY_MAX_RETRIES` | Nombre max de retries par tâche | `3` | ❌ |
-| `LEANNA_AUTONOMY_TASK_TIMEOUT_MS` | Timeout (ms) d'exécution d'une tâche autonome | `60000` | ❌ |
-| `LEANNA_AUTONOMY_CIRCUIT_BREAKER_THRESHOLD` | Échecs consécutifs avant ouverture du circuit breaker | `5` | ❌ |
-| `LEANNA_AUTONOMY_CIRCUIT_BREAKER_COOLDOWN_MS` | Durée (ms) du cooldown du circuit breaker | `300000` | ❌ |
 
 ---
 
 ## Runtime autonome 24/7
 
-Leanna inclut une fondation d’autonomie **événementielle**, pas une boucle `while(true)` qui interroge un modèle. `LeannaCore` reçoit les événements du `EventBus` existant, les classe localement, crée au besoin une tâche `maintenance`/`reactive` dédupliquée et laisse le heartbeat passer en `watching`, `idle` puis `sleeping` lorsque rien ne requiert d’attention.
+Leanna possède un runtime d'autonomie **événementiel**. Il ne repose pas sur une boucle qui interroge constamment un modèle.
 
-- Aucun appel LLM n’est effectué par le heartbeat ni par la perception.
-- Les tâches sont bornées par la concurrence, une queue maximale, le timeout, les retries exponentiels, le circuit breaker et une dead-letter queue visible.
-- Les permissions par skill, le dry-run, le sandbox, les approbations et `.leannaignore` restent obligatoires : cette couche n’accorde ni ne contourne de permission.
-- Consultez [AUTONOMY.md](AUTONOMY.md) pour le cycle complet, le tuning 24/7, la procédure d’arrêt/reprise et les limites connues.
+Le runtime comprend notamment :
 
-**Démarrage prudent :** conservez `Leanna_PERMISSION_MODE="enforce"`, activez `Leanna_DRY_RUN="true"` pour une première validation et commencez avec `LEANNA_AUTONOMY_MAX_CONCURRENCY="1"`.
+- heartbeat avec états `watching`, `idle` et `sleeping` ;
+- déduplication des tâches ;
+- file d'attente bornée ;
+- limite de concurrence ;
+- timeout ;
+- retries avec backoff ;
+- circuit breaker ;
+- dead-letter queue ;
+- persistance/reprise optionnelle via Supabase ;
+- coordination multi-instance optionnelle via Redis ;
+- bus d'événements Redis Streams optionnel ;
+- monitoring via `/api/v2/metrics/autonomy`.
 
-**Monitoring :** après démarrage, consultez `GET /api/v2/metrics/autonomy` avec le header `x-leanna-token`. Il expose l’état, la santé, les échecs récents et les 100 dernières tâches autonomes. `GET /api/health` reste accessible sans authentification.
+> Pour une première validation, il est recommandé de conserver `Leanna_PERMISSION_MODE=enforce`, d'activer `Leanna_DRY_RUN=true` et de commencer avec `LEANNA_AUTONOMY_MAX_CONCURRENCY=1`.
 
-Les variables `LEANNA_HEARTBEAT_*` et `LEANNA_AUTONOMY_*` de `.env.example` règlent les intervalles, la backpressure, la déduplication, les retries, timeouts et le circuit breaker.
-
-**Couches optionnelles (dégradation propre sans Redis/Supabase) :**
-
-- **Task store durable** — checkpoint/reprise des tâches autonomes après un crash (Supabase).
-- **Timeline temps réel** — événements `autonomy:*` diffusés sur le canal WebSocket dédié `/autonomy`, visualisés dans l’UI via la route `/autonomy` (`AutonomyView`).
-- **Fallback inter-providers** — bascule automatique Gemini ↔ OpenRouter avec disjoncteur (`LEANNA_PROVIDER_FALLBACK`).
-- **Verrou distribué** — coordination mono-instance entre processus (`LEANNA_LOCK_REDIS_URL`, repli in-process).
-- **Bus multi-processus** — pont Redis Streams pour diffuser l’`EventBus` entre instances (`LEANNA_EVENTBUS_*`).
-- **Test de charge** — `npm run test:soak` valide le `TaskManager` sous charge soutenue.
-
-Sans Redis/Supabase configurés, chacune de ces couches reste inactive et le runtime fonctionne exactement comme en mono-instance in-process. Détails complets dans [AUTONOMY.md](AUTONOMY.md).
+Documentation détaillée : [`AUTONOMY.md`](AUTONOMY.md).
 
 ---
 
-## Lancement
+## Bot Telegram
 
-### Mode développement
+Leanna peut être piloté à distance depuis Telegram via `grammy` et Long Polling, sans exposer de port réseau public.
 
-```bash
-npm run dev
+```text
+Smartphone
+    │
+    ▼
+Telegram Bot
+    │
+    ├─ Vérification de la whitelist
+    ├─ Routage de la commande
+    ├─ Exécution de la tâche
+    └─ Notification du résultat
 ```
 
-Démarre le serveur Express avec Vite en middleware (HMR activé) sur `http://127.0.0.1:4000`.
+### Commandes principales
 
-### Mode production (Node direct)
-
-```bash
-npm run build
-npm start
+```text
+/status
+/agent <tâche>
+/tasks [statut]
+/task <id>
+/cancel <id>
+/cmd <commande>
+/ls [dossier]
+/read <chemin>
+/project [chemin]
+/clear
+/help
 ```
 
-### Mode production supervisé (PM2 — recommandé)
+Le bot applique notamment :
 
-Le fichier `ecosystem.config.cjs` est inclus à la racine. Il définit une app `leanna` avec :
-- `script: ./dist/server.cjs` (le bundle produit par `npm run build`)
-- `exec_mode: fork` (1 instance), `autorestart: true`, `max_memory_restart: 1G`
-- `kill_timeout: 3000`, `shutdown_with_message: true` pour une extinction propre
-
-```bash
-# 1. Build le bundle
-npm run build
-
-# 2. Démarrer via ecosystem.config.cjs
-pm2 start ecosystem.config.cjs
-
-# 3. Vérifier le statut dans le terminal ou via l'IDE (Panel PM2)
-pm2 status
-pm2 logs leanna
-
-# 4. Sauvegarder le process list pour démarrage au boot
-pm2 save
-pm2 startup    # (copier/coller la commande générée)
-```
-
-Endpoints `/api/pm2/*` exposés par le serveur (monitoring et contrôle) :
-```
-GET    /api/pm2/status           # Statut global (apps + daemon + host)
-POST   /api/pm2/:name/restart    # Redémarrer une app
-POST   /api/pm2/:name/stop       # Arrêter une app
-POST   /api/pm2/reload?file=ecosystem.config.cjs
-POST   /api/pm2/flush            # Vider les logs
-GET    /api/pm2/logs/:name?lines=120
-```
-
-### Mode desktop (Electron)
-
-```bash
-# Développement
-npm run desktop
-
-# Debug (DevTools ouverts)
-npm run desktop:debug
-
-# Build installateur Windows (.exe)
-npm run dist:win
-```
-
-### Tests
-
-```bash
-# Lancer tous les tests
-npm test
-
-# Tests Agent Brain uniquement
-node --import tsx --test server/agents/brain/AgentBrain.test.ts
-
-# Lancer les tests d'un module spécifique
-npm test -- server/skills/browser.test.ts
-
-# Lancer uniquement les tests d'intégration des routes
-npm test -- server/routes/*.test.ts
-```
-
-**Couverture de tests :**
-- ✅ `server/agents/brain/` : **20 tests unitaires** Agent Brain (100% pass)
-  - GoalUnderstandingEngine : détection de domaine et complexité
-  - DynamicPlanner : séquence dynamique par type d'objectif
-  - BrainVerifier : vérification multi-niveaux
-  - BrainCorrectionLoop : boucle d'auto-correction bornée
-- ✅ `server/runtime/` : Runtime V2 + HierarchicalMemoryService
-- ✅ `server/skills/` : ≥60% de couverture
-  - 136+ tests unitaires sur les skills critiques
-  - Validation exhaustive des schemas Zod
-  - Tests de gestion d'erreurs et logique métier
-- ✅ `server/routes/` : **74 tests d'intégration REST**
-  - Tests complets de tous les endpoints API
-  - Validation des schémas de requêtes/réponses
-  - Gestion des erreurs 400/404/500/503
-  - Tests d'authentification et autorisation
+- une whitelist d'utilisateurs ;
+- une protection contre le path traversal pour `/read` et `/ls` ;
+- des restrictions sur les commandes destructrices ;
+- des notifications lors de la fin ou de l'échec d'une tâche.
 
 ---
 
-## Structure du projet
+## IDE et outils développeur
 
-```
-leanna/
-├── electron/               # Application desktop Electron
-│   ├── main.cjs            # Processus principal Electron
-│   ├── preload.cjs         # Preload script (IPC bridge)
-│   ├── splash.css          # Styles splash screen
-│   └── splash.html         # Splash screen de démarrage
-├── server/                 # Backend Express (Node.js)
-│   ├── agents/             # Orchestrateur et flotte d'agents autonomes
-│   │   ├── brain/          # 🧠 Agent Brain
-│   │   │   ├── types.ts                 # Types et interfaces Brain
-│   │   │   ├── GoalUnderstandingEngine.ts # Compréhension de l'objectif
-│   │   │   ├── DynamicPlanner.ts        # Décomposition DAG dynamique
-│   │   │   ├── BrainVerifier.ts         # Vérification multi-niveaux
-│   │   │   ├── BrainCorrectionLoop.ts   # Boucle d'auto-correction
-│   │   │   ├── AgentBrain.ts            # Coordinateur central
-│   │   │   └── AgentBrain.test.ts       # Tests unitaires
-│   │   ├── AgentOrchestrator.ts         # Façade orchestration + Brain
-│   │   ├── AgentExecutor.ts             # Exécution de tâches
-│   │   ├── DelegationManager.ts         # Délégation structurée JSON
-│   │   ├── AutonomousAgent.ts           # Base class agents autonomes
-│   │   ├── AgentCommunication.ts        # Matrice de délégation
-│   │   ├── AgentPersistence.ts          # Persistance tâches agents
-│   │   └── roles.ts                     # Définitions des 15 rôles
-│   ├── autonomy/           # Supervisor, SmartSkills + LeannaCore événementiel
-│   ├── config/             # Rate limiters, configuration serveur
-│   ├── export/             # Export PDF/DOCX/HTML
-│   ├── knowledge/          # Knowledge Graph (indexation workspace, RAG)
-│   │   └── document-system/ # Extraction / analyse / mémoire documents
-│   ├── live/               # Handler WebSocket Gemini Live
-│   ├── marketplace/        # Catalogue skills/agents
-│   ├── mcp/                # Bridge + Client MCP (Model Context Protocol)
-│   ├── middleware/         # Middlewares Express (validateBody…)
-│   ├── mission/            # Système de missions longues (Planner/Executor/Reflection)
-│   ├── notebooks/          # RAG : ingestion + embeddings + RAGEngine
-│   ├── prompts/            # System instructions + SystemPromptBuilder
-│   ├── routes/             # Routeurs REST (40+ modules)
-│   │   ├── pm2.ts          # Endpoints monitoring/contrôle PM2
-│   │   ├── safeguards.ts   # Garde-fous sécurité
-│   │   ├── checkpoint.ts   # Sauvegardes Git avant modifs
-│   │   ├── mcp.ts          # Configuration MCP
-│   │   ├── automation.ts   # Tâches planifiées
-│   │   ├── workflows.ts    # Moteur de workflows
-│   │   ├── audit.ts        # Audit log
-│   │   ├── agents.ts       # API REST agents + /brain/plan /brain/execute
-│   │   └── telegram.ts     # API de gestion du bot Telegram
-│   ├── runtime/            # ⚡ Runtime V2 — SkillManagerV2
-│   │   ├── agents/         # 8 agents V2 spécialisés (formatter, planner, proofreader, researcher, summarizer, translator, writer)
-│   │   ├── compat/         # LegacyBridge + SkillAdapter
-│   │   ├── prompts/        # PromptRegistry (base, chat, browser, autonomy…)
-│   │   ├── routes/         # /api/v2/agents + /api/v2/metrics (+ /autonomy)
-│   │   ├── workflows/      # Workflows JSON prédéfinis (feature, refactor-safe, security-audit)
-│   │   ├── ToolRegistry.ts · StateMachine.ts · WorkflowEngine.ts
-│   │   ├── PermissionPolicy.ts · DryRun.ts   # Permissions par skill + dry-run global
-│   │   ├── EventBus.ts · Observability.ts · AgentRuntime.ts
-│   │   └── HierarchicalMemoryService.ts
-│   ├── skills/             # Skills natifs (35+) dont agent_brain et telegram
-│   ├── telegram/           # Service Bot Telegram (grammy, whitelist, chat IA)
-│   │   ├── TelegramService.ts
-│   │   └── types.ts
-│   ├── utils/              # Sandbox, crypto, checkpoint, selfRoot, serverRestart…
-│   ├── workflows/          # Moteur de workflows planifiés + audit-workflow
-│   ├── audit.ts            # Module d'audit global
-│   ├── security.ts         # Authentification (token), validation, rate limiter
-│   └── lifecycle.ts        # Graceful shutdown
-├── src/                    # Frontend React
-│   ├── components/
-│   │   ├── ide/            # Composants IDE (Monaco, sidebar, file explorer, terminal…)
-│   │   ├── panels/         # Panels spécialisés
-│   │   │   ├── PM2StatusPanel.tsx     # Monitoring + contrôle PM2
-│   │   │   ├── AgentFleetPanel.tsx    # Flotte d'agents V2
-│   │   │   ├── MissionPanel.tsx       # Système de missions
-│   │   │   ├── CheckpointPanel.tsx    # Checkpoints Git
-│   │   │   ├── AgentBuilderPanel.tsx  # Création d'agents custom
-│   │   │   ├── McpPanel.tsx           # Config MCP
-│   │   │   ├── WorkflowsPanel.tsx     # Gestion workflows
-│   │   │   ├── SandboxPanel.tsx       # Sandbox viewer + diff
-│   │   │   ├── AutomationPanel.tsx    # Tâches planifiées
-│   │   │   ├── AuditPanel.tsx         # Audit log
-│   │   │   ├── MarketplacePanel.tsx   # Marketplace skills/agents
-│   │   │   └── ... (BrowserPanel, TerminalPanel, Notebooks…)
-│   │   ├── notebooks/      # Panels notebooks RAG + Mermaid + slides
-│   │   ├── settings/       # Sections paramètres (Agents, AI, Apparence, Mémoire, Telegram…)
-│   │   └── ui/             # Composants UI atomiques (Panel, Toast, Modal…)
-│   ├── context/            # Contextes React (LiveAPI, Profile, ScreenShare, Theme)
-│   ├── hooks/              # Hooks personnalisés (useLiveAPI, useFileMention, useToken…)
-│   ├── services/           # Clients API (ideApi, pm2Api, workspaceApi, notebookApi…)
-│   ├── config/             # Config sidebar, templates
-│   ├── stores/             # État global
-│   ├── types/              # Types TypeScript partagés
-│   ├── utils/              # Utilitaires frontend
-│   ├── views/              # Pages (IdeView, NotebooksView, GitHubView…)
-│   ├── index.css           # Tailwind + tokens globaux
-│   └── main.tsx            # Point d'entrée React
-├── scripts/                # Scripts utilitaires (lint, start-desktop, analyze-tooltips…)
-├── assets/                 # Images, icônes, vidéos splash
-├── ecosystem.config.cjs    # Configuration PM2 (app leanna)
-├── supabase/               # Schémas SQL et migrations Supabase
-├── server.ts               # Point d'entrée du serveur Express
-├── server-bootstrap.ts     # Bootstrap (env, déchiffrement, démarrage)
-├── vite.config.ts          # Configuration Vite
-├── tsconfig.json           # Configuration TypeScript
-├── package.json            # Dépendances et scripts npm
-├── .env.example            # Template variables d'environnement
-├── API_DOCS.md             # Référence API REST + WebSocket
-├── ARCHITECTURE.md         # Architecture technique détaillée
-├── DB_SCHEMA.md            # Schéma de base de données
-├── GEMINI.md               # Guide d'utilisation Gemini
-├── SELF_IDE.md             # Auto-hébergement & développement avec Leanna
-├── ROADMAP.md              # Feuille de route
-├── CHANGELOG.md            # Historique des versions
-├── CLAUDE.md · CONTRIBUTING.md
-└── LICENSE                 # BUSL 1.1
-```
+### Expérience utilisateur
+
+- Éditeur Monaco avec onglets, coloration syntaxique et explorateur de fichiers.
+- Terminal interactif.
+- Interaction vocale Gemini Live.
+- Partage d'écran et webcam.
+- Historique des conversations.
+- Mémoire court / moyen / long terme.
+- Recherche globale dans le workspace.
+- Palette de commandes `Ctrl+K`.
+- Thème clair/sombre et couleur d'accent.
+- Workflows et tâches planifiées.
+- Notebooks RAG avec PDF, texte, recherche sémantique, Mermaid, slides et TTS.
+- Gestion de documents.
+- Intégration GitHub.
+- Checkpoints Git et rollback.
+- Panel PM2.
+- Contrôle à distance via Telegram.
+
+### Outils avancés
+
+- Knowledge Graph et analyse des dépendances.
+- Custom Skills.
+- Marketplace de skills et agents.
+- MCP.
+- Audit log.
+- FTP.
+- OpenRouter.
+- Rotation de clés Gemini.
+- Token optimization.
+- Sandbox Watch.
+- Hierarchical Memory Engine.
+- Serveur de métriques Runtime V2.
 
 ---
 
-## Utiliser l'Agent Brain
+## Sécurité et contrôle
 
-### Via l'interface vocale
+Leanna fournit plusieurs niveaux de contrôle afin de limiter les effets de bord des agents.
 
-Dites simplement votre objectif à Leanna :
-> *« Modernise mon site et rends le header responsive »*
-> *« Corrige le crash au démarrage de l'application »*
-> *« Refactorise le module authentication pour respecter les principes SOLID »*
+### Permissions par skill
 
-Leanna invoque automatiquement `agent_brain` qui planifie et exécute dynamiquement.
+Chaque skill peut déclarer des permissions :
 
-### Via l'outil direct (mode plan_first)
-
-```
-agent_brain({
-  goal: "Modernise mon site et rends le header responsive",
-  mode: "plan_first"
-})
-```
-
-Retourne le plan complet pour inspection avant exécution.
-
-### Via l'API REST
-
-```bash
-# Générer un plan sans exécuter
-curl -X POST http://localhost:4000/api/agents/brain/plan \
-  -H "Content-Type: application/json" \
-  -H "x-leanna-token: <Leanna_API_TOKEN>" \
-  -d '{"goal": "Modernise mon site et rends le header responsive"}'
-
-# Exécuter de bout en bout
-curl -X POST http://localhost:4000/api/agents/brain/execute \
-  -H "Content-Type: application/json" \
-  -H "x-leanna-token: <Leanna_API_TOKEN>" \
-  -d '{"goal": "Fix le crash au démarrage", "maxCorrectionAttempts": 3}'
-
-# Suivre l'avancement
-curl -H "x-leanna-token: <Leanna_API_TOKEN>" \
-  http://localhost:4000/api/agents/brain/status/<planId>
-```
-
----
-
-## Sécurité de l'agent : permissions & dry-run
-
-Deux garde-fous complémentaires contrôlent ce que l'agent peut réellement faire.
-
-### Modèle de permissions par skill
-
-Chaque skill (et chaque outil) déclare les permissions qu'il requiert, dans le vocabulaire de la roadmap :
-
-| Permission | Signification |
+| Permission | Usage |
 |---|---|
-| `read` | Lecture de fichiers / ressources |
-| `write` | Écriture, création ou suppression de fichiers |
-| `network` | Accès réseau sortant (API, git remote…) |
-| `exec` | Exécution de commandes shell / processus |
+| `read` | Lecture de fichiers et ressources |
+| `write` | Création, modification ou suppression |
+| `network` | Accès réseau sortant |
+| `exec` | Exécution de commandes/processus |
 
-Les permissions sont déclarées sur le skill, appliquées au runtime par le `ToolRegistry` à **chaque appel d'outil** (missions, agents, chat). Exemple de déclaration :
+Le runtime applique ces permissions via `ToolRegistry`.
 
-```ts
-export const systemSkill: Skill = {
-  name: "system",
-  permissions: ["exec"],                 // défaut du skill
-  toolPermissions: {                     // surcharge par outil
-    system_info: ["read"],
-    run_project_command: ["exec"],
-  },
-  // …
-};
-```
-
-À défaut de déclaration explicite, les permissions sont **déduites** du nom de l'outil (fallback historique).
-
-**Modes d'application** (`Leanna_PERMISSION_MODE`) :
-- `enforce` (défaut) : un appel réclamant une permission non accordée est **refusé** (`PermissionDeniedError`).
-- `audit` : l'appel passe mais l'usage est **journalisé** (utile pour cartographier avant de restreindre).
-- `off` : aucune vérification (comportement legacy).
-
-Le jeu de permissions accordées globalement se règle via `Leanna_GRANTED_PERMISSIONS` (CSV). Par exemple, pour interdire toute exécution shell et tout accès réseau :
+### Modes
 
 ```env
 Leanna_PERMISSION_MODE=enforce
 Leanna_GRANTED_PERMISSIONS=read,write
 ```
 
-### Dry-run global (simulation sans effet de bord)
+- `enforce` : refuse les appels non autorisés.
+- `audit` : autorise mais journalise.
+- `off` : désactive les vérifications.
 
-Le dry-run exécute une mission complète **en simulation** : les outils en lecture seule (`read`) s'exécutent normalement — pour que l'agent puisse lire, chercher et planifier — mais tout outil à effet de bord (`write` / `exec` / `network`) est **intercepté** et **non exécuté**. Un résultat simulé est renvoyé et l'effet évité est enregistré dans un rapport.
+### Dry-run
 
-**Par mission** (via le skill `mission`) :
-```
-mission_create({
-  title: "Refactor auth",
-  description: "…",
-  dryRun: true          // simulation, aucun effet de bord réel
-})
-```
-Puis, pour voir ce qui aurait été fait :
-```
-mission_dryrun_report()   // liste des écritures / exécutions / appels réseau simulés
-```
+Le dry-run permet de simuler une mission sans effet de bord :
 
-**Globalement** (au démarrage) via l'environnement :
 ```env
 Leanna_DRY_RUN=true
 ```
 
-Le dry-run s'appuie sur les mêmes permissions déclarées : la classification d'un outil comme « effet de bord » est cohérente avec le contrôle d'accès.
+Les opérations de lecture restent exécutables ; les opérations `write`, `exec` et `network` sont interceptées.
 
----
+Exemple :
 
-## Dépannage (Troubleshooting)
-
-### `GET /api/pm2/status 503 Service Unavailable`
-
-Le serveur ne peut pas invoquer la CLI `pm2`. Causes les plus fréquentes :
-
-1. **PM2 n'est pas installé (global)**
-   ```bash
-   npm install -g pm2
-   pm2 --version   # doit afficher 7.x
-   ```
-
-2. **PM2 n'est pas dans le PATH du process serveur (Windows)**
-   - Symptôme : `pm2 jlist` fonctionne dans PowerShell mais pas via le serveur.
-   - Solution : Le code a un fallback `exec()` avec shell qui résout `pm2` via `PATH/PATHEXT`. Si le problème persiste, redémarrer le terminal / l'IDE pour rafraîchir `PATH`.
-   - Sur Windows avec PowerShell, PM2 s'installe typiquement en `%APPDATA%\npm\pm2.cmd` et `%APPDATA%\npm\pm2.ps1`.
-
-3. **Le daemon PM2 n'a jamais été démarré (aucune app)**
-   ```bash
-   pm2 ping          # doit retourner pong
-   pm2 list          # affiche la liste (vide OK)
-   pm2 resurrect     # restore la dernière liste sauvegardée
-   ```
-
-4. **Inspecter le log backend**
-   Le serveur log désormais `[PM2] GET /status failed: <message> (code=...)` directement dans la console du process. Ce message donne la cause exacte (ENOENT, EINVAL, CMD introuvable, etc.).
-
-### Erreur 401 Unauthorized sur /api/*
-
-Si `Leanna_API_TOKEN` est défini dans `.env`, TOUTES les routes `/api/*` (sauf `/api/health`) nécessitent le header :
-
-```
-x-leanna-token: <valeur de Leanna_API_TOKEN>
+```ts
+mission_create({
+  title: "Refactor auth",
+  description: "...",
+  dryRun: true
+})
 ```
 
-Le frontend doit stocker ce token dans `localStorage['Leanna_api_token']` (le login / setup s'en occupe). Les clients API (`ideApi`, `pm2Api`, etc.) l'ajoutent automatiquement via `getAuthHeaders()`.
+Puis :
 
-### Gemini Live échoue immédiatement (Quota dépassé)
-
-- Vérifiez que `INITIAL_PROMPT_MAX_TOKENS` et la limite d'injection notebooks sont bien appliqués.
-- Si vous injectez beaucoup de notebooks : préférer `summary` à `rawText`.
-- Activer le key pool : définissez plusieurs `GEMINI_API_KEY_N` (rotation + failover 429).
+```ts
+mission_dryrun_report()
+```
 
 ---
 
-## Documentation
+# Architecture
 
-- [README.md](README.md) — Vue d'ensemble et installation (ce fichier)
-- [API_DOCS.md](API_DOCS.md) — Référence complète de l'API REST et WebSockets
-- [AUTONOMY.md](AUTONOMY.md) — Fonctionnement, exploitation 24/7, supervision, arrêt et récupération du runtime autonome
-- [AUTONOMY_AUDIT.md](AUTONOMY_AUDIT.md) — Audit des composants réutilisés et des limites de l’architecture
-- [ARCHITECTURE.md](ARCHITECTURE.md) — Architecture technique détaillée
-- [CONTRIBUTING.md](CONTRIBUTING.md) — Guide de contribution et conventions
-- [DB_SCHEMA.md](DB_SCHEMA.md) — Schéma de base de données Supabase
-- [GEMINI.md](GEMINI.md) — Guide d'intégration et troubleshooting Gemini
-- [SELF_IDE.md](SELF_IDE.md) — Auto-hébergement et développement de Leanna avec Leanna
-- [ROADMAP.md](ROADMAP.md) — Feuille de route du projet
-- [CHANGELOG.md](CHANGELOG.md) — Historique des versions
+Leanna est organisé en plusieurs couches :
+
+```text
+┌──────────────────────────────────────────────┐
+│                 Agent Brain                  │
+│ Compréhension → Planification → Vérification │
+└──────────────────────┬───────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────┐
+│             AgentOrchestrator                │
+│ délégation · orchestration · collaboration  │
+└──────────────────────┬───────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────┐
+│        Runtime V2 / SkillManagerV2           │
+│ ToolRegistry · StateMachine · Workflows      │
+│ Observability · PromptRegistry · EventBus    │
+└──────────────────────┬───────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────┐
+│             Agents spécialisés               │
+│ Code · Test · Research · Vision · Docs ...  │
+└──────────────────────────────────────────────┘
+```
+
+### Principaux composants
+
+- `AgentBrain` : compréhension et planification dynamique.
+- `AgentOrchestrator` : orchestration et délégation.
+- `SkillManagerV2` : exécution des skills.
+- `ToolRegistry` : registre et contrôle des outils.
+- `PermissionPolicy` : contrôle des permissions.
+- `DryRun` : simulation des effets de bord.
+- `EventBus` : communication événementielle.
+- `HierarchicalMemoryService` : mémoire hiérarchisée.
+- `LeannaCore` : runtime autonome événementiel.
+
+Pour l'architecture complète : [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ---
 
-## Contribuer
+# Stack technique
 
-Consultez [CONTRIBUTING.md](CONTRIBUTING.md) pour le workflow Git, les conventions de code et le processus de review.
+| Technologie | Rôle | Version |
+|---|---|---|
+| React | Frontend | ^19.0.1 |
+| React Router DOM | Routage | ^7.18.1 |
+| Vite | Bundler / dev server | ^6.2.3 |
+| TypeScript | Front + back | ^5.0.0 |
+| TailwindCSS | UI | ^4.1.14 |
+| Express | API / serveur | ^4.21.2 |
+| Node.js | Runtime | ≥ 20 |
+| WebSocket (`ws`) | Temps réel | ^8.21.0 |
+| Electron | Desktop Windows | ^43.1.0 |
+| Monaco Editor | Éditeur | ^0.53.0 |
+| Google GenAI | Gemini texte/voix | ^2.4.0 |
+| Supabase | PostgreSQL + pgvector | ^2.110.2 |
+| Redis | Cache / coordination | ^6.2.1 |
+| Puppeteer | Automatisation navigateur | ^25.3.0 |
+| Mermaid | Diagrammes | ^11.4.1 |
+| Tree-sitter | Parsing AST | ^0.27.0 |
+| grammy | Bot Telegram | ^1.46.0 |
+| PM2 | Supervision production | 7.x |
 
 ---
 
-## Licence
+# Prérequis
 
-Ce projet est distribué sous licence **BUSL 1.1** (Business Source License 1.1).
+| Élément | Version minimale |
+|---|---|
+| Node.js | 20.x |
+| npm | 10.x |
+| Git | 2.x |
+| PM2 | 7.x, optionnel |
+| Google AI Studio | Pour `GEMINI_API_KEY` |
+| Supabase | Optionnel |
+| OpenRouter | Optionnel |
+| GitHub | Optionnel |
 
-Voir le fichier [LICENSE](LICENSE) pour les conditions complètes.
+> Le build Electron (`.exe`) est prévu pour Windows. Le serveur web fonctionne également sous Linux/macOS.
+
+---
+
+# Installation
+
+## 1. Cloner le dépôt
+
+```bash
+git clone https://github.com/<owner>/leanna.git
+cd leanna
+```
+
+## 2. Installer les dépendances
+
+```bash
+npm install
+```
+
+## 3. Configurer l'environnement
+
+```bash
+cp .env.example .env
+```
+
+Renseignez au minimum :
+
+```env
+GEMINI_API_KEY=...
+```
+
+`Leanna_API_TOKEN` et `Leanna_MASTER_KEY` peuvent être générés automatiquement s'ils sont laissés vides.
+
+## 4. Démarrer Leanna
+
+```bash
+npm run dev
+```
+
+Application disponible sur :
+
+```text
+http://127.0.0.1:4000
+```
+
+## 5. Desktop Electron
+
+```bash
+npm run desktop
+```
+
+---
+
+# Configuration
+
+Les variables sont chargées depuis `.env` ou `.env.local`, ce dernier étant prioritaire.
+
+## Variables essentielles
+
+| Variable | Description | Défaut |
+|---|---|---|
+| `GEMINI_API_KEY` | Clé Google Gemini | — |
+| `Leanna_API_TOKEN` | Authentification API/WebSocket | Auto |
+| `Leanna_MASTER_KEY` | Chiffrement des données sensibles | Auto |
+| `VITE_SERVER_PORT` | Port serveur | `4000` |
+| `Leanna_PERMISSION_MODE` | `enforce`, `audit`, `off` | `enforce` |
+| `Leanna_GRANTED_PERMISSIONS` | Permissions globales | — |
+| `Leanna_DRY_RUN` | Simulation globale | `false` |
+| `Leanna_LISTEN_HOST` | Interface d'écoute | `127.0.0.1` |
+| `NODE_ENV` | Environnement | `development` |
+
+## Providers IA
+
+| Variable | Description |
+|---|---|
+| `OPENROUTER_API_KEY` | Clé OpenRouter |
+| `OPENROUTER_FREE_API_KEY` | Clé OpenRouter tier gratuit |
+| `OPENROUTER_MODEL` | Modèle OpenRouter |
+| `LEANNA_PROVIDER_FALLBACK` | Fallback Gemini ↔ OpenRouter |
+| `LEANNA_PROVIDER_BREAKER_THRESHOLD` | Seuil du circuit breaker |
+| `LEANNA_PROVIDER_BREAKER_COOLDOWN_MS` | Cooldown du provider |
+
+## Redis et multi-instance
+
+| Variable | Description |
+|---|---|
+| `REDIS_URL` | Redis principal |
+| `LEANNA_LOCK_REDIS_URL` | Verrou distribué |
+| `LEANNA_EVENTBUS_REDIS_URL` | EventBus Redis Streams |
+| `LEANNA_EVENTBUS_STREAM` | Nom du stream |
+| `LEANNA_EVENTBUS_MAXLEN` | Taille maximale approximative |
+
+## Runtime autonome
+
+| Variable | Description |
+|---|---|
+| `LEANNA_HEARTBEAT_ACTIVE_MS` | Heartbeat actif |
+| `LEANNA_HEARTBEAT_IDLE_MS` | Heartbeat idle |
+| `LEANNA_HEARTBEAT_SLEEP_MS` | Heartbeat sleeping |
+| `LEANNA_AUTONOMY_MAX_CONCURRENCY` | Concurrence maximale |
+| `LEANNA_AUTONOMY_MAX_QUEUE_SIZE` | Taille maximale de queue |
+| `LEANNA_AUTONOMY_MAX_RETRIES` | Nombre maximal de retries |
+| `LEANNA_AUTONOMY_TASK_TIMEOUT_MS` | Timeout des tâches |
+| `LEANNA_AUTONOMY_CIRCUIT_BREAKER_THRESHOLD` | Seuil circuit breaker |
+| `LEANNA_AUTONOMY_CIRCUIT_BREAKER_COOLDOWN_MS` | Cooldown |
+
+Pour la liste complète des variables, voir `.env.example` et [`AUTONOMY.md`](AUTONOMY.md).
+
+---
+
+# Lancement et exploitation
+
+## Développement
+
+```bash
+npm run dev
+```
+
+## Production
+
+```bash
+npm run build
+npm start
+```
+
+## Production avec PM2
+
+Le fichier `ecosystem.config.cjs` configure le process `leanna`.
+
+```bash
+npm run build
+pm2 start ecosystem.config.cjs
+pm2 status
+pm2 logs leanna
+pm2 save
+pm2 startup
+```
+
+### API PM2
+
+```text
+GET  /api/pm2/status
+POST /api/pm2/:name/restart
+POST /api/pm2/:name/stop
+POST /api/pm2/reload?file=ecosystem.config.cjs
+POST /api/pm2/flush
+GET  /api/pm2/logs/:name?lines=120
+```
+
+## Electron
+
+```bash
+npm run desktop
+npm run desktop:debug
+npm run dist:win
+```
+
+---
+
+# Tests
+
+```bash
+# Tous les tests
+npm test
+
+# Agent Brain
+node --import tsx --test server/agents/brain/AgentBrain.test.ts
+
+# Module spécifique
+npm test -- server/skills/browser.test.ts
+
+# Routes
+npm test -- server/routes/*.test.ts
+
+# Test de charge autonomie
+npm run test:soak
+```
+
+La suite actuelle couvre notamment :
+
+- Agent Brain et ses composants ;
+- Runtime V2 ;
+- skills critiques ;
+- validation Zod ;
+- routes REST ;
+- authentification et autorisation ;
+- gestion des erreurs.
+
+---
+
+# Structure du projet
+
+```text
+leanna/
+├── electron/          # Application desktop
+├── server/
+│   ├── agents/        # Agents + Agent Brain
+│   ├── autonomy/      # Runtime autonome
+│   ├── config/        # Configuration serveur
+│   ├── knowledge/     # Knowledge Graph / RAG
+│   ├── live/          # Gemini Live
+│   ├── marketplace/   # Skills et agents
+│   ├── mcp/           # Model Context Protocol
+│   ├── mission/       # Missions longues
+│   ├── notebooks/     # RAG / documents
+│   ├── routes/        # API REST
+│   ├── runtime/       # Runtime V2
+│   ├── skills/        # Skills natifs
+│   ├── telegram/      # Bot Telegram
+│   ├── workflows/     # Workflows planifiés
+│   ├── security.ts    # Auth / sécurité
+│   └── lifecycle.ts   # Arrêt propre
+├── src/               # Frontend React
+│   ├── components/    # UI / IDE / panels
+│   ├── context/       # Contextes React
+│   ├── hooks/         # Hooks
+│   ├── services/      # Clients API
+│   ├── stores/        # État global
+│   ├── views/         # Pages
+│   └── main.tsx       # Entrée frontend
+├── scripts/           # Scripts utilitaires
+├── assets/            # Assets
+├── supabase/          # Schémas et migrations
+├── ecosystem.config.cjs
+├── server.ts
+├── server-bootstrap.ts
+├── vite.config.ts
+├── package.json
+└── .env.example
+```
+
+---
+
+# Utiliser l'Agent Brain
+
+## Depuis l'interface
+
+Exemples :
+
+```text
+« Modernise mon site et rends le header responsive »
+
+« Corrige le crash au démarrage de l'application »
+
+« Refactorise le module authentication pour respecter les principes SOLID »
+```
+
+## Avec le skill
+
+```ts
+agent_brain({
+  goal: "Modernise mon site et rends le header responsive",
+  mode: "plan_first"
+})
+```
+
+## Avec l'API
+
+### Générer un plan
+
+```bash
+curl -X POST http://localhost:4000/api/agents/brain/plan \
+  -H "Content-Type: application/json" \
+  -H "x-leanna-token: <Leanna_API_TOKEN>" \
+  -d '{"goal": "Modernise mon site et rends le header responsive"}'
+```
+
+### Exécuter une mission
+
+```bash
+curl -X POST http://localhost:4000/api/agents/brain/execute \
+  -H "Content-Type: application/json" \
+  -H "x-leanna-token: <Leanna_API_TOKEN>" \
+  -d '{"goal": "Fix le crash au démarrage", "maxCorrectionAttempts": 3}'
+```
+
+### Suivre une mission
+
+```bash
+curl -H "x-leanna-token: <Leanna_API_TOKEN>" \
+  http://localhost:4000/api/agents/brain/status/<planId>
+```
+
+---
+
+# Dépannage
+
+## `GET /api/pm2/status` retourne `503`
+
+Vérifiez :
+
+```bash
+pm2 --version
+pm2 ping
+pm2 list
+```
+
+Si PM2 n'est pas installé :
+
+```bash
+npm install -g pm2
+```
+
+Sous Windows, vérifiez également que PM2 est disponible dans le `PATH` du processus serveur.
+
+## `401 Unauthorized` sur `/api/*`
+
+Lorsque `Leanna_API_TOKEN` est défini, les routes API nécessitent :
+
+```text
+x-leanna-token: <Leanna_API_TOKEN>
+```
+
+Exception :
+
+```text
+/api/health
+```
+
+## Gemini Live échoue à cause du quota
+
+Vérifiez les limites de tokens et l'injection des notebooks. Si nécessaire, configurez plusieurs clés `GEMINI_API_KEY_N` pour permettre la rotation et le failover sur les erreurs 429.
+
+---
+
+# Documentation
+
+| Document | Contenu |
+|---|---|
+| [`API_DOCS.md`](API_DOCS.md) | API REST et WebSocket |
+| [`AUTONOMY.md`](AUTONOMY.md) | Runtime autonome 24/7 |
+| [`AUTONOMY_AUDIT.md`](AUTONOMY_AUDIT.md) | Audit et limites de l'autonomie |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Architecture technique |
+| [`DB_SCHEMA.md`](DB_SCHEMA.md) | Schéma Supabase |
+| [`GEMINI.md`](GEMINI.md) | Intégration Gemini |
+| [`SELF_IDE.md`](SELF_IDE.md) | Auto-hébergement avec Leanna |
+| [`ROADMAP.md`](ROADMAP.md) | Feuille de route |
+| [`CHANGELOG.md`](CHANGELOG.md) | Historique des versions |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution et conventions |
+
+---
+
+# Contribution
+
+Consultez [`CONTRIBUTING.md`](CONTRIBUTING.md) pour :
+
+- le workflow Git ;
+- les conventions de code ;
+- les règles de contribution ;
+- le processus de review.
+
+---
+
+# Licence
+
+Leanna est distribué sous licence **BUSL 1.1 (Business Source License 1.1)**.
+
+Voir [`LICENSE`](LICENSE) pour les conditions complètes.
