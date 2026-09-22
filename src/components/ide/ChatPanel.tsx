@@ -1565,28 +1565,6 @@ export function ChatPanel({
                         </p>
                       </div>
 
-                      {/* Quick action hints */}
-                      {connected && (
-                        <div className="flex items-center gap-2 flex-wrap justify-center px-4">
-                          {[
-                            { label: '@fichier', color: 'var(--accent-primary)' },
-                            { label: '/commande', color: 'var(--accent-secondary)' },
-                            { label: '📎 document', color: 'var(--color-success)' },
-                          ].map(({ label, color }) => (
-                            <span
-                              key={label}
-                              className="text-[11px] px-2.5 py-1 rounded-full font-medium"
-                              style={{
-                                color,
-                                backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`,
-                                border: `1px solid color-mix(in srgb, ${color} 20%, transparent)`,
-                              }}
-                            >
-                              {label}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </motion.div>
                   )}
 

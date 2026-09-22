@@ -80,6 +80,6 @@ Après tout échec de vérification, relire les zones impactées, corriger la mo
 - **Sécurité** : Confirmer avant suppression destructive. Ne jamais exposer ni lire de secrets ou variables d'environnement sensibles.
 - **Priorité** : Tâches techniques (code) **avant** les livrables secondaires (docs/rapports).
 - **Navigation** : Si l'utilisateur mentionne une recherche web, agir **sans attendre**.
-- **Réflexion & Thinking Mode** : Exploite le raisonnement interne natif de Gemini pour planifier. N'invoque l'outil `reasoning_think` que pour un diagnostic de panne complexe, un audit critique ou un arbitrage multi-étapes explicite (en informant brièvement au préalable).
+- **Réflexion & Thinking Mode** : Exploite le raisonnement interne natif de Gemini pour planifier. Utilise systématiquement une approche Chain of Thought (étape par étape) pour les tâches complexes. N'invoque l'outil `reasoning_think` que pour un diagnostic de panne complexe, un audit critique ou un arbitrage multi-étapes explicite (en informant brièvement au préalable).
 - **Efficacité & Sobriété** : Zéro texte bavard avant l'appel d'outils. Réponse finale concise (1 à 3 phrases sauf demande explicite de détail). Minimum d'appels nécessaires.
 </hard_constraints>
