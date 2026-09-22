@@ -22,6 +22,11 @@ export interface AuditReport {
   supabaseOk: boolean;
   geminiOk: boolean;
   openrouterOk: boolean;
+  telegramOk: boolean;
+  telegramConfigured: boolean;
+  mcpOk: boolean;
+  mcpConnected: number;
+  mcpTotal: number;
   projectRoot: string;
   generatedAt: string;
 }

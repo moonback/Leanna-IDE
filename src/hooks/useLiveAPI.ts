@@ -614,12 +614,32 @@ export function useLiveAPI() {
       update('services', { status: 'running', detail: 'Vérification des clés API…' });
       await delay(400);
 
-      const svcOk  = [report.geminiOk, report.supabaseOk, report.openrouterOk].filter(Boolean).length;
-      const svcBad = 3 - svcOk;
+      // Services de base toujours vérifiés + services optionnels (Telegram, MCP)
+      // uniquement s'ils sont réellement configurés, pour ne pas compter comme
+      // "en panne" des intégrations que l'utilisateur n'a jamais activées.
+      const baseChecks = [report.geminiOk, report.supabaseOk, report.openrouterOk];
+      const optionalChecks: boolean[] = [];
+      const detailParts = [
+        `Gemini ${report.geminiOk ? '✓' : '✗'}`,
+        `Supabase ${report.supabaseOk ? '✓' : '✗'}`,
+        `OpenRouter ${report.openrouterOk ? '✓' : '✗'}`,
+      ];
+      if (report.telegramConfigured) {
+        optionalChecks.push(report.telegramOk);
+        detailParts.push(`Telegram ${report.telegramOk ? '✓' : '✗'}`);
+      }
+      if (report.mcpTotal > 0) {
+        optionalChecks.push(report.mcpOk);
+        detailParts.push(`MCP ${report.mcpConnected}/${report.mcpTotal}`);
+      }
+      const allChecks = [...baseChecks, ...optionalChecks];
+      const svcOk  = allChecks.filter(Boolean).length;
+      const svcTotal = allChecks.length;
+      const svcBad = svcTotal - svcOk;
       update('services', {
         status: svcBad > 0 ? 'error' : 'done',
-        detail: `Gemini ${report.geminiOk ? '✓' : '✗'} · Supabase ${report.supabaseOk ? '✓' : '✗'} · OpenRouter ${report.openrouterOk ? '✓' : '✗'}`,
-        value: `${svcOk}/3`,
+        detail: detailParts.join(' · '),
+        value: `${svcOk}/${svcTotal}`,
         timestamp: Date.now(),
       });
 
@@ -637,7 +657,7 @@ export function useLiveAPI() {
       await delay(500);
 
       const score = Math.round(
-        (svcOk / 3) * 50 +
+        (svcOk / svcTotal) * 50 +
         Math.max(0, 50 - ((report.totalMemoryMB - report.freeMemoryMB) / report.totalMemoryMB) * 100 * 0.3)
       );
       update('summary', {

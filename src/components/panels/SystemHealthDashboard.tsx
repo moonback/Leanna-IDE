@@ -20,11 +20,16 @@ interface AuditReport {
   supabaseOk: boolean;
   geminiOk: boolean;
   openrouterOk: boolean;
+  telegramOk: boolean;
+  telegramConfigured: boolean;
+  mcpOk: boolean;
+  mcpConnected: number;
+  mcpTotal: number;
   projectRoot: string;
   generatedAt: string;
 }
 
-type ServiceName = 'gemini' | 'supabase' | 'openrouter';
+type ServiceName = 'gemini' | 'supabase' | 'openrouter' | 'telegram' | 'mcp';
 
 interface ServiceHealth {
   name: ServiceName;
@@ -233,11 +238,22 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
   }, [autoRefresh, load]);
 
   // Derived values
-  const services: ServiceHealth[] = useMemo(() => [
-    { name: 'gemini', label: 'Gemini (IA)', ok: report?.geminiOk ?? false },
-    { name: 'supabase', label: 'Supabase (DB)', ok: report?.supabaseOk ?? false },
-    { name: 'openrouter', label: 'OpenRouter (LLM)', ok: report?.openrouterOk ?? false },
-  ], [report]);
+  const services: ServiceHealth[] = useMemo(() => {
+    const list: ServiceHealth[] = [
+      { name: 'gemini', label: 'Gemini (IA)', ok: report?.geminiOk ?? false },
+      { name: 'supabase', label: 'Supabase (DB)', ok: report?.supabaseOk ?? false },
+      { name: 'openrouter', label: 'OpenRouter (LLM)', ok: report?.openrouterOk ?? false },
+    ];
+    // Telegram et MCP ne sont affichés que s'ils sont réellement configurés,
+    // pour éviter d'afficher des services "DOWN" que l'utilisateur n'a jamais activés.
+    if (report?.telegramConfigured) {
+      list.push({ name: 'telegram', label: 'Telegram (Bot)', ok: report.telegramOk });
+    }
+    if (report && report.mcpTotal > 0) {
+      list.push({ name: 'mcp', label: `MCP (${report.mcpConnected}/${report.mcpTotal})`, ok: report.mcpOk });
+    }
+    return list;
+  }, [report]);
 
   const serviceScore = report
     ? (services.filter(s => s.ok).length / services.length) * 50
@@ -254,7 +270,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
     <div
       className="flex flex-col w-full h-full min-h-0 border-l"
       style={{
-        width: 320,
+        width: 420,
         minWidth: 320,
         borderColor: 'var(--border-base)',
         backgroundColor: 'var(--bg-secondary)',
@@ -389,6 +405,12 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
                 <div>
                   <span className="text-xs uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Node.js</span>
                   <p className="font-semibold font-mono truncate mt-0.5" style={{ color: 'var(--text-primary)' }}>{report.nodeVersion}</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-xs uppercase font-bold tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Racine du projet</span>
+                  <p className="font-semibold font-mono truncate mt-0.5" style={{ color: 'var(--text-primary)' }} title={report.projectRoot}>
+                    {report.projectRoot}
+                  </p>
                 </div>
               </div>
             </div>

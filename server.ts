@@ -41,7 +41,7 @@ import { createGithubRouter } from "./server/routes/github.js";
 import { createAgentsRouter } from "./server/routes/agents.js";
 import workflowsRouter from "./server/routes/workflows.js";
 import { createCustomSkillsRouter } from "./server/routes/custom-skills.js";
-import auditRouter from "./server/routes/audit.js";
+import { createAuditRouter } from "./server/routes/audit.js";
 import { createProfileRouter, createTokensRouter } from "./server/routes/profile.js";
 import { createOpenRouterRouter } from "./server/routes/openrouter.js";
 import { createTokensOptimizationRouter } from "./server/routes/tokens-optimization.js";
@@ -569,7 +569,7 @@ async function startServer() {
   // IMPORTANT : chaque routeur est monté sur SON préfixe dédié.
   //   - Routeurs dont les routes internes incluent déjà le nom (/profile, /workspace...) restent sur "/api"
   //   - Routeurs dont les routes internes sont génériques (/status, /, /config...) requièrent "/api/<prefix>"
-  app.use("/api/audit", auditRouter);
+  app.use("/api/audit", createAuditRouter(skillManager, mcpBridge));
   app.use("/api/pm2", pm2Router);
   app.use("/api/automation", automationRouter);
   app.use("/api/workflows", workflowsRouter);
