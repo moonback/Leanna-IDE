@@ -44,6 +44,7 @@ import { useScreenShare } from '../context/ScreenShareContext.js';
 import { useSandboxWatcher } from '../hooks/useSandboxWatcher.js';
 import { ideApi } from '../services/ideApi.js';
 import { AgentProgressBar } from '../components/ide/AgentProgressBar.js';
+import { ToolCallCard } from '../components/ide/ToolCallCard.js';
 import { ThoughtStreamContainer } from '../components/ide/ThoughtStream.js';
 import { ChatPanel } from '../components/ide/ChatPanel.js';
 import { LiveSkillsMonitor } from '../components/ide/LiveSkillsMonitor.js';
@@ -1286,6 +1287,9 @@ export default function IdeView() {
 
         {/* Thought Stream — panneau dédié aux résumés de pensée (distinct du CoT) */}
         <ThoughtStreamContainer thought={thoughtStream} />
+
+        {/* Carte enrichie de l'appel d'outil actif (outil + cible en évidence) */}
+        <ToolCallCard steps={activity} connected={connected} />
 
         {/* Agent Progress Bar */}
         <AgentProgressBar steps={activity} connected={connected} onClear={clearActivity} reasoning={reasoning} />

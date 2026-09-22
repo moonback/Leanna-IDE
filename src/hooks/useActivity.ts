@@ -103,6 +103,29 @@ function toolLabel(tool: string, args?: Record<string, unknown>): string {
   return fn ? fn(args) : tool.replace(/_/g, ' ');
 }
 
+/**
+ * Extrait la « cible » brute d'un tool call à partir de ses arguments : le
+ * chemin de fichier, la requête, l'URL, la commande, le rôle d'agent, etc.
+ * Sert à afficher la cible en évidence dans la carte d'appel d'outil (point 3).
+ * Retourne undefined si aucune cible pertinente n'est identifiable.
+ */
+export function toolTarget(args?: Record<string, unknown>): string | undefined {
+  if (!args) return undefined;
+  const pick = (...keys: string[]): string | undefined => {
+    for (const k of keys) {
+      const v = args[k];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+      if (typeof v === 'number') return String(v);
+    }
+    return undefined;
+  };
+  return pick(
+    'path', 'newPath', 'oldPath', 'filePath', 'file',
+    'query', 'url', 'command', 'selector',
+    'role', 'title', 'strategy', 'task_type', 'category',
+  );
+}
+
 export function useActivity() {
   const [activity, setActivity] = useState<ActivityStep[]>([]);
   const [modifiedFiles, setModifiedFiles] = useState<ModifiedFile[]>([]);
@@ -115,6 +138,7 @@ export function useActivity() {
       id: Date.now().toString() + Math.random(),
       tool,
       label: toolLabel(tool, args),
+      detail: toolTarget(args),
       status: 'running',
       timestamp: new Date(),
     };

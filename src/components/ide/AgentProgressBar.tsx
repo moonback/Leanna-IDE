@@ -2,10 +2,10 @@ import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   CheckCircle2, AlertCircle, Loader2, ChevronDown, X, Clock,
-  FileText, FilePen, Search, Trash2, Globe, Brain, Users,
-  Database, LayoutGrid, Terminal, Info,
+  Brain, Info,
 } from 'lucide-react';
 import type { ActivityStep, ReasoningState } from '../../hooks/useLiveAPI.js';
+import { getCat, CAT_COLOR, CAT_LABEL, CatIcon } from './toolCategories.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,7 +17,6 @@ interface AgentProgressBarProps {
 }
 
 type StepStatus = 'running' | 'done' | 'error' | 'pending';
-type ToolCategory = 'file-read' | 'file-write' | 'file-delete' | 'search' | 'web' | 'agent' | 'reasoning' | 'memory' | 'system' | 'other';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -51,51 +50,8 @@ function getStepStatus(step: ActivityStep): StepStatus {
 }
 
 // ─── Tool categorisation ──────────────────────────────────────────────────────
-
-const TOOL_CATEGORIES: Record<string, ToolCategory> = {
-  read_project_file: 'file-read',  list_project_files: 'file-read',
-  analyze_project_file: 'file-read', open_project_file: 'file-read',
-  write_project_file: 'file-write', modify_project_file: 'file-write',
-  create_project_directory: 'file-write', rename_project_file: 'file-write',
-  patch_project_file: 'file-write',
-  delete_project_file: 'file-delete',
-  delete_project_folder: 'file-delete',
-  search_in_files: 'search', automation_search: 'search',
-  automation_navigate: 'web', automation_snapshot: 'web',
-  automation_click: 'web', automation_type: 'web', automation_extract: 'web',
-  agent_delegate: 'agent', agent_orchestrate: 'agent', agent_status: 'agent',
-  agent_list_tasks: 'agent', agent_list_roles: 'agent',
-  agent_cancel: 'agent', agent_stats: 'agent',
-  reasoning_think: 'reasoning', reasoning_delegate_task: 'reasoning',
-  reasoning_list_strategies: 'reasoning',
-  save_memory: 'memory', search_memory: 'memory',
-  get_workspace_info: 'system', generate_codebase_markdown: 'system',
-  open_ide: 'system',
-  create_rich_document: 'other',
-};
-
-function getCat(tool: string): ToolCategory {
-  return TOOL_CATEGORIES[tool] ?? 'other';
-}
-
-const CAT_COLOR: Record<ToolCategory, string> = {
-  'file-read':   'var(--accent-primary)',
-  'file-write':  'var(--color-success)',
-  'file-delete': 'var(--color-error)',
-  'search':      'var(--color-warning)',
-  'web':         'var(--accent-secondary)',
-  'agent':       'var(--color-accent-alt)',
-  'reasoning':   'var(--accent-primary)',
-  'memory':      'var(--accent-secondary)',
-  'system':      'var(--text-muted)',
-  'other':       'var(--text-dimmed)',
-};
-
-const CAT_LABEL: Record<ToolCategory, string> = {
-  'file-read': 'lecture', 'file-write': 'écriture', 'file-delete': 'suppression',
-  'search': 'recherche', 'web': 'web', 'agent': 'agent',
-  'reasoning': 'raisonnement', 'memory': 'mémoire', 'system': 'système', 'other': 'outil',
-};
+// Tables partagées (couleurs, labels, icônes, mapping) importées depuis
+// ./toolCategories pour éviter la divergence avec ToolCallCard et consorts.
 
 const TOOL_LABEL: Record<string, string> = {
   read_project_file: 'lecture', write_project_file: 'écriture',
@@ -116,25 +72,6 @@ const TOOL_LABEL: Record<string, string> = {
 function toolLabel(tool: string): string {
   return TOOL_LABEL[tool] ?? tool.replace(/_/g, ' ').toLowerCase();
 }
-
-// ─── Micro-icons ─────────────────────────────────────────────────────────────
-
-const CatIcon = memo(function CatIcon({ tool, size = 10 }: { tool: string; size?: number }) {
-  const cat = getCat(tool);
-  const s = { color: CAT_COLOR[cat], width: size, height: size, flexShrink: 0 as const };
-  switch (cat) {
-    case 'file-read':   return <FileText style={s} />;
-    case 'file-write':  return <FilePen style={s} />;
-    case 'file-delete': return <Trash2 style={s} />;
-    case 'search':      return <Search style={s} />;
-    case 'web':         return <Globe style={s} />;
-    case 'agent':       return <Users style={s} />;
-    case 'reasoning':   return <Brain style={s} />;
-    case 'memory':      return <Database style={s} />;
-    case 'system':      return <LayoutGrid style={s} />;
-    default:            return <Terminal style={s} />;
-  }
-});
 
 // ─── ReasoningPanel ───────────────────────────────────────────────────────────
 

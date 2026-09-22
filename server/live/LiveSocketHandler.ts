@@ -58,7 +58,10 @@ const TOOL_RESULT_CAPS: Record<string, number> = {
   read_project_file: 24_000,
   generate_codebase_markdown: 16_000,
   list_project_files: 10_000,
-  search_in_files: 10_000,
+  // Troncature agressive : les résultats de recherche multi-fichiers peuvent
+  // exploser en volume (beaucoup de matches) sans proportionnellement plus
+  // de valeur informative. Plafond resserré à 5 000 caractères.
+  search_in_files: 5_000,
   browser_read_content: 14_000,
   browser_get_accessibility_snapshot: 12_000,
 };
@@ -122,6 +125,171 @@ function isRetryableToolError(err: unknown): boolean {
  */
 function sleepMs(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ─── Coercition des arguments d'outils (robustesse STT) ───────────────────────
+// En session vocale, la STT peut mal formater les arguments : chemins avec
+// backslashes ou espaces parasites, JSON imbriqué renvoyé sous forme de string,
+// nombres/booléens en string. Ces déformations provoquent des erreurs de
+// validation (Zod) ou des 400. On applique une passe de normalisation
+// CONSERVATRICE avant validation : on ne corrige que les cas non ambigus, jamais
+// de devinette agressive qui pourrait fausser un argument volontaire.
+
+/** Noms d'arguments traités comme des chemins de fichiers (normalisation dédiée). */
+const PATH_ARG_KEYS = new Set([
+  'path', 'newPath', 'oldPath', 'filePath', 'file', 'dir', 'directory', 'folder', 'target',
+]);
+
+/**
+ * Normalise un chemin de fichier mal formaté par la STT :
+ *   - backslashes Windows → slashes POSIX (le workspace est normalisé en slash) ;
+ *   - trim des espaces en bordure ;
+ *   - suppression d'un préfixe « ./ » redondant ;
+ *   - compactage des espaces parasites autour des séparateurs (« src / main .tsx »
+ *     → « src/main.tsx ») que la dictée vocale insère fréquemment.
+ * Ne touche jamais aux URLs (http/https) ni aux chemins déjà propres.
+ */
+function normalizeArgPath(value: string): string {
+  let p = value.trim();
+  if (!p) return value;
+  // Ne pas toucher aux URLs.
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(p)) return value;
+  p = p.replace(/\\/g, '/');
+  // Espaces autour des séparateurs de chemin : « a / b » → « a/b ».
+  p = p.replace(/\s*\/\s*/g, '/');
+  // Espace avant une extension de fichier : « main .tsx » → « main.tsx ».
+  p = p.replace(/\s+\.(\w+)$/g, '.$1');
+  // Préfixe « ./ » redondant.
+  p = p.replace(/^\.\//, '');
+  return p;
+}
+
+/** Détecte une string qui ressemble à un objet/array JSON sérialisé. */
+function looksLikeJson(value: string): boolean {
+  const t = value.trim();
+  return (t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'));
+}
+
+/**
+ * Applique une coercition conservatrice aux arguments d'un tool call.
+ * Retourne les args (potentiellement) corrigés et la liste des corrections
+ * appliquées (pour transparence côté client et logs). N'altère jamais l'objet
+ * d'origine.
+ */
+function coerceToolArgs(
+  // Réservé à d'éventuelles règles de coercition spécifiques à un outil ; la
+  // passe actuelle est générique (clé d'argument uniquement). Préfixe `_` pour
+  // satisfaire noUnusedParameters sans perdre la signature d'extension.
+  _toolName: string,
+  args: unknown,
+): { args: Record<string, unknown>; corrections: string[] } {
+  const corrections: string[] = [];
+  if (!args || typeof args !== 'object' || Array.isArray(args)) {
+    return { args: (args as Record<string, unknown>) ?? {}, corrections };
+  }
+
+  const out: Record<string, unknown> = { ...(args as Record<string, unknown>) };
+
+  for (const [key, raw] of Object.entries(out)) {
+    if (typeof raw !== 'string') continue;
+    const value = raw;
+
+    // 1. Chemins de fichiers mal formatés par la STT.
+    if (PATH_ARG_KEYS.has(key)) {
+      const normalized = normalizeArgPath(value);
+      if (normalized !== value) {
+        out[key] = normalized;
+        corrections.push(`${key}: chemin normalisé "${value}" → "${normalized}"`);
+      }
+      continue; // un chemin n'est ni du JSON ni un scalaire
+    }
+
+    // 2. JSON imbriqué renvoyé sous forme de string.
+    if (looksLikeJson(value)) {
+      try {
+        out[key] = JSON.parse(value);
+        corrections.push(`${key}: JSON désérialisé depuis une string`);
+        continue;
+      } catch { /* pas du JSON valide — on laisse tel quel */ }
+    }
+
+    // 3. Scalaires évidents et non ambigus (booléens / nombres purs).
+    //    On reste strict : uniquement "true"/"false" exacts et nombres entiers
+    //    ou décimaux complets, pour ne pas casser un argument textuel légitime.
+    const trimmed = value.trim();
+    if (trimmed === 'true' || trimmed === 'false') {
+      out[key] = trimmed === 'true';
+      corrections.push(`${key}: booléen coercé depuis "${value}"`);
+    } else if (/^-?\d+(\.\d+)?$/.test(trimmed) && trimmed.length <= 15) {
+      const n = Number(trimmed);
+      if (Number.isFinite(n)) {
+        out[key] = n;
+        corrections.push(`${key}: nombre coercé depuis "${value}"`);
+      }
+    }
+  }
+
+  return { args: out, corrections };
+}
+
+// ─── Erreurs d'outils constructives (auto-correction du modèle) ───────────────
+// Le catch final aplatissait toute erreur en { error: e.message }, perdant les
+// métadonnées riches de SkillValidationError (issues Zod, suggestions, code).
+// Sans ces détails, le modèle ne peut pas ré-appeler l'outil avec les bons
+// arguments. buildToolErrorResponse préserve ces informations pour offrir au
+// modèle une erreur exploitable (repair-loop implicite, sans tour forcé).
+
+/**
+ * Construit une réponse d'erreur structurée et exploitable par le modèle à
+ * partir d'une exception d'exécution d'outil. Pour les erreurs de validation
+ * (SkillValidationError et assimilées), on expose les problèmes précis, des
+ * suggestions et un rappel des arguments reçus afin de permettre l'auto-correction.
+ */
+function buildToolErrorResponse(err: any, receivedArgs?: unknown): Record<string, unknown> {
+  const message = err?.message ? String(err.message) : 'Erreur inconnue lors de l’exécution de l’outil.';
+  const name = err?.name ?? '';
+  const code = err?.code ?? '';
+
+  const isValidation =
+    name === 'SkillValidationError' ||
+    code === 'VALIDATION_ERROR' ||
+    /validation|zod/i.test(message);
+
+  if (isValidation) {
+    // Problèmes précis : privilégier les issues Zod si disponibles.
+    const issues = Array.isArray(err?.zodIssues) && err.zodIssues.length > 0
+      ? err.zodIssues.map((i: any) => ({
+          field: Array.isArray(i?.path) ? i.path.join('.') || '(root)' : '(root)',
+          message: i?.message ?? 'invalide',
+          ...(i?.expected !== undefined ? { expected: i.expected } : {}),
+          ...(i?.received !== undefined ? { received: i.received } : {}),
+        }))
+      : undefined;
+
+    const suggestions = Array.isArray(err?.suggestions) && err.suggestions.length > 0
+      ? err.suggestions
+      : ['Vérifie les champs requis et leurs types, puis rappelle l’outil avec des arguments corrigés.'];
+
+    return {
+      error: message,
+      code: 'VALIDATION_ERROR',
+      recoverable: true,
+      ...(issues ? { issues } : {}),
+      suggestions,
+      // Rappel des arguments reçus : aide le modèle à repérer précisément ce
+      // qui doit changer avant de rappeler l'outil.
+      ...(receivedArgs !== undefined ? { receivedArgs } : {}),
+      hint: 'Corrige les arguments signalés ci-dessus puis rappelle le même outil.',
+    };
+  }
+
+  // Erreurs non-validation : message brut + indice de récupérabilité si présent.
+  return {
+    error: message,
+    ...(name ? { name } : {}),
+    ...(code ? { code } : {}),
+    ...(typeof err?.recoverable === 'boolean' ? { recoverable: err.recoverable } : {}),
+  };
 }
 
 // ─── Helpers internes ─────────────────────────────────────────────────────────
@@ -235,6 +403,81 @@ export function attachLiveWebSocket(
       audioIdleTimer = setTimeout(markAudioStreamEnd, AUDIO_STREAM_IDLE_MS);
     };
 
+    // ── Synchronisation voix ↔ résultats d'outils (audioGate) ────────────────
+    // Problème : les outils sont NON_BLOCKING et `scheduling` n'est pas supporté
+    // par gemini-3.8-live-extended-thinking. Rien ne cadence donc l'audio sortant
+    // par rapport à `sendToolResponse` : la voix peut parler AVANT que le résultat
+    // d'outil ne soit réinjecté, d'où silences et ruptures de flux narratif.
+    //
+    // Solution serveur : tant qu'au moins un tool call est « en vol », on tamponne
+    // les chunks audio du modèle dans un FIFO au lieu de les émettre. Dès que tous
+    // les outils sont réglés (sendToolResponse envoyé), on flush le buffer dans
+    // l'ordre. Le client reçoit aussi des marqueurs tool_pending/tool_settled pour
+    // gérer un éventuel filler d'attente et reprendre la lecture proprement.
+    //
+    // Garde-fou : un buffer plafonné évite qu'un outil très lent n'accumule un
+    // retard audio ingérable. Au-delà du plafond, on laisse l'audio passer (mieux
+    // vaut un léger déphasage qu'une latence perçue de plusieurs secondes).
+    const AUDIO_BUFFER_MAX_CHUNKS = 200; // ~ quelques secondes de PCM 16 kHz
+    const audioGate = {
+      pendingTools: 0,              // nombre de tool calls en vol
+      buffer: [] as Buffer[],       // chunks audio retenus, dans l'ordre d'arrivée
+      overflowed: false,            // le buffer a dépassé le plafond ce cycle
+    };
+
+    /** Vide le buffer audio retenu vers le client, dans l'ordre. */
+    const flushAudioBuffer = () => {
+      if (audioGate.buffer.length === 0) return;
+      const chunks = audioGate.buffer;
+      audioGate.buffer = [];
+      for (const chunk of chunks) {
+        if (clientWs.readyState !== WebSocket.OPEN) break;
+        try { clientWs.send(chunk); } catch { /* ignore si WS fermé */ }
+      }
+    };
+
+    /**
+     * Émet un chunk audio en respectant le gate : si des outils sont en vol, on
+     * bufferise (jusqu'au plafond) pour préserver l'ordre voix ↔ résultat ; sinon
+     * on envoie directement. En cas de dépassement du plafond, on bascule en
+     * passthrough pour ce cycle afin d'éviter une latence perçue excessive.
+     */
+    const emitAudioChunk = (chunk: Buffer) => {
+      if (clientWs.readyState !== WebSocket.OPEN) return;
+      if (audioGate.pendingTools > 0 && !audioGate.overflowed) {
+        if (audioGate.buffer.length >= AUDIO_BUFFER_MAX_CHUNKS) {
+          // Plafond atteint : on abandonne le maintien d'ordre pour ce cycle.
+          audioGate.overflowed = true;
+          console.warn(
+            `[AudioGate] ⚠️ Buffer audio plafonné (${AUDIO_BUFFER_MAX_CHUNKS} chunks) ` +
+            `avec ${audioGate.pendingTools} outil(s) en vol → passthrough audio.`,
+          );
+          flushAudioBuffer();
+          try { clientWs.send(chunk); } catch { /* ignore */ }
+          return;
+        }
+        audioGate.buffer.push(chunk);
+        return;
+      }
+      try { clientWs.send(chunk); } catch { /* ignore */ }
+    };
+
+    /** Signale le début d'un lot de tool calls (retient l'audio). */
+    const onToolPending = (callIds: string[]) => {
+      audioGate.pendingTools++;
+      try { clientWs.send(JSON.stringify({ type: 'tool_pending', ids: callIds })); } catch {}
+    };
+
+    /** Signale la fin d'un lot de tool calls (libère l'audio si plus rien en vol). */
+    const onToolSettled = (callIds: string[]) => {
+      audioGate.pendingTools = Math.max(0, audioGate.pendingTools - 1);
+      try { clientWs.send(JSON.stringify({ type: 'tool_settled', ids: callIds })); } catch {}
+      if (audioGate.pendingTools === 0) {
+        audioGate.overflowed = false;
+        flushAudioBuffer();
+      }
+    };
+
     // ── Context window monitoring ────────────────────────────────────────
     // Seuils proactifs : on déclenche le résumé BIEN avant la limite réelle du
     // modèle, car un seul gros résultat d'outil (ex. generate_codebase_markdown
@@ -247,8 +490,20 @@ export function attachLiveWebSocket(
     // d'affichage si la compression échoue.
     const CONTEXT_WINDOW_TOKENS = 131_072;
     const COMPRESSION_TRIGGER_TOKENS = 90_000; // la compression serveur se déclenche ici
-    const WARNING_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * 0.60);  // ≈ 78k — affichage UI
-    const CRITICAL_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * 0.80); // ≈ 105k — filet de secours
+    // Seuils exprimés en pourcentage (source unique de vérité, réutilisée par
+    // resolveContextLevel et par la logique d'alerte pour éviter la divergence).
+    const INFO_PCT = 40;      // premier repère informatif (pas d'alerte bloquante)
+    const WARNING_PCT = 60;   // conversation longue → suggérer un résumé
+    const CRITICAL_PCT = 80;  // filet de secours avant context_too_long
+    const INFO_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * (INFO_PCT / 100));      // ≈ 52k
+    const WARNING_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * (WARNING_PCT / 100));  // ≈ 78k — affichage UI
+    const CRITICAL_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * (CRITICAL_PCT / 100)); // ≈ 105k — filet de secours
+    // Hystérésis : quand le contexte redescend sous ce pourcentage (ex. après une
+    // compression serveur ou un auto-résumé), on réarme les alertes pour pouvoir
+    // réalerter si le contexte remonte à nouveau. Évite de rester « bloqué » sur
+    // un niveau critique déjà émis alors que la situation a changé.
+    const ALERT_REARM_PCT = 50;
+    const ALERT_REARM_THRESHOLD = Math.floor(CONTEXT_WINDOW_TOKENS * (ALERT_REARM_PCT / 100));
 
     const conversationCtx = {
       totalPromptTokens: 0,
@@ -264,25 +519,47 @@ export function attachLiveWebSocket(
       pendingToolTokens: 0,
       turns: 0,
       warningsIssued: new Set<string>(),
-      lastAlertLevel: '' as '' | 'warn' | 'critical',
+      lastAlertLevel: '' as '' | 'info' | 'warn' | 'critical',
       lastAutoSummarizeAt: 0,
       autoSummarizeCount: 0,
+      // ── Vélocité & projection ──────────────────────────────────────────
+      // Taille du contexte au tour précédent : sert à calculer la croissance
+      // par tour (delta) et à projeter le nombre de tours restants avant
+      // saturation. `lastReportedPct` limite les logs redondants au même palier.
+      prevContextTokens: 0,
+      lastGrowthPerTurn: 0,
+      lastReportedPct: -1,
     };
 
     let autoSummarizeContext: (() => Promise<void>) | null = null;
 
-    const resolveContextLevel = (percent: number): 'ok' | 'warn' | 'critical' => {
-      if (percent >= 80) return 'critical';
-      if (percent >= 60) return 'warn';
+    const resolveContextLevel = (percent: number): 'ok' | 'info' | 'warn' | 'critical' => {
+      if (percent >= CRITICAL_PCT) return 'critical';
+      if (percent >= WARNING_PCT) return 'warn';
+      if (percent >= INFO_PCT) return 'info';
       return 'ok';
+    };
+
+    /**
+     * Projette le nombre de tours restants avant saturation à partir de la
+     * croissance moyenne par tour. Retourne `null` si la croissance est nulle
+     * ou négative (contexte stable ou en baisse : pas de saturation prévisible).
+     */
+    const projectTurnsUntilFull = (current: number, growthPerTurn: number): number | null => {
+      if (growthPerTurn <= 0) return null;
+      const remaining = CRITICAL_THRESHOLD - current;
+      if (remaining <= 0) return 0;
+      return Math.max(0, Math.round(remaining / growthPerTurn));
     };
 
     const sendContextSize = (
       currentSize: number,
-      opts?: { turns?: number; suggestion?: string; level?: 'ok' | 'warn' | 'critical' },
+      opts?: { turns?: number; suggestion?: string; level?: 'ok' | 'info' | 'warn' | 'critical' },
     ) => {
       const percent = Math.round((currentSize / CONTEXT_WINDOW_TOKENS) * 100);
       const level = opts?.level ?? resolveContextLevel(percent);
+      const growthPerTurn = conversationCtx.lastGrowthPerTurn;
+      const turnsUntilFull = projectTurnsUntilFull(currentSize, growthPerTurn);
       try {
         clientWs.send(JSON.stringify({
           context_size: {
@@ -292,6 +569,12 @@ export function attachLiveWebSocket(
             level,
             turns: opts?.turns ?? conversationCtx.turns,
             suggestion: opts?.suggestion,
+            // Télémétrie de tendance : croissance moyenne par tour et projection
+            // du nombre de tours restants avant le seuil critique. Permet au
+            // client d'afficher une jauge « qui bouge » plutôt qu'un simple %.
+            growthPerTurn,
+            ...(turnsUntilFull !== null ? { turnsUntilFull } : {}),
+            thresholds: { info: INFO_PCT, warn: WARNING_PCT, critical: CRITICAL_PCT },
           },
         }));
       } catch {}
@@ -310,60 +593,85 @@ export function attachLiveWebSocket(
       // zéro : ils sont maintenant reflétés dans ce promptTokenCount.
       conversationCtx.pendingToolTokens = 0;
       const current = prompt + completion;
+
+      // ── Vélocité : croissance du contexte depuis le tour précédent ─────────
+      // On ignore les deltas négatifs (compression/résumé) pour la projection :
+      // seule la croissance nette renseigne sur le risque de saturation.
+      if (conversationCtx.prevContextTokens > 0) {
+        const delta = current - conversationCtx.prevContextTokens;
+        conversationCtx.lastGrowthPerTurn = delta > 0 ? delta : 0;
+      }
+      conversationCtx.prevContextTokens = current;
       conversationCtx.currentContextTokens = current;
 
       const currentPct = (current / CONTEXT_WINDOW_TOKENS) * 100;
       const turnPct = (prompt / CONTEXT_WINDOW_TOKENS) * 100;
+      const turnsUntilFull = projectTurnsUntilFull(current, conversationCtx.lastGrowthPerTurn);
 
-      const baseLog =
-        `[ContextMonitor] 🔄 Tour ${conversationCtx.turns}: prompt=${prompt} (${turnPct.toFixed(1)}%)` +
-        ` | contexte=${current}/${CONTEXT_WINDOW_TOKENS} (${currentPct.toFixed(1)}%)`;
+      // ── Hystérésis : réarmement des alertes ────────────────────────────────
+      // Si le contexte est repassé sous le seuil de réarmement (après compression
+      // serveur ou auto-résumé), on efface les alertes déjà émises pour pouvoir
+      // réalerter proprement si le contexte remonte ensuite.
+      if (current < ALERT_REARM_THRESHOLD && conversationCtx.warningsIssued.size > 0) {
+        conversationCtx.warningsIssued.clear();
+        conversationCtx.lastAlertLevel = '';
+      }
+
+      /** Émet une alerte de contexte (log + context_size + context_alert). */
+      const emitContextAlert = (
+        level: 'info' | 'warn' | 'critical',
+        emoji: string,
+        suggestion: string,
+      ) => {
+        conversationCtx.warningsIssued.add(level);
+        conversationCtx.lastAlertLevel = level;
+        console.warn(`[ContextMonitor] ${emoji} ${level.toUpperCase()}: contexte à ${currentPct.toFixed(1)}%`);
+        sendContextSize(current, { level, turns: conversationCtx.turns, suggestion });
+        try {
+          clientWs.send(JSON.stringify({
+            context_alert: {
+              level,
+              used_tokens: current,
+              max_tokens: CONTEXT_WINDOW_TOKENS,
+              percent: Math.round(currentPct),
+              suggestion,
+              turns: conversationCtx.turns,
+              growth_per_turn: conversationCtx.lastGrowthPerTurn,
+              ...(turnsUntilFull !== null ? { turns_until_full: turnsUntilFull } : {}),
+            },
+          }));
+        } catch {}
+      };
 
       if (current >= CRITICAL_THRESHOLD && !conversationCtx.warningsIssued.has('critical')) {
-        conversationCtx.warningsIssued.add('critical');
-        conversationCtx.lastAlertLevel = 'critical';
-        console.warn(`[ContextMonitor] 🔴 CRITIQUE: contexte à ${currentPct.toFixed(1)}% !`);
-        sendContextSize(current, {
-          level: 'critical',
-          turns: conversationCtx.turns,
-          suggestion: 'Contexte proche de la limite. Démarrer une nouvelle conversation ou demander un résumé.',
-        });
-        try {
-          clientWs.send(JSON.stringify({
-            context_alert: {
-              level: 'critical',
-              used_tokens: current,
-              max_tokens: CONTEXT_WINDOW_TOKENS,
-              percent: Math.round(currentPct),
-              suggestion: 'Contexte proche de la limite. Démarrer une nouvelle conversation ou demander un résumé.',
-              turns: conversationCtx.turns,
-            },
-          }));
-        } catch {}
+        emitContextAlert(
+          'critical', '🔴',
+          'Contexte proche de la limite. Démarrer une nouvelle conversation ou demander un résumé.',
+        );
         autoSummarizeContext?.();
       } else if (current >= WARNING_THRESHOLD && !conversationCtx.warningsIssued.has('warn')) {
-        conversationCtx.warningsIssued.add('warn');
-        conversationCtx.lastAlertLevel = 'warn';
-        console.warn(`[ContextMonitor] 🟠 AVERTISSEMENT: contexte à ${currentPct.toFixed(1)}%`);
-        sendContextSize(current, {
-          level: 'warn',
-          turns: conversationCtx.turns,
-          suggestion: 'Conversation longue. Envisager un résumé ou knowledge_memory_add.',
-        });
-        try {
-          clientWs.send(JSON.stringify({
-            context_alert: {
-              level: 'warn',
-              used_tokens: current,
-              max_tokens: CONTEXT_WINDOW_TOKENS,
-              percent: Math.round(currentPct),
-              suggestion: 'Conversation longue. Envisager un résumé ou knowledge_memory_add.',
-              turns: conversationCtx.turns,
-            },
-          }));
-        } catch {}
+        emitContextAlert(
+          'warn', '🟠',
+          'Conversation longue. Envisager un résumé ou knowledge_memory_add.',
+        );
+      } else if (current >= INFO_THRESHOLD && !conversationCtx.warningsIssued.has('info')) {
+        emitContextAlert(
+          'info', '🔵',
+          'Contexte en croissance. Rien à faire pour l’instant.',
+        );
       } else {
-        console.log(baseLog);
+        // Log conditionnel : uniquement quand le palier de % change, pour éviter
+        // de spammer les logs à chaque tour sans information nouvelle.
+        const roundedPct = Math.round(currentPct);
+        if (roundedPct !== conversationCtx.lastReportedPct) {
+          conversationCtx.lastReportedPct = roundedPct;
+          const projection = turnsUntilFull !== null ? ` | ~${turnsUntilFull} tour(s) avant seuil` : '';
+          console.log(
+            `[ContextMonitor] 🔄 Tour ${conversationCtx.turns}: prompt=${prompt} (${turnPct.toFixed(1)}%)` +
+            ` | contexte=${current}/${CONTEXT_WINDOW_TOKENS} (${currentPct.toFixed(1)}%)` +
+            ` | +${conversationCtx.lastGrowthPerTurn}/tour${projection}`,
+          );
+        }
       }
 
       sendContextSize(current, { turns: conversationCtx.turns });
@@ -795,7 +1103,9 @@ export function attachLiveWebSocket(
             }
 
             const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (audio) clientWs.send(Buffer.from(audio, 'base64'));
+            // Passe par le gate : l'audio est retenu tant qu'un tool call est en
+            // vol, puis flushé dans l'ordre une fois le résultat réinjecté.
+            if (audio) emitAudioChunk(Buffer.from(audio, 'base64'));
 
             // Résumés de pensée (includeThoughts) : parts texte marquées
             // `thought: true`. On les émet séparément et on ne les ajoute PAS
@@ -862,6 +1172,10 @@ export function attachLiveWebSocket(
                     autoSummarizeContext?.();
                   }
                 },
+                // Synchronisation voix ↔ résultat : retient/relâche l'audio autour
+                // de l'exécution des outils pour éviter que la voix parle avant que
+                // le tool_result ne soit réinjecté.
+                { onToolPending, onToolSettled },
               ).catch(e =>
                 console.error('[handleToolCall] Erreur non catchée:', e),
               );
@@ -1441,8 +1755,19 @@ async function handleToolCall(
     readFiles: new Set(),
   },
   onToolResultTokens?: (tokens: number) => void,
+  // Marqueurs de synchronisation voix ↔ résultats d'outils. `onToolPending` est
+  // appelé au début du lot (retient l'audio côté connexion), `onToolSettled`
+  // après `sendToolResponse` (ou en cas d'échec) pour libérer le flux audio.
+  audioSync?: {
+    onToolPending: (callIds: string[]) => void;
+    onToolSettled: (callIds: string[]) => void;
+  },
 ): Promise<void> {
   const functionResponses: any[] = [];
+  // IDs des calls de ce lot, pour les marqueurs de synchronisation audio.
+  const batchCallIds: string[] = Array.isArray(toolCall?.functionCalls)
+    ? toolCall.functionCalls.map((c: any) => c?.id).filter(Boolean)
+    : [];
   const skillManager = deps?.skillManager;
   const browserReadPending = deps?.browserReadPending;
   const browserActionPending = deps?.browserActionPending;
@@ -1470,6 +1795,8 @@ async function handleToolCall(
   };
 
   try { clientWs.send(JSON.stringify({ busy: true })); } catch {}
+  // Retient l'audio sortant tant que ce lot d'outils est en vol.
+  try { audioSync?.onToolPending(batchCallIds); } catch {}
   if (busyStateRef) {
     const firstCallName = toolCall.functionCalls?.[0]?.name ?? "traitement d'outils";
     busyStateRef.activeDescription = `l'exécution de l'outil "${firstCallName}"`;
@@ -1480,6 +1807,11 @@ async function handleToolCall(
   // de { busy: false } pour rétablir le micro et éviter le blocage perçu.
   try {
   for (const call of toolCall.functionCalls) {
+    // Arguments réellement transmis à l'outil (coercés le cas échéant). Déclaré
+    // au scope de l'itération pour rester accessible dans le catch et enrichir
+    // l'erreur constructive (receivedArgs). Fallback sur call.args si l'exception
+    // survient avant la coercition.
+    let receivedArgs: unknown = call.args;
     try {
       // Ask mode guard
       if (mode === 'ask' && WRITE_TOOLS.has(call.name)) {
@@ -1567,13 +1899,27 @@ async function handleToolCall(
         continue;
       }
 
+      // ── Coercition des arguments (robustesse STT) ────────────────────────
+      // Normalise les arguments mal formatés par la dictée vocale AVANT
+      // validation/exécution : chemins, JSON-en-string, scalaires évidents.
+      // Conservateur : ne corrige que les cas non ambigus. On journalise les
+      // corrections et on les remonte au client pour transparence.
+      const { args: effectiveArgs, corrections } = coerceToolArgs(call.name, call.args);
+      receivedArgs = effectiveArgs;
+      if (corrections.length > 0) {
+        console.log(`[ArgCoerce] ${call.name}: ${corrections.join(' | ')}`);
+        try {
+          clientWs.send(JSON.stringify({ type: 'arg_coerced', tool: call.name, corrections }));
+        } catch { /* ignore si WS fermé */ }
+      }
+
       // ── Retry logic pour erreurs transientes ─────────────────────────────
       // MAX_RETRIES=2, délai initial RETRY_DELAY_MS=1000ms, backoff exponentiel.
       // Seules les erreurs réseau/IO/timeout sont retentées (pas les erreurs métier).
       let response: unknown = undefined;
       for (let attempt = 0; attempt <= TOOL_MAX_RETRIES; attempt++) {
         try {
-          response = await skillManager.handleToolCall(call.name, call.args, context);
+          response = await skillManager.handleToolCall(call.name, effectiveArgs, context);
           break; // Succès — sortir de la boucle
         } catch (toolErr: any) {
           const retryable = isRetryableToolError(toolErr);
@@ -1603,19 +1949,21 @@ async function handleToolCall(
       const success = !(response && (response as any).error && !(response as any).status);
       try { skillManager.recordToolUsage(call.name, success); } catch {}
 
-      updateContextGate(contextGate, call.name, call.args, response);
+      // On utilise les arguments coercés pour tout le suivi aval (context gate,
+      // trace client, auto-verify) afin de refléter ce qui a réellement été exécuté.
+      updateContextGate(contextGate, call.name, effectiveArgs, response);
 
       functionResponses.push({ id: call.id, name: call.name, response });
       clientWs.send(JSON.stringify({
         tool_used: call.name,
-        info: JSON.stringify(call.args),
+        info: JSON.stringify(effectiveArgs),
         ...(call.name === 'security_audit' ? { result: response } : {}),
       }));
 
       // Auto-verify
       const WRITE_TOOLS_VERIFY = ['write_project_file', 'modify_project_file', 'patch_project_file', 'rename_project_file'];
       const VERIFY_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
-      const verifyPath = call.name === 'rename_project_file' ? call.args?.newPath : call.args?.path;
+      const verifyPath = call.name === 'rename_project_file' ? (effectiveArgs as any)?.newPath : (effectiveArgs as any)?.path;
       const verifyExt = verifyPath ? path.extname(verifyPath).toLowerCase() : '';
       if (WRITE_TOOLS_VERIFY.includes(call.name) && verifyPath && VERIFY_EXTENSIONS.has(verifyExt)) {
         try {
@@ -1637,7 +1985,17 @@ async function handleToolCall(
       }
     } catch (e: any) {
       console.error(`Error executing tool ${call.name}:`, e);
-      functionResponses.push({ id: call.id, name: call.name, response: { error: e.message } });
+      // Erreur constructive : préserve les métadonnées de validation (issues Zod,
+      // suggestions, arguments reçus) pour que le modèle puisse s'auto-corriger et
+      // rappeler l'outil, au lieu d'une string brute non exploitable.
+      const errorResponse = buildToolErrorResponse(e, receivedArgs);
+      functionResponses.push({ id: call.id, name: call.name, response: errorResponse });
+      try {
+        clientWs.send(JSON.stringify({
+          tool_used: call.name,
+          info: `[ERREUR] ${errorResponse.error}`,
+        }));
+      } catch { /* ignore si WS fermé */ }
     }
   }
 
@@ -1713,6 +2071,11 @@ async function handleToolCall(
     // exception avant la boucle, functionCalls vide…). Sans ça, le client peut
     // rester `isBusy=true` et l'utilisateur perçoit un blocage sur les fillers.
     try { clientWs.send(JSON.stringify({ busy: false })); } catch {}
+    // Libère l'audio retenu : le résultat d'outil est réinjecté (ou l'échec est
+    // acté), donc l'ordre voix ↔ résultat est désormais respecté. Placé dans le
+    // finally pour garantir le settle même si functionResponses est vide ou si
+    // une exception a interrompu le traitement (sinon l'audio resterait bloqué).
+    try { audioSync?.onToolSettled(batchCallIds); } catch {}
     if (busyStateRef) busyStateRef.activeDescription = null;
   }
 }
