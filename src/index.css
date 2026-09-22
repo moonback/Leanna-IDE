@@ -112,118 +112,92 @@
 ═══════════════════════════════════════════════ */
 
 :root[data-theme="dark"] {
-  /* Base – foncé mais avec une teinte bleutée */
-  --bg-base:       #0a1628;
-  --bg-secondary:  #0e2a47;
-  --bg-panel:      #0a1628;
-  --bg-ctrl:       rgba(14, 42, 71, 0.96);
-  --bg-sidebar:    rgba(10, 22, 40, 0.98);
-  --bg-input:      rgba(0, 194, 255, 0.10);
-  --bg-elevated:   #0e2a47;
-/* Dans la section :root[data-theme="dark"] */
-  /* Contrôles */
-  --ctrl-icon:       #6a8aaa;
-  --ctrl-icon-hover: #f0f4ff;
-  --ctrl-hover:      rgba(0, 194, 255, 0.08);
-  --btn-active-bg:   rgba(0, 194, 255, 0.18);
-  --btn-active-text: #00c2ff;
-  --scroll-thumb: rgba(255, 140, 0, 0.60);
-  --scroll-thumb-hover: rgba(255, 140, 0, 0.60);
-  /* Bordures – cyan et orange */
-  --border-base:   rgba(0, 194, 255, 0.20);
-  --border-strong: rgba(255, 140, 0, 0.60);
-  --border-focus:  #00c2ff;
-  --border-glow:   rgba(0, 194, 255, 0.35);
+    --bg-base:       #060814;
+  --bg-secondary:  #0d1127;
+  --bg-panel:      rgba(15, 23, 42, 0.95);
+  --bg-ctrl:       rgba(13, 17, 39, 0.95);
+  --bg-sidebar:    rgba(6, 8, 20, 0.98);
+  --bg-input:      rgba(24, 34, 66, 0.6);
+  --bg-elevated:   #121833;
 
-  /* Textes */
-  --text-primary:   #f0f4ff;
-  --text-secondary: #b0c8e0;
-  --text-muted:     #6a8aaa;
-  --text-dimmed:    #3a5a7a;
+  --shadow-xs:  0 1px 2px rgba(0,240,255,0.2);
+  --shadow-sm:  0 2px 8px rgba(0,240,255,0.25);
+  --shadow-md:  0 4px 16px rgba(255,0,128,0.25);
+  --shadow-lg:  0 12px 40px rgba(0,240,255,0.3);
+  --shadow-xl:  0 24px 56px rgba(255,0,128,0.35);
+  --shadow-glow: 0 0 24px rgba(0,240,255,0.35);
 
-  /* Accents – vos couleurs */
-  --accent-primary:  #00c2ff;
-  --accent-hover:    #33ccff;
-  --accent-subtle:   rgba(0, 194, 255, 0.12);
-  --accent-glow:     rgba(0, 194, 255, 0.25);
-  --accent-secondary: #ff8c00;
+  --border-base:   rgba(0, 240, 255, 0.35);
+  --border-strong: rgba(255, 0, 128, 0.6);
+  --border-focus:  #00f0ff;
+  --border-glow:   rgba(0, 240, 255, 0.5);
 
-  /* Couleurs sémantiques adaptées */
+  --text-primary:   #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted:     #94a3b8;
+  --text-dimmed:    #64748b;
+
+  --accent-primary:  #00f0ff;
+  --accent-hover:    #38bdf8;
+  --accent-subtle:   rgba(0, 240, 255, 0.15);
+  --accent-glow:     rgba(0, 240, 255, 0.5);
+  --accent-secondary: #ec8022;
+
   --color-success:  #00ff9d;
   --color-warning:  #ffb703;
-  --color-error:    #ff4d6d;
-  --color-info:     #00c2ff;
+  --color-error:    #ff0055;
+  --color-info:     #00f0ff;
 
-  /* Déclinaisons subtiles */
+  /* Semantic colours — subtle variants (12% opacity backgrounds) */
   --color-success-subtle: color-mix(in srgb, var(--color-success) 12%, transparent);
   --color-warning-subtle: color-mix(in srgb, var(--color-warning) 12%, transparent);
   --color-error-subtle:   color-mix(in srgb, var(--color-error) 12%, transparent);
   --color-info-subtle:    color-mix(in srgb, var(--color-info) 12%, transparent);
 
-  /* Bordures sémantiques subtiles (DESIGN_TOKENS.md §14.2) */
+  /* Semantic borders — subtle variants (DESIGN_TOKENS.md §14.2) */
   --border-success-subtle: color-mix(in srgb, var(--color-success) 25%, transparent);
   --border-warning-subtle: color-mix(in srgb, var(--color-warning) 25%, transparent);
   --border-error-subtle:   color-mix(in srgb, var(--color-error) 25%, transparent);
   --border-info-subtle:    color-mix(in srgb, var(--color-info) 25%, transparent);
 
-  /* Accent alternatif — Maysson orange */
-  --color-accent-alt: #ff8c00;
+  /* Accent alternative — secondary highlight color */
+  --color-accent-alt: #e056fd;
   --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
 
-  /* Orb – avec le bleu foncé en halo */
-  --orb-glow-active: rgba(0, 194, 255, 0.50);
-  --gradient-from:   rgba(0, 194, 255, 0.10);
-  --orb-idle:      #00c2ff;
-  --orb-online:    #33ccff;
-  --orb-listening: #00bfff;
-  --orb-speaking:  #ff8c00;
-  --orb-busy:      #ffa500;
-  --orb-thinking:  #0e2a47;
+  --orb-idle:      #00f0ff;
+  --orb-online:    #38bdf8;
+  --orb-listening: #ff0080;
+  --orb-speaking:  #e056fd;
+  --orb-busy:      #ffb703;
+  --orb-thinking:  #7d5fff;
 
-  /* Contrôles */
-  --ctrl-icon:       #6a8aaa;
-  --ctrl-icon-hover: #f0f4ff;
-  --ctrl-hover:      rgba(0, 194, 255, 0.08);
-  --btn-active-bg:   rgba(0, 194, 255, 0.18);
-  --btn-active-text: #00c2ff;
+  --ctrl-icon:       #94a3b8;
+  --ctrl-icon-hover: #00f0ff;
+  --ctrl-hover:      rgba(0, 240, 255, 0.15);
+  --btn-active-bg:   rgba(0, 240, 255, 0.2);
+  --btn-active-text: #00f0ff;
 
-  /* Navigation */
-  --nav-active-bg:  rgba(0, 194, 255, 0.12);
-  --nav-active-bar: #00c2ff;
+  --drag-overlay:   rgba(0, 240, 255, 0.2);
+  --scroll-thumb:   #1e293b;
+  --scroll-thumb-hover: #00f0ff;
 
-  /* Verre */
-  --glass-bg:        rgba(14, 42, 71, 0.80);
-  --glass-border:    rgba(0, 194, 255, 0.20);
-  --glass-blur:      18px;
+  --nav-active-bg:  rgba(0, 240, 255, 0.15);
+  --nav-active-bar: #00f0ff;
 
-  /* Variables spécifiques pour le notebook */
-  --notebook-bg: #0e2a47;
-  --notebook-canvas: #0a1628;
-  --notebook-surface: rgba(14, 42, 71, 0.90);
-  --notebook-accent: #00c2ff;
-  --notebook-accent-text: #0a1628;
-  --notebook-accent-surface: rgba(0, 194, 255, 0.08);
-  --notebook-accent-hover: rgba(0, 194, 255, 0.14);
-  --notebook-border: rgba(0, 194, 255, 0.20);
-  --notebook-card-bg: rgba(10, 22, 40, 0.90);
-  --notebook-chat-user: rgba(0, 194, 255, 0.10);
+  --glass-bg:        rgba(15, 23, 42, 0.85);
+  --glass-border:    rgba(0, 240, 255, 0.2);
+  --glass-blur:      16px;
 
-  /* IDE shell */
-  --ide-shell-bg: #0a1628;
-  --ide-panel-bg: rgba(14, 42, 71, 0.94);
-  --ide-sidebar-bg: rgba(10, 22, 40, 0.98);
-  --ide-shell-border: rgba(0, 194, 255, 0.15);
-
-  /* New design variables for EmptyEditorState - Dark theme */
-  --bg: #0a1628;
-  --surface: #0e2a47;
-  --surface-soft: #1a3a5c;
-  --text: #f0f4ff;
-  --text-secondary: #b0c8e0;
-  --text-muted: #6a8aaa;
-  --primary: #00c2ff;
-  --primary-dark: #0099cc;
-  --border: rgba(255, 140, 0, 0.15);
+  /* New design variables for EmptyEditorState - Cyberpunk theme */
+  --bg: #060814;
+  --surface: #0d1127;
+  --surface-soft: #121833;
+  --text: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --primary: #00f0ff;
+  --primary-dark: #00bfff;
+  --border: rgba(0, 240, 255, 0.2);
 }
 
 :root[data-theme="light"] {
@@ -372,7 +346,7 @@
   --accent-hover:    #38bdf8;
   --accent-subtle:   rgba(0, 240, 255, 0.15);
   --accent-glow:     rgba(0, 240, 255, 0.5);
-  --accent-secondary: #ff0080;
+  --accent-secondary: #ec8022;
 
   --color-success:  #00ff9d;
   --color-warning:  #ffb703;

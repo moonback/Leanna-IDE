@@ -79,25 +79,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
             </p>
           </div>
 
-          {/* Ligne d'état sécurité */}
-          <div
-            className="rounded-xl px-3 py-2.5 flex items-center gap-2.5"
-            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}
-          >
-            <ShieldCheck className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
-            <span
-              className="flex-1 text-xs font-mono truncate"
-              style={{ color: 'var(--text-dimmed)', letterSpacing: '.03em' }}
-            >
-              SECURE · AES-256-GCM · SESSION ACTIVE
-            </span>
-            <span
-              className="text-xs font-mono font-semibold uppercase"
-              style={{ color: 'var(--color-success)', letterSpacing: '.06em' }}
-            >
-              Online
-            </span>
-          </div>
+          
         </div>
       </Modal.Body>
 
