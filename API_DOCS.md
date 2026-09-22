@@ -666,7 +666,7 @@ Délègue une tâche à un agent autonome. L'agent peut sous-déléguer automati
 | `description` | `string` | ✅ | Description complète |
 | `files` | `string[]` | ❌ | Fichiers à traiter |
 | `instructions` | `string` | ❌ | Instructions spécifiques |
-| `priority` | `"low"\|"normal"\|"high"\|"critical"` | ❌ | Priorité (défaut: `normal`) |
+| `priority` | `"low"\|"medium"\|"high"\|"critical"` | ❌ | Priorité (défaut: `medium`) |
 | `timeoutMs` | `number` | ❌ | Timeout en ms |
 
 **Réponse 202 :**

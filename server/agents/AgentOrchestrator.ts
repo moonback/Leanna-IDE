@@ -17,6 +17,12 @@ import { agentPersistence } from "./AgentPersistence.js";
 import { createLogger } from "../utils/logger.js";
 import { initCustomAgents } from "../routes/custom-agents.js";
 import { agentEventStream } from "./AgentEventStream.js";
+import type { AgentBrain as AgentBrainType } from "./brain/AgentBrain.js";
+import type {
+  BrainGoalInput,
+  BrainPlan,
+  BrainExecutionResult,
+} from "./brain/types.js";
 
 // Ré-exporter pour compatibilité et usage externe
 export type { AgentEvent } from "./ProgressNotifier.js";
@@ -550,12 +556,14 @@ export class AgentOrchestrator {
 
   // ─── Agent Brain (Cerveau Central Leanna) ──────────────────────────────────
 
-  private brainInstance: any = null;
+  private brainInstance: AgentBrainType | null = null;
 
   /**
-   * Retourne l'instance de l'Agent Brain (cerveau central Leanna)
+   * Retourne l'instance de l'Agent Brain (cerveau central Leanna).
+   * L'import est dynamique pour éviter le cycle d'import
+   * (AgentBrain importe AgentOrchestrator).
    */
-  async getBrain() {
+  async getBrain(): Promise<AgentBrainType> {
     if (!this.brainInstance) {
       const { AgentBrain } = await import("./brain/AgentBrain.js");
       this.brainInstance = new AgentBrain(this);
@@ -566,7 +574,7 @@ export class AgentOrchestrator {
   /**
    * Planifie dynamiquement un objectif utilisateur via l'Agent Brain
    */
-  async brainPlan(input: import("./brain/types.js").BrainGoalInput) {
+  async brainPlan(input: BrainGoalInput): Promise<BrainPlan> {
     const brain = await this.getBrain();
     return brain.planGoal(input);
   }
@@ -574,7 +582,7 @@ export class AgentOrchestrator {
   /**
    * Exécute de bout en bout un objectif utilisateur via l'Agent Brain
    */
-  async brainExecute(input: import("./brain/types.js").BrainGoalInput) {
+  async brainExecute(input: BrainGoalInput): Promise<BrainExecutionResult> {
     const brain = await this.getBrain();
     return brain.executeGoal(input);
   }

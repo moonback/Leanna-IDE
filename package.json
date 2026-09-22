@@ -21,7 +21,8 @@
     "audit:deps:full": "npm audit",
     "pack:win": "npm run build && electron-builder --win --dir",
     "dist:win": "npm run build && electron-builder --win",
-    "ui:audit": "node scripts/ui-audit.mjs"
+    "ui:audit": "node scripts/ui-audit.mjs",
+    "brain:smoke": "node scripts/brain-smoke.mjs"
   },
   "build": {
     "appId": "com.Leanna.os",

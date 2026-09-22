@@ -265,6 +265,8 @@ export const agentsSkill: Skill = {
           contextFiles: { type: "ARRAY", items: { type: "STRING" }, description: "Fichiers pertinents connus (optionnel)" },
           instructions: { type: "STRING", description: "Consignes spécifiques (optionnel)" },
           mode: { type: "STRING", description: "Mode d'exécution : 'auto' (complet) ou 'plan_first' (planification préalable)" },
+          maxCorrectionAttempts: { type: "NUMBER", description: "Budget d'auto-correction par étape en échec (0-5, défaut 3). Baisser pour limiter le coût." },
+          maxReplans: { type: "NUMBER", description: "Budget de réplanification à chaud du sous-graphe restant sur échec persistant (0-5, défaut 2)." },
         },
         required: ["goal"],
       },
@@ -293,6 +295,8 @@ export const agentsSkill: Skill = {
       contextFiles: z.array(z.string()).optional().default([]),
       instructions: z.string().optional(),
       mode: z.enum(["auto", "plan_first"]).optional().default("auto"),
+      maxCorrectionAttempts: z.number().int().min(0).max(5).optional().default(3),
+      maxReplans: z.number().int().min(0).max(5).optional().default(2),
     }),
   },
 
@@ -327,6 +331,7 @@ export const agentsSkill: Skill = {
               dependsOn: s.dependsOn,
             })),
             rationale: plan.architectureRationale,
+            mermaid: plan.mermaid,
           };
         } else {
           const result = await agentOrchestrator.brainExecute({

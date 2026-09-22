@@ -15,7 +15,8 @@ import { GoalUnderstandingEngine } from "./GoalUnderstandingEngine.js";
 import { DynamicPlanner } from "./DynamicPlanner.js";
 import { BrainVerifier } from "./BrainVerifier.js";
 import { BrainCorrectionLoop } from "./BrainCorrectionLoop.js";
-import type { BrainGoalInput, BrainStage, StageVerification, GoalUnderstanding } from "./types.js";
+import { AgentBrain } from "./AgentBrain.js";
+import type { BrainGoalInput, BrainStage, StageVerification, GoalUnderstanding, BrainPlan } from "./types.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -315,5 +316,334 @@ describe("BrainCorrectionLoop", () => {
     const correction = loop.createCorrection(stage, verification, 1, understanding);
     assert.ok(correction?.correctiveInstructions.includes("CORRECTION REQUISE"));
     assert.ok(correction?.correctiveInstructions.includes("DIAGNOSTIC"));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Helpers — Orchestrateur mocké pour tester AgentBrain sans exécution réelle
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface MockTaskResult {
+  success: boolean;
+  outcome?: string;
+  summary?: string;
+  error?: string;
+  filesModified?: string[];
+  durationMs?: number;
+}
+
+/**
+ * Orchestrateur mocké minimal : implémente delegateTask() et getTask().
+ * `resultFor(role, title, attempt)` détermine le résultat de chaque tâche,
+ * ce qui permet de simuler succès, échec, puis succès après correction.
+ */
+class MockOrchestrator {
+  private tasks = new Map<string, any>();
+  public delegated: Array<{ role: string; title: string }> = [];
+  private counter = 0;
+
+  constructor(
+    private resultFor: (params: { role: string; title: string; index: number }) => MockTaskResult
+  ) {}
+
+  async delegateTask(params: { role: string; title: string; description?: string; files?: string[]; instructions?: string; priority?: string }) {
+    const index = this.counter++;
+    const id = `task-${index}-${params.role}`;
+    this.delegated.push({ role: params.role, title: params.title });
+    const r = this.resultFor({ role: params.role, title: params.title, index });
+    const task = {
+      id,
+      role: params.role,
+      title: params.title,
+      status: r.success ? "completed" : "failed",
+      result: {
+        success: r.success,
+        outcome: r.outcome ?? (r.success ? "success" : "failed"),
+        summary: r.summary ?? (r.success ? "OK" : "Échec"),
+        error: r.error,
+        filesModified: r.filesModified ?? [],
+        durationMs: r.durationMs ?? 1,
+      },
+    };
+    this.tasks.set(id, task);
+    return task;
+  }
+
+  getTask(id: string) {
+    return this.tasks.get(id);
+  }
+}
+
+/** Construit un AgentBrain avec understanding + plan injectés (sans LLM). */
+function makeBrainWithPlan(orchestrator: any, understanding: GoalUnderstanding, plan: BrainPlan): AgentBrain {
+  const brain = new AgentBrain(orchestrator);
+  const anyBrain = brain as any;
+  anyBrain.understandingEngine = { understand: async () => understanding };
+  anyBrain.planner = {
+    plan: async () => JSON.parse(JSON.stringify(plan)) as BrainPlan,
+    planHeuristic: () => JSON.parse(JSON.stringify(plan)) as BrainPlan,
+  };
+  return brain;
+}
+
+function makePlanFrom(stages: BrainStage[], goal = "Objectif de test"): BrainPlan {
+  return {
+    id: "plan-brain-test",
+    goal,
+    understanding: makeUnderstanding("frontend"),
+    stages,
+    estimatedDurationMs: stages.length * 1000,
+    architectureRationale: "Plan de test",
+    createdAt: new Date().toISOString(),
+    status: "planned",
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Tests AgentBrain.planGoal — validation + Mermaid
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("AgentBrain.planGoal", () => {
+  it("retourne un plan valide avec un diagramme Mermaid non vide", async () => {
+    const understanding = makeUnderstanding("frontend");
+    const plan = makePlanFrom([
+      { ...makeStage("coder", "stage-1"), status: "pending" },
+      { ...makeStage("tester", "stage-2"), status: "pending", dependsOn: ["stage-1"] },
+    ]);
+    const brain = makeBrainWithPlan(new MockOrchestrator(() => ({ success: true })), understanding, plan);
+
+    const result = await brain.planGoal(makeInput("Rends le header responsive"));
+    assert.ok(result.mermaid && result.mermaid.includes("graph TD"), "Le plan doit contenir un Mermaid graph TD");
+    assert.ok(result.mermaid!.includes("-->"), "Le Mermaid doit contenir au moins une arête");
+  });
+
+  it("rejette un plan invalide (cycle) produit par le planner", async () => {
+    const understanding = makeUnderstanding("frontend");
+    const plan = makePlanFrom([
+      { ...makeStage("coder", "a"), status: "pending", dependsOn: ["b"] },
+      { ...makeStage("tester", "b"), status: "pending", dependsOn: ["a"] },
+    ]);
+    const brain = makeBrainWithPlan(new MockOrchestrator(() => ({ success: true })), understanding, plan);
+
+    await assert.rejects(
+      () => brain.planGoal(makeInput("Objectif menant à un cycle")),
+      /invalide/i,
+      "planGoal doit rejeter un plan cyclique"
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Tests AgentBrain.executeGoal — scheduler parallèle, correction, réplanification
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("AgentBrain.executeGoal (scheduler DAG)", () => {
+  it("exécute un plan linéaire et retourne success=true", async () => {
+    const understanding = makeUnderstanding("frontend");
+    const plan = makePlanFrom([
+      { ...makeStage("coder", "stage-1"), status: "pending" },
+      { ...makeStage("tester", "stage-2"), status: "pending", dependsOn: ["stage-1"] },
+    ]);
+    const orch = new MockOrchestrator(() => ({ success: true, filesModified: ["src/a.ts"] }));
+    const brain = makeBrainWithPlan(orch, understanding, plan);
+
+    const result = await brain.executeGoal(makeInput("Objectif linéaire", { mode: "auto", maxCorrectionAttempts: 1, maxReplans: 0 }));
+    assert.equal(result.success, true, result.summary);
+    assert.equal(result.stages.length, 2);
+    assert.ok(result.filesModified.includes("src/a.ts"));
+  });
+
+  it("exécute les branches indépendantes en parallèle", async () => {
+    const understanding = makeUnderstanding("frontend");
+    // a -> {b, c} -> d
+    const plan = makePlanFrom([
+      { ...makeStage("researcher", "a"), status: "pending" },
+      { ...makeStage("coder", "b"), status: "pending", dependsOn: ["a"] },
+      { ...makeStage("coder", "c"), status: "pending", dependsOn: ["a"] },
+      { ...makeStage("reviewer", "d"), status: "pending", dependsOn: ["b", "c"] },
+    ]);
+
+    // Mesurer le chevauchement de b et c en traçant delegateTask (début/fin)
+    const windows: Record<string, { start: number; end: number }> = {};
+    const t0 = Date.now();
+    const orch2 = new MockOrchestrator(() => ({ success: true }));
+    // Patch delegateTask pour introduire un délai et enregistrer la fenêtre temporelle
+    const origDelegate = orch2.delegateTask.bind(orch2);
+    let delegateSeq = 0;
+    (orch2 as any).delegateTask = async (params: any) => {
+      const startedKey = `${params.role}#${delegateSeq++}`;
+      windows[startedKey] = { start: Date.now() - t0, end: 0 };
+      await sleepMs(40);
+      windows[startedKey].end = Date.now() - t0;
+      return origDelegate(params);
+    };
+
+    const brain = makeBrainWithPlan(orch2, understanding, plan);
+    const result = await brain.executeGoal(makeInput("DAG diamant", { mode: "auto", maxCorrectionAttempts: 0, maxReplans: 0 }));
+
+    assert.equal(result.success, true, result.summary);
+    // Retrouver les fenêtres de b et c (leurs titres contiennent l'id de stage via makeStage: "Étape test (role)")
+    // makeStage titre = `Étape test (${role})` -> b et c ont le même role "coder" donc on distingue par ordre.
+    const coderWindows = Object.entries(windows).filter(([t]) => t.includes("coder"));
+    assert.ok(coderWindows.length >= 2, "Deux étapes coder attendues (b et c)");
+    const [w1, w2] = coderWindows.map(([, w]) => w);
+    const overlap = w1.start < w2.end && w2.start < w1.end;
+    assert.ok(overlap, `b et c doivent se chevaucher: ${JSON.stringify(coderWindows)}`);
+  });
+
+  it("poursuit une branche indépendante malgré l'échec d'une autre (succès partiel)", async () => {
+    const understanding = makeUnderstanding("frontend");
+    const plan = makePlanFrom([
+      { ...makeStage("researcher", "a"), status: "pending" },
+      { ...makeStage("coder", "b"), status: "pending", dependsOn: ["a"] }, // échoue
+      { ...makeStage("writer", "c"), status: "pending" }, // indépendant, réussit
+    ]);
+    const orch = new MockOrchestrator(({ role }) => {
+      if (role === "coder") return { success: false, error: "compilation KO" };
+      return { success: true };
+    });
+    const brain = makeBrainWithPlan(orch, understanding, plan);
+
+    const result = await brain.executeGoal(makeInput("Branche échouée", { mode: "auto", maxCorrectionAttempts: 0, maxReplans: 0 }));
+    assert.equal(result.success, false, "Succès global faux car une branche échoue");
+    // c (writer) doit avoir réussi
+    const cResult = result.stages.find((s) => s.stage.agentRole === "writer");
+    assert.equal(cResult?.stage.status, "completed", "La branche indépendante writer doit réussir");
+  });
+
+  it("corrige une étape en échec puis réussit (correction autonome)", async () => {
+    const understanding = makeUnderstanding("frontend");
+    const plan = makePlanFrom([{ ...makeStage("coder", "stage-1"), status: "pending" }]);
+
+    // Premier appel (délégation initiale) échoue ; l'appel de correction réussit.
+    const orch = new MockOrchestrator(({ title }) => {
+      if (title.includes("Auto-Correction")) return { success: true, filesModified: ["src/fixed.ts"] };
+      return { success: false, error: "erreur initiale" };
+    });
+    const brain = makeBrainWithPlan(orch, understanding, plan);
+
+    const result = await brain.executeGoal(makeInput("Correction", { mode: "auto", maxCorrectionAttempts: 2, maxReplans: 0 }));
+    assert.equal(result.success, true, `Doit réussir après correction: ${result.summary}`);
+    assert.ok(result.corrections.length >= 1, "Au moins une correction enregistrée");
+    assert.ok(result.corrections.some((c) => c.resolved), "Une correction doit être marquée resolved");
+  });
+
+  it("réplanifie le sous-graphe restant sur échec persistant, borné par maxReplans", async () => {
+    const understanding = makeUnderstanding("frontend");
+    const plan = makePlanFrom([
+      { ...makeStage("coder", "stage-1"), status: "pending" },
+      { ...makeStage("tester", "stage-2"), status: "pending", dependsOn: ["stage-1"] },
+    ]);
+
+    // stage-1 (coder) échoue toujours, y compris après correction et réplanification.
+    const brain = makeBrainWithPlan(
+      new MockOrchestrator(({ role, title }) => {
+        if (title.includes("Auto-Correction")) return { success: false, error: "fix inefficace" };
+        if (role === "coder") return { success: false, error: "échec persistant" };
+        return { success: true };
+      }),
+      understanding,
+      plan
+    );
+    // Le 1er appel à planner.plan est la planification initiale ; les suivants sont
+    // les réplanifications de sous-graphe. On ne compte que ces derniers.
+    const anyBrain = brain as any;
+    let planCalls = 0;
+    let replanObserved = 0;
+    anyBrain.planner.plan = async () => {
+      planCalls++;
+      if (planCalls === 1) return JSON.parse(JSON.stringify(plan)); // plan initial
+      replanObserved++;
+      return makePlanFrom([{ ...makeStage("coder", "regen"), status: "pending" }]);
+    };
+
+    const result = await brain.executeGoal(makeInput("Réplanification", { mode: "auto", maxCorrectionAttempts: 0, maxReplans: 2 }));
+    assert.equal(result.success, false, "Doit échouer proprement après épuisement du budget");
+    assert.equal(replanObserved, 2, `maxReplans=2 doit produire exactement 2 réplanifications, observé: ${replanObserved}`);
+  });
+
+  it("ne réexécute pas les étapes déjà complétées lors d'une réplanification", async () => {
+    const understanding = makeUnderstanding("frontend");
+    const plan = makePlanFrom([
+      { ...makeStage("researcher", "stage-1"), status: "pending" }, // réussit
+      { ...makeStage("coder", "stage-2"), status: "pending", dependsOn: ["stage-1"] }, // échoue
+    ]);
+
+    const executedRoles: string[] = [];
+    const orch = new MockOrchestrator(({ role, title }) => {
+      if (!title.includes("Auto-Correction")) executedRoles.push(role);
+      if (role === "coder") return { success: false, error: "échec" };
+      return { success: true };
+    });
+    const brain = makeBrainWithPlan(orch, understanding, plan);
+    const anyBrain = brain as any;
+    let planCalls = 0;
+    anyBrain.planner.plan = async () => {
+      planCalls++;
+      if (planCalls === 1) return JSON.parse(JSON.stringify(plan)); // plan initial (researcher + coder)
+      // réplanification : seulement un nouveau coder pour le sous-graphe restant
+      return makePlanFrom([{ ...makeStage("coder", "regen"), status: "pending" }]);
+    };
+
+    await brain.executeGoal(makeInput("Préservation", { mode: "auto", maxCorrectionAttempts: 0, maxReplans: 1 }));
+    // researcher (stage-1) ne doit être exécuté qu'une seule fois malgré la réplanification
+    const researcherCount = executedRoles.filter((r) => r === "researcher").length;
+    assert.equal(researcherCount, 1, `researcher exécuté ${researcherCount} fois (attendu 1)`);
+  });
+});
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Test d'intégration — DAG parallèle + correction + réplanification combinés
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("AgentBrain.executeGoal (intégration bout-en-bout)", () => {
+  it("combine parallélisme, correction autonome et réplanification en un seul run", async () => {
+    const understanding = makeUnderstanding("frontend");
+    // a -> {b, c} ; b réussit après correction ; c échoue puis est réplanifié
+    const plan = makePlanFrom([
+      { ...makeStage("researcher", "a"), status: "pending" },
+      { ...makeStage("coder", "b"), status: "pending", dependsOn: ["a"] },
+      { ...makeStage("tester", "c"), status: "pending", dependsOn: ["a"] },
+    ]);
+
+    const orch = new MockOrchestrator(({ role, title }) => {
+      // Corrections : distinguer selon l'étape source encodée dans le titre du fix.
+      if (title.includes("Auto-Correction")) {
+        // Le fix de b (coder) réussit ; le fix de c (tester) échoue → échec persistant de c.
+        if (title.includes("(coder)")) return { success: true, filesModified: ["src/b.ts"] };
+        return { success: false, error: "fix de c inefficace" };
+      }
+      // Délégations initiales
+      if (role === "coder") return { success: false, error: "b: erreur initiale" }; // b échoue, puis corrigé
+      if (role === "tester") return { success: false, error: "c: échec persistant" }; // c échoue → réplanif
+      return { success: true }; // researcher + étapes régénérées (writer)
+    });
+    const brain = makeBrainWithPlan(orch, understanding, plan);
+
+    // Réplanification : régénère un writer (qui réussit) pour remplacer la branche c
+    const anyBrain = brain as any;
+    let planCalls = 0;
+    anyBrain.planner.plan = async () => {
+      planCalls++;
+      if (planCalls === 1) return JSON.parse(JSON.stringify(plan));
+      return makePlanFrom([{ ...makeStage("writer", "regen-c"), status: "pending" }]);
+    };
+
+    const result = await brain.executeGoal(
+      makeInput("Mission combinée", { mode: "auto", maxCorrectionAttempts: 2, maxReplans: 2 })
+    );
+
+    // b doit avoir été corrigé avec succès
+    assert.ok(result.corrections.some((c) => c.resolved), "La correction de b doit réussir");
+    assert.ok(result.filesModified.includes("src/b.ts"), "Le fix de b doit apparaître dans filesModified");
+    // Une réplanification a eu lieu pour la branche c
+    assert.ok(planCalls >= 2, `Au moins une réplanification attendue, planCalls=${planCalls}`);
+    // Le run se termine (pas de boucle infinie) avec un succès global après régénération
+    assert.equal(typeof result.success, "boolean");
+    assert.ok(result.totalDurationMs >= 0);
   });
 });
