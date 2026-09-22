@@ -1,6 +1,13 @@
-import React from 'react';
-import { BrainCircuit, GitBranch, FolderOpen, MessageSquare } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { BrainCircuit, GitBranch, FolderOpen, MessageSquare, Puzzle, Send } from 'lucide-react';
 import { Modal } from '../ui/Modal.js';
+import { useCustomSkills } from '../../hooks/useCustomSkills.js';
+
+interface TelegramInfo {
+  isConfigured: boolean;
+  isRunning: boolean;
+  botInfo: { username: string } | null;
+}
 
 interface SystemModalProps {
   onClose: () => void;
@@ -11,6 +18,48 @@ interface SystemModalProps {
 }
 
 export function SystemModal({ onClose, connected, profile, gitInfo, workspace }: SystemModalProps) {
+  // Skills custom activés
+  const { skills, loading: skillsLoading } = useCustomSkills({ enabledOnly: true });
+
+  // Statut du bot Telegram
+  const [telegram, setTelegram] = useState<TelegramInfo | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchTelegram = async () => {
+      try {
+        const res = await fetch('/api/telegram/status');
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && data.status === 'success') setTelegram(data.data);
+        }
+      } catch {
+        /* silencieux : intégration optionnelle */
+      }
+    };
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) setTelegram(detail);
+      else fetchTelegram();
+    };
+    fetchTelegram();
+    window.addEventListener('Leanna-telegram-status-changed', handler);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('Leanna-telegram-status-changed', handler);
+    };
+  }, []);
+
+  const telegramValue = !telegram || !telegram.isConfigured
+    ? 'Non configuré'
+    : telegram.isRunning
+      ? `Actif${telegram.botInfo?.username ? ` (@${telegram.botInfo.username})` : ''}`
+      : 'Arrêté';
+  const telegramColor = !telegram || !telegram.isConfigured
+    ? 'var(--text-muted)'
+    : telegram.isRunning
+      ? 'var(--color-success)'
+      : 'var(--color-warning)';
+
   return (
     <Modal open onClose={onClose} size="sm" tone="default">
       <Modal.Header>
@@ -45,6 +94,18 @@ export function SystemModal({ onClose, connected, profile, gitInfo, workspace }:
               ? profile.openrouterModel?.split('/').pop() || 'OpenRouter'
               : 'Gemini 2.0'}
             mono
+          />
+          <StatusRow
+            icon={<Puzzle size={12} style={{ color: 'var(--color-accent-alt)' }} />}
+            label="Skills actifs"
+            value={skillsLoading ? '…' : `${skills.length}`}
+            valueColor="var(--color-accent-alt)"
+          />
+          <StatusRow
+            icon={<Send size={12} style={{ color: 'var(--color-info)' }} />}
+            label="Telegram"
+            value={telegramValue}
+            valueColor={telegramColor}
           />
           {gitInfo && (
             <StatusRow
