@@ -272,6 +272,18 @@ export function rankLinkCandidates(
 // Petit wrapper pour garantir qu'on ne renvoie jamais "success" si l'IPC
 // n'est pas disponible (context.emitIdeAction manquant), et pour uniformiser
 // la forme des erreurs renvoyées au modèle.
+/**
+ * Message uniforme renvoyé quand le panneau navigateur intégré (piloté par
+ * emitIdeAction) n'est pas disponible dans le contexte d'exécution. Il oriente
+ * explicitement le modèle vers la famille automation_* (Puppeteer headless),
+ * qui ne dépend PAS de emitIdeAction et reste disponible en vocal comme en REST.
+ */
+const BROWSER_UNAVAILABLE_MESSAGE =
+  "Le panneau navigateur intégré n'est pas disponible dans ce contexte (emitIdeAction manquant). " +
+  "Bascule sur les outils automation_* (navigateur Puppeteer headless) qui ne nécessitent pas le panneau : " +
+  "automation_search pour une recherche web, automation_navigate pour ouvrir une URL, " +
+  "automation_extract pour lire le contenu, automation_click / automation_type pour interagir.";
+
 function withEmit<T>(
   emit: ((action: any) => void) | undefined,
   fn: (emit: (action: any) => void) => T
@@ -279,8 +291,7 @@ function withEmit<T>(
   if (!emit) {
     return {
       status: "error",
-      message:
-        "Le panneau navigateur n'est pas disponible dans ce contexte (emitIdeAction manquant).",
+      message: BROWSER_UNAVAILABLE_MESSAGE,
     };
   }
   try {
@@ -1027,7 +1038,7 @@ export const browserSkill: Skill = {
       message: string;
     }> => {
       if (!emit) {
-        return { status: "error", message: "Le navigateur n'est pas disponible dans ce contexte." };
+        return { status: "error", message: BROWSER_UNAVAILABLE_MESSAGE };
       }
 
       const pending = context?.browserReadPending as Map<string, {
@@ -1114,7 +1125,7 @@ export const browserSkill: Skill = {
       if (!emit) {
         return {
           status: "error",
-          message: "Le panneau navigateur n'est pas disponible dans ce contexte (emitIdeAction manquant).",
+          message: BROWSER_UNAVAILABLE_MESSAGE,
         };
       }
 
@@ -1249,7 +1260,7 @@ export const browserSkill: Skill = {
     // N meilleures sources (hors pages de moteur de recherche / trackers).
     if (name === "browser_research") {
       if (!emit) {
-        return { status: "error", message: "Le panneau navigateur n'est pas disponible dans ce contexte." };
+        return { status: "error", message: BROWSER_UNAVAILABLE_MESSAGE };
       }
 
       const { query, engine, maxSources } = validateArgs(browserSkill.inputSchemas!["browser_research"], args);

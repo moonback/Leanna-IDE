@@ -816,8 +816,12 @@ export class Executor {
     }
 
     try {
-      const dryRun = mission.getConfig().dryRun;
-      result = await this.skillHandler!(action.skillName, action.args, { dryRun });
+      const missionConfig = mission.getConfig();
+      const dryRun = missionConfig.dryRun;
+      result = await this.skillHandler!(action.skillName, action.args, {
+        dryRun,
+        timeoutMs: missionConfig.timeoutMs,
+      });
       success = !!(
         result === null ||
         result === undefined ||
@@ -1260,6 +1264,8 @@ JSON:`;
 export interface SkillHandlerOptions {
   /** Exécuter en simulation (dry-run), sans effet de bord. */
   dryRun?: boolean;
+  /** Timeout par action (ms), aligné sur MissionConfig.timeoutMs (180 s). */
+  timeoutMs?: number;
 }
 
 /** Handler pour exécuter un skill */

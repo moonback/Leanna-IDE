@@ -209,6 +209,13 @@ export interface MissionConfig {
    * Les outils en lecture seule continuent de s'exécuter normalement.
    */
   dryRun: boolean;
+  /**
+   * Timeout par action exécutée par la mission (ms). Aligné sur les autres
+   * couches (AgentRuntime / SkillAdapter agent_execute = 180 s) pour éviter que
+   * les actions longues (recherche navigateur, refactor multi-fichiers) soient
+   * tuées prématurément côté mission alors qu'elles réussissent via REST.
+   */
+  timeoutMs: number;
 }
 
 // ─── Schemas Zod ──────────────────────────────────────────────────────────────
@@ -238,4 +245,5 @@ export const DEFAULT_MISSION_CONFIG: MissionConfig = {
   minSkillScore: 25,
   maxConcurrentGoals: 3,
   dryRun: false,
+  timeoutMs: Number(process.env.LEANNA_AUTONOMY_TASK_TIMEOUT_MS ?? "180000"),
 };

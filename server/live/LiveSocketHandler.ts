@@ -1467,6 +1467,22 @@ async function handleToolCall(
     browserReadPending,
     browserActionPending,
     supervisor: sessionSupervisor,
+    // Contexte enrichi (parité avec le chemin REST/agent). Ces champs permettent
+    // aux skills et au ToolRegistry de connaître le workspace, l'utilisateur et
+    // les paramètres d'exécution (retries/timeout) sans dépendre de globals.
+    workspace: { root: deps?.getWorkspaceRoot?.() ?? process.cwd() },
+    user: {
+      language: (currentProfile as any).language ?? 'fr',
+      preferredStyle: (currentProfile as any).preferredStyle ?? 'concise',
+      preferences: {},
+      recentErrors: [] as string[],
+    },
+    execution: {
+      attemptNumber: 1,
+      maxRetries: TOOL_MAX_RETRIES,
+      timeoutMs: 180_000,
+      startTime: Date.now(),
+    },
   };
 
   try { clientWs.send(JSON.stringify({ busy: true })); } catch {}

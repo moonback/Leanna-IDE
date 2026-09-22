@@ -18,20 +18,48 @@ import {
 const log = createLogger("CodebaseWriter");
 
 // ── Rate limiting pour les opérations d'écriture ────────────────────────────
-const WRITE_RATE_LIMIT = 30; // max 30 écritures par minute
-const WRITE_WINDOW_MS = 60_000;
+// Configurable via l'environnement pour supporter le mode agent/vocal, où une
+// seule instruction (« refactorise le module auth ») déclenche une rafale
+// d'écritures via AgentOrchestrator → coder → patch_project_file × N.
+const WRITE_RATE_LIMIT = Number(process.env.LEANNA_WRITE_RATE_LIMIT ?? "60");
+const WRITE_WINDOW_MS = Number(process.env.LEANNA_WRITE_WINDOW_MS ?? "60000");
+// Attente maximale (ms) avant de renoncer quand la fenêtre est pleine. Plutôt
+// que d'échouer immédiatement (ce que le modèle interprète comme un échec
+// définitif), on attend qu'un créneau se libère. La micro-pause est invisible
+// pour l'utilisateur vocal et l'action aboutit.
+const WRITE_RATE_MAX_WAIT_MS = Number(process.env.LEANNA_WRITE_RATE_MAX_WAIT_MS ?? "5000");
 const writeTimestamps: number[] = [];
 
-function checkWriteRateLimit(): boolean {
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Purge les entrées hors fenêtre et indique s'il reste de la place. */
+function pruneAndHasSlot(): boolean {
   const now = Date.now();
-  // Purger les entrées plus vieilles que la fenêtre
   while (writeTimestamps.length > 0 && writeTimestamps[0] < now - WRITE_WINDOW_MS) {
     writeTimestamps.shift();
   }
-  if (writeTimestamps.length >= WRITE_RATE_LIMIT) {
-    return false; // Rate limited
+  return writeTimestamps.length < WRITE_RATE_LIMIT;
+}
+
+/**
+ * Réserve un créneau d'écriture. Si la fenêtre est pleine, attend (borné à
+ * WRITE_RATE_MAX_WAIT_MS) que le plus ancien timestamp expire avant de réessayer.
+ * Retourne true si un créneau a été réservé, false seulement si la limite reste
+ * atteinte après l'attente maximale.
+ */
+async function checkWriteRateLimit(): Promise<boolean> {
+  const deadline = Date.now() + WRITE_RATE_MAX_WAIT_MS;
+
+  while (!pruneAndHasSlot()) {
+    if (Date.now() >= deadline) return false;
+    // Temps avant expiration du plus ancien créneau, plafonné pour rester réactif.
+    const oldest = writeTimestamps[0] ?? Date.now();
+    const untilFree = Math.max(50, oldest + WRITE_WINDOW_MS - Date.now());
+    const remaining = deadline - Date.now();
+    await sleep(Math.min(untilFree, remaining, 500));
   }
-  writeTimestamps.push(now);
+
+  writeTimestamps.push(Date.now());
   return true;
 }
 
@@ -91,7 +119,7 @@ function resolveCurrentSandboxPath(requestedPath: string, expectedPath: string):
 // ─── Writer Handlers ──────────────────────────────────────────────────────────
 
 export async function handleWriteProjectFile(args: any, toolContext: any) {
-  if (!checkWriteRateLimit()) return { error: "Rate limit atteint : trop d'écritures par minute. Attendez avant de modifier d'autres fichiers." };
+  if (!(await checkWriteRateLimit())) return { error: "Rate limit atteint : trop d'écritures par minute. Attendez avant de modifier d'autres fichiers." };
   if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
   const requestedPath = String(args.path || "").trim();
   const content = String(args.content || "");
@@ -165,7 +193,7 @@ export async function handleWriteProjectFile(args: any, toolContext: any) {
 }
 
 export async function handleModifyProjectFile(args: any, toolContext: any) {
-  if (!checkWriteRateLimit()) return { error: "Rate limit atteint : trop d'écritures par minute." };
+  if (!(await checkWriteRateLimit())) return { error: "Rate limit atteint : trop d'écritures par minute." };
   if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
   const requestedPath = String(args.path || "").trim();
   let searchText = String(args.searchText || "");
@@ -295,7 +323,7 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
 }
 
 export async function handlePatchProjectFile(args: any, toolContext: any) {
-  if (!checkWriteRateLimit()) return { error: "Rate limit atteint : trop d'écritures par minute." };
+  if (!(await checkWriteRateLimit())) return { error: "Rate limit atteint : trop d'écritures par minute." };
   if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
   const requestedPath = String(args.path || "").trim();
   if (!requestedPath) return { error: "Le chemin de fichier est requis." };
@@ -431,7 +459,7 @@ export async function handlePatchProjectFile(args: any, toolContext: any) {
  * les remplacements silencieux sur un fichier devenu obsolète.
  */
 export async function handleApplyPatch(args: any, toolContext: any) {
-  if (!checkWriteRateLimit()) return { error: "Rate limit atteint : trop d'écritures par minute." };
+  if (!(await checkWriteRateLimit())) return { error: "Rate limit atteint : trop d'écritures par minute." };
   if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
 
   const requestedPath = String(args.path || "").trim();
@@ -588,7 +616,7 @@ export async function handleRenameProjectFile(args: any, toolContext: any) {
 }
 
 export async function handleDeleteProjectFile(args: any, toolContext: any) {
-  if (!checkWriteRateLimit()) return { error: "Rate limit atteint : trop d'écritures par minute." };
+  if (!(await checkWriteRateLimit())) return { error: "Rate limit atteint : trop d'écritures par minute." };
   if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
   const requestedPath = String(args.path || "").trim();
   if (!requestedPath) return { error: "Le chemin de fichier est requis." };
@@ -639,7 +667,7 @@ export async function handleDeleteProjectFile(args: any, toolContext: any) {
 }
 
 export async function handleDeleteProjectFolder(args: any, toolContext: any) {
-  if (!checkWriteRateLimit()) return { error: "Rate limit atteint : trop d'écritures par minute." };
+  if (!(await checkWriteRateLimit())) return { error: "Rate limit atteint : trop d'écritures par minute." };
   if (!checkWorkspace().exists) return { error: "Workspace non disponible.", path: getProjectRoot() };
   const requestedPath = String(args.path || "").trim();
   if (!requestedPath) return { error: "Le chemin du dossier est requis." };

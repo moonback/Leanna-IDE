@@ -110,27 +110,18 @@ export class SkillManagerV2 {
       }
     }
 
-    // Si un contexte est fourni, chercher la skill correspondante et appeler son handler
-    // directement pour préserver le contexte (nécessaire pour emitIdeAction, etc.)
-    if (context) {
-      for (const skill of this.skills) {
-        const tool = skill.declarations.find(d => d.name === normalizedName);
-        if (tool) {
-          // En dry-run, on ne court-circuite PAS vers le handler direct pour les
-          // outils à effet de bord : on les intercepte via le registre pour
-          // garantir la simulation. Les outils en lecture seule passent en direct.
-          const dryRunActive = options?.dryRun ?? this.registry.getDryRun().isEnabled();
-          const def = this.registry.getDefinition(normalizedName);
-          if (dryRunActive && def && this.registry.getDryRun().hasSideEffect(def.permissions)) {
-            return this.registry.call(normalizedName, args ?? {}, { context, dryRun: true });
-          }
-          return skill.handleToolCall(normalizedName, args, context);
-        }
-      }
-    }
-
-    // Sinon, utiliser le ToolRegistry normal
-    return this.registry.call(normalizedName, args ?? {}, { context, dryRun: options?.dryRun });
+    // Toujours router par le ToolRegistry — même quand un contexte est fourni
+    // (cas vocal). C'est le seul endroit où s'appliquent les permissions
+    // (PermissionPolicy.enforce), le dry-run réel, les métriques, le retry et le
+    // circuit breaker. Court-circuiter le registre revenait à désactiver toutes
+    // ces garanties pour les actions vocales (bug de sécurité).
+    //
+    // Le contexte est transmis via options.context : ToolRegistry.executeWithTimeout
+    // le passe au handler adapté (signature (args, ctx)), qui le relaie au skill.
+    return this.registry.call(normalizedName, args ?? {}, {
+      context,
+      dryRun: options?.dryRun,
+    });
   }
 
   /**
@@ -260,7 +251,7 @@ export class SkillManagerV2 {
    * Crée un handler compatible avec l'ancien interface.
    * Utile pour les composants qui attendent (name, args) => Promise<any>.
    */
-  createHandler(): (name: string, args: any) => Promise<any> {
+  createHandler(): (name: string, args: any, context?: any) => Promise<any> {
     return createToolCallProxy(this.registry);
   }
 

@@ -73,8 +73,14 @@ function adaptDeclaration(
 
   return {
     declaration,
-    handler: async (args: Record<string, unknown>) => {
-      return skill.handleToolCall(decl.name, args, options.context);
+    // Le handler accepte un contexte d'exécution passé au runtime via
+    // ToolRegistry.call(..., { context }). On privilégie ce contexte dynamique
+    // (fourni par LiveSocketHandler en vocal, par les routes REST, etc.) et on
+    // retombe sur options.context (contexte figé à l'adaptation) sinon.
+    // La signature à 2 paramètres est indispensable : ToolRegistry.executeWithTimeout
+    // n'injecte le contexte que si handler.length >= 2.
+    handler: async (args: Record<string, unknown>, ctx?: any) => {
+      return skill.handleToolCall(decl.name, args, ctx ?? options.context);
     },
     category: options.category ?? skill.name,
     timeoutMs: options.timeoutMs ?? inferTimeout(decl.name),
@@ -217,15 +223,15 @@ import type { ToolRegistry } from "../ToolRegistry.js";
  * Cela permet aux composants qui dépendent de `handleToolCall(name, args)`
  * de fonctionner sans modification pendant la transition.
  */
-export function createToolCallProxy(registry: ToolRegistry): (name: string, args: any) => Promise<any> {
-  return async (name: string, args: any) => {
+export function createToolCallProxy(registry: ToolRegistry): (name: string, args: any, context?: any) => Promise<any> {
+  return async (name: string, args: any, context?: any) => {
     // Normalisation du nom (même logique que l'ancien SkillManager)
     let normalizedName = name;
     if (name.includes(':')) {
       normalizedName = name.split(':').pop()!;
     }
 
-    return registry.call(normalizedName, args ?? {});
+    return registry.call(normalizedName, args ?? {}, { context });
   };
 }
 

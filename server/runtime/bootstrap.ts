@@ -88,8 +88,13 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   // 1.5. Configurer l'AgentOrchestrator pour utiliser le ToolRegistry du runtime (timeout corrigé)
   // Import dynamique pour éviter la dépendance circulaire
   const { agentOrchestrator } = await import("../agents/AgentOrchestrator");
-  agentOrchestrator.setSkillHandler((name: string, args: any) => 
-    runtime.tools.call(name, args)
+  // On accepte un 3ᵉ argument optionnel (options) transmis par le mission
+  // Executor : { dryRun, timeoutMs }. Les appelants à 2 arguments (AgentExecutor)
+  // le laissent indéfini, sans changement de comportement. Sans ce forward, le
+  // timeout de mission (180 s) était ignoré et l'action retombait sur le défaut
+  // du ToolRegistry — d'où les actions longues tuées en mission mais OK en REST.
+  agentOrchestrator.setSkillHandler((name: string, args: any, options?: { dryRun?: boolean; timeoutMs?: number }) =>
+    runtime.tools.call(name, args, { dryRun: options?.dryRun, timeoutMs: options?.timeoutMs })
   );
 
   // 2. Créer le SkillManagerV2 qui partage le ToolRegistry du runtime

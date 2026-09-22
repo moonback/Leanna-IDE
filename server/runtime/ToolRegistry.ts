@@ -383,9 +383,12 @@ export class ToolRegistry {
         reject(new ToolTimeoutError(timeoutMs));
       }, timeoutMs);
 
-      // Essayer d'appeler avec contexte si le handler l'accepte ( pour compatibilité legacy)
-      // Les handlers modernes prennent seulement args, mais les handlers legacy peuvent prendre context
-      const resultPromise = (handler as any).length >= 3 
+      // Essayer d'appeler avec contexte si le handler l'accepte (compatibilité legacy).
+      // Les handlers adaptés depuis les skills exposent la signature (args, ctx) :
+      // c'est ainsi que emitIdeAction / browserReadPending / supervisor remontent
+      // jusqu'au skill. Le seuil est donc >= 2 (et non >= 3, qui empêchait le
+      // contexte d'arriver et cassait toute la famille browser_* en vocal).
+      const resultPromise = (handler as any).length >= 2
         ? (handler as any)(args, context)
         : handler(args);
 
