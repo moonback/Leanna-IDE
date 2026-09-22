@@ -1,6 +1,8 @@
 # Roadmap — Leanna AI Operating System
 
 > Dernière mise à jour : Septembre 2026 · Version courante : **1.1.0** · Licence BUSL 1.1
+>
+> Nouveauté : liste d'exclusion `.leannaignore` — dossiers/fichiers interdits en écriture à l'agent, éditable depuis l'explorateur de fichiers.
 
 Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonomes et une mémoire long-terme réunis dans une seule application desktop. Cette roadmap décrit où va le produit, avec quelles priorités et selon quels critères de succès.
 
@@ -224,7 +226,7 @@ Fonctionnalités déjà présentes dans le code source.
 | **Modèle de permissions par skill** (`read` / `write` / `network` / `exec`) déclaré et appliqué au runtime | P0 | L | ✅ Fait |
 | **Mode approbation humaine** : validation requise avant écriture hors sandbox, `git push`, commande shell | P0 | M | 📋 Planifié |
 | **Dry-run global** : exécuter une mission complète en simulation, sans effet de bord | P1 | M | ✅ Fait |
-| **Liste d'exclusion de chemins** (`.leannaignore`) : dossiers interdits en écriture à l'agent | P1 | S | 📋 Planifié |
+| **Liste d'exclusion de chemins** (`.leannaignore`) : dossiers interdits en écriture à l'agent, éditables via un modal depuis l'explorateur de fichiers | P1 | S | ✅ Fait |
 | Snapshots de workspace avant mission longue, avec rollback en un clic | P1 | M | 📋 Planifié |
 | Support HTTPS local (certificat auto-signé) | P2 | S | 📋 Planifié |
 | Rotation du `Leanna_API_TOKEN` depuis l'UI (sans redémarrage) | P1 | S | 📋 Planifié |
