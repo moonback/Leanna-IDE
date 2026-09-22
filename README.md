@@ -1,6 +1,12 @@
 # Leanna — AI Operating System
 
 > **Un IDE augmenté par IA pour déléguer, orchestrer et exécuter des tâches complexes directement dans votre workspace.**
+<p align="center">
+  <img src="assets\images\logo.png" alt="Jarvis-os" width="440" />
+</p>
+<p align="center">
+  <img src="assets\images\header-bg.png" alt="Jarvis IA" width="100%" />
+</p>
 
 Leanna combine un IDE Monaco, un terminal interactif, des agents autonomes, un **Agent Brain** capable de construire dynamiquement des plans d'exécution, une interaction vocale Gemini Live et un runtime autonome 24/7.
 
