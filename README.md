@@ -76,7 +76,7 @@ L'objectif est de fournir une expérience proche d'un **environnement de dévelo
 
 ## Agent Brain
 
-L'**Agent Brain** est la couche d'orchestration cognitive de Leanna. Il transforme un objectif utilisateur en graphe d'exécution dynamique, sans workflow métier figé.
+L'**Agent Brain** est la couche d'orchestration cognitive de Leanna. Il transforme un objectif utilisateur en **graphe d'exécution dynamique (DAG)**, sans workflow métier figé.
 
 ```text
 Utilisateur
@@ -85,26 +85,46 @@ Utilisateur
     ▼
 Agent Brain
     ├─ Compréhension de l'objectif
-    ├─ Décomposition dynamique
-    ├─ Sélection des agents
-    ├─ Sélection des skills et outils
-    ├─ Exécution orchestrée
+    ├─ Décomposition dynamique en DAG
+    ├─ Validation du plan (schéma strict + Mermaid)
+    ├─ Sélection des agents, skills et outils
+    ├─ Exécution parallèle du DAG (fan-out / fan-in)
     ├─ Vérification multi-niveaux
-    └─ Correction autonome bornée
+    ├─ Correction autonome bornée
+    └─ Réplanification à chaud du sous-graphe restant
     │
     ▼
 Résultat final + rapport
 ```
 
+### Moteur d'exécution
+
+Le Brain ne se contente pas d'enchaîner les étapes séquentiellement : il lit les
+dépendances (`dependsOn`) de chaque étape et pilote leur exécution via un
+**scheduler topologique**.
+
+- **Exécution parallèle** : toutes les étapes dont les dépendances sont
+  satisfaites démarrent simultanément (fan-out), puis convergent (fan-in).
+- **Plan validé** : chaque plan généré est vérifié par un schéma strict avant
+  exécution — rôles connus, dépendances existantes, absence de cycle. Un
+  diagramme **Mermaid** du DAG est produit pour inspection.
+- **Correction autonome** : sur échec d'une étape, une boucle de correction
+  bornée (`maxCorrectionAttempts`) tente de réparer avant d'abandonner.
+- **Réplanification à chaud** : si une étape échoue durablement, le Brain
+  re-décompose le sous-graphe restant au lieu d'interrompre toute la mission,
+  avec un garde-fou anti-boucle (`maxReplans`).
+- **Échec isolé** : l'échec d'une branche n'annule que ses dépendants ; les
+  branches indépendantes poursuivent (succès partiel possible).
+
 ### Modes
 
-- `plan_first` : génère le plan et permet de l'inspecter avant exécution.
+- `plan_first` : génère le plan (avec diagramme Mermaid) et permet de l'inspecter avant exécution.
 - `auto` : exécute la mission de bout en bout.
 
 ### API
 
 ```text
-POST /api/agents/brain/plan
+POST /api/agents/brain/plan       # renvoie le plan + le DAG Mermaid
 POST /api/agents/brain/execute
 GET  /api/agents/brain/status/:id
 ```
@@ -577,8 +597,11 @@ npm run dist:win
 # Tous les tests
 npm test
 
-# Agent Brain
+# Agent Brain (scheduler DAG, validation, réplanification)
 node --import tsx --test server/agents/brain/AgentBrain.test.ts
+
+# Cohérence des capacités d'agents (détection d'outils fantômes)
+node --import tsx --test server/agents/roleCapabilities.test.ts
 
 # Module spécifique
 npm test -- server/skills/browser.test.ts
@@ -590,9 +613,25 @@ npm test -- server/routes/*.test.ts
 npm run test:soak
 ```
 
+## Smoke-test réel de l'Agent Brain
+
+Une fois le serveur démarré (`npm run dev`), un script vérifie de bout en bout
+la planification (avec diagramme Mermaid) puis, en option, l'exécution :
+
+```bash
+npm run brain:smoke                              # plan_first : DAG + Mermaid
+npm run brain:smoke -- --execute                 # + exécution auto complète
+npm run brain:smoke -- --goal "Ton objectif"     # objectif personnalisé
+```
+
+Le token est lu automatiquement depuis `.env` (`Leanna_API_TOKEN`). Pendant une
+exécution, les logs du serveur affichent les lignes `[BrainScheduler] Fan-out`
+qui matérialisent le parallélisme des étapes.
+
 La suite actuelle couvre notamment :
 
-- Agent Brain et ses composants ;
+- Agent Brain : scheduler DAG parallèle, validation de plan, réplanification ;
+- cohérence des capacités d'agents (détection d'outils fantômes) ;
 - Runtime V2 ;
 - skills critiques ;
 - validation Zod ;
@@ -662,15 +701,27 @@ Exemples :
 ## Avec le skill
 
 ```ts
+// Planification seule : renvoie les étapes, leurs dépendances et un diagramme Mermaid
 agent_brain({
   goal: "Modernise mon site et rends le header responsive",
   mode: "plan_first"
+})
+
+// Exécution complète avec budgets d'auto-correction et de réplanification
+agent_brain({
+  goal: "Fix le crash au démarrage",
+  mode: "auto",
+  maxCorrectionAttempts: 2, // tentatives de correction par étape (0-5, défaut 3)
+  maxReplans: 2             // réplanifications du sous-graphe restant (0-5, défaut 2)
 })
 ```
 
 ## Avec l'API
 
 ### Générer un plan
+
+La réponse contient les étapes, leurs `dependsOn` et un champ `mermaid`
+(diagramme `graph TD` du DAG, copiable dans [mermaid.live](https://mermaid.live)).
 
 ```bash
 curl -X POST http://localhost:4000/api/agents/brain/plan \
@@ -685,7 +736,7 @@ curl -X POST http://localhost:4000/api/agents/brain/plan \
 curl -X POST http://localhost:4000/api/agents/brain/execute \
   -H "Content-Type: application/json" \
   -H "x-leanna-token: <Leanna_API_TOKEN>" \
-  -d '{"goal": "Fix le crash au démarrage", "maxCorrectionAttempts": 3}'
+  -d '{"goal": "Fix le crash au démarrage", "maxCorrectionAttempts": 3, "maxReplans": 2}'
 ```
 
 ### Suivre une mission
