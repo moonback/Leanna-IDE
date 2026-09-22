@@ -17,6 +17,27 @@ const log = createLogger("Assistant");
 
 const AGENT_LOG_MODULE = /^(Agent|Orchestrator|TaskScheduler|FileWriter|DelegationParser|Autonomous)/;
 
+/** Statuts terminaux d'une tâche/orchestration : plus rien ne changera après. */
+const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled", "incomplete"]);
+
+/**
+ * Enrichit une réponse de statut (tâche ou orchestration) avec un signal
+ * d'arrêt explicite pour l'assistant, afin d'éviter les boucles de polling
+ * serrées de `agent_status` qui font exploser le contexte.
+ *
+ * - `done: true`  → statut terminal, ne plus interroger.
+ * - `done: false` → encore en cours ; NE PAS re-poller en boucle. La mission
+ *   déléguée s'exécute en arrière-plan ; un seul contrôle périodique suffit.
+ */
+function withStatusGuard<T extends { status?: string }>(payload: T): T & { done: boolean; hint: string } {
+  const done = TERMINAL_STATUSES.has(payload.status ?? "");
+  const hint = done
+    ? "Statut terminal — inutile de rappeler agent_status pour cet ID."
+    : "Encore en cours. NE re-vérifie PAS en boucle : un seul agent_status espacé suffit. " +
+      "Interroger en continu sature le contexte sans accélérer la mission.";
+  return { ...payload, done, hint };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Skill: Agents Multi-Rôles + Communication Autonome
 // Permet à Leanna de déléguer, orchestrer, collaborer et monitorer les agents
@@ -132,7 +153,9 @@ export const agentsSkill: Skill = {
     {
       name: "agent_status",
       description:
-        "Consulte le statut d'une tâche ou orchestration par son ID. Utilise agent_status pour toute question de progression avant de déléguer.",
+        "Consulte le statut d'une tâche ou orchestration par son ID. La réponse contient un champ 'done' " +
+        "(true = terminé, false = en cours). N'appelle PAS agent_status en boucle : si done=false, la mission " +
+        "tourne en arrière-plan et un contrôle unique et espacé suffit. Interroger en continu sature le contexte.",
       parameters: {
         type: "OBJECT",
         properties: { taskId: { type: "STRING", description: "ID de la tâche ou orchestration" } },
@@ -402,23 +425,23 @@ export const agentsSkill: Skill = {
         const { taskId } = validateArgs(z.object({ taskId: z.string().min(1) }), args);
         const task = agentOrchestrator.getTask(taskId);
         if (task) {
-          return {
+          return withStatusGuard({
             type: "task", id: task.id, role: task.role, title: task.title,
             status: task.status, priority: task.priority,
             createdAt: task.createdAt, startedAt: task.startedAt, completedAt: task.completedAt,
             result: task.result ?? null,
-          };
+          });
         }
         const orch = agentOrchestrator.getOrchestration(taskId);
         if (orch) {
-          return {
+          return withStatusGuard({
             type: "orchestration", id: orch.id, title: orch.title,
             status: orch.status, createdAt: orch.createdAt, completedAt: orch.completedAt,
             tasks: orch.tasks.map((t) => ({
               id: t.id, role: t.role, title: t.title, status: t.status,
               result: t.result ? { success: t.result.success, summary: t.result.summary } : null,
             })),
-          };
+          });
         }
 
         // Fuzzy match: recherche par préfixe d'ID ou par titre
@@ -430,14 +453,14 @@ export const agentsSkill: Skill = {
           query.includes(o.title.toLowerCase().slice(0, 15))
         );
         if (matchedOrch) {
-          return {
+          return withStatusGuard({
             type: "orchestration", id: matchedOrch.id, title: matchedOrch.title,
             status: matchedOrch.status, createdAt: matchedOrch.createdAt, completedAt: matchedOrch.completedAt,
             tasks: matchedOrch.tasks.map((t) => ({
               id: t.id, role: t.role, title: t.title, status: t.status,
               result: t.result ? { success: t.result.success, summary: t.result.summary } : null,
             })),
-          };
+          });
         }
 
         const allTasks = agentOrchestrator.listTasks({ limit: 50 });
@@ -447,18 +470,18 @@ export const agentsSkill: Skill = {
           query.includes(t.title.toLowerCase().slice(0, 15))
         );
         if (matchedTask) {
-          return {
+          return withStatusGuard({
             type: "task", id: matchedTask.id, role: matchedTask.role, title: matchedTask.title,
             status: matchedTask.status, priority: matchedTask.priority,
             createdAt: matchedTask.createdAt, startedAt: matchedTask.startedAt, completedAt: matchedTask.completedAt,
             result: matchedTask.result ?? null,
-          };
+          });
         }
 
         // Si aucune correspondance et que des orchestrations existent, retourner la dernière
         if (allOrchs.length > 0 && (query === "latest" || query === "last" || query.includes("orchestration"))) {
           const latest = allOrchs[0];
-          return {
+          return withStatusGuard({
             type: "orchestration", id: latest.id, title: latest.title,
             status: latest.status, createdAt: latest.createdAt, completedAt: latest.completedAt,
             note: `ID '${taskId}' non trouvé directement. Dernière orchestration retournée.`,
@@ -466,7 +489,7 @@ export const agentsSkill: Skill = {
               id: t.id, role: t.role, title: t.title, status: t.status,
               result: t.result ? { success: t.result.success, summary: t.result.summary } : null,
             })),
-          };
+          });
         }
 
         throw new Error(`Aucune tâche ou orchestration trouvée avec l'ID ou titre "${taskId}".`);

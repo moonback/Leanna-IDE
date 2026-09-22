@@ -119,7 +119,6 @@ const ADAPTED_TOOL_TIMEOUTS: Record<string, number> = {
   analyze_project_file: 90_000,
   knowledge_build_context: 90_000,
   knowledge_impact_analyze: 90_000,
-  knowledge_graph_query: 60_000,
   knowledge_semantic_search: 45_000,
   write_project_file: 60_000,
   apply_patch: 60_000,

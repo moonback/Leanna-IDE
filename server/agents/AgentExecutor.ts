@@ -63,7 +63,6 @@ const EXECUTABLE_AGENT_TOOLS = new Set([
   "knowledge_memory_add",
   "knowledge_memory_list",
   "knowledge_impact_analyze",
-  "knowledge_graph_query",
   "knowledge_status",
   "knowledge_reindex",
   "reasoning_think",
@@ -104,7 +103,6 @@ export class AgentExecutor {
     'analyze_project_file': 90_000,
     'knowledge_build_context': 90_000,
     'knowledge_impact_analyze': 90_000,
-    'knowledge_graph_query': 60_000,
     
     // Outils de vérification (45-60s)
     'verify_file': 60_000,
