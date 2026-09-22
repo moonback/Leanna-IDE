@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import type { ConnectionStatus } from './useLiveAPI.js';
+import { playSessionStartSound } from '../lib/sound.js';
 
 export interface UseWebSocketOptions {
   onMessage: (msg: any) => void;
@@ -271,6 +272,8 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
         reconnectCountRef.current = 0;
         setStatus('connected');
         onLog('Connected to Core', 'info');
+        // Jouer un son lors du démarrage initial de la session live Gemini.
+        playSessionStartSound();
         // Notifier les composants d'une connexion établie pour qu'ils chargent l'état
         // des agents actifs depuis le serveur (premier connect ou reconnexion manuelle).
         window.dispatchEvent(new CustomEvent('Leanna-session-reconnected'));
