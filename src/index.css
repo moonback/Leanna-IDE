@@ -1123,6 +1123,15 @@ button {
   padding-inline: var(--premium-page-gutter);
 }
 
+/* ═══════════════════════════════════════════════
+   CUSTOMIZATIONS – Maysson
+   Custom overrides and project-specific tweaks.
+   Note: Keep structural CSS in designated sections
+   above and use this block for ad-hoc adjustments.
+   Always document the reason for each override.
+═══════════════════════════════════════════════ */
+
+
 
 /* ═══════════════════════════════════════════════
    GLASS MORPHISM UTILITY

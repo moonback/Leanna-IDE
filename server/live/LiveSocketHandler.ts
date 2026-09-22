@@ -12,7 +12,7 @@
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
-import { GoogleGenAI, LiveServerMessage, Modality, ThinkingLevel } from '@google/genai';
+import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
@@ -638,16 +638,12 @@ export function attachLiveWebSocket(
 
       // ── Connect to Gemini Live ───────────────────────────────────────
       const session = await createGeminiAI().live.connect({
-        model: 'gemini-3.8-live-extended-thinking',
+        model: 'gemini-3.8-live',
         config: {
           responseModalities: [Modality.AUDIO],
           temperature,
           topP,
-          // Niveau de réflexion du modèle gemini-3.8-live-extended-thinking.
-          // Valeurs supportées : 'low' | 'medium' | 'high' (MINIMAL non supporté).
-          // 'high' → raisonnement de fond maximal pour les tâches multi-étapes /
-          // multi-outils. Voir https://ai.google.dev/gemini-api/docs/live-api/thinking
-          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+          
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
           systemInstruction: {
             parts: [{ text: systemText + memoryContext + knowledgeContext + notebookContext }],
