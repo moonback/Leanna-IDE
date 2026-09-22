@@ -747,6 +747,24 @@ export const StatusBar = memo(function StatusBar({
       >
         {/* ─── Zone gauche : statuts en permanence visibles ──────────────── */}
         <div className="flex items-center gap-1">
+          {/* Gemini Live Connection Status */}
+          <button
+            type="button"
+            className={PILL}
+            style={{ color: 'var(--text-secondary)' }}
+            title={`Statut Gemini Live : ${status}`}
+          >
+            {status === 'connected' ? (
+              <Wifi size={13} style={{ color: 'var(--color-success)' }} />
+            ) : status === 'connecting' ? (
+              <LoaderCircle size={13} className="animate-spin" style={{ color: 'var(--color-warning)' }} />
+            ) : (
+              <WifiOff size={13} style={{ color: 'var(--text-muted)' }} />
+            )}
+            <span className="truncate max-w-[110px] capitalize">
+              {status}
+            </span>
+          </button>
           {/* Sandbox — dot + label */}
           <button
             type="button"
@@ -781,24 +799,7 @@ export const StatusBar = memo(function StatusBar({
             </span>
           </button>
 
-          {/* Gemini Live Connection Status */}
-          <button
-            type="button"
-            className={PILL}
-            style={{ color: 'var(--text-secondary)' }}
-            title={`Statut Gemini Live : ${status}`}
-          >
-            {status === 'connected' ? (
-              <Wifi size={13} style={{ color: 'var(--color-success)' }} />
-            ) : status === 'connecting' ? (
-              <LoaderCircle size={13} className="animate-spin" style={{ color: 'var(--color-warning)' }} />
-            ) : (
-              <WifiOff size={13} style={{ color: 'var(--text-muted)' }} />
-            )}
-            <span className="truncate max-w-[110px] capitalize">
-              {status}
-            </span>
-          </button>
+          
 
           <button
             type="button"
