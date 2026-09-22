@@ -339,6 +339,8 @@ export const agentsSkill: Skill = {
             contextFiles: v.contextFiles,
             instructions: v.instructions,
             mode: "auto",
+            maxCorrectionAttempts: v.maxCorrectionAttempts,
+            maxReplans: v.maxReplans,
           });
           return {
             success: result.success,
