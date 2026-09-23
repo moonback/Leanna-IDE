@@ -1,7 +1,7 @@
 # Leanna Design System Tokens
 
-**Version:** 2.0.0
-**Date:** 20 septembre 2026
+**Version:** 2.1.0
+**Date:** 23 septembre 2026
 **Périmètre:** Tous les composants React dans `src/components/`
 
 Ce document définit les tokens, conventions visuelles et règles d'implémentation du design system de **Leanna**.
@@ -131,14 +131,28 @@ Les composants doivent utiliser des tokens sémantiques plutôt que des couleurs
 
 | Token                | Rôle                        | Dark      | Light     |
 | -------------------- | --------------------------- | --------- | --------- |
-| `--color-success`    | États positifs, validations | `#4ade80` | `#059669` |
-| `--color-warning`    | Avertissements              | `#fcd34d` | `#d97706` |
-| `--color-error`      | Erreurs, suppressions       | `#fb7185` | `#dc2626` |
-| `--color-info`       | Information, liens          | `#67e8f9` | `#0891b2` |
-| `--accent-primary`   | Accent principal            | `#818cf8` | `#4f46e5` |
-| `--accent-secondary` | Accent secondaire           | `#06b6d4` | `#0891b2` |
+| `--color-success`    | États positifs, validations | `#3ecf8e` | `#059669` |
+| `--color-warning`    | Avertissements              | `#e2b341` | `#d97706` |
+| `--color-error`      | Erreurs, suppressions       | `#f26d6d` | `#dc2626` |
+| `--color-info`       | Information, liens          | `#6ea8fe` | `#2563eb` |
+| `--accent-primary`   | Accent principal            | `#6ea8fe` | `#2563eb` |
+| `--accent-secondary` | Accent secondaire           | `#c792ea` | `#f59e0b` |
 
-Ces valeurs constituent les valeurs de référence du design system. Elles doivent être définies à un emplacement central, par exemple `src/index.css`.
+Ces valeurs constituent les valeurs de référence du design system. Elles sont définies à un emplacement central : `src/index.css` (blocs `:root[data-theme="…"]`), qui fait autorité. **Ce tableau doit rester synchronisé avec `index.css`.**
+
+### Direction visuelle (v2.1.0)
+
+Le système repose sur la **sobriété** : surfaces neutres, un seul accent par thème, couleurs sémantiques adoucies. Chaque thème est distinct :
+
+| Thème           | Base                     | Accent principal      | Intention                          |
+| --------------- | ------------------------ | --------------------- | ---------------------------------- |
+| `dark` (défaut) | neutre near-black `#0a0a0c` | indigo-bleu `#6ea8fe` | Pro, moderne, reposant             |
+| `light`         | blanc `#ffffff`          | bleu franc `#2563eb`  | Contraste lisible, orange secondaire |
+| `cyberpunk`     | navy `#060814`           | néon cyan `#00f0ff`   | Le seul thème néon (magenta assumé) |
+| `sepia`         | crème `#fbf0d9`          | solarized `#b58900`   | Lecture chaude                     |
+| `high-contrast` | noir `#000000`           | jaune `#ffff00`       | Accessibilité maximale             |
+
+> Les surfaces `dark` ne portent plus de teinte navy/cyan : les bordures sont des filets neutres (`rgba(255,255,255,0.09)`) pour laisser respirer l'accent. Seul `cyberpunk` conserve le néon d'origine.
 
 ## 3.2 Tokens subtils
 
@@ -161,7 +175,8 @@ Chaque couleur sémantique peut disposer d'une variante destinée aux arrière-p
 Pour l'accent secondaire :
 
 ```css
---color-accent-alt: #a78bfa;
+/* Dark : #c792ea (violet doux) · Light : #f59e0b (orange) */
+--color-accent-alt: #c792ea;
 ```
 
 avec la variante :
@@ -171,7 +186,31 @@ avec la variante :
   color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
 ```
 
-Les valeurs Light/Dark de `--color-accent-alt` doivent être définies au niveau du thème.
+Les valeurs Light/Dark de `--color-accent-alt` sont définies au niveau du thème.
+
+## 3.2.1 Surfaces interactives (hover / active)
+
+Deux tokens de surface pilotent les états de survol et d'activation. Ils
+sont **theme-aware** : voile clair sur fond sombre, voile sombre sur fond
+clair. Ne jamais utiliser `bg-white/N` en dur (invisible en thème clair).
+
+```css
+/* Dark  */ --bg-hover: rgba(255, 255, 255, 0.06);  --bg-active: rgba(255, 255, 255, 0.1);
+/* Light */ --bg-hover: rgba(17, 24, 39, 0.05);     --bg-active: rgba(17, 24, 39, 0.09);
+```
+
+### Autorisé
+
+```tsx
+className="hover:bg-[var(--bg-hover)]"
+style={{ backgroundColor: 'var(--bg-hover)' }}
+```
+
+### Interdit
+
+```tsx
+className="hover:bg-white/5"   /* casse en thème clair/sepia */
+```
 
 ## 3.3 Règles
 

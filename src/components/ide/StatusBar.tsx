@@ -63,7 +63,7 @@ function getModifierKey(): string {
 // coins doux, transition sur toutes les propriétés et halo au survol.
 const PILL =
   'group/pill relative flex items-center gap-1.5 px-2.5 h-[22px] rounded-md ' +
-  'text-[12px] font-medium leading-none transition-all duration-200 ' +
+  'text-xs font-medium leading-none transition-all duration-200 ' +
   'hover:bg-[var(--accent-subtle)] active:scale-[0.97]';
 
 // Petit point d'état avec halo doux.
@@ -99,7 +99,7 @@ function CountBadge({ value, color }: { value: number; color: string }) {
       exit={{ scale: 0.6, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 320, damping: 18 }}
       className="min-w-[15px] h-[15px] flex items-center justify-center rounded-full text-[9px] font-bold tabular-nums leading-none px-1"
-      style={{ backgroundColor: color, color: 'var(--bg-primary)', boxShadow: `0 0 8px ${color}` }}
+      style={{ backgroundColor: color, color: 'var(--bg-base)', boxShadow: `0 0 8px ${color}` }}
     >
       {value > 99 ? '99+' : value}
     </motion.span>
@@ -153,7 +153,7 @@ function ToolsMenuRow({ item }: { item: ToolsMenuItem }) {
           <Icon size={16} style={{ color: iconColor ?? 'var(--text-muted)' }} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+          <div className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
             {label}
           </div>
           {description && (
@@ -899,7 +899,7 @@ export const StatusBar = memo(function StatusBar({
                 initial={{ opacity: 0, x: 8 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 8 }}
-                className="flex items-center gap-1.5 px-2.5 h-[22px] rounded-md text-[12px] font-medium leading-none"
+                className="flex items-center gap-1.5 px-2.5 h-[22px] rounded-md text-xs font-medium leading-none"
                 style={{ color: 'var(--color-warning)', backgroundColor: 'var(--color-warning-subtle)' }}
               >
                 <LoaderCircle size={12} className="animate-spin" />
@@ -910,7 +910,7 @@ export const StatusBar = memo(function StatusBar({
 
           {/* File state */}
           {filePath && (
-            <span className="flex items-center gap-1.5 text-[12px] font-medium leading-none px-1">
+            <span className="flex items-center gap-1.5 text-xs font-medium leading-none px-1">
               <StatusDot
                 color={dirty ? 'var(--color-warning)' : 'var(--color-success)'}
                 pulse={dirty}
@@ -931,11 +931,11 @@ export const StatusBar = memo(function StatusBar({
             style={{ color: 'var(--text-muted)' }}
             title={`Tokens : ${formatExactTokenCount(tokenUsage.totalTokens)} · Contexte : ${formatExactTokenCount(promptContext.currentSize)} / ${formatExactTokenCount(promptContext.maxSize)}`}
           >
-            <span className="flex items-center gap-1 tabular-nums font-semibold text-[12px] leading-none">
+            <span className="flex items-center gap-1 tabular-nums font-semibold text-xs leading-none">
               <Hash size={11} className="opacity-50" />
               {tokenUsage.totalTokens > 0 ? formatTokenCount(tokenUsage.totalTokens) : '—'}
             </span>
-            <span className="flex items-center gap-1 tabular-nums font-semibold text-[12px] leading-none">
+            <span className="flex items-center gap-1 tabular-nums font-semibold text-xs leading-none">
               <FileText size={11} className="opacity-50" />
               {formatTokenCount(promptContext.currentSize)}/{formatTokenCount(promptContext.maxSize)}
             </span>
@@ -949,26 +949,13 @@ export const StatusBar = memo(function StatusBar({
 
           <Divider />
 
-          {/* Édition */}
-          {/* <div className="flex items-center gap-2 font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>
-            <span>{encoding}</span>
-            <span>LF</span>
-            {typeof line === 'number' && typeof column === 'number' && (
-              <button
-                onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', ...(navigator.platform.includes('Mac') ? { metaKey: true } : { ctrlKey: true }) }))}
-                className="hover:text-primary transition-colors duration-150"
-                title="Aller à la ligne..."
-              >
-                Ln {line}, Col {column}
-              </button>
-            )}
-          </div> */}
+          
 
           {/* Reset — discret, visible on hover */}
           <button
             type="button"
             onClick={() => setShowResetConfirm(true)}
-            className="flex items-center gap-1 px-2 h-[22px] rounded-md text-[12px] font-medium leading-none opacity-0 group-hover/bar:opacity-100 transition-all duration-300 hover:bg-[var(--color-warning-subtle)] active:scale-95"
+            className="flex items-center gap-1 px-2 h-[22px] rounded-md text-xs font-medium leading-none opacity-0 group-hover/bar:opacity-100 transition-all duration-300 hover:bg-[var(--color-warning-subtle)] active:scale-95"
             style={{ color: 'var(--text-muted)' }}
             onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-warning)')}
             onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
@@ -1143,7 +1130,7 @@ export const StatusBar = memo(function StatusBar({
                 onClick={handleConfirmReset}
                 disabled={resetCode.length !== 6 || resetInProgress}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
-                style={{ backgroundColor: 'var(--color-warning)', color: 'var(--bg-primary)' }}
+                style={{ backgroundColor: 'var(--color-warning)', color: 'var(--bg-base)' }}
               >
                 {resetInProgress && <LoaderCircle size={13} className="animate-spin" />}
                 {resetInProgress ? 'Réinitialisation…' : 'Réinitialiser'}

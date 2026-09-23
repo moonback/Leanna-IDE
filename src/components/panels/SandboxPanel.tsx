@@ -237,15 +237,15 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
       <motion.div
         className="rounded-2xl border px-4 py-4 flex items-center gap-3 shadow-sm"
         style={{
-          borderColor: status?.active ? 'rgba(74,222,128,0.28)' : 'var(--border-base)',
-          backgroundColor: status?.active ? 'rgba(74,222,128,0.055)' : 'var(--bg-input)',
+          borderColor: status?.active ? 'color-mix(in srgb, var(--color-success) 28%, transparent)' : 'var(--border-base)',
+          backgroundColor: status?.active ? 'color-mix(in srgb, var(--color-success) 6%, transparent)' : 'var(--bg-input)',
           transition: 'border-color 0.3s ease, background-color 0.3s ease',
         }}
         layout
       >
         <div
           className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: status?.active ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.04)' }}
+          style={{ backgroundColor: status?.active ? 'var(--color-success-subtle)' : 'var(--bg-input)' }}
         >
           <Box size={15} style={{ color: status?.active ? 'var(--color-success)' : 'var(--text-dimmed)' }} />
         </div>
@@ -289,7 +289,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
         <button
           type="button"
           onClick={fetchStatus}
-          className="p-1.5 rounded-lg hover:bg-white/8 active:scale-95 transition-all duration-150"
+          className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] active:scale-95 transition-all duration-150"
           title="Rafraîchir l'état du sandbox"
           aria-label="Rafraîchir l'état du sandbox"
         >
@@ -375,7 +375,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                 </button>
                 <button
                   onClick={() => { setShowCodeInput(false); setSecurityCode(''); }}
-                  className="text-xs px-1 py-0.5 rounded hover:bg-white/10"
+                  className="text-xs px-1 py-0.5 rounded hover:bg-[var(--bg-hover)]"
                   style={{ color: 'var(--text-dimmed)' }}
                 >
                   ✕
@@ -417,7 +417,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                 </button>
                 <button
                   onClick={() => { setShowResetCodeInput(false); setResetCode(''); }}
-                  className="text-xs px-1 py-0.5 rounded hover:bg-white/10"
+                  className="text-xs px-1 py-0.5 rounded hover:bg-[var(--bg-hover)]"
                   style={{ color: 'var(--text-dimmed)' }}
                 >
                   ✕
@@ -450,7 +450,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             <button
               type="button"
               onClick={() => setShowAdvancedActions(value => !value)}
-              className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-xs font-medium transition-colors hover:bg-white/5"
+              className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-xs font-medium transition-colors hover:bg-[var(--bg-hover)]"
               style={{ color: 'var(--text-muted)' }}
               aria-expanded={showAdvancedActions}
             >
@@ -554,7 +554,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
           <button
             type="button"
             onClick={() => setShowModifiedFiles(value => !value)}
-            className="flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-white/5"
+            className="flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-hover)]"
             aria-expanded={showModifiedFiles}
           >
             <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -585,7 +585,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                 <button
                   key={f}
                   onClick={() => onOpenDiff(f)}
-                  className="group w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all hover:bg-white/5"
+                  className="group w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all hover:bg-[var(--bg-hover)]"
                   style={{ borderLeft: '2px solid transparent' }}
                 >
                   <Icon size={11} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
@@ -633,7 +633,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             <button
               type="button"
               onClick={() => setFeedback(null)}
-              className="p-0.5 rounded hover:bg-white/10 transition-colors active:scale-90"
+              className="p-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors active:scale-90"
               aria-label="Fermer"
             >
               <X size={11} />
@@ -666,7 +666,7 @@ function ActionRow({ icon, label, color, onClick, busy, tooltip, highlight, tran
       whileTap={{ scale: 0.97 }}
       whileHover={{ x: 2 }}
       transition={transition}
-      className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all disabled:opacity-50 w-full group hover:bg-white/5"
+      className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all disabled:opacity-50 w-full group hover:bg-[var(--bg-hover)]"
       style={{
         backgroundColor: highlight
           ? `color-mix(in srgb, ${color} 10%, transparent)`

@@ -112,41 +112,51 @@
 ═══════════════════════════════════════════════ */
 
 :root[data-theme="dark"] {
-    --bg-base:       #060814;
-  --bg-secondary:  #0d1127;
-  --bg-panel:      rgba(15, 23, 42, 0.95);
-  --bg-ctrl:       rgba(13, 17, 39, 0.95);
-  --bg-sidebar:    rgba(6, 8, 20, 0.98);
-  --bg-input:      rgba(24, 34, 66, 0.6);
-  --bg-elevated:   #121833;
+  /* Surfaces — neutral near-black, aligned with the sober IDE shell (#09090b).
+     No more navy tint: a calm, modern base that lets accent colours breathe. */
+  --bg-base:       #0a0a0c;
+  --bg-secondary:  #121216;
+  --bg-panel:      rgba(20, 20, 26, 0.95);
+  --bg-ctrl:       rgba(16, 16, 21, 0.95);
+  --bg-sidebar:    rgba(10, 10, 12, 0.98);
+  --bg-input:      rgba(38, 38, 46, 0.55);
+  --bg-elevated:   #17171d;
+  /* Interactive surface overlays (hover / active) — theme-aware, replaces
+     the hardcoded `bg-white/N` overlays that broke on light themes. */
+  --bg-hover:      rgba(255, 255, 255, 0.06);
+  --bg-active:     rgba(255, 255, 255, 0.1);
 
-  --shadow-xs:  0 1px 2px rgba(0,240,255,0.2);
-  --shadow-sm:  0 2px 8px rgba(0,240,255,0.25);
-  --shadow-md:  0 4px 16px rgba(255,0,128,0.25);
-  --shadow-lg:  0 12px 40px rgba(0,240,255,0.3);
-  --shadow-xl:  0 24px 56px rgba(255,0,128,0.35);
-  --shadow-glow: 0 0 24px rgba(0,240,255,0.35);
+  /* Elevation — soft neutral shadows, no coloured glow spilling everywhere. */
+  --shadow-xs:  0 1px 2px rgba(0,0,0,0.4);
+  --shadow-sm:  0 2px 8px rgba(0,0,0,0.45);
+  --shadow-md:  0 6px 20px rgba(0,0,0,0.5);
+  --shadow-lg:  0 14px 40px rgba(0,0,0,0.55);
+  --shadow-xl:  0 26px 60px rgba(0,0,0,0.6);
+  --shadow-glow: 0 0 24px color-mix(in srgb, var(--accent-primary) 30%, transparent);
 
-  --border-base:   rgba(0, 240, 255, 0.35);
-  --border-strong: rgba(255, 0, 128, 0.6);
-  --border-focus:  #00f0ff;
-  --border-glow:   rgba(0, 240, 255, 0.5);
+  /* Borders — neutral hairlines instead of a cyan haze. */
+  --border-base:   rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --border-focus:  #6ea8fe;
+  --border-glow:   color-mix(in srgb, var(--accent-primary) 45%, transparent);
 
-  --text-primary:   #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted:     #94a3b8;
-  --text-dimmed:    #64748b;
+  --text-primary:   #f4f4f6;
+  --text-secondary: #c4c4cc;
+  --text-muted:     #8a8a95;
+  --text-dimmed:    #5c5c66;
 
-  --accent-primary:  #00f0ff;
-  --accent-hover:    #38bdf8;
-  --accent-subtle:   rgba(0, 240, 255, 0.15);
-  --accent-glow:     rgba(0, 240, 255, 0.5);
-  --accent-secondary: #ec8022;
+  /* Accent — soft indigo-blue. Modern, professional, easy on the eyes. */
+  --accent-primary:  #6ea8fe;
+  --accent-hover:    #8bbcff;
+  --accent-subtle:   rgba(110, 168, 254, 0.14);
+  --accent-glow:     rgba(110, 168, 254, 0.4);
+  --accent-secondary: #c792ea;
 
-  --color-success:  #00ff9d;
-  --color-warning:  #ffb703;
-  --color-error:    #ff0055;
-  --color-info:     #00f0ff;
+  /* Semantic — softened from fluorescent to comfortable. */
+  --color-success:  #3ecf8e;
+  --color-warning:  #e2b341;
+  --color-error:    #f26d6d;
+  --color-info:     #6ea8fe;
 
   /* Semantic colours — subtle variants (12% opacity backgrounds) */
   --color-success-subtle: color-mix(in srgb, var(--color-success) 12%, transparent);
@@ -161,68 +171,72 @@
   --border-info-subtle:    color-mix(in srgb, var(--color-info) 25%, transparent);
 
   /* Accent alternative — secondary highlight color */
-  --color-accent-alt: #e056fd;
+  --color-accent-alt: #c792ea;
   --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
 
-  --orb-idle:      #00f0ff;
-  --orb-online:    #38bdf8;
-  --orb-listening: #ff0080;
-  --orb-speaking:  #e056fd;
-  --orb-busy:      #ffb703;
-  --orb-thinking:  #7d5fff;
+  --orb-idle:      #6ea8fe;
+  --orb-online:    #8bbcff;
+  --orb-listening: #f26d6d;
+  --orb-speaking:  #c792ea;
+  --orb-busy:      #e2b341;
+  --orb-thinking:  #9d8cff;
 
-  --ctrl-icon:       #94a3b8;
-  --ctrl-icon-hover: #00f0ff;
-  --ctrl-hover:      rgba(0, 240, 255, 0.15);
-  --btn-active-bg:   rgba(0, 240, 255, 0.2);
-  --btn-active-text: #00f0ff;
+  --ctrl-icon:       #8a8a95;
+  --ctrl-icon-hover: #6ea8fe;
+  --ctrl-hover:      rgba(110, 168, 254, 0.12);
+  --btn-active-bg:   rgba(110, 168, 254, 0.18);
+  --btn-active-text: #6ea8fe;
 
-  --drag-overlay:   rgba(0, 240, 255, 0.2);
-  --scroll-thumb:   #1e293b;
-  --scroll-thumb-hover: #00f0ff;
+  --drag-overlay:   rgba(110, 168, 254, 0.18);
+  --scroll-thumb:   rgba(255, 255, 255, 0.12);
+  --scroll-thumb-hover: rgba(110, 168, 254, 0.6);
 
-  --nav-active-bg:  rgba(0, 240, 255, 0.15);
-  --nav-active-bar: #00f0ff;
+  --nav-active-bg:  rgba(110, 168, 254, 0.14);
+  --nav-active-bar: #6ea8fe;
 
-  --glass-bg:        rgba(15, 23, 42, 0.85);
-  --glass-border:    rgba(0, 240, 255, 0.2);
+  --glass-bg:        rgba(20, 20, 26, 0.85);
+  --glass-border:    rgba(255, 255, 255, 0.08);
   --glass-blur:      16px;
 
-  /* New design variables for EmptyEditorState - Cyberpunk theme */
-  --bg: #060814;
-  --surface: #0d1127;
-  --surface-soft: #121833;
-  --text: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --primary: #00f0ff;
-  --primary-dark: #00bfff;
-  --border: rgba(0, 240, 255, 0.2);
+  /* EmptyEditorState alias set — points at the canonical tokens above so
+     there is a single source of truth for colour. */
+  --bg: var(--bg-base);
+  --surface: var(--bg-secondary);
+  --surface-soft: var(--bg-elevated);
+  --text: var(--text-primary);
+  --text-secondary: #c4c4cc;
+  --text-muted: #8a8a95;
+  --primary: var(--accent-primary);
+  --primary-dark: #4d8ae8;
+  --border: var(--border-base);
 }
 
 :root[data-theme="light"] {
-  /* Elevation (shadows) — Maysson brand colors */
-  --shadow-xs:  0 1px 2px rgba(0, 194, 255, 0.04);
-  --shadow-sm:  0 2px 4px rgba(0, 194, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md:  0 4px 16px rgba(0, 194, 255, 0.06), 0 2px 6px rgba(0, 0, 0, 0.06);
-  --shadow-lg:  0 12px 36px rgba(0, 194, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.06);
-  --shadow-xl:  0 24px 52px rgba(0, 194, 255, 0.1), 0 8px 20px rgba(0, 0, 0, 0.06);
-  --shadow-glow: 0 0 16px rgba(0, 194, 255, 0.08), 0 0 48px rgba(0, 194, 255, 0.03);
+  /* Elevation (shadows) — neutral, soft, with a faint accent tint */
+  --shadow-xs:  0 1px 2px rgba(37, 99, 235, 0.04);
+  --shadow-sm:  0 2px 4px rgba(37, 99, 235, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md:  0 4px 16px rgba(37, 99, 235, 0.05), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-lg:  0 12px 36px rgba(37, 99, 235, 0.07), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-xl:  0 24px 52px rgba(37, 99, 235, 0.09), 0 8px 20px rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 16px rgba(37, 99, 235, 0.08), 0 0 48px rgba(37, 99, 235, 0.03);
 
   /* Surfaces — clean whites with warmth */
   --bg-base:       #ffffff;
-  --bg-secondary:  #ecedf4;
+  --bg-secondary:  #eceef3;
   --bg-panel:      rgba(255, 255, 255, 0.92);
   --bg-ctrl:       rgba(255, 255, 255, 0.98);
-  --bg-sidebar:    rgba(250, 250, 255, 0.98);
-  --bg-input:      rgba(235, 236, 244, 0.7);
+  --bg-sidebar:    rgba(249, 250, 252, 0.98);
+  --bg-input:      rgba(236, 238, 243, 0.7);
   --bg-elevated:   #ffffff;
+  /* Interactive surface overlays — dark tint for light theme */
+  --bg-hover:      rgba(17, 24, 39, 0.05);
+  --bg-active:     rgba(17, 24, 39, 0.09);
 
   /* Borders — softer, more refined */
-  --border-base:   rgba(180, 185, 210, 0.45);
-  --border-strong: rgba(150, 155, 185, 0.6);
-  --border-focus:  rgba(0, 194, 255, 0.5);
-  --border-glow:   rgba(0, 194, 255, 0.2);
+  --border-base:   rgba(180, 185, 200, 0.45);
+  --border-strong: rgba(148, 155, 175, 0.6);
+  --border-focus:  rgba(37, 99, 235, 0.5);
+  --border-glow:   rgba(37, 99, 235, 0.2);
 
   /* Text — strong hierarchy */
   --text-primary:   #111827;
@@ -230,18 +244,18 @@
   --text-muted:     #6b7280;
   --text-dimmed:    #9ca3af;
 
-  /* Accent — Maysson brand colors (#00c2ff and #ff8c00) */
-  --accent-primary:  #00c2ff;
-  --accent-hover:    #33ccff;
-  --accent-subtle:   rgba(0, 194, 255, 0.08);
-  --accent-glow:     rgba(0, 194, 255, 0.2);
-  --accent-secondary: #ff8c00;
+  /* Accent — franc blue for legible contrast, warm orange as secondary. */
+  --accent-primary:  #2563eb;
+  --accent-hover:    #1d4ed8;
+  --accent-subtle:   rgba(37, 99, 235, 0.08);
+  --accent-glow:     rgba(37, 99, 235, 0.18);
+  --accent-secondary: #f59e0b;
 
   /* Semantic colours — vibrant but readable */
   --color-success:  #059669;
   --color-warning:  #d97706;
   --color-error:    #dc2626;
-  --color-info:     #0891b2;
+  --color-info:     #2563eb;
 
   /* Semantic colours — subtle variants (12% opacity backgrounds) */
   --color-success-subtle: color-mix(in srgb, var(--color-success) 12%, transparent);
@@ -255,41 +269,41 @@
   --border-error-subtle:   color-mix(in srgb, var(--color-error) 25%, transparent);
   --border-info-subtle:    color-mix(in srgb, var(--color-info) 25%, transparent);
 
-  /* Accent alternative — Maysson orange (#ff8c00) */
-  --color-accent-alt: #ff8c00;
+  /* Accent alternative — warm orange */
+  --color-accent-alt: #f59e0b;
   --color-accent-alt-subtle: color-mix(in srgb, var(--color-accent-alt) 12%, transparent);
 
   /* Orb */
-  --orb-glow-active: rgba(0, 194, 255, 0.35);
-  --gradient-from:   rgba(0, 194, 255, 0.08);
+  --orb-glow-active: rgba(37, 99, 235, 0.32);
+  --gradient-from:   rgba(37, 99, 235, 0.08);
   /* Orb state accents */
-  --orb-idle:      #00c2ff;
-  --orb-online:    #33ccff;
-  --orb-listening: #00bfff;
-  --orb-speaking:  #ff8c00;
-  --orb-busy:      #ffa500;
-  --orb-thinking:  #00c2ff;
+  --orb-idle:      #2563eb;
+  --orb-online:    #1d4ed8;
+  --orb-listening: #dc2626;
+  --orb-speaking:  #f59e0b;
+  --orb-busy:      #d97706;
+  --orb-thinking:  #7c3aed;
 
   /* Controls */
   --ctrl-icon:       #6b7280;
   --ctrl-icon-hover: #111827;
-  --ctrl-hover:      rgba(0, 194, 255, 0.06);
-  --btn-active-bg:   rgba(0, 194, 255, 0.1);
-  --btn-active-text: #00c2ff;
+  --ctrl-hover:      rgba(37, 99, 235, 0.06);
+  --btn-active-bg:   rgba(37, 99, 235, 0.1);
+  --btn-active-text: #2563eb;
 
   /* Misc */
-  --drag-overlay:   rgba(0, 194, 255, 0.15);
-  --scroll-thumb:   rgba(0, 194, 255, 0.3);
-  --scroll-thumb-hover: rgba(0, 194, 255, 0.5);
+  --drag-overlay:   rgba(37, 99, 235, 0.14);
+  --scroll-thumb:   rgba(37, 99, 235, 0.28);
+  --scroll-thumb-hover: rgba(37, 99, 235, 0.48);
 
   /* Sidebar nav */
-  --nav-active-bg:  rgba(0, 194, 255, 0.08);
-  --nav-active-bar: #00c2ff;
+  --nav-active-bg:  rgba(37, 99, 235, 0.08);
+  --nav-active-bar: #2563eb;
 
   /* Self-edit / Checkpoint system */
-  --self-edit-bg:     rgba(0, 194, 255, 0.05);
-  --self-edit-border: rgba(0, 194, 255, 0.2);
-  --self-edit-text:   #00c2ff;
+  --self-edit-bg:     rgba(37, 99, 235, 0.05);
+  --self-edit-border: rgba(37, 99, 235, 0.2);
+  --self-edit-text:   #2563eb;
   --checkpoint-bg:    rgba(5, 150, 105, 0.06);
   --checkpoint-text:  #047857;
   --critical-bg:      rgba(220, 38, 38, 0.05);
@@ -298,23 +312,25 @@
 
   /* Glass effect tokens */
   --glass-bg:        rgba(255, 255, 255, 0.8);
-  --glass-border:    rgba(0, 194, 255, 0.08);
+  --glass-border:    rgba(37, 99, 235, 0.08);
   --glass-blur:      12px;
 
-  /* New design variables for EmptyEditorState - Maysson brand colors */
+  /* EmptyEditorState alias set — single source of truth */
   --bg: #f7f8fa;
   --surface: #ffffff;
   --surface-soft: #f1f3f7;
   --text: #111827;
   --text-secondary: #667085;
   --text-muted: #98a2b3;
-  --primary: #00c2ff;
-  --primary-dark: #0099cc;
-  --border: rgba(0, 194, 255, 0.08);
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --border: rgba(37, 99, 235, 0.1);
 }
 
 /* ═══════════════════════════════════════════════
-   CYBERPUNK THEME
+   CYBERPUNK THEME — the one theme that keeps the neon.
+   Deliberately loud (cyan/magenta) so it stays distinct
+   from the now-sober default dark theme.
 ═══════════════════════════════════════════════ */
 :root[data-theme="cyberpunk"] {
   --bg-base:       #060814;
@@ -324,6 +340,8 @@
   --bg-sidebar:    rgba(6, 8, 20, 0.98);
   --bg-input:      rgba(24, 34, 66, 0.6);
   --bg-elevated:   #121833;
+  --bg-hover:      rgba(0, 240, 255, 0.08);
+  --bg-active:     rgba(0, 240, 255, 0.14);
 
   --shadow-xs:  0 1px 2px rgba(0,240,255,0.2);
   --shadow-sm:  0 2px 8px rgba(0,240,255,0.25);
@@ -416,6 +434,8 @@
   --bg-sidebar:    rgba(243, 229, 200, 0.98);
   --bg-input:      rgba(235, 218, 185, 0.6);
   --bg-elevated:   #fdf6e3;
+  --bg-hover:      rgba(67, 52, 34, 0.05);
+  --bg-active:     rgba(181, 137, 0, 0.12);
 
   --shadow-xs:  0 1px 2px rgba(181,137,0,0.08);
   --shadow-sm:  0 2px 6px rgba(181,137,0,0.1);
@@ -508,6 +528,8 @@
   --bg-sidebar:    #000000;
   --bg-input:      #1a1a1a;
   --bg-elevated:   #1f1f1f;
+  --bg-hover:      #333333;
+  --bg-active:     #ffff00;
 
   --shadow-xs:  none;
   --shadow-sm:  none;
@@ -2303,18 +2325,18 @@ button {
   --ide-panel-bg: rgba(17, 17, 20, 0.96);
   --ide-sidebar-bg: rgba(12, 12, 15, 0.98);
   --ide-sidebar-hover: rgba(255, 255, 255, 0.045);
-  --ide-sidebar-active: rgba(0, 194, 255, 0.11);
+  --ide-sidebar-active: rgba(110, 168, 254, 0.12);
   --ide-sidebar-item-bg: rgba(255, 255, 255, 0.025);
   --ide-shell-border: rgba(255, 255, 255, 0.07);
 }
 :root[data-theme="light"] {
-  --ide-shell-bg: #f4f1ea;
+  --ide-shell-bg: #f4f4f7;
   --ide-panel-bg: rgba(255, 255, 255, 0.96);
-  --ide-sidebar-bg: rgba(250, 248, 244, 0.98);
+  --ide-sidebar-bg: rgba(249, 250, 252, 0.98);
   --ide-sidebar-hover: rgba(17, 24, 39, 0.055);
-  --ide-sidebar-active: rgba(0, 194, 255, 0.10);
+  --ide-sidebar-active: rgba(37, 99, 235, 0.10);
   --ide-sidebar-item-bg: rgba(17, 24, 39, 0.035);
-  --ide-shell-border: rgba(86, 82, 74, 0.12);
+  --ide-shell-border: rgba(30, 41, 59, 0.1);
 }
 :root[data-theme="cyberpunk"] {
   --ide-shell-bg: #060814;
