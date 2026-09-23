@@ -71,6 +71,9 @@ export class Executor {
   private completedMissions: Mission[] = [];
   private static readonly MAX_COMPLETED = 50;
 
+  /** Promesses des missions lancées en arrière-plan, pour les appelants autonomes. */
+  private readonly missionRuns = new Map<string, Promise<void>>();
+
   /**
    * Missions mises en pause par l'utilisateur.
    * L'exécution boucle sur un point de contrôle tant que l'ID est présent ici.
@@ -259,14 +262,29 @@ export class Executor {
     });
     this.emit("mission_started", { missionId: mission.id, title: params.title });
 
-    // Lancer l'exécution en arrière-plan
-    this.executeMission(mission, params.availableSkills).catch((err) => {
+    // Lancer l'exécution en arrière-plan, tout en conservant une promesse
+    // observable. Le runtime autonome doit attendre le résultat vérifié plutôt
+    // que déclarer une mission réussie juste après sa création.
+    const run = this.executeMission(mission, params.availableSkills).catch((err) => {
       console.error(`[Executor] Mission ${mission.id} failed:`, err);
       telemetryService.endMissionTrace(mission.id, false);
       this.emit("mission_failed", { missionId: mission.id, error: String(err) });
     });
+    this.missionRuns.set(mission.id, run);
+    void run.finally(() => this.missionRuns.delete(mission.id));
 
     return mission;
+  }
+
+  /**
+   * Attend la fin réelle d'une mission déjà lancée et retourne son état
+   * terminal. C'est le contrat utilisé par l'autonomie pour fermer la boucle
+   * exécution → vérification → réflexion avant de prendre la décision suivante.
+   */
+  async waitForMission(missionId: string): Promise<Mission | undefined> {
+    await this.missionRuns.get(missionId);
+    return this.activeMissions.get(missionId)
+      ?? this.completedMissions.find((mission) => mission.id === missionId);
   }
 
   private async preparePlan(mission: Mission, availableSkills: string[]): Promise<MissionPlan> {

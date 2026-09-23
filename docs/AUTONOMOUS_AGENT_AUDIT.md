@@ -55,8 +55,8 @@ Le runtime (`server/runtime/AgentRuntime.ts`) est le conteneur des agents, de `T
 * **PROBLÈME :** aucune frontière typée n'unissait tâche autonome et mission.
 * **CAUSE / FICHIERS :** `LeannaCoreOptions.onTask` ne connaissait que `AutonomousTask`.
 * **IMPACT :** intégrations fragiles/no-op possibles.
-* **SOLUTION :** `executeMission(AutonomousMissionRequest)` est le hand-off unique, avec cycle, trace, objectif, observation et tâche.
-* **RISQUE :** l'adaptateur applicatif doit fournir le callback vers `Mission.Executor` ou `AgentBrain`.
+* **SOLUTION :** `server.ts` raccorde maintenant `executeMission(AutonomousMissionRequest)` au `Mission.Executor` initialisé au bootstrap. `Executor.waitForMission()` attend le résultat terminal vérifié au lieu de considérer la création asynchrone comme un succès.
+* **RISQUE :** un événement reçu avant l'initialisation du Mission System est explicitement escaladé ; il ne déclenche aucun outil hors politique.
 * **TEST À AJOUTER :** test d'intégration callback + MissionStore.
 
 ### Mission → Scheduler / Scheduler → Execution
@@ -85,4 +85,4 @@ Le runtime (`server/runtime/AgentRuntime.ts`) est le conteneur des agents, de `T
 
 ## Architecture cible et règles d'intégration
 
-`LeannaCore` doit être construit avec `executive.executeMission`. Cette fonction adapte **une seule fois** le `AutonomousMissionRequest` vers le système de mission déjà configuré. Elle doit : (1) valider le plan; (2) déléguer au DAG; (3) exécuter exclusivement par `ToolRegistry`; (4) vérifier; (5) réfléchir et proposer l'apprentissage; (6) retourner succès, blocage ou escalade. Les budgets, confirmations, permissions et dry-run restent les responsabilités du runtime/outils existants. `maxCycles` borne l'executive et une permission refusée s'escalade immédiatement, sans tentative d'exécution.
+`server.ts` construit `LeannaCore` avec `executive.executeMission`. Cette fonction adapte **une seule fois** le `AutonomousMissionRequest` vers le système de mission déjà configuré et attend son état terminal. Elle : (1) valide le plan; (2) délègue au DAG; (3) exécute exclusivement par `ToolRegistry`; (4) vérifie; (5) réfléchit et propose l'apprentissage; (6) retourne succès, blocage ou escalade. Les budgets, confirmations, permissions et dry-run restent les responsabilités du runtime/outils existants. `maxCycles` borne l'executive et une permission refusée s'escalade immédiatement, sans tentative d'exécution.

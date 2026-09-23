@@ -26,3 +26,17 @@ test('Executor emits an explicit plan before mission start', async () => {
   }
   assert.deepEqual(plan.targetedFiles, ['server.ts']);
 });
+
+test('Executor exposes a completion promise for autonomous callers', async () => {
+  const executor = new Executor();
+  executor.setSkillHandler(async () => null);
+  const mission = await executor.startMission({
+    title: 'Autonomy completion',
+    description: 'Verify that autonomous callers observe a terminal mission state.',
+    availableSkills: [],
+  });
+
+  const completed = await executor.waitForMission(mission.id);
+  assert.ok(completed);
+  assert.ok(['completed', 'failed'].includes(completed.status));
+});

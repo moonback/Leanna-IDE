@@ -390,6 +390,32 @@ void eventBridge.start();
 const autonomyPersistence = new AutonomyPersistence();
 const leannaCore = new LeannaCore(runtimeV2, {
   persistence: autonomyPersistence,
+  executive: {
+    // The Mission Executor is initialized asynchronously by bootstrapRuntimeSync.
+    // Resolve it at execution time so early events escalate safely instead of
+    // bypassing the existing plan/permission/dry-run/approval pipeline.
+    executeMission: async ({ goal }) => {
+      const executor = skillManager.missionExecutor;
+      if (!executor) {
+        return { success: false, escalate: true, summary: "Mission system is not initialized yet." };
+      }
+      const mission = await executor.startMission({
+        title: `Autonomy: ${goal.description}`,
+        description: goal.description,
+        priority: goal.priority,
+        availableSkills: skillManager.getToolDeclarations().map((tool: any) => tool.name),
+        budget: goal.budget,
+        dryRun: runtimeV2.tools.getDryRun().isEnabled(),
+      });
+      const completed = await executor.waitForMission(mission.id);
+      const success = completed?.status === "completed";
+      return {
+        success,
+        escalate: !completed || completed.status === "blocked",
+        summary: completed?.toContextSummary?.() ?? "Mission did not produce a terminal result.",
+      };
+    },
+  },
   onTask: async (task) => {
     // Autonomous tasks remain observable and use existing runtime memory; no tool
     // or mission action bypasses PermissionPolicy, DryRun or AutonomyPolicy.
