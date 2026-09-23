@@ -189,6 +189,11 @@ le serveur les transforme en une décision traçable, puis les transmet à la
 mission existante. La boucle reste **bornée**, **interruptible** et ne crée pas
 de chemin d'exécution parallèle aux protections du runtime.
 
+La concurrence est doublement bornée : `TaskManager` limite la queue et les
+workers autonomes, tandis que `AutonomousExecutive.maxConcurrentCycles` limite
+les cycles de décision/mission simultanés. Lorsqu'une limite est atteinte, la
+tâche remonte vers le retry/backoff existant au lieu de contourner la limite.
+
 ```text
 RuntimeEvent / Heartbeat
         ↓

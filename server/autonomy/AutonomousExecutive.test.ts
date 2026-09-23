@@ -33,3 +33,15 @@ test("permission denials escalate without executing a mission", async () => {
   assert.equal(executions, 0);
   assert.equal(executive.goals.list()[0].status, "ESCALATED");
 });
+
+test("releases the concurrency budget after a completed cycle", async () => {
+  const runtime = fakeRuntime();
+  const executive = new AutonomousExecutive(runtime as never, {
+    maxConcurrentCycles: 1,
+    executeMission: async () => ({ success: true }),
+  });
+  const task = (id: string) => ({ id, type: "maintenance" as const, title: "failure", priority: "high" as const, sourceEventId: id, fingerprint: id, createdAt: Date.now(), status: "pending" as const, attempts: 0, maxRetries: 1, timeoutMs: 100, metadata: { event: { type: "task:failed" as const, taskId: id, error: "boom" } } });
+  await executive.execute(task("one"));
+  await executive.execute(task("two"));
+  assert.equal(executive.goals.list().filter((goal) => goal.status === "COMPLETED").length, 2);
+});

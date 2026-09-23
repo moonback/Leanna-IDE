@@ -93,7 +93,10 @@ export interface AutonomousMissionRequest {
 export interface AutonomousExecutiveOptions {
   /** The sole hand-off into planning/execution. Existing Mission/Brain systems own this callback. */
   executeMission?: (request: AutonomousMissionRequest) => Promise<{ success: boolean; summary?: string; escalate?: boolean }>;
+  /** @deprecated Use maxConcurrentCycles; retained for configuration compatibility. */
   maxCycles?: number;
+  /** Maximum executive cycles in flight; excess work remains in TaskManager's bounded queue. */
+  maxConcurrentCycles?: number;
   onEvent?: (event: AutonomousExecutiveEvent) => void;
 }
 
@@ -117,7 +120,7 @@ export class AutonomousExecutive {
   readonly goals = new GoalManager();
   readonly priorities = new PriorityEngine();
   private readonly perception = new PerceptionEngine();
-  private cycles = 0;
+  private activeCycles = 0;
 
   constructor(private readonly runtime: AgentRuntime, private readonly options: AutonomousExecutiveOptions = {}) {}
 
@@ -149,27 +152,33 @@ export class AutonomousExecutive {
   async execute(task: AutonomousTask): Promise<void> {
     const event = task.metadata?.event as RuntimeEvent | undefined;
     if (!event) return; // Restored legacy tasks remain safe no-ops until a planner provides context.
-    const cycleId = randomUUID(); const traceId = `autonomy:${cycleId}`;
-    this.emit("autonomy.cycle.started", traceId, cycleId, { taskId: task.id });
-    if (++this.cycles > (this.options.maxCycles ?? 100)) throw new Error("Autonomy cycle budget exhausted; human intervention required.");
-    const decision = this.decide(event);
-    this.emit("autonomy.decision.made", traceId, cycleId, { taskId: task.id, goalId: decision.goal?.id, status: decision.disposition });
-    if (decision.disposition === "IGNORE" || decision.disposition === "STORE" || decision.disposition === "MONITOR") {
-      await this.runtime.memory.set("session", `autonomy:observation:${task.id}`, { event, decision, observedAt: Date.now() }, { ttl: 86_400_000 });
-      this.emit("autonomy.memory.updated", traceId, cycleId, { taskId: task.id, status: "stored" });
-      return;
+    const limit = this.options.maxConcurrentCycles ?? this.options.maxCycles ?? 1;
+    if (this.activeCycles >= limit) throw new Error("Autonomy concurrency budget exhausted; task will be retried by TaskManager.");
+    this.activeCycles++;
+    try {
+      const cycleId = randomUUID(); const traceId = `autonomy:${cycleId}`;
+      this.emit("autonomy.cycle.started", traceId, cycleId, { taskId: task.id });
+      const decision = this.decide(event);
+      this.emit("autonomy.decision.made", traceId, cycleId, { taskId: task.id, goalId: decision.goal?.id, status: decision.disposition });
+      if (decision.disposition === "IGNORE" || decision.disposition === "STORE" || decision.disposition === "MONITOR") {
+        await this.runtime.memory.set("session", `autonomy:observation:${task.id}`, { event, decision, observedAt: Date.now() }, { ttl: 86_400_000 });
+        this.emit("autonomy.memory.updated", traceId, cycleId, { taskId: task.id, status: "stored" });
+        return;
+      }
+      if (!decision.goal || decision.disposition === "ESCALATE" || !this.options.executeMission) {
+        decision.goal && this.goals.transition(decision.goal.id, "ESCALATED");
+        this.emit("autonomy.cycle.escalated", traceId, cycleId, { taskId: task.id, goalId: decision.goal?.id, status: decision.reason });
+        return;
+      }
+      this.goals.transition(decision.goal.id, "ACTIVE");
+      this.emit("autonomy.mission.created", traceId, cycleId, { taskId: task.id, goalId: decision.goal.id });
+      const result = await this.options.executeMission({ cycleId, traceId, goal: decision.goal, observation: this.perception.perceive(event), task });
+      this.goals.transition(decision.goal.id, result.escalate ? "ESCALATED" : result.success ? "COMPLETED" : "BLOCKED");
+      await this.runtime.memory.set("project", `autonomy:outcome:${decision.goal.id}`, { result, cycleId, traceId, completedAt: Date.now() });
+      this.emit(result.escalate ? "autonomy.cycle.escalated" : "autonomy.cycle.completed", traceId, cycleId, { taskId: task.id, goalId: decision.goal.id, status: result.success ? "completed" : "blocked" });
+    } finally {
+      this.activeCycles--;
     }
-    if (!decision.goal || decision.disposition === "ESCALATE" || !this.options.executeMission) {
-      decision.goal && this.goals.transition(decision.goal.id, "ESCALATED");
-      this.emit("autonomy.cycle.escalated", traceId, cycleId, { taskId: task.id, goalId: decision.goal?.id, status: decision.reason });
-      return;
-    }
-    this.goals.transition(decision.goal.id, "ACTIVE");
-    this.emit("autonomy.mission.created", traceId, cycleId, { taskId: task.id, goalId: decision.goal.id });
-    const result = await this.options.executeMission({ cycleId, traceId, goal: decision.goal, observation: this.perception.perceive(event), task });
-    this.goals.transition(decision.goal.id, result.escalate ? "ESCALATED" : result.success ? "COMPLETED" : "BLOCKED");
-    await this.runtime.memory.set("project", `autonomy:outcome:${decision.goal.id}`, { result, cycleId, traceId, completedAt: Date.now() });
-    this.emit(result.escalate ? "autonomy.cycle.escalated" : "autonomy.cycle.completed", traceId, cycleId, { taskId: task.id, goalId: decision.goal.id, status: result.success ? "completed" : "blocked" });
   }
 
   private emit(type: string, traceId: string, cycleId: string, extra: Omit<AutonomousExecutiveEvent, "type" | "traceId" | "cycleId" | "timestamp">): void {
