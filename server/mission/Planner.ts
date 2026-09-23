@@ -6,6 +6,7 @@ import type {
 } from "./types.js";
 import { Mission } from "./Mission.js";
 import { SkillScorer } from "./SkillScorer.js";
+import { strategyMemory } from "../knowledge/StrategyMemory.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Planner — Décomposition hiérarchique des objectifs
@@ -189,6 +190,11 @@ export class Planner {
   ): string {
     const context = mission.getContext();
 
+    // Boucle d'apprentissage inter-missions (GAP-1) : avertir le planificateur
+    // des outils qui ont historiquement échoué, en s'appuyant uniquement sur
+    // les outils disponibles pour cette mission.
+    const failingWarning = this.buildFailingSkillsWarning(availableSkills);
+
     return `Tu es un planificateur de tâches. Décompose cet objectif en sous-étapes concrètes.
 
 OBJECTIF: ${goal.title}
@@ -200,7 +206,7 @@ CONTEXTE:
 - Fichiers pertinents: ${context.relevantFiles.slice(0, 10).join(", ") || "aucun"}
 - Erreurs passées: ${context.errors.slice(-3).map((e) => e.error).join("; ") || "aucune"}
 - Hypothèses: ${context.hypotheses.slice(-3).join("; ") || "aucune"}
-
+${failingWarning}
 OUTILS DISPONIBLES: ${availableSkills.join(", ")}
 
 INSTRUCTIONS:
@@ -219,6 +225,32 @@ RÉPONDS EN JSON STRICT:
     "dependsOn": []
   }
 ]`;
+  }
+
+  /**
+   * Construit un avertissement, à injecter dans le prompt de décomposition,
+   * listant les outils disponibles historiquement peu fiables (mémoire de
+   * stratégie durable). Retourne une chaîne vide si aucun signal fiable.
+   */
+  private buildFailingSkillsWarning(availableSkills: string[]): string {
+    let failing: { skillName: string; recentSuccessRate: number; totalCalls: number }[] = [];
+    try {
+      const available = new Set(availableSkills);
+      failing = strategyMemory
+        .getFailingSkills()
+        .filter((s) => available.has(s.skillName));
+    } catch {
+      return "";
+    }
+    if (failing.length === 0) return "";
+    const lines = failing
+      .slice(0, 5)
+      .map(
+        (s) =>
+          `  - ${s.skillName} (succès récent ${Math.round(s.recentSuccessRate * 100)}% sur ${s.totalCalls} appels)`,
+      )
+      .join("\n");
+    return `\nOUTILS HISTORIQUEMENT PEU FIABLES (préférer une alternative si possible):\n${lines}\n`;
   }
 
   private parseDecomposeResult(result: string): SubGoalPlan[] {

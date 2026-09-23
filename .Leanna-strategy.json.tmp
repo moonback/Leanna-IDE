@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "updatedAt": "2026-09-23T10:25:29.873Z",
+  "skills": [
+    {
+      "skillName": "flaky_tool",
+      "successCount": 0,
+      "failureCount": 5,
+      "totalDurationMs": 500,
+      "totalCalls": 5,
+      "recent": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "lastUsedAt": "2026-09-23T10:25:29.808Z"
+    },
+    {
+      "skillName": "solid_tool",
+      "successCount": 5,
+      "failureCount": 0,
+      "totalDurationMs": 250,
+      "totalCalls": 5,
+      "recent": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "lastUsedAt": "2026-09-23T10:25:29.820Z"
+    },
+    {
+      "skillName": "new_tool",
+      "successCount": 0,
+      "failureCount": 1,
+      "totalDurationMs": 100,
+      "totalCalls": 1,
+      "recent": [
+        false
+      ],
+      "lastUsedAt": "2026-09-23T10:25:29.824Z"
+    },
+    {
+      "skillName": "bad",
+      "successCount": 0,
+      "failureCount": 4,
+      "totalDurationMs": 400,
+      "totalCalls": 4,
+      "recent": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "lastUsedAt": "2026-09-23T10:25:29.832Z"
+    },
+    {
+      "skillName": "good",
+      "successCount": 4,
+      "failureCount": 0,
+      "totalDurationMs": 400,
+      "totalCalls": 4,
+      "recent": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "lastUsedAt": "2026-09-23T10:25:29.840Z"
+    },
+    {
+      "skillName": "write_project_file",
+      "successCount": 0,
+      "failureCount": 6,
+      "totalDurationMs": 1200,
+      "totalCalls": 6,
+      "recent": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "lastUsedAt": "2026-09-23T10:25:29.857Z"
+    },
+    {
+      "skillName": "run_command",
+      "successCount": 0,
+      "failureCount": 6,
+      "totalDurationMs": 1200,
+      "totalCalls": 6,
+      "recent": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "lastUsedAt": "2026-09-23T10:25:29.873Z"
+    }
+  ]
+}

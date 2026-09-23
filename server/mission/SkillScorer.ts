@@ -1,4 +1,5 @@
 import type { SkillScore } from "./types.js";
+import type { SkillReliabilityStats } from "../knowledge/StrategyMemory.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SkillScorer — Sélection intelligente des outils
@@ -105,6 +106,41 @@ export class SkillScorer {
     }
 
     this.usageHistory.set(skillName, stats);
+  }
+
+  /**
+   * Amorce l'historique d'usage à partir de la mémoire de stratégie durable
+   * (StrategyMemory). Ferme la boucle d'apprentissage inter-missions : un skill
+   * qui a historiquement échoué obtient un score d'historique/probabilité plus
+   * faible dès la PREMIÈRE planification d'une nouvelle mission, sans attendre
+   * un échec re-observé dans le processus courant.
+   *
+   * On ne remplace pas l'historique déjà accumulé en cours de mission : les
+   * observations vivantes priment. On ne fait qu'amorcer les skills encore vierges.
+   */
+  seedFromReliability(stats: SkillReliabilityStats[]): void {
+    for (const s of stats) {
+      if (this.usageHistory.has(s.skillName)) continue;
+      if (s.totalCalls <= 0) continue;
+      const successCount = Math.round(s.successRate * s.totalCalls);
+      const failureCount = Math.max(0, s.totalCalls - successCount);
+      // Reconstituer une fenêtre récente cohérente avec le taux de succès récent.
+      const recentLen = Math.min(10, s.totalCalls);
+      const recentSuccesses = Math.round(s.recentSuccessRate * recentLen);
+      const recentResults = Array.from({ length: recentLen }, (_v, i) => ({
+        success: i < recentSuccesses,
+        durationMs: s.avgDurationMs,
+        at: new Date().toISOString(),
+      }));
+      this.usageHistory.set(s.skillName, {
+        successCount,
+        failureCount,
+        totalDurationMs: s.avgDurationMs * s.totalCalls,
+        totalCalls: s.totalCalls,
+        lastUsed: new Date().toISOString(),
+        recentResults,
+      });
+    }
   }
 
   /**

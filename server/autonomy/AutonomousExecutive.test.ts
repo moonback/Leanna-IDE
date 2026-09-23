@@ -51,3 +51,44 @@ test("releases the concurrency budget after a completed cycle", async () => {
   await executive.execute(task("two"));
   assert.equal(executive.goals.list().filter((goal) => goal.status === "COMPLETED").length, 2);
 });
+
+// ── GAP-2: memory-informed decisions ─────────────────────────────────────────
+
+/** Fake runtime with a working in-memory project store (get + set). */
+function memoryRuntime() {
+  const store = new Map<string, unknown>();
+  return {
+    events: new EventBus(),
+    memory: {
+      get: (_level: string, key: string) => store.get(key),
+      set: async (_level: string, key: string, value: unknown) => { store.set(key, value); },
+    },
+    store,
+  };
+}
+
+test("repeated failures of the same goal class escalate instead of re-attempting", async () => {
+  const runtime = memoryRuntime();
+  // Simulate three prior failures recorded for this event class.
+  runtime.store.set(`autonomy:fingerprint:task:failed`, { failures: 3 });
+
+  const executive = new AutonomousExecutive(runtime as never, { executeMission: async () => ({ success: true }) });
+  const decision = executive.decide({ type: "task:failed", taskId: "x", error: "boom" });
+  assert.equal(decision.disposition, "ESCALATE", "3 prior failures should force escalation");
+});
+
+test("a fresh goal class with no failure history still acts", () => {
+  const runtime = memoryRuntime();
+  const executive = new AutonomousExecutive(runtime as never);
+  const decision = executive.decide({ type: "task:failed", taskId: "x", error: "boom" });
+  assert.equal(decision.disposition, "ACT");
+});
+
+test("execute records a per-fingerprint failure tally consumed by later decisions", async () => {
+  const runtime = memoryRuntime();
+  const executive = new AutonomousExecutive(runtime as never, { executeMission: async () => ({ success: false }) });
+  const task = { id: "t", type: "maintenance" as const, title: "f", priority: "high" as const, sourceEventId: "t", fingerprint: "t", createdAt: Date.now(), status: "pending" as const, attempts: 0, maxRetries: 1, timeoutMs: 100, metadata: { event: { type: "task:failed" as const, taskId: "t", error: "boom" } } };
+  await executive.execute(task);
+  const recorded = [...runtime.store.keys()].some((k) => k.startsWith("autonomy:fingerprint:"));
+  assert.equal(recorded, true, "a fingerprint tally must be persisted after a blocked mission");
+});

@@ -117,6 +117,9 @@ export interface AutonomousExecutiveEvent {
   goalId?: string;
   taskId?: string;
   error?: string;
+  // Index signature keeps the event structurally compatible with the generic
+  // broadcaster payload in LeannaCore.broadcastExecutive (fixes GAP-4).
+  [key: string]: unknown;
 }
 
 /**
@@ -132,10 +135,42 @@ export class AutonomousExecutive {
 
   constructor(private readonly runtime: AgentRuntime, private readonly options: AutonomousExecutiveOptions = {}) {}
 
+  /**
+   * Stable fingerprint of an event *class*, not a specific resource. This mirrors
+   * the goal-dedup philosophy (resource identifiers are intentionally excluded so
+   * repeated instances of the same failure class share one goal/tally), which is
+   * what lets decide() recognise a recurring-but-impossible objective.
+   */
+  private fingerprint(event: RuntimeEvent, _observation: Perception): string {
+    return event.type;
+  }
+
+  /**
+   * Memory-informed bias (GAP-2). Reads the outcome recorded by a previous cycle
+   * for the same fingerprint. If that class of goal was already escalated or
+   * blocked recently, we raise urgency (it needs attention) and, once it has
+   * failed repeatedly, we escalate immediately instead of re-attempting an
+   * impossible mission. Deterministic and bounded; never invokes an LLM.
+   */
+  private recallOutcome(fingerprint: string): { escalate: boolean; urgencyBonus: number } {
+    try {
+      const recalled = this.runtime.memory.get("project", `autonomy:fingerprint:${fingerprint}`) as
+        | { failures?: number; lastDisposition?: string }
+        | undefined;
+      if (!recalled) return { escalate: false, urgencyBonus: 0 };
+      const failures = Number(recalled.failures) || 0;
+      // 3+ prior failures of the same class → stop retrying, escalate to a human.
+      return { escalate: failures >= 3, urgencyBonus: Math.min(0.3, failures * 0.1) };
+    } catch {
+      return { escalate: false, urgencyBonus: 0 };
+    }
+  }
+
   decide(event: RuntimeEvent): AutonomousDecision {
     const observation = this.perception.perceive(event);
     if (!observation.requiresAttention) return { disposition: observation.importance < .1 ? "IGNORE" : "STORE", reason: observation.reason, priority: "low" };
-    const score = this.priorities.score({ importance: observation.importance, urgency: observation.requiresAttention ? .7 : 0, risk: observation.importance, confidence: .8, impact: observation.importance });
+    const memory = this.recallOutcome(this.fingerprint(event, observation));
+    const score = this.priorities.score({ importance: observation.importance, urgency: Math.min(1, (observation.requiresAttention ? .7 : 0) + memory.urgencyBonus), risk: observation.importance, confidence: .8, impact: observation.importance });
     const priority = this.priorities.toPriority(score);
     const { goal } = this.goals.createOrUpdate({
       // Resource identifiers are intentionally excluded: repeated instances of
@@ -145,6 +180,9 @@ export class AutonomousExecutive {
       successCriteria: ["The triggering condition is verified, recovered, or escalated."],
     });
     if (event.type === "tool:permissionDenied") return { disposition: "ESCALATE", reason: observation.reason, priority, goal };
+    // A goal class that already failed repeatedly is escalated rather than
+    // re-attempted, preventing an infinite loop on an impossible objective.
+    if (memory.escalate) return { disposition: "ESCALATE", reason: `${observation.reason} (échecs répétés du même type — escalade)`, priority, goal };
     return { disposition: observation.possibleActions.includes("maintenance") ? "ACT" : "INVESTIGATE", reason: observation.reason, priority, goal };
   }
 
@@ -183,6 +221,15 @@ export class AutonomousExecutive {
       const result = await this.options.executeMission({ cycleId, traceId, goal: decision.goal, observation: this.perception.perceive(event), task });
       this.goals.transition(decision.goal.id, result.escalate ? "ESCALATED" : result.success ? "COMPLETED" : "BLOCKED");
       await this.runtime.memory.set("project", `autonomy:outcome:${decision.goal.id}`, { result, cycleId, traceId, completedAt: Date.now() });
+      // Persist a per-fingerprint tally so decide() can bias future cycles of the
+      // same goal class (GAP-2). Success resets the failure counter. Guarded so a
+      // memory backend without get() (e.g. minimal test doubles) never breaks the cycle.
+      try {
+        const fingerprint = this.fingerprint(event, this.perception.perceive(event));
+        const prior = (this.runtime.memory.get?.("project", `autonomy:fingerprint:${fingerprint}`) as { failures?: number } | undefined)?.failures ?? 0;
+        const failures = result.success ? 0 : prior + 1;
+        await this.runtime.memory.set("project", `autonomy:fingerprint:${fingerprint}`, { failures, lastDisposition: decision.disposition, updatedAt: Date.now() });
+      } catch { /* per-fingerprint tally is best-effort */ }
       this.emit(result.escalate ? "autonomy.cycle.escalated" : "autonomy.cycle.completed", traceId, cycleId, { taskId: task.id, goalId: decision.goal.id, status: result.success ? "completed" : "blocked" });
     } finally {
       this.activeCycles--;

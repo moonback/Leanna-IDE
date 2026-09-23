@@ -14,6 +14,7 @@ import { telemetryService } from "../observability/TelemetryService.js";
 import { setTelemetryContext, clearTelemetryContext } from "../utils/textGeneration.js";
 import { learningEngine } from "../knowledge/LearningEngine.js";
 import type { LearningResult } from "../knowledge/types.js";
+import { strategyMemory } from "../knowledge/StrategyMemory.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Executor — Boucle plan → agir → vérifier → corriger
@@ -254,6 +255,15 @@ export class Executor {
 
     // Set telemetry context for all model calls in this mission
     setTelemetryContext({ missionId: mission.id });
+
+    // Ferme la boucle d'apprentissage inter-missions (GAP-1) : amorcer le
+    // SkillScorer avec la fiabilité durable des skills AVANT la planification,
+    // pour qu'un outil historiquement défaillant soit d'emblée moins prioritaire.
+    try {
+      this.scorer.seedFromReliability(strategyMemory.getAllStats());
+    } catch (err) {
+      console.warn(`[Executor] Amorçage de fiabilité ignoré: ${(err as Error).message}`);
+    }
 
     const plan = await this.preparePlan(mission, params.availableSkills);
 
@@ -867,6 +877,11 @@ export class Executor {
     // Enregistrer le résultat
     mission.recordActionResult(action.id, result, success);
     this.scorer.recordUsage(action.skillName, success, durationMs);
+    // Persistance durable de la fiabilité du skill (GAP-1) : alimente la mémoire
+    // de stratégie lue par les missions futures. Best-effort, jamais bloquant.
+    try {
+      strategyMemory.recordSkillOutcome(action.skillName, success, durationMs);
+    } catch { /* la fiabilité durable est best-effort */ }
 
     // Réflexion
     const reflectionInput: ReflectionInput = {
