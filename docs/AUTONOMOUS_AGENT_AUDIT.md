@@ -79,9 +79,9 @@ Le runtime (`server/runtime/AgentRuntime.ts`) est le conteneur des agents, de `T
 * **PROBLÈME :** pas de contrat homogène de retour de mission à l'autonomie.
 * **CAUSE / FICHIERS :** `ReflectionEngine`, `LearningEngine`, `ProjectMemory` sont indépendants.
 * **IMPACT :** les résultats ne sont pas toujours retrouvés au prochain cycle.
-* **SOLUTION :** l'executive écrit les observations/outcomes dans la mémoire runtime et porte un goal stable; le callback mission doit faire passer réflexion et propositions du `LearningEngine` avant son résultat.
+* **SOLUTION :** l'executive écrit les observations/outcomes dans la mémoire runtime et porte un goal stable. `Executor.finalizeMission()` appelle maintenant `LearningEngine` avec `applyAutoImprovements: false`, expose des `candidateImprovements` et émet un événement de fin d'apprentissage sans modifier le workspace.
 * **RISQUE :** `LearningEngine` ne doit appliquer aucune modification sensible sans politique/confirmation.
-* **TEST À AJOUTER :** une leçon issue d'échec influe sur un plan suivant.
+* **TEST À AJOUTER :** une leçon issue d'échec influe sur un plan suivant après validation explicite de la proposition.
 
 ## Architecture cible et règles d'intégration
 

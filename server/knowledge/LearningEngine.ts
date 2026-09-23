@@ -303,6 +303,7 @@ export class LearningEngine {
     return {
       lessons: filtered,
       improvementsApplied: applied,
+      candidateImprovements: improvements.map(({ id, kind, label, rationale, autoApplicable }) => ({ id, kind, label, rationale, autoApplicable })),
       filesModified: Array.from(new Set(filesModified)),
       summary,
     };

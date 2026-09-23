@@ -39,4 +39,7 @@ test('Executor exposes a completion promise for autonomous callers', async () =>
   const completed = await executor.waitForMission(mission.id);
   assert.ok(completed);
   assert.ok(['completed', 'failed'].includes(completed.status));
+  const learning = executor.getLearningResult(mission.id);
+  assert.ok(learning, 'terminal missions should produce reviewable learning proposals');
+  assert.deepEqual(learning.improvementsApplied, [], 'mission finalization must not auto-apply learning proposals');
 });

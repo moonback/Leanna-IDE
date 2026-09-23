@@ -12,6 +12,8 @@ import type {  PlannedAction,  ReflectionResult,
 import { DEFAULT_MISSION_CONFIG } from "./types.js";
 import { telemetryService } from "../observability/TelemetryService.js";
 import { setTelemetryContext, clearTelemetryContext } from "../utils/textGeneration.js";
+import { learningEngine } from "../knowledge/LearningEngine.js";
+import type { LearningResult } from "../knowledge/types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Executor — Boucle plan → agir → vérifier → corriger
@@ -73,6 +75,8 @@ export class Executor {
 
   /** Promesses des missions lancées en arrière-plan, pour les appelants autonomes. */
   private readonly missionRuns = new Map<string, Promise<void>>();
+  /** Candidate lessons/proposals; never auto-applied by mission finalization. */
+  private readonly learningResults = new Map<string, LearningResult>();
 
   /**
    * Missions mises en pause par l'utilisateur.
@@ -346,6 +350,11 @@ export class Executor {
    */
   listCompletedMissions(): Mission[] {
     return [...this.completedMissions];
+  }
+
+  /** Returns post-mission learning proposals for review by the policy/UI. */
+  getLearningResult(missionId: string): LearningResult | undefined {
+    return this.learningResults.get(missionId);
   }
 
   /**
@@ -1179,6 +1188,44 @@ JSON:`;
     }
     // Persistance finale (statut terminal).
     void this.persist(mission);
+    this.proposeLearning(mission);
+  }
+
+  /**
+   * Close reflection → learning without allowing the learning engine to mutate
+   * the workspace or policy. Applying a proposal remains an explicit human or
+   * policy decision in a later step.
+   */
+  private proposeLearning(mission: Mission): void {
+    try {
+      const state = mission.getState();
+      const actions = Object.values(state.goals).flatMap((goal) => goal.plannedActions.map((action) => ({
+        actionId: action.id,
+        actionName: action.skillName,
+        skillName: action.skillName,
+        success: action.status === "completed",
+        errorMessage: action.status === "failed" ? String(action.result ?? "Action failed") : undefined,
+        goalId: goal.id,
+      })));
+      const learning = learningEngine.learnFromMission({
+        missionId: mission.id,
+        missionTitle: state.title,
+        overallSuccess: mission.status === "completed",
+        touchedFiles: state.context.relevantFiles,
+        actions,
+        errors: state.context.errors.map((error) => ({ message: error.error, action: error.action })),
+        decisions: state.context.decisions.map((decision) => ({ what: decision.what, why: decision.why })),
+      }, { applyAutoImprovements: false });
+      this.learningResults.set(mission.id, learning);
+      this.emit("mission_learning_completed", {
+        missionId: mission.id,
+        lessons: learning.lessons.length,
+        candidateProposals: learning.candidateImprovements?.length ?? 0,
+      });
+    } catch (error) {
+      // Learning must never turn an already terminal mission into a failure.
+      this.emit("mission_learning_failed", { missionId: mission.id, error: String(error) });
+    }
   }
 
   /**
