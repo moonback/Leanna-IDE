@@ -137,10 +137,16 @@ export class Planner {
       .getContext()
       .errors.filter((e) => e.action === failedAction.skillName).length;
 
-    const filteredSkills =
-      failCount >= 2
-        ? availableSkills.filter((s) => s !== failedAction.skillName)
-        : availableSkills;
+    // Boucle d'apprentissage inter-missions (GAP-1) : lors d'une replanification,
+    // écarter aussi les outils durablement peu fiables (mémoire de stratégie),
+    // même sans échec re-observé dans cette mission — mais toujours en gardant au
+    // moins un outil disponible pour ne pas rendre la replanification impossible.
+    const durableFailing = this.durableFailingSkillNames(availableSkills);
+    const toExclude = new Set<string>(durableFailing);
+    if (failCount >= 2) toExclude.add(failedAction.skillName);
+
+    const filtered = availableSkills.filter((s) => !toExclude.has(s));
+    const filteredSkills = filtered.length > 0 ? filtered : availableSkills;
 
     // Ajouter une hypothèse corrective
     mission.addHypothesis(
@@ -225,6 +231,19 @@ RÉPONDS EN JSON STRICT:
     "dependsOn": []
   }
 ]`;
+  }
+
+  /** Noms des outils disponibles marqués durablement peu fiables. Best-effort. */
+  private durableFailingSkillNames(availableSkills: string[]): string[] {
+    try {
+      const available = new Set(availableSkills);
+      return strategyMemory
+        .getFailingSkills()
+        .map((s) => s.skillName)
+        .filter((name) => available.has(name));
+    } catch {
+      return [];
+    }
   }
 
   /**

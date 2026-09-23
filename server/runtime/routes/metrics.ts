@@ -8,6 +8,7 @@
 import { Router, Request, Response } from "express";
 import type { AgentRuntime } from "../AgentRuntime.js";
 import type { LeannaCore } from "../../autonomy/LeannaCore.js";
+import { strategyMemory } from "../../knowledge/StrategyMemory.js";
 
 export function createMetricsRouter(runtime: AgentRuntime, autonomy?: LeannaCore): Router {
   const router = Router();
@@ -52,6 +53,23 @@ export function createMetricsRouter(runtime: AgentRuntime, autonomy?: LeannaCore
   router.get("/autonomy", (_req: Request, res: Response) => {
     if (!autonomy) return res.status(503).json({ error: "Autonomy runtime unavailable" });
     return res.json({ state: autonomy.getState(), tasks: autonomy.getTasks().slice(0, 100) });
+  });
+
+  // GET /api/v2/metrics/reliability — durable cross-mission skill reliability.
+  // Surfaces the StrategyMemory signal that biases planning (see master audit
+  // GAP-1) so operators can see WHY a tool is deprioritised.
+  router.get("/reliability", (_req: Request, res: Response) => {
+    try {
+      const all = strategyMemory.getAllStats();
+      return res.json({
+        timestamp: new Date().toISOString(),
+        totalSkills: all.length,
+        failing: strategyMemory.getFailingSkills(),
+        skills: all.sort((a, b) => a.recentSuccessRate - b.recentSuccessRate),
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
   });
 
   // GET /api/v2/metrics/tools
