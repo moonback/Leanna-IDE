@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { EventBus } from "../runtime/EventBus.js";
-import { AutonomousExecutive, PriorityEngine } from "./AutonomousExecutive.js";
+import { AutonomousExecutive, PriorityEngine, autonomousExecutiveConfigFromEnv } from "./AutonomousExecutive.js";
 
 function fakeRuntime() {
   const stored: Array<{ level: string; key: string; value: unknown }> = [];
@@ -13,6 +13,12 @@ test("priority arbitration is deterministic and bounded", () => {
   assert.equal(engine.score({ importance: 1, urgency: 1, risk: 1, dependency: 1, userIntent: 1, deadline: 1, cost: 0, confidence: 1, impact: 1, missionPriority: 1 }), 100);
   assert.equal(engine.toPriority(80), "critical");
   assert.equal(engine.toPriority(34), "low");
+});
+
+test("reads a safe executive concurrency limit from the environment", () => {
+  assert.equal(autonomousExecutiveConfigFromEnv({ LEANNA_AUTONOMY_MAX_CONCURRENT_CYCLES: "3" } as NodeJS.ProcessEnv).maxConcurrentCycles, 3);
+  assert.equal(autonomousExecutiveConfigFromEnv({ LEANNA_AUTONOMY_MAX_CONCURRENT_CYCLES: "0" } as NodeJS.ProcessEnv).maxConcurrentCycles, 1);
+  assert.equal(autonomousExecutiveConfigFromEnv({ LEANNA_AUTONOMY_MAX_CONCURRENT_CYCLES: "invalid" } as NodeJS.ProcessEnv).maxConcurrentCycles, 1);
 });
 
 test("deduplicates matching event goals before mission handoff", () => {

@@ -603,6 +603,7 @@ Les variables sont chargées depuis `.env` ou `.env.local`, ce dernier étant pr
 | `LEANNA_HEARTBEAT_IDLE_MS` | Heartbeat idle |
 | `LEANNA_HEARTBEAT_SLEEP_MS` | Heartbeat sleeping |
 | `LEANNA_AUTONOMY_MAX_CONCURRENCY` | Concurrence maximale |
+| `LEANNA_AUTONOMY_MAX_CONCURRENT_CYCLES` | Cycles exécutifs simultanés (défaut sûr : `1`) |
 | `LEANNA_AUTONOMY_MAX_QUEUE_SIZE` | Taille maximale de queue |
 | `LEANNA_AUTONOMY_MAX_RETRIES` | Nombre maximal de retries |
 | `LEANNA_AUTONOMY_TASK_TIMEOUT_MS` | Timeout des tâches |

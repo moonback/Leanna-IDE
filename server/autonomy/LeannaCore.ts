@@ -3,7 +3,7 @@ import type { AgentRuntime, EventBus } from "../runtime/index.js";
 import type { RuntimeEvent } from "../runtime/types.js";
 import { HeartbeatService, heartbeatConfigFromEnv } from "./HeartbeatService.js";
 import { PerceptionEngine } from "./PerceptionEngine.js";
-import { AutonomousExecutive, type AutonomousExecutiveOptions } from "./AutonomousExecutive.js";
+import { AutonomousExecutive, autonomousExecutiveConfigFromEnv, type AutonomousExecutiveOptions } from "./AutonomousExecutive.js";
 import {
   TaskManager,
   taskManagerConfigFromEnv,
@@ -117,6 +117,7 @@ export class LeannaCore {
     );
     if (options.executive) {
       this.executive = new AutonomousExecutive(runtime, {
+        ...autonomousExecutiveConfigFromEnv(),
         ...options.executive,
         onEvent: (event) => this.broadcastExecutive(event),
       });

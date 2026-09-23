@@ -100,6 +100,14 @@ export interface AutonomousExecutiveOptions {
   onEvent?: (event: AutonomousExecutiveEvent) => void;
 }
 
+/** Reads only positive integer limits; malformed environment values fail closed to the safe default. */
+export const autonomousExecutiveConfigFromEnv = (
+  env: NodeJS.ProcessEnv = process.env,
+): Pick<AutonomousExecutiveOptions, "maxConcurrentCycles"> => {
+  const parsed = Number(env.LEANNA_AUTONOMY_MAX_CONCURRENT_CYCLES);
+  return { maxConcurrentCycles: Number.isInteger(parsed) && parsed > 0 ? parsed : 1 };
+};
+
 export interface AutonomousExecutiveEvent {
   type: string;
   traceId: string;

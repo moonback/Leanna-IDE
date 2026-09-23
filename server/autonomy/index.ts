@@ -25,7 +25,7 @@ export type {
 } from "./LeannaCore.js";
 export { HeartbeatService, heartbeatConfigFromEnv } from "./HeartbeatService.js";
 export { PerceptionEngine } from "./PerceptionEngine.js";
-export { AutonomousExecutive, GoalManager, PriorityEngine } from "./AutonomousExecutive.js";
+export { AutonomousExecutive, GoalManager, PriorityEngine, autonomousExecutiveConfigFromEnv } from "./AutonomousExecutive.js";
 export type { AutonomousGoal, AutonomousGoalSource, AutonomousGoalStatus, ObservationDisposition, AutonomousDecision, AutonomousMissionRequest, AutonomousExecutiveOptions, AutonomousExecutiveEvent, PriorityFactors } from "./AutonomousExecutive.js";
 export { TaskManager, taskManagerConfigFromEnv } from "./TaskManager.js";
 export type { AutonomousTask, AutonomousTaskStatus, TaskManagerConfig, TaskPersistence } from "./TaskManager.js";
