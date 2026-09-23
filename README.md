@@ -29,6 +29,7 @@ Le projet cible principalement les développeurs solo et les petites équipes qu
   - [Agent Brain](#agent-brain)
   - [Agents autonomes](#agents-autonomes)
   - [Runtime autonome 24/7](#runtime-autonome-247)
+  - [Boucle exécutive autonome](#boucle-exécutive-autonome)
   - [Bot Telegram](#bot-telegram)
   - [IDE et outils développeur](#ide-et-outils-développeur)
   - [Sécurité et contrôle](#sécurité-et-contrôle)
@@ -180,6 +181,64 @@ Le runtime comprend notamment :
 - coordination multi-instance optionnelle via Redis ;
 - bus d'événements Redis Streams optionnel ;
 - monitoring via `/api/v2/metrics/autonomy`.
+
+## Boucle exécutive autonome
+
+Les événements significatifs ne restent plus de simples éléments de queue :
+le serveur les transforme en une décision traçable, puis les transmet à la
+mission existante. La boucle reste **bornée**, **interruptible** et ne crée pas
+de chemin d'exécution parallèle aux protections du runtime.
+
+```text
+RuntimeEvent / Heartbeat
+        ↓
+PerceptionEngine
+        ↓
+AutonomousExecutive
+  ├─ normalise l'observation
+  ├─ arbitre la priorité de façon déterministe
+  ├─ déduplique ou crée un AutonomousGoal
+  └─ choisit STORE, INVESTIGATE, ACT ou ESCALATE
+        ↓
+Mission.Executor
+  ├─ planification et DAG existants
+  ├─ ToolRegistry → PermissionPolicy → DryRunController
+  ├─ vérification, correction et réplanification bornées
+  └─ réflexion
+        ↓
+LearningEngine (propositions uniquement)
+        ↓
+Memory / prochain cycle
+```
+
+### Décisions et objectifs
+
+`AutonomousExecutive` utilise les dispositions suivantes : `IGNORE`, `STORE`,
+`MONITOR`, `INVESTIGATE`, `ACT` et `ESCALATE`. Les objectifs issus d'événements
+répétés sont dédupliqués selon leur classe de défaillance, et non selon un ID de
+tâche éphémère. Leur priorité est calculée par le runtime à partir de critères
+bornés (urgence, importance, risque, dépendances, intention, délai, coût,
+confiance et impact) : un modèle peut proposer du contexte, mais ne décide pas
+seul d'une priorité critique.
+
+Un refus de permission est toujours escaladé, sans tentative de contournement.
+Si un événement arrive avant l'initialisation du système de missions, il est
+également escaladé en sécurité. Les missions autonomes attendent l'état terminal
+du `Mission.Executor`; la simple création asynchrone d'une mission n'est jamais
+considérée comme un succès.
+
+### Apprentissage contrôlé
+
+Après une mission terminale, `LearningEngine` extrait des leçons et des
+`candidateImprovements`. Ces propositions sont disponibles pour l'UI ou une
+politique ultérieure, mais ne sont **pas auto-appliquées** par la finalisation de
+mission. Ce choix évite qu'un apprentissage transforme le workspace, les
+permissions ou les stratégies sans validation explicite.
+
+Les événements de cycle incluent un `traceId`, un `cycleId`, le `goalId` et le
+`taskId` lorsque disponibles; ils sont relayés à la timeline d'autonomie. Voir
+[l'audit complet](docs/AUTONOMOUS_AGENT_AUDIT.md) pour les composants, limites,
+risques et travaux de validation restants.
 
 > Pour une première validation, il est recommandé de conserver `Leanna_PERMISSION_MODE=enforce`, d'activer `Leanna_DRY_RUN=true` et de commencer avec `LEANNA_AUTONOMY_MAX_CONCURRENCY=1`.
 
@@ -357,6 +416,11 @@ Leanna est organisé en plusieurs couches :
 
 ```text
 ┌──────────────────────────────────────────────┐
+│        Autonomous Executive Loop              │
+│ Perception → Goal → Priority → Mission        │
+└──────────────────────┬───────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────┐
 │                 Agent Brain                  │
 │ Compréhension → Planification → Vérification │
 └──────────────────────┬───────────────────────┘
@@ -388,7 +452,9 @@ Leanna est organisé en plusieurs couches :
 - `DryRun` : simulation des effets de bord.
 - `EventBus` : communication événementielle.
 - `HierarchicalMemoryService` : mémoire hiérarchisée.
-- `LeannaCore` : runtime autonome événementiel.
+- `LeannaCore` : runtime autonome événementiel et queue bornée.
+- `AutonomousExecutive` : pont déterministe perception → objectif → mission.
+- `Mission.Executor` : attend la fin vérifiée d'une mission et produit des propositions d'apprentissage non appliquées.
 
 Pour l'architecture complète : [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
@@ -611,6 +677,9 @@ npm test -- server/routes/*.test.ts
 
 # Test de charge autonomie
 npm run test:soak
+
+# Boucle perception → objectif → escalade et fin de mission vérifiée
+node --import tsx --test server/autonomy/AutonomousExecutive.test.ts server/autonomy/LeannaCore.test.ts server/mission/Executor.test.ts
 ```
 
 ## Smoke-test réel de l'Agent Brain
@@ -633,6 +702,8 @@ La suite actuelle couvre notamment :
 - Agent Brain : scheduler DAG parallèle, validation de plan, réplanification ;
 - cohérence des capacités d'agents (détection d'outils fantômes) ;
 - Runtime V2 ;
+- boucle exécutive autonome : priorité déterministe, déduplication, escalade de permission et attente de mission terminale ;
+- apprentissage : propositions disponibles après mission sans auto-application ;
 - skills critiques ;
 - validation Zod ;
 - routes REST ;
@@ -794,7 +865,8 @@ Vérifiez les limites de tokens et l'injection des notebooks. Si nécessaire, co
 |---|---|
 | [`API_DOCS.md`](API_DOCS.md) | API REST et WebSocket |
 | [`AUTONOMY.md`](AUTONOMY.md) | Runtime autonome 24/7 |
-| [`AUTONOMY_AUDIT.md`](AUTONOMY_AUDIT.md) | Audit et limites de l'autonomie |
+| [`AUTONOMY_AUDIT.md`](AUTONOMY_AUDIT.md) | Audit historique et limites de l'autonomie |
+| [`docs/AUTONOMOUS_AGENT_AUDIT.md`](docs/AUTONOMOUS_AGENT_AUDIT.md) | Audit actuel de la boucle exécutive autonome, gaps et contrat d'intégration |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Architecture technique |
 | [`DB_SCHEMA.md`](DB_SCHEMA.md) | Schéma Supabase |
 | [`GEMINI.md`](GEMINI.md) | Intégration Gemini |
