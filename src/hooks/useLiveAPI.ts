@@ -14,6 +14,14 @@ import { useProfile } from '../context/UserProfileContext.js';
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected';
 export type LogType = 'system' | 'action' | 'error' | 'info';
 
+/**
+ * Seuil au-delà duquel une mesure de latence voix est considérée aberrante /
+ * issue d'un timestamp de départ périmé. Sert à la fois à réarmer le tracking
+ * (handleAudioData) et à rejeter la mesure (recordLatency), pour éviter le bug
+ * historique du 81276ms mesuré depuis une utterance obsolète.
+ */
+const LATENCY_MAX_MS = 30_000;
+
 export interface LogEntry {
   id: string;
   type: LogType;
@@ -92,9 +100,11 @@ export function useLiveAPI() {
   const latencyHistoryRef = useRef<number[]>([]);
 
   const recordLatency = useCallback((ms: number) => {
-    // Validation : rejeter les latences manifestement incorrectes (> 30 secondes)
-    if (ms > 30_000) {
-      console.warn(`[VoiceLatency] Latence anormale rejetée: ${ms}ms (probable bug de timestamp)`);
+    // Validation : rejeter les latences manifestement incorrectes ou négatives.
+    // Un départ périmé est désormais réarmé en amont (handleAudioData), donc ce
+    // rejet ne devrait quasiment plus se déclencher.
+    if (ms < 0 || ms > LATENCY_MAX_MS) {
+      console.warn(`[VoiceLatency] Latence anormale rejetée: ${ms}ms (timestamp périmé ou négatif)`);
       return;
     }
     
@@ -122,10 +132,20 @@ export function useLiveAPI() {
     // Bloquer uniquement pendant l'exécution d'outils côté serveur
     if (isBusyRef.current) return;
 
-    // Mesure de latence : détecter début d'utterance UNIQUEMENT si aucune utterance en cours
-    // Cela évite de réinitialiser le timestamp au milieu d'une utterance existante
-    if (utteranceStartRef.current === null && !waitingFirstResponseChunkRef.current) {
-      utteranceStartRef.current = performance.now();
+    // Mesure de latence : détecter le début d'utterance.
+    // Cas normal : aucune utterance en cours → armer le timestamp.
+    // Garde-fou anti-timestamp-périmé : si on attend une réponse depuis trop
+    // longtemps (aucun chunk n'est jamais arrivé — VAD faux positif, audio
+    // ignoré pendant un tool call, réponse filtrée), l'ancien timestamp est
+    // périmé. On le ré-arme sur l'utterance COURANTE plutôt que de mesurer un
+    // jour plus tard depuis un départ obsolète (cause du 81276ms).
+    const now = performance.now();
+    const stale =
+      waitingFirstResponseChunkRef.current &&
+      utteranceStartRef.current !== null &&
+      now - utteranceStartRef.current > LATENCY_MAX_MS;
+    if ((utteranceStartRef.current === null && !waitingFirstResponseChunkRef.current) || stale) {
+      utteranceStartRef.current = now;
       waitingFirstResponseChunkRef.current = true;
     }
 
@@ -412,9 +432,16 @@ export function useLiveAPI() {
   const handleAudioChunk = useCallback((pcm16: ArrayBuffer) => {
     if (waitingFirstResponseChunkRef.current && utteranceStartRef.current !== null) {
       const now = performance.now();
-      recordLatency(Math.round(now - utteranceStartRef.current));
+      const elapsed = Math.round(now - utteranceStartRef.current);
+      // Toujours réinitialiser le tracking, même si la mesure est écartée : un
+      // timestamp de départ périmé (utterance sans réponse, audio ignoré pendant
+      // un tool call, réponse filtrée) ne doit jamais contaminer la mesure de la
+      // PROCHAINE utterance. C'était la cause du 81276ms observé.
       waitingFirstResponseChunkRef.current = false;
       utteranceStartRef.current = null;
+      // recordLatency filtre déjà les valeurs aberrantes ; on n'enregistre que
+      // les mesures fraîches et plausibles.
+      recordLatency(elapsed);
     }
     playAudioChunk(pcm16);
   }, [playAudioChunk, recordLatency]);

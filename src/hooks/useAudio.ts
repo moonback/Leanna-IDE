@@ -10,6 +10,49 @@ function floatToPcm16(pcmData: Float32Array): ArrayBuffer {
   return buffer;
 }
 
+// ── AudioWorklet de capture ────────────────────────────────────────────────
+// Remplace le ScriptProcessorNode déprécié sur les navigateurs modernes. Le
+// worklet tourne dans le thread audio, accumule les échantillons en blocs de
+// FRAME_SIZE (2048, comme l'ancien buffer) et les poste au thread principal.
+// Défini en Blob inline pour éviter toute configuration de bundling (Vite/Electron).
+const CAPTURE_FRAME_SIZE = 2048;
+const AUDIO_WORKLET_SOURCE = `
+class CaptureProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this._frameSize = ${CAPTURE_FRAME_SIZE};
+    this._buffer = new Float32Array(this._frameSize);
+    this._offset = 0;
+  }
+  process(inputs) {
+    const input = inputs[0];
+    if (!input || input.length === 0) return true;
+    const channel = input[0];
+    if (!channel) return true;
+    for (let i = 0; i < channel.length; i++) {
+      this._buffer[this._offset++] = channel[i];
+      if (this._offset >= this._frameSize) {
+        // Copie transférable pour ne pas bloquer le thread audio.
+        this.port.postMessage(this._buffer.slice(0));
+        this._offset = 0;
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('leanna-capture-processor', CaptureProcessor);
+`;
+
+let audioWorkletModuleUrl: string | null = null;
+function getAudioWorkletModuleUrl(): string {
+  if (!audioWorkletModuleUrl) {
+    audioWorkletModuleUrl = URL.createObjectURL(
+      new Blob([AUDIO_WORKLET_SOURCE], { type: 'application/javascript' }),
+    );
+  }
+  return audioWorkletModuleUrl;
+}
+
 export interface UseAudioOptions {
   onAudioData: (pcm16: ArrayBuffer) => void;
   autoMuteEnabled?: boolean;
@@ -52,6 +95,7 @@ export function useAudio({
   const inputAudioCtxRef = useRef<AudioContext | null>(null);
   const outputAudioCtxRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const workletRef = useRef<AudioWorkletNode | null>(null);
   const nextStartTimeRef = useRef<number>(0);
   const mediaStreamRef = useRef<MediaStream | null>(null);
  
@@ -215,13 +259,6 @@ export function useAudio({
       compressor.attack.value = 0.003;  // 3ms — réactif
       compressor.release.value = 0.25;  // 250ms — relâchement naturel
 
-      // ── Buffer réduit à 2048 samples (128ms) pour moins de latence ─────
-      // Valeur précédente : 4096 (256ms). 2048 est le meilleur compromis
-      // latence/stabilité sur ScriptProcessorNode (déprécié mais encore
-      // universellement supporté).
-      const processor = inputCtx.createScriptProcessor(2048, 1, 1);
-      processorRef.current = processor;
-
       const inputAnalyser = inputCtx.createAnalyser();
       inputAnalyser.fftSize = 256;
       inputAnalyser.smoothingTimeConstant = 0.8;
@@ -231,8 +268,6 @@ export function useAudio({
       source.connect(highpassFilter);
       highpassFilter.connect(compressor);
       compressor.connect(inputAnalyser);
-      inputAnalyser.connect(processor);
-      processor.connect(inputCtx.destination);
 
       const outputAnalyser = outputCtx.createAnalyser();
       outputAnalyser.fftSize = 256;
@@ -259,44 +294,74 @@ export function useAudio({
       };
       tick();
 
-      processor.onaudioprocess = (e) => {
+      // ── Traitement d'un bloc de capture (VAD + envoi) ──────────────────
+      // Logique identique quel que soit le backend (AudioWorklet ou fallback
+      // ScriptProcessor). L'amplitude VAD est lue via l'analyser côté thread
+      // principal, alimenté en continu par tick(), donc indépendant du backend.
+      const processCaptureFrame = (channelData: Float32Array) => {
         if (mutedRef.current) return;
-        
+
         // ── VAD (Voice Activity Detection) ──────────────────────────────
         // Économise 40-60% de bande passante en ne transmettant que les segments
         // où une voix est détectée (amplitude > seuil).
-        
         if (vadEnabledRef.current) {
-          // Calculer l'amplitude moyenne du chunk actuel
           inputAnalyser.getByteFrequencyData(dataArray);
           const amplitude = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-          
+
           if (amplitude > vadThresholdRef.current) {
-            // ✅ Voix détectée → envoyer le chunk et reset le timer de silence
             vadSilenceStartRef.current = null;
-            onAudioData(floatToPcm16(e.inputBuffer.getChannelData(0)));
+            onAudioData(floatToPcm16(channelData));
             resetAutoMute();
           } else {
-            // 🔇 Silence détecté
             if (vadSilenceStartRef.current === null) {
-              // Premier chunk de silence → démarrer le timer
               vadSilenceStartRef.current = Date.now();
             }
-            
             const silenceDuration = Date.now() - vadSilenceStartRef.current;
-            
             if (silenceDuration < vadSilenceDurationRef.current) {
-              // Silence court (< 800ms par défaut) → continuer d'envoyer
-              // (pauses naturelles dans les phrases, respiration)
-              onAudioData(floatToPcm16(e.inputBuffer.getChannelData(0)));
+              // Silence court → continuer (pauses naturelles, respiration).
+              onAudioData(floatToPcm16(channelData));
             }
-            // Silence long (> 800ms) → NE RIEN ENVOYER (économie bande passante)
+            // Silence long → ne rien envoyer (économie de bande passante).
           }
         } else {
-          // VAD désactivé → envoyer tout l'audio (comportement original)
-          onAudioData(floatToPcm16(e.inputBuffer.getChannelData(0)));
+          onAudioData(floatToPcm16(channelData));
         }
       };
+
+      // ── Backend de capture : AudioWorklet (moderne) avec repli ScriptProcessor ──
+      // ScriptProcessorNode est déprécié ; on privilégie AudioWorkletNode quand
+      // il est disponible et chargeable, tout en gardant un repli sûr pour les
+      // environnements où le worklet échoue (WebView anciennes, CSP stricte).
+      let useWorklet = false;
+      if (typeof AudioWorkletNode !== 'undefined' && inputCtx.audioWorklet) {
+        try {
+          await inputCtx.audioWorklet.addModule(getAudioWorkletModuleUrl());
+          const workletNode = new AudioWorkletNode(inputCtx, 'leanna-capture-processor');
+          workletNode.port.onmessage = (event) => {
+            processCaptureFrame(event.data as Float32Array);
+          };
+          inputAnalyser.connect(workletNode);
+          // Un nœud sans sortie audible : on le relie à la destination pour
+          // maintenir le graphe actif sans produire de son (le worklet n'émet rien).
+          workletNode.connect(inputCtx.destination);
+          workletRef.current = workletNode;
+          useWorklet = true;
+        } catch (workletErr) {
+          console.warn('[useAudio] AudioWorklet indisponible, repli sur ScriptProcessorNode:', workletErr);
+        }
+      }
+
+      if (!useWorklet) {
+        // Repli : ScriptProcessorNode (déprécié mais universellement supporté).
+        // 2048 samples = meilleur compromis latence/stabilité.
+        const processor = inputCtx.createScriptProcessor(CAPTURE_FRAME_SIZE, 1, 1);
+        processorRef.current = processor;
+        inputAnalyser.connect(processor);
+        processor.connect(inputCtx.destination);
+        processor.onaudioprocess = (e) => {
+          processCaptureFrame(e.inputBuffer.getChannelData(0));
+        };
+      }
     } catch (err) {
       console.error('Failed to start audio', err);
       throw err;
@@ -309,6 +374,12 @@ export function useAudio({
 
     processorRef.current?.disconnect();
     processorRef.current = null;
+
+    if (workletRef.current) {
+      try { workletRef.current.port.onmessage = null; } catch { /* ignore */ }
+      workletRef.current.disconnect();
+      workletRef.current = null;
+    }
 
     inputAnalyserRef.current?.disconnect();
     inputAnalyserRef.current = null;

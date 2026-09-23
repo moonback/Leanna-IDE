@@ -12,6 +12,7 @@
 import type { AgentTask } from "./types.js";
 import type { ToolExecutionState } from "./AgentExecutionTypes.js";
 import { ResultParser } from "./ResultParser.js";
+import { roleCanWriteFiles } from "./roles.js";
 
 export class AgentEvidenceEvaluator {
   constructor(private readonly resultParser: ResultParser = new ResultParser()) {}
@@ -39,9 +40,14 @@ export class AgentEvidenceEvaluator {
     ])];
     const findings = this.extractFindings(resultText);
     const completion = toolExecution.workspace.completionReport(writeResult.written);
-    const writeRequired = ["writer", "formatter", "proofreader", "translator", "coder", "refactor", "debugger"].includes(task.role)
-      && !this.isAnalysisOnlyTask(task);
-    const readEvidenceRequired = ["researcher", "planner"].includes(task.role);
+    // Contrat de succès par TYPE de tâche (et non par liste de rôles figée) :
+    //   - Un rôle sans capacité d'écriture (reviewer, security, researcher, vision)
+    //     ne peut JAMAIS être write-required : son succès est analytique/preuves.
+    //   - Un rôle capable d'écriture ne l'est que si la tâche demande réellement
+    //     une modification (isAnalysisOnlyTask == false).
+    // Corrige le faux FAILED d'agents read-only (proofreader en relecture, etc.).
+    const writeRequired = roleCanWriteFiles(task.role) && !this.isAnalysisOnlyTask(task);
+    const readEvidenceRequired = ["researcher", "planner", "reviewer", "security"].includes(task.role);
     const planningOnly = this.isPlanningOnly(resultText);
     const declaredFailure = this.resultParser.detectFailure(resultText);
 
@@ -207,8 +213,9 @@ export class AgentEvidenceEvaluator {
     // Si le titre/description mentionne explicitement une modification/écriture de code ou contenu
     const writingSignal = /\b(?:modifier|écriture|écrire|amélio|refactor|implément|créer|créa|ajust|corriger|correct|optimis|rédig|fix|update|write|patch|modify|create|improve|write_project_file|apply_patch|patch_project_file|modify_project_file)\b/i;
     if (writingSignal.test(text)) return false;
-    // Mots-clés indiquant une tâche d'analyse pure, proposition, synthèse, rapport, recommandation, audit
-    const analysisSignal = /\b(?:analys|inspect|audit|review|check|read|lire|analyser|examin|rapport|report|résumé|summary|checkpoint\s+git|identifier|propos|proposition|suggestion|recommand|conseil|avis)\b/i;
+    // Mots-clés indiquant une tâche d'analyse pure, relecture, proposition, synthèse,
+    // rapport, recommandation, audit, vérification, critique, traduction/évaluation.
+    const analysisSignal = /\b(?:analys|inspect|audit|review|revue|relecture|relire|relis|check|vérif|verif|read|lire|analyser|examin|rapport|report|résumé|resume|summary|synth|checkpoint\s+git|identifier|propos|proposition|suggestion|recommand|conseil|avis|critique|évalu|evalu|classif)\b/i;
     return analysisSignal.test(text);
   }
 

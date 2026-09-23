@@ -29,7 +29,28 @@ try {
     : 'npx electron electron/main.cjs';
 
   execSync(electronCmd, { stdio: 'inherit' });
+  // Electron s'est fermé proprement (code 0). Fin normale du runner.
+  console.log('[Desktop Runner] Electron fermé proprement.');
 } catch (error) {
+  // Distinguer un ARRÊT VOLONTAIRE (fermeture Electron via before-quit, ou
+  // SIGTERM/SIGINT envoyé par `concurrently --kill-others` quand l'autre
+  // process s'arrête) d'une VRAIE erreur d'exécution. Un arrêt propre ne doit
+  // pas être transformé en échec CI/dev (Bug #9).
+  const signal = error && error.signal;                 // ex: 'SIGTERM', 'SIGINT'
+  const status = error && typeof error.status === 'number' ? error.status : null;
+  const isIntentionalShutdown =
+    signal === 'SIGTERM' ||
+    signal === 'SIGINT' ||
+    status === 0 ||
+    // Windows : une fermeture via kill/CTRL peut remonter 130 (SIGINT) ou 143 (SIGTERM).
+    status === 130 ||
+    status === 143;
+
+  if (isIntentionalShutdown) {
+    console.log(`[Desktop Runner] Arrêt volontaire détecté (${signal || 'code ' + status}). Sortie propre.`);
+    process.exit(0);
+  }
+
   console.error('[Desktop Runner] Error:', error.message);
-  process.exit(1);
+  process.exit(status && status !== 0 ? status : 1);
 }
