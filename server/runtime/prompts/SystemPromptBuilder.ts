@@ -526,10 +526,14 @@ export class SystemPromptBuilder {
 
   private buildFooter(config: SystemPromptConfig): string {
     const parts: string[] = [];
-    if (config.language && config.language !== "fr") {
-      const inst = LANG_INSTRUCTIONS_FR[config.language];
-      if (inst) parts.push(inst);
-    }
+    // La directive de langue est TOUJOURS injectée, y compris pour le français :
+    // la langue choisie par l'utilisateur est une consigne impérative, jamais
+    // une valeur supposée par défaut. Sans ça, sélectionner « français » dans
+    // les réglages n'avait aucun effet sur le prompt système.
+    const language = config.language ?? "fr";
+    const langInst = LANG_INSTRUCTIONS_FR[language];
+    if (langInst) parts.push(langInst);
+
     if (config.responseStyle) {
       const inst = STYLE_INSTRUCTIONS_FR[config.responseStyle];
       if (inst) parts.push(inst);

@@ -58,14 +58,21 @@ export const STYLE_INSTRUCTIONS: Record<ResponseStyle, string> = {
 };
 
 /**
- * Mappings de langue pour le footer du prompt (format français)
- * Utilisé dans SystemPromptBuilder pour le footer
+ * Directives de langue impératives injectées dans le footer du prompt système.
+ *
+ * Couvre TOUTES les langues supportées, y compris le français : la langue
+ * choisie par l'utilisateur doit toujours être une consigne explicite et
+ * impérative pour le modèle, on ne suppose jamais une langue par défaut.
+ * Formulation impérative et sans ambiguïté (« MUST », « regardless of ») pour
+ * que le modèle réponde dans la langue demandée même si l'utilisateur écrit
+ * dans une autre langue.
  */
-export const LANG_INSTRUCTIONS_FR: Record<Exclude<Language, "fr">, string> = {
-  en: "Respond exclusively in English.",
-  es: "Respond exclusively in Spanish.",
-  de: "Respond exclusively in German.",
-  pt: "Respond exclusively in Portuguese.",
+export const LANG_INSTRUCTIONS_FR: Record<Language, string> = {
+  fr: "You MUST respond exclusively in French (français), regardless of the language the user writes in. This is a strict, non-negotiable requirement.",
+  en: "You MUST respond exclusively in English, regardless of the language the user writes in. This is a strict, non-negotiable requirement.",
+  es: "You MUST respond exclusively in Spanish (español), regardless of the language the user writes in. This is a strict, non-negotiable requirement.",
+  de: "You MUST respond exclusively in German (Deutsch), regardless of the language the user writes in. This is a strict, non-negotiable requirement.",
+  pt: "You MUST respond exclusively in Portuguese (português), regardless of the language the user writes in. This is a strict, non-negotiable requirement.",
 };
 
 /**
