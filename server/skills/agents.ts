@@ -182,11 +182,25 @@ export const agentsSkill: Skill = {
     },
     {
       name: "agent_cancel",
-      description: "Annule une tâche en attente (statut 'pending').",
+      description:
+        "Annule une tâche d'agent, qu'elle soit en attente ('pending') ou déjà en cours ('running'). " +
+        "Une tâche 'running' est interrompue de façon coopérative au prochain point de contrôle " +
+        "(avant/après un appel d'outil), puis passe au statut 'cancelled'.",
       parameters: {
         type: "OBJECT",
         properties: { taskId: { type: "STRING", description: "ID de la tâche à annuler" } },
         required: ["taskId"],
+      },
+    },
+    {
+      name: "agent_cancel_orchestration",
+      description:
+        "Annule une orchestration multi-agents entière : toutes ses tâches en attente ou en cours " +
+        "reçoivent le signal d'annulation. Les tâches déjà terminées ne sont pas affectées.",
+      parameters: {
+        type: "OBJECT",
+        properties: { orchestrationId: { type: "STRING", description: "ID de l'orchestration à annuler" } },
+        required: ["orchestrationId"],
       },
     },
     {
@@ -303,6 +317,7 @@ export const agentsSkill: Skill = {
     agent_list_tasks:                 listAgentTasksSchema,
     agent_list_roles:                 z.object({}),
     agent_cancel:                     z.object({ taskId: z.string().min(1) }),
+    agent_cancel_orchestration:       z.object({ orchestrationId: z.string().min(1) }),
     agent_stats:                      z.object({}),
     agent_collaborate:                collaborateSchema,
     agent_fleet_status:               z.object({}),
@@ -525,8 +540,19 @@ export const agentsSkill: Skill = {
       case "agent_cancel": {
         const { taskId } = validateArgs(z.object({ taskId: z.string().min(1) }), args);
         const ok = agentOrchestrator.cancelTask(taskId);
-        if (!ok) throw new Error(`Impossible d'annuler "${taskId}" — inexistante ou non-pending.`);
-        return { success: true, message: `Tâche "${taskId}" annulée.` };
+        if (!ok) throw new Error(`Impossible d'annuler "${taskId}" — inexistante ou déjà terminée.`);
+        return { success: true, message: `Tâche "${taskId}" annulée (interruption prise en compte si elle était en cours).` };
+      }
+
+      case "agent_cancel_orchestration": {
+        const { orchestrationId } = validateArgs(z.object({ orchestrationId: z.string().min(1) }), args);
+        const count = agentOrchestrator.cancelOrchestration(orchestrationId);
+        if (count === -1) throw new Error(`Orchestration "${orchestrationId}" introuvable.`);
+        return {
+          success: true,
+          message: `Annulation de l'orchestration "${orchestrationId}" prise en compte — ${count} tâche(s) concernée(s).`,
+          cancelledTasks: count,
+        };
       }
 
       case "agent_stats": {

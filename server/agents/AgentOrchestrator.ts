@@ -437,13 +437,70 @@ export class AgentOrchestrator {
     );
   }
 
-  /** Annule une tâche en attente */
+  /**
+   * Annule une tâche, qu'elle soit en attente (`pending`) ou en cours (`running`).
+   *
+   * - `pending` : la tâche est marquée annulée immédiatement, elle ne démarrera pas.
+   * - `running` : un signal d'annulation coopératif est envoyé à l'exécuteur ;
+   *   la tâche s'arrête au prochain point de contrôle (avant/après un appel
+   *   d'outil ou un tour), puis son statut passe à `cancelled` via `execute()`.
+   *
+   * @returns `true` si l'annulation a été prise en compte, `false` si la tâche
+   *          est introuvable ou déjà terminée.
+   */
   cancelTask(taskId: string): boolean {
     const task = this.tasks.get(taskId);
-    if (!task || task.status !== "pending") return false;
-    task.status = "cancelled";
-    agentPersistence.updateTaskStatus(taskId, "cancelled").catch(() => {});
-    return true;
+    if (!task) return false;
+
+    if (task.status === "pending") {
+      task.status = "cancelled";
+      agentPersistence.updateTaskStatus(taskId, "cancelled").catch(() => {});
+      log.info(`🛑 Tâche ${taskId.slice(0, 8)} (pending) annulée`);
+      return true;
+    }
+
+    if (task.status === "running") {
+      const signaled = this.executor.cancel(taskId);
+      if (signaled) {
+        log.info(`🛑 Tâche ${taskId.slice(0, 8)} (running) — signal d'annulation envoyé`);
+      } else {
+        log.warn(`⚠️ Tâche ${taskId.slice(0, 8)} marquée running mais aucune exécution active — annulation logique`);
+        task.status = "cancelled";
+        agentPersistence.updateTaskStatus(taskId, "cancelled").catch(() => {});
+      }
+      return true;
+    }
+
+    // Déjà terminée (completed/failed/incomplete/cancelled) — rien à annuler.
+    return false;
+  }
+
+  /**
+   * Annule une orchestration entière : signale toutes ses tâches `pending` et
+   * `running`. Les tâches déjà terminées ne sont pas affectées.
+   *
+   * @returns le nombre de tâches pour lesquelles l'annulation a été prise en
+   *          compte, ou `-1` si l'orchestration est introuvable.
+   */
+  cancelOrchestration(orchestrationId: string): number {
+    const plan = this.orchestrations.get(orchestrationId);
+    if (!plan) return -1;
+
+    let cancelledCount = 0;
+    for (const task of plan.tasks) {
+      if (task.status === "pending" || task.status === "running") {
+        if (this.cancelTask(task.id)) cancelledCount++;
+      }
+    }
+
+    if (plan.status === "pending" || plan.status === "running") {
+      plan.status = "cancelled";
+      plan.completedAt = new Date().toISOString();
+      agentPersistence.updateOrchestrationStatus(orchestrationId, "cancelled", plan.completedAt).catch(() => {});
+    }
+
+    log.info(`🛑 Orchestration ${orchestrationId.slice(0, 8)} annulée — ${cancelledCount} tâche(s) concernée(s)`);
+    return cancelledCount;
   }
 
   /**
