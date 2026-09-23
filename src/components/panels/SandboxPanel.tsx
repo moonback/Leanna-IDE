@@ -44,6 +44,9 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
   const hasFetched = useRef(false);
   const [showModifiedFiles, setShowModifiedFiles] = useState(false);
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
+  // Progression de la réinitialisation du sandbox (0 → 100).
+  const [resetProgress, setResetProgress] = useState(0);
+  const resetProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Motion : spring critically-damped par défaut, fondu court si l'utilisateur
   // a demandé moins de mouvement — même convention que NotebookDetail /
@@ -100,6 +103,26 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
   const doAction = useCallback(async (action: string, method = 'POST', body?: object) => {
     setBusy(action);
     setFeedback(null);
+
+    // Barre de progression uniquement pour la réinitialisation, qui peut être
+    // longue (copie fraîche du code source). La route ne streame pas
+    // d'avancement : on simule une montée fluide jusqu'à ~90% puis on complète
+    // à 100% une fois la réponse reçue.
+    const isReset = action === 'reset';
+    const stopResetTimer = () => {
+      if (resetProgressTimerRef.current) {
+        clearInterval(resetProgressTimerRef.current);
+        resetProgressTimerRef.current = null;
+      }
+    };
+    if (isReset) {
+      setResetProgress(8);
+      stopResetTimer();
+      resetProgressTimerRef.current = setInterval(() => {
+        setResetProgress(prev => (prev >= 90 ? prev : prev + Math.max(1, Math.round((90 - prev) * 0.12))));
+      }, 120);
+    }
+
     try {
       const headers: Record<string, string> = {
         ...authHeaders(),
@@ -108,10 +131,18 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
       const res = await fetch(`/api/sandbox/${action}`, { method, headers, ...(body ? { body: JSON.stringify(body) } : {}) });
       const data = await res.json();
       if (data.status === 'success') {
+        if (isReset) {
+          stopResetTimer();
+          setResetProgress(100);
+        }
         setFeedback({ type: 'success', msg: actionMessages[action] || 'OK' });
         window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
         setShowCodeInput(false);
         setSecurityCode('');
+        if (isReset) {
+          setShowResetCodeInput(false);
+          setResetCode('');
+        }
       } else if (data.status === 'validation_failed') {
         setFeedback({ type: 'error', msg: 'Synchronisation refusée' });
       } else {
@@ -120,7 +151,14 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
       await fetchStatus();
     } catch (e: any) {
       setFeedback({ type: 'error', msg: e.message || 'Erreur réseau' });
-    } finally { setBusy(null); }
+    } finally {
+      setBusy(null);
+      if (isReset) {
+        stopResetTimer();
+        // Laisse la barre atteindre 100% visuellement avant de disparaître.
+        setTimeout(() => setResetProgress(0), 500);
+      }
+    }
   }, [fetchStatus]);
 
   const handleDeactivate = useCallback(() => {
@@ -169,6 +207,13 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
     const t = setTimeout(() => setFeedback(null), 4000);
     return () => clearTimeout(t);
   }, [feedback]);
+
+  // Nettoyage du timer de progression de reset au démontage.
+  useEffect(() => {
+    return () => {
+      if (resetProgressTimerRef.current) clearInterval(resetProgressTimerRef.current);
+    };
+  }, []);
 
   if (loading && !status) {
     return (
@@ -456,6 +501,45 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                       tooltip="Écraser le sandbox avec une copie fraîche du code source (code requis)"
                       transition={hoverSpring}
                     />
+
+                    {/* ─── Barre de progression de la réinitialisation ─── */}
+                    <AnimatePresence>
+                      {busy === 'reset' && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={spring}
+                          className="overflow-hidden px-2.5 pt-1 space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between text-[11px] font-medium">
+                            <span className="flex items-center gap-1.5" style={{ color: 'var(--color-warning)' }}>
+                              <Loader2 size={11} className="animate-spin" />
+                              {resetProgress >= 100 ? 'Réinitialisation terminée' : 'Réinitialisation en cours…'}
+                            </span>
+                            <span className="tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                              {Math.round(resetProgress)}%
+                            </span>
+                          </div>
+                          <div
+                            className="h-1.5 w-full rounded-full overflow-hidden"
+                            style={{ backgroundColor: 'var(--bg-input)' }}
+                            role="progressbar"
+                            aria-valuenow={Math.round(resetProgress)}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-label="Progression de la réinitialisation du sandbox"
+                          >
+                            <motion.div
+                              className="h-full rounded-full"
+                              style={{ backgroundColor: 'var(--color-warning)' }}
+                              animate={{ width: `${resetProgress}%` }}
+                              transition={reduceMotion ? { duration: 0.1 } : { type: 'spring', stiffness: 120, damping: 20 }}
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </motion.div>
               )}
