@@ -261,6 +261,10 @@ export const StatusBar = memo(function StatusBar({
   const [resetCode, setResetCode] = useState('');
   const [resetError, setResetError] = useState<string | null>(null);
   const resetInputRef = useRef<HTMLInputElement | null>(null);
+  // Réinitialisation en cours : pilote la barre de progression de la modale.
+  const [resetInProgress, setResetInProgress] = useState(false);
+  const [resetProgress, setResetProgress] = useState(0);
+  const resetProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const [mcpStatus, setMcpStatus] = useState<'ok' | 'error' | 'loading'>('loading');
   const [sandboxActive, setSandboxActive] = useState(false);
@@ -476,7 +480,26 @@ export const StatusBar = memo(function StatusBar({
   }, []);
 
   const handleConfirmReset = useCallback(async () => {
+    if (resetInProgress) return;
     setResetError(null);
+    setResetInProgress(true);
+    setResetProgress(8);
+
+    // Progression simulée : la route de reset ne streame pas d'avancement,
+    // on fait donc grimper la barre de façon fluide jusqu'à ~90% en attendant
+    // la réponse, puis on complète à 100% une fois terminé.
+    if (resetProgressTimerRef.current) clearInterval(resetProgressTimerRef.current);
+    resetProgressTimerRef.current = setInterval(() => {
+      setResetProgress(prev => (prev >= 90 ? prev : prev + Math.max(1, Math.round((90 - prev) * 0.12))));
+    }, 120);
+
+    const stopTimer = () => {
+      if (resetProgressTimerRef.current) {
+        clearInterval(resetProgressTimerRef.current);
+        resetProgressTimerRef.current = null;
+      }
+    };
+
     try {
       const token = localStorage.getItem('Leanna_api_token');
       const headers: Record<string, string> = {
@@ -490,22 +513,36 @@ export const StatusBar = memo(function StatusBar({
       });
       const data = await res.json();
       if (res.ok && data.status === 'success') {
-        setShowResetConfirm(false);
-        setResetCode('');
+        stopTimer();
+        setResetProgress(100);
         window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+        // Laisse la barre atteindre 100% visuellement avant de fermer.
+        setTimeout(() => {
+          setShowResetConfirm(false);
+          setResetCode('');
+          setResetInProgress(false);
+          setResetProgress(0);
+        }, 450);
       } else {
+        stopTimer();
+        setResetInProgress(false);
+        setResetProgress(0);
         // Show error to user
         setResetError(data.error || 'Erreur lors de la réinitialisation');
       }
     } catch {
+      stopTimer();
+      setResetInProgress(false);
+      setResetProgress(0);
       setResetError('Erreur réseau');
     }
-  }, [resetCode]);
+  }, [resetCode, resetInProgress]);
 
   useEffect(() => {
     if (!showResetConfirm) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      // Ne pas fermer pendant une réinitialisation en cours.
+      if (e.key === 'Escape' && !resetInProgress) {
         setShowResetConfirm(false);
         setResetCode('');
         setResetError(null);
@@ -513,7 +550,14 @@ export const StatusBar = memo(function StatusBar({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [showResetConfirm]);
+  }, [showResetConfirm, resetInProgress]);
+
+  // Nettoyage du timer de progression au démontage.
+  useEffect(() => {
+    return () => {
+      if (resetProgressTimerRef.current) clearInterval(resetProgressTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (showResetConfirm) {
@@ -973,6 +1017,7 @@ export const StatusBar = memo(function StatusBar({
           className="fixed inset-0 flex items-center justify-center p-4 backdrop-blur-sm bg-black/50"
           style={{ zIndex: 50 as any }}
           onClick={() => {
+            if (resetInProgress) return;
             setShowResetConfirm(false);
             setResetCode('');
             setResetError(null);
@@ -1007,7 +1052,8 @@ export const StatusBar = memo(function StatusBar({
               <button
                 type="button"
                 onClick={() => { setShowResetConfirm(false); setResetCode(''); }}
-                className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
+                disabled={resetInProgress}
+                className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ color: 'var(--text-muted)' }}
                 aria-label="Fermer"
               >
@@ -1028,8 +1074,10 @@ export const StatusBar = memo(function StatusBar({
                 ref={resetInputRef}
                 type="text"
                 maxLength={6}
+                disabled={resetInProgress}
                 onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 onKeyDown={(e: any) => {
+                  if (resetInProgress) return;
                   if (e.key === 'Enter' && resetCode.length === 6) handleConfirmReset();
                   if (e.key === 'Escape') {
                     setShowResetConfirm(false);
@@ -1037,17 +1085,55 @@ export const StatusBar = memo(function StatusBar({
                   }
                 }}
                 value={resetCode}
-                className="w-full rounded-xl border px-4 py-3 text-center text-sm font-mono tracking-[0.45em] outline-none transition-colors"
+                className="w-full rounded-xl border px-4 py-3 text-center text-sm font-mono tracking-[0.45em] outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
                 placeholder="000000"
               />
+
+              {/* ─── Barre de progression de la réinitialisation ─────────── */}
+              <AnimatePresence>
+                {resetInProgress && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                      <span className="flex items-center gap-1.5" style={{ color: 'var(--color-warning)' }}>
+                        <LoaderCircle size={11} className="animate-spin" />
+                        {resetProgress >= 100 ? 'Réinitialisation terminée' : 'Réinitialisation en cours…'}
+                      </span>
+                      <span className="tabular-nums">{Math.round(resetProgress)}%</span>
+                    </div>
+                    <div
+                      className="h-1.5 w-full rounded-full overflow-hidden"
+                      style={{ backgroundColor: 'var(--bg-hover)' }}
+                      role="progressbar"
+                      aria-valuenow={Math.round(resetProgress)}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label="Progression de la réinitialisation"
+                    >
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: 'var(--color-warning)' }}
+                        animate={{ width: `${resetProgress}%` }}
+                        transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <div className="flex items-center justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: 'var(--border-base)' }}>
               <button
                 type="button"
                 onClick={() => { setShowResetConfirm(false); setResetCode(''); setResetError(null); }}
-                className="rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--bg-hover)]"
+                disabled={resetInProgress}
+                className="rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--bg-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
               >
                 Annuler
@@ -1055,11 +1141,12 @@ export const StatusBar = memo(function StatusBar({
               <button
                 type="button"
                 onClick={handleConfirmReset}
-                disabled={resetCode.length !== 6}
-                className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+                disabled={resetCode.length !== 6 || resetInProgress}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
                 style={{ backgroundColor: 'var(--color-warning)', color: 'var(--bg-primary)' }}
               >
-                Réinitialiser
+                {resetInProgress && <LoaderCircle size={13} className="animate-spin" />}
+                {resetInProgress ? 'Réinitialisation…' : 'Réinitialiser'}
               </button>
             </div>
           </motion.div>
