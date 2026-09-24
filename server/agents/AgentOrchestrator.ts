@@ -54,6 +54,7 @@ export class AgentOrchestrator {
     getRunningCount(role: string): number;
     cancel(taskId: string): boolean;
     isRunning?(taskId: string): boolean;
+    runTool?(name: string, args: Record<string, unknown>): Promise<unknown>;
   } = this.legacyExecutor;
   private scheduler = new TaskScheduler(this.executor, this.notifier);
   /** Vrai une fois le runtime agentique branché (plus de fallback silencieux). */
@@ -114,6 +115,24 @@ export class AgentOrchestrator {
   /** Indique si le runtime agentique est le moteur d'exécution actif. */
   get isAgenticEnabled(): boolean {
     return this.agenticEnabled;
+  }
+
+  /**
+   * Exécute un outil isolé via le moteur d'exécution actif (si celui-ci expose
+   * `runTool`). Utilisé par le BrainVerifier pour la vérification hashée des
+   * étapes. Retourne `undefined` si le moteur courant ne supporte pas
+   * l'exécution d'outil isolée.
+   */
+  async runTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+    if (typeof this.executor.runTool !== "function") {
+      throw new Error("Le moteur d'exécution actif n'expose pas runTool.");
+    }
+    return this.executor.runTool(name, args);
+  }
+
+  /** Indique si le moteur actif peut exécuter un outil isolé (runTool). */
+  get canRunTool(): boolean {
+    return typeof this.executor.runTool === "function";
   }
 
   /** Configure le callback de progression */

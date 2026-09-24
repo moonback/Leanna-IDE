@@ -30,17 +30,43 @@ interface BrainRunContext {
   understanding: BrainPlan["understanding"];
 }
 
+/**
+ * Dépendances injectables du Brain. Toutes optionnelles : par défaut le Brain
+ * construit ses composants réels. Sert à l'injection déterministe pour les
+ * tests de bout en bout du superviseur (understanding/planner/verifier
+ * scriptés, sans réseau).
+ */
+export interface AgentBrainDeps {
+  understandingEngine?: Pick<GoalUnderstandingEngine, "understand">;
+  planner?: Pick<DynamicPlanner, "plan">;
+  verifier?: BrainVerifier;
+}
+
 export class AgentBrain {
-  private understandingEngine = new GoalUnderstandingEngine();
-  private planner = new DynamicPlanner();
-  private verifier = new BrainVerifier();
+  private understandingEngine: Pick<GoalUnderstandingEngine, "understand">;
+  private planner: Pick<DynamicPlanner, "plan">;
+  private verifier: BrainVerifier;
   private validator = new BrainPlanValidator();
   private orchestrator: AgentOrchestrator;
   private activePlans = new Map<string, BrainPlan>();
   private results = new Map<string, BrainExecutionResult>();
 
-  constructor(orchestrator: AgentOrchestrator = agentOrchestrator) {
+  constructor(orchestrator: AgentOrchestrator = agentOrchestrator, deps: AgentBrainDeps = {}) {
     this.orchestrator = orchestrator;
+    this.understandingEngine = deps.understandingEngine ?? new GoalUnderstandingEngine();
+    this.planner = deps.planner ?? new DynamicPlanner();
+    // Vérification d'étape alignée sur WorkspaceState : si le moteur actif
+    // expose runTool (runtime agentique), le BrainVerifier fait une
+    // vérification HASHÉE des fichiers modifiés (verify_file → hash gate).
+    // Sinon, il retombe sur les contrôles superficiels (compatibilité).
+    if (deps.verifier) {
+      this.verifier = deps.verifier;
+    } else {
+      const runTool = this.orchestrator.canRunTool
+        ? (name: string, args: Record<string, unknown>) => this.orchestrator.runTool(name, args)
+        : undefined;
+      this.verifier = new BrainVerifier(runTool);
+    }
   }
 
   /**

@@ -8,11 +8,25 @@ import type {
 } from "./types.js";
 import { checkBracketBalance } from "../../skills/verify.js";
 import { getProjectRoot } from "../../skills/codebaseHelpers.js";
+import { WorkspaceState, type VerificationRecord } from "../WorkspaceState.js";
 import { createLogger } from "../../utils/logger.js";
 
 const log = createLogger("BrainVerifier");
 
+/** Exécute un outil isolé (contrat aligné sur `AgentTaskRunner.runTool`). */
+export type BrainToolRunner = (name: string, args: Record<string, unknown>) => Promise<unknown>;
+
 export class BrainVerifier {
+  /**
+   * Runner d'outils optionnel. S'il est fourni, la vérification d'étape passe
+   * par la MÊME discipline que le runtime agentique : `verify_file` produit un
+   * `VerificationRecord` hashé, enregistré dans un `WorkspaceState`, et l'étape
+   * ne passe que si chaque fichier modifié est `verified` avec un hash courant
+   * concordant. Sans runner, on retombe sur les contrôles superficiels
+   * (équilibre de crochets + heuristiques de rôle) — compatibilité ascendante.
+   */
+  constructor(private readonly runTool?: BrainToolRunner) {}
+
   /**
    * Vérifie le résultat d'une étape individuelle du Brain
    */
@@ -34,6 +48,22 @@ export class BrainVerifier {
     if (!codeCheck.ok) {
       syntaxCheckOk = false;
       issues.push(...codeCheck.issues);
+    }
+
+    // 1bis. Vérification HASHÉE des fichiers modifiés (si un runner est injecté).
+    // Aligne le Brain sur la discipline WorkspaceState du runtime agentique :
+    // une étape qui a écrit des fichiers ne passe que si chacun est vérifié avec
+    // un hash concordant. On ne vérifie que les fichiers réellement écrits par
+    // cette étape (intersection avec stage.result.filesModified quand dispo).
+    if (this.runTool && filesModified.length > 0) {
+      const stageFiles: string[] = Array.isArray(stage.result?.filesModified) && stage.result!.filesModified!.length > 0
+        ? stage.result!.filesModified!.filter((f) => filesModified.includes(f))
+        : filesModified;
+      const hashCheck = await this.verifyModifiedFilesHashed(stageFiles);
+      if (!hashCheck.ok) {
+        syntaxCheckOk = false;
+        issues.push(...hashCheck.issues);
+      }
     }
 
     // 2. Vérification spécifique par rôle
@@ -125,5 +155,86 @@ export class BrainVerifier {
       ok: !issues.some((i) => i.severity === "error"),
       issues,
     };
+  }
+
+  /**
+   * Vérification hashée via `verify_file` + `WorkspaceState` (chemin injecté).
+   * Chaîne : reread(hash) → verify_file → VerificationRecord → recordVerification
+   * → l'étape ne passe que si le fichier est `verified` avec hash concordant.
+   */
+  private async verifyModifiedFilesHashed(
+    files: string[]
+  ): Promise<{ ok: boolean; issues: VerificationIssue[] }> {
+    const issues: VerificationIssue[] = [];
+    const runTool = this.runTool!;
+    const root = getProjectRoot();
+
+    const workspace = new WorkspaceState(async (p: string) => {
+      const full = path.isAbsolute(p) ? p : path.join(root, p);
+      return fs.readFileSync(full, "utf-8");
+    });
+
+    for (const file of [...new Set(files)]) {
+      try {
+        // 1. Relecture + hash de l'état courant sur disque.
+        await workspace.reread(file, "read");
+
+        // 2. Vérification hashée par l'outil.
+        const res = (await runTool("verify_file", { path: file })) as
+          | { verificationRecord?: unknown } | undefined;
+        const record = this.asVerificationRecord(res?.verificationRecord);
+
+        if (!record) {
+          workspace.markError(file, "verify_file n'a pas retourné de preuve hashée.");
+          issues.push({
+            severity: "error",
+            file,
+            message: `Vérification hashée impossible pour ${file} (aucun VerificationRecord).`,
+            rule: "hash_verification_missing",
+          });
+          continue;
+        }
+
+        // 3. Enregistrement de la preuve et contrôle du hash.
+        workspace.recordVerification(file, record);
+        const state = workspace.get(file);
+        const verified = state?.status === "verified" && state.verifiedHash === state.contentHash;
+
+        if (!verified) {
+          issues.push({
+            severity: "error",
+            file,
+            message:
+              `Vérification hashée non concluante pour ${file} ` +
+              `(status ${state?.status ?? "absent"}; ${record.allIssues.slice(0, 2).map((i) => i.message).join("; ")}).`,
+            rule: "hash_verification_failed",
+          });
+        }
+      } catch (err) {
+        issues.push({
+          severity: "warning",
+          file,
+          message: `Vérification hashée en erreur pour ${file}: ${(err as Error).message}`,
+        });
+      }
+    }
+
+    return { ok: !issues.some((i) => i.severity === "error"), issues };
+  }
+
+  /** Type guard : un objet est-il un VerificationRecord structuré et hashé ? */
+  private asVerificationRecord(value: unknown): VerificationRecord | null {
+    if (!value || typeof value !== "object") return null;
+    const r = value as Partial<VerificationRecord>;
+    if (
+      typeof r.contentHash === "string" &&
+      typeof r.hashBefore === "string" &&
+      typeof r.hashAfter === "string" &&
+      typeof r.ok === "boolean" &&
+      ["success", "failed", "stale"].includes(r.status ?? "")
+    ) {
+      return r as VerificationRecord;
+    }
+    return null;
   }
 }
