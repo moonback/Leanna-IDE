@@ -178,11 +178,10 @@ function inferPermissions(toolName: string, skillName: string): ToolDefinition["
     permissions.push("dangerous");
   }
 
-  // Si aucune permission détectée, au minimum "read"
-  if (permissions.length === 0) {
-    permissions.push("read");
-  }
-
+  // Aucun mot-clé reconnu → tableau VIDE (et non ["read"]). Un outil sans
+  // permission déclarée est ainsi traité prudemment comme un effet de bord
+  // potentiel par le dry-run et l'AutonomyPolicy, au lieu d'être classé
+  // silencieusement en lecture seule. Voir le commentaire ci-dessus.
   return permissions;
 }
 

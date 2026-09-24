@@ -209,4 +209,19 @@ describe("SkillAdapter — permissions déclarées", () => {
     const [def] = adaptSkill(skill);
     assert.ok(def.permissions?.includes("read"));
   });
+
+  it("ne classe PAS en lecture seule un outil au nom non reconnu (fail-safe)", () => {
+    // Régression sécurité : un outil à effet de bord dont le nom ne matche aucun
+    // mot-clé (ex: telegram_notify, automation_click, agent_delegate avant
+    // déclaration explicite) ne doit pas hériter de ["read"]. Il doit obtenir un
+    // tableau vide, que le dry-run et l'AutonomyPolicy traitent comme un effet
+    // de bord potentiel.
+    const skill: LegacySkill = {
+      name: "misc",
+      declarations: [{ name: "notify_owner", description: "", parameters: {} }],
+      handleToolCall: async () => null,
+    };
+    const [def] = adaptSkill(skill);
+    assert.deepEqual(def.permissions, []);
+  });
 });

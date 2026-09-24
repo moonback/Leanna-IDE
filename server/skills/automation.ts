@@ -68,7 +68,7 @@ export const automationSkill: Skill = {
     automation_save_session: ["write"],
     automation_restore_session: ["read"],
     automation_list_sessions: ["read"],
-    automation_delete_session: ["write", "dangerous"],
+    automation_delete_session: ["write"],
     // Tâches planifiées : exécution périodique en arrière-plan.
     automation_schedule_task: ["exec"],
     automation_list_scheduled_tasks: ["read"],
@@ -77,7 +77,7 @@ export const automationSkill: Skill = {
     workflow_create: ["write"],
     workflow_run: ["exec"],
     workflow_list: ["read"],
-    workflow_delete: ["write", "dangerous"],
+    workflow_delete: ["write"],
     workflow_toggle: ["write"],
   },
   declarations: [
