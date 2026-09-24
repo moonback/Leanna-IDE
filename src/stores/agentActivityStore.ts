@@ -115,8 +115,10 @@ function getAgentForTool(tool: string): string {
     }
   }
   
-  // Fallback vers le mapping statique
-  return FALLBACK_TOOL_TO_AGENT[tool] ?? 'writer';
+  // Fallback vers le mapping statique, puis rôle neutre « Exécution système ».
+  // Ne PAS retomber sur 'writer' : cela attribuerait faussement du travail
+  // système au Rédacteur (fausse télémétrie).
+  return FALLBACK_TOOL_TO_AGENT[tool] ?? UNATTRIBUTED_ROLE;
 }
 
 function formatToolLabel(tool: string): string {
@@ -215,6 +217,18 @@ function cleanup() {
 
 // ─── Role → Agent name mapping (mirrors AgentPanel.tsx / AgentsSection.tsx) ──
 
+/**
+ * Rôle neutre pour les outils exécutables non rattachés à un agent spécialisé
+ * (primitives système : browser, telegram, weather, system_execute, etc.).
+ *
+ * IMPORTANT : ne JAMAIS retomber sur 'writer' pour ces outils. Attribuer du
+ * travail système au « Rédacteur » crée une fausse télémétrie agentique
+ * (observabilité, audit, historique, attribution des coûts). Ce rôle doit
+ * rester synchronisé avec le fallback backend `UNATTRIBUTED_ROLE`
+ * dans server/agents/toolAgentMapper.ts.
+ */
+export const UNATTRIBUTED_ROLE = 'system';
+
 const ROLE_TO_AGENT_NAME: Record<string, string> = {
   coder:      'Développeur',
   refactor:   'Refactorisation',
@@ -223,6 +237,7 @@ const ROLE_TO_AGENT_NAME: Record<string, string> = {
   tester:     'QA & Tests',
   security:   'Sécurité & Audit',
   architect:  'Architecte',
+  vision:     'Analyse Visuelle',
   writer:     'Rédacteur',
   formatter:  'Mise en forme',
   researcher: 'Recherche',
@@ -230,6 +245,7 @@ const ROLE_TO_AGENT_NAME: Record<string, string> = {
   translator: 'Traducteur',
   summarizer: 'Synthèse',
   planner:    'Planificateur',
+  [UNATTRIBUTED_ROLE]: 'Exécution système',
 };
 
 // ─── Server sync ─────────────────────────────────────────────────────────────

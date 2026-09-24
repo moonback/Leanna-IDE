@@ -11,6 +11,15 @@
 import { getAgentDefinition, listAgentDefinitions } from './roles.js';
 import type { AgentRole } from './types.js';
 
+/**
+ * Rôle neutre pour les outils exécutables non rattachés à un agent spécialisé.
+ * Doit rester synchronisé avec `UNATTRIBUTED_ROLE` côté renderer
+ * (src/stores/agentActivityStore.ts). Ne JAMAIS retomber sur 'writer' : cela
+ * attribue faussement des primitives système (browser, telegram, exec…) au
+ * Rédacteur et corrompt la télémétrie agentique.
+ */
+export const UNATTRIBUTED_ROLE: AgentRole = 'system';
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Cache pour le mapping outil → rôle(s)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -204,14 +213,14 @@ export function getAgentsForTool(tool: string): AgentRole[] {
  * Utilisé pour la compatibilité avec le système existant.
  * 
  * @param tool - Le nom de l'outil
- * @returns Le rôle principal ou 'writer' comme fallback
+ * @returns Le rôle principal, ou le rôle neutre `UNATTRIBUTED_ROLE` en fallback
  */
 export function getPrimaryAgentForTool(tool: string): AgentRole {
   if (!isInitialized) {
     initializeToolAgentMapper();
   }
   
-  return toolToPrimaryAgentCache.get(tool) || 'writer';
+  return toolToPrimaryAgentCache.get(tool) || UNATTRIBUTED_ROLE;
 }
 
 /**

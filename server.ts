@@ -374,6 +374,17 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
     }
     
     console.log(`[Bootstrap] ✅ Initialisation complète: ${r.tools.size} outils, ${r.listAgents().length} agents`);
+
+    // Réconciliation des compteurs : rend explicites les 4 populations distinctes
+    // (délégation / runtime / outils exécutables / capabilities mappées) et
+    // signale les asymétries (capabilities orphelines, rôles sans plugin runtime,
+    // outils non attribués à un agent dans l'UI). Purement observationnel.
+    try {
+      const { reconcileAndLogCounts } = await import("./server/runtime/reconcileCounts.js");
+      reconcileAndLogCounts(r);
+    } catch (error) {
+      console.warn(`[Bootstrap] ⚠️ Réconciliation des compteurs échouée:`, error);
+    }
   },
 });
 

@@ -55,6 +55,9 @@ const ROLE_META: Record<string, {
   memory:   { icon: Database,     color: 'var(--color-accent-alt)', label: 'Mémoire',     description: 'Mémoire persistante' },
   reasoning:{ icon: Brain,        color: 'var(--color-warning)', label: 'Raisonnement', description: 'Réflexion et planification' },
   mission:  { icon: Target,       color: 'var(--accent-secondary)', label: 'Mission',     description: 'Mission autonome' },
+
+  // Rôle neutre : outils exécutables non rattachés à un agent spécialisé
+  system:   { icon: Bot,          color: 'var(--text-muted)', label: 'Exécution système', description: 'Outils système non rattachés à un agent' },
 };
 
 function getRoleMeta(role: string) {
