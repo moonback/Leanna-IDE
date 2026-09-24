@@ -8,7 +8,9 @@ import type {
   OrchestrationPlan,
 } from "./types.js";
 import { AgentExecutor, SkillHandler } from "./AgentExecutor.js";
-import { TaskScheduler } from "./TaskScheduler.js";
+import { AgentRuntimeExecutor } from "./AgentRuntimeExecutor.js";
+import { TaskScheduler, type TaskRunner } from "./TaskScheduler.js";
+import type { AgentRuntime as AgenticRuntime } from "../runtime/agentic/AgentRuntime.js";
 import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier.js";
 import { AgentRegistry, agentRegistry } from "./AgentRegistry.js";
 import { agentMessageBus } from "./AgentMessageBus.js";
@@ -43,8 +45,20 @@ export class AgentOrchestrator {
 
   // Composants spécialisés
   private notifier = new ProgressNotifier();
-  private executor = new AgentExecutor(this.notifier);
+  private legacyExecutor = new AgentExecutor(this.notifier);
+  /**
+   * Moteur d'exécution ACTIF. Par défaut l'exécuteur legacy, remplacé par le
+   * runtime agentique dès que `enableAgenticRuntime()` est appelé au bootstrap.
+   */
+  private executor: TaskRunner & {
+    getRunningCount(role: string): number;
+    cancel(taskId: string): boolean;
+    isRunning?(taskId: string): boolean;
+    runTool?(name: string, args: Record<string, unknown>): Promise<unknown>;
+  } = this.legacyExecutor;
   private scheduler = new TaskScheduler(this.executor, this.notifier);
+  /** Vrai une fois le runtime agentique branché (plus de fallback silencieux). */
+  private agenticEnabled = false;
 
   // Registry des agents autonomes (partagé via singleton)
   private registry: AgentRegistry = agentRegistry;
@@ -56,7 +70,8 @@ export class AgentOrchestrator {
    * Initialise également le registre d'agents autonomes.
    */
   setSkillHandler(handler: SkillHandler): void {
-    this.executor.setSkillHandler(handler);
+    // Le handler alimente l'exécuteur legacy et le registre d'agents autonomes.
+    this.legacyExecutor.setSkillHandler(handler);
 
     // Initialiser le registre d'agents autonomes si ce n'est pas encore fait
     if (!this.registry.isReady) {
@@ -66,6 +81,58 @@ export class AgentOrchestrator {
       // Charger les agents personnalisés après l'initialisation
       initCustomAgents();
     }
+  }
+
+  /**
+   * Bascule l'orchestrateur sur le RUNTIME AGENTIQUE comme moteur d'exécution.
+   *
+   * À partir de cet appel, `delegateTask()` et l'orchestration multi-agents
+   * (`orchestrate()` → scheduler) exécutent les tâches via la vraie boucle
+   * analyse → plan → écriture → vérification → correction, avec budget
+   * transactionnel. L'exécuteur legacy n'est plus utilisé pour les tâches
+   * (il reste seulement pour la flotte d'agents autonomes qui l'appelle
+   * directement).
+   *
+   * Appelé une fois au bootstrap. Après migration, c'est le chemin par défaut :
+   * plus aucun fallback silencieux vers `AgentExecutor` pour `agent_orchestrate`.
+   */
+  enableAgenticRuntime(agentic: AgenticRuntime): void {
+    const runtimeExecutor = new AgentRuntimeExecutor(agentic, this.notifier);
+    this.executor = runtimeExecutor;
+    this.scheduler.setRunner(runtimeExecutor);
+    // Phase 5 : la flotte d'agents autonomes partage le même moteur agentique.
+    // Le registre redémarre ses agents sur le runtime (voir AgentRegistry.setRunner).
+    // Au bootstrap aucune mission ne tourne, la bascule est donc acceptée ; si
+    // elle était refusée (tâches actives), on le journalise sans forcer.
+    const swapped = this.registry.setRunner(runtimeExecutor);
+    if (!swapped) {
+      log.warn("⚠️ Flotte autonome non basculée sur le runtime agentique (tâches actives) — reste sur le moteur legacy.");
+    }
+    this.agenticEnabled = true;
+    log.info("🧠 Runtime agentique ACTIVÉ — orchestrate/delegateTask ET flotte autonome passent par la boucle plan→act→verify");
+  }
+
+  /** Indique si le runtime agentique est le moteur d'exécution actif. */
+  get isAgenticEnabled(): boolean {
+    return this.agenticEnabled;
+  }
+
+  /**
+   * Exécute un outil isolé via le moteur d'exécution actif (si celui-ci expose
+   * `runTool`). Utilisé par le BrainVerifier pour la vérification hashée des
+   * étapes. Retourne `undefined` si le moteur courant ne supporte pas
+   * l'exécution d'outil isolée.
+   */
+  async runTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+    if (typeof this.executor.runTool !== "function") {
+      throw new Error("Le moteur d'exécution actif n'expose pas runTool.");
+    }
+    return this.executor.runTool(name, args);
+  }
+
+  /** Indique si le moteur actif peut exécuter un outil isolé (runTool). */
+  get canRunTool(): boolean {
+    return typeof this.executor.runTool === "function";
   }
 
   /** Configure le callback de progression */
@@ -437,13 +504,70 @@ export class AgentOrchestrator {
     );
   }
 
-  /** Annule une tâche en attente */
+  /**
+   * Annule une tâche, qu'elle soit en attente (`pending`) ou en cours (`running`).
+   *
+   * - `pending` : la tâche est marquée annulée immédiatement, elle ne démarrera pas.
+   * - `running` : un signal d'annulation coopératif est envoyé à l'exécuteur ;
+   *   la tâche s'arrête au prochain point de contrôle (avant/après un appel
+   *   d'outil ou un tour), puis son statut passe à `cancelled` via `execute()`.
+   *
+   * @returns `true` si l'annulation a été prise en compte, `false` si la tâche
+   *          est introuvable ou déjà terminée.
+   */
   cancelTask(taskId: string): boolean {
     const task = this.tasks.get(taskId);
-    if (!task || task.status !== "pending") return false;
-    task.status = "cancelled";
-    agentPersistence.updateTaskStatus(taskId, "cancelled").catch(() => {});
-    return true;
+    if (!task) return false;
+
+    if (task.status === "pending") {
+      task.status = "cancelled";
+      agentPersistence.updateTaskStatus(taskId, "cancelled").catch(() => {});
+      log.info(`🛑 Tâche ${taskId.slice(0, 8)} (pending) annulée`);
+      return true;
+    }
+
+    if (task.status === "running") {
+      const signaled = this.executor.cancel(taskId);
+      if (signaled) {
+        log.info(`🛑 Tâche ${taskId.slice(0, 8)} (running) — signal d'annulation envoyé`);
+      } else {
+        log.warn(`⚠️ Tâche ${taskId.slice(0, 8)} marquée running mais aucune exécution active — annulation logique`);
+        task.status = "cancelled";
+        agentPersistence.updateTaskStatus(taskId, "cancelled").catch(() => {});
+      }
+      return true;
+    }
+
+    // Déjà terminée (completed/failed/incomplete/cancelled) — rien à annuler.
+    return false;
+  }
+
+  /**
+   * Annule une orchestration entière : signale toutes ses tâches `pending` et
+   * `running`. Les tâches déjà terminées ne sont pas affectées.
+   *
+   * @returns le nombre de tâches pour lesquelles l'annulation a été prise en
+   *          compte, ou `-1` si l'orchestration est introuvable.
+   */
+  cancelOrchestration(orchestrationId: string): number {
+    const plan = this.orchestrations.get(orchestrationId);
+    if (!plan) return -1;
+
+    let cancelledCount = 0;
+    for (const task of plan.tasks) {
+      if (task.status === "pending" || task.status === "running") {
+        if (this.cancelTask(task.id)) cancelledCount++;
+      }
+    }
+
+    if (plan.status === "pending" || plan.status === "running") {
+      plan.status = "cancelled";
+      plan.completedAt = new Date().toISOString();
+      agentPersistence.updateOrchestrationStatus(orchestrationId, "cancelled", plan.completedAt).catch(() => {});
+    }
+
+    log.info(`🛑 Orchestration ${orchestrationId.slice(0, 8)} annulée — ${cancelledCount} tâche(s) concernée(s)`);
+    return cancelledCount;
   }
 
   /**

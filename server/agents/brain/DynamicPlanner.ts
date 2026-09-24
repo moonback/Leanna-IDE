@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { z } from "zod";
 import type {
   GoalUnderstanding,
   BrainGoalInput,
@@ -12,6 +13,80 @@ import { generateText } from "../../utils/textGeneration.js";
 import { createLogger } from "../../utils/logger.js";
 
 const log = createLogger("DynamicPlanner");
+
+// ─── Schéma Zod strict de la réponse brute du LLM ────────────────────────────
+//
+// La sortie du LLM est du texte non fiable : on ne fait plus confiance à un
+// simple `JSON.parse` suivi de vérifications ad hoc. Ce schéma valide la
+// STRUCTURE de la réponse au niveau du parsing (le contrat d'échange avec le
+// modèle), avant toute transformation en `BrainStage`. Les invariants de graphe
+// (cycles, refs orphelines, rôles connus) restent contrôlés en aval par le
+// BrainPlanValidator sur le plan transformé.
+
+/** Une étape telle que retournée par le LLM (avant enrichissement). */
+export const llmStageSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    role: z.string().trim().min(1, "Le rôle de l'étape est requis"),
+    title: z.string().trim().min(1).optional(),
+    reason: z.string().trim().optional(),
+    instructions: z.string().trim().optional(),
+    dependsOn: z.array(z.string().trim().min(1)).optional().default([]),
+  })
+  .passthrough();
+
+/** Plan complet tel que retourné par le LLM. */
+export const llmPlanSchema = z.object({
+  architectureRationale: z.string().trim().optional(),
+  stages: z
+    .array(llmStageSchema)
+    .min(1, "Le plan LLM doit contenir au moins une étape"),
+});
+
+export type LLMPlanParsed = z.infer<typeof llmPlanSchema>;
+export type LLMStageParsed = z.infer<typeof llmStageSchema>;
+
+/**
+ * Extrait et valide la réponse JSON du LLM via le schéma Zod strict.
+ *
+ * Fonction pure (pas d'état, pas d'I/O) pour rester directement testable
+ * indépendamment de l'appel réseau au fournisseur de modèle.
+ *
+ * Étapes :
+ *   1. Isole le premier bloc `{ ... }` dans la réponse (le LLM peut baver du
+ *      texte autour du JSON malgré la consigne).
+ *   2. `JSON.parse` sécurisé (les exceptions de syntaxe sont capturées).
+ *   3. Validation structurelle Zod (`llmPlanSchema.safeParse`).
+ *
+ * @returns le plan validé, ou `null` si la réponse est absente/malformée
+ *          (le caller retombe alors sur la décomposition heuristique).
+ */
+export function parseLLMPlanResponse(rawText: string): LLMPlanParsed | null {
+  const match = rawText.match(/\{[\s\S]*\}/);
+  if (!match) {
+    log.warn("Réponse LLM sans objet JSON détectable — repli heuristique");
+    return null;
+  }
+
+  let candidate: unknown;
+  try {
+    candidate = JSON.parse(match[0]);
+  } catch (err: any) {
+    log.warn(`JSON du plan LLM illisible (${err?.message ?? err}) — repli heuristique`);
+    return null;
+  }
+
+  const result = llmPlanSchema.safeParse(candidate);
+  if (!result.success) {
+    const detail = result.error.issues
+      .map((i) => `${i.path.join(".") || "plan"}: ${i.message}`)
+      .join(" ; ");
+    log.warn(`Plan LLM invalide (${detail}) — repli heuristique`);
+    return null;
+  }
+
+  return result.data;
+}
 
 export class DynamicPlanner {
   /**
@@ -410,17 +485,38 @@ Retourne UNIQUEMENT un objet JSON valide :
       maxOutputTokens: 2048,
     });
 
-    const match = res.text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
+    // Validation stricte de la réponse brute du LLM via Zod (au lieu d'un
+    // JSON.parse + vérifications ad hoc). Une réponse malformée retourne null,
+    // ce qui déclenche proprement le repli heuristique dans `plan()`.
+    const parsed = this.parsePlanResponse(res.text);
+    if (!parsed) return null;
 
-    const parsed = JSON.parse(match[0]);
-    if (!Array.isArray(parsed.stages) || parsed.stages.length === 0) return null;
+    // Réindexation des id d'étapes : on associe à chaque étape LLM son id final
+    // (fourni ou dérivé) AVANT de remapper les `dependsOn`, afin de préserver
+    // les dépendances même quand le LLM omet certains id.
+    const stageIds = parsed.stages.map((st, idx) => {
+      const role = (hasAgent(st.role) ? st.role : "coder") as AgentRole;
+      return st.id && st.id.trim() ? st.id.trim() : `stage-${idx + 1}-${role}`;
+    });
+    const originalIdToFinal = new Map<string, string>();
+    parsed.stages.forEach((st, idx) => {
+      if (st.id && st.id.trim()) originalIdToFinal.set(st.id.trim(), stageIds[idx]);
+    });
 
-    const stages: BrainStage[] = parsed.stages.map((st: any, idx: number) => {
+    const stages: BrainStage[] = parsed.stages.map((st: LLMStageParsed, idx: number) => {
       const role = (hasAgent(st.role) ? st.role : "coder") as AgentRole;
       const { skills, tools } = this.selectSkillsAndTools(role, understanding.domain);
+
+      // Remapper les dépendances déclarées vers les id finaux ; à défaut de
+      // dépendance explicite, chaîner sur l'étape précédente (séquence par défaut).
+      const declaredDeps = (st.dependsOn ?? [])
+        .map((d) => originalIdToFinal.get(d.trim()) ?? d.trim())
+        .filter((d) => d && d !== stageIds[idx]);
+      const dependsOn =
+        declaredDeps.length > 0 ? declaredDeps : idx > 0 ? [stageIds[idx - 1]] : [];
+
       return {
-        id: st.id || `stage-${idx + 1}-${role}`,
+        id: stageIds[idx],
         title: st.title || `Étape ${idx + 1} (${role})`,
         description: st.reason || `Exécution par ${role}`,
         agentRole: role,
@@ -429,7 +525,7 @@ Retourne UNIQUEMENT un objet JSON valide :
         tools,
         files: understanding.relevantFiles,
         instructions: st.instructions || this.buildStageInstructions(role, understanding),
-        dependsOn: Array.isArray(st.dependsOn) ? st.dependsOn : idx > 0 ? [`stage-${idx}`] : [],
+        dependsOn,
         status: "pending",
         priority: "high",
         verificationCriteria: this.getRoleVerificationCriteria(role, understanding),
@@ -446,5 +542,13 @@ Retourne UNIQUEMENT un objet JSON valide :
       createdAt: new Date().toISOString(),
       status: "planned",
     };
+  }
+
+  /**
+   * Extrait et valide la réponse JSON du LLM via le schéma Zod strict.
+   * Délègue à la fonction pure `parseLLMPlanResponse` (testable isolément).
+   */
+  private parsePlanResponse(rawText: string): LLMPlanParsed | null {
+    return parseLLMPlanResponse(rawText);
   }
 }

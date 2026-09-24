@@ -22,6 +22,7 @@ import { AgentContextResolver } from "./AgentContextResolver.js";
 import { AgentEvidenceEvaluator } from "./AgentEvidenceEvaluator.js";
 import { DelegationDispatcher } from "./DelegationDispatcher.js";
 import type { ToolExecutionState } from "./AgentExecutionTypes.js";
+import type { AgentTaskRunner } from "./AgentTaskRunner.js";
 import { createLogger } from "../utils/logger.js";
 import { WorkspaceState, type VerificationRecord, type VerificationIssue } from "./WorkspaceState.js";
 import { AgentRepairLoop } from "./AgentRepairLoop.js";
@@ -33,6 +34,18 @@ const log = createLogger("AgentExecutor");
 
 /** Handler externe pour exécuter les actions d'un agent */
 export type SkillHandler<TArgs = unknown, TResult = unknown> = (name: string, args: TArgs) => Promise<TResult>;
+
+/**
+ * Erreur levée lorsqu'une tâche en cours est annulée par l'utilisateur.
+ * Distincte des échecs d'exécution : `execute()` la capture pour produire
+ * un statut "cancelled" plutôt que "failed".
+ */
+export class CancellationError extends Error {
+  constructor(taskId: string) {
+    super(`Tâche ${taskId.slice(0, 8)} annulée par l'utilisateur`);
+    this.name = "CancellationError";
+  }
+}
 
 // Seuls les appels structurés correspondant à des skills du workspace sont
 // exécutables. Un faux appel `bash` généré par le modèle n'est jamais exécuté.
@@ -83,7 +96,7 @@ export const EXECUTABLE_AGENT_TOOLS = new Set([
   "agent_execute",
 ]);
 
-export class AgentExecutor {
+export class AgentExecutor implements AgentTaskRunner {
   private skillHandler: SkillHandler | null = null;
   private promptBuilder = new PromptBuilder();
   private fileWriter: GeneratedFileWriter;
@@ -95,6 +108,14 @@ export class AgentExecutor {
 
   /** Compteur de tâches en cours par rôle */
   private runningCount: Map<string, number> = new Map();
+
+  /**
+   * Registre des contrôleurs d'annulation par tâche en cours.
+   * Une entrée existe uniquement pendant l'exécution active (créée dans
+   * `execute()`, retirée dans le `finally`). Permet une annulation
+   * coopérative : les points de contrôle vérifient `signal.aborted`.
+   */
+  private abortControllers: Map<string, AbortController> = new Map();
   
   /**
    * Timeouts par outil (ms) - optimisé pour éviter les timeouts prématurés
@@ -189,9 +210,51 @@ export class AgentExecutor {
     this.fileWriter.setSkillHandler(handler);
   }
 
+  /**
+   * Exécute un outil isolé via le skillHandler configuré (implémentation de
+   * `AgentTaskRunner.runTool`). Permet à la boucle autonome de relancer une
+   * vérification sans accéder au handler privé.
+   */
+  async runTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+    if (!this.skillHandler) throw new Error("SkillHandler non initialisé");
+    return this.skillHandler(name, args);
+  }
+
   /** Retourne le nombre de tâches en cours pour un rôle */
   getRunningCount(role: string): number {
     return this.runningCount.get(role) ?? 0;
+  }
+
+  /**
+   * Demande l'annulation coopérative d'une tâche en cours d'exécution.
+   * Déclenche l'`AbortController` associé : la boucle d'exécution s'arrête
+   * au prochain point de contrôle (avant/après un appel d'outil ou un tour).
+   *
+   * @returns `true` si une tâche active correspondante a reçu le signal,
+   *          `false` si aucune exécution n'est en cours pour cet id.
+   */
+  cancel(taskId: string): boolean {
+    const controller = this.abortControllers.get(taskId);
+    if (!controller) return false;
+    if (controller.signal.aborted) return true;
+    log.info(`[task:${taskId.slice(0, 8)}] 🛑 Annulation demandée — interruption à venir`);
+    controller.abort();
+    return true;
+  }
+
+  /** Indique si une tâche est actuellement en cours d'exécution (registre actif). */
+  isRunning(taskId: string): boolean {
+    return this.abortControllers.has(taskId);
+  }
+
+  /**
+   * Lève une `CancellationError` si le signal d'annulation de la tâche a été
+   * déclenché. Appelé aux points de contrôle de la boucle d'exécution.
+   */
+  private throwIfCancelled(taskId: string): void {
+    if (this.abortControllers.get(taskId)?.signal.aborted) {
+      throw new CancellationError(taskId);
+    }
   }
 
   /**
@@ -253,6 +316,9 @@ export class AgentExecutor {
       this.notifier.notify(task, "progress", { current, total: 5, label });
     };
 
+    // Enregistrer le contrôleur d'annulation pour cette exécution
+    this.abortControllers.set(task.id, new AbortController());
+
     // Mettre à jour le statut
     task.status = "running";
     task.startedAt = new Date().toISOString();
@@ -274,6 +340,9 @@ export class AgentExecutor {
       const executionPrompt = this.promptBuilder.build(agent, task, fileContents);
       notifyProgress(2, "Prompt construit");
       log.debug(`[task:${taskShortId}] [${agent.name}] 📝 Prompt construit — ${executionPrompt.length} caractères`);
+
+      // Point de contrôle d'annulation avant l'appel LLM coûteux
+      this.throwIfCancelled(task.id);
 
       // ── Étape 3: Exécution directe par l'agent ──
       log.info(`[task:${taskShortId}] [${agent.name}] 🤖 Étape 3/5 — Exécution agent_execute (LLM)...`);
@@ -384,6 +453,25 @@ export class AgentExecutor {
       clearTelemetryContext();
     } catch (error) {
       const durationMs = Date.now() - startTime;
+
+      // Annulation coopérative : statut distinct de l'échec.
+      if (error instanceof CancellationError) {
+        task.status = "cancelled";
+        task.completedAt = new Date().toISOString();
+        task.result = {
+          success: false,
+          outcome: "failed",
+          summary: `Tâche annulée par l'utilisateur après ${(durationMs / 1000).toFixed(1)}s`,
+          error: "cancelled_by_user",
+          durationMs,
+        };
+        log.info(`[task:${taskShortId}] 🛑 [${agent.name}] Annulée après ${(durationMs / 1000).toFixed(1)}s`);
+        telemetryService.endTaskSpan(task.id, false);
+        clearTelemetryContext();
+        this.notifier.notify(task, "failed");
+        return;
+      }
+
       task.status = "failed";
       task.completedAt = new Date().toISOString();
       task.result = {
@@ -406,6 +494,7 @@ export class AgentExecutor {
       
       this.notifier.notify(task, "failed");
     } finally {
+      this.abortControllers.delete(task.id);
       this.decrementRunning(task.role);
       log.debug(`[task:${taskShortId}] [${agent.name}] Concurrence: ${this.getRunningCount(task.role)} tâche(s) en cours pour ce rôle`);
     }
@@ -462,6 +551,9 @@ export class AgentExecutor {
     };
 
     for (let turn = 0; turn < AgentExecutor.MAX_TOOL_TURNS; turn++) {
+      // Point de contrôle d'annulation en tête de chaque tour de la boucle d'outils
+      this.throwIfCancelled(task.id);
+
       const calls = extractToolCalls(state.resultText);
       if (calls.length === 0) {
         if (turn === 0) {
@@ -480,7 +572,7 @@ export class AgentExecutor {
       const newlyTouchedBeforeTurn = new Set(state.newlyTouchedFiles);
 
       const observationCountBefore = state.observations.length;
-      await this.executeRequestedTools(agent, calls, state);
+      await this.executeRequestedTools(agent, calls, state, task.id);
       const observations = state.observations
         .slice(observationCountBefore)
         .join("\n")
@@ -625,7 +717,7 @@ export class AgentExecutor {
         );
         if (pendingWriteCalls.length > 0) {
           log.info(`[${agent.name}] ⚡ Exécution de ${pendingWriteCalls.length} outil(s) d'écriture issus de la réponse forcée`);
-          await this.executeRequestedTools(agent, pendingWriteCalls, state);
+          await this.executeRequestedTools(agent, pendingWriteCalls, state, task.id);
           if (state.filesModified.length > 0) {
             state.noProgressAbort = false;
             log.info(`[${agent.name}] ✅ ${state.filesModified.length} fichier(s) modifié(s) après exécution forcée`);
@@ -861,12 +953,16 @@ ${truncated}
   private async executeRequestedTools(
     agent: { name: string; capabilities: string[] },
     calls: AgentToolCall[],
-    state: ToolExecutionState
+    state: ToolExecutionState,
+    taskId?: string
   ): Promise<void> {
     const seenCalls = new Set<string>();
     const writePathsHandled = new Set<string>();
 
     for (const call of calls) {
+      // Interruption coopérative entre chaque appel d'outil d'un même tour
+      if (taskId) this.throwIfCancelled(taskId);
+
       const callSignature = `${call.name}:${JSON.stringify(call.parameters)}`;
       if (seenCalls.has(callSignature)) {
         state.observations.push(`- ${call.name}: appel identique ignoré dans ce tour; l'observation du premier appel est suffisante.`);

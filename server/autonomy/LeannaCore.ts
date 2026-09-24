@@ -3,6 +3,7 @@ import type { AgentRuntime, EventBus } from "../runtime/index.js";
 import type { RuntimeEvent } from "../runtime/types.js";
 import { HeartbeatService, heartbeatConfigFromEnv } from "./HeartbeatService.js";
 import { PerceptionEngine } from "./PerceptionEngine.js";
+import { AutonomousExecutive, autonomousExecutiveConfigFromEnv, type AutonomousExecutiveOptions } from "./AutonomousExecutive.js";
 import {
   TaskManager,
   taskManagerConfigFromEnv,
@@ -64,6 +65,8 @@ export type AutonomyBroadcaster = (message: AutonomyBroadcastMessage) => void;
 
 export interface LeannaCoreOptions {
   onTask?: (task: AutonomousTask) => Promise<void>;
+  /** Optional closed-loop bridge into the existing mission executor. */
+  executive?: Omit<AutonomousExecutiveOptions, "onEvent">;
   /** Optional durable task store enabling crash recovery of autonomy tasks. */
   persistence?: AutonomyTaskStore;
   /** Optional real-time broadcaster for the autonomy timeline (e.g. WebSocket). */
@@ -81,6 +84,7 @@ export class LeannaCore {
   private readonly perception = new PerceptionEngine();
   private readonly taskManager: TaskManager;
   private readonly heartbeat: HeartbeatService;
+  private readonly executive?: AutonomousExecutive;
   private readonly unsubscribers: Array<() => void> = [];
   private readonly persistence?: AutonomyTaskStore;
   private broadcaster?: AutonomyBroadcaster;
@@ -99,6 +103,7 @@ export class LeannaCore {
     this.taskManager = new TaskManager(
       async (task) => {
         this.setStatus("executing", `Executing ${task.type} task.`);
+        if (this.executive) await this.executive.execute(task);
         await options.onTask?.(task);
       },
       taskManagerConfigFromEnv(),
@@ -110,6 +115,13 @@ export class LeannaCore {
       () => this.healthCheck(),
       heartbeatConfigFromEnv(),
     );
+    if (options.executive) {
+      this.executive = new AutonomousExecutive(runtime, {
+        ...autonomousExecutiveConfigFromEnv(),
+        ...options.executive,
+        onEvent: (event) => this.broadcastExecutive(event),
+      });
+    }
   }
 
   start(): void {
@@ -226,7 +238,9 @@ export class LeannaCore {
       priority: perception.importance >= 0.8 ? "high" : "medium",
       sourceEventId: this.eventId(event),
       fingerprint: `${event.type}:${perception.affectedResources.sort().join(",")}`,
-      metadata: { reason: perception.reason, resources: perception.affectedResources },
+      // Keeping the typed source event makes the queued item a resumable
+      // perception-to-decision unit rather than an opaque maintenance tick.
+      metadata: { reason: perception.reason, resources: perception.affectedResources, event },
     });
 
     if (task) {
@@ -237,6 +251,13 @@ export class LeannaCore {
         sourceEventId: task.sourceEventId,
       });
     }
+  }
+
+  private broadcastExecutive(event: { type: string; traceId: string; cycleId: string; timestamp: number; [key: string]: unknown }): void {
+    if (!this.broadcaster) return;
+    try {
+      this.broadcaster({ type: "autonomy_event", event: event.type as AutonomyEventType, timestamp: new Date(event.timestamp).toISOString(), payload: event });
+    } catch { /* observability is best-effort */ }
   }
 
   private handleTaskStateChange(task: AutonomousTask, previous: AutonomousTaskStatus): void {

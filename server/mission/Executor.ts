@@ -12,6 +12,9 @@ import type {  PlannedAction,  ReflectionResult,
 import { DEFAULT_MISSION_CONFIG } from "./types.js";
 import { telemetryService } from "../observability/TelemetryService.js";
 import { setTelemetryContext, clearTelemetryContext } from "../utils/textGeneration.js";
+import { learningEngine } from "../knowledge/LearningEngine.js";
+import type { LearningResult } from "../knowledge/types.js";
+import { strategyMemory } from "../knowledge/StrategyMemory.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Executor — Boucle plan → agir → vérifier → corriger
@@ -70,6 +73,11 @@ export class Executor {
   /** Missions complétées (historique, max 50) */
   private completedMissions: Mission[] = [];
   private static readonly MAX_COMPLETED = 50;
+
+  /** Promesses des missions lancées en arrière-plan, pour les appelants autonomes. */
+  private readonly missionRuns = new Map<string, Promise<void>>();
+  /** Candidate lessons/proposals; never auto-applied by mission finalization. */
+  private readonly learningResults = new Map<string, LearningResult>();
 
   /**
    * Missions mises en pause par l'utilisateur.
@@ -248,6 +256,15 @@ export class Executor {
     // Set telemetry context for all model calls in this mission
     setTelemetryContext({ missionId: mission.id });
 
+    // Ferme la boucle d'apprentissage inter-missions (GAP-1) : amorcer le
+    // SkillScorer avec la fiabilité durable des skills AVANT la planification,
+    // pour qu'un outil historiquement défaillant soit d'emblée moins prioritaire.
+    try {
+      this.scorer.seedFromReliability(strategyMemory.getAllStats());
+    } catch (err) {
+      console.warn(`[Executor] Amorçage de fiabilité ignoré: ${(err as Error).message}`);
+    }
+
     const plan = await this.preparePlan(mission, params.availableSkills);
 
     this.activeMissions.set(mission.id, mission);
@@ -259,14 +276,29 @@ export class Executor {
     });
     this.emit("mission_started", { missionId: mission.id, title: params.title });
 
-    // Lancer l'exécution en arrière-plan
-    this.executeMission(mission, params.availableSkills).catch((err) => {
+    // Lancer l'exécution en arrière-plan, tout en conservant une promesse
+    // observable. Le runtime autonome doit attendre le résultat vérifié plutôt
+    // que déclarer une mission réussie juste après sa création.
+    const run = this.executeMission(mission, params.availableSkills).catch((err) => {
       console.error(`[Executor] Mission ${mission.id} failed:`, err);
       telemetryService.endMissionTrace(mission.id, false);
       this.emit("mission_failed", { missionId: mission.id, error: String(err) });
     });
+    this.missionRuns.set(mission.id, run);
+    void run.finally(() => this.missionRuns.delete(mission.id));
 
     return mission;
+  }
+
+  /**
+   * Attend la fin réelle d'une mission déjà lancée et retourne son état
+   * terminal. C'est le contrat utilisé par l'autonomie pour fermer la boucle
+   * exécution → vérification → réflexion avant de prendre la décision suivante.
+   */
+  async waitForMission(missionId: string): Promise<Mission | undefined> {
+    await this.missionRuns.get(missionId);
+    return this.activeMissions.get(missionId)
+      ?? this.completedMissions.find((mission) => mission.id === missionId);
   }
 
   private async preparePlan(mission: Mission, availableSkills: string[]): Promise<MissionPlan> {
@@ -328,6 +360,11 @@ export class Executor {
    */
   listCompletedMissions(): Mission[] {
     return [...this.completedMissions];
+  }
+
+  /** Returns post-mission learning proposals for review by the policy/UI. */
+  getLearningResult(missionId: string): LearningResult | undefined {
+    return this.learningResults.get(missionId);
   }
 
   /**
@@ -840,6 +877,11 @@ export class Executor {
     // Enregistrer le résultat
     mission.recordActionResult(action.id, result, success);
     this.scorer.recordUsage(action.skillName, success, durationMs);
+    // Persistance durable de la fiabilité du skill (GAP-1) : alimente la mémoire
+    // de stratégie lue par les missions futures. Best-effort, jamais bloquant.
+    try {
+      strategyMemory.recordSkillOutcome(action.skillName, success, durationMs);
+    } catch { /* la fiabilité durable est best-effort */ }
 
     // Réflexion
     const reflectionInput: ReflectionInput = {
@@ -1161,6 +1203,44 @@ JSON:`;
     }
     // Persistance finale (statut terminal).
     void this.persist(mission);
+    this.proposeLearning(mission);
+  }
+
+  /**
+   * Close reflection → learning without allowing the learning engine to mutate
+   * the workspace or policy. Applying a proposal remains an explicit human or
+   * policy decision in a later step.
+   */
+  private proposeLearning(mission: Mission): void {
+    try {
+      const state = mission.getState();
+      const actions = Object.values(state.goals).flatMap((goal) => goal.plannedActions.map((action) => ({
+        actionId: action.id,
+        actionName: action.skillName,
+        skillName: action.skillName,
+        success: action.status === "completed",
+        errorMessage: action.status === "failed" ? String(action.result ?? "Action failed") : undefined,
+        goalId: goal.id,
+      })));
+      const learning = learningEngine.learnFromMission({
+        missionId: mission.id,
+        missionTitle: state.title,
+        overallSuccess: mission.status === "completed",
+        touchedFiles: state.context.relevantFiles,
+        actions,
+        errors: state.context.errors.map((error) => ({ message: error.error, action: error.action })),
+        decisions: state.context.decisions.map((decision) => ({ what: decision.what, why: decision.why })),
+      }, { applyAutoImprovements: false });
+      this.learningResults.set(mission.id, learning);
+      this.emit("mission_learning_completed", {
+        missionId: mission.id,
+        lessons: learning.lessons.length,
+        candidateProposals: learning.candidateImprovements?.length ?? 0,
+      });
+    } catch (error) {
+      // Learning must never turn an already terminal mission into a failure.
+      this.emit("mission_learning_failed", { missionId: mission.id, error: String(error) });
+    }
   }
 
   /**

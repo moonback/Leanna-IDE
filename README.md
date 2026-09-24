@@ -28,7 +28,9 @@ Le projet cible principalement les développeurs solo et les petites équipes qu
 - [Fonctionnalités](#fonctionnalités)
   - [Agent Brain](#agent-brain)
   - [Agents autonomes](#agents-autonomes)
+  - [Runtime agentique](#runtime-agentique)
   - [Runtime autonome 24/7](#runtime-autonome-247)
+  - [Boucle exécutive autonome](#boucle-exécutive-autonome)
   - [Bot Telegram](#bot-telegram)
   - [IDE et outils développeur](#ide-et-outils-développeur)
   - [Sécurité et contrôle](#sécurité-et-contrôle)
@@ -162,6 +164,55 @@ planner
 
 ---
 
+## Runtime agentique
+
+Le **runtime agentique** est le moteur d'exécution partagé d'une tâche agent. Il donne
+**réellement** ses outils à un agent (intersection de ses `capabilities` déclarées et du
+`ToolRegistry`) et boucle jusqu'à un résultat vérifié, au lieu d'un simple aller-retour
+prompt → réponse.
+
+```text
+Objectif
+   ↓
+PLAN ──► ACT ──► OBSERVE ──► VERIFY ──► (SUCCESS → étape suivante | FAILURE → RECOVER)
+   ▲                                                        │
+   └──────────────── réplanification bornée ◄───────────────┘
+   ↓
+FINALIZE → rapport
+```
+
+### Ce qu'il garantit
+
+- **Outils réellement fournis** — un agent ne peut appeler que les outils qu'il déclare ;
+  chaque appel passe par `ToolRegistry.call()` (permissions, dry-run, timeout, métriques).
+- **Budget de mission par phase** (valeurs absolues, source de vérité) — défaut
+  `lecture 8 · plan 3 · écriture 9 · vérification 6 · correction 4` (total 30). Les quotas
+  d'écriture et de vérification sont **réservés** : l'exploration ne peut jamais les consommer,
+  donc après la découverte l'agent a toujours de quoi écrire ET vérifier.
+- **Écritures transactionnelles** — une écriture réussie est enregistrée et hashée (SHA-256)
+  **immédiatement**, avant tout contrôle de budget. Une limite atteinte plus tard n'annule
+  jamais une modification déjà émise.
+- **Vérification hashée** — chaque fichier écrit est revérifié via `verify_file` ; le
+  `VerificationRecord` (hash avant/après) est conservé dans `WorkspaceState`. L'étape ne passe
+  que si le hash vérifié correspond au contenu courant.
+- **Réparation bornée** — `AgentRepairLoop` décide `retry / replan / stop` en détectant les
+  patchs identiques répétés, l'absence de progrès et les régressions.
+- **Cache de contexte** — les lectures/recherches identiques sont resservies depuis le cache,
+  sans réexécution ni coût de budget.
+
+Tous les chemins d'exécution (`agent_orchestrate`, délégation, scheduler DAG et flotte
+autonome) partagent ce moteur via l'interface `AgentTaskRunner`. L'ancien `AgentExecutor`
+reste disponible derrière la même interface mais n'est plus le moteur principal. Un **contrat
+commun** (10 invariants) est vérifié contre les deux moteurs pour éviter toute divergence.
+
+Le superviseur multi-agents (`AgentBrain`) roule sur ce moteur : la **vérification d'étape**
+du DAG passe par la même discipline `WorkspaceState` (preuve hashée `verify_file`), et une
+étape n'est validée que si le hash vérifié correspond au contenu courant.
+
+Documentation détaillée : [`docs/AGENTIC_RUNTIME.md`](docs/AGENTIC_RUNTIME.md).
+
+---
+
 ## Runtime autonome 24/7
 
 Leanna possède un runtime d'autonomie **événementiel**. Il ne repose pas sur une boucle qui interroge constamment un modèle.
@@ -180,6 +231,69 @@ Le runtime comprend notamment :
 - coordination multi-instance optionnelle via Redis ;
 - bus d'événements Redis Streams optionnel ;
 - monitoring via `/api/v2/metrics/autonomy`.
+
+## Boucle exécutive autonome
+
+Les événements significatifs ne restent plus de simples éléments de queue :
+le serveur les transforme en une décision traçable, puis les transmet à la
+mission existante. La boucle reste **bornée**, **interruptible** et ne crée pas
+de chemin d'exécution parallèle aux protections du runtime.
+
+La concurrence est doublement bornée : `TaskManager` limite la queue et les
+workers autonomes, tandis que `AutonomousExecutive.maxConcurrentCycles` limite
+les cycles de décision/mission simultanés. Lorsqu'une limite est atteinte, la
+tâche remonte vers le retry/backoff existant au lieu de contourner la limite.
+
+```text
+RuntimeEvent / Heartbeat
+        ↓
+PerceptionEngine
+        ↓
+AutonomousExecutive
+  ├─ normalise l'observation
+  ├─ arbitre la priorité de façon déterministe
+  ├─ déduplique ou crée un AutonomousGoal
+  └─ choisit STORE, INVESTIGATE, ACT ou ESCALATE
+        ↓
+Mission.Executor
+  ├─ planification et DAG existants
+  ├─ ToolRegistry → PermissionPolicy → DryRunController
+  ├─ vérification, correction et réplanification bornées
+  └─ réflexion
+        ↓
+LearningEngine (propositions uniquement)
+        ↓
+Memory / prochain cycle
+```
+
+### Décisions et objectifs
+
+`AutonomousExecutive` utilise les dispositions suivantes : `IGNORE`, `STORE`,
+`MONITOR`, `INVESTIGATE`, `ACT` et `ESCALATE`. Les objectifs issus d'événements
+répétés sont dédupliqués selon leur classe de défaillance, et non selon un ID de
+tâche éphémère. Leur priorité est calculée par le runtime à partir de critères
+bornés (urgence, importance, risque, dépendances, intention, délai, coût,
+confiance et impact) : un modèle peut proposer du contexte, mais ne décide pas
+seul d'une priorité critique.
+
+Un refus de permission est toujours escaladé, sans tentative de contournement.
+Si un événement arrive avant l'initialisation du système de missions, il est
+également escaladé en sécurité. Les missions autonomes attendent l'état terminal
+du `Mission.Executor`; la simple création asynchrone d'une mission n'est jamais
+considérée comme un succès.
+
+### Apprentissage contrôlé
+
+Après une mission terminale, `LearningEngine` extrait des leçons et des
+`candidateImprovements`. Ces propositions sont disponibles pour l'UI ou une
+politique ultérieure, mais ne sont **pas auto-appliquées** par la finalisation de
+mission. Ce choix évite qu'un apprentissage transforme le workspace, les
+permissions ou les stratégies sans validation explicite.
+
+Les événements de cycle incluent un `traceId`, un `cycleId`, le `goalId` et le
+`taskId` lorsque disponibles; ils sont relayés à la timeline d'autonomie. Voir
+[l'audit complet](docs/AUTONOMOUS_AGENT_AUDIT.md) pour les composants, limites,
+risques et travaux de validation restants.
 
 > Pour une première validation, il est recommandé de conserver `Leanna_PERMISSION_MODE=enforce`, d'activer `Leanna_DRY_RUN=true` et de commencer avec `LEANNA_AUTONOMY_MAX_CONCURRENCY=1`.
 
@@ -357,6 +471,11 @@ Leanna est organisé en plusieurs couches :
 
 ```text
 ┌──────────────────────────────────────────────┐
+│        Autonomous Executive Loop              │
+│ Perception → Goal → Priority → Mission        │
+└──────────────────────┬───────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────┐
 │                 Agent Brain                  │
 │ Compréhension → Planification → Vérification │
 └──────────────────────┬───────────────────────┘
@@ -382,13 +501,18 @@ Leanna est organisé en plusieurs couches :
 
 - `AgentBrain` : compréhension et planification dynamique.
 - `AgentOrchestrator` : orchestration et délégation.
+- `AgentRuntime` (agentique) : boucle plan → act → verify → recover, budget de mission et écritures transactionnelles.
+- `AgentTaskRunner` : interface partagée du moteur d'exécution (runtime agentique ou exécuteur legacy).
+- `WorkspaceState` / `AgentRepairLoop` : état de fichiers adressé par contenu (hash) et réparation bornée.
 - `SkillManagerV2` : exécution des skills.
 - `ToolRegistry` : registre et contrôle des outils.
 - `PermissionPolicy` : contrôle des permissions.
 - `DryRun` : simulation des effets de bord.
 - `EventBus` : communication événementielle.
 - `HierarchicalMemoryService` : mémoire hiérarchisée.
-- `LeannaCore` : runtime autonome événementiel.
+- `LeannaCore` : runtime autonome événementiel et queue bornée.
+- `AutonomousExecutive` : pont déterministe perception → objectif → mission.
+- `Mission.Executor` : attend la fin vérifiée d'une mission et produit des propositions d'apprentissage non appliquées.
 
 Pour l'architecture complète : [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
@@ -532,6 +656,7 @@ Les variables sont chargées depuis `.env` ou `.env.local`, ce dernier étant pr
 | `LEANNA_HEARTBEAT_IDLE_MS` | Heartbeat idle |
 | `LEANNA_HEARTBEAT_SLEEP_MS` | Heartbeat sleeping |
 | `LEANNA_AUTONOMY_MAX_CONCURRENCY` | Concurrence maximale |
+| `LEANNA_AUTONOMY_MAX_CONCURRENT_CYCLES` | Cycles exécutifs simultanés (défaut sûr : `1`) |
 | `LEANNA_AUTONOMY_MAX_QUEUE_SIZE` | Taille maximale de queue |
 | `LEANNA_AUTONOMY_MAX_RETRIES` | Nombre maximal de retries |
 | `LEANNA_AUTONOMY_TASK_TIMEOUT_MS` | Timeout des tâches |
@@ -603,6 +728,21 @@ node --import tsx --test server/agents/brain/AgentBrain.test.ts
 # Cohérence des capacités d'agents (détection d'outils fantômes)
 node --import tsx --test server/agents/roleCapabilities.test.ts
 
+# Runtime agentique (budget de mission, écritures transactionnelles, vérification hashée, réparation)
+node --import tsx --test server/runtime/agentic/agentic.test.ts
+
+# Migration du moteur partagé (AgentTaskRunner, flotte autonome)
+node --import tsx --test server/agents/AgentTaskRunner.test.ts
+
+# Contrat AgentTaskRunner (10 invariants, exécuté contre les deux moteurs)
+node --import tsx --test server/agents/AgentTaskRunnerContract.test.ts
+
+# Harness de mission agentique de bout en bout (modèle déterministe)
+node --import tsx --test server/runtime/agentic/mission-harness.test.ts
+
+# Harness superviseur (AgentBrain end-to-end, vérification d'étape hashée)
+node --import tsx --test server/agents/brain/supervisor-harness.test.ts
+
 # Module spécifique
 npm test -- server/skills/browser.test.ts
 
@@ -611,6 +751,9 @@ npm test -- server/routes/*.test.ts
 
 # Test de charge autonomie
 npm run test:soak
+
+# Boucle perception → objectif → escalade et fin de mission vérifiée
+node --import tsx --test server/autonomy/AutonomousExecutive.test.ts server/autonomy/LeannaCore.test.ts server/mission/Executor.test.ts
 ```
 
 ## Smoke-test réel de l'Agent Brain
@@ -632,7 +775,12 @@ La suite actuelle couvre notamment :
 
 - Agent Brain : scheduler DAG parallèle, validation de plan, réplanification ;
 - cohérence des capacités d'agents (détection d'outils fantômes) ;
+- runtime agentique : budget de mission par phase, écritures transactionnelles, vérification hashée, réparation bornée ;
+- contrat `AgentTaskRunner` (10 invariants) vérifié contre les deux moteurs ;
+- harness de bout en bout : mission agentique (modèle déterministe) et superviseur `AgentBrain` avec vérification d'étape hashée ;
 - Runtime V2 ;
+- boucle exécutive autonome : priorité déterministe, déduplication, escalade de permission et attente de mission terminale ;
+- apprentissage : propositions disponibles après mission sans auto-application ;
 - skills critiques ;
 - validation Zod ;
 - routes REST ;
@@ -794,7 +942,9 @@ Vérifiez les limites de tokens et l'injection des notebooks. Si nécessaire, co
 |---|---|
 | [`API_DOCS.md`](API_DOCS.md) | API REST et WebSocket |
 | [`AUTONOMY.md`](AUTONOMY.md) | Runtime autonome 24/7 |
-| [`AUTONOMY_AUDIT.md`](AUTONOMY_AUDIT.md) | Audit et limites de l'autonomie |
+| [`AUTONOMY_AUDIT.md`](AUTONOMY_AUDIT.md) | Audit historique et limites de l'autonomie |
+| [`docs/AUTONOMOUS_AGENT_AUDIT.md`](docs/AUTONOMOUS_AGENT_AUDIT.md) | Audit actuel de la boucle exécutive autonome, gaps et contrat d'intégration |
+| [`docs/AGENTIC_RUNTIME.md`](docs/AGENTIC_RUNTIME.md) | Runtime agentique : boucle plan→act→verify→recover, budget de mission, écritures transactionnelles |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Architecture technique |
 | [`DB_SCHEMA.md`](DB_SCHEMA.md) | Schéma Supabase |
 | [`GEMINI.md`](GEMINI.md) | Intégration Gemini |

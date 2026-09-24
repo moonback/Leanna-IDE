@@ -13,6 +13,7 @@
  */
 
 import { AgentRuntime } from "./AgentRuntime.js";
+import { createAgentRuntime, type AgenticRuntime, type AgentBudget } from "./agentic/index.js";
 import { SkillManagerV2 } from "./compat/SkillManagerV2.js";
 import { PromptRegistry } from "./PromptRegistry.js";
 import { PermissionPolicy } from "./PermissionPolicy.js";
@@ -50,6 +51,8 @@ export interface BootstrapConfig {
   skills?: LegacySkill[];
   /** Désactiver les agents par défaut */
   disableDefaultAgents?: boolean;
+  /** Budget par défaut du runtime agentique (maxIterations, maxToolCalls, …). */
+  agenticBudget?: Partial<AgentBudget>;
   /** Dossier des prompts (défaut: server/runtime/prompts/) */
   promptsDir?: string;
   /** Callback post-initialisation */
@@ -64,6 +67,11 @@ export interface BootstrapResult {
   runtime: AgentRuntime;
   skillManager: SkillManagerV2;
   prompts: PromptRegistry;
+  /**
+   * Runtime agentique branché sur le `ToolRegistry` du runtime.
+   * C'est lui qui exécute la vraie boucle OBSERVE→PLAN→ACT→VERIFY→RECOVER.
+   */
+  agentic: AgenticRuntime;
 }
 
 /**
@@ -87,7 +95,7 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
 
   // 1.5. Configurer l'AgentOrchestrator pour utiliser le ToolRegistry du runtime (timeout corrigé)
   // Import dynamique pour éviter la dépendance circulaire
-  const { agentOrchestrator } = await import("../agents/AgentOrchestrator");
+  const { agentOrchestrator } = await import("../agents/AgentOrchestrator.js");
   agentOrchestrator.setSkillHandler((name: string, args: any) => 
     runtime.tools.call(name, args)
   );
@@ -136,7 +144,15 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
     console.log(`[Bootstrap] 🧪 Dry-run global ACTIVÉ — aucun effet de bord ne sera réellement exécuté.`);
   }
 
-  return { runtime, skillManager, prompts };
+  // Runtime agentique : réutilise le ToolRegistry/EventBus déjà configurés,
+  // de sorte que les agents reçoivent réellement leurs outils déclarés.
+  const agentic = createAgentRuntime(runtime, { budget: config.agenticBudget });
+
+  // Migration : l'orchestrateur exécute désormais les tâches via le runtime
+  // agentique (boucle plan→act→verify→recover), plus via l'AgentExecutor legacy.
+  agentOrchestrator.enableAgenticRuntime(agentic);
+
+  return { runtime, skillManager, prompts, agentic };
 }
 
 /**
@@ -183,5 +199,13 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
     console.error("[Bootstrap] Erreur lors du démarrage:", err);
   });
 
-  return { runtime, skillManager, prompts };
+  const agentic = createAgentRuntime(runtime, { budget: config.agenticBudget });
+
+  // Brancher l'orchestrateur sur le runtime agentique (import dynamique pour
+  // éviter la dépendance circulaire ; best-effort en mode synchrone).
+  import("../agents/AgentOrchestrator.js")
+    .then(({ agentOrchestrator }) => agentOrchestrator.enableAgenticRuntime(agentic))
+    .catch((err) => console.error("[Bootstrap] enableAgenticRuntime (sync) échec:", err));
+
+  return { runtime, skillManager, prompts, agentic };
 }

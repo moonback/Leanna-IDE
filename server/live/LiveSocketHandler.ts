@@ -430,7 +430,7 @@ export function attachLiveWebSocket(
         'automation_search',
         'automation_list_scheduled_tasks',
         'agent_delegate', 'agent_orchestrate', 'agent_status',
-        'agent_list_tasks', 'agent_list_roles', 'agent_cancel', 'agent_stats',
+        'agent_list_tasks', 'agent_list_roles', 'agent_cancel', 'agent_cancel_orchestration', 'agent_stats',
         // Custom skills — accessibles en mode ask aussi
         'list_custom_skills', 'create_custom_skill', 'update_custom_skill', 'delete_custom_skill', 'toggle_custom_skill',
         // Graphify — interrogeable en mode question (lecture seule sécurisée)
@@ -480,7 +480,7 @@ export function attachLiveWebSocket(
       const agentsConfig = currentProfile.agents;
       const agentsEnabled = agentsConfig?.enabled !== false;
       if (!agentsEnabled) {
-        const AGENT_TOOLS = new Set(['agent_delegate', 'agent_orchestrate', 'agent_status', 'agent_list_tasks', 'agent_list_roles', 'agent_cancel', 'agent_stats']);
+        const AGENT_TOOLS = new Set(['agent_delegate', 'agent_orchestrate', 'agent_status', 'agent_list_tasks', 'agent_list_roles', 'agent_cancel', 'agent_cancel_orchestration', 'agent_stats']);
         filteredDeclarations = filteredDeclarations.filter(d => !AGENT_TOOLS.has(d.name));
       }
       filteredDeclarations = filteredDeclarations.filter(d => !d.name.startsWith('git_'));

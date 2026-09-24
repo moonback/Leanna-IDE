@@ -28,7 +28,7 @@ import type {
 } from "./AgentCommunication.js";
 import { isDelegationAllowed } from "./AgentCommunication.js";
 import { AgentMessageBus } from "./AgentMessageBus.js";
-import { AgentExecutor } from "./AgentExecutor.js";
+import type { AgentTaskRunner } from "./AgentTaskRunner.js";
 import { AutonomousLoop, type LoopConfig } from "./AutonomousLoop.js";
 import { getAgentDefinitionOrThrow } from "./roles.js";
 import { createLogger } from "../utils/logger.js";
@@ -60,7 +60,7 @@ interface DelegatedSubTask {
 export class AutonomousAgent {
   private readonly role: AgentRole;
   private readonly bus: AgentMessageBus;
-  private readonly executor: AgentExecutor;
+  private readonly executor: AgentTaskRunner;
   private readonly loop: AutonomousLoop;
 
   // État interne
@@ -71,7 +71,7 @@ export class AutonomousAgent {
   private broadcastSubId: string | null = null;
   private isOnline = false;
 
-  constructor(role: AgentRole, executor: AgentExecutor, bus: AgentMessageBus, loopConfig?: Partial<LoopConfig>) {
+  constructor(role: AgentRole, executor: AgentTaskRunner, bus: AgentMessageBus, loopConfig?: Partial<LoopConfig>) {
     this.role = role;
     this.executor = executor;
     this.bus = bus;

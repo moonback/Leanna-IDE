@@ -279,3 +279,28 @@ Un verrou distribué optionnel (Redis, avec repli in-process) est désormais dis
 Un bus d’événements durable multi-processus (Redis Streams) est désormais disponible via un pont optionnel qui dégrade proprement vers l’in-process sans Redis (voir « Bus d’événements multi-processus (Redis Streams) »).
 
 Les briques initialement listées comme prochaines étapes (task store durable, checkpoint/reprise, fallbacks de providers, timeline WebSocket + frontend, test de charge/soak, verrou distribué, Redis Streams) sont désormais en place, chacune optionnelle et à dégradation propre. Le durcissement pour un usage multi-instance à grande échelle reste recommandé : groupes de consommateurs Redis avec accusés de réception, et tests d’intégration multi-instance de bout en bout. Aucune de ces couches ne contourne les politiques de permissions, dry-run, sandbox ou approbation existantes.
+
+## Boucle d'apprentissage inter-missions (StrategyMemory)
+
+Depuis l'itération d'autonomie documentée dans
+[`docs/LEANNA_AUTONOMY_MASTER_AUDIT.md`](docs/LEANNA_AUTONOMY_MASTER_AUDIT.md) et
+[`docs/LEANNA_AUTONOMY_IMPLEMENTATION_REPORT.md`](docs/LEANNA_AUTONOMY_IMPLEMENTATION_REPORT.md),
+la fiabilité des outils est mémorisée durablement et **réutilisée** par la planification.
+
+- `server/knowledge/StrategyMemory.ts` enregistre, par outil, un signal compact
+  (succès/échec, durée) dans `.Leanna-strategy.json` (par workspace, écriture atomique,
+  dégradation propre en mémoire seule). Aucun secret ni payload n'y est stocké.
+- Au démarrage d'une mission, `SkillScorer.seedFromReliability()` amorce l'historique de
+  scoring : un outil historiquement défaillant est déprioritisé **dès la première
+  planification**, sans attendre un échec re-observé. Les observations vivantes de la mission
+  courante restent prioritaires.
+- Le `Planner` reçoit un avertissement listant les outils peu fiables et, lors d'une
+  replanification, écarte les outils durablement défaillants tout en garantissant qu'au moins
+  un outil reste disponible.
+- `AutonomousExecutive.decide()` consulte l'historique d'échecs d'une même classe d'objectif :
+  après plusieurs échecs, l'objectif est escaladé au lieu d'être ré-tenté indéfiniment.
+- Observabilité : `GET /api/v2/metrics/reliability` expose ce signal (outils défaillants +
+  statistiques), ce qui rend la décision de déprioriser un outil explicable.
+
+Le contrat d'autonomie complet est décrit dans
+[`docs/AUTONOMY_CONTRACT.md`](docs/AUTONOMY_CONTRACT.md).

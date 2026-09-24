@@ -6,6 +6,7 @@ import type {
 } from "./types.js";
 import { Mission } from "./Mission.js";
 import { SkillScorer } from "./SkillScorer.js";
+import { strategyMemory } from "../knowledge/StrategyMemory.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Planner — Décomposition hiérarchique des objectifs
@@ -136,10 +137,16 @@ export class Planner {
       .getContext()
       .errors.filter((e) => e.action === failedAction.skillName).length;
 
-    const filteredSkills =
-      failCount >= 2
-        ? availableSkills.filter((s) => s !== failedAction.skillName)
-        : availableSkills;
+    // Boucle d'apprentissage inter-missions (GAP-1) : lors d'une replanification,
+    // écarter aussi les outils durablement peu fiables (mémoire de stratégie),
+    // même sans échec re-observé dans cette mission — mais toujours en gardant au
+    // moins un outil disponible pour ne pas rendre la replanification impossible.
+    const durableFailing = this.durableFailingSkillNames(availableSkills);
+    const toExclude = new Set<string>(durableFailing);
+    if (failCount >= 2) toExclude.add(failedAction.skillName);
+
+    const filtered = availableSkills.filter((s) => !toExclude.has(s));
+    const filteredSkills = filtered.length > 0 ? filtered : availableSkills;
 
     // Ajouter une hypothèse corrective
     mission.addHypothesis(
@@ -189,6 +196,11 @@ export class Planner {
   ): string {
     const context = mission.getContext();
 
+    // Boucle d'apprentissage inter-missions (GAP-1) : avertir le planificateur
+    // des outils qui ont historiquement échoué, en s'appuyant uniquement sur
+    // les outils disponibles pour cette mission.
+    const failingWarning = this.buildFailingSkillsWarning(availableSkills);
+
     return `Tu es un planificateur de tâches. Décompose cet objectif en sous-étapes concrètes.
 
 OBJECTIF: ${goal.title}
@@ -200,7 +212,7 @@ CONTEXTE:
 - Fichiers pertinents: ${context.relevantFiles.slice(0, 10).join(", ") || "aucun"}
 - Erreurs passées: ${context.errors.slice(-3).map((e) => e.error).join("; ") || "aucune"}
 - Hypothèses: ${context.hypotheses.slice(-3).join("; ") || "aucune"}
-
+${failingWarning}
 OUTILS DISPONIBLES: ${availableSkills.join(", ")}
 
 INSTRUCTIONS:
@@ -219,6 +231,45 @@ RÉPONDS EN JSON STRICT:
     "dependsOn": []
   }
 ]`;
+  }
+
+  /** Noms des outils disponibles marqués durablement peu fiables. Best-effort. */
+  private durableFailingSkillNames(availableSkills: string[]): string[] {
+    try {
+      const available = new Set(availableSkills);
+      return strategyMemory
+        .getFailingSkills()
+        .map((s) => s.skillName)
+        .filter((name) => available.has(name));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Construit un avertissement, à injecter dans le prompt de décomposition,
+   * listant les outils disponibles historiquement peu fiables (mémoire de
+   * stratégie durable). Retourne une chaîne vide si aucun signal fiable.
+   */
+  private buildFailingSkillsWarning(availableSkills: string[]): string {
+    let failing: { skillName: string; recentSuccessRate: number; totalCalls: number }[] = [];
+    try {
+      const available = new Set(availableSkills);
+      failing = strategyMemory
+        .getFailingSkills()
+        .filter((s) => available.has(s.skillName));
+    } catch {
+      return "";
+    }
+    if (failing.length === 0) return "";
+    const lines = failing
+      .slice(0, 5)
+      .map(
+        (s) =>
+          `  - ${s.skillName} (succès récent ${Math.round(s.recentSuccessRate * 100)}% sur ${s.totalCalls} appels)`,
+      )
+      .join("\n");
+    return `\nOUTILS HISTORIQUEMENT PEU FIABLES (préférer une alternative si possible):\n${lines}\n`;
   }
 
   private parseDecomposeResult(result: string): SubGoalPlan[] {

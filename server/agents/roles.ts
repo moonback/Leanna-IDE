@@ -1289,3 +1289,27 @@ export function hasAgent(role: string): boolean {
   return dynamicAgentRegistry.hasAgent(role) || 
          (role in STATIC_AGENT_REGISTRY);
 }
+
+/** Capacités de modification de fichiers reconnues (source de vérité du contrat). */
+const FILE_WRITE_CAPABILITIES = new Set<string>([
+  "write_project_file",
+  "modify_project_file",
+  "patch_project_file",
+  "apply_patch",
+  "rename_project_file",
+  "delete_project_file",
+]);
+
+/**
+ * Indique si un rôle possède au moins une capacité d'écriture de fichier.
+ *
+ * C'est le contrat qui remplace la liste de rôles codée en dur dans
+ * l'évaluateur de preuves : un rôle strictement lecture seule (reviewer,
+ * security, researcher, vision) ne peut JAMAIS être « write-required » et son
+ * succès est un résultat analytique/preuves, pas un fichier écrit.
+ */
+export function roleCanWriteFiles(role: string): boolean {
+  const def = getAgentDefinition(role);
+  if (!def) return false;
+  return def.capabilities.some((cap) => FILE_WRITE_CAPABILITIES.has(cap));
+}

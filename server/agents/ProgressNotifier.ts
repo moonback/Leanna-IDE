@@ -6,7 +6,7 @@
  * Persiste également les mises à jour de statut dans Supabase.
  */
 import type { AgentTask, TaskStatus, AgentRole } from "./types.js";
-import { getAgentDefinitionOrThrow } from "./roles.js";
+import { getAgentDefinition } from "./roles.js";
 import { agentPersistence } from "./AgentPersistence.js";
 import { createLogger } from "../utils/logger.js";
 
@@ -58,21 +58,24 @@ export class ProgressNotifier {
    * Notifie la progression d'une tâche agent via tous les canaux configurés.
    */
   notify(task: AgentTask, event: ProgressEvent, progress?: AgentEvent["progress"]): void {
-    const agent = getAgentDefinitionOrThrow(task.role);
+    // Résolution DÉFENSIVE : un notifier ne doit jamais faire échouer l'exécuteur.
+    // Un rôle inconnu (ex: échec "agent introuvable", ou agent dynamique
+    // désenregistré) ne doit pas lever ici — on retombe sur le nom du rôle.
+    const agentName = getAgentDefinition(task.role)?.name ?? task.role;
 
     // Log structuré
     switch (event) {
       case "started":
-        log.info(`🚀 ${agent.name} — "${task.title}" démarrée`);
+        log.info(`🚀 ${agentName} — "${task.title}" démarrée`);
         break;
       case "completed":
-        log.info(`✅ ${agent.name} — "${task.title}" terminée: ${task.result?.summary ?? ""}`);
+        log.info(`✅ ${agentName} — "${task.title}" terminée: ${task.result?.summary ?? ""}`);
         break;
       case "failed":
-        log.error(`❌ ${agent.name} — "${task.title}" échouée: ${task.result?.error ?? ""}`);
+        log.error(`❌ ${agentName} — "${task.title}" échouée: ${task.result?.error ?? ""}`);
         break;
       case "progress":
-        log.debug(`⏳ ${agent.name} — "${task.title}" en cours`);
+        log.debug(`⏳ ${agentName} — "${task.title}" en cours`);
         break;
     }
 
@@ -106,10 +109,10 @@ export class ProgressNotifier {
           role: task.role,
           title: task.title,
           status: task.status,
-          agentName: agent.name,
+          agentName,
           timestamp: new Date().toISOString(),
           detail: event === "started"
-            ? `Agent "${agent.name}" démarre la tâche "${task.title}"`
+            ? `Agent "${agentName}" démarre la tâche "${task.title}"`
             : event === "progress"
             ? progress?.label
             : event === "completed"

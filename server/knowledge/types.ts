@@ -391,6 +391,14 @@ export interface LearningResult {
   lessons: Lesson[];
   /** Améliorations appliquées */
   improvementsApplied: string[];
+  /** Propositions à valider par une politique ou un humain avant application. */
+  candidateImprovements?: Array<{
+    id: string;
+    kind: string;
+    label: string;
+    rationale: string;
+    autoApplicable: boolean;
+  }>;
   /** Fichiers modifiés pendant l'apprentissage */
   filesModified: string[];
   /** Résumé */
@@ -533,4 +541,3 @@ export const knowledgeGraphSchema = z.object({
     entitiesByType: z.record(z.number()),
   }),
 });
-

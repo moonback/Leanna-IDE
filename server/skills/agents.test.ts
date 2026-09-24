@@ -31,6 +31,7 @@ test("agentsSkill — déclare tous les outils attendus", () => {
     "agent_list_tasks",
     "agent_list_roles",
     "agent_cancel",
+    "agent_cancel_orchestration",
     "agent_stats",
     "agent_collaborate",
     "agent_fleet_status",
@@ -39,6 +40,7 @@ test("agentsSkill — déclare tous les outils attendus", () => {
     "agent_bus_metrics",
     "assistant_logs",
     "agent_message_history",
+    "agent_brain",
   ];
   for (const name of expected) {
     assert.ok(toolNames.includes(name), `Outil "${name}" doit être déclaré`);
