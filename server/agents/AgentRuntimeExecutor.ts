@@ -16,6 +16,7 @@ import type { AgentRuntime as AgenticRuntime } from "../runtime/agentic/AgentRun
 import type { AgentResult, AgentTask as AgenticTask, AgentBudget } from "../runtime/agentic/types.js";
 import { getAgentDefinitionOrThrow, hasAgent } from "./roles.js";
 import type { AgentTask, TaskResult, TaskOutcome } from "./types.js";
+import type { AgentTaskRunner } from "./AgentTaskRunner.js";
 import { ProgressNotifier } from "./ProgressNotifier.js";
 import { createLogger } from "../utils/logger.js";
 
@@ -26,7 +27,7 @@ const log = createLogger("AgentRuntimeExecutor");
  * Compatible avec la surface publique de `AgentExecutor` utilisée par les
  * appelants (execute / getRunningCount / cancel / isRunning).
  */
-export class AgentRuntimeExecutor {
+export class AgentRuntimeExecutor implements AgentTaskRunner {
   private runningCount = new Map<string, number>();
   private active = new Map<string, AbortController>();
 
@@ -35,6 +36,11 @@ export class AgentRuntimeExecutor {
     private readonly notifier: ProgressNotifier,
     private readonly defaultBudget?: Partial<AgentBudget>
   ) {}
+
+  /** Exécute un outil isolé (ex: verify_file relancé par la boucle autonome). */
+  runTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+    return this.agentic.callTool(name, args);
+  }
 
   getRunningCount(role: string): number {
     return this.runningCount.get(role) ?? 0;

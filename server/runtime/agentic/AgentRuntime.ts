@@ -28,6 +28,8 @@ import type { ToolDeclaration } from "../types.js";
 import { getAgentDefinitionOrThrow, hasAgent } from "../../agents/roles.js";
 import type { AgentDefinition } from "../../agents/types.js";
 import { extractToolCalls } from "../../agents/ToolCallParser.js";
+import { WorkspaceState, type VerificationRecord } from "../../agents/WorkspaceState.js";
+import { AgentRepairLoop, type RepairDirective } from "../../agents/AgentRepairLoop.js";
 import { generateText, type GenerateTextResult } from "../../utils/textGeneration.js";
 import { createLogger } from "../../utils/logger.js";
 import {
@@ -39,6 +41,7 @@ import {
 import {
   DEFAULT_AGENT_BUDGET,
   emptyBudgetUsage,
+  normalizeBudget,
   type AgentBudget,
   type AgentError,
   type AgentPhase,
@@ -131,18 +134,41 @@ export class AgentRuntime implements IAgentRuntime {
     this.defaultBudget = { ...DEFAULT_AGENT_BUDGET, ...deps.budget };
   }
 
+  /**
+   * Exécute un outil ponctuel via le ToolRegistry (permissions, dry-run,
+   * timeout, métriques appliqués). Utilisé hors boucle par les appelants qui
+   * ont besoin d'une vérification isolée (ex: AutonomousLoop.verifyFile).
+   */
+  async callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+    return this.registry.call(name, args);
+  }
+
   // ─── run : orchestration complète ─────────────────────────────────────────
 
   async run(task: AgentTask): Promise<AgentResult> {
     const startedAt = Date.now();
     const taskId = task.id ?? randomUUID();
-    const budget: AgentBudget = { ...this.defaultBudget, ...task.budget };
+    // Le budget est normalisé : maxToolCalls = somme des quotas de phase absolus.
+    const budget: AgentBudget = normalizeBudget({ ...this.defaultBudget, ...task.budget });
 
     if (!hasAgent(task.role)) {
       return this.failFast(task, taskId, startedAt, `Agent "${task.role}" introuvable`);
     }
     const agent = getAgentDefinitionOrThrow(task.role);
     const tools = resolveAgentTools(agent.capabilities, this.registry);
+
+    // WorkspaceState : état authoritatif adressé par contenu (SHA-256). La
+    // fonction de lecture passe par le ToolRegistry (read_project_file), comme
+    // le fait le legacy executor.
+    const workspace = new WorkspaceState(async (path: string) => {
+      const res = (await this.registry.call("read_project_file", { path, full: true })) as
+        | { content?: string; error?: string; status?: string }
+        | undefined;
+      if (!res || res.error || res.status === "failed" || typeof res.content !== "string") {
+        throw new Error(res?.error ?? "Lecture du fichier impossible.");
+      }
+      return res.content;
+    });
 
     const session: RunSession = {
       taskId,
@@ -161,6 +187,10 @@ export class AgentRuntime implements IAgentRuntime {
       phase: "discovery",
       readCache: new Map<string, unknown>(),
       readFilesSeen: new Set<string>(),
+      workspace,
+      repairLoops: new Map<string, AgentRepairLoop>(),
+      blockedFiles: new Set<string>(),
+      lastPatchByFile: new Map<string, string>(),
     };
     this.session = session;
 
@@ -224,9 +254,12 @@ export class AgentRuntime implements IAgentRuntime {
 
       // ── FAILURE → RECOVER ──
       step.status = "failed";
+      // Identifie le premier fichier écrit non vérifié pour piloter la réparation.
+      const failedFile = this.firstUnverifiedWrite(session, observation);
       const recovery = await this.recover({
         phase: "verify",
         message: verification.issues.join("; ") || verification.summary,
+        file: failedFile,
       });
       session.recoveries.push(recovery);
       const advance = this.applyRecovery(session, plan, stepIdx, recovery);
@@ -427,12 +460,20 @@ export class AgentRuntime implements IAgentRuntime {
       // ── Écriture CONFIRMÉE : enregistrée immédiatement (transactionnel). ──
       // La preuve d'écriture est capturée dès le retour du handler, AVANT tout
       // contrôle de budget ultérieur. Une limite atteinte plus tard n'annule
-      // jamais une modification déjà émise et réussie.
+      // jamais une modification déjà émise et réussie. On relit puis on hashe
+      // le fichier dans le WorkspaceState (chaîne WRITE → observe → hash).
       if (kind === "write") {
         const path = extractPath(parameters);
         if (path) {
           session.filesModified.add(path);
           session.usage.filesModified = session.filesModified.size;
+          try {
+            await session.workspace.reread(path, "write");
+          } catch {
+            session.workspace.markError(path, "Relecture post-écriture impossible.");
+          }
+          // Mémorise le patch pour la détection de patch identique répété.
+          session.lastPatchByFile.set(normPath(path), JSON.stringify(parameters));
         }
       }
 
@@ -474,6 +515,21 @@ export class AgentRuntime implements IAgentRuntime {
     else u.otherCalls += 1;
   }
 
+  /** Premier fichier écrit dans l'observation qui n'est pas vérifié dans le WorkspaceState. */
+  private firstUnverifiedWrite(session: RunSession, observation: Observation): string | undefined {
+    for (const o of observation.toolOutcomes) {
+      if (o.success && WRITE_TOOLS.has(o.invocation.name)) {
+        const path = extractPath(o.invocation.parameters);
+        if (!path) continue;
+        const state = session.workspace.get(path);
+        if (!state || state.status !== "verified" || state.verifiedHash !== state.contentHash) {
+          return path;
+        }
+      }
+    }
+    return undefined;
+  }
+
   // ─── verify : VERIFICATION ──────────────────────────────────────────────────
 
   async verify(step: PlanStep, observation: Observation): Promise<Verification> {
@@ -488,23 +544,54 @@ export class AgentRuntime implements IAgentRuntime {
     }
     checks.push(`${observation.toolOutcomes.length} action(s), ${failed.length} en échec`);
 
-    // 2. Si l'étape a produit des écritures, on tente une vérification concrète
-    //    via un outil de vérification réellement disponible (typecheck/lint).
-    const wrote = observation.toolOutcomes.some((o) => o.success && WRITE_TOOLS.has(o.invocation.name));
-    if (wrote) {
-      const verifyTool = VERIFY_TOOLS.find((t) => session.tools.some((d) => d.name === t));
-      if (verifyTool) {
-        const res = await this.invokeTool(session, verifyTool, {});
-        checks.push(`vérification via ${verifyTool}: ${res.success ? "OK" : "ÉCHEC"}`);
-        if (!res.success) issues.push(`${verifyTool}: ${res.error ?? "échec de vérification"}`);
-        else if (isFailingVerification(res.result)) {
-          issues.push(`${verifyTool} signale des problèmes`);
+    // 2. Vérification HASHÉE par fichier écrit dans ce tour.
+    //    Chaîne : WRITE → observe/hash (déjà fait) → verify_file → VerificationRecord
+    //    → workspace.recordVerification → HASH MATCH ? On NE JETTE PAS le record.
+    const writtenPaths = [
+      ...new Set(
+        observation.toolOutcomes
+          .filter((o) => o.success && WRITE_TOOLS.has(o.invocation.name))
+          .map((o) => extractPath(o.invocation.parameters))
+          .filter((p): p is string => Boolean(p))
+      ),
+    ];
+
+    const hasVerifyFile = session.tools.some((d) => d.name === "verify_file");
+    for (const path of writtenPaths) {
+      if (!hasVerifyFile) {
+        checks.push(`écriture ${path} (verify_file indisponible pour cet agent)`);
+        continue;
+      }
+      const res = await this.invokeTool(session, "verify_file", { path });
+      const record = extractVerificationRecord(res.result);
+      if (record) {
+        // Le fichier doit être relu avant recordVerification (invariant WorkspaceState).
+        await session.workspace.reread(path, "read").catch(() => undefined);
+        try {
+          session.workspace.recordVerification(path, record);
+        } catch (e) {
+          session.workspace.markError(path, (e as Error).message);
         }
+      } else {
+        session.workspace.markError(path, "verify_file n'a pas retourné de preuve hashée.");
+      }
+
+      const state = session.workspace.get(path);
+      const verified =
+        Boolean(record) &&
+        state?.status === "verified" &&
+        state.verifiedHash === state.contentHash;
+
+      checks.push(
+        `verify_file ${path}: ${verified ? "VÉRIFIÉ (hash match)" : "NON vérifié"} ` +
+          `[before=${record?.hashBefore.slice(0, 8) ?? "?"} after=${record?.hashAfter.slice(0, 8) ?? "?"}]`
+      );
+      if (!verified) {
+        issues.push(`${path}: vérification hashée non concluante (${state?.status ?? "état absent"})`);
       }
     }
 
-    // 3. Une réponse finale sans aucune action ni écriture n'est acceptée que si
-    //    l'étape n'exigeait pas d'effet de bord (heuristique : mention d'écriture).
+    // 3. Réponse finale sans action : acceptée seulement si rien n'a été écrit.
     if (observation.isFinal && observation.toolOutcomes.length === 0) {
       checks.push("réponse finale sans action");
     }
@@ -527,32 +614,97 @@ export class AgentRuntime implements IAgentRuntime {
     const { budget, usage } = session;
     session.phase = "recovery";
 
-    // Budget de retries épuisé → replan une fois, sinon abort.
-    if (usage.retries >= budget.maxRetries) {
+    // 1. Budget de récupération épuisé → arrêt (les réserves verify ne sont pas
+    //    consommées par la recovery ; voir admitCall).
+    if (usage.recoveryCalls >= budget.maxRecovery) {
       const canReplan = usage.iterations < budget.maxIterations - 1 && session.replans < 1;
       if (canReplan) {
         session.replans += 1;
         return {
           strategy: "replan",
-          instruction: `Le plan initial a échoué (${error.message}). Reconsidère l'approche complètement.`,
-          reason: "Budget de retries épuisé, une replanification est encore possible.",
+          instruction: `Le plan a échoué (${error.message}). Reconsidère l'approche complètement.`,
+          reason: "Budget de récupération épuisé, une replanification reste possible.",
         };
       }
       return {
         strategy: "abort",
         instruction: "",
-        reason: `Budget de récupération épuisé après ${usage.retries} tentative(s).`,
+        reason: `Budget de récupération épuisé (${usage.recoveryCalls}/${budget.maxRecovery}).`,
       };
     }
 
-    usage.retries += 1;
+    // 2. Politique de réparation DÉTERMINISTE par fichier (AgentRepairLoop) :
+    //    détecte patch identique répété, absence de progrès, régression.
+    const file = error.file;
+    if (file) {
+      const directive = this.assessRepair(session, file, error);
+      usage.recoveryCalls += 1;
+      switch (directive.action) {
+        case "stop":
+          session.blockedFiles.add(normPath(file));
+          return {
+            strategy: "abort",
+            instruction: directive.requiredAction,
+            reason: directive.reason,
+          };
+        case "change_strategy":
+          return {
+            strategy: "replan",
+            instruction: directive.requiredAction,
+            reason: directive.reason,
+          };
+        case "continue":
+        default:
+          return {
+            strategy: "retry",
+            instruction: directive.requiredAction,
+            reason: directive.reason,
+          };
+      }
+    }
+
+    // 3. Erreur sans fichier identifié (plan/act générique) : retry borné.
+    usage.recoveryCalls += 1;
     return {
       strategy: "retry",
       instruction:
         `L'action précédente a échoué : ${error.message}. ` +
-        `Analyse la cause exacte et corrige avant de réessayer (tentative ${usage.retries}/${budget.maxRetries}).`,
-      reason: "Erreur récupérable, nouvelle tentative avec consigne corrective.",
+        `Analyse la cause exacte et corrige avant de réessayer ` +
+        `(récupération ${usage.recoveryCalls}/${budget.maxRecovery}).`,
+      reason: "Erreur récupérable sans fichier ciblé.",
     };
+  }
+
+  /**
+   * Applique AgentRepairLoop pour un fichier : construit les issues à partir de
+   * l'état WorkspaceState + de l'erreur, et laisse la politique décider
+   * continue / change_strategy / stop (patch identique, stall, régression).
+   */
+  private assessRepair(session: RunSession, file: string, error: AgentError): RepairDirective {
+    const key = normPath(file);
+    const loop = session.repairLoops.get(key) ?? new AgentRepairLoop();
+    session.repairLoops.set(key, loop);
+    const state = session.workspace.get(file);
+    const issues = state?.verification?.allIssues?.length
+      ? state.verification.allIssues
+      : [
+          {
+            type: "execution",
+            file: key,
+            line: null,
+            column: null,
+            severity: "error" as const,
+            rule: "tool-result",
+            message: error.message || "Écriture ou vérification non confirmée.",
+          },
+        ];
+    return loop.assess({
+      issues,
+      record: state?.verification,
+      currentHash: state?.contentHash,
+      currentVersion: state?.version,
+      patch: session.lastPatchByFile.get(key),
+    });
   }
 
   // ─── finalize : COMPLETE ────────────────────────────────────────────────────
@@ -638,10 +790,9 @@ export class AgentRuntime implements IAgentRuntime {
 
   /**
    * Épuisement du budget contrôlant l'ARRÊT de la boucle (niveau itération).
-   * Les limites de temps, itérations et coût sont dures. Le plafond d'appels
-   * d'outils, lui, ne stoppe la boucle que si le budget réservé aux actions
-   * critiques (write/verify) est lui aussi consommé — sinon on laisse la boucle
-   * tourner pour permettre écritures et vérifications.
+   * Les limites de temps, itérations et coût sont dures. Le budget d'outils ne
+   * stoppe la boucle que si TOUS les quotas de phase restants sont à zéro —
+   * sinon on laisse la boucle tourner pour permettre écritures/vérifications.
    */
   private budgetExhausted(session: RunSession): boolean {
     const { budget, usage, startedAt } = session;
@@ -649,35 +800,20 @@ export class AgentRuntime implements IAgentRuntime {
     if (usage.iterations >= budget.maxIterations) return true;
     if (usage.elapsedMs >= budget.maxExecutionTimeMs) return true;
     if (usage.cost >= budget.maxCost) return true;
-    // Plafond global d'outils atteint ET plus aucun budget critique disponible.
-    if (usage.toolCalls >= budget.maxToolCalls && this.criticalBudgetLeft(session) <= 0) {
-      return true;
-    }
+    // Reste-t-il un quota exploitable dans une phase quelconque ?
+    const writeLeft = budget.maxWrite - usage.writeCalls;
+    const verifyLeft = budget.maxVerify - usage.verifyCalls;
+    const recoveryLeft = budget.maxRecovery - usage.recoveryCalls;
+    const readLeft = budget.maxRead - usage.readCalls;
+    if (writeLeft <= 0 && verifyLeft <= 0 && recoveryLeft <= 0 && readLeft <= 0) return true;
     return false;
   }
 
   /**
-   * Budget d'appels réservé aux actions critiques (write + verify), au-delà du
-   * plafond global. Garantit qu'une limite atteinte ne fige pas l'agent avant
-   * qu'il ait pu écrire et vérifier.
-   */
-  private criticalReserve(budget: AgentBudget): number {
-    const { writeMin, verifyMin } = budget.phases;
-    return Math.ceil(budget.maxToolCalls * (writeMin + verifyMin));
-  }
-
-  private criticalBudgetLeft(session: RunSession): number {
-    const { budget, usage } = session;
-    const reserve = this.criticalReserve(budget);
-    const criticalUsed = usage.writeCalls + usage.verifyCalls;
-    // Marge critique = réserve dédiée non encore consommée.
-    return Math.max(0, reserve - criticalUsed);
-  }
-
-  /**
-   * Règle d'arrêt intelligente : décide si un appel d'une nature donnée est
-   * admis, selon la répartition par phase. Empêche l'agent de dépenser 80 % de
-   * son budget en exploration ; garantit un quota pour write/verify/recovery.
+   * Règle d'arrêt intelligente basée sur les quotas ABSOLUS par phase.
+   * Les quotas write/verify/recovery sont RÉSERVÉS : ils ne peuvent jamais être
+   * consommés par la lecture. C'est ce qui garantit qu'après la découverte,
+   * l'agent dispose toujours des appels nécessaires pour écrire ET vérifier.
    */
   private admitCall(
     session: RunSession,
@@ -694,33 +830,36 @@ export class AgentRuntime implements IAgentRuntime {
       return { allowed: false, reason: "Budget de coût épuisé." };
     }
 
-    // write / verify : toujours admis tant que la réserve critique tient, même
-    // au-delà du plafond global d'outils. C'est la garantie « les corrections
-    // et vérifications peuvent aboutir ».
-    if (kind === "write" || kind === "verify") {
-      if (usage.toolCalls < budget.maxToolCalls) return { allowed: true, reason: "" };
-      if (this.criticalBudgetLeft(session) > 0) return { allowed: true, reason: "" };
-      return { allowed: false, reason: "Budget d'actions critiques épuisé." };
+    // Chaque nature d'appel est plafonnée par SON quota de phase absolu, jamais
+    // par le total : le total est la somme, mais les réserves sont étanches.
+    switch (kind) {
+      case "write":
+        return usage.writeCalls < budget.maxWrite
+          ? { allowed: true, reason: "" }
+          : { allowed: false, reason: `Quota d'écriture épuisé (${usage.writeCalls}/${budget.maxWrite}).` };
+      case "verify":
+        return usage.verifyCalls < budget.maxVerify
+          ? { allowed: true, reason: "" }
+          : { allowed: false, reason: `Quota de vérification épuisé (${usage.verifyCalls}/${budget.maxVerify}).` };
+      case "read":
+        return usage.readCalls < budget.maxRead && usage.filesRead < budget.maxFilesRead
+          ? { allowed: true, reason: "" }
+          : {
+              allowed: false,
+              reason: `Quota d'exploration épuisé (${usage.readCalls}/${budget.maxRead}).`,
+              nudge:
+                "Le quota d'exploration est atteint. Arrête de lire/chercher et PASSE À L'ACTION : " +
+                "applique les modifications (write_project_file / modify_project_file / patch_project_file), " +
+                "puis vérifie (verify_file / verify_typecheck).",
+            };
+      case "other":
+      default:
+        // Les appels « autres » (ex: planification, run_project_command hors
+        // verify) puisent dans le quota de planification résiduel.
+        return usage.otherCalls < budget.maxPlan
+          ? { allowed: true, reason: "" }
+          : { allowed: false, reason: `Quota d'appels divers épuisé (${usage.otherCalls}/${budget.maxPlan}).` };
     }
-
-    // read / other : plafonnés par le budget de découverte (part MAX).
-    if (usage.toolCalls >= budget.maxToolCalls) {
-      return { allowed: false, reason: "Plafond global d'appels d'outils atteint." };
-    }
-    if (kind === "read") {
-      const discoveryCap = Math.max(1, Math.floor(budget.maxToolCalls * budget.phases.discoveryMax));
-      if (usage.readCalls >= discoveryCap || usage.readCalls >= budget.maxReadCalls) {
-        return {
-          allowed: false,
-          reason: "Quota d'exploration (discovery) atteint.",
-          nudge:
-            "Le quota d'exploration est atteint. Arrête de lire/chercher et PASSE À L'ACTION : " +
-            "applique les modifications nécessaires avec write_project_file / modify_project_file / patch_project_file, " +
-            "puis lance la vérification (verify_typecheck).",
-        };
-      }
-    }
-    return { allowed: true, reason: "" };
   }
 
   /**
@@ -767,8 +906,7 @@ export class AgentRuntime implements IAgentRuntime {
   private advancePhase(session: RunSession): void {
     if (session.phase === "recovery" || session.phase === "verify") return;
     const { budget, usage } = session;
-    const discoveryCap = Math.max(1, Math.floor(budget.maxToolCalls * budget.phases.discoveryMax));
-    if (session.phase === "discovery" && (usage.readCalls >= discoveryCap || usage.writeCalls > 0)) {
+    if (session.phase === "discovery" && (usage.readCalls >= budget.maxRead || usage.writeCalls > 0)) {
       session.phase = "write";
     }
   }
@@ -861,6 +999,46 @@ export class AgentRuntime implements IAgentRuntime {
     }
     return this.session;
   }
+
+  /**
+   * Amorce une session sans appeler le LLM. RÉSERVÉ AUX TESTS : permet de
+   * valider les phases déterministes (verify/recover, budget, WorkspaceState,
+   * AgentRepairLoop) de façon hermétique, sans réseau ni clés API.
+   */
+  _seedSessionForTest(task: AgentTask): RunSession {
+    const budget = normalizeBudget({ ...this.defaultBudget, ...task.budget });
+    const agent = getAgentDefinitionOrThrow(task.role);
+    const tools = resolveAgentTools(agent.capabilities, this.registry);
+    const workspace = new WorkspaceState(async (path: string) => {
+      const res = (await this.registry.call("read_project_file", { path, full: true })) as
+        | { content?: string } | undefined;
+      if (typeof res?.content !== "string") throw new Error("read failed");
+      return res.content;
+    });
+    const session: RunSession = {
+      taskId: task.id ?? "test-task",
+      agent,
+      tools,
+      observations: [],
+      verifications: [],
+      recoveries: [],
+      filesModified: new Set(),
+      toolsExecuted: [],
+      usage: emptyBudgetUsage(),
+      budget,
+      startedAt: Date.now(),
+      replans: 0,
+      phase: "discovery",
+      readCache: new Map(),
+      readFilesSeen: new Set(),
+      workspace,
+      repairLoops: new Map(),
+      blockedFiles: new Set(),
+      lastPatchByFile: new Map(),
+    };
+    this.session = session;
+    return session;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -888,6 +1066,14 @@ interface RunSession {
   readCache: Map<string, unknown>;
   /** Fichiers déjà lus (déduplication du compteur filesRead). */
   readFilesSeen: Set<string>;
+  /** État authoritatif adressé par contenu (hash before/after, vérification). */
+  workspace: WorkspaceState;
+  /** Politique de réparation bornée par fichier (progrès / stall / stop). */
+  repairLoops: Map<string, AgentRepairLoop>;
+  /** Fichiers bloqués par le diagnostic de non-progression. */
+  blockedFiles: Set<string>;
+  /** Dernier patch appliqué par fichier (détection de patch identique répété). */
+  lastPatchByFile: Map<string, string>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -924,6 +1110,30 @@ function extractPath(parameters: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
+/** Normalise un chemin (slashes, préfixe ./) pour servir de clé stable. */
+function normPath(filePath: string): string {
+  return filePath.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+/** Type guard : le résultat de verify_file contient-il un VerificationRecord ? */
+function extractVerificationRecord(result: unknown): VerificationRecord | null {
+  if (!result || typeof result !== "object") return null;
+  const record = (result as { verificationRecord?: unknown }).verificationRecord as
+    | Partial<VerificationRecord>
+    | undefined;
+  if (
+    record &&
+    typeof record.contentHash === "string" &&
+    typeof record.hashBefore === "string" &&
+    typeof record.hashAfter === "string" &&
+    typeof record.ok === "boolean" &&
+    ["success", "failed", "stale"].includes(record.status ?? "")
+  ) {
+    return record as VerificationRecord;
+  }
+  return null;
+}
+
 function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
@@ -957,12 +1167,4 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
   return null;
 }
 
-/** Heuristique : un résultat de vérification signale-t-il un échec ? */
-function isFailingVerification(result: unknown): boolean {
-  if (!result || typeof result !== "object") return false;
-  const r = result as Record<string, unknown>;
-  if (r.passed === false || r.ok === false || r.success === false) return true;
-  if (typeof r.errorCount === "number" && r.errorCount > 0) return true;
-  if (Array.isArray(r.errors) && r.errors.length > 0) return true;
-  return false;
-}
+

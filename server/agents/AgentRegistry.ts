@@ -10,7 +10,9 @@
  */
 import type { AgentRole } from "./types.js";
 import type { SkillHandler } from "./AgentExecutor.js";
+import type { AgentTaskRunner } from "./AgentTaskRunner.js";
 import { AutonomousAgent } from "./AutonomousAgent.js";
+import type { LoopConfig } from "./AutonomousLoop.js";
 import { AgentExecutor } from "./AgentExecutor.js";
 import { AgentMessageBus, agentMessageBus } from "./AgentMessageBus.js";
 import { ProgressNotifier } from "./ProgressNotifier.js";
@@ -28,13 +30,51 @@ export class AgentRegistry {
   private agents: Map<AgentRole, AutonomousAgent> = new Map();
   private notifier: ProgressNotifier;
   private executor: AgentExecutor;
+  /**
+   * Moteur d'exécution ACTIF partagé par tous les agents autonomes. Par défaut
+   * l'exécuteur legacy ; remplacé par le runtime agentique via `setRunner()`
+   * au bootstrap. Les agents déjà démarrés ne sont pas recréés — seuls les
+   * agents créés APRÈS le swap utilisent le nouveau moteur (voir setRunner).
+   */
+  private runner: AgentTaskRunner;
   private bus: AgentMessageBus;
   private initialized = false;
+  /** Config de boucle mémorisée par rôle, pour recréer à l'identique au swap de moteur. */
+  private loopConfigByRole = new Map<AgentRole, Partial<LoopConfig>>();
 
   constructor(bus: AgentMessageBus = agentMessageBus) {
     this.bus = bus;
     this.notifier = new ProgressNotifier();
     this.executor = new AgentExecutor(this.notifier);
+    this.runner = this.executor;
+  }
+
+  /** Retourne le ProgressNotifier partagé (pour brancher un runtime agentique). */
+  getNotifier(): ProgressNotifier {
+    return this.notifier;
+  }
+
+  /**
+   * Bascule le moteur d'exécution des agents autonomes vers le runtime
+   * agentique. Doit être appelé AVANT `initialize()` pour que la flotte soit
+   * créée sur le nouveau moteur. Si des agents existent déjà, ils sont
+   * redémarrés sur le nouveau moteur.
+   */
+  setRunner(runner: AgentTaskRunner): void {
+    this.runner = runner;
+    if (this.agents.size > 0) {
+      log.info("🔁 Bascule du moteur d'exécution — redémarrage de la flotte sur le runtime agentique");
+      const roles = [...this.agents.keys()];
+      // Arrêt sans réinitialiser le flag ni les configs mémorisées.
+      for (const agent of this.agents.values()) agent.stop();
+      this.agents.clear();
+      // Recrée chaque agent sur le nouveau moteur, en conservant sa config de boucle.
+      for (const role of roles) {
+        const agent = new AutonomousAgent(role, this.runner, this.bus, this.loopConfigByRole.get(role));
+        this.agents.set(role, agent);
+        agent.start();
+      }
+    }
   }
 
   // ─── Initialisation ────────────────────────────────────────────────────────
@@ -75,7 +115,8 @@ export class AgentRegistry {
     const allRoles = listAgentRoles();
     for (const role of allRoles) {
       const loopConfig = loopConfigByRole[role] ?? { maxIterations: 2, minConfidenceScore: 0.60 };
-      const agent = new AutonomousAgent(role as AgentRole, this.executor, this.bus, loopConfig);
+      this.loopConfigByRole.set(role as AgentRole, loopConfig);
+      const agent = new AutonomousAgent(role as AgentRole, this.runner, this.bus, loopConfig);
       this.agents.set(role as AgentRole, agent);
       agent.start();
     }
@@ -169,7 +210,8 @@ export class AgentRegistry {
     }
 
     const config = loopConfig ?? { maxIterations: 2, minConfidenceScore: 0.60 };
-    const agent = new AutonomousAgent(role as AgentRole, this.executor, this.bus, config);
+    this.loopConfigByRole.set(role as AgentRole, config);
+    const agent = new AutonomousAgent(role as AgentRole, this.runner, this.bus, config);
     this.agents.set(role as AgentRole, agent);
     agent.start();
 

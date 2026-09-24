@@ -47,73 +47,95 @@ export interface AgentTask {
 
 /**
  * Phases de la boucle agentique. Le budget d'appels d'outils est alloué par
- * phase pour empêcher un agent de tout dépenser en exploration.
+ * phase, en valeurs ABSOLUES, pour empêcher un agent de tout dépenser en
+ * exploration et pour réserver des appels aux étapes critiques.
  */
 export type AgentPhase = "discovery" | "plan" | "write" | "verify" | "recovery";
 
 /**
- * Répartition du budget d'appels d'outils par phase, en fraction du total.
- * Les bornes `max` plafonnent une phase (ex: discovery ≤ 30 %) ; les bornes
- * `min` réservent un quota garanti pour les phases critiques (write/verify).
- * La somme des `min` doit rester ≤ 1.
- */
-export interface PhaseAllocation {
-  /** Part MAX du budget d'outils consommable en exploration (défaut 0.30). */
-  discoveryMax: number;
-  /** Part MAX consommable en (re)planification (défaut 0.10). */
-  planMax: number;
-  /** Part MIN réservée aux écritures (défaut 0.30). */
-  writeMin: number;
-  /** Part MIN réservée aux vérifications (défaut 0.20). */
-  verifyMin: number;
-  /** Part MIN réservée à la récupération (défaut 0.10). */
-  recoveryMin: number;
-}
-
-export const DEFAULT_PHASE_ALLOCATION: PhaseAllocation = {
-  discoveryMax: 0.3,
-  planMax: 0.1,
-  writeMin: 0.3,
-  verifyMin: 0.2,
-  recoveryMin: 0.1,
-};
-
-/**
- * Contraintes dures de la boucle. Sans elles, un agent pourrait boucler
- * indéfiniment ou consommer un budget LLM illimité.
+ * Budget de mission en VALEURS ABSOLUES — source de vérité.
+ *
+ * Contrairement à un simple plafond global, chaque phase a son propre quota
+ * d'appels d'outils. Les réserves d'écriture et de vérification NE PEUVENT PAS
+ * être consommées par l'exploration : c'est ce qui garantit qu'après la
+ * découverte, l'agent a toujours de quoi écrire ET vérifier.
+ *
+ * Répartition par défaut (total 30) :
+ *   discovery 8 · plan 3 · write 9 · verify 6 · recovery 4
+ *
+ * Les éventuelles fractions (affichage, heuristiques) sont DÉRIVÉES de ces
+ * absolus, jamais l'inverse.
  */
 export interface AgentBudget {
-  /** Nombre maximum d'itérations de la boucle (défaut 20). */
+  /** Nombre maximum d'itérations de la boucle. */
   maxIterations: number;
-  /** Nombre maximum d'appels d'outils cumulés. */
+  /** Budget total d'appels d'outils (= somme des quotas de phase). */
   maxToolCalls: number;
-  /** Nombre maximum d'appels de LECTURE (search/read/analyze). */
-  maxReadCalls: number;
+  /** Quota d'appels de LECTURE / exploration (discovery). */
+  maxRead: number;
+  /** Quota d'appels de (re)planification. */
+  maxPlan: number;
+  /** Quota d'appels d'ÉCRITURE (réservé, non consommable par l'exploration). */
+  maxWrite: number;
+  /** Quota d'appels de VÉRIFICATION (réservé). */
+  maxVerify: number;
+  /** Quota d'appels de RÉCUPÉRATION / correction (réservé). */
+  maxRecovery: number;
   /** Nombre maximum de fichiers lus distincts. */
   maxFilesRead: number;
   /** Temps d'exécution maximum en ms (mur temporel). */
   maxExecutionTimeMs: number;
-  /** Nombre maximum de tentatives de récupération après échec, par étape. */
-  maxRetries: number;
   /**
    * Coût maximum estimé (unité abstraite alignée sur les tokens/1000).
    * `Infinity` désactive la limite de coût.
    */
   maxCost: number;
-  /** Répartition du budget d'outils par phase (règle d'arrêt intelligente). */
-  phases: PhaseAllocation;
 }
 
+/**
+ * Budget par défaut. Les cinq quotas de phase sont la SOURCE DE VÉRITÉ ;
+ * `maxToolCalls` en est la somme (30).
+ */
 export const DEFAULT_AGENT_BUDGET: AgentBudget = {
   maxIterations: 20,
-  maxToolCalls: 30,
-  maxReadCalls: 18, // borne dure ; la phase discovery la plafonne aussi à 30 %
+  maxRead: 8,
+  maxPlan: 3,
+  maxWrite: 9,
+  maxVerify: 6,
+  maxRecovery: 4,
+  maxToolCalls: 8 + 3 + 9 + 6 + 4, // = 30 (dérivé de la somme des phases)
   maxFilesRead: 20,
   maxExecutionTimeMs: 5 * 60_000, // 5 minutes
-  maxRetries: 3,
   maxCost: Infinity,
-  phases: DEFAULT_PHASE_ALLOCATION,
 };
+
+/** Recalcule `maxToolCalls` comme somme des quotas de phase (invariant). */
+export function normalizeBudget(budget: AgentBudget): AgentBudget {
+  const total = budget.maxRead + budget.maxPlan + budget.maxWrite + budget.maxVerify + budget.maxRecovery;
+  return { ...budget, maxToolCalls: total };
+}
+
+/** Réserve d'appels garantie aux actions critiques (write + verify + recovery). */
+export function criticalReserve(budget: AgentBudget): number {
+  return budget.maxWrite + budget.maxVerify + budget.maxRecovery;
+}
+
+/**
+ * Fractions DÉRIVÉES des absolus (pour affichage / diagnostics uniquement).
+ * Ne jamais utiliser comme source de vérité.
+ */
+export function derivedPhaseFractions(budget: AgentBudget): {
+  discovery: number; plan: number; write: number; verify: number; recovery: number;
+} {
+  const total = budget.maxToolCalls || 1;
+  return {
+    discovery: budget.maxRead / total,
+    plan: budget.maxPlan / total,
+    write: budget.maxWrite / total,
+    verify: budget.maxVerify / total,
+    recovery: budget.maxRecovery / total,
+  };
+}
 
 /** Classe un appel d'outil par nature, pour la comptabilité séparée. */
 export type ToolKind = "read" | "write" | "verify" | "other";
@@ -125,11 +147,13 @@ export type ToolKind = "read" | "write" | "verify" | "other";
  */
 export interface BudgetUsage {
   iterations: number;
-  /** Total d'appels d'outils (= readCalls + writeCalls + verifyCalls + otherCalls). */
+  /** Total d'appels d'outils (somme des compteurs par nature). */
   toolCalls: number;
   readCalls: number;
   writeCalls: number;
   verifyCalls: number;
+  /** Appels de correction consommés dans la phase recovery. */
+  recoveryCalls: number;
   otherCalls: number;
   /** Fichiers distincts lus. */
   filesRead: number;
@@ -148,6 +172,7 @@ export function emptyBudgetUsage(): BudgetUsage {
     readCalls: 0,
     writeCalls: 0,
     verifyCalls: 0,
+    recoveryCalls: 0,
     otherCalls: 0,
     filesRead: 0,
     filesModified: 0,
@@ -257,6 +282,8 @@ export interface AgentError {
   message: string;
   /** Nom de l'outil en cause, le cas échéant. */
   tool?: string;
+  /** Fichier concerné (pilote la politique de réparation par fichier). */
+  file?: string;
   /** Erreur d'origine (non sérialisée). */
   cause?: unknown;
 }

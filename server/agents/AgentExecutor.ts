@@ -22,6 +22,7 @@ import { AgentContextResolver } from "./AgentContextResolver.js";
 import { AgentEvidenceEvaluator } from "./AgentEvidenceEvaluator.js";
 import { DelegationDispatcher } from "./DelegationDispatcher.js";
 import type { ToolExecutionState } from "./AgentExecutionTypes.js";
+import type { AgentTaskRunner } from "./AgentTaskRunner.js";
 import { createLogger } from "../utils/logger.js";
 import { WorkspaceState, type VerificationRecord, type VerificationIssue } from "./WorkspaceState.js";
 import { AgentRepairLoop } from "./AgentRepairLoop.js";
@@ -95,7 +96,7 @@ export const EXECUTABLE_AGENT_TOOLS = new Set([
   "agent_execute",
 ]);
 
-export class AgentExecutor {
+export class AgentExecutor implements AgentTaskRunner {
   private skillHandler: SkillHandler | null = null;
   private promptBuilder = new PromptBuilder();
   private fileWriter: GeneratedFileWriter;
@@ -207,6 +208,16 @@ export class AgentExecutor {
   setSkillHandler(handler: SkillHandler): void {
     this.skillHandler = handler;
     this.fileWriter.setSkillHandler(handler);
+  }
+
+  /**
+   * Exécute un outil isolé via le skillHandler configuré (implémentation de
+   * `AgentTaskRunner.runTool`). Permet à la boucle autonome de relancer une
+   * vérification sans accéder au handler privé.
+   */
+  async runTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+    if (!this.skillHandler) throw new Error("SkillHandler non initialisé");
+    return this.skillHandler(name, args);
   }
 
   /** Retourne le nombre de tâches en cours pour un rôle */

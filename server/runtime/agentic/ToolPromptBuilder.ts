@@ -60,22 +60,25 @@ export function buildToolSection(tools: ToolDeclaration[]): string {
 /**
  * Résumé compact du budget restant + phase courante, pour que le modèle
  * s'auto-régule et respecte la règle d'arrêt (pas 80 % d'exploration).
+ * Les quotas affichés sont ABSOLUS par phase (source de vérité).
  */
 export function buildBudgetSection(budget: AgentBudget, usage: BudgetUsage, phase?: string): string {
   const cost = budget.maxCost === Infinity ? "∞" : String(budget.maxCost);
-  const discoveryCap = Math.max(1, Math.floor(budget.maxToolCalls * budget.phases.discoveryMax));
   const lines = [
-    "BUDGET RESTANT (comptabilité séparée) :",
+    "BUDGET DE MISSION (quotas absolus par phase, réserves étanches) :",
     phase ? `- phase courante: ${phase.toUpperCase()}` : "",
     `- itérations: ${usage.iterations}/${budget.maxIterations}`,
-    `- appels d'outils: ${usage.toolCalls}/${budget.maxToolCalls}`,
-    `  · lecture: ${usage.readCalls} (max exploration ${discoveryCap})`,
-    `  · écriture: ${usage.writeCalls} | vérif: ${usage.verifyCalls}`,
+    `- total outils: ${usage.toolCalls}/${budget.maxToolCalls}`,
+    `  · exploration: ${usage.readCalls}/${budget.maxRead}`,
+    `  · écriture (réservé): ${usage.writeCalls}/${budget.maxWrite}`,
+    `  · vérification (réservé): ${usage.verifyCalls}/${budget.maxVerify}`,
+    `  · récupération (réservé): ${usage.recoveryCalls}/${budget.maxRecovery}`,
     `- fichiers lus: ${usage.filesRead}/${budget.maxFilesRead} | modifiés: ${usage.filesModified}`,
     `- coût estimé: ${Math.round(usage.cost)}/${cost}`,
     "",
-    "RÈGLE D'ARRÊT : n'explore pas au-delà du quota de lecture. Dès que tu as identifié",
-    "les fichiers et erreurs, PASSE À L'ACTION (écriture), puis VÉRIFIE (verify_typecheck).",
+    "RÈGLE D'ARRÊT : les appels d'écriture et de vérification sont RÉSERVÉS et ne peuvent",
+    "pas être consommés par l'exploration. Dès le quota d'exploration atteint, PASSE À",
+    "L'ACTION (écriture), puis VÉRIFIE (verify_file / verify_typecheck).",
   ].filter(Boolean);
   return lines.join("\n");
 }

@@ -22,7 +22,7 @@
  *   - Deux itérations consécutives produisent le même résultat (détection de boucle)
  */
 import type { AgentTask, TaskResult } from "./types.js";
-import { AgentExecutor } from "./AgentExecutor.js";
+import type { AgentTaskRunner } from "./AgentTaskRunner.js";
 import { getAgentDefinitionOrThrow } from "./roles.js";
 import { createLogger } from "../utils/logger.js";
 
@@ -92,7 +92,7 @@ const MAX_AUTONOMOUS_ATTEMPTS = MAX_ATTEMPTS_PER_APPROACH * MAX_APPROACHES;
 
 export class AutonomousLoop {
   constructor(
-    private readonly executor: AgentExecutor,
+    private readonly executor: AgentTaskRunner,
     private readonly config: LoopConfig = DEFAULT_CONFIG
   ) {}
 
@@ -310,7 +310,8 @@ export class AutonomousLoop {
 
   private async verifyFile(filePath: string): Promise<string | null> {
     try {
-      const result = await (this.executor as any).skillHandler?.("verify_file", { path: filePath });
+      if (!this.executor.runTool) return null; // moteur sans exécution d'outil isolé
+      const result = (await this.executor.runTool("verify_file", { path: filePath })) as any;
       if (!result || result.ok === true || result.status === "success") return null;
       const issues = Array.isArray(result.allIssues)
         ? result.allIssues.slice(0, 10).map((issue: any) => `${issue.file ?? "global"}${issue.line ? `:${issue.line}` : ""} — ${issue.message ?? "Erreur"}`)
