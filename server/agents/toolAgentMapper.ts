@@ -10,6 +10,7 @@
 
 import { getAgentDefinition, listAgentDefinitions } from './roles.js';
 import type { AgentRole } from './types.js';
+import type { ToolAttribution } from '../runtime/types.js';
 
 /**
  * Rôle neutre pour les outils exécutables non rattachés à un agent spécialisé.
@@ -35,6 +36,55 @@ let toolToAgentsCache: Map<string, AgentRole[]> = new Map();
  * Chaque outil est associé au premier rôle d'agent qui le supporte
  */
 let toolToPrimaryAgentCache: Map<string, AgentRole> = new Map();
+
+/**
+ * Attribution explicite déclarée par le ToolRegistry (source de vérité).
+ * Renseignée via `applyToolRegistryAttribution()`. Quand un outil y figure,
+ * son attribution PRIME sur le mapping dérivé des capabilities de rôle.
+ *
+ * - `preferred` : rôle principal affiché (télémétrie/audit).
+ * - `allowed`   : rôles autorisés (superset du principal).
+ */
+let toolAttributionCache: Map<string, { preferred: AgentRole; allowed: AgentRole[] }> = new Map();
+
+/**
+ * Forme minimale d'une définition d'outil consommée par le mapper.
+ * Structurellement compatible avec `ToolDefinition` (server/runtime/types.ts),
+ * de sorte que `runtime.tools.getDefinitions()` soit accepté directement.
+ */
+export interface ToolAttributionInput {
+  declaration: { name: string };
+  attribution?: ToolAttribution;
+}
+
+/**
+ * Enregistre l'attribution explicite portée par les définitions du ToolRegistry.
+ *
+ * Le ToolRegistry devient ainsi la source unique de vérité pour l'attribution :
+ * tout outil qui déclare `attribution.preferredAgent` (ou un premier
+ * `allowedAgents`) sera rattaché à ce rôle, indépendamment des capabilities
+ * déclarées sur les rôles. Les outils sans attribution conservent le
+ * comportement historique (mapping par capability puis rôle neutre).
+ *
+ * Idempotent : recalcule intégralement le cache d'attribution à chaque appel.
+ * À appeler après le démarrage du runtime (tous les tools enregistrés).
+ *
+ * @param definitions - Définitions d'outils (typiquement `runtime.tools.getDefinitions()`).
+ */
+export function applyToolRegistryAttribution(definitions: ToolAttributionInput[]): void {
+  toolAttributionCache = new Map();
+  for (const def of definitions) {
+    const attr = def.attribution;
+    if (!attr) continue;
+    const allowed = (attr.allowedAgents ?? []).filter(Boolean) as AgentRole[];
+    const preferred = (attr.preferredAgent ?? allowed[0]) as AgentRole | undefined;
+    if (!preferred) continue;
+    toolAttributionCache.set(def.declaration.name, {
+      preferred,
+      allowed: allowed.length > 0 ? allowed : [preferred],
+    });
+  }
+}
 
 /**
  * Indique si le cache a été initialisé
@@ -205,6 +255,13 @@ export function getAgentsForTool(tool: string): AgentRole[] {
     initializeToolAgentMapper();
   }
   
+  // Priorité 1 : attribution explicite du ToolRegistry (source de vérité).
+  const explicit = toolAttributionCache.get(tool);
+  if (explicit) {
+    return [...explicit.allowed];
+  }
+  
+  // Priorité 2 : mapping dérivé des capabilities de rôle.
   return toolToAgentsCache.get(tool) || [];
 }
 
@@ -220,7 +277,24 @@ export function getPrimaryAgentForTool(tool: string): AgentRole {
     initializeToolAgentMapper();
   }
   
+  // Priorité 1 : attribution explicite du ToolRegistry (source de vérité).
+  const explicit = toolAttributionCache.get(tool);
+  if (explicit) {
+    return explicit.preferred;
+  }
+  
+  // Priorité 2 : mapping dérivé des capabilities, puis rôle neutre.
   return toolToPrimaryAgentCache.get(tool) || UNATTRIBUTED_ROLE;
+}
+
+/**
+ * Retourne la liste des outils portant une attribution explicite via le
+ * ToolRegistry (renseignée par `applyToolRegistryAttribution`). Utilisé par
+ * l'endpoint de mapping pour exposer aussi les outils attribués qui ne sont
+ * déclarés comme capability d'aucun rôle.
+ */
+export function getExplicitlyAttributedTools(): string[] {
+  return [...toolAttributionCache.keys()];
 }
 
 /**

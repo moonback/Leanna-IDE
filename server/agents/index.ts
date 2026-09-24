@@ -72,6 +72,9 @@ export {
   getAllToolCategories,
   getToolsForAgent,
   getRecommendedRolesForCategory,
+  applyToolRegistryAttribution,
+  getExplicitlyAttributedTools,
+  UNATTRIBUTED_ROLE,
 } from "./toolAgentMapper.js";
 export {
   agentRoleSchema,

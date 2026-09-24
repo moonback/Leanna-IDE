@@ -13,6 +13,7 @@ import {
   getPrimaryAgentForTool,
   getAllToolCategories,
   getToolsForAgent,
+  getExplicitlyAttributedTools,
 } from '../agents/index.js';
 import { AgentPersistence } from '../agents/AgentPersistence.js';
 import { agentEventStream } from '../agents/AgentEventStream.js';
@@ -462,6 +463,16 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
         }
       }
       
+      // Inclure aussi les outils portant une attribution explicite du
+      // ToolRegistry (source de vérité), même s'ils ne sont capability
+      // d'aucun rôle. getPrimaryAgentForTool applique la priorité attribution.
+      for (const tool of getExplicitlyAttributedTools()) {
+        if (!allTools.has(tool)) {
+          allTools.add(tool);
+        }
+        toolMapping[tool] = getPrimaryAgentForTool(tool);
+      }
+      
       return res.json({
         success: true,
         mapping: toolMapping,
@@ -495,6 +506,13 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
             mapping[tool] = getPrimaryAgentForTool(tool);
           }
         }
+      }
+      
+      // Outils à attribution explicite (ToolRegistry) : priment et sont
+      // exposés même sans rôle capability correspondant.
+      for (const tool of getExplicitlyAttributedTools()) {
+        allTools.add(tool);
+        mapping[tool] = getPrimaryAgentForTool(tool);
       }
       
       return res.json({

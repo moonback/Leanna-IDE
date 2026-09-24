@@ -126,6 +126,17 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   // 6. Démarrer le runtime
   await runtime.start();
 
+  // 6b. Alimenter le mapper d'attribution à partir du ToolRegistry (source de
+  // vérité). Les outils qui déclarent `attribution` priment sur le mapping
+  // dérivé des capabilities de rôle. Import dynamique pour éviter le couplage
+  // server/runtime → server/agents au chargement du module.
+  try {
+    const { applyToolRegistryAttribution } = await import("../agents/toolAgentMapper.js");
+    applyToolRegistryAttribution(runtime.tools.getDefinitions());
+  } catch (err) {
+    console.error("[Bootstrap] applyToolRegistryAttribution échec:", err);
+  }
+
   // 7. Callback post-init
   if (config.onReady) {
     await config.onReady(runtime, skillManager);

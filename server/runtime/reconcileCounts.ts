@@ -17,6 +17,7 @@
 
 import type { AgentRuntime } from "./AgentRuntime.js";
 import { listAgentDefinitions } from "../agents/roles.js";
+import { getExplicitlyAttributedTools } from "../agents/toolAgentMapper.js";
 import { defaultAgents } from "./agents/index.js";
 
 export interface ReconciliationReport {
@@ -66,9 +67,12 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
     .filter((role) => !runtimeAgentIds.has(role))
     .sort();
 
-  // Asymétrie 3 : outils exécutables non attribués à un rôle dans le mapping.
+  // Asymétrie 3 : outils exécutables non attribués à un rôle.
+  // Un outil est attribué s'il est soit déclaré comme capability d'un rôle,
+  // soit porteur d'une attribution explicite via le ToolRegistry (phase B).
+  const explicitlyAttributed = new Set(getExplicitlyAttributedTools());
   const unmappedExecutableTools = [...executableToolNames].filter(
-    (tool) => !mappedCapabilities.has(tool)
+    (tool) => !mappedCapabilities.has(tool) && !explicitlyAttributed.has(tool)
   ).length;
 
   const report: ReconciliationReport = {
