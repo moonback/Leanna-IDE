@@ -26,6 +26,12 @@ export { translatorAgent } from "./translator.agent";
 export { summarizerAgent } from "./summarizer.agent";
 export { plannerAgent } from "./planner.agent";
 
+export { engineeringAgents } from "./engineering.agents.js";
+export {
+  setAgenticRuntimeProvider,
+  hasAgenticRuntimeProvider,
+} from "./agenticBridge.js";
+
 import type { AgentPlugin } from "../AgentRuntime.js";
 import { writerAgent } from "./writer.agent";
 import { formatterAgent } from "./formatter.agent";
@@ -34,12 +40,13 @@ import { proofreaderAgent } from "./proofreader.agent";
 import { translatorAgent } from "./translator.agent";
 import { summarizerAgent } from "./summarizer.agent";
 import { plannerAgent } from "./planner.agent";
+import { engineeringAgents } from "./engineering.agents.js";
 
 /**
- * Tous les agents par défaut — spécialisés rédaction de documents.
- * Le runtime les enregistre tous au démarrage.
+ * Agents de rédaction — exécutés par l'exécuteur LLM par défaut de defineAgent
+ * (un seul appel modèle, adapté à la production de documents).
  */
-export const defaultAgents: AgentPlugin[] = [
+const writingAgents: AgentPlugin[] = [
   writerAgent,
   formatterAgent,
   researcherAgent,
@@ -47,4 +54,18 @@ export const defaultAgents: AgentPlugin[] = [
   translatorAgent,
   summarizerAgent,
   plannerAgent,
+];
+
+/**
+ * Tous les agents par défaut = 7 rédaction + 8 ingénierie = 15.
+ *
+ * Les 8 agents d'ingénierie délèguent leur exécution à la boucle agentique
+ * partagée (plan→act→verify) via le pont `runViaAgentic`, branché au bootstrap
+ * par `setAgenticRuntimeProvider`. Le runtime les enregistre tous au démarrage,
+ * ce qui aligne « agents runtime » sur « agents de délégation » (15 = 15) et
+ * fait disparaître le warning `delegationOnlyRoles`.
+ */
+export const defaultAgents: AgentPlugin[] = [
+  ...writingAgents,
+  ...engineeringAgents,
 ];

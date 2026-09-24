@@ -141,8 +141,9 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
 
   if (report.categoryAttributedTools > 0) {
     console.log(
-      `[Reconcile] ℹ️ ${report.categoryAttributedTools} outil(s) attribué(s) par heuristique de catégorie ` +
-      `(attribution probable, pas certaine — à confirmer via une attribution explicite si besoin).`
+      `[Reconcile] ℹ️ ${report.categoryAttributedTools} outil(s) attribué(s) par catégorie sémantique ` +
+      `→ ENSEMBLE d'agents (affiché « Plusieurs agents », jamais un propriétaire unique). ` +
+      `Précisable via une attribution explicite (ToolRegistry) au besoin.`
     );
   }
 

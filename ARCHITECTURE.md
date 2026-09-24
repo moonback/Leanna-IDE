@@ -198,6 +198,10 @@ Domaines d'API montés (voir [API_DOCS.md](API_DOCS.md) pour le détail des endp
 server/runtime/
 ├── bootstrap.ts             # bootstrapRuntimeSync() — point d'entrée unique
 ├── ToolRegistry             # Registre de tous les outils disponibles
+├── reconcileCounts.ts       # Diagnostic démarrage : populations + attribution outils
+├── agents/                  # Plugins AgentRuntime (15 = 7 rédaction + 8 ingénierie)
+│   ├── engineering.agents.ts # 8 rôles ingénierie bridgés à la boucle agentique
+│   └── agenticBridge.ts      # Pont plugin → runtime agentique (provider injecté)
 ├── Observability.ts         # Métriques et événements du runtime
 ├── compat/SkillManagerV2.ts # Adaptateur de compatibilité (migration progressive)
 └── routes/
@@ -264,6 +268,29 @@ L'orchestrateur implémente une boucle **Observe → Decide → Act** par rôle.
 - *Rédaction & documents* : `writer`, `formatter`, `researcher`, `proofreader`, `translator`, `summarizer`, `planner`
 
 Des rôles **dynamiques** supplémentaires peuvent être enregistrés à l'exécution via l'Agent Builder (`POST /api/agent-registration/register`).
+
+#### Deux points d'entrée, une seule boucle d'exécution
+
+Les 15 rôles sont exécutables par **deux chemins** qui convergent vers la **même** boucle agentique `plan → act → verify` :
+
+1. **Orchestrateur** (`delegateTask` / `orchestrate`) → `AgentRuntimeExecutor` → runtime agentique.
+2. **`AgentRuntime.submit()`** → plugin runtime (`server/runtime/agents/`).
+
+Historiquement, seuls les 7 rôles de rédaction étaient des plugins `AgentRuntime` ; les 8 rôles d'ingénierie n'étaient exécutables que via l'orchestrateur (d'où l'ancien écart « 15 rôles / 7 plugins runtime »). Les 8 plugins d'ingénierie (`server/runtime/agents/engineering.agents.ts`) comblent l'écart **sans dupliquer la logique** : leur `execute` délègue à la boucle agentique partagée via le pont `agenticBridge.ts` (`setAgenticRuntimeProvider`, branché une fois au bootstrap). Résultat : **15 rôles de délégation = 15 plugins runtime**, un seul concept d'exécution.
+
+- Les 7 agents de rédaction utilisent l'exécuteur LLM par défaut de `defineAgent` (un appel modèle, adapté aux documents).
+- Les 8 agents d'ingénierie passent par `plan → act → verify` avec budget transactionnel et vérification.
+
+#### Attribution outil → agent (observabilité)
+
+L'UI affiche quel agent est responsable de chaque outil. L'attribution est résolue par une **cascade déterministe** (`server/agents/toolAgentMapper.ts`), du plus fiable au moins précis :
+
+1. **Explicite** — `ToolAttribution` déclarée sur l'outil (source de vérité `ToolRegistry`), plus un socle d'outils sensibles (`security_audit → security`, `run_tests`/`verify_* → tester`, `run_project_command`/`system_execute_command`/`delete_* → coder`, `git_push → coder`). Jamais deviné.
+2. **Capability** — l'outil est déclaré dans les `capabilities` d'un rôle (`roles.ts`).
+3. **Catégorie** — attribution par **ensemble** d'agents via `TOOL_CATEGORIES`. On ne désigne **jamais** un propriétaire unique : l'outil s'affiche « **Plusieurs agents** » (`MULTI_ROLE`), l'ensemble réel restant disponible via `getAgentsForTool()`.
+4. **Non attribué** — rôle neutre `system` (« Exécution système »). Aucun fallback vers un rôle plausible : ne jamais mentir sur l'agent.
+
+Le rapport `reconcileCounts.ts` logue au démarrage les 4 populations distinctes (agents de délégation, agents runtime, outils exécutables, capabilities mappées) et la ventilation réelle de l'attribution (explicite / capability / catégorie / non attribué).
 
 ### Authentification
 

@@ -229,6 +229,14 @@ function cleanup() {
  */
 export const UNATTRIBUTED_ROLE = 'system';
 
+/**
+ * Rôle d'affichage pour une attribution par catégorie (ensemble d'agents).
+ * Doit rester synchronisé avec `MULTI_ROLE` côté serveur
+ * (server/agents/toolAgentMapper.ts). Un outil marqué `multi` est utilisable
+ * par plusieurs agents : on n'en désigne aucun comme propriétaire unique.
+ */
+export const MULTI_ROLE = 'multi';
+
 const ROLE_TO_AGENT_NAME: Record<string, string> = {
   coder:      'Développeur',
   refactor:   'Refactorisation',
@@ -246,6 +254,7 @@ const ROLE_TO_AGENT_NAME: Record<string, string> = {
   summarizer: 'Synthèse',
   planner:    'Planificateur',
   [UNATTRIBUTED_ROLE]: 'Exécution système',
+  [MULTI_ROLE]: 'Plusieurs agents',
 };
 
 // ─── Server sync ─────────────────────────────────────────────────────────────

@@ -21,6 +21,18 @@ import type { ToolAttribution } from '../runtime/types.js';
  */
 export const UNATTRIBUTED_ROLE: AgentRole = 'system';
 
+/**
+ * Rôle d'affichage pour une attribution PAR CATÉGORIE (ensemble d'agents).
+ *
+ * Un outil comme `search_in_files` appartient légitimement à plusieurs agents
+ * (debugger, reviewer, architect, security, tester, refactor). Le désigner
+ * comme un propriétaire unique « probable » serait un mensonge d'observabilité.
+ * On l'affiche donc comme « plusieurs agents » : l'ensemble réel reste
+ * disponible via `getAgentsForTool()`. Doit rester synchronisé avec
+ * `MULTI_ROLE` côté renderer (src/stores/agentActivityStore.ts).
+ */
+export const MULTI_ROLE: AgentRole = 'multi';
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Cache pour le mapping outil → rôle(s)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -360,10 +372,13 @@ export function getPrimaryAgentForTool(tool: string): AgentRole {
     return byCapability;
   }
 
-  // Priorité 3 : attribution sémantique par catégorie (heuristique).
+  // Priorité 3 : attribution sémantique par catégorie (ENSEMBLE d'agents).
+  // On NE choisit PAS un propriétaire unique : l'outil appartient à plusieurs
+  // agents. On renvoie le rôle d'affichage `multi` (« plusieurs agents »),
+  // l'ensemble réel restant accessible via getAgentsForTool().
   const byCategory = getCategoryRolesForTool(tool);
   if (byCategory && byCategory.length > 0) {
-    return byCategory[0];
+    return byCategory.length === 1 ? byCategory[0] : MULTI_ROLE;
   }
 
   // Dernier recours : rôle neutre. On ne ment jamais sur l'agent.

@@ -19,7 +19,7 @@ import { PromptRegistry } from "./PromptRegistry.js";
 import { PermissionPolicy } from "./PermissionPolicy.js";
 import { DryRunController } from "./DryRun.js";
 import { loadPromptTemplates } from "./prompts/loader.js";
-import { defaultAgents } from "./agents/index.js";
+import { defaultAgents, setAgenticRuntimeProvider } from "./agents/index.js";
 import type { RuntimeConfig } from "./types.js";
 import type { LegacySkill } from "./compat/SkillAdapter.js";
 import * as path from "path";
@@ -159,6 +159,11 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   // de sorte que les agents reçoivent réellement leurs outils déclarés.
   const agentic = createAgentRuntime(runtime, { budget: config.agenticBudget });
 
+  // Brancher le pont Runtime-plugin → boucle agentique. Les 8 plugins
+  // d'ingénierie (coder, debugger, …) exécutent alors leurs tâches
+  // AgentRuntime.submit() via la MÊME boucle plan→act→verify.
+  setAgenticRuntimeProvider(agentic);
+
   // Migration : l'orchestrateur exécute désormais les tâches via le runtime
   // agentique (boucle plan→act→verify→recover), plus via l'AgentExecutor legacy.
   agentOrchestrator.enableAgenticRuntime(agentic);
@@ -211,6 +216,9 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
   });
 
   const agentic = createAgentRuntime(runtime, { budget: config.agenticBudget });
+
+  // Brancher le pont Runtime-plugin → boucle agentique (voir version async).
+  setAgenticRuntimeProvider(agentic);
 
   // Brancher l'orchestrateur sur le runtime agentique (import dynamique pour
   // éviter la dépendance circulaire ; best-effort en mode synchrone).
