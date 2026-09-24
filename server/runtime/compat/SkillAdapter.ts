@@ -136,6 +136,18 @@ function inferTimeout(toolName: string): number {
 
 /**
  * Déduit les permissions d'un outil à partir de son nom et de sa catégorie.
+ *
+ * ⚠️ Fallback historique, faillible par conception : l'inférence par mot-clé
+ * ne « voit » pas les effets de bord non nommés (envoi Telegram, clic
+ * navigateur, orchestration multi-agents…). Un skill DEVRAIT toujours déclarer
+ * ses permissions explicitement (`permissions` / `toolPermissions`).
+ *
+ * Point clé de sûreté : quand aucun mot-clé ne matche, on retourne un tableau
+ * VIDE — surtout PAS `["read"]`. C'est ce qui permet aux garde-fous fail-safe
+ * (`DryRunController.hasSideEffect` et `AutonomyPolicy.hasSideEffect`, qui
+ * traitent « aucune permission déclarée » comme un effet de bord potentiel) de
+ * se déclencher. Défaut sur `["read"]` masquerait ces effets de bord aux trois
+ * couches de sécurité simultanément.
  */
 function inferPermissions(toolName: string, skillName: string): ToolDefinition["permissions"] {
   const name = toolName.toLowerCase();

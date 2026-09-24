@@ -4,6 +4,22 @@ import { telegramService } from "../telegram/TelegramService.js";
 
 export const telegramSkill: Skill = {
   name: "telegram",
+  // Permissions déclarées explicitement, appliquées au runtime par le ToolRegistry.
+  // Par défaut réseau (envoi via l'API Telegram) ; les requêtes locales de statut
+  // sont en lecture seule. Sans cette déclaration, l'inférence par nom classerait
+  // à tort les outils d'envoi comme "read" (voir SkillAdapter.inferPermissions).
+  permissions: ["network"],
+  toolPermissions: {
+    telegram_notify: ["network"],
+    telegram_send_message: ["network"],
+    telegram_send_photo: ["network"],
+    telegram_send_document: ["network"],
+    telegram_send_from_workspace: ["read", "network"],
+    telegram_broadcast: ["network"],
+    telegram_get_status: ["read"],
+    telegram_list_users: ["read"],
+    telegram_get_chat_info: ["network"],
+  },
   declarations: [
     {
       name: "telegram_notify",
