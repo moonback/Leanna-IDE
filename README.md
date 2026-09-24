@@ -215,6 +215,10 @@ Documentation détaillée : [`docs/AGENTIC_RUNTIME.md`](docs/AGENTIC_RUNTIME.md)
 
 ## Runtime autonome 24/7
 
+<p align="center">
+  <img src="assets\images\header-runtime.png" alt="Leanna Runtime Agentique" width="100%" />
+</p>
+
 Leanna possède un runtime d'autonomie **événementiel**. Il ne repose pas sur une boucle qui interroge constamment un modèle.
 
 Le runtime comprend notamment :
