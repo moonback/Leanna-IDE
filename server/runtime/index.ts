@@ -73,6 +73,26 @@ export { buildSystemPrompt } from "./prompts/SystemPromptBuilder.js";
 export { bootstrapRuntime, bootstrapRuntimeSync } from "./bootstrap.js";
 export type { BootstrapConfig, BootstrapResult } from "./bootstrap.js";
 
+// Agentic runtime — la vraie boucle OBSERVE→PLAN→ACT→VERIFY→RECOVER→COMPLETE
+export { AgenticRuntime, createAgentRuntime, DEFAULT_AGENT_BUDGET } from "./agentic/index.js";
+export type {
+  AgenticRuntimeDeps,
+  AgentBudget,
+  AgentTask as AgenticTask,
+  AgentResult as AgenticResult,
+  AgentOutcome,
+  Plan,
+  PlanStep,
+  Observation,
+  ToolInvocation,
+  ToolCallOutcome,
+  Verification,
+  Recovery,
+  FinalResult,
+  BudgetUsage,
+  IAgentRuntime,
+} from "./agentic/index.js";
+
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 import { AgentRuntime } from "./AgentRuntime.js";

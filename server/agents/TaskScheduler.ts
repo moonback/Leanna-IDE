@@ -4,19 +4,32 @@
  * Responsabilité unique : exécuter un plan d'orchestration en respectant
  * les dépendances entre tâches et la parallélisation.
  */
-import type { OrchestrationPlan, TaskResult } from "./types.js";
+import type { AgentTask, OrchestrationPlan, TaskResult } from "./types.js";
 import { getAgentDefinition } from "./roles.js";
-import { AgentExecutor } from "./AgentExecutor.js";
 import { ProgressNotifier } from "./ProgressNotifier.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("TaskScheduler");
 
+/**
+ * Moteur d'exécution d'une tâche. Implémenté par `AgentExecutor` (legacy) et
+ * par `AgentRuntimeExecutor` (runtime agentique). Le scheduler dépend de cette
+ * interface, pas d'une implémentation concrète — ce qui permet la migration.
+ */
+export interface TaskRunner {
+  execute(task: AgentTask): Promise<void>;
+}
+
 export class TaskScheduler {
   constructor(
-    private executor: AgentExecutor,
+    private executor: TaskRunner,
     private notifier?: ProgressNotifier
   ) {}
+
+  /** Remplace le moteur d'exécution (bascule vers le runtime agentique). */
+  setRunner(runner: TaskRunner): void {
+    this.executor = runner;
+  }
 
   /**
    * Exécute un plan d'orchestration complet.

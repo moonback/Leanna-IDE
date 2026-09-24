@@ -9,11 +9,11 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   BookOpen, Plus, Trash2, Clock, FileText, MessageSquare,
-  Search, SortAsc, SortDesc, ArrowRight, Github, LayoutGrid,
+  Search, SortAsc, SortDesc, ArrowRight, Github, LayoutGrid, X,
 } from 'lucide-react';
-import { useToast } from '../ui/Toast.js';
 import { CreateNotebookModal } from './CreateNotebookModal.js';
 import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModal.js';
+import { useToast } from '../ui/Toast.js';
 
 interface NotebookSummary {
   id: string;
@@ -381,26 +381,34 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             <AnimatePresence initial={false}>
               {filteredNotebooks.map((nb, i) => (
-                <motion.div
-                  key={nb.id}
-                  layout
-                  initial={{ opacity: 0, y: 14, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                  whileHover={prefersReducedMotion ? undefined : { y: -4, scale: 1.008 }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{
-                    ...(prefersReducedMotion ? { duration: 0.1 } : SPRING_MOMENTUM),
-                    delay: i < 12 ? i * 0.03 : 0,
-                  }}
-                  onClick={() => onSelectNotebook(nb.id)}
-                  className="group cursor-pointer rounded-xl border overflow-hidden flex flex-col relative transition-colors"
-                  style={{
-                    backgroundColor: 'var(--notebook-card-bg)',
-                    borderColor: 'var(--notebook-border)',
-                    boxShadow: 'var(--shadow-xs, 0 1px 2px rgba(0,0,0,0.04))',
-                  }}
-                >
+                  <motion.div
+                    key={nb.id}
+                    layout
+                    initial={{ opacity: 0, y: 14, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                    whileHover={prefersReducedMotion ? undefined : { y: -4, scale: 1.008 }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{
+                      ...(prefersReducedMotion ? { duration: 0.1 } : SPRING_MOMENTUM),
+                      delay: i < 12 ? i * 0.03 : 0,
+                    }}
+                    onClick={() => onSelectNotebook(nb.id)}
+                    className="group cursor-pointer rounded-xl border border-transparent overflow-hidden flex flex-col relative transition-all duration-200"
+                    style={{
+                      backgroundColor: 'var(--notebook-card-bg)',
+                      borderColor: 'var(--notebook-border)',
+                      boxShadow: 'var(--shadow-xs, 0 1px 2px rgba(0,0,0,0.04))',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = nb.color || 'var(--accent-primary)';
+                      e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.08), 0 0 0 1px var(--notebook-border)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--notebook-border)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-xs, 0 1px 2px rgba(0,0,0,0.04))';
+                    }}
+                  >
                   <div
                     className="h-1 w-full flex-shrink-0"
                     style={{ backgroundColor: nb.color || 'var(--accent-primary)' }}
@@ -409,30 +417,27 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                   <div className="p-4 flex flex-col gap-4 flex-1">
                     {/* Card header */}
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {/* Emoji icon with colored background */}
                         <div
-                            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-lg leading-none"
+                            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg leading-none transition-colors duration-200"
                           style={{
-                            backgroundColor: `${nb.color || 'var(--accent-primary)'}1a`,
-                            border: `1px solid ${nb.color || 'var(--accent-primary)'}22`,
+                            backgroundColor: 'var(--notebook-surface-muted)',
+                            border: `1px solid var(--notebook-border)`,
                           }}
                         >
                           {nb.icon || '📓'}
                         </div>
                         <div className="min-w-0">
                           <h3
-                            className="text-sm font-semibold truncate notebook-body"
+                            className="text-sm font-semibold truncate notebook-body transition-colors duration-200 group-hover:text-[var(--notebook-accent)]"
                             style={{ color: 'var(--text-primary)' }}
                           >
                             {nb.title}
                           </h3>
-                          <p className="text-xs mt-0.5 flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}>
+                          <p className="text-xs mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
                             <Clock className="w-3 h-3 flex-shrink-0" />
                             {timeAgo(nb.updatedAt)}
                           </p>
                         </div>
-                      </div>
 
                       {/* Delete button */}
                       <motion.button
@@ -455,27 +460,28 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                     )}
 
                     {/* Footer stats + open cta */}
-                    <div className="flex items-center gap-2 mt-auto pt-1">
+                    {/* Footer stats + open cta */}
+                    <div className="flex items-center gap-4 mt-auto pt-4 border-t" style={{ borderColor: 'var(--notebook-surface-muted)' }}>
                       <span
-                        className="flex items-center gap-1.5 text-xs"
+                        className="flex items-center gap-1.5 text-xs font-medium"
                         style={{ color: 'var(--text-muted)' }}
                       >
-                        <FileText className="w-3 h-3 flex-shrink-0" />
-                        {nb.sourcesCount} source{nb.sourcesCount !== 1 ? 's' : ''}
+                        <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
+                        {nb.sourcesCount}
                       </span>
                       <span
-                        className="flex items-center gap-1.5 text-xs"
+                        className="flex items-center gap-1.5 text-xs font-medium"
                         style={{ color: 'var(--text-muted)' }}
                       >
-                        <MessageSquare className="w-3 h-3 flex-shrink-0" />
-                        {nb.notesCount} note{nb.notesCount !== 1 ? 's' : ''}
+                        <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
+                        {nb.notesCount}
                       </span>
                       <span
-                        className="ml-auto flex items-center gap-1 text-xs font-medium opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200"
-                        style={{ color: 'var(--accent-primary)' }}
+                        className="ml-auto flex items-center gap-1.5 text-xs font-semibold opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 -translate-x-1"
+                        style={{ color: 'var(--notebook-accent)' }}
                       >
                         Ouvrir
-                        <ArrowRight className="w-3 h-3" />
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </span>
                     </div>
                   </div>

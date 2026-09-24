@@ -8,7 +8,9 @@ import type {
   OrchestrationPlan,
 } from "./types.js";
 import { AgentExecutor, SkillHandler } from "./AgentExecutor.js";
-import { TaskScheduler } from "./TaskScheduler.js";
+import { AgentRuntimeExecutor } from "./AgentRuntimeExecutor.js";
+import { TaskScheduler, type TaskRunner } from "./TaskScheduler.js";
+import type { AgentRuntime as AgenticRuntime } from "../runtime/agentic/AgentRuntime.js";
 import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier.js";
 import { AgentRegistry, agentRegistry } from "./AgentRegistry.js";
 import { agentMessageBus } from "./AgentMessageBus.js";
@@ -43,8 +45,19 @@ export class AgentOrchestrator {
 
   // Composants spécialisés
   private notifier = new ProgressNotifier();
-  private executor = new AgentExecutor(this.notifier);
+  private legacyExecutor = new AgentExecutor(this.notifier);
+  /**
+   * Moteur d'exécution ACTIF. Par défaut l'exécuteur legacy, remplacé par le
+   * runtime agentique dès que `enableAgenticRuntime()` est appelé au bootstrap.
+   */
+  private executor: TaskRunner & {
+    getRunningCount(role: string): number;
+    cancel(taskId: string): boolean;
+    isRunning?(taskId: string): boolean;
+  } = this.legacyExecutor;
   private scheduler = new TaskScheduler(this.executor, this.notifier);
+  /** Vrai une fois le runtime agentique branché (plus de fallback silencieux). */
+  private agenticEnabled = false;
 
   // Registry des agents autonomes (partagé via singleton)
   private registry: AgentRegistry = agentRegistry;
@@ -56,7 +69,8 @@ export class AgentOrchestrator {
    * Initialise également le registre d'agents autonomes.
    */
   setSkillHandler(handler: SkillHandler): void {
-    this.executor.setSkillHandler(handler);
+    // Le handler alimente l'exécuteur legacy et le registre d'agents autonomes.
+    this.legacyExecutor.setSkillHandler(handler);
 
     // Initialiser le registre d'agents autonomes si ce n'est pas encore fait
     if (!this.registry.isReady) {
@@ -66,6 +80,32 @@ export class AgentOrchestrator {
       // Charger les agents personnalisés après l'initialisation
       initCustomAgents();
     }
+  }
+
+  /**
+   * Bascule l'orchestrateur sur le RUNTIME AGENTIQUE comme moteur d'exécution.
+   *
+   * À partir de cet appel, `delegateTask()` et l'orchestration multi-agents
+   * (`orchestrate()` → scheduler) exécutent les tâches via la vraie boucle
+   * analyse → plan → écriture → vérification → correction, avec budget
+   * transactionnel. L'exécuteur legacy n'est plus utilisé pour les tâches
+   * (il reste seulement pour la flotte d'agents autonomes qui l'appelle
+   * directement).
+   *
+   * Appelé une fois au bootstrap. Après migration, c'est le chemin par défaut :
+   * plus aucun fallback silencieux vers `AgentExecutor` pour `agent_orchestrate`.
+   */
+  enableAgenticRuntime(agentic: AgenticRuntime): void {
+    const runtimeExecutor = new AgentRuntimeExecutor(agentic, this.notifier);
+    this.executor = runtimeExecutor;
+    this.scheduler.setRunner(runtimeExecutor);
+    this.agenticEnabled = true;
+    log.info("🧠 Runtime agentique ACTIVÉ — agent_orchestrate/delegateTask passent par la boucle plan→act→verify");
+  }
+
+  /** Indique si le runtime agentique est le moteur d'exécution actif. */
+  get isAgenticEnabled(): boolean {
+    return this.agenticEnabled;
   }
 
   /** Configure le callback de progression */
