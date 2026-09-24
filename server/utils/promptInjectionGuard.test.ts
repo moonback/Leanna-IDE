@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { scanPromptInjection } from "./promptInjectionGuard.js";
+import { scanPromptInjection, guardUntrustedContent } from "./promptInjectionGuard.js";
 
 test("scanPromptInjection marks benign documents as safe", () => {
   const result = scanPromptInjection("Résumé d'architecture React avec hooks, routes et API Express.");
