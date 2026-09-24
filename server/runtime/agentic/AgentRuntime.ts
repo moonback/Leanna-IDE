@@ -113,17 +113,30 @@ function classifyTool(name: string): ToolKind {
   return "other";
 }
 
+/**
+ * Signature du générateur de texte. En production c'est `generateText`
+ * (Gemini/OpenRouter). Un modèle DÉTERMINISTE peut être injecté pour tester la
+ * chaîne agentique complète sans réseau ni clés API (voir mission-harness).
+ */
+export type GenerateTextFn = typeof generateText;
+
 export interface AgenticRuntimeDeps {
   registry: ToolRegistry;
   events?: EventBus;
   /** Budget par défaut (fusionné avec le budget de la tâche). */
   budget?: Partial<AgentBudget>;
+  /**
+   * Générateur de texte injectable. Défaut : `generateText` (provider réel).
+   * Permet d'injecter un modèle déterministe pour les tests de bout en bout.
+   */
+  model?: GenerateTextFn;
 }
 
 export class AgentRuntime implements IAgentRuntime {
   private readonly registry: ToolRegistry;
   private readonly events?: EventBus;
   private readonly defaultBudget: AgentBudget;
+  private readonly model: GenerateTextFn;
 
   // État par exécution (reconstruit à chaque run pour rester réentrant).
   private session: RunSession | null = null;
@@ -132,6 +145,7 @@ export class AgentRuntime implements IAgentRuntime {
     this.registry = deps.registry;
     this.events = deps.events;
     this.defaultBudget = { ...DEFAULT_AGENT_BUDGET, ...deps.budget };
+    this.model = deps.model ?? generateText;
   }
 
   /**
@@ -773,7 +787,7 @@ export class AgentRuntime implements IAgentRuntime {
     prompt: string,
     systemPrompt?: string
   ): Promise<GenerateTextResult> {
-    return generateText({
+    return this.model({
       prompt,
       systemPrompt: systemPrompt ?? agent.systemPrompt,
       temperature: 0.3,
@@ -920,9 +934,27 @@ export class AgentRuntime implements IAgentRuntime {
     const wroteSomething = session.filesModified.size > 0;
     const anyToolError = session.observations.some((o) => o.toolOutcomes.some((t) => !t.success));
 
-    if (this.budgetExhausted(session) && anyFailedStep) return "blocked";
-    if (anyFailedStep && !wroteSomething) return "failed";
+    // Aucune écriture ni aucun outil exécuté : rien n'a bougé.
     if (!wroteSomething && session.toolsExecuted.length === 0) return "no_change";
+
+    // La VÉRIFICATION hashée est l'arbitre, pas le simple fait d'avoir écrit.
+    // On consulte le WorkspaceState : chaque fichier modifié doit être "verified"
+    // avec un hash courant concordant, sinon la mission n'est pas un succès.
+    const report = session.workspace.completionReport(session.filesModified);
+    const allWritesVerified = wroteSomething && report.passed;
+
+    // Un fichier bloqué par la politique de réparation (no-progress / patch répété)
+    // signale un échec de progression explicite.
+    if (session.blockedFiles.size > 0 && !allWritesVerified) return "failed";
+
+    if (allWritesVerified && !anyFailedStep) return "success";
+
+    // Des écritures existent mais la vérification n'aboutit pas.
+    if (wroteSomething && !allWritesVerified) {
+      return this.budgetExhausted(session) ? "blocked" : "failed";
+    }
+
+    if (anyFailedStep && !wroteSomething) return "failed";
     if (anyFailedStep || anyToolError) return "partial";
     return "success";
   }

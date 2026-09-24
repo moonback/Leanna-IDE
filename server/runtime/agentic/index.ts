@@ -17,7 +17,7 @@ import { AgentRuntime as AgenticRuntime, type AgenticRuntimeDeps } from "./Agent
 import type { AgentBudget } from "./types.js";
 
 export { AgentRuntime as AgenticRuntime } from "./AgentRuntime.js";
-export type { AgenticRuntimeDeps } from "./AgentRuntime.js";
+export type { AgenticRuntimeDeps, GenerateTextFn } from "./AgentRuntime.js";
 export {
   resolveAgentTools,
   buildToolSection,
@@ -53,12 +53,13 @@ export {
  */
 export function createAgentRuntime(
   runtime: DIRuntime,
-  options: { budget?: Partial<AgentBudget> } = {}
+  options: { budget?: Partial<AgentBudget>; model?: import("./AgentRuntime.js").GenerateTextFn } = {}
 ): AgenticRuntime {
   const deps: AgenticRuntimeDeps = {
     registry: runtime.tools,
     events: runtime.events,
     budget: options.budget,
+    model: options.model,
   };
   return new AgenticRuntime(deps);
 }

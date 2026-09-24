@@ -54,27 +54,62 @@ export class AgentRegistry {
     return this.notifier;
   }
 
-  /**
-   * Bascule le moteur d'exécution des agents autonomes vers le runtime
-   * agentique. Doit être appelé AVANT `initialize()` pour que la flotte soit
-   * créée sur le nouveau moteur. Si des agents existent déjà, ils sont
-   * redémarrés sur le nouveau moteur.
-   */
-  setRunner(runner: AgentTaskRunner): void {
-    this.runner = runner;
-    if (this.agents.size > 0) {
-      log.info("🔁 Bascule du moteur d'exécution — redémarrage de la flotte sur le runtime agentique");
-      const roles = [...this.agents.keys()];
-      // Arrêt sans réinitialiser le flag ni les configs mémorisées.
-      for (const agent of this.agents.values()) agent.stop();
-      this.agents.clear();
-      // Recrée chaque agent sur le nouveau moteur, en conservant sa config de boucle.
-      for (const role of roles) {
-        const agent = new AutonomousAgent(role, this.runner, this.bus, this.loopConfigByRole.get(role));
-        this.agents.set(role, agent);
-        agent.start();
-      }
+  /** Nombre de tâches actives (en cours + en file) sur toute la flotte. */
+  private activeWorkCount(): number {
+    let total = 0;
+    for (const agent of this.agents.values()) {
+      const stats = agent.getStats();
+      total += (stats.runningTasks ?? 0) + (stats.queuedTasks ?? 0);
     }
+    return total;
+  }
+
+  /**
+   * Bascule le moteur d'exécution des agents autonomes vers un autre moteur
+   * (typiquement le runtime agentique). Conçu pour le BOOTSTRAP : appelé avant
+   * qu'aucune mission ne tourne, il redéploie la flotte sur le nouveau moteur en
+   * conservant les configs de boucle par rôle.
+   *
+   * GARDE-FOU : si des tâches sont en cours ou en file, la bascule est REFUSÉE
+   * (retourne `false`) au lieu de tuer silencieusement des missions actives.
+   * Utiliser `options.allowRestart = true` pour forcer explicitement (réservé
+   * aux cas maîtrisés). Un vrai swap à chaud (drain → stop → deploy → resume)
+   * est un travail de production ultérieur (`swapRunner`).
+   *
+   * @returns `true` si la bascule a été appliquée, `false` si refusée.
+   */
+  setRunner(runner: AgentTaskRunner, options: { allowRestart?: boolean } = {}): boolean {
+    // Aucun agent démarré encore → simple affectation (chemin bootstrap idéal).
+    if (this.agents.size === 0) {
+      this.runner = runner;
+      return true;
+    }
+
+    const active = this.activeWorkCount();
+    if (active > 0 && options.allowRestart !== true) {
+      log.warn(
+        `⛔ setRunner refusé — ${active} tâche(s) active(s)/en file. ` +
+        `La bascule tuerait des missions en cours. Réessayez à l'arrêt, ou passez allowRestart:true en connaissance de cause.`
+      );
+      return false;
+    }
+
+    this.runner = runner;
+    log.info(
+      `🔁 Bascule du moteur d'exécution — redémarrage de la flotte sur le nouveau moteur` +
+      (active > 0 ? ` (allowRestart forcé, ${active} tâche(s) interrompue(s))` : "")
+    );
+    const roles = [...this.agents.keys()];
+    // Arrêt sans réinitialiser le flag ni les configs mémorisées.
+    for (const agent of this.agents.values()) agent.stop();
+    this.agents.clear();
+    // Recrée chaque agent sur le nouveau moteur, en conservant sa config de boucle.
+    for (const role of roles) {
+      const agent = new AutonomousAgent(role, this.runner, this.bus, this.loopConfigByRole.get(role));
+      this.agents.set(role, agent);
+      agent.start();
+    }
+    return true;
   }
 
   // ─── Initialisation ────────────────────────────────────────────────────────

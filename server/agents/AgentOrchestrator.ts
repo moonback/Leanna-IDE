@@ -101,7 +101,12 @@ export class AgentOrchestrator {
     this.scheduler.setRunner(runtimeExecutor);
     // Phase 5 : la flotte d'agents autonomes partage le même moteur agentique.
     // Le registre redémarre ses agents sur le runtime (voir AgentRegistry.setRunner).
-    this.registry.setRunner(runtimeExecutor);
+    // Au bootstrap aucune mission ne tourne, la bascule est donc acceptée ; si
+    // elle était refusée (tâches actives), on le journalise sans forcer.
+    const swapped = this.registry.setRunner(runtimeExecutor);
+    if (!swapped) {
+      log.warn("⚠️ Flotte autonome non basculée sur le runtime agentique (tâches actives) — reste sur le moteur legacy.");
+    }
     this.agenticEnabled = true;
     log.info("🧠 Runtime agentique ACTIVÉ — orchestrate/delegateTask ET flotte autonome passent par la boucle plan→act→verify");
   }
