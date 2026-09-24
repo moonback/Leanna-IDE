@@ -166,6 +166,10 @@ planner
 
 ## Runtime agentique
 
+<p align="center">
+  <img src="assets\images\header-runtime.png" alt="Leanna Runtime Agentique" width="100%" />
+</p>
+
 Le **runtime agentique** est le moteur d'exécution partagé d'une tâche agent. Il donne
 **réellement** ses outils à un agent (intersection de ses `capabilities` déclarées et du
 `ToolRegistry`) et boucle jusqu'à un résultat vérifié, au lieu d'un simple aller-retour
@@ -214,10 +218,6 @@ Documentation détaillée : [`docs/AGENTIC_RUNTIME.md`](docs/AGENTIC_RUNTIME.md)
 ---
 
 ## Runtime autonome 24/7
-
-<p align="center">
-  <img src="assets\images\header-runtime.png" alt="Leanna Runtime Agentique" width="100%" />
-</p>
 
 Leanna possède un runtime d'autonomie **événementiel**. Il ne repose pas sur une boucle qui interroge constamment un modèle.
 
