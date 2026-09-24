@@ -28,6 +28,7 @@ Le projet cible principalement les développeurs solo et les petites équipes qu
 - [Fonctionnalités](#fonctionnalités)
   - [Agent Brain](#agent-brain)
   - [Agents autonomes](#agents-autonomes)
+  - [Runtime agentique](#runtime-agentique)
   - [Runtime autonome 24/7](#runtime-autonome-247)
   - [Boucle exécutive autonome](#boucle-exécutive-autonome)
   - [Bot Telegram](#bot-telegram)
@@ -160,6 +161,50 @@ planner
           ↓
        reviewer
 ```
+
+---
+
+## Runtime agentique
+
+Le **runtime agentique** est le moteur d'exécution partagé d'une tâche agent. Il donne
+**réellement** ses outils à un agent (intersection de ses `capabilities` déclarées et du
+`ToolRegistry`) et boucle jusqu'à un résultat vérifié, au lieu d'un simple aller-retour
+prompt → réponse.
+
+```text
+Objectif
+   ↓
+PLAN ──► ACT ──► OBSERVE ──► VERIFY ──► (SUCCESS → étape suivante | FAILURE → RECOVER)
+   ▲                                                        │
+   └──────────────── réplanification bornée ◄───────────────┘
+   ↓
+FINALIZE → rapport
+```
+
+### Ce qu'il garantit
+
+- **Outils réellement fournis** — un agent ne peut appeler que les outils qu'il déclare ;
+  chaque appel passe par `ToolRegistry.call()` (permissions, dry-run, timeout, métriques).
+- **Budget de mission par phase** (valeurs absolues, source de vérité) — défaut
+  `lecture 8 · plan 3 · écriture 9 · vérification 6 · correction 4` (total 30). Les quotas
+  d'écriture et de vérification sont **réservés** : l'exploration ne peut jamais les consommer,
+  donc après la découverte l'agent a toujours de quoi écrire ET vérifier.
+- **Écritures transactionnelles** — une écriture réussie est enregistrée et hashée (SHA-256)
+  **immédiatement**, avant tout contrôle de budget. Une limite atteinte plus tard n'annule
+  jamais une modification déjà émise.
+- **Vérification hashée** — chaque fichier écrit est revérifié via `verify_file` ; le
+  `VerificationRecord` (hash avant/après) est conservé dans `WorkspaceState`. L'étape ne passe
+  que si le hash vérifié correspond au contenu courant.
+- **Réparation bornée** — `AgentRepairLoop` décide `retry / replan / stop` en détectant les
+  patchs identiques répétés, l'absence de progrès et les régressions.
+- **Cache de contexte** — les lectures/recherches identiques sont resservies depuis le cache,
+  sans réexécution ni coût de budget.
+
+Tous les chemins d'exécution (`agent_orchestrate`, délégation, scheduler DAG et flotte
+autonome) partagent ce moteur via l'interface `AgentTaskRunner`. L'ancien `AgentExecutor`
+reste disponible derrière la même interface mais n'est plus le moteur principal.
+
+Documentation détaillée : [`docs/AGENTIC_RUNTIME.md`](docs/AGENTIC_RUNTIME.md).
 
 ---
 
@@ -451,6 +496,9 @@ Leanna est organisé en plusieurs couches :
 
 - `AgentBrain` : compréhension et planification dynamique.
 - `AgentOrchestrator` : orchestration et délégation.
+- `AgentRuntime` (agentique) : boucle plan → act → verify → recover, budget de mission et écritures transactionnelles.
+- `AgentTaskRunner` : interface partagée du moteur d'exécution (runtime agentique ou exécuteur legacy).
+- `WorkspaceState` / `AgentRepairLoop` : état de fichiers adressé par contenu (hash) et réparation bornée.
 - `SkillManagerV2` : exécution des skills.
 - `ToolRegistry` : registre et contrôle des outils.
 - `PermissionPolicy` : contrôle des permissions.
@@ -675,6 +723,12 @@ node --import tsx --test server/agents/brain/AgentBrain.test.ts
 # Cohérence des capacités d'agents (détection d'outils fantômes)
 node --import tsx --test server/agents/roleCapabilities.test.ts
 
+# Runtime agentique (budget de mission, écritures transactionnelles, vérification hashée, réparation)
+node --import tsx --test server/runtime/agentic/agentic.test.ts
+
+# Migration du moteur partagé (AgentTaskRunner, flotte autonome)
+node --import tsx --test server/agents/AgentTaskRunner.test.ts
+
 # Module spécifique
 npm test -- server/skills/browser.test.ts
 
@@ -707,6 +761,7 @@ La suite actuelle couvre notamment :
 
 - Agent Brain : scheduler DAG parallèle, validation de plan, réplanification ;
 - cohérence des capacités d'agents (détection d'outils fantômes) ;
+- runtime agentique : budget de mission par phase, écritures transactionnelles, vérification hashée, réparation bornée ;
 - Runtime V2 ;
 - boucle exécutive autonome : priorité déterministe, déduplication, escalade de permission et attente de mission terminale ;
 - apprentissage : propositions disponibles après mission sans auto-application ;
@@ -873,6 +928,7 @@ Vérifiez les limites de tokens et l'injection des notebooks. Si nécessaire, co
 | [`AUTONOMY.md`](AUTONOMY.md) | Runtime autonome 24/7 |
 | [`AUTONOMY_AUDIT.md`](AUTONOMY_AUDIT.md) | Audit historique et limites de l'autonomie |
 | [`docs/AUTONOMOUS_AGENT_AUDIT.md`](docs/AUTONOMOUS_AGENT_AUDIT.md) | Audit actuel de la boucle exécutive autonome, gaps et contrat d'intégration |
+| [`docs/AGENTIC_RUNTIME.md`](docs/AGENTIC_RUNTIME.md) | Runtime agentique : boucle plan→act→verify→recover, budget de mission, écritures transactionnelles |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Architecture technique |
 | [`DB_SCHEMA.md`](DB_SCHEMA.md) | Schéma Supabase |
 | [`GEMINI.md`](GEMINI.md) | Intégration Gemini |

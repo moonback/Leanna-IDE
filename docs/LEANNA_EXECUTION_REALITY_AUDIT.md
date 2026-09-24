@@ -1,5 +1,13 @@
 # Leanna — Audit d'exécution réelle (Real vs Registered)
 
+> **Mise à jour 2026-09-24** — L'écart « outils déclarés mais non fournis » décrit dans cet
+> audit est désormais corrigé par le **runtime agentique**. Voir
+> [`AGENTIC_RUNTIME.md`](AGENTIC_RUNTIME.md). Les chemins d'exécution
+> (`agent_orchestrate`, `delegateTask`, `TaskScheduler`, flotte autonome) passent maintenant
+> par un moteur partagé (`AgentTaskRunner` → `AgentRuntimeExecutor` → runtime agentique) avec
+> budget de mission, écritures transactionnelles et vérification hashée. Les sections
+> ci-dessous reflètent l'état **antérieur** à cette migration (Phases 1–5).
+
 Date : 2026-09-23. Objectif : distinguer ce que Leanna **exécute réellement de bout en bout
 au runtime** de ce qui est seulement **enregistré, initialisé ou déclaré** dans
 l'architecture. Chaque verdict est prouvé par un appelant concret (fichier:ligne) tracé dans
