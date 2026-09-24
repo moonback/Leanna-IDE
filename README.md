@@ -13,7 +13,7 @@ Leanna combine un IDE Monaco, un terminal interactif, des agents autonomes, un *
 Le projet cible principalement les développeurs solo et les petites équipes qui souhaitent conserver leur code et leur environnement d'exécution dans leur propre workspace.
 
 ![Build](https://img.shields.io/badge/build-passing-brightgreen)
-![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.2.0-blue)
 ![License](https://img.shields.io/badge/license-BUSL--1.1-orange)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-green)
 ![Electron](https://img.shields.io/badge/electron-43-blueviolet)

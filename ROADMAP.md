@@ -1,6 +1,6 @@
 # Roadmap — Leanna AI Operating System
 
-> Dernière refonte : Septembre 2026 · Version courante : **1.1.0** · Licence BUSL 1.1
+> Dernière refonte : Septembre 2026 · Version courante : **1.2.0** · Licence BUSL 1.1
 >
 > Cette roadmap a été **entièrement repensée** après un audit du code réel. Elle distingue rigoureusement ce qui est *réellement livré et solide*, ce qui est *scaffolding en attente de câblage*, et ce qui est *ambitieux mais buildable*. Aucune case n'est ✅ si le code ne le prouve pas.
 
