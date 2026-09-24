@@ -36,6 +36,50 @@ const selectorSchema = z.string().min(1, "Sélecteur requis").trim();
 
 export const automationSkill: Skill = {
   name: "automation",
+  // Permissions déclarées explicitement, appliquées au runtime par le ToolRegistry.
+  // La plupart des outils pilotent un vrai navigateur (effet de bord réseau),
+  // écrivent des fichiers/sessions, ou planifient/exécutent des tâches. Sans
+  // cette déclaration, l'inférence par nom classait à tort click/type/download/
+  // schedule/toggle… comme "read" (voir SkillAdapter.inferPermissions), ce qui
+  // les faisait échapper au dry-run et à l'AutonomyPolicy.
+  permissions: ["network"],
+  toolPermissions: {
+    // Pilotage du navigateur (contenu externe non fiable, effet de bord réseau).
+    automation_navigate: ["network"],
+    automation_click: ["network"],
+    automation_type: ["network"],
+    automation_extract: ["network"],
+    automation_music_search: ["network"],
+    automation_search: ["network"],
+    automation_snapshot: ["network"],
+    automation_inspect: ["network"],
+    automation_close: ["network"],
+    automation_screenshot: ["network"],
+    automation_analyze_screenshot: ["network"],
+    automation_double_click: ["network"],
+    automation_right_click: ["network"],
+    automation_hover: ["network"],
+    automation_press_keys: ["network"],
+    automation_scroll: ["network"],
+    automation_wait_for: ["network"],
+    // Téléchargement : réseau + écriture disque (sandbox).
+    automation_download_file: ["network", "write"],
+    // Sessions persistées (cookies/localStorage) sur disque.
+    automation_save_session: ["write"],
+    automation_restore_session: ["read"],
+    automation_list_sessions: ["read"],
+    automation_delete_session: ["write"],
+    // Tâches planifiées : exécution périodique en arrière-plan.
+    automation_schedule_task: ["exec"],
+    automation_list_scheduled_tasks: ["read"],
+    automation_cancel_scheduled_task: ["exec"],
+    // Workflows (chaînes d'actions).
+    workflow_create: ["write"],
+    workflow_run: ["exec"],
+    workflow_list: ["read"],
+    workflow_delete: ["write"],
+    workflow_toggle: ["write"],
+  },
   declarations: [
     {
       name: "automation_navigate",

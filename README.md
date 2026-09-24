@@ -507,6 +507,8 @@ Leanna est organisé en plusieurs couches :
 - `AgentOrchestrator` : orchestration et délégation.
 - `AgentRuntime` (agentique) : boucle plan → act → verify → recover, budget de mission et écritures transactionnelles.
 - `AgentTaskRunner` : interface partagée du moteur d'exécution (runtime agentique ou exécuteur legacy).
+- **Alignement runtime** : les 15 rôles de délégation sont tous des plugins `AgentRuntime` (7 rédaction + 8 ingénierie). Les 8 rôles d'ingénierie délèguent à la même boucle plan → act → verify via `agenticBridge`, exécutables aussi bien par l'orchestrateur que par `AgentRuntime.submit()`.
+- **Attribution outil → agent** (`toolAgentMapper`) : cascade déterministe explicite → capability → catégorie (ensemble « Plusieurs agents ») → `system`. Les outils sensibles ont une attribution explicite ; aucun fallback trompeur.
 - `WorkspaceState` / `AgentRepairLoop` : état de fichiers adressé par contenu (hash) et réparation bornée.
 - `SkillManagerV2` : exécution des skills.
 - `ToolRegistry` : registre et contrôle des outils.

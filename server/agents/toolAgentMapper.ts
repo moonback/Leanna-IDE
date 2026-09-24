@@ -10,6 +10,28 @@
 
 import { getAgentDefinition, listAgentDefinitions } from './roles.js';
 import type { AgentRole } from './types.js';
+import type { ToolAttribution } from '../runtime/types.js';
+
+/**
+ * Rôle neutre pour les outils exécutables non rattachés à un agent spécialisé.
+ * Doit rester synchronisé avec `UNATTRIBUTED_ROLE` côté renderer
+ * (src/stores/agentActivityStore.ts). Ne JAMAIS retomber sur 'writer' : cela
+ * attribue faussement des primitives système (browser, telegram, exec…) au
+ * Rédacteur et corrompt la télémétrie agentique.
+ */
+export const UNATTRIBUTED_ROLE: AgentRole = 'system';
+
+/**
+ * Rôle d'affichage pour une attribution PAR CATÉGORIE (ensemble d'agents).
+ *
+ * Un outil comme `search_in_files` appartient légitimement à plusieurs agents
+ * (debugger, reviewer, architect, security, tester, refactor). Le désigner
+ * comme un propriétaire unique « probable » serait un mensonge d'observabilité.
+ * On l'affiche donc comme « plusieurs agents » : l'ensemble réel reste
+ * disponible via `getAgentsForTool()`. Doit rester synchronisé avec
+ * `MULTI_ROLE` côté renderer (src/stores/agentActivityStore.ts).
+ */
+export const MULTI_ROLE: AgentRole = 'multi';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Cache pour le mapping outil → rôle(s)
@@ -26,6 +48,97 @@ let toolToAgentsCache: Map<string, AgentRole[]> = new Map();
  * Chaque outil est associé au premier rôle d'agent qui le supporte
  */
 let toolToPrimaryAgentCache: Map<string, AgentRole> = new Map();
+
+/**
+ * Attribution explicite déclarée par le ToolRegistry (source de vérité).
+ * Renseignée via `applyToolRegistryAttribution()`. Quand un outil y figure,
+ * son attribution PRIME sur le mapping dérivé des capabilities de rôle.
+ *
+ * - `preferred` : rôle principal affiché (télémétrie/audit).
+ * - `allowed`   : rôles autorisés (superset du principal).
+ */
+let toolAttributionCache: Map<string, { preferred: AgentRole; allowed: AgentRole[] }> = new Map();
+
+/**
+ * Forme minimale d'une définition d'outil consommée par le mapper.
+ * Structurellement compatible avec `ToolDefinition` (server/runtime/types.ts),
+ * de sorte que `runtime.tools.getDefinitions()` soit accepté directement.
+ */
+export interface ToolAttributionInput {
+  declaration: { name: string };
+  attribution?: ToolAttribution;
+}
+
+/**
+ * Enregistre l'attribution explicite portée par les définitions du ToolRegistry.
+ *
+ * Le ToolRegistry devient ainsi la source unique de vérité pour l'attribution :
+ * tout outil qui déclare `attribution.preferredAgent` (ou un premier
+ * `allowedAgents`) sera rattaché à ce rôle, indépendamment des capabilities
+ * déclarées sur les rôles. Les outils sans attribution conservent le
+ * comportement historique (mapping par capability puis rôle neutre).
+ *
+ * Idempotent : recalcule intégralement le cache d'attribution à chaque appel.
+ * À appeler après le démarrage du runtime (tous les tools enregistrés).
+ *
+ * @param definitions - Définitions d'outils (typiquement `runtime.tools.getDefinitions()`).
+ */
+export function applyToolRegistryAttribution(definitions: ToolAttributionInput[]): void {
+  toolAttributionCache = new Map();
+
+  // Socle : attributions explicites des outils sensibles. Elles garantissent
+  // qu'un outil à fort impact (sécurité, exécution shell, suppression, tests)
+  // ne sera JAMAIS attribué par l'heuristique de catégorie (priorité 3). Un
+  // outil qui déclare sa propre `attribution` côté ToolRegistry écrase ce
+  // socle (boucle ci-dessous), qui reste donc un défaut sûr, pas un verrou.
+  for (const [tool, spec] of Object.entries(SENSITIVE_TOOL_ATTRIBUTION)) {
+    toolAttributionCache.set(tool, {
+      preferred: spec.preferred,
+      allowed: spec.allowed ?? [spec.preferred],
+    });
+  }
+
+  for (const def of definitions) {
+    const attr = def.attribution;
+    if (!attr) continue;
+    const allowed = (attr.allowedAgents ?? []).filter(Boolean) as AgentRole[];
+    const preferred = (attr.preferredAgent ?? allowed[0]) as AgentRole | undefined;
+    if (!preferred) continue;
+    toolAttributionCache.set(def.declaration.name, {
+      preferred,
+      allowed: allowed.length > 0 ? allowed : [preferred],
+    });
+  }
+}
+
+/**
+ * Attribution explicite des outils sensibles (B2).
+ *
+ * Ces outils ont un impact fort (audit sécurité, exécution shell, tests,
+ * suppression, push git). Une attribution *heuristique* par catégorie serait
+ * dangereuse pour l'observabilité (ex: `security_audit` classé comme un simple
+ * outil d'analyse générique). On fixe donc ici leur agent responsable, avec
+ * priorité 1 (explicite). Ce socle est appliqué avant toute attribution
+ * déclarée par le ToolRegistry, qui peut le surcharger si besoin.
+ */
+const SENSITIVE_TOOL_ATTRIBUTION: Record<string, { preferred: AgentRole; allowed?: AgentRole[] }> = {
+  // Sécurité — jamais présenté comme un rôle générique.
+  security_audit: { preferred: 'security', allowed: ['security', 'reviewer'] },
+  // Tests & vérification — pilotés par le testeur/débogueur.
+  run_tests: { preferred: 'tester', allowed: ['tester', 'debugger', 'coder'] },
+  verify_full: { preferred: 'tester', allowed: ['tester', 'reviewer', 'debugger'] },
+  verify_typecheck: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger'] },
+  verify_lint: { preferred: 'tester', allowed: ['tester', 'reviewer', 'coder'] },
+  verify_file: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger'] },
+  // Exécution shell — attribuée au développeur (contexte d'exécution projet).
+  run_project_command: { preferred: 'coder', allowed: ['coder', 'tester', 'debugger'] },
+  system_execute_command: { preferred: 'coder', allowed: ['coder', 'tester'] },
+  // Opérations destructrices — développeur, jamais deviné.
+  delete_project_file: { preferred: 'coder', allowed: ['coder', 'refactor'] },
+  delete_project_folder: { preferred: 'coder', allowed: ['coder', 'refactor'] },
+  // Push distant — impact hors machine.
+  git_push: { preferred: 'coder', allowed: ['coder'] },
+};
 
 /**
  * Indique si le cache a été initialisé
@@ -186,6 +299,29 @@ export function initializeToolAgentMapper(): void {
 }
 
 /**
+ * Résolution sémantique par catégorie (priorité 3).
+ *
+ * Quand un outil n'a NI attribution explicite (ToolRegistry) NI capability de
+ * rôle, on tente de le rattacher à un agent plausible via sa catégorie
+ * sémantique (TOOL_CATEGORIES + getToolCategory). L'agent retenu est le
+ * premier `typicalRoles` de la catégorie détectée.
+ *
+ * C'est une HEURISTIQUE assumée : elle produit une attribution *probable*, pas
+ * *certaine*. Elle est infiniment préférable au rôle neutre `system` pour
+ * l'observabilité (un outil `git_*` remonte comme "coder" plutôt que comme
+ * "Exécution système"), mais elle NE DOIT PAS s'appliquer aux outils
+ * sensibles : ceux-ci portent une attribution explicite (priorité 1) qui la
+ * court-circuite. Retourne `undefined` si aucune catégorie ne matche.
+ */
+function getCategoryRolesForTool(tool: string): AgentRole[] | undefined {
+  const category = getToolCategory(tool);
+  if (!category) return undefined;
+  const roles = TOOL_CATEGORIES[category]?.typicalRoles;
+  if (!roles || roles.length === 0) return undefined;
+  return [...roles];
+}
+
+/**
  * Obtient tous les rôles d'agents capables d'utiliser un outil donné.
  * 
  * @param tool - Le nom de l'outil
@@ -196,7 +332,20 @@ export function getAgentsForTool(tool: string): AgentRole[] {
     initializeToolAgentMapper();
   }
   
-  return toolToAgentsCache.get(tool) || [];
+  // Priorité 1 : attribution explicite du ToolRegistry (source de vérité).
+  const explicit = toolAttributionCache.get(tool);
+  if (explicit) {
+    return [...explicit.allowed];
+  }
+  
+  // Priorité 2 : mapping dérivé des capabilities de rôle.
+  const byCapability = toolToAgentsCache.get(tool);
+  if (byCapability && byCapability.length > 0) {
+    return [...byCapability];
+  }
+
+  // Priorité 3 : attribution sémantique par catégorie (heuristique).
+  return getCategoryRolesForTool(tool) ?? [];
 }
 
 /**
@@ -204,14 +353,74 @@ export function getAgentsForTool(tool: string): AgentRole[] {
  * Utilisé pour la compatibilité avec le système existant.
  * 
  * @param tool - Le nom de l'outil
- * @returns Le rôle principal ou 'writer' comme fallback
+ * @returns Le rôle principal, ou le rôle neutre `UNATTRIBUTED_ROLE` en fallback
  */
 export function getPrimaryAgentForTool(tool: string): AgentRole {
   if (!isInitialized) {
     initializeToolAgentMapper();
   }
   
-  return toolToPrimaryAgentCache.get(tool) || 'writer';
+  // Priorité 1 : attribution explicite du ToolRegistry (source de vérité).
+  const explicit = toolAttributionCache.get(tool);
+  if (explicit) {
+    return explicit.preferred;
+  }
+  
+  // Priorité 2 : mapping dérivé des capabilities de rôle.
+  const byCapability = toolToPrimaryAgentCache.get(tool);
+  if (byCapability) {
+    return byCapability;
+  }
+
+  // Priorité 3 : attribution sémantique par catégorie (ENSEMBLE d'agents).
+  // On NE choisit PAS un propriétaire unique : l'outil appartient à plusieurs
+  // agents. On renvoie le rôle d'affichage `multi` (« plusieurs agents »),
+  // l'ensemble réel restant accessible via getAgentsForTool().
+  const byCategory = getCategoryRolesForTool(tool);
+  if (byCategory && byCategory.length > 0) {
+    return byCategory.length === 1 ? byCategory[0] : MULTI_ROLE;
+  }
+
+  // Dernier recours : rôle neutre. On ne ment jamais sur l'agent.
+  return UNATTRIBUTED_ROLE;
+}
+
+/**
+ * Indique comment un outil a été attribué à un rôle. Sert à distinguer une
+ * attribution *certaine* (explicite/capability) d'une attribution *probable*
+ * (catégorie) et d'une absence d'attribution (system), pour une télémétrie
+ * honnête côté UI et diagnostic.
+ */
+export type AttributionSource = 'explicit' | 'capability' | 'category' | 'unattributed';
+
+/**
+ * Résout l'attribution d'un outil ET sa provenance, sans effet de bord.
+ * Reflète exactement la cascade de priorités de `getPrimaryAgentForTool`.
+ */
+export function resolveToolAttribution(tool: string): { role: AgentRole; source: AttributionSource } {
+  if (!isInitialized) {
+    initializeToolAgentMapper();
+  }
+  const explicit = toolAttributionCache.get(tool);
+  if (explicit) return { role: explicit.preferred, source: 'explicit' };
+
+  const byCapability = toolToPrimaryAgentCache.get(tool);
+  if (byCapability) return { role: byCapability, source: 'capability' };
+
+  const byCategory = getCategoryRolesForTool(tool);
+  if (byCategory && byCategory.length > 0) return { role: byCategory[0], source: 'category' };
+
+  return { role: UNATTRIBUTED_ROLE, source: 'unattributed' };
+}
+
+/**
+ * Retourne la liste des outils portant une attribution explicite via le
+ * ToolRegistry (renseignée par `applyToolRegistryAttribution`). Utilisé par
+ * l'endpoint de mapping pour exposer aussi les outils attribués qui ne sont
+ * déclarés comme capability d'aucun rôle.
+ */
+export function getExplicitlyAttributedTools(): string[] {
+  return [...toolAttributionCache.keys()];
 }
 
 /**

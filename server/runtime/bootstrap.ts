@@ -19,7 +19,7 @@ import { PromptRegistry } from "./PromptRegistry.js";
 import { PermissionPolicy } from "./PermissionPolicy.js";
 import { DryRunController } from "./DryRun.js";
 import { loadPromptTemplates } from "./prompts/loader.js";
-import { defaultAgents } from "./agents/index.js";
+import { defaultAgents, setAgenticRuntimeProvider } from "./agents/index.js";
 import type { RuntimeConfig } from "./types.js";
 import type { LegacySkill } from "./compat/SkillAdapter.js";
 import * as path from "path";
@@ -126,6 +126,17 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   // 6. Démarrer le runtime
   await runtime.start();
 
+  // 6b. Alimenter le mapper d'attribution à partir du ToolRegistry (source de
+  // vérité). Les outils qui déclarent `attribution` priment sur le mapping
+  // dérivé des capabilities de rôle. Import dynamique pour éviter le couplage
+  // server/runtime → server/agents au chargement du module.
+  try {
+    const { applyToolRegistryAttribution } = await import("../agents/toolAgentMapper.js");
+    applyToolRegistryAttribution(runtime.tools.getDefinitions());
+  } catch (err) {
+    console.error("[Bootstrap] applyToolRegistryAttribution échec:", err);
+  }
+
   // 7. Callback post-init
   if (config.onReady) {
     await config.onReady(runtime, skillManager);
@@ -147,6 +158,11 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   // Runtime agentique : réutilise le ToolRegistry/EventBus déjà configurés,
   // de sorte que les agents reçoivent réellement leurs outils déclarés.
   const agentic = createAgentRuntime(runtime, { budget: config.agenticBudget });
+
+  // Brancher le pont Runtime-plugin → boucle agentique. Les 8 plugins
+  // d'ingénierie (coder, debugger, …) exécutent alors leurs tâches
+  // AgentRuntime.submit() via la MÊME boucle plan→act→verify.
+  setAgenticRuntimeProvider(agentic);
 
   // Migration : l'orchestrateur exécute désormais les tâches via le runtime
   // agentique (boucle plan→act→verify→recover), plus via l'AgentExecutor legacy.
@@ -200,6 +216,9 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
   });
 
   const agentic = createAgentRuntime(runtime, { budget: config.agenticBudget });
+
+  // Brancher le pont Runtime-plugin → boucle agentique (voir version async).
+  setAgenticRuntimeProvider(agentic);
 
   // Brancher l'orchestrateur sur le runtime agentique (import dynamique pour
   // éviter la dépendance circulaire ; best-effort en mode synchrone).

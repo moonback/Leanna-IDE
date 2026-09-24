@@ -96,6 +96,33 @@ function summarizePayload(payload: any): string {
 
 export const agentsSkill: Skill = {
   name: "agents",
+  // Permissions déclarées explicitement, appliquées au runtime par le ToolRegistry.
+  // Déléguer/orchestrer/collaborer/annuler lance ou modifie une exécution
+  // multi-agents (effet de bord) ; les consultations d'état sont en lecture seule.
+  // Sans cette déclaration, l'inférence par nom classait agent_delegate/
+  // agent_orchestrate/agent_collaborate comme "read" (voir
+  // SkillAdapter.inferPermissions), les faisant échapper au dry-run et à
+  // l'AutonomyPolicy (mode suggest).
+  permissions: ["exec"],
+  toolPermissions: {
+    // Lancement / contrôle d'exécution multi-agents (effet de bord).
+    agent_delegate: ["exec"],
+    agent_orchestrate: ["exec"],
+    agent_cancel: ["exec"],
+    agent_cancel_orchestration: ["exec"],
+    agent_collaborate: ["exec"],
+    agent_brain: ["exec"],
+    // Consultations en lecture seule.
+    agent_status: ["read"],
+    agent_list_tasks: ["read"],
+    agent_list_roles: ["read"],
+    agent_stats: ["read"],
+    agent_fleet_status: ["read"],
+    agent_list_collaboration_patterns: ["read"],
+    agent_delegation_matrix: ["read"],
+    agent_bus_metrics: ["read"],
+    agent_message_history: ["read"],
+  },
   declarations: [
     // ─── Outils existants ─────────────────────────────────────────────────────
     {

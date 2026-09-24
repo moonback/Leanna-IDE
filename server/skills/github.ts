@@ -1,4 +1,5 @@
 import { Skill } from "./base.js";
+import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
 
 const GITHUB_API = "https://api.github.com";
 const TIMEOUT_MS = 10_000;
@@ -461,11 +462,15 @@ export const githubSkill: Skill = {
           if (data.encoding === "base64" && data.content) {
             const decoded = Buffer.from(data.content, "base64").toString("utf-8");
             console.log(`[GitHub] get_github_file_content OK: fichier ${data.path} (${data.size} bytes) [${Date.now() - startTime}ms]`);
+            // Contenu de dépôt distant = donnée externe non fiable : neutraliser
+            // toute instruction injectée avant de le renvoyer au modèle.
+            const guarded = guardUntrustedContent(truncate(decoded, 6000), "github");
             return {
               type: "file",
               path: data.path,
               size: data.size,
-              content: truncate(decoded, 6000),
+              content: guarded.text,
+              promptInjection: guarded.promptInjection,
             };
           }
           console.log(`[GitHub] get_github_file_content OK: fichier ${data.path} (téléchargement externe) [${Date.now() - startTime}ms]`);

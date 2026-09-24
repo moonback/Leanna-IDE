@@ -512,7 +512,7 @@ export class AgentExecutor implements AgentTaskRunner {
   /** Budget de contraintes pour éviter la surconsommation de ressources */
   private static readonly EXECUTION_BUDGET = {
     /** Nombre maximum d'appels d'outils au total */
-    maxToolCalls: 30,
+    maxToolCalls: 60,
     /** Nombre maximum de fichiers lus */
     maxFilesRead: 20,
     /** Caractères maximum pour le contexte cumulé (approximation de ~60k tokens) */

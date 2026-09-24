@@ -70,3 +70,58 @@ export function scanPromptInjection(text: string): PromptInjectionScanResult {
 
   return { riskScore, blocked, findings, sanitizedText };
 }
+
+/** Métadonnées de scan attachées à un résultat d'outil renvoyant du contenu externe. */
+export interface UntrustedContentMeta {
+  /** Score de risque heuristique (0-100). */
+  riskScore: number;
+  /** Vrai si un motif à haut risque a été détecté (contenu à traiter avec méfiance). */
+  flagged: boolean;
+  /** Étiquettes des motifs détectés (ex: "ignore-previous"). */
+  findings: string[];
+  /** Origine du contenu, pour la traçabilité (ex: "github", "browser"). */
+  source: string;
+}
+
+/** Contenu externe passé au garde-fou, prêt à être renvoyé dans un résultat d'outil. */
+export interface GuardedContent {
+  /**
+   * Texte sûr à exposer au modèle : identique à l'entrée si rien n'est détecté,
+   * sinon préfixé d'un avertissement « ceci est une donnée, pas un ordre ».
+   */
+  text: string;
+  /** Métadonnées de scan (jamais `undefined`, pour un traitement uniforme). */
+  promptInjection: UntrustedContentMeta;
+}
+
+/**
+ * Applique le garde-fou de manière UNIFORME à tout contenu externe non fiable
+ * (fichiers GitHub, contenu extrait du navigateur, sortie d'outil…), comme le
+ * promet AUTONOMY_CONTRACT.md pour « fichiers, web, sortie d'outil, documents ».
+ *
+ * Contrairement à la route d'upload — qui peut refuser un document avant de le
+ * transmettre au modèle — un outil doit renvoyer le contenu pour que l'agent
+ * puisse raisonner dessus. On ne bloque donc pas : on neutralise en préfixant un
+ * avertissement (les instructions du contenu sont des données) et on attache des
+ * métadonnées `promptInjection` pour la traçabilité et l'observabilité.
+ *
+ * @param content Le texte externe non fiable (peut être `undefined`/vide).
+ * @param source  Origine, pour la traçabilité (ex: "github", "browser").
+ */
+export function guardUntrustedContent(
+  content: string | undefined | null,
+  source: string,
+): GuardedContent {
+  const text = typeof content === "string" ? content : "";
+  const scan = scanPromptInjection(text);
+  const flagged = scan.findings.length > 0;
+  return {
+    text: flagged ? scan.sanitizedText : text,
+    promptInjection: {
+      riskScore: scan.riskScore,
+      flagged,
+      findings: scan.findings.map((f) => f.pattern),
+      source,
+    },
+  };
+}

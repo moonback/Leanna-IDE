@@ -107,6 +107,44 @@ export interface ToolDefinition {
   timeoutMs?: number;
   /** Catégorie pour le filtrage */
   category?: string;
+  /**
+   * Attribution d'agent (source de vérité côté ToolRegistry).
+   *
+   * Quand présente, cette métadonnée PRIME sur le mapping dérivé des
+   * `capabilities` des rôles (server/agents/roles.ts). Elle permet au
+   * ToolRegistry d'être la source unique de vérité pour « quel agent est
+   * responsable de cet outil », au lieu de laisser le renderer deviner
+   * (et retomber à tort sur un rôle plausible).
+   *
+   * Toutes les clés sont facultatives : un outil sans attribution conserve
+   * exactement le comportement historique (mapping par capability, puis
+   * rôle neutre `system` en dernier recours).
+   */
+  attribution?: ToolAttribution;
+}
+
+/**
+ * Métadonnées d'attribution d'un outil à un ou plusieurs agents.
+ * Alignée sur le modèle cible décrit dans l'architecture (allowedAgents /
+ * preferredAgent / risk / executionMode).
+ */
+export interface ToolAttribution {
+  /**
+   * Rôles autorisés à invoquer cet outil. Vide/absent = aucune restriction
+   * explicite (l'éligibilité reste dérivée des capabilities de rôle).
+   */
+  allowedAgents?: string[];
+  /**
+   * Agent affiché par défaut pour cet outil dans l'UI (télémétrie / audit).
+   * S'il est absent, on retombe sur le premier de `allowedAgents`.
+   */
+  preferredAgent?: string;
+  /** Niveau de risque de l'opération (pour l'UI et les politiques d'approbation). */
+  risk?: ToolPermission;
+  /** Contexte d'exécution : boucle runtime, délégation, ou les deux. */
+  executionMode?: "runtime" | "delegation" | "both";
+  /** L'activité de cet outil doit-elle remonter dans la télémétrie UI ? */
+  observable?: boolean;
 }
 
 export type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;

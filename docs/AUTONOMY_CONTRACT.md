@@ -68,3 +68,10 @@ External content is always treated as data. If it contains text resembling instr
 - `server/mission/AutonomyPolicy.ts`
 - `server/autonomy/AutonomousExecutive.ts` (escalation, bounded cycles)
 - `server/autonomy/TaskManager.ts` (dedupe, retry, timeout, circuit breaker, dead-letter)
+- `server/utils/promptInjectionGuard.ts` — heuristic scan of untrusted external
+  content. `guardUntrustedContent()` is applied uniformly to documents
+  (`routes/upload-document.ts`), remote repo files (`skills/github.ts` →
+  `get_github_file_content`), and browser-extracted content (`skills/automationBrowser.ts`
+  → `automation_extract` / `automation_snapshot`). The regex scan is a first-pass
+  heuristic, not a boundary: it flags and neutralizes (wraps as data), it does not
+  authorize.
