@@ -73,6 +73,19 @@ export interface ToolAttributionInput {
  */
 export function applyToolRegistryAttribution(definitions: ToolAttributionInput[]): void {
   toolAttributionCache = new Map();
+
+  // Socle : attributions explicites des outils sensibles. Elles garantissent
+  // qu'un outil à fort impact (sécurité, exécution shell, suppression, tests)
+  // ne sera JAMAIS attribué par l'heuristique de catégorie (priorité 3). Un
+  // outil qui déclare sa propre `attribution` côté ToolRegistry écrase ce
+  // socle (boucle ci-dessous), qui reste donc un défaut sûr, pas un verrou.
+  for (const [tool, spec] of Object.entries(SENSITIVE_TOOL_ATTRIBUTION)) {
+    toolAttributionCache.set(tool, {
+      preferred: spec.preferred,
+      allowed: spec.allowed ?? [spec.preferred],
+    });
+  }
+
   for (const def of definitions) {
     const attr = def.attribution;
     if (!attr) continue;
@@ -85,6 +98,35 @@ export function applyToolRegistryAttribution(definitions: ToolAttributionInput[]
     });
   }
 }
+
+/**
+ * Attribution explicite des outils sensibles (B2).
+ *
+ * Ces outils ont un impact fort (audit sécurité, exécution shell, tests,
+ * suppression, push git). Une attribution *heuristique* par catégorie serait
+ * dangereuse pour l'observabilité (ex: `security_audit` classé comme un simple
+ * outil d'analyse générique). On fixe donc ici leur agent responsable, avec
+ * priorité 1 (explicite). Ce socle est appliqué avant toute attribution
+ * déclarée par le ToolRegistry, qui peut le surcharger si besoin.
+ */
+const SENSITIVE_TOOL_ATTRIBUTION: Record<string, { preferred: AgentRole; allowed?: AgentRole[] }> = {
+  // Sécurité — jamais présenté comme un rôle générique.
+  security_audit: { preferred: 'security', allowed: ['security', 'reviewer'] },
+  // Tests & vérification — pilotés par le testeur/débogueur.
+  run_tests: { preferred: 'tester', allowed: ['tester', 'debugger', 'coder'] },
+  verify_full: { preferred: 'tester', allowed: ['tester', 'reviewer', 'debugger'] },
+  verify_typecheck: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger'] },
+  verify_lint: { preferred: 'tester', allowed: ['tester', 'reviewer', 'coder'] },
+  verify_file: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger'] },
+  // Exécution shell — attribuée au développeur (contexte d'exécution projet).
+  run_project_command: { preferred: 'coder', allowed: ['coder', 'tester', 'debugger'] },
+  system_execute_command: { preferred: 'coder', allowed: ['coder', 'tester'] },
+  // Opérations destructrices — développeur, jamais deviné.
+  delete_project_file: { preferred: 'coder', allowed: ['coder', 'refactor'] },
+  delete_project_folder: { preferred: 'coder', allowed: ['coder', 'refactor'] },
+  // Push distant — impact hors machine.
+  git_push: { preferred: 'coder', allowed: ['coder'] },
+};
 
 /**
  * Indique si le cache a été initialisé
@@ -245,6 +287,29 @@ export function initializeToolAgentMapper(): void {
 }
 
 /**
+ * Résolution sémantique par catégorie (priorité 3).
+ *
+ * Quand un outil n'a NI attribution explicite (ToolRegistry) NI capability de
+ * rôle, on tente de le rattacher à un agent plausible via sa catégorie
+ * sémantique (TOOL_CATEGORIES + getToolCategory). L'agent retenu est le
+ * premier `typicalRoles` de la catégorie détectée.
+ *
+ * C'est une HEURISTIQUE assumée : elle produit une attribution *probable*, pas
+ * *certaine*. Elle est infiniment préférable au rôle neutre `system` pour
+ * l'observabilité (un outil `git_*` remonte comme "coder" plutôt que comme
+ * "Exécution système"), mais elle NE DOIT PAS s'appliquer aux outils
+ * sensibles : ceux-ci portent une attribution explicite (priorité 1) qui la
+ * court-circuite. Retourne `undefined` si aucune catégorie ne matche.
+ */
+function getCategoryRolesForTool(tool: string): AgentRole[] | undefined {
+  const category = getToolCategory(tool);
+  if (!category) return undefined;
+  const roles = TOOL_CATEGORIES[category]?.typicalRoles;
+  if (!roles || roles.length === 0) return undefined;
+  return [...roles];
+}
+
+/**
  * Obtient tous les rôles d'agents capables d'utiliser un outil donné.
  * 
  * @param tool - Le nom de l'outil
@@ -262,7 +327,13 @@ export function getAgentsForTool(tool: string): AgentRole[] {
   }
   
   // Priorité 2 : mapping dérivé des capabilities de rôle.
-  return toolToAgentsCache.get(tool) || [];
+  const byCapability = toolToAgentsCache.get(tool);
+  if (byCapability && byCapability.length > 0) {
+    return [...byCapability];
+  }
+
+  // Priorité 3 : attribution sémantique par catégorie (heuristique).
+  return getCategoryRolesForTool(tool) ?? [];
 }
 
 /**
@@ -283,8 +354,48 @@ export function getPrimaryAgentForTool(tool: string): AgentRole {
     return explicit.preferred;
   }
   
-  // Priorité 2 : mapping dérivé des capabilities, puis rôle neutre.
-  return toolToPrimaryAgentCache.get(tool) || UNATTRIBUTED_ROLE;
+  // Priorité 2 : mapping dérivé des capabilities de rôle.
+  const byCapability = toolToPrimaryAgentCache.get(tool);
+  if (byCapability) {
+    return byCapability;
+  }
+
+  // Priorité 3 : attribution sémantique par catégorie (heuristique).
+  const byCategory = getCategoryRolesForTool(tool);
+  if (byCategory && byCategory.length > 0) {
+    return byCategory[0];
+  }
+
+  // Dernier recours : rôle neutre. On ne ment jamais sur l'agent.
+  return UNATTRIBUTED_ROLE;
+}
+
+/**
+ * Indique comment un outil a été attribué à un rôle. Sert à distinguer une
+ * attribution *certaine* (explicite/capability) d'une attribution *probable*
+ * (catégorie) et d'une absence d'attribution (system), pour une télémétrie
+ * honnête côté UI et diagnostic.
+ */
+export type AttributionSource = 'explicit' | 'capability' | 'category' | 'unattributed';
+
+/**
+ * Résout l'attribution d'un outil ET sa provenance, sans effet de bord.
+ * Reflète exactement la cascade de priorités de `getPrimaryAgentForTool`.
+ */
+export function resolveToolAttribution(tool: string): { role: AgentRole; source: AttributionSource } {
+  if (!isInitialized) {
+    initializeToolAgentMapper();
+  }
+  const explicit = toolAttributionCache.get(tool);
+  if (explicit) return { role: explicit.preferred, source: 'explicit' };
+
+  const byCapability = toolToPrimaryAgentCache.get(tool);
+  if (byCapability) return { role: byCapability, source: 'capability' };
+
+  const byCategory = getCategoryRolesForTool(tool);
+  if (byCategory && byCategory.length > 0) return { role: byCategory[0], source: 'category' };
+
+  return { role: UNATTRIBUTED_ROLE, source: 'unattributed' };
 }
 
 /**

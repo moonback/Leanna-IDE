@@ -17,7 +17,7 @@
 
 import type { AgentRuntime } from "./AgentRuntime.js";
 import { listAgentDefinitions } from "../agents/roles.js";
-import { getExplicitlyAttributedTools } from "../agents/toolAgentMapper.js";
+import { resolveToolAttribution } from "../agents/toolAgentMapper.js";
 import { defaultAgents } from "./agents/index.js";
 
 export interface ReconciliationReport {
@@ -29,8 +29,17 @@ export interface ReconciliationReport {
   orphanCapabilities: string[];
   /** Rôles de délégation sans plugin runtime correspondant. */
   delegationOnlyRoles: string[];
-  /** Outils exécutables non attribués à un rôle dans le mapping UI. */
+  /**
+   * Outils exécutables réellement sans attribution après TOUTES les couches
+   * (explicite → capability → catégorie). Ceux-là seuls retombent sur `system`.
+   */
   unmappedExecutableTools: number;
+  /** Outils attribués via l'heuristique de catégorie (probable, pas certain). */
+  categoryAttributedTools: number;
+  /** Outils attribués via une capability de rôle. */
+  capabilityAttributedTools: number;
+  /** Outils attribués explicitement (ToolRegistry / socle sensible). */
+  explicitlyAttributedTools: number;
 }
 
 /**
@@ -67,13 +76,23 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
     .filter((role) => !runtimeAgentIds.has(role))
     .sort();
 
-  // Asymétrie 3 : outils exécutables non attribués à un rôle.
-  // Un outil est attribué s'il est soit déclaré comme capability d'un rôle,
-  // soit porteur d'une attribution explicite via le ToolRegistry (phase B).
-  const explicitlyAttributed = new Set(getExplicitlyAttributedTools());
-  const unmappedExecutableTools = [...executableToolNames].filter(
-    (tool) => !mappedCapabilities.has(tool) && !explicitlyAttributed.has(tool)
-  ).length;
+  // Asymétrie 3 : attribution réelle des outils exécutables.
+  // On interroge la MÊME cascade que le renderer (resolveToolAttribution) :
+  //   explicit → capability → category → unattributed.
+  // Seul `unattributed` retombe sur `system` : c'est le vrai chiffre honnête,
+  // et non plus « tout ce qui n'est pas une capability ».
+  let explicitlyAttributedTools = 0;
+  let capabilityAttributedTools = 0;
+  let categoryAttributedTools = 0;
+  let unmappedExecutableTools = 0;
+  for (const tool of executableToolNames) {
+    switch (resolveToolAttribution(tool).source) {
+      case "explicit": explicitlyAttributedTools++; break;
+      case "capability": capabilityAttributedTools++; break;
+      case "category": categoryAttributedTools++; break;
+      default: unmappedExecutableTools++; break;
+    }
+  }
 
   const report: ReconciliationReport = {
     delegationAgents: delegationDefs.length,
@@ -83,6 +102,9 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
     orphanCapabilities,
     delegationOnlyRoles,
     unmappedExecutableTools,
+    categoryAttributedTools,
+    capabilityAttributedTools,
+    explicitlyAttributedTools,
   };
 
   // ── Log lisible : les 4 populations, explicitement nommées ──────────────────
@@ -92,6 +114,15 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
     `  • Agents runtime (AgentRuntime plugins) : ${report.runtimeAgents}\n` +
     `  • Outils exécutables (ToolRegistry)     : ${report.executableTools}\n` +
     `  • Capabilities mappées UI (roles.ts)    : ${report.mappedCapabilities}`
+  );
+
+  // ── Attribution réelle des outils (cascade explicit → capability → category) ─
+  console.log(
+    "[Reconcile] Attribution des outils exécutables :\n" +
+    `  • Explicite (ToolRegistry / socle sensible) : ${report.explicitlyAttributedTools}\n` +
+    `  • Capability de rôle (roles.ts)             : ${report.capabilityAttributedTools}\n` +
+    `  • Catégorie sémantique (heuristique)        : ${report.categoryAttributedTools}\n` +
+    `  • Non attribué → rôle « system »            : ${report.unmappedExecutableTools}`
   );
 
   if (report.orphanCapabilities.length > 0) {
@@ -108,10 +139,17 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
     );
   }
 
+  if (report.categoryAttributedTools > 0) {
+    console.log(
+      `[Reconcile] ℹ️ ${report.categoryAttributedTools} outil(s) attribué(s) par heuristique de catégorie ` +
+      `(attribution probable, pas certaine — à confirmer via une attribution explicite si besoin).`
+    );
+  }
+
   if (report.unmappedExecutableTools > 0) {
     console.warn(
-      `[Reconcile] ⚠️ ${report.unmappedExecutableTools} outil(s) exécutable(s) sans attribution d'agent dans ` +
-      `le mapping UI (fallback "writer" côté renderer).`
+      `[Reconcile] ⚠️ ${report.unmappedExecutableTools} outil(s) exécutable(s) réellement sans attribution ` +
+      `(ni explicite, ni capability, ni catégorie) — affichés comme « Exécution système » (rôle "system") côté renderer.`
     );
   }
 

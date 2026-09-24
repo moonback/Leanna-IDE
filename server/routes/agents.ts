@@ -472,6 +472,18 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
         }
         toolMapping[tool] = getPrimaryAgentForTool(tool);
       }
+
+      // Enfin, énumérer TOUS les outils exécutables du ToolRegistry pour que
+      // l'attribution sémantique par catégorie (priorité 3) atteigne l'UI.
+      // Sans cette passe, les outils non-capability tombaient sur 'system'
+      // côté renderer faute d'être présents dans le mapping injecté.
+      for (const decl of skillManager.getToolDeclarations()) {
+        const tool = decl.name;
+        if (!allTools.has(tool)) {
+          allTools.add(tool);
+          toolMapping[tool] = getPrimaryAgentForTool(tool);
+        }
+      }
       
       return res.json({
         success: true,
@@ -513,6 +525,17 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
       for (const tool of getExplicitlyAttributedTools()) {
         allTools.add(tool);
         mapping[tool] = getPrimaryAgentForTool(tool);
+      }
+
+      // Énumérer TOUS les outils exécutables pour que l'attribution par
+      // catégorie (priorité 3) soit servie au renderer plutôt que résolue
+      // en 'system' faute de présence dans le mapping.
+      for (const decl of skillManager.getToolDeclarations()) {
+        const tool = decl.name;
+        if (!allTools.has(tool)) {
+          allTools.add(tool);
+          mapping[tool] = getPrimaryAgentForTool(tool);
+        }
       }
       
       return res.json({
