@@ -188,6 +188,10 @@ consommation de budget.
 | 3 | Écritures transactionnelles (jamais jetées) | ✅ |
 | 4 | `WorkspaceState` + `VerificationRecord` + `AgentRepairLoop` câblés dans le runtime | ✅ |
 | 5 | `AutonomousLoop` / `AutonomousAgent` / `AgentRegistry` / `TaskScheduler` / `delegateTask` sur le moteur partagé `AgentTaskRunner` | ✅ |
+| 5.5 | Modèle déterministe injectable + Autonomous Mission Harness (bout en bout) ; `setRunner` protégé pendant une mission active | ✅ |
+| 6 | Contrat `AgentTaskRunner` (10 invariants) + suite commune contre les deux moteurs | ✅ |
+| 6.4 | Vérification d'étape du Brain routée sur `WorkspaceState` (verify_file hashé) | ✅ |
+| 6.5 | Supervisor Harness (bout en bout) : `AgentBrain.executeGoal` sur DAG + vérification hashée + correction | ✅ |
 
 Point de bascule : `AgentOrchestrator.enableAgenticRuntime(agentic)` (appelé au bootstrap)
 remplace le moteur d'exécution par `AgentRuntimeExecutor` pour :
@@ -196,6 +200,59 @@ remplace le moteur d'exécution par `AgentRuntimeExecutor` pour :
 
 `AgentExecutor` (legacy) reste disponible **derrière la même interface** `AgentTaskRunner`
 mais n'est plus le moteur principal — plus de fallback silencieux pour `agent_orchestrate`.
+
+---
+
+## 7bis. Contrat `AgentTaskRunner` (10 invariants)
+
+Deux moteurs implémentent `AgentTaskRunner` (`AgentExecutor` legacy et
+`AgentRuntimeExecutor` agentique). Pour éviter qu'ils divergent, une suite de contrat
+COMMUNE (`server/agents/AgentTaskRunnerContract.test.ts`) vérifie les mêmes invariants contre
+les deux, de façon hermétique :
+
+1. statut terminal après `execute()` ; 2. `result` toujours cohérent ; 3. erreurs normalisées
+sans fuite d'exception ; 4. annulation supportée ; 5. exécution d'outils via un point unique ;
+6. `filesModified` fiable ; 7. aucune écriture non comptabilisée ; 8. exécution bornée ;
+9. vérification observable ; 10. résultat déterministe.
+
+> Le contrat a immédiatement attrapé un vrai bug commun aux deux moteurs :
+> `ProgressNotifier.notify()` levait pour un rôle inconnu (via `getAgentDefinitionOrThrow`),
+> l'exception s'échappant de `execute()` (violation de l'invariant 3). Corrigé : le notifier
+> résout le nom de façon défensive (`getAgentDefinition` + repli sur le rôle) et ne peut plus
+> faire crasher l'exécuteur.
+
+---
+
+## 7ter. Superviseur multi-agents (`AgentBrain`) sur la vérification hashée
+
+Le superviseur multi-agents **existe déjà** : `AgentBrain.executeGoal` est le
+`SUPERVISOR → PLANNER → TASK GRAPH → VERIFIER → REPAIR → SUPERVISOR` :
+
+```text
+planGoal (understanding + planner → DAG)
+   ↓
+BrainScheduler (fan-out / fan-in parallèle, dépendances)
+   ↓  par étape
+executeStage → delegateTask → moteur agentique (depuis la Phase 5)
+   ↓
+BrainVerifier.verifyStage  ── vérification HASHÉE (depuis 6.4) ──┐
+   ↓                                                             │
+(PASS → étape suivante) | (FAIL → BrainCorrectionLoop → re-verify)
+   ↓
+replanSubgraph (réplanification bornée du sous-graphe restant)
+   ↓
+BrainExecutionResult
+```
+
+**Vérification d'étape hashée (6.4)** — `BrainVerifier` reçoit un `runTool` injectable. Quand
+il est présent, chaque fichier modifié par une étape est revérifié via `verify_file` →
+`VerificationRecord` → `WorkspaceState.recordVerification` ; l'étape ne passe que si le hash
+vérifié correspond au contenu courant. Sans `runTool`, l'ancien contrôle superficiel est
+conservé (rétrocompatibilité). Le `runTool` est fourni par
+`AgentOrchestrator.runTool` (délégué au moteur actif) lorsque `canRunTool` est vrai.
+
+Aucun nouvel orchestrateur « AgentRuntime 2.0 » n'a été créé : cela aurait dupliqué
+l'`AgentBrain`. Le superviseur roule sur le moteur agentique durci.
 
 ---
 
@@ -237,3 +294,9 @@ Budget par défaut surchargé au bootstrap : `bootstrapRuntime({ agenticBudget: 
   conservé ; hash avant/après ; budget absolu 8/3/9/6/4 ; résolution d'outils ; rôle inconnu.
 - `server/agents/AgentTaskRunner.test.ts` — conformité au contrat partagé, `AutonomousLoop`
   contre un runner arbitraire, `AgentRegistry.setRunner` préservant la flotte.
+- `server/agents/AgentTaskRunnerContract.test.ts` — suite de contrat commune exécutée contre
+  les DEUX moteurs (10 invariants).
+- `server/runtime/agentic/mission-harness.test.ts` — Autonomous Mission Harness (modèle
+  déterministe) : success ; failure→repair→pass ; no-progress→stop ; budget réservé.
+- `server/agents/brain/supervisor-harness.test.ts` — Supervisor Harness : `AgentBrain.executeGoal`
+  sur un DAG avec vérification d'étape HASHÉE (`WorkspaceState`) et correction autonome.

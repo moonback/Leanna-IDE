@@ -202,7 +202,12 @@ FINALIZE → rapport
 
 Tous les chemins d'exécution (`agent_orchestrate`, délégation, scheduler DAG et flotte
 autonome) partagent ce moteur via l'interface `AgentTaskRunner`. L'ancien `AgentExecutor`
-reste disponible derrière la même interface mais n'est plus le moteur principal.
+reste disponible derrière la même interface mais n'est plus le moteur principal. Un **contrat
+commun** (10 invariants) est vérifié contre les deux moteurs pour éviter toute divergence.
+
+Le superviseur multi-agents (`AgentBrain`) roule sur ce moteur : la **vérification d'étape**
+du DAG passe par la même discipline `WorkspaceState` (preuve hashée `verify_file`), et une
+étape n'est validée que si le hash vérifié correspond au contenu courant.
 
 Documentation détaillée : [`docs/AGENTIC_RUNTIME.md`](docs/AGENTIC_RUNTIME.md).
 
@@ -729,6 +734,15 @@ node --import tsx --test server/runtime/agentic/agentic.test.ts
 # Migration du moteur partagé (AgentTaskRunner, flotte autonome)
 node --import tsx --test server/agents/AgentTaskRunner.test.ts
 
+# Contrat AgentTaskRunner (10 invariants, exécuté contre les deux moteurs)
+node --import tsx --test server/agents/AgentTaskRunnerContract.test.ts
+
+# Harness de mission agentique de bout en bout (modèle déterministe)
+node --import tsx --test server/runtime/agentic/mission-harness.test.ts
+
+# Harness superviseur (AgentBrain end-to-end, vérification d'étape hashée)
+node --import tsx --test server/agents/brain/supervisor-harness.test.ts
+
 # Module spécifique
 npm test -- server/skills/browser.test.ts
 
@@ -762,6 +776,8 @@ La suite actuelle couvre notamment :
 - Agent Brain : scheduler DAG parallèle, validation de plan, réplanification ;
 - cohérence des capacités d'agents (détection d'outils fantômes) ;
 - runtime agentique : budget de mission par phase, écritures transactionnelles, vérification hashée, réparation bornée ;
+- contrat `AgentTaskRunner` (10 invariants) vérifié contre les deux moteurs ;
+- harness de bout en bout : mission agentique (modèle déterministe) et superviseur `AgentBrain` avec vérification d'étape hashée ;
 - Runtime V2 ;
 - boucle exécutive autonome : priorité déterministe, déduplication, escalade de permission et attente de mission terminale ;
 - apprentissage : propositions disponibles après mission sans auto-application ;
