@@ -168,9 +168,9 @@ try {
     if (p.theme)       document.documentElement.setAttribute('data-theme', p.theme);
     if (p.accentColor) document.documentElement.style.setProperty('--accent-primary', p.accentColor);
   } else {
-    document.documentElement.setAttribute('data-theme', 'dark');
+    document.documentElement.setAttribute('data-theme', 'cyberpunk');
   }
-} catch { document.documentElement.setAttribute('data-theme', 'dark'); }
+} catch { document.documentElement.setAttribute('data-theme', 'cyberpunk'); }
 
 // ── Sync profile to server on startup ──────────────────────────────────────
 // This ensures the WS session always uses the latest saved identity/voice.

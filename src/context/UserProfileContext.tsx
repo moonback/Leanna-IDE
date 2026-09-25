@@ -124,7 +124,7 @@ const DEFAULT_PROFILE: UserProfile = {
   openrouterModel:  'minimax/minimax-m3:free',
   openrouterApiKey: '',
   openrouterImageModel: 'google/gemini-3.6-flash-image',
-  theme:         'dark',
+  theme:         'cyberpunk',
   accentColor:   '#0ea5e9',
   floatingOrb:   false,
   compactPrompt: true,
