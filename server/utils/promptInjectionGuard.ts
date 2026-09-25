@@ -125,3 +125,65 @@ export function guardUntrustedContent(
     },
   };
 }
+
+/**
+ * Agrège les métadonnées d'injection de plusieurs champs en un seul verdict :
+ * risque = max des risques, flagged si au moins un champ l'est, findings = union.
+ */
+function mergeMeta(metas: UntrustedContentMeta[], source: string): UntrustedContentMeta {
+  let riskScore = 0;
+  let flagged = false;
+  const findings = new Set<string>();
+  for (const m of metas) {
+    riskScore = Math.max(riskScore, m.riskScore);
+    flagged = flagged || m.flagged;
+    for (const f of m.findings) findings.add(f);
+  }
+  return { riskScore, flagged, findings: [...findings], source };
+}
+
+/**
+ * Neutralise, EN PLACE, un ensemble de champs texte libre d'un objet résultat
+ * externe non fiable (ex: description de dépôt, titre d'issue, bio utilisateur).
+ *
+ * Point de passage unique pour couvrir de façon systématique tout contenu
+ * externe injecté dans le contexte du modèle — au lieu d'un garde-fou ad hoc par
+ * site d'appel. Seuls des champs *texte libre* doivent être passés : les champs
+ * purement structurels (nombres, SHA, URL, booléens, dates, logins-identifiants)
+ * ne peuvent pas porter d'instruction en langage naturel et sont laissés tels
+ * quels par l'appelant.
+ *
+ * - Les valeurs non-`string` (undefined, nombres, tableaux…) sont ignorées.
+ * - Les tableaux de chaînes (ex: `topics`, `labels`) sont scannés élément par
+ *   élément.
+ * - Les métadonnées agrégées sont attachées sous `obj.promptInjection` afin que
+ *   le modèle et l'observabilité disposent d'un verdict unique par objet.
+ *
+ * @returns le même objet (muté), pour permettre le chaînage.
+ */
+export function guardUntrustedFields<T extends Record<string, any>>(
+  obj: T,
+  fields: readonly (keyof T)[],
+  source: string,
+): T & { promptInjection: UntrustedContentMeta } {
+  const metas: UntrustedContentMeta[] = [];
+
+  for (const field of fields) {
+    const value = obj[field];
+    if (typeof value === "string") {
+      const guarded = guardUntrustedContent(value, source);
+      obj[field] = guarded.text as T[keyof T];
+      metas.push(guarded.promptInjection);
+    } else if (Array.isArray(value)) {
+      obj[field] = value.map((item: unknown) => {
+        if (typeof item !== "string") return item;
+        const guarded = guardUntrustedContent(item, source);
+        metas.push(guarded.promptInjection);
+        return guarded.text;
+      }) as T[keyof T];
+    }
+  }
+
+  (obj as any).promptInjection = mergeMeta(metas, source);
+  return obj as T & { promptInjection: UntrustedContentMeta };
+}

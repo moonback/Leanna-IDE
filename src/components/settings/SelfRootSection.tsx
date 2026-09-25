@@ -444,8 +444,7 @@ export function SelfRootSection() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 flex items-center justify-center p-4"
-            style={{ zIndex: 'var(--z-critical)' as any }}
-            style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+            style={{ zIndex: 'var(--z-critical)' as any, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }}

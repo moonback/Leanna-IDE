@@ -1,6 +1,6 @@
 import { Page } from "puppeteer";
 import { assertSafeUrl, addAllowedDomain } from "./automationHelpers.js";
-import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
+import { guardUntrustedContent, guardUntrustedFields } from "../utils/promptInjectionGuard.js";
 
 addAllowedDomain('duckduckgo.com');
 addAllowedDomain('html.duckduckgo.com');
@@ -475,10 +475,13 @@ export async function handleMusicSearch(validated: { query: string }) {
         r.snippet.toLowerCase().includes('song')
     );
 
+    // Résultats de recherche = texte web entièrement contrôlé par des tiers :
+    // neutraliser les champs libres (titre, extrait) avant de les exposer au modèle.
+    const chosen = filteredResults.length > 0 ? filteredResults : results.slice(0, 4);
     return {
         status: "success",
         message: `Recherche web musicale pour "${validated.query}"`,
-        results: filteredResults.length > 0 ? filteredResults : results.slice(0, 4),
+        results: chosen.map(r => guardUntrustedFields({ ...r }, ["title", "snippet"], "web-search")),
         note: filteredResults.length > 0 ? "Résultats filtrés pour sources musicales" : "Résultats généraux"
     };
 }
@@ -493,7 +496,10 @@ export async function handleSearch(validated: { query: string }) {
     });
 
     const results = (await extractResultsFromDuckDuckGo(p)).slice(0, 5);
-    return { status: "success", results };
+    // Résultats de recherche = texte web entièrement contrôlé par des tiers :
+    // neutraliser les champs libres (titre, extrait) avant de les exposer au modèle.
+    const guarded = results.map(r => guardUntrustedFields({ ...r }, ["title", "snippet"], "web-search"));
+    return { status: "success", results: guarded };
 }
 
 export async function handleSnapshot() {

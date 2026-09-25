@@ -69,9 +69,45 @@ External content is always treated as data. If it contains text resembling instr
 - `server/autonomy/AutonomousExecutive.ts` (escalation, bounded cycles)
 - `server/autonomy/TaskManager.ts` (dedupe, retry, timeout, circuit breaker, dead-letter)
 - `server/utils/promptInjectionGuard.ts` — heuristic scan of untrusted external
-  content. `guardUntrustedContent()` is applied uniformly to documents
-  (`routes/upload-document.ts`), remote repo files (`skills/github.ts` →
-  `get_github_file_content`), and browser-extracted content (`skills/automationBrowser.ts`
-  → `automation_extract` / `automation_snapshot`). The regex scan is a first-pass
-  heuristic, not a boundary: it flags and neutralizes (wraps as data), it does not
-  authorize.
+  content. `guardUntrustedContent()` (single text) and `guardUntrustedFields()`
+  (named free-text fields of a structured result) are applied to **every** path
+  that feeds externally-controlled text into model context:
+  - documents (`routes/upload-document.ts`),
+  - remote repo file content (`skills/github.ts` → `get_github_file_content`),
+  - all other GitHub free-text fields — user bio/name/company/location, repo
+    description/topics, issue & PR titles/labels, notification titles, search
+    descriptions (`skills/github.ts`),
+  - browser-extracted content and page snapshots (`skills/automationBrowser.ts` →
+    `automation_extract` / `automation_snapshot`),
+  - web search results — result titles and snippets (`skills/automationBrowser.ts`
+    → `automation_search` / music search).
+
+  Purely structural/enumerable fields (numbers, SHAs, URLs, booleans, dates,
+  logins used as identifiers) are not scanned — they cannot carry a natural-language
+  directive. The regex scan is a first-pass heuristic, not a boundary: it flags and
+  neutralizes (wraps as data), it does not authorize. Non-model-facing outbound
+  calls (weather API, LLM provider) are out of scope: they ingest no
+  attacker-authored free text into the model's instruction stream.
+
+  **Separate trust flow — notebook / knowledge ingestion**
+  (`notebooks/SourceIngester.ts`, `knowledge/document-system/ContentExtractor.ts`)
+  fetches arbitrary web/repo content, but only on explicit user action via the UI /
+  `/api/notebooks`; the autonomous agent has no tool to trigger it
+  (`ingest_github_repository` was removed). Retrieved passages surface as cited
+  sources, not as agent instructions. This path is tracked as a follow-up for
+  guard coverage at retrieval time; it is out of scope for the agent's live
+  tool-call instruction stream.
+
+## Audit trail
+
+- **Finding 1 (name-based permission misclassification) — CLOSED / verified remediated.**
+  All side-effecting skills (telegram, automation, agents, github, system) declare
+  explicit `permissions` / `toolPermissions`, overriding the name heuristic in
+  `SkillAdapter.inferPermissions`. That heuristic's no-match fallback returns an
+  **empty** permission array (not `["read"]`); `DryRunController.hasSideEffect` and
+  `AutonomyPolicy.hasSideEffect` both treat empty/undeclared permissions as a
+  potential side effect. No side-effecting tool is classified read-only, so dry-run,
+  permission enforcement, and suggest/ask gating all engage.
+- **Finding 2 (uneven prompt-injection guard coverage) — FIXED.** The guard now
+  covers all model-facing external-text paths listed above via
+  `guardUntrustedFields()`, rather than a subset of call sites.

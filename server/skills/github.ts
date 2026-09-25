@@ -1,5 +1,5 @@
 import { Skill } from "./base.js";
-import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
+import { guardUntrustedContent, guardUntrustedFields } from "../utils/promptInjectionGuard.js";
 
 const GITHUB_API = "https://api.github.com";
 const TIMEOUT_MS = 10_000;
@@ -251,21 +251,27 @@ export const githubSkill: Skill = {
           const data = await githubFetch(endpoint);
           if (data.error) { console.warn(`[GitHub] get_github_user échec: ${data.error}`); return data; }
           console.log(`[GitHub] get_github_user OK: ${data.login} (${data.public_repos} repos, ${data.followers} followers) [${Date.now() - startTime}ms]`);
-          return {
-            login: data.login,
-            name: data.name,
-            bio: data.bio,
-            company: data.company,
-            location: data.location,
-            blog: data.blog,
-            followers: data.followers,
-            following: data.following,
-            public_repos: data.public_repos,
-            total_private_repos: data.total_private_repos,
-            owned_private_repos: data.owned_private_repos,
-            created_at: data.created_at,
-            avatar_url: data.avatar_url,
-          };
+          // Champs texte libre contrôlables par l'utilisateur GitHub distant :
+          // neutraliser toute instruction injectée avant de les renvoyer au modèle.
+          return guardUntrustedFields(
+            {
+              login: data.login,
+              name: data.name,
+              bio: data.bio,
+              company: data.company,
+              location: data.location,
+              blog: data.blog,
+              followers: data.followers,
+              following: data.following,
+              public_repos: data.public_repos,
+              total_private_repos: data.total_private_repos,
+              owned_private_repos: data.owned_private_repos,
+              created_at: data.created_at,
+              avatar_url: data.avatar_url,
+            },
+            ["name", "bio", "company", "location", "blog"],
+            "github",
+          );
         }
 
         // ─── Get Repo ───────────────────────────────────────────────────
@@ -276,23 +282,27 @@ export const githubSkill: Skill = {
           const data = await githubFetch(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`);
           if (data.error) { console.warn(`[GitHub] get_github_repo échec: ${data.error}`); return data; }
           console.log(`[GitHub] get_github_repo OK: ${data.full_name} ⭐${data.stargazers_count} [${Date.now() - startTime}ms]`);
-          return {
-            full_name: data.full_name,
-            name: data.name,
-            owner: data.owner?.login || owner,
-            repo: data.name || repo,
-            description: data.description,
-            language: data.language,
-            stars: data.stargazers_count,
-            forks: data.forks_count,
-            open_issues: data.open_issues_count,
-            default_branch: data.default_branch,
-            private: !!data.private,
-            topics: data.topics || [],
-            license: data.license?.spdx_id,
-            updated_at: data.updated_at,
-            html_url: data.html_url,
-          };
+          return guardUntrustedFields(
+            {
+              full_name: data.full_name,
+              name: data.name,
+              owner: data.owner?.login || owner,
+              repo: data.name || repo,
+              description: data.description,
+              language: data.language,
+              stars: data.stargazers_count,
+              forks: data.forks_count,
+              open_issues: data.open_issues_count,
+              default_branch: data.default_branch,
+              private: !!data.private,
+              topics: data.topics || [],
+              license: data.license?.spdx_id,
+              updated_at: data.updated_at,
+              html_url: data.html_url,
+            },
+            ["description", "topics"],
+            "github",
+          );
         }
 
         // ─── List Repos ─────────────────────────────────────────────────
@@ -322,21 +332,25 @@ export const githubSkill: Skill = {
           if (!Array.isArray(data)) return { error: "Réponse inattendue de GitHub." };
           console.log(`[GitHub] list_github_repos OK: ${data.length} repos retournés [${Date.now() - startTime}ms]`);
           return {
-            repos: data.map((r: any) => ({
-              full_name: r.full_name,
-              name: r.name,
-              owner: r.owner?.login || r.full_name.split('/')[0],
-              repo: r.name || r.full_name.split('/')[1],
-              description: r.description,
-              language: r.language,
-              stars: r.stargazers_count,
-              forks: r.forks_count,
-              default_branch: r.default_branch,
-              topics: r.topics || [],
-              updated_at: r.updated_at,
-              private: !!r.private,
-              html_url: r.html_url,
-            })),
+            repos: data.map((r: any) => guardUntrustedFields(
+              {
+                full_name: r.full_name,
+                name: r.name,
+                owner: r.owner?.login || r.full_name.split('/')[0],
+                repo: r.name || r.full_name.split('/')[1],
+                description: r.description,
+                language: r.language,
+                stars: r.stargazers_count,
+                forks: r.forks_count,
+                default_branch: r.default_branch,
+                topics: r.topics || [],
+                updated_at: r.updated_at,
+                private: !!r.private,
+                html_url: r.html_url,
+              },
+              ["description", "topics"],
+              "github",
+            )),
           };
         }
 
@@ -355,16 +369,20 @@ export const githubSkill: Skill = {
           const issues = data.filter((i: any) => !i.pull_request);
           console.log(`[GitHub] list_github_issues OK: ${issues.length} issues retournées [${Date.now() - startTime}ms]`);
           return {
-            issues: issues.map((i: any) => ({
-                number: i.number,
-                title: i.title,
-                state: i.state,
-                author: i.user?.login,
-                labels: i.labels?.map((l: any) => l.name),
-                created_at: i.created_at,
-                comments: i.comments,
-                html_url: i.html_url,
-              })),
+            issues: issues.map((i: any) => guardUntrustedFields(
+                {
+                  number: i.number,
+                  title: i.title,
+                  state: i.state,
+                  author: i.user?.login,
+                  labels: (i.labels?.map((l: any) => l.name) ?? []),
+                  created_at: i.created_at,
+                  comments: i.comments,
+                  html_url: i.html_url,
+                },
+                ["title", "labels"],
+                "github",
+              )),
           };
         }
 
@@ -404,17 +422,21 @@ export const githubSkill: Skill = {
           if (!Array.isArray(data)) return { error: "Réponse inattendue." };
           console.log(`[GitHub] list_github_pull_requests OK: ${data.length} PRs retournées [${Date.now() - startTime}ms]`);
           return {
-            pull_requests: data.map((pr: any) => ({
-              number: pr.number,
-              title: pr.title,
-              state: pr.state,
-              author: pr.user?.login,
-              head: pr.head?.ref,
-              base: pr.base?.ref,
-              created_at: pr.created_at,
-              draft: pr.draft,
-              html_url: pr.html_url,
-            })),
+            pull_requests: data.map((pr: any) => guardUntrustedFields(
+              {
+                number: pr.number,
+                title: pr.title,
+                state: pr.state,
+                author: pr.user?.login,
+                head: pr.head?.ref,
+                base: pr.base?.ref,
+                created_at: pr.created_at,
+                draft: pr.draft,
+                html_url: pr.html_url,
+              },
+              ["title"],
+              "github",
+            )),
           };
         }
 
@@ -431,15 +453,19 @@ export const githubSkill: Skill = {
           console.log(`[GitHub] search_github_repos OK: ${data.total_count} résultats totaux, ${(data.items || []).length} retournés [${Date.now() - startTime}ms]`);
           return {
             total_count: data.total_count,
-            repos: (data.items || []).map((r: any) => ({
-              full_name: r.full_name,
-              description: r.description,
-              language: r.language,
-              stars: r.stargazers_count,
-              forks: r.forks_count,
-              topics: r.topics?.slice(0, 5),
-              html_url: r.html_url,
-            })),
+            repos: (data.items || []).map((r: any) => guardUntrustedFields(
+              {
+                full_name: r.full_name,
+                description: r.description,
+                language: r.language,
+                stars: r.stargazers_count,
+                forks: r.forks_count,
+                topics: r.topics?.slice(0, 5) ?? [],
+                html_url: r.html_url,
+              },
+              ["description", "topics"],
+              "github",
+            )),
           };
         }
 
@@ -491,15 +517,19 @@ export const githubSkill: Skill = {
           if (!Array.isArray(data)) return { error: "Réponse inattendue." };
           console.log(`[GitHub] get_github_notifications OK: ${data.length} notifications [${Date.now() - startTime}ms]`);
           return {
-            notifications: data.map((n: any) => ({
-              id: n.id,
-              reason: n.reason,
-              unread: n.unread,
-              title: n.subject?.title,
-              type: n.subject?.type,
-              repo: n.repository?.full_name,
-              updated_at: n.updated_at,
-            })),
+            notifications: data.map((n: any) => guardUntrustedFields(
+              {
+                id: n.id,
+                reason: n.reason,
+                unread: n.unread,
+                title: n.subject?.title,
+                type: n.subject?.type,
+                repo: n.repository?.full_name,
+                updated_at: n.updated_at,
+              },
+              ["title"],
+              "github",
+            )),
           };
         }
 

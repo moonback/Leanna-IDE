@@ -21,17 +21,17 @@ interface AgentRoleMeta {
 
 const STATIC_AGENT_ROLES_META: AgentRoleMeta[] = [
   // Code & Ingénierie logicielle
-  { id: 'coder',       label: 'Développeur',     desc: 'Écriture et modification de code typé',       icon: Code2,        color: 'var(--accent-primary)', category: 'code' },
-  { id: 'refactor',    label: 'Refactorisation', desc: 'Clean code, architecture & modularité',        icon: Sparkles,     color: 'var(--color-accent-alt)', category: 'code' },
-  { id: 'debugger',    label: 'Débogueur',       desc: 'Diagnostic de bugs & patches chirurgicaux',     icon: Bug,          color: 'var(--color-error)', category: 'code' },
-  { id: 'reviewer',    label: 'Revue de Code',   desc: 'Audit qualité, détection d\'anti-patterns',    icon: CheckCheck,   color: 'var(--color-success)', category: 'code' },
-  { id: 'tester',      label: 'QA & Tests',      desc: 'Création & exécution de tests automatisés',    icon: FlaskConical, color: 'var(--color-warning)', category: 'code' },
-  { id: 'security',    label: 'Sécurité & Audit',desc: 'Détection failles OWASP, fuites de secrets',   icon: ShieldAlert,  color: 'var(--color-accent-alt)', category: 'code' },
-  { id: 'architect',   label: 'Architecte',      desc: 'Conception système, interfaces & modèles',    icon: Network,      color: 'var(--color-info)', category: 'code' },
+  { id: 'coder', label: 'Développeur', desc: 'Écriture et modification de code typé', icon: Code2, color: 'var(--accent-primary)', category: 'code' },
+  { id: 'refactor', label: 'Refactorisation', desc: 'Clean code, architecture & modularité', icon: Sparkles, color: 'var(--color-accent-alt)', category: 'code' },
+  { id: 'debugger', label: 'Débogueur', desc: 'Diagnostic de bugs & patches chirurgicaux', icon: Bug, color: 'var(--color-error)', category: 'code' },
+  { id: 'reviewer', label: 'Revue de Code', desc: 'Audit qualité, détection d\'anti-patterns', icon: CheckCheck, color: 'var(--color-success)', category: 'code' },
+  { id: 'tester', label: 'QA & Tests', desc: 'Création & exécution de tests automatisés', icon: FlaskConical, color: 'var(--color-warning)', category: 'code' },
+  { id: 'security', label: 'Sécurité & Audit', desc: 'Détection failles OWASP, fuites de secrets', icon: ShieldAlert, color: 'var(--color-accent-alt)', category: 'code' },
+  { id: 'architect', label: 'Architecte', desc: 'Conception système, interfaces & modèles', icon: Network, color: 'var(--color-info)', category: 'code' },
 
   // Rédaction & Documentation
-  { id: 'writer',      label: 'Rédacteur',       desc: 'Rédaction de documents & articles',            icon: PenTool,      color: 'var(--accent-primary)', category: 'docs' },
-  { id: 'formatter',   label: 'Mise en Forme',   desc: 'Formatage & structure Markdown',               icon: AlignLeft,    color: 'var(--color-success)', category: 'docs' },
+  { id: 'writer', label: 'Rédacteur', desc: 'Rédaction de documents & articles', icon: PenTool, color: 'var(--accent-primary)', category: 'docs' },
+  { id: 'formatter', label: 'Mise en Forme', desc: 'Formatage & structure Markdown', icon: AlignLeft, color: 'var(--color-success)', category: 'docs' },
   { id: 'researcher',  label: 'Recherche',       desc: 'Collecte & synthèse d\'informations',          icon: Search,       color: 'var(--color-accent-alt)', category: 'docs' },
   { id: 'proofreader', label: 'Correcteur',      desc: 'Orthographe, grammaire & style',               icon: SpellCheck,   color: 'var(--color-warning)', category: 'docs' },
   { id: 'translator',  label: 'Traducteur',      desc: 'Traduction & localisation multilingue',        icon: Languages,    color: 'var(--color-error)', category: 'docs' },
