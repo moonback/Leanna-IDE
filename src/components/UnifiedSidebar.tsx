@@ -462,7 +462,7 @@ function BrandLogo({ theme, onNavigate }: { theme: string; onNavigate: () => voi
         />
         
         <motion.img
-          src={theme === 'dark' ? logoDark : logoLight}
+          src={['dark', 'cyberpunk', 'high-contrast'].includes(theme) ? logoDark : logoLight}
           alt="Leanna"
           className="w-[32px] h-[32px] object-contain"
           whileHover={{ 
