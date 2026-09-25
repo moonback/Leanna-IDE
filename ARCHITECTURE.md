@@ -379,7 +379,7 @@ L'ancien SkillManager inline a été remplacé par un `ToolRegistry` centralisé
 
 ### Sandbox par défaut activé
 
-Par sécurité, le sandbox est activé dès qu'un projet est sélectionné. L'IA ne peut jamais écrire directement dans le workspace sans validation explicite. Ce choix protège contre les modifications accidentelles ou malveillantes sur le code source de l'application elle-même (Leanna est un IDE auto-hébergé qui gère son propre code).
+Par sécurité, le sandbox est activé dès qu'un projet est sélectionné. L'IA ne peut jamais écrire directement dans le workspace sans validation explicite. 
 
 ### Écoute sur `127.0.0.1` par défaut
 

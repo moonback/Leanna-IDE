@@ -510,7 +510,7 @@ Le Knowledge Graph attend un projet actif. Vérifiez que le workspace contient l
 - [`docs/AUTONOMY_CONTRACT.md`](docs/AUTONOMY_CONTRACT.md) — contrat d’autonomie ;
 - [`docs/LEANNA_EXECUTION_REALITY_AUDIT.md`](docs/LEANNA_EXECUTION_REALITY_AUDIT.md) — audit de réalité d’exécution ;
 - [`ROADMAP.md`](ROADMAP.md) — état, écarts et feuille de route ;
-- [`SELF_IDE.md`](SELF_IDE.md) — fonctionnement de l’IDE auto-hébergé ;
+- [`SELF_IDE.md`](SELF_IDE.md) — fonctionnement de l’IDE ;
 - [`.env.example`](.env.example) — configuration commentée ;
 - [`.leannaignore.example`](.leannaignore.example) — modèle d’exclusion des chemins.
 
