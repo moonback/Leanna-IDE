@@ -169,160 +169,254 @@ export class DynamicPlanner {
   }
 
   /**
-   * Détermine la séquence d'agents optimale selon l'analyse de l'objectif
+   * Détermine la séquence d'agents en s'appuyant sur les CAPABILITIES déclarées
+   * des agents, et non sur une échelle de rôles codée en dur ni sur des
+   * expressions régulières appliquées à l'intention.
+   *
+   * Principe :
+   *   1. On dérive les PHASES d'exécution réellement nécessaires à partir du
+   *      `GoalUnderstanding` (domaine, complexité, préférences) — chaque phase
+   *      est caractérisée par un ensemble d'outils *signature* (des noms de
+   *      capabilities réels du ToolRegistry).
+   *   2. Pour chaque phase retenue, on SÉLECTIONNE le rôle dont les
+   *      `capabilities` déclarées couvrent le mieux ces outils signature
+   *      (via `selectRoleForPhase` → `scoreRoleForCapabilities`).
+   *
+   * Conséquence : aucune branche « header responsive » ni ladder figé. Un
+   * agent nouvellement enregistré avec les bonnes capabilities devient
+   * automatiquement éligible, sans toucher au planificateur.
    */
   private determineRoleSequence(
     understanding: GoalUnderstanding,
     input: BrainGoalInput
   ): Array<{ role: AgentRole; reason: string; customTitle?: string; customInstructions?: string }> {
-    const { domain, intent, complexity } = understanding;
-    const lower = intent.toLowerCase();
+    const phases = this.determineNeededPhases(understanding, input);
     const roles: Array<{ role: AgentRole; reason: string; customTitle?: string; customInstructions?: string }> = [];
+    const usedRoles = new Set<AgentRole>();
 
-    // Cas 1 : Modernisation de site / UI / Responsive Header (Exemple spécifique du prompt utilisateur)
-    if (domain === "frontend" || /(responsive|header|modernis|ui|css)/i.test(lower)) {
+    for (const phase of phases) {
+      const selection = this.selectRoleForPhase(phase, understanding, usedRoles);
+      if (!selection) continue; // aucun agent ne couvre cette phase → on la saute
+      usedRoles.add(selection.role);
       roles.push({
-        role: "researcher",
-        reason: "Analyse la structure existante du header, les classes CSS et les breakpoints responsive.",
-        customTitle: "Recherche et analyse de l'existant UI",
+        role: selection.role,
+        reason: selection.reason,
+        customTitle: phase.title,
       });
-      roles.push({
-        role: "architect",
-        reason: "Conçoit la disposition responsive (Flexbox/Grid, media queries, menu hamburger sur mobile).",
-        customTitle: "Conception de l'architecture responsive",
-      });
-      roles.push({
-        role: "coder",
-        reason: "Implémente le code TSX/CSS du composant pour le rendre responsive et moderne.",
-        customTitle: "Implémentation du header responsive",
-      });
-      if (input.preferences?.visualValidation !== false) {
-        roles.push({
-          role: "vision",
-          reason: "Vérifie visuellement l'adaptation responsive sur différentes largeurs et détecte les débordements.",
-          customTitle: "Validation visuelle & responsive",
-        });
-      }
-      if (!input.preferences?.skipTests) {
-        roles.push({
-          role: "tester",
-          reason: "Valide la syntaxe, l'intégrité des composants et l'absence de régression.",
-          customTitle: "Tests de validation et de non-régression",
-        });
-      }
-      roles.push({
-        role: "reviewer",
-        reason: "Revue de code approfondie sur l'accessibilité, les conventions et la propreté CSS/TSX.",
-        customTitle: "Revue de code et audit qualité",
-      });
-      return roles;
     }
 
-    // Cas 2 : Bugfix / Dépannage
-    if (domain === "bugfix" || /(bug|fix|erreur|crash)/i.test(lower)) {
+    // Garde-fou : si aucune phase n'a pu être couverte (ex. registre d'agents
+    // vide en test), on retombe sur une implémentation directe minimale.
+    if (roles.length === 0) {
+      const fallback = this.selectRoleForPhase(
+        DynamicPlanner.PHASES.implement,
+        understanding,
+        usedRoles
+      );
       roles.push({
-        role: "debugger",
-        reason: "Analyse les stacktraces et localise la cause racine du dysfonctionnement.",
-        customTitle: "Diagnostic et isolation du bug",
-      });
-      roles.push({
-        role: "coder",
-        reason: "Applique le correctif ciblé sur le code concerné.",
-        customTitle: "Application du correctif",
-      });
-      roles.push({
-        role: "tester",
-        reason: "Valide le correctif et vérifie qu'aucune régression n'apparaît.",
-        customTitle: "Vérification et non-régression",
-      });
-      roles.push({
-        role: "reviewer",
-        reason: "Revue de sécurité et de conformité du correctif.",
-        customTitle: "Revue qualité du fix",
-      });
-      return roles;
-    }
-
-    // Cas 3 : Refactorisation
-    if (domain === "refactor") {
-      roles.push({
-        role: "architect",
-        reason: "Modélise la restructuration modulaire et les interfaces cibles.",
-        customTitle: "Modélisation de la refactorisation",
-      });
-      roles.push({
-        role: "refactor",
-        reason: "Restructure le code, découpe les fonctions trop complexes et élimine la dette.",
-        customTitle: "Restructuration propre du code",
-      });
-      roles.push({
-        role: "tester",
-        reason: "Garantit la stricte équivalence comportementale via les tests.",
-        customTitle: "Tests de non-régression",
-      });
-      roles.push({
-        role: "reviewer",
-        reason: "Vérifie le respect des principes SOLID et clean code.",
-        customTitle: "Revue finale",
-      });
-      return roles;
-    }
-
-    // Cas 4 : Documentation
-    if (domain === "documentation") {
-      roles.push({
-        role: "researcher",
-        reason: "Collecte les informations techniques et signatures d'API.",
-        customTitle: "Collecte des informations",
-      });
-      roles.push({
-        role: "writer",
-        reason: "Rédige la documentation technique claire et exhaustive.",
-        customTitle: "Rédaction documentaire",
-      });
-      roles.push({
-        role: "proofreader",
-        reason: "Relecture orthographique, syntaxique et stylistique.",
-        customTitle: "Relecture et validation",
-      });
-      return roles;
-    }
-
-    // Cas 5 : Développement Fullstack / Général
-    if (complexity === "complex" || complexity === "critical") {
-      roles.push({
-        role: "researcher",
-        reason: "Analyse des dépendances, sources et contraintes techniques.",
-      });
-      roles.push({
-        role: "architect",
-        reason: "Conception de l'architecture technique et des interfaces.",
-      });
-      roles.push({
-        role: "coder",
-        reason: "Développement et implémentation du code.",
-      });
-      roles.push({
-        role: "tester",
-        reason: "Vérification et validation par tests automatisés.",
-      });
-      roles.push({
-        role: "reviewer",
-        reason: "Audit qualité et validation globale.",
-      });
-    } else {
-      // Cas simple
-      roles.push({
-        role: "coder",
-        reason: "Implémentation directe de la demande.",
-      });
-      roles.push({
-        role: "tester",
-        reason: "Validation du code implémenté.",
+        role: fallback?.role ?? "coder",
+        reason: fallback?.reason ?? "Implémentation directe de la demande.",
       });
     }
 
     return roles;
+  }
+
+  /**
+   * Phases d'exécution candidates. Chaque phase est décrite par les outils
+   * *signature* qui caractérisent son travail (noms réels de capabilities) et
+   * la liste des rôles autorisés à la porter. Le choix final du rôle dépend de
+   * la couverture réelle de ces outils par les capabilities de chaque agent —
+   * pas d'un mapping rôle↔phase figé.
+   */
+  private static readonly PHASES: Record<string, {
+    key: string;
+    title: string;
+    /** Outils signature (capabilities) qui définissent le travail de la phase. */
+    signatureTools: string[];
+    /** Rôles candidats pour porter la phase (départage par score de couverture). */
+    candidateRoles: AgentRole[];
+    /** Modèle de justification, `{role}` remplacé par le rôle retenu. */
+    reason: string;
+  }> = {
+    research: {
+      key: "research",
+      title: "Analyse et exploration du contexte",
+      signatureTools: ["search_in_files", "analyze_project_file", "knowledge_build_context", "knowledge_semantic_search", "knowledge_impact_analyze"],
+      candidateRoles: ["researcher", "architect", "planner"],
+      reason: "Analyse le contexte existant, les dépendances et les contraintes techniques.",
+    },
+    design: {
+      key: "design",
+      title: "Conception de l'architecture",
+      signatureTools: ["knowledge_search_entities", "knowledge_impact_analyze", "create_project_directory", "reasoning_think"],
+      candidateRoles: ["architect", "planner"],
+      reason: "Conçoit la structure cible, les interfaces et les patterns.",
+    },
+    diagnose: {
+      key: "diagnose",
+      title: "Diagnostic et isolation de la cause racine",
+      signatureTools: ["search_in_files", "run_project_command", "analyze_project_file", "reasoning_think"],
+      candidateRoles: ["debugger", "researcher"],
+      reason: "Localise la cause racine du dysfonctionnement à partir des traces et du code.",
+    },
+    implement: {
+      key: "implement",
+      title: "Implémentation et modification du code",
+      signatureTools: ["write_project_file", "modify_project_file", "patch_project_file", "verify_file", "verify_typecheck"],
+      candidateRoles: ["coder", "refactor", "debugger"],
+      reason: "Applique les modifications de code nécessaires puis les vérifie.",
+    },
+    refactor: {
+      key: "refactor",
+      title: "Restructuration et réduction de dette",
+      signatureTools: ["modify_project_file", "patch_project_file", "knowledge_impact_analyze", "verify_lint", "verify_full"],
+      candidateRoles: ["refactor", "coder"],
+      reason: "Restructure le code sans altérer le comportement externe.",
+    },
+    write: {
+      key: "write",
+      title: "Rédaction du contenu",
+      signatureTools: ["write_project_file", "modify_project_file", "apply_patch"],
+      candidateRoles: ["writer", "formatter", "summarizer", "translator"],
+      reason: "Produit le contenu rédactionnel clair et structuré.",
+    },
+    proofread: {
+      key: "proofread",
+      title: "Relecture et finitions",
+      signatureTools: ["modify_project_file", "patch_project_file", "verify_file"],
+      candidateRoles: ["proofreader", "formatter"],
+      reason: "Relit et corrige la cohérence, la clarté et le style.",
+    },
+    visualCheck: {
+      key: "visualCheck",
+      title: "Validation visuelle et responsive",
+      signatureTools: ["automation_screenshot", "automation_analyze_screenshot", "automation_navigate"],
+      candidateRoles: ["vision"],
+      reason: "Vérifie visuellement le rendu et détecte les débordements.",
+    },
+    test: {
+      key: "test",
+      title: "Tests et non-régression",
+      signatureTools: ["run_project_command", "verify_full", "verify_file", "verify_typecheck"],
+      candidateRoles: ["tester", "coder"],
+      reason: "Valide le comportement et l'absence de régression via les tests.",
+    },
+    review: {
+      key: "review",
+      title: "Revue de code et audit qualité",
+      signatureTools: ["verify_lint", "verify_typecheck", "analyze_project_file", "knowledge_impact_analyze"],
+      candidateRoles: ["reviewer", "security"],
+      reason: "Audite la qualité, la conformité et la maintenabilité.",
+    },
+  };
+
+  /**
+   * Dérive les phases nécessaires à partir de la compréhension de l'objectif.
+   * On raisonne en termes de NATURE du travail (produire du code, du texte,
+   * diagnostiquer, valider visuellement…), pas de mots-clés d'intention.
+   */
+  private determineNeededPhases(
+    understanding: GoalUnderstanding,
+    input: BrainGoalInput
+  ): Array<typeof DynamicPlanner.PHASES[keyof typeof DynamicPlanner.PHASES]> {
+    const { domain, complexity } = understanding;
+    const P = DynamicPlanner.PHASES;
+    const heavy = complexity === "complex" || complexity === "critical";
+    const phases: Array<typeof P[keyof typeof P]> = [];
+
+    // Domaines à dominante rédactionnelle : le livrable est du texte.
+    if (domain === "documentation") {
+      phases.push(P.research, P.write, P.proofread);
+      return phases;
+    }
+
+    // Bugfix : le cœur du travail est le diagnostic avant le correctif.
+    if (domain === "bugfix") {
+      phases.push(P.diagnose, P.implement, P.test, P.review);
+      return phases;
+    }
+
+    // Refactorisation : conception de la cible puis restructuration.
+    if (domain === "refactor") {
+      phases.push(P.design, P.refactor, P.test, P.review);
+      return phases;
+    }
+
+    // Domaines de développement (frontend/backend/fullstack/devops/general).
+    // La sélection reste capacitaire : on ajoute les phases pertinentes, le
+    // rôle porteur étant choisi par couverture d'outils.
+    if (heavy) phases.push(P.research, P.design);
+    else phases.push(P.research);
+
+    phases.push(P.implement);
+
+    // Validation visuelle : pertinente pour le frontend, activable/désactivable
+    // par préférence — sans jamais dépendre d'un mot-clé « header »/« responsive ».
+    if (domain === "frontend" && input.preferences?.visualValidation !== false) {
+      phases.push(P.visualCheck);
+    }
+
+    if (!input.preferences?.skipTests) phases.push(P.test);
+    phases.push(P.review);
+
+    return phases;
+  }
+
+  /**
+   * Sélectionne le rôle le mieux adapté à une phase en comparant les
+   * `signatureTools` de la phase aux `capabilities` déclarées de chaque rôle
+   * candidat. Le rôle avec la meilleure couverture (et non déjà utilisé, à
+   * couverture égale) l'emporte. Retourne `null` si aucun candidat ne couvre
+   * au moins un outil signature.
+   */
+  private selectRoleForPhase(
+    phase: typeof DynamicPlanner.PHASES[keyof typeof DynamicPlanner.PHASES],
+    _understanding: GoalUnderstanding,
+    usedRoles: Set<AgentRole>
+  ): { role: AgentRole; reason: string } | null {
+    const definitions = listAgentDefinitions();
+    const byRole = new Map(definitions.map((d) => [d.role, d]));
+
+    let best: { role: AgentRole; score: number; alreadyUsed: boolean } | null = null;
+
+    for (const role of phase.candidateRoles) {
+      const def = byRole.get(role);
+      if (!def) continue; // rôle non enregistré
+      const score = this.scoreRoleForCapabilities(def.capabilities, phase.signatureTools);
+      if (score <= 0) continue; // ce rôle ne couvre aucun outil de la phase
+
+      const alreadyUsed = usedRoles.has(role);
+      const better =
+        best === null ||
+        // À couverture égale, on préfère un rôle pas encore engagé (diversité).
+        score > best.score ||
+        (score === best.score && best.alreadyUsed && !alreadyUsed);
+      if (better) best = { role, score, alreadyUsed };
+    }
+
+    if (!best) return null;
+    return {
+      role: best.role,
+      reason: phase.reason.replace("{role}", String(best.role)),
+    };
+  }
+
+  /**
+   * Score de couverture : nombre d'outils signature de la phase réellement
+   * présents dans les capabilities déclarées du rôle. Simple, déterministe et
+   * directement fondé sur la source de vérité (les capabilities des agents).
+   */
+  private scoreRoleForCapabilities(
+    capabilities: readonly string[],
+    signatureTools: readonly string[]
+  ): number {
+    const declared = new Set(capabilities);
+    let score = 0;
+    for (const tool of signatureTools) {
+      if (declared.has(tool)) score++;
+    }
+    return score;
   }
 
   /**
