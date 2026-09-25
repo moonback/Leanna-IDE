@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Target, Loader2, CheckCircle2, XCircle, AlertTriangle,
@@ -354,6 +354,48 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
   // Le panneau est ensuite mis à jour en temps réel par les événements WebSocket.
   useEffect(() => {
     return syncMissionsFromServer();
+  }, [syncMissionsFromServer]);
+
+  // Indique si une mission est « vivante » (tourne, en pause ou bloquée). Lu par
+  // le polling via une ref, pour éviter de recréer l'intervalle à chaque
+  // changement d'état des missions.
+  const hasActiveRef = useRef(false);
+  hasActiveRef.current = missions.some(
+    m => m.status === 'in_progress' || m.status === 'paused' || m.status === 'blocked'
+  );
+
+  // Filet de rafraîchissement : les événements `mission_event` transitent
+  // uniquement par le WebSocket `/live` (session de chat). Sans session Live
+  // active — cas des missions créées via l'API REST ou le harness — le panneau
+  // ne recevrait aucune mise à jour en direct et resterait figé jusqu'à sa
+  // réouverture. On complète donc le flux WebSocket par un polling léger de
+  // `/api/missions` tant que le panneau est monté. La fusion côté
+  // `syncMissionsFromServer` fait autorité sur status/goals/metrics, donc ce
+  // polling ne « bat » jamais les événements live plus fins reçus entre-temps.
+  //
+  // L'intervalle est stable (dépend uniquement de `syncMissionsFromServer`) et
+  // se re-planifie lui-même avec un rythme adaptatif : réactif (3 s) quand une
+  // mission tourne, économe (10 s) au repos.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    let cleanup: (() => void) | undefined;
+    let stopped = false;
+
+    const schedule = () => {
+      if (stopped) return;
+      timer = setTimeout(() => {
+        cleanup?.();
+        cleanup = syncMissionsFromServer();
+        schedule();
+      }, hasActiveRef.current ? 3000 : 10000);
+    };
+    schedule();
+
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      cleanup?.();
+    };
   }, [syncMissionsFromServer]);
 
   // Listen for mission events
