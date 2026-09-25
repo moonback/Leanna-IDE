@@ -10,7 +10,7 @@
 
 import { getAgentDefinition, listAgentDefinitions } from './roles.js';
 import type { AgentRole } from './types.js';
-import type { ToolAttribution } from '../runtime/types.js';
+import type { ToolAttribution, ToolPermission } from '../runtime/types.js';
 
 /**
  * Rôle neutre pour les outils exécutables non rattachés à un agent spécialisé.
@@ -112,6 +112,50 @@ export function applyToolRegistryAttribution(definitions: ToolAttributionInput[]
 }
 
 /**
+ * Estampille l'AUTORISATION par agent (chantier C) sur les définitions d'outils
+ * sensibles, à partir de `SENSITIVE_TOOL_ATTRIBUTION`.
+ *
+ * Contrairement à `applyToolRegistryAttribution` (qui alimente un cache
+ * d'AFFICHAGE consulté par le renderer), cette fonction écrit directement
+ * `attribution.allowedAgents` + `attribution.risk` sur la `ToolDefinition`
+ * vivante du ToolRegistry. C'est cette métadonnée que `PermissionPolicy.enforce`
+ * lit à l'exécution pour refuser un agent hors liste sur un outil à risque.
+ *
+ * Règle de non-régression : on NE surcharge PAS une attribution déjà déclarée
+ * par l'outil lui-même (un outil qui définit explicitement `allowedAgents`/`risk`
+ * reste maître de sa politique). On ne fait que renseigner ce qui manque, à
+ * partir du socle sensible.
+ *
+ * Idempotent. À appeler au démarrage, après l'enregistrement de tous les outils.
+ *
+ * @param definitions - Définitions vivantes (typiquement `runtime.tools.getDefinitions()`).
+ * @returns Le nombre d'outils effectivement estampillés (pour le log de boot).
+ */
+export function applyRuntimeAgentAuthorization(definitions: ToolAttributionInput[]): number {
+  let stamped = 0;
+  for (const def of definitions) {
+    const spec = SENSITIVE_TOOL_ATTRIBUTION[def.declaration.name];
+    if (!spec) continue;
+
+    const current: ToolAttribution = def.attribution ?? {};
+    const allowedAgents =
+      current.allowedAgents && current.allowedAgents.length > 0
+        ? current.allowedAgents
+        : (spec.allowed ?? [spec.preferred]);
+    const risk = current.risk ?? spec.risk;
+
+    def.attribution = {
+      ...current,
+      allowedAgents,
+      preferredAgent: current.preferredAgent ?? spec.preferred,
+      ...(risk ? { risk } : {}),
+    };
+    stamped++;
+  }
+  return stamped;
+}
+
+/**
  * Attribution explicite des outils sensibles (B2).
  *
  * Ces outils ont un impact fort (audit sécurité, exécution shell, tests,
@@ -121,23 +165,26 @@ export function applyToolRegistryAttribution(definitions: ToolAttributionInput[]
  * priorité 1 (explicite). Ce socle est appliqué avant toute attribution
  * déclarée par le ToolRegistry, qui peut le surcharger si besoin.
  */
-const SENSITIVE_TOOL_ATTRIBUTION: Record<string, { preferred: AgentRole; allowed?: AgentRole[] }> = {
+const SENSITIVE_TOOL_ATTRIBUTION: Record<
+  string,
+  { preferred: AgentRole; allowed?: AgentRole[]; risk?: ToolPermission }
+> = {
   // Sécurité — jamais présenté comme un rôle générique.
-  security_audit: { preferred: 'security', allowed: ['security', 'reviewer'] },
+  security_audit: { preferred: 'security', allowed: ['security', 'reviewer'], risk: 'exec' },
   // Tests & vérification — pilotés par le testeur/débogueur.
-  run_tests: { preferred: 'tester', allowed: ['tester', 'debugger', 'coder'] },
-  verify_full: { preferred: 'tester', allowed: ['tester', 'reviewer', 'debugger'] },
-  verify_typecheck: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger'] },
-  verify_lint: { preferred: 'tester', allowed: ['tester', 'reviewer', 'coder'] },
-  verify_file: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger'] },
+  run_tests: { preferred: 'tester', allowed: ['tester', 'debugger', 'coder'], risk: 'exec' },
+  verify_full: { preferred: 'tester', allowed: ['tester', 'reviewer', 'debugger'], risk: 'exec' },
+  verify_typecheck: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger'], risk: 'exec' },
+  verify_lint: { preferred: 'tester', allowed: ['tester', 'reviewer', 'coder'], risk: 'exec' },
+  verify_file: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger'], risk: 'exec' },
   // Exécution shell — attribuée au développeur (contexte d'exécution projet).
-  run_project_command: { preferred: 'coder', allowed: ['coder', 'tester', 'debugger'] },
-  system_execute_command: { preferred: 'coder', allowed: ['coder', 'tester'] },
+  run_project_command: { preferred: 'coder', allowed: ['coder', 'tester', 'debugger'], risk: 'exec' },
+  system_execute_command: { preferred: 'coder', allowed: ['coder', 'tester'], risk: 'exec' },
   // Opérations destructrices — développeur, jamais deviné.
-  delete_project_file: { preferred: 'coder', allowed: ['coder', 'refactor'] },
-  delete_project_folder: { preferred: 'coder', allowed: ['coder', 'refactor'] },
+  delete_project_file: { preferred: 'coder', allowed: ['coder', 'refactor'], risk: 'dangerous' },
+  delete_project_folder: { preferred: 'coder', allowed: ['coder', 'refactor'], risk: 'dangerous' },
   // Push distant — impact hors machine.
-  git_push: { preferred: 'coder', allowed: ['coder'] },
+  git_push: { preferred: 'coder', allowed: ['coder'], risk: 'dangerous' },
 };
 
 /**

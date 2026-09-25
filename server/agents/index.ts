@@ -73,6 +73,7 @@ export {
   getToolsForAgent,
   getRecommendedRolesForCategory,
   applyToolRegistryAttribution,
+  applyRuntimeAgentAuthorization,
   getExplicitlyAttributedTools,
   UNATTRIBUTED_ROLE,
 } from "./toolAgentMapper.js";

@@ -262,7 +262,8 @@ export class ToolRegistry {
     const decision = this.permissionPolicy.enforce(
       name,
       entry.definition.permissions,
-      options.agentId
+      options.agentId,
+      entry.definition.attribution
     );
     if (!decision.allowed) {
       throw new PermissionDeniedError(decision);

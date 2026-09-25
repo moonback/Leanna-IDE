@@ -131,8 +131,21 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   // dérivé des capabilities de rôle. Import dynamique pour éviter le couplage
   // server/runtime → server/agents au chargement du module.
   try {
-    const { applyToolRegistryAttribution } = await import("../agents/toolAgentMapper.js");
-    applyToolRegistryAttribution(runtime.tools.getDefinitions());
+    const { applyToolRegistryAttribution, applyRuntimeAgentAuthorization } = await import(
+      "../agents/toolAgentMapper.js"
+    );
+    const defs = runtime.tools.getDefinitions();
+    // Autorisation par agent (chantier C) : estampille allowedAgents + risk sur
+    // les outils sensibles AVANT de calculer le cache d'affichage, afin que la
+    // même vérité serve l'exécution (PermissionPolicy) et la télémétrie.
+    const stamped = applyRuntimeAgentAuthorization(defs);
+    applyToolRegistryAttribution(defs);
+    if (stamped > 0) {
+      console.log(
+        `[Bootstrap] Autorisation par agent — ${stamped} outil(s) sensible(s) estampillé(s) ` +
+        `(allowedAgents + risk). Un agent hors liste est refusé en mode "enforce".`
+      );
+    }
   } catch (err) {
     console.error("[Bootstrap] applyToolRegistryAttribution échec:", err);
   }

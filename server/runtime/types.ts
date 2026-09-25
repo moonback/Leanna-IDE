@@ -218,7 +218,12 @@ export type RuntimeEvent =
       type: "tool:permissionDenied";
       toolName: string;
       required: ToolPermission[];
-      missing: ToolPermission[];
+      /**
+       * Motifs de refus : permissions manquantes, le pseudo-motif "undeclared"
+       * (absence de déclaration, voir PermissionPolicy.denyUndeclared), ou un
+       * motif d'agent "agent-not-allowed:<role>" (autorisation par agent).
+       */
+      missing: Array<ToolPermission | "undeclared" | `agent-not-allowed:${string}`>;
       mode: "enforce" | "audit" | "off";
       enforced: boolean;
       agentId?: string;
