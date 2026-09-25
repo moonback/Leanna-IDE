@@ -203,9 +203,11 @@ function finalizeGoals(goals: GoalEntry[], missionSucceeded: boolean): GoalEntry
 
 interface MissionPanelProps {
   inline?: boolean;
+  /** Callback de fermeture. Affiche un bouton « fermer » dans l'en-tête. */
+  onClose?: () => void;
 }
 
-export function MissionPanel({ inline = false }: MissionPanelProps) {
+export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
   const [missions, setMissions] = useState<MissionEntry[]>([]);
   const [expandedMission, setExpandedMission] = useState<string | null>(null);
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
@@ -305,15 +307,17 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
     }
   }, []);
 
-  // Charger l'état initial des missions depuis le serveur (au montage).
-  // Le panneau est ensuite mis à jour en temps réel par les événements WebSocket.
-  useEffect(() => {
+  // Récupère l'état complet des missions depuis le serveur et fusionne dans le
+  // state local. Fusion (et non remplacement) : on préserve les détails déjà
+  // reçus en temps réel via WebSocket pour les missions déjà connues, et on
+  // ajoute/rafraîchit celles renvoyées par le serveur.
+  const syncMissionsFromServer = useCallback(() => {
     let cancelled = false;
     fetch('/api/missions')
       .then(res => (res.ok ? res.json() : { missions: [] }))
       .then((data: { missions?: any[] }) => {
         if (cancelled || !Array.isArray(data.missions)) return;
-        setMissions(data.missions.map((m): MissionEntry => ({
+        const serverEntries = data.missions.map((m): MissionEntry => ({
           id: m.id,
           title: m.title ?? 'Mission',
           status: m.status ?? 'pending',
@@ -327,11 +331,30 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
             failedActions: m.metrics?.failedActions ?? 0,
           },
           createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
-        })));
+        }));
+        setMissions(prev => {
+          const byId = new Map(prev.map(m => [m.id, m]));
+          for (const s of serverEntries) {
+            const existing = byId.get(s.id);
+            // Le serveur fait autorité sur status/goals/metrics. Pour une
+            // mission déjà connue, on ne conserve que les goals détaillés reçus
+            // en live si le serveur n'en renvoie pas encore.
+            byId.set(s.id, existing
+              ? { ...existing, ...s, goals: s.goals.length > 0 ? s.goals : existing.goals }
+              : s);
+          }
+          return Array.from(byId.values());
+        });
       })
       .catch(() => { /* pas de mission system dispo — panneau vide, normal */ });
     return () => { cancelled = true; };
   }, []);
+
+  // Charger l'état initial des missions depuis le serveur (au montage).
+  // Le panneau est ensuite mis à jour en temps réel par les événements WebSocket.
+  useEffect(() => {
+    return syncMissionsFromServer();
+  }, [syncMissionsFromServer]);
 
   // Listen for mission events
   useEffect(() => {
@@ -342,6 +365,14 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
       // Les demandes d'approbation sont désormais gérées par le store partagé
       // `usePendingApprovals` (écoute le même flux d'événements), afin de rester
       // visibles hors du panneau. On ne les traite donc plus localement ici.
+
+      // Reprise au démarrage : la mission revient d'abord via `mission_resumed`
+      // (émis par Executor.resumePending) avec un payload minimal. On resynchronise
+      // depuis le serveur pour récupérer l'état complet (goals, métriques, etc.),
+      // même si le fetch initial du montage était arrivé trop tôt ou vide.
+      if (detail.event === 'mission_resumed') {
+        syncMissionsFromServer();
+      }
 
       setMissions(prev => {
         const existing = prev.find(m => m.id === detail.missionId);
@@ -524,10 +555,29 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
             });
 
           case 'mission_resumed':
-            return prev.map(m => {
-              if (m.id !== detail.missionId) return m;
-              return { ...m, status: 'in_progress' as const };
-            });
+            // Au redémarrage de l'app, le serveur relance les missions
+            // interrompues (Executor.resumePending) et émet `mission_resumed`.
+            // Cet événement peut arriver AVANT que le fetch initial de
+            // `/api/missions` n'ait peuplé la liste (ou alors que ce fetch avait
+            // répondu vide car la reprise côté serveur n'était pas terminée).
+            // Il faut donc créer l'entrée si elle est absente — sinon la mission
+            // reprise n'apparaît jamais et le panneau affiche « 0 active » alors
+            // que la StatusBar la compte bien. On reflète le comportement de
+            // `mission_started`.
+            if (existing) {
+              return prev.map(m => m.id === detail.missionId ? { ...m, status: 'in_progress' as const } : m);
+            }
+            return [...prev, {
+              id: detail.missionId,
+              title: detail.title ?? 'Mission',
+              status: 'in_progress',
+              priority: 'medium',
+              goals: [],
+              activeGoalId: null,
+              confidence: 0.5,
+              metrics: { totalActions: 0, successfulActions: 0, failedActions: 0 },
+              createdAt: new Date(detail.timestamp),
+            }];
 
           case 'mission_deleted':
             return prev.filter(m => m.id !== detail.missionId);
@@ -540,7 +590,7 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
 
     window.addEventListener('Leanna-mission-event', handler);
     return () => window.removeEventListener('Leanna-mission-event', handler);
-  }, []);
+  }, [syncMissionsFromServer]);
 
   // Auto-expand first active mission
   useEffect(() => {
@@ -570,6 +620,17 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
         >
           <Plus size={12} /> Nouvelle
         </button>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer hover:bg-white/10"
+            style={{ color: 'var(--text-muted)' }}
+            aria-label="Fermer"
+            title="Fermer le panneau"
+          >
+            <X size={15} />
+          </button>
+        )}
       </div>
 
       {/* Formulaire de création */}

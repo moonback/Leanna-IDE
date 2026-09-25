@@ -1227,7 +1227,7 @@ export default function IdeView() {
                 className="border-l flex flex-col min-h-0"
                 style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
               >
-                <MissionPanel inline />
+                <MissionPanel inline onClose={() => setShowMissions(false)} />
               </div>
             )}
 
