@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Target, Loader2, CheckCircle2, XCircle, AlertTriangle,
   ChevronRight, Brain, Zap, RotateCcw, Pause, Play,
   TrendingUp, TrendingDown, Minus, Clock, Plus, Trash2, X,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
+import { usePendingApprovals, clearPendingApproval } from '../../hooks/usePendingApprovals.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -35,15 +36,10 @@ interface MissionEvent {
   timeoutMs?: number;
 }
 
+import type { PendingApprovalInfo } from '../../hooks/usePendingApprovals.js';
+
 /** Demande d'approbation en attente pour une action à effet de bord. */
-interface PendingApproval {
-  actionId: string;
-  missionId: string;
-  skill: string;
-  reason: string;
-  args?: Record<string, unknown>;
-  requestedAt: number;
-}
+type PendingApproval = PendingApprovalInfo;
 
 interface MissionPlan {
   objectives: string[];
@@ -115,18 +111,46 @@ function statusIcon(status: string, size = 10) {
 }
 
 function decisionBadge(decision: string) {
-  const config: Record<string, { color: string; label: string; icon: React.ReactNode }> = {
-    continue: { color: 'var(--color-success)', label: 'Continue', icon: <Play size={8} /> },
-    retry: { color: 'var(--color-warning)', label: 'Retry', icon: <RotateCcw size={8} /> },
-    replan: { color: 'var(--color-warning)', label: 'Replan', icon: <Brain size={8} /> },
-    escalate: { color: 'var(--color-error)', label: 'Escalade', icon: <AlertTriangle size={8} /> },
-    abort: { color: 'var(--color-error)', label: 'Abort', icon: <XCircle size={8} /> },
+  // `label` reste court pour la place disponible ; `hint` explicite la portée
+  // concrète de la décision du superviseur (affiché en info-bulle).
+  const config: Record<string, { color: string; label: string; hint: string; icon: React.ReactNode }> = {
+    continue: {
+      color: 'var(--color-success)',
+      label: 'Continue',
+      hint: 'Continuer : l’action a réussi, la mission passe à l’étape suivante.',
+      icon: <Play size={8} />,
+    },
+    retry: {
+      color: 'var(--color-warning)',
+      label: 'Réessai',
+      hint: 'Réessai : rejoue la même action à l’identique (échec jugé passager).',
+      icon: <RotateCcw size={8} />,
+    },
+    replan: {
+      color: 'var(--color-warning)',
+      label: 'Replanif.',
+      hint: 'Replanification : l’approche a échoué, l’agent recalcule un nouveau plan.',
+      icon: <Brain size={8} />,
+    },
+    escalate: {
+      color: 'var(--color-error)',
+      label: 'Escalade',
+      hint: 'Escalade : l’agent ne peut pas résoudre seul et remonte à l’utilisateur.',
+      icon: <AlertTriangle size={8} />,
+    },
+    abort: {
+      color: 'var(--color-error)',
+      label: 'Abandon',
+      hint: 'Abandon : arrêt de la mission. Les actions déjà effectuées ne sont pas annulées automatiquement.',
+      icon: <XCircle size={8} />,
+    },
   };
   const c = config[decision] ?? config.continue;
   return (
     <span
       className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-xs font-bold uppercase"
       style={{ color: c.color, backgroundColor: `color-mix(in srgb, ${c.color} 6%, transparent)` }}
+      title={c.hint}
     >
       {c.icon} {c.label}
     </span>
@@ -151,7 +175,10 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
   const [missions, setMissions] = useState<MissionEntry[]>([]);
   const [expandedMission, setExpandedMission] = useState<string | null>(null);
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
-  const [approvals, setApprovals] = useState<PendingApproval[]>([]);
+  const prefersReducedMotion = useReducedMotion();
+  // Source partagée : les approbations en attente sont aussi lues par la barre
+  // de statut (pastille globale), pour rester visibles panneau fermé.
+  const approvals = usePendingApprovals();
   const [resolving, setResolving] = useState<string | null>(null);
   const [busyMission, setBusyMission] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -201,7 +228,7 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
       });
       // Qu'elle réussisse ou expire côté serveur, on retire la demande localement.
       if (res.ok || res.status === 404) {
-        setApprovals(prev => prev.filter(a => a.actionId !== actionId));
+        clearPendingApproval(actionId);
       }
     } catch (err) {
       console.error('[MissionPanel] Échec de résolution d\'approbation:', err);
@@ -278,28 +305,9 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
       const detail = (e as CustomEvent<MissionEvent>).detail;
       if (!detail || detail.type !== 'mission_event') return;
 
-      // ── Gestion des demandes d'approbation (état séparé) ──
-      if (detail.event === 'approval_required' && detail.actionId) {
-        setApprovals(prev => {
-          if (prev.some(a => a.actionId === detail.actionId)) return prev;
-          return [...prev, {
-            actionId: detail.actionId!,
-            missionId: detail.missionId,
-            skill: detail.skill ?? '?',
-            reason: detail.reason ?? 'Approbation requise.',
-            args: detail.args,
-            requestedAt: Date.now(),
-          }];
-        });
-      } else if (
-        detail.actionId &&
-        (detail.event === 'action_denied' ||
-          detail.event === 'approval_timeout' ||
-          detail.event === 'action_completed')
-      ) {
-        // L'action est résolue d'une manière ou d'une autre → retirer la demande.
-        setApprovals(prev => prev.filter(a => a.actionId !== detail.actionId));
-      }
+      // Les demandes d'approbation sont désormais gérées par le store partagé
+      // `usePendingApprovals` (écoute le même flux d'événements), afin de rester
+      // visibles hors du panneau. On ne les traite donc plus localement ici.
 
       setMissions(prev => {
         const existing = prev.find(m => m.id === detail.missionId);
@@ -520,9 +528,9 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
       <AnimatePresence>
         {showCreate && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
+            initial={prefersReducedMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            animate={prefersReducedMotion ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
             className="overflow-hidden flex-shrink-0"
             style={{ borderBottom: '1px solid var(--border-base)' }}
           >
@@ -664,11 +672,27 @@ function ApprovalCard({
     ? JSON.stringify(approval.args)
     : null;
 
+  // Compte à rebours aligné sur CriticalEditConfirm : sans réponse, la demande
+  // expire (le serveur applique le refus « fail-closed »). La couleur s'intensifie
+  // sous 10 s pour signaler l'urgence.
+  const totalMs = Math.max(1, approval.expiresAt - approval.requestedAt);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, []);
+  const remainingMs = Math.max(0, approval.expiresAt - now);
+  const secondsLeft = Math.ceil(remainingMs / 1000);
+  const progressPct = Math.min(100, Math.max(0, Math.round((remainingMs / totalMs) * 100)));
+  const urgent = secondsLeft <= 10;
+  const timerColor = urgent ? 'var(--color-error)' : 'var(--color-warning)';
+  const prefersReducedMotion = useReducedMotion();
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: -4 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, height: 0 }}
+      initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+      animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
       className="rounded-xl overflow-hidden"
       style={{
         backgroundColor: 'color-mix(in srgb, var(--color-warning) 8%, transparent)',
@@ -696,6 +720,23 @@ function ApprovalCard({
             {argsPreview}
           </p>
         )}
+
+        {/* Compte à rebours avant refus automatique */}
+        <div className="flex items-center gap-2 mb-1" aria-hidden={false}>
+          <Clock size={11} style={{ color: timerColor, flexShrink: 0 }} />
+          <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 15%, transparent)' }}>
+            <motion.div
+              className="h-full rounded-full"
+              style={{ backgroundColor: timerColor }}
+              initial={false}
+              animate={{ width: `${progressPct}%` }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.5, ease: 'linear' }}
+            />
+          </div>
+          <span className="text-xs font-mono tabular-nums" style={{ color: timerColor }}>
+            {secondsLeft}s
+          </span>
+        </div>
 
         <div className="flex items-center gap-2 mt-2">
           <button
@@ -779,15 +820,16 @@ function MissionCard({
   const isTerminal = mission.status === 'completed' || mission.status === 'failed';
   const [confirmDelete, setConfirmDelete] = useState(false);
   const confColor = confidenceColor(mission.confidence);
+  const prefersReducedMotion = useReducedMotion();
   const progress = mission.metrics.totalActions > 0
     ? Math.round((mission.metrics.successfulActions / mission.metrics.totalActions) * 100)
     : 0;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -4 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, height: 0 }}
+      initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+      animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
       className="rounded-xl overflow-hidden"
       style={{
         backgroundColor: isPaused

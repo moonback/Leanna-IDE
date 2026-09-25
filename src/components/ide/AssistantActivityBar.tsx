@@ -75,9 +75,9 @@ const StepRow = memo(function StepRow({
     <div
       className="flex items-start gap-2.5 px-3 py-2 mx-1.5 rounded-2xl"
       style={{
-        backgroundColor: isRun ? 'rgba(59,130,246,0.10)' : 'var(--bg-surface)',
+        backgroundColor: isRun ? 'color-mix(in srgb, var(--accent-primary) 10%, transparent)' : 'var(--bg-surface)',
         border: '1px solid var(--border-base)',
-        boxShadow: isRun ? '0 8px 20px rgba(59,130,246,0.08)' : 'inset 0 -1px 0 rgba(255,255,255,0.04)',
+        boxShadow: isRun ? '0 8px 20px color-mix(in srgb, var(--accent-primary) 8%, transparent)' : 'inset 0 -1px 0 rgba(255,255,255,0.04)',
       }}
     >
       <div
@@ -207,10 +207,10 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
           style={inline
             ? { borderTop: '1px solid var(--border-base)' }
             : {
-                backgroundColor: 'rgba(15, 23, 42, 0.92)',
-                border: '1px solid rgba(148, 163, 184, 0.18)',
-                borderTop: '1px solid rgba(255, 255, 255, 0.14)', // bright top edge = light catching the material
-                boxShadow: '0 24px 64px rgba(0,0,0,0.28)',
+                backgroundColor: 'color-mix(in srgb, var(--bg-panel) 92%, transparent)',
+                border: '1px solid var(--border-base)',
+                borderTop: '1px solid var(--border-strong, var(--border-base))', // bright top edge = light catching the material
+                boxShadow: 'var(--shadow-lg, 0 24px 64px rgba(0,0,0,0.28))',
                 backdropFilter: 'blur(18px)',
                 transformOrigin: 'bottom right', // grows from the corner it lives in
               }
@@ -220,8 +220,8 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
           <div
             className="flex items-center gap-2.5 px-4 py-3 cursor-pointer select-none"
             style={{
-              borderBottom: expanded ? '1px solid rgba(148,163,184,0.18)' : 'none',
-              backgroundColor: expanded ? 'rgba(255,255,255,0.02)' : 'transparent',
+              borderBottom: expanded ? '1px solid var(--border-base)' : 'none',
+              backgroundColor: expanded ? 'color-mix(in srgb, var(--text-primary) 2%, transparent)' : 'transparent',
             }}
             onClick={() => setExpanded(v => !v)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(v => !v); } }}

@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Code, GitBranch, Globe, Brain, Database,
-  FileText, Search, Loader2, Target, Users, FlaskConical,
-  RefreshCw, Shield, Eye, Building2,
+  FileText, Loader2, Target, FlaskConical,
+  RefreshCw, Shield, Eye, Building2, Wrench,
 } from 'lucide-react';
 import type { ActivityStep } from '../../hooks/useLiveAPI.js';
 
@@ -90,6 +90,13 @@ interface MultiAgentIndicatorProps {
   steps: ActivityStep[];
 }
 
+/**
+ * Nature du badge — distingue une vraie unité autonome (mission, agent de rôle)
+ * d'un simple appel d'outil personnifié. Cette distinction évite de laisser
+ * croire à une activité multi-agent là où il n'y a qu'un outil invoqué.
+ */
+type AgentKind = 'mission' | 'role' | 'tool';
+
 interface LiveAgent {
   id: string;
   name: string;
@@ -97,6 +104,7 @@ interface LiveAgent {
   color: string;
   isActive: boolean;
   expiresAt: number;
+  kind: AgentKind;
 }
 
 /**
@@ -188,7 +196,7 @@ export function MultiAgentIndicator({ steps }: MultiAgentIndicatorProps) {
       const agent = getAgentForTool(step.tool);
       if (agent && !agentSet.has(agent.id)) {
         agentSet.add(agent.id);
-        result.push({ ...agent, isActive: true, expiresAt: Infinity });
+        result.push({ ...agent, isActive: true, expiresAt: Infinity, kind: 'tool' });
       }
     }
 
@@ -198,7 +206,7 @@ export function MultiAgentIndicator({ steps }: MultiAgentIndicatorProps) {
       const agent = getAgentForTool(step.tool);
       if (agent && !agentSet.has(agent.id)) {
         agentSet.add(agent.id);
-        result.push({ ...agent, isActive: false, expiresAt: step.timestamp.getTime() + 5000 });
+        result.push({ ...agent, isActive: false, expiresAt: step.timestamp.getTime() + 5000, kind: 'tool' });
       }
     }
 
@@ -210,7 +218,7 @@ export function MultiAgentIndicator({ steps }: MultiAgentIndicatorProps) {
     const result: LiveAgent[] = [];
     const seenRoles = new Set<string>();
 
-    for (const [taskId, entry] of roleAgents) {
+    for (const entry of roleAgents.values()) {
       if (entry.expiresAt < now) continue;
       if (seenRoles.has(entry.role)) continue;
       seenRoles.add(entry.role);
@@ -222,6 +230,7 @@ export function MultiAgentIndicator({ steps }: MultiAgentIndicatorProps) {
           name: entry.name || def.name,
           isActive: entry.expiresAt > now + 5000, // If TTL > 5s, it's still running
           expiresAt: entry.expiresAt,
+          kind: 'role',
         });
       }
     }
@@ -240,6 +249,7 @@ export function MultiAgentIndicator({ steps }: MultiAgentIndicatorProps) {
         color: 'var(--accent-primary)',
         isActive: entry.expiresAt > now + 5000,
         expiresAt: entry.expiresAt,
+        kind: 'mission',
       });
     }
     return result;
@@ -265,44 +275,112 @@ export function MultiAgentIndicator({ steps }: MultiAgentIndicatorProps) {
     });
   }, [tick]);
 
-  const allVisible = [...missionBadges, ...roleAgentBadges, ...toolAgents];
+  // Unités réellement autonomes : missions + agents de rôle.
+  const autonomousBadges = [...missionBadges, ...roleAgentBadges];
+  // Appels d'outils personnifiés — présentés à part pour ne pas les confondre
+  // avec de vrais agents.
+  const toolBadges = toolAgents;
 
-  if (allVisible.length === 0) return null;
+  const prefersReducedMotion = useReducedMotion();
+
+  if (autonomousBadges.length === 0 && toolBadges.length === 0) return null;
+
+  const badgeMotion = prefersReducedMotion
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.15 } }
+    : {
+        initial: { opacity: 0, scale: 0.8, width: 0 },
+        animate: { opacity: 1, scale: 1, width: 'auto' as const },
+        exit: { opacity: 0, scale: 0.8, width: 0 },
+        transition: { duration: 0.2 },
+      };
 
   return (
-    <div className="flex items-center gap-1 flex-wrap">
+    <div
+      className="flex items-center gap-1.5 flex-wrap"
+      role="status"
+      aria-label="Agents et outils actifs"
+    >
+      {/* ── Agents autonomes (missions + rôles) : forme pleine, libellé en capitales ── */}
       <AnimatePresence mode="popLayout">
-        {allVisible.map((agent) => {
+        {autonomousBadges.map((agent) => {
           const Icon = agent.icon;
+          const stateLabel = agent.isActive ? 'actif' : 'terminé';
+          const kindLabel = agent.kind === 'mission' ? 'Mission' : 'Agent';
           return (
             <motion.div
               key={agent.id}
-              initial={{ opacity: 0, scale: 0.8, width: 0 }}
-              animate={{ opacity: 1, scale: 1, width: 'auto' }}
-              exit={{ opacity: 0, scale: 0.8, width: 0 }}
-              transition={{ duration: 0.2 }}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md overflow-hidden"
+              {...badgeMotion}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md overflow-hidden"
               style={{
-                backgroundColor: `${agent.color}12`,
-                border: `1px solid ${agent.color}${agent.isActive ? '35' : '18'}`,
+                backgroundColor: `color-mix(in srgb, ${agent.color} 12%, transparent)`,
+                border: `1px solid color-mix(in srgb, ${agent.color} ${agent.isActive ? '40%' : '20%'}, transparent)`,
               }}
-              title={`${agent.name} ${agent.isActive ? '(actif)' : '(récent)'}`}
+              title={`${kindLabel} · ${agent.name} — ${stateLabel}`}
             >
               {agent.isActive ? (
-                <Loader2 size={9} className="animate-spin" style={{ color: agent.color }} />
+                <Loader2 size={12} className={prefersReducedMotion ? '' : 'animate-spin'} style={{ color: agent.color }} />
               ) : (
-                <Icon size={9} style={{ color: agent.color, opacity: 0.7 }} />
+                <Icon size={12} style={{ color: agent.color, opacity: 0.75 }} />
               )}
               <span
                 className="text-xs font-semibold uppercase whitespace-nowrap"
-                style={{ color: agent.color, opacity: agent.isActive ? 1 : 0.6 }}
+                style={{ color: agent.color, opacity: agent.isActive ? 1 : 0.65 }}
               >
                 {agent.name}
+              </span>
+              {/* Statut en toutes lettres (ne repose pas que sur la couleur) */}
+              <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-dimmed)' }}>
+                {stateLabel}
               </span>
             </motion.div>
           );
         })}
       </AnimatePresence>
+
+      {/* ── Séparateur visuel entre agents autonomes et outils ── */}
+      {autonomousBadges.length > 0 && toolBadges.length > 0 && (
+        <span
+          aria-hidden="true"
+          className="h-3.5 w-px flex-shrink-0"
+          style={{ backgroundColor: 'var(--border-base)' }}
+        />
+      )}
+
+      {/* ── Outils invoqués : forme discrète (pilule, icône Wrench, minuscules) ── */}
+      {toolBadges.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap" title="Outils invoqués (pas des agents autonomes)">
+          <Wrench size={11} style={{ color: 'var(--text-dimmed)', flexShrink: 0 }} aria-hidden="true" />
+          <AnimatePresence mode="popLayout">
+            {toolBadges.map((tool) => {
+              const Icon = tool.icon;
+              return (
+                <motion.div
+                  key={tool.id}
+                  {...badgeMotion}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-full overflow-hidden"
+                  style={{
+                    backgroundColor: 'var(--bg-input)',
+                    border: '1px solid var(--border-base)',
+                  }}
+                  title={`Outil · ${tool.name} — ${tool.isActive ? 'en cours' : 'récent'}`}
+                >
+                  {tool.isActive ? (
+                    <Loader2 size={11} className={prefersReducedMotion ? '' : 'animate-spin'} style={{ color: tool.color }} />
+                  ) : (
+                    <Icon size={11} style={{ color: tool.color, opacity: 0.7 }} />
+                  )}
+                  <span
+                    className="text-xs font-medium whitespace-nowrap"
+                    style={{ color: 'var(--text-muted)', opacity: tool.isActive ? 1 : 0.7 }}
+                  >
+                    {tool.name}
+                  </span>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }

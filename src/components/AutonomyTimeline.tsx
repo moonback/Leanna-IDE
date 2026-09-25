@@ -65,6 +65,53 @@ function EventIcon({ event }: { event: AutonomyEventType }) {
   }
 }
 
+/**
+ * Phrase de vérité : décrit ce que le runtime fait *réellement* en ce moment,
+ * dérivé de son statut live. Évite l'écart attente/réalité relevé dans l'audit
+ * (docs contradictoires « observe mais n'agit pas » vs chaîne perception→action
+ * réellement câblée). La source unique est l'état du runtime, pas la doc.
+ */
+function autonomyScope(status: string | undefined, activeTasks: number): {
+  acting: boolean;
+  text: string;
+} {
+  switch (status) {
+    case 'executing':
+      return {
+        acting: true,
+        text:
+          activeTasks > 0
+            ? `Le système agit en ce moment : ${activeTasks} tâche${activeTasks > 1 ? 's' : ''} en cours d'exécution.`
+            : "Le système exécute une action de façon autonome.",
+      };
+    case 'watching':
+      return {
+        acting: true,
+        text: "Le système surveille activement et peut décider d'agir seul selon vos garde-fous.",
+      };
+    case 'idle':
+      return {
+        acting: false,
+        text: "Le système est en veille active : il observe, sans action en cours.",
+      };
+    case 'sleeping':
+      return {
+        acting: false,
+        text: 'Le système est en sommeil : ni observation ni action pour le moment.',
+      };
+    case 'error':
+      return {
+        acting: false,
+        text: "Le runtime autonome est en erreur : aucune action n'est entreprise.",
+      };
+    default:
+      return {
+        acting: false,
+        text: 'Portée de l\u2019autonomie en cours de détermination…',
+      };
+  }
+}
+
 function StatusIcon({ status }: { status: string }) {
   const cls = 'w-3.5 h-3.5';
   switch (status) {
@@ -125,6 +172,7 @@ export function AutonomyTimeline({ enabled = true, className = '' }: AutonomyTim
 
   const runningTasks = tasks.filter((t) => t.status === 'running' || t.status === 'pending');
   const online = connection === 'open';
+  const scope = autonomyScope(state?.status, state?.activeTasks ?? 0);
 
   const itemMotion = prefersReducedMotion
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.15 } }
@@ -158,6 +206,35 @@ export function AutonomyTimeline({ enabled = true, className = '' }: AutonomyTim
           >
             {online ? 'En direct' : connection === 'connecting' ? 'Connexion…' : 'Hors ligne'}
           </span>
+        </div>
+      </div>
+
+      {/* Phrase de vérité : ce que le système fait réellement, en direct */}
+      <div
+        className="flex items-start gap-2 px-4 py-2.5 border-b"
+        style={{
+          borderColor: 'var(--border-base)',
+          backgroundColor: scope.acting
+            ? 'color-mix(in srgb, var(--color-info) 8%, transparent)'
+            : 'var(--bg-secondary)',
+        }}
+        role="status"
+      >
+        {scope.acting ? (
+          <Play className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-info)' }} />
+        ) : (
+          <Activity className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
+        )}
+        <div className="min-w-0">
+          <span
+            className="text-xs font-semibold uppercase tracking-wider"
+            style={{ color: scope.acting ? 'var(--color-info)' : 'var(--text-muted)' }}
+          >
+            {scope.acting ? 'Autonomie active' : 'Observation'}
+          </span>
+          <p className="text-sm leading-snug mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+            {scope.text}
+          </p>
         </div>
       </div>
 

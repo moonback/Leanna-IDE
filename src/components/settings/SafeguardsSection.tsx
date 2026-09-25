@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import { ShieldCheck, History, FileWarning, RotateCcw, Play, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { Section, Field, ToggleSwitch } from './SettingsPrimitives.js';
+import { AutonomyLevelSelector } from '../autonomy/AutonomyLevelSelector.js';
+import { useSafeguardsConfig, type SafeguardsConfig } from '../../hooks/useSafeguardsConfig.js';
 
 interface Checkpoint {
   hash: string;
@@ -9,48 +11,19 @@ interface Checkpoint {
   date: string;
 }
 
-type AutonomyLevel = 'manual' | 'semi' | 'autonomous';
-
-interface SafeguardsConfig {
-  autoCheckpoint: boolean;
-  postEditValidation: boolean;
-  criticalFileConfirm: boolean;
-  autoRestart: boolean;
-  criticalFiles: string[];
-  autonomyLevel?: AutonomyLevel;
-}
-
 export function SafeguardsSection() {
-  const [config, setConfig] = useState<SafeguardsConfig>({
-    autoCheckpoint: true,
-    postEditValidation: true,
-    criticalFileConfirm: true,
-    autoRestart: true,
-    criticalFiles: ['server.ts', 'server/security.ts', '.env', '.env.local', 'package.json'],
-    autonomyLevel: 'manual',
-  });
+  const { config, update } = useSafeguardsConfig();
+  const saveConfig = (next: SafeguardsConfig) => { void update(next); };
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [loadingCheckpoints, setLoadingCheckpoints] = useState(false);
   const [validationStatus, setValidationStatus] = useState<'idle' | 'running' | 'pass' | 'fail'>('idle');
-  const [saving, setSaving] = useState(false);
   const hasFetched = useRef(false);
 
   useEffect(() => {
     if (hasFetched.current) return;
     hasFetched.current = true;
-    fetchConfig();
     fetchCheckpoints();
   }, []);
-
-  const fetchConfig = async () => {
-    try {
-      const res = await fetch('/api/safeguards/config');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.config) setConfig(data.config);
-      }
-    } catch { /* use defaults */ }
-  };
 
   const fetchCheckpoints = async () => {
     setLoadingCheckpoints(true);
@@ -62,19 +35,6 @@ export function SafeguardsSection() {
       }
     } catch { setCheckpoints([]); }
     finally { setLoadingCheckpoints(false); }
-  };
-
-  const saveConfig = async (newConfig: SafeguardsConfig) => {
-    setConfig(newConfig);
-    setSaving(true);
-    try {
-      await fetch('/api/safeguards/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newConfig),
-      });
-    } catch { /* silent */ }
-    finally { setSaving(false); }
   };
 
   const runValidation = async () => {
@@ -108,6 +68,17 @@ export function SafeguardsSection() {
       description="Protections actives quand l'IA modifie son propre code source"
       badge="PHASE 2"
     >
+      {/* ─── Niveau d'autonomie ─── */}
+      <Field
+        label="Niveau d'autonomie"
+        hint="Détermine jusqu'où l'IA peut agir seule avant de demander votre aval."
+      >
+        <AutonomyLevelSelector
+          value={config.autonomyLevel ?? 'manual'}
+          onChange={level => saveConfig({ ...config, autonomyLevel: level })}
+        />
+      </Field>
+
       {/* ─── Toggles ─── */}
       <div className="flex flex-col gap-1">
         <ToggleSwitch

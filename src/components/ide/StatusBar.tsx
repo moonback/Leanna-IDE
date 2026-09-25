@@ -30,6 +30,7 @@ import { useProfile } from '../../context/UserProfileContext.js';
 import { type TelegramStatus } from './TelegramStatusModal.js';
 import { formatExactTokenCount, formatTokenCount } from '../../utils/tokenFormatting.js';
 import { getAgentTasks, getToolActivities, subscribe as subscribeActivity } from '../../stores/agentActivityStore.js';
+import { usePendingApprovalCount } from '../../hooks/usePendingApprovals.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -275,6 +276,9 @@ export const StatusBar = memo(function StatusBar({
   // puis mis à jour en temps réel via les événements 'Leanna-mission-event',
   // exactement comme le MissionPanel.
   const [activeMissionCount, setActiveMissionCount] = useState(0);
+
+  // Demandes d'approbation en attente — source partagée, visibles même panneau fermé.
+  const pendingApprovalCount = usePendingApprovalCount();
 
   // ── Telegram ───────────────────────────────────────────────────────────────
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
@@ -691,12 +695,18 @@ export const StatusBar = memo(function StatusBar({
     {
       key: 'missions',
       icon: Target,
+      // Une approbation en attente prime sur le nombre de missions actives :
+      // c'est une action qui réclame l'aval de l'utilisateur (boucle humaine).
       label: 'Missions',
-      description: activeMissionCount > 0 ? `${activeMissionCount} active${activeMissionCount > 1 ? 's' : ''}` : 'Ouvrir le panneau',
+      description: pendingApprovalCount > 0
+        ? `${pendingApprovalCount} approbation${pendingApprovalCount > 1 ? 's' : ''} en attente`
+        : activeMissionCount > 0
+          ? `${activeMissionCount} active${activeMissionCount > 1 ? 's' : ''}`
+          : 'Ouvrir le panneau',
       onClick: () => { onToggleMissions?.(); setShowToolsMenu(false); },
-      iconColor: 'var(--color-info)',
-      count: activeMissionCount,
-      countColor: 'var(--color-info)',
+      iconColor: pendingApprovalCount > 0 ? 'var(--color-warning)' : 'var(--color-info)',
+      count: pendingApprovalCount > 0 ? pendingApprovalCount : activeMissionCount,
+      countColor: pendingApprovalCount > 0 ? 'var(--color-warning)' : 'var(--color-info)',
     },
     'divider',
     {
@@ -725,7 +735,7 @@ export const StatusBar = memo(function StatusBar({
     },
   ];
 
-  const toolsMenuBadgeCount = activeAgentCount + activeMissionCount;
+  const toolsMenuBadgeCount = activeAgentCount + activeMissionCount + pendingApprovalCount;
 
   return (
     <>
@@ -881,7 +891,10 @@ export const StatusBar = memo(function StatusBar({
             <span>Outils</span>
             {toolsMenuBadgeCount > 0 && (
               <span className="absolute -top-1 -right-1">
-                <CountBadge value={toolsMenuBadgeCount} color="var(--accent-primary)" />
+                <CountBadge
+                  value={toolsMenuBadgeCount}
+                  color={pendingApprovalCount > 0 ? 'var(--color-warning)' : 'var(--accent-primary)'}
+                />
               </span>
             )}
           </button>

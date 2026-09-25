@@ -36,8 +36,12 @@ export const SelfEditBanner = React.memo(function SelfEditBanner({
           <div
             className="flex items-center gap-2.5 px-3.5 py-2 text-xs border-b"
             style={{
-              borderColor: isCritical ? 'rgba(239,68,68,0.3)' : 'rgba(168,85,247,0.2)',
-              backgroundColor: isCritical ? 'rgba(239,68,68,0.06)' : 'rgba(168,85,247,0.04)',
+              borderColor: isCritical
+                ? 'color-mix(in srgb, var(--color-error) 30%, transparent)'
+                : 'color-mix(in srgb, var(--color-accent-alt) 20%, transparent)',
+              backgroundColor: isCritical
+                ? 'color-mix(in srgb, var(--color-error) 6%, transparent)'
+                : 'color-mix(in srgb, var(--color-accent-alt) 4%, transparent)',
             }}
           >
             <AlertTriangle
@@ -49,7 +53,7 @@ export const SelfEditBanner = React.memo(function SelfEditBanner({
               {' — '}
               <span className="font-mono opacity-80">{editingFile}</span>
               {isCritical && (
-                <span className="ml-1.5 text-xs px-1 py-0.5 rounded font-semibold" style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: 'var(--color-error)' }}>
+                <span className="ml-1.5 text-xs px-1 py-0.5 rounded font-semibold" style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 15%, transparent)', color: 'var(--color-error)' }}>
                   CRITIQUE
                 </span>
               )}

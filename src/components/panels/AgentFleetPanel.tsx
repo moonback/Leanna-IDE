@@ -7,7 +7,7 @@
  * - Métriques: taux de succès, dead-letter, subscriptions
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Users, Radio, BarChart3, RefreshCw, Loader2, X,
   AlertTriangle, ArrowRight, Zap, FlaskConical, FileText,
@@ -126,6 +126,12 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const busRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  // Transition des onglets : simple fondu, neutralisé si mouvement réduit.
+  const tabFade = prefersReducedMotion
+    ? { initial: { opacity: 1 }, animate: { opacity: 1 }, exit: { opacity: 1 } }
+    : { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } };
 
   const { permission, requestPermission } = useAgentNotifications({
     notifyOnComplete: notificationsEnabled,
@@ -328,7 +334,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0" ref={tab === 'bus' ? busRef : undefined}>
         <AnimatePresence mode="wait">
           {tab === 'fleet' && (
-            <motion.div key="fleet" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-3 space-y-2">
+            <motion.div key="fleet" {...tabFade} className="p-3 space-y-2">
               {isFirstLoad ? <LoadingState /> : !fleet?.initialized || !fleet?.summary ? (
                 <EmptyState icon={Zap} title="Flotte non initialisée" sub={fleet?.message ?? 'Lancez une tâche pour démarrer la flotte.'} />
               ) : (
@@ -342,7 +348,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
             </motion.div>
           )}
           {tab === 'bus' && (
-            <motion.div key="bus" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-2 space-y-0.5">
+            <motion.div key="bus" {...tabFade} className="p-2 space-y-0.5">
               {isFirstLoad ? <LoadingState /> : messages.length === 0 ? (
                 <EmptyState icon={Radio} title="Aucun message" sub="Les communications inter-agents apparaîtront ici." />
               ) : (
@@ -351,7 +357,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
             </motion.div>
           )}
           {tab === 'metrics' && (
-            <motion.div key="metrics" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-3 space-y-4">
+            <motion.div key="metrics" {...tabFade} className="p-3 space-y-4">
               {isFirstLoad ? <LoadingState /> : metrics ? <MetricsView metrics={metrics} /> : (
                 <EmptyState icon={BarChart3} title="Aucune donnée" sub="Les métriques apparaîtront après la première tâche." />
               )}
@@ -414,10 +420,10 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
             borderRadius: '16px',
             boxShadow: '0 25px 60px rgba(0,0,0,0.4)',
           }}
-          initial={{ scale: 0.95, y: 12, opacity: 0 }}
-          animate={{ scale: 1, y: 0, opacity: 1 }}
-          exit={{ scale: 0.95, y: 12, opacity: 0 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
+          initial={prefersReducedMotion ? { opacity: 0 } : { scale: 0.95, y: 12, opacity: 0 }}
+          animate={prefersReducedMotion ? { opacity: 1 } : { scale: 1, y: 0, opacity: 1 }}
+          exit={prefersReducedMotion ? { opacity: 0 } : { scale: 0.95, y: 12, opacity: 0 }}
+          transition={{ duration: prefersReducedMotion ? 0.15 : 0.2, ease: 'easeOut' }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Modal Header */}
