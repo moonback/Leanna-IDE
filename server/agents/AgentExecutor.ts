@@ -32,8 +32,21 @@ import { setTelemetryContext, clearTelemetryContext } from "../utils/textGenerat
 
 const log = createLogger("AgentExecutor");
 
+/**
+ * Options transmises à un appel d'outil via le `SkillHandler`.
+ * Le champ `signal` porte le kill-switch temps-réel : quand il est déclenché,
+ * le `ToolRegistry` interrompt l'appel en cours et le propage au handler.
+ */
+export interface SkillHandlerOptions {
+  signal?: AbortSignal;
+}
+
 /** Handler externe pour exécuter les actions d'un agent */
-export type SkillHandler<TArgs = unknown, TResult = unknown> = (name: string, args: TArgs) => Promise<TResult>;
+export type SkillHandler<TArgs = unknown, TResult = unknown> = (
+  name: string,
+  args: TArgs,
+  options?: SkillHandlerOptions
+) => Promise<TResult>;
 
 /**
  * Erreur levée lorsqu'une tâche en cours est annulée par l'utilisateur.
@@ -42,8 +55,20 @@ export type SkillHandler<TArgs = unknown, TResult = unknown> = (name: string, ar
  */
 export class CancellationError extends Error {
   constructor(taskId: string) {
-    super(`Tâche ${taskId.slice(0, 8)} annulée par l'utilisateur`);
+    super(taskId ? `Tâche ${taskId.slice(0, 8)} annulée par l'utilisateur` : "Tâche annulée par l'utilisateur");
     this.name = "CancellationError";
+  }
+}
+
+/**
+ * Marqueur interne : le signal d'annulation d'un appel d'outil s'est déclenché
+ * pendant la course `callToolWithTimeout`. Converti en `CancellationError` par
+ * le catch, jamais propagé tel quel au reste de l'exécuteur.
+ */
+class ToolAbortedSignal extends Error {
+  constructor(toolName: string) {
+    super(`Outil "${toolName}" interrompu (kill-switch)`);
+    this.name = "ToolAbortedSignal";
   }
 }
 
@@ -174,8 +199,15 @@ export class AgentExecutor implements AgentTaskRunner {
    */
   private async callToolWithTimeout(
     toolName: string,
-    args: Record<string, unknown>
+    args: Record<string, unknown>,
+    signal?: AbortSignal
   ): Promise<any> {
+    // Kill-switch temps-réel : si la tâche est déjà annulée, ne pas lancer
+    // l'outil du tout.
+    if (signal?.aborted) {
+      throw new CancellationError("");
+    }
+
     const timeoutMs = AgentExecutor.TOOL_TIMEOUTS[toolName] ?? 
                      AgentExecutor.TOOL_TIMEOUTS['default'];
     
@@ -186,13 +218,33 @@ export class AgentExecutor implements AgentTaskRunner {
       }, timeoutMs);
     });
 
+    // Course additionnelle contre l'annulation : dès que le signal se déclenche,
+    // `callToolWithTimeout` rejette immédiatement (le ToolRegistry, qui a reçu
+    // le même signal, interrompt de son côté le handler sous-jacent).
+    let abortListener: (() => void) | undefined;
+    const abortPromise = signal
+      ? new Promise<never>((_, reject) => {
+          abortListener = () => reject(new ToolAbortedSignal(toolName));
+          signal.addEventListener("abort", abortListener, { once: true });
+        })
+      : null;
+
     try {
       const handler = this.skillHandler!;
-      const toolPromise = handler(toolName, args);
+      // Propagation du signal jusqu'au ToolRegistry.call via les options.
+      const toolPromise = handler(toolName, args, { signal });
       
-      // Course entre le tool et le timeout
-      return await Promise.race([toolPromise, timeoutPromise]);
+      // Course entre le tool, le timeout et l'annulation
+      const racers: Promise<any>[] = [toolPromise, timeoutPromise];
+      if (abortPromise) racers.push(abortPromise);
+      return await Promise.race(racers);
     } catch (error) {
+      // Annulation temps-réel : convertir en CancellationError pour que la
+      // boucle d'exécution la traite comme un arrêt volontaire (statut
+      // "cancelled"), et non comme un échec d'outil.
+      if (error instanceof ToolAbortedSignal || signal?.aborted) {
+        throw new CancellationError("");
+      }
       // Si l'erreur vient du timeout, ajouter des infos contextuelles
       if ((error as Error).message.includes('timeout')) {
         throw new Error(`[${toolName}] ${(error as Error).message}`);
@@ -201,6 +253,9 @@ export class AgentExecutor implements AgentTaskRunner {
     } finally {
       if (timer) {
         clearTimeout(timer);
+      }
+      if (signal && abortListener) {
+        signal.removeEventListener("abort", abortListener);
       }
     }
   }
@@ -215,9 +270,9 @@ export class AgentExecutor implements AgentTaskRunner {
    * `AgentTaskRunner.runTool`). Permet à la boucle autonome de relancer une
    * vérification sans accéder au handler privé.
    */
-  async runTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+  async runTool(name: string, args: Record<string, unknown>, options?: SkillHandlerOptions): Promise<unknown> {
     if (!this.skillHandler) throw new Error("SkillHandler non initialisé");
-    return this.skillHandler(name, args);
+    return this.skillHandler(name, args, options);
   }
 
   /** Retourne le nombre de tâches en cours pour un rôle */
@@ -255,6 +310,15 @@ export class AgentExecutor implements AgentTaskRunner {
     if (this.abortControllers.get(taskId)?.signal.aborted) {
       throw new CancellationError(taskId);
     }
+  }
+
+  /**
+   * Retourne l'`AbortSignal` de la tâche en cours, s'il existe. Propagé jusqu'au
+   * `ToolRegistry.call` pour interrompre un outil long-running en temps réel.
+   */
+  private getTaskSignal(taskId?: string): AbortSignal | undefined {
+    if (!taskId) return undefined;
+    return this.abortControllers.get(taskId)?.signal;
   }
 
   /**
@@ -349,7 +413,7 @@ export class AgentExecutor implements AgentTaskRunner {
       log.debug(`[task:${taskShortId}] [${agent.name}] 📊 Budget: max ${AgentExecutor.EXECUTION_BUDGET.maxToolCalls} appels outils, ${AgentExecutor.EXECUTION_BUDGET.maxFilesRead} fichiers lus, ${Math.round(AgentExecutor.EXECUTION_BUDGET.maxContextChars / 1000)}k chars contexte`);
       const thinkResult = await this.callToolWithTimeout("agent_execute", {
         prompt: executionPrompt,
-      });
+      }, this.getTaskSignal(task.id));
 
       const initialResultText = this.resultParser.normalizeResult(thinkResult);
       log.debug(`[task:${taskShortId}] [${agent.name}] 🤖 Réponse initiale: ${initialResultText.length} chars`);
@@ -642,7 +706,7 @@ export class AgentExecutor implements AgentTaskRunner {
           "Fournis un résumé de tes découvertes et recommandations.",
         ].join("\n");
         
-        const budgetFollowUp = await this.callToolWithTimeout("agent_execute", { prompt: budgetPrompt });
+        const budgetFollowUp = await this.callToolWithTimeout("agent_execute", { prompt: budgetPrompt }, this.getTaskSignal(task.id));
         state.resultText = this.resultParser.normalizeResult(budgetFollowUp);
         break;
       }
@@ -706,7 +770,7 @@ export class AgentExecutor implements AgentTaskRunner {
           `2. Déclarer explicitement pourquoi tu es bloqué avec "## Blocage\nCause: <raison précise>" si une erreur externe t'en empêche.\n` +
           `N'émet plus de tool_calls de lecture (read_project_file, search_in_files, list_project_files).`,
         ].join("\n");
-        const forcedFollowUp = await this.callToolWithTimeout("agent_execute", { prompt: forcePrompt });
+        const forcedFollowUp = await this.callToolWithTimeout("agent_execute", { prompt: forcePrompt }, this.getTaskSignal(task.id));
         state.resultText = this.resultParser.normalizeResult(forcedFollowUp);
 
         // ── Exécuter les tool_calls d'écriture présents dans la réponse forcée ──
@@ -753,7 +817,7 @@ export class AgentExecutor implements AgentTaskRunner {
       ].join("\n");
       const followUp = await this.callToolWithTimeout("agent_execute", {
         prompt: followUpPrompt,
-      });
+      }, this.getTaskSignal(task.id));
       state.resultText = this.resultParser.normalizeResult(followUp);
     }
 
@@ -1061,7 +1125,7 @@ ${truncated}
         const argSummary = JSON.stringify(call.parameters).slice(0, 150);
         log.debug(`[${agent.name}] ⚙️  ${call.name}(${argSummary})`);
         const toolStart = Date.now();
-        const result = await this.callToolWithTimeout(call.name, call.parameters);
+        const result = await this.callToolWithTimeout(call.name, call.parameters, this.getTaskSignal(taskId));
         const toolMs = Date.now() - toolStart;
         log.debug(`[${agent.name}] ⚙️  ${call.name} → ${result?.status ?? (result?.ok === false ? "failed" : "ok")} (${toolMs}ms)`);
         state.toolsExecuted.push(call.name);
@@ -1094,7 +1158,7 @@ ${truncated}
             continue;
           }
 
-          const verification = await this.callToolWithTimeout("verify_file", { path: requestedPath });
+          const verification = await this.callToolWithTimeout("verify_file", { path: requestedPath }, this.getTaskSignal(taskId));
           state.toolsExecuted.push("verify_file");
           const record = verification?.verificationRecord;
           if (!this.isVerificationRecord(record)) state.workspace.markError(requestedPath, "verify_file n'a pas retourné de preuve hashée structurée.");

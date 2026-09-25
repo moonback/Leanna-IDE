@@ -50,6 +50,21 @@ export interface ToolCallOptions {
    * suivre l'état global.
    */
   dryRun?: boolean;
+  /**
+   * Signal d'annulation (kill-switch temps-réel).
+   *
+   * Quand fourni, l'appel est interrompu dès que le signal est déclenché :
+   *   - avant l'exécution : rejet immédiat sans lancer le handler ;
+   *   - pendant l'exécution : la promesse `call()` se résout en erreur
+   *     `ToolAbortedError` sans attendre la fin du handler, et le signal est
+   *     propagé au handler via `context.signal` afin qu'un handler coopératif
+   *     (ex. `run_project_command`) tue réellement le sous-processus en cours.
+   *
+   * C'est le maillon qui rend l'annulation « temps-réel » : sans lui, une
+   * action longue (build de 10 min) tournait jusqu'à son terme même après
+   * l'annulation de la tâche.
+   */
+  signal?: AbortSignal;
 }
 
 export interface ToolRegistryConfig {
@@ -242,6 +257,12 @@ export class ToolRegistry {
     args: Record<string, unknown>,
     options: ToolCallOptions = {}
   ): Promise<unknown> {
+    // Kill-switch temps-réel : si le signal est déjà déclenché, on n'entame
+    // même pas l'appel. Court-circuite aussi le cache et la simulation.
+    if (options.signal?.aborted) {
+      throw new ToolAbortedError(name);
+    }
+
     // Cache pour read_project_file et list_project_files
     if (name === 'read_project_file' || name === 'list_project_files') {
       const key = `${name}:${JSON.stringify(args)}`;
@@ -305,7 +326,8 @@ export class ToolRegistry {
           entry.definition.handler,
           args,
           timeoutMs,
-          options.context
+          options.context,
+          options.signal
         );
 
         // Mettre en cache pour les outils de lecture
@@ -321,6 +343,12 @@ export class ToolRegistry {
         return result;
       } catch (err) {
         lastError = err as Error;
+        // Une annulation ne se retente jamais : le kill-switch doit être
+        // immédiat et définitif pour cet appel.
+        if (err instanceof ToolAbortedError || options.signal?.aborted) {
+          if (!(err instanceof ToolAbortedError)) lastError = new ToolAbortedError(name);
+          break;
+        }
         if (attempt < maxRetries) {
           // Backoff exponentiel : 1s → 2s → 4s (max)
           await this.sleep(Math.min(1000 * Math.pow(2, attempt), 4000));
@@ -377,27 +405,59 @@ export class ToolRegistry {
     handler: ToolHandler,
     args: Record<string, unknown>,
     timeoutMs: number,
-    context?: any
+    context?: any,
+    signal?: AbortSignal
   ): Promise<unknown> {
+    // Le signal est propagé au handler via le contexte : un handler coopératif
+    // (ex. `run_project_command`) peut alors tuer son sous-processus. On ne
+    // modifie jamais l'objet fourni par l'appelant (clone superficiel).
+    const handlerContext =
+      signal !== undefined
+        ? { ...(context ?? {}), signal }
+        : context;
+
     return new Promise<unknown>((resolve, reject) => {
+      let settled = false;
+      const finish = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (signal) signal.removeEventListener("abort", onAbort);
+        fn();
+      };
+
       const timer = setTimeout(() => {
-        reject(new ToolTimeoutError(timeoutMs));
+        finish(() => reject(new ToolTimeoutError(timeoutMs)));
       }, timeoutMs);
 
-      // Essayer d'appeler avec contexte si le handler l'accepte ( pour compatibilité legacy)
-      // Les handlers modernes prennent seulement args, mais les handlers legacy peuvent prendre context
-      const resultPromise = (handler as any).length >= 3 
-        ? (handler as any)(args, context)
+      // Kill-switch temps-réel : dès que le signal se déclenche, `call()` se
+      // résout en erreur SANS attendre la fin du handler. Le handler coopératif
+      // reçoit le même signal via le contexte et libère ses ressources
+      // (processus enfant, requête réseau…) de son côté.
+      const onAbort = () => finish(() => reject(new ToolAbortedError(handlerName(handler))));
+      if (signal) {
+        if (signal.aborted) {
+          finish(() => reject(new ToolAbortedError(handlerName(handler))));
+          return;
+        }
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      // Essayer d'appeler avec contexte si le handler l'accepte (compat legacy +
+      // propagation du signal). Les handlers modernes déclarés directement dans
+      // le registre prennent seulement `args` (arité 1) ; les handlers adaptés
+      // depuis les skills legacy prennent `(args, context)` (arité ≥ 2) et
+      // reçoivent ainsi le contexte par appel — dont `context.signal`.
+      const resultPromise = (handler as any).length >= 2
+        ? (handler as any)(args, handlerContext)
         : handler(args);
 
       resultPromise
         .then((result: unknown) => {
-          clearTimeout(timer);
-          resolve(result);
+          finish(() => resolve(result));
         })
         .catch((err: any) => {
-          clearTimeout(timer);
-          reject(err);
+          finish(() => reject(err));
         });
     });
   }
@@ -483,6 +543,27 @@ export class ToolTimeoutError extends Error {
     super(`Outil timeout après ${timeoutMs}ms`);
     this.name = "ToolTimeoutError";
   }
+}
+
+/**
+ * Erreur levée lorsqu'un appel d'outil est interrompu par le kill-switch
+ * temps-réel (AbortSignal déclenché avant ou pendant l'exécution).
+ *
+ * Distincte de `ToolTimeoutError` : ici l'arrêt est volontaire (annulation
+ * utilisateur / budget dépassé), pas un dépassement de délai. Les couches
+ * supérieures (AgentExecutor) peuvent la mapper vers un statut `cancelled`.
+ */
+export class ToolAbortedError extends Error {
+  constructor(toolName?: string) {
+    super(toolName ? `Outil "${toolName}" interrompu (annulation)` : "Outil interrompu (annulation)");
+    this.name = "ToolAbortedError";
+  }
+}
+
+/** Nom lisible d'un handler pour les messages d'erreur (best-effort). */
+function handlerName(handler: ToolHandler): string | undefined {
+  const n = (handler as { name?: string })?.name;
+  return n && n !== "handler" && n !== "" ? n : undefined;
 }
 
 export class ToolPermissionError extends Error {

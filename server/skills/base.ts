@@ -64,6 +64,13 @@ export interface SkillContext {
   /** Drapeaux d'attente d'action / lecture navigateur */
   browserReadPending?: boolean;
   browserActionPending?: boolean;
+  /**
+   * Signal d'annulation temps-réel (kill-switch). Propagé par le ToolRegistry
+   * jusqu'aux handlers coopératifs : un outil long-running (ex.
+   * `run_project_command`) doit le transmettre à son sous-processus/requête
+   * pour un arrêt immédiat quand la tâche est annulée.
+   */
+  signal?: AbortSignal;
 }
 
 /**

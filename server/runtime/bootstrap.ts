@@ -96,8 +96,11 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   // 1.5. Configurer l'AgentOrchestrator pour utiliser le ToolRegistry du runtime (timeout corrigé)
   // Import dynamique pour éviter la dépendance circulaire
   const { agentOrchestrator } = await import("../agents/AgentOrchestrator.js");
-  agentOrchestrator.setSkillHandler((name: string, args: any) => 
-    runtime.tools.call(name, args)
+  // Le 3e argument (options) porte le kill-switch temps-réel : le signal
+  // remonte de l'AgentExecutor jusqu'au ToolRegistry.call, qui interrompt
+  // l'outil en cours (ex. build de 10 min) dès l'annulation.
+  agentOrchestrator.setSkillHandler((name: string, args: any, options?: { signal?: AbortSignal }) =>
+    runtime.tools.call(name, args, { signal: options?.signal })
   );
 
   // 2. Créer le SkillManagerV2 qui partage le ToolRegistry du runtime

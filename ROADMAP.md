@@ -150,12 +150,12 @@ Ces cinq paris structurent toute la roadmap. Chacun transforme une force existan
 | Fonctionnalité | Prio | Effort | Statut |
 |---|---|---|---|
 | ✅ ~~Validation de schéma Zod du plan LLM~~ | P0 | S | ✅ Livré (`DynamicPlanner.parseLLMPlanResponse` + `DynamicPlanner.test.ts`) |
-| ✅ ~~Appliquer les budgets (arrêt dur au dépassement)~~ | P0 | M | ✅ Livré par action (`Executor.executeAction` → `checkBudget → abort`) ; 🟡 arrêt temps-réel manquant |
+| ✅ ~~Appliquer les budgets (arrêt dur au dépassement)~~ | P0 | M | ✅ Livré par action (`Executor.executeAction` → `checkBudget → abort`) ; ✅ arrêt temps-réel via `AbortSignal` propagé au `ToolRegistry.call` |
 | **Exporter OpenTelemetry réel** (OTLP → Jaeger/Tempo local en container) — les traces existent mais ne sortent nulle part | P0 | S | 📋 |
 | **CI GitHub Actions bloquante** : lint + typecheck + test + build + `npm audit` à chaque PR | P0 | M | 📋 |
 | **Reconnexion WebSocket auto** (backoff exponentiel) sur `/live`, `/terminal`, `/sandbox-watch`, `/autonomy` | P0 | S | 📋 |
 | **Scan + redaction de secrets** dans logs, traces, prompts et avant tout commit/push agent | P0 | M | 📋 |
-| **Kill-switch budget temps-réel** : propager un `AbortSignal` jusqu'au `ToolRegistry.call` pour interrompre une action longue en cours | P0 | M | 📋 |
+| ✅ ~~**Kill-switch budget temps-réel** : propager un `AbortSignal` jusqu'au `ToolRegistry.call` pour interrompre une action longue en cours~~ | P0 | M | ✅ Livré (`ToolCallOptions.signal` + course abort dans `ToolRegistry.executeWithTimeout` ; `AgentExecutor` propage `AbortController.signal` via `SkillHandler` → `bootstrap` → registry ; `run_project_command` tue le sous-processus via `execFile({ signal })`) |
 | **Health check enrichi** `/api/health` : Supabase, Gemini, pgvector, Ollama, uptime, version | P1 | S | 📋 |
 | **Endpoint `/api/metrics` Prometheus** (latences, erreurs, files, coûts) | P2 | M | 📋 |
 

@@ -220,7 +220,8 @@ async function runNpmSubcommand(
     parts: string[],
     cwd: string,
     toolContext: { emitToClient?: (data: any) => void } | undefined,
-    timeoutMs: number
+    timeoutMs: number,
+    signal?: AbortSignal
 ): Promise<any> {
     const sub = (parts[1] ?? "").toLowerCase();
 
@@ -276,6 +277,8 @@ async function runNpmSubcommand(
             maxBuffer: MAX_BUFFER,
             shell: isWindows, // Windows nécessite shell pour les .cmd
             env: { ...process.env },
+            // Kill-switch temps-réel : tue le sous-processus npm à l'annulation.
+            signal,
         });
         return {
             status: "success",
@@ -286,14 +289,17 @@ async function runNpmSubcommand(
             exitCode: 0,
         };
     } catch (e: any) {
+        const aborted = e?.name === "AbortError" || signal?.aborted;
         return {
-            status: "error",
+            status: aborted ? "cancelled" : "error",
             command: parts.join(" "),
             cwd,
             stdout: truncate(e.stdout ?? "", 6000),
             stderr: truncate(e.stderr ?? e.message ?? "", 3000),
             exitCode: typeof e.code === "number" ? e.code : null,
-            error: e.killed ? `Commande interrompue (timeout ${timeoutMs / 1000}s dépassé)` : e.message,
+            error: aborted
+                ? "Commande interrompue par le kill-switch (annulation)."
+                : (e.killed ? `Commande interrompue (timeout ${timeoutMs / 1000}s dépassé)` : e.message),
         };
     }
 }
@@ -407,7 +413,7 @@ export const systemSkill: Skill = {
                     // Les commandes npm passent par le chemin centralisé : allowlist de
                     // sous-commande + confirmation le cas échéant.
                     if (verb === "npm") {
-                        return await runNpmSubcommand(parts, cwdPath, toolContext, RUN_TIMEOUT_MS);
+                        return await runNpmSubcommand(parts, cwdPath, toolContext, RUN_TIMEOUT_MS, toolContext?.signal);
                     }
 
                     console.log(`[System] run_project_command: ${rawCmd} (cwd: ${cwdPath})`);
@@ -432,6 +438,9 @@ export const systemSkill: Skill = {
                             maxBuffer: MAX_BUFFER,
                             shell: isWin && verb === "npx", // Windows nécessite shell pour npx.cmd
                             env: { ...process.env },
+                            // Kill-switch temps-réel : Node tue le sous-processus dès que
+                            // le signal se déclenche (annulation de la tâche).
+                            signal: toolContext?.signal,
                         });
                         return {
                             status: "success",
@@ -442,14 +451,17 @@ export const systemSkill: Skill = {
                             exitCode: 0,
                         };
                     } catch (e: any) {
+                        const aborted = e?.name === "AbortError" || toolContext?.signal?.aborted;
                         return {
-                            status: "error",
+                            status: aborted ? "cancelled" : "error",
                             command: rawCmd,
                             cwd: cwdPath,
                             stdout: truncate(e.stdout ?? "", 6000),
                             stderr: truncate(e.stderr ?? e.message ?? "", 3000),
                             exitCode: typeof e.code === "number" ? e.code : null,
-                            error: e.killed ? `Commande interrompue (timeout ${RUN_TIMEOUT_MS / 1000}s dépassé)` : e.message,
+                            error: aborted
+                                ? "Commande interrompue par le kill-switch (annulation)."
+                                : (e.killed ? `Commande interrompue (timeout ${RUN_TIMEOUT_MS / 1000}s dépassé)` : e.message),
                         };
                     }
                 }
@@ -575,7 +587,8 @@ export const systemSkill: Skill = {
                             commandParts,
                             getProjectRoot(),
                             toolContext ? { emitToClient: toolContext.emitToClient } : undefined,
-                            120_000
+                            120_000,
+                            toolContext?.signal
                         );
                     }
 

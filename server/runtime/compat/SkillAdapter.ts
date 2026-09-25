@@ -73,8 +73,16 @@ function adaptDeclaration(
 
   return {
     declaration,
-    handler: async (args: Record<string, unknown>) => {
-      return skill.handleToolCall(decl.name, args, options.context);
+    // Arité 2 volontaire : signale au ToolRegistry qu'il doit transmettre le
+    // contexte par appel (qui porte notamment le `signal` du kill-switch
+    // temps-réel). Le contexte statique de l'adaptateur (options.context) est
+    // fusionné avec le contexte par appel, ce dernier ayant priorité.
+    handler: async (args: Record<string, unknown>, callContext?: any) => {
+      const mergedContext =
+        callContext || options.context
+          ? { ...(options.context ?? {}), ...(callContext ?? {}) }
+          : undefined;
+      return skill.handleToolCall(decl.name, args, mergedContext);
     },
     category: options.category ?? skill.name,
     timeoutMs: options.timeoutMs ?? inferTimeout(decl.name),
