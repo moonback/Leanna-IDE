@@ -101,12 +101,26 @@ function confidenceIcon(conf: number) {
 
 function statusIcon(status: string, size = 10) {
   switch (status) {
+    // Seul l'état réellement en cours anime le spinner. Toute autre valeur
+    // affiche une icône statique — plus aucun tournoiement après la fin.
     case 'in_progress': return <Loader2 size={size} className="animate-spin" style={{ color: 'var(--color-info)' }} />;
     case 'completed': return <CheckCircle2 size={size} style={{ color: 'var(--color-success)' }} />;
     case 'failed': return <XCircle size={size} style={{ color: 'var(--color-error)' }} />;
     case 'blocked': return <AlertTriangle size={size} style={{ color: 'var(--color-warning)' }} />;
     case 'paused': return <Pause size={size} style={{ color: 'var(--color-warning)' }} />;
     default: return <Clock size={size} style={{ color: 'var(--text-dimmed)' }} />;
+  }
+}
+
+/** Libellé lisible du statut de mission, affiché à côté du titre. */
+function statusLabel(status: string): { text: string; color: string } {
+  switch (status) {
+    case 'in_progress': return { text: 'En cours', color: 'var(--color-info)' };
+    case 'completed': return { text: 'Terminée', color: 'var(--color-success)' };
+    case 'failed': return { text: 'Échouée', color: 'var(--color-error)' };
+    case 'blocked': return { text: 'Bloquée', color: 'var(--color-warning)' };
+    case 'paused': return { text: 'En pause', color: 'var(--color-warning)' };
+    default: return { text: 'En attente', color: 'var(--text-dimmed)' };
   }
 }
 
@@ -161,6 +175,26 @@ function formatDuration(ms?: number): string {
   if (!ms) return '';
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
+}
+
+/**
+ * Fige les objectifs et actions restés « in_progress » lorsqu'une mission se
+ * termine. Sans ça, un événement `action_completed`/`goal_completed` manquant
+ * laisse tourner les spinners indéfiniment alors que rien ne s'exécute plus.
+ * `missionSucceeded` détermine l'état de repli des étapes non résolues.
+ */
+function finalizeGoals(goals: GoalEntry[], missionSucceeded: boolean): GoalEntry[] {
+  const fallbackGoal = missionSucceeded ? ('completed' as const) : ('blocked' as const);
+  const fallbackAction = missionSucceeded ? ('completed' as const) : ('failed' as const);
+  return goals.map(g => ({
+    ...g,
+    status: g.status === 'in_progress' || g.status === 'pending' ? fallbackGoal : g.status,
+    actions: g.actions.map(a =>
+      a.status === 'in_progress' || a.status === 'pending'
+        ? { ...a, status: fallbackAction }
+        : a
+    ),
+  }));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -460,13 +494,27 @@ export function MissionPanel({ inline = false }: MissionPanelProps) {
           case 'mission_completed':
             return prev.map(m => {
               if (m.id !== detail.missionId) return m;
-              return { ...m, status: detail.success ? 'completed' as const : 'failed' as const };
+              // Quand la mission se termine, on fige les objectifs/actions restés
+              // « in_progress » pour éviter des spinners qui tournent à l'infini
+              // alors que plus rien ne s'exécute.
+              return {
+                ...m,
+                status: detail.success ? 'completed' as const : 'failed' as const,
+                activeGoalId: null,
+                goals: finalizeGoals(m.goals, detail.success ?? true),
+              };
             });
 
           case 'mission_cancelled':
             return prev.map(m => {
               if (m.id !== detail.missionId) return m;
-              return { ...m, status: 'failed' as const };
+              // Idem à l'annulation : on stoppe toutes les animations en cours.
+              return {
+                ...m,
+                status: 'failed' as const,
+                activeGoalId: null,
+                goals: finalizeGoals(m.goals, false),
+              };
             });
 
           case 'mission_paused':
@@ -818,6 +866,8 @@ function MissionCard({
   const isPaused = mission.status === 'paused';
   const isRunning = isActive || isPaused || mission.status === 'blocked';
   const isTerminal = mission.status === 'completed' || mission.status === 'failed';
+  const isCompleted = mission.status === 'completed';
+  const isFailed = mission.status === 'failed';
   const [confirmDelete, setConfirmDelete] = useState(false);
   const confColor = confidenceColor(mission.confidence);
   const prefersReducedMotion = useReducedMotion();
@@ -836,12 +886,20 @@ function MissionCard({
           ? 'color-mix(in srgb, var(--color-warning) 5%, transparent)'
           : isActive
           ? 'color-mix(in srgb, var(--color-info) 4%, transparent)'
+          : isCompleted
+          ? 'color-mix(in srgb, var(--color-success) 4%, transparent)'
+          : isFailed
+          ? 'color-mix(in srgb, var(--color-error) 4%, transparent)'
           : 'var(--bg-input)',
         border: `1px solid ${
           isPaused
             ? 'color-mix(in srgb, var(--color-warning) 25%, transparent)'
             : isActive
             ? 'color-mix(in srgb, var(--color-info) 20%, transparent)'
+            : isCompleted
+            ? 'color-mix(in srgb, var(--color-success) 18%, transparent)'
+            : isFailed
+            ? 'color-mix(in srgb, var(--color-error) 18%, transparent)'
             : 'var(--border-base)'
         }`,
       }}
@@ -861,8 +919,21 @@ function MissionCard({
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-            {mission.title}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+              {mission.title}
+            </span>
+            {(() => {
+              const sl = statusLabel(mission.status);
+              return (
+                <span
+                  className="flex-shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                  style={{ color: sl.color, backgroundColor: `color-mix(in srgb, ${sl.color} 10%, transparent)` }}
+                >
+                  {sl.text}
+                </span>
+              );
+            })()}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
             {/* Progress bar */}
