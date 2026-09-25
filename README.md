@@ -2,6 +2,9 @@
 
 > **Leanna est un IDE augmenté par IA qui réunit un éditeur de code, un terminal, des agents outillés, une mémoire de projet et des mécanismes de contrôle des effets de bord.**
 
+<img src="assets/images/Architecture_d_un_système_agentique_IA.png" alt="Leanna-OS" />
+
+
 Leanna est une application TypeScript composée d’un frontend React/Vite, d’un serveur Express avec API REST et WebSockets, ainsi que d’une application desktop Electron. Elle permet d’explorer et de modifier le workspace du projet, d’exécuter des outils spécialisés, de déléguer des tâches à des agents et de suivre les opérations depuis une interface unique.
 
 Le dépôt contient également un runtime autonome événementiel, un système de missions, un Knowledge Graph, des notebooks RAG, des workflows planifiés, une intégration Gemini/OpenRouter, un bot Telegram optionnel et plusieurs couches de sécurité.
