@@ -54,7 +54,6 @@ Le frontend React fournit une interface IDE comprenant notamment :
 - suivi de l’activité des agents et de la timeline d’autonomie ;
 - partage d’écran et capture webcam lorsque le navigateur les autorise.
 
-Le projet est configuré comme un **IDE auto-hébergé** : le code manipulé par Leanna correspond à son propre workspace. La sélection d’un workspace externe n’est pas prévue par la configuration actuelle du serveur.
 
 ### Agents, skills et outils
 
