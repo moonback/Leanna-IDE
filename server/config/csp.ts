@@ -100,8 +100,12 @@ export function getProdCSP(): CSPDirectives {
     scriptSrc: [
       "'self'",
       "blob:",
-      // Note: En production, Monaco Editor doit utiliser des workers pré-compilés
-      // sans eval. Le build Vite doit configurer cela correctement.
+      // Le plugin Monaco injecte un <script> inline dans index.html qui définit
+      // window.MonacoEnvironment (URLs des workers). Sans 'unsafe-inline' en prod,
+      // on l'autorise par son hash SHA-256 exact — le seul inline toléré.
+      // Si ce bloc change (nouvelle version de Monaco/Vite), mettre à jour le hash :
+      // le navigateur affiche le hash attendu dans l'erreur CSP de la console.
+      "'sha256-HFhrXxEaMb8M1qOPJFyWyRxQ19x/oAt60ZKfwIqwr8g='",
     ],
     styleSrc: [
       "'self'",
