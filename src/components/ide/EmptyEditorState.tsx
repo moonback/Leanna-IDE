@@ -12,6 +12,8 @@ import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { ShortcutsModal } from './ShortcutsModal.js';
 import { SystemModal } from './SystemModal.js';
+// @ts-ignore - Asset handled by bundler
+import bgVideo from '../../../assets/video.mp4';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -443,6 +445,27 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
       style={{ backgroundColor: 'var(--bg)' }}
     >
       <GlobalStyles />
+
+      {/* ── Vidéo de fond ── */}
+      <video
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        src={bgVideo}
+        autoPlay
+        loop
+        muted
+        playsInline
+        aria-hidden="true"
+        style={{ zIndex: 0 }}
+      />
+      {/* Voile pour garder le contenu lisible par-dessus la vidéo */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundColor: 'var(--bg)',
+          opacity: 0.3,
+          zIndex: 0,
+        }}
+      />
 
       {/* ── Fond subtil : dégradé bleu très léger en haut seulement ── */}
       <div
