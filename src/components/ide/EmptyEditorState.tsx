@@ -462,7 +462,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
         className="absolute inset-0 pointer-events-none"
         style={{
           backgroundColor: 'var(--bg)',
-          opacity: 0.3,
+          opacity: 0.4,
           zIndex: 0,
         }}
       />
