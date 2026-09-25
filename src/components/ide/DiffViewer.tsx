@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DiffEditor, loader } from '@monaco-editor/react';
+import type { editor } from 'monaco-editor';
 import * as monacoInstance from 'monaco-editor';
 // Use the bundled monaco instance to avoid CDN loader (fixes CSP violations)
 loader.config({ monaco: monacoInstance });
@@ -31,6 +32,33 @@ export function DiffViewer({ filePath, currentContent, theme = 'vs-dark', onClos
   const [savedContent, setSavedContent] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Référence à l'instance DiffEditor de Monaco, pour la disposer proprement
+  // au démontage. Sans ça, Monaco annule ses tâches différées (layout, workers)
+  // à l'unmount et rejette des promesses `Canceled` non catchées, qui polluent
+  // la console avec « Uncaught (in promise) Canceled ».
+  const diffEditorRef = useRef<editor.IStandaloneDiffEditor | null>(null);
+
+  const handleEditorMount = useCallback((editor: editor.IStandaloneDiffEditor) => {
+    diffEditorRef.current = editor;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      const editor = diffEditorRef.current;
+      if (!editor) return;
+      // Dispose des modèles original/modifié puis de l'éditeur : coupe court
+      // aux tâches en vol avant que React ne démonte le nœud, ce qui évite les
+      // rejets `Canceled` remontés en console.
+      try {
+        const model = editor.getModel();
+        model?.original?.dispose();
+        model?.modified?.dispose();
+        editor.dispose();
+      } catch { /* déjà disposé — sans effet */ }
+      diffEditorRef.current = null;
+    };
+  }, []);
 
   // ── Load saved file content ────────────────────────────────────────────────
 
@@ -197,6 +225,7 @@ export function DiffViewer({ filePath, currentContent, theme = 'vs-dark', onClos
             original={savedContent}
             modified={currentContent}
             theme={theme}
+            onMount={handleEditorMount}
             options={{
               renderSideBySide: true,
               readOnly: true,

@@ -619,6 +619,22 @@ class RootErrorBoundary extends React.Component<
 // Patch console in production to suppress console.log/debug noise
 patchConsole();
 
+// ── Silence les rejets « Canceled » de Monaco ───────────────────────────────
+// Monaco annule ses tâches différées (layout, workers, coloration) quand un
+// éditeur est démonté — par exemple à la fermeture du DiffViewer. Chaque
+// annulation rejette une promesse `CancellationError` (name/message = "Canceled")
+// que personne ne catch, ce qui produit un « Uncaught (in promise) Canceled »
+// bruyant en console. Ce sont des annulations attendues, pas des erreurs :
+// on les absorbe silencieusement sans masquer les vrais rejets.
+window.addEventListener('unhandledrejection', (event) => {
+  const reason: any = event.reason;
+  const name = reason?.name ?? '';
+  const message = String(reason?.message ?? reason ?? '');
+  if (name === 'Canceled' || message === 'Canceled' || message === 'Cancelled') {
+    event.preventDefault();
+  }
+});
+
 // Vite peut réévaluer ce module pendant un HMR sans perdre le conteneur DOM.
 // Conserver la racine évite un second createRoot et le démontage de Monaco.
 type AppWindow = Window & { __leannaReactRoot?: ReturnType<typeof createRoot> };
