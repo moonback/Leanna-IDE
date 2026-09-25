@@ -300,19 +300,19 @@ html, body {
 }
 
 .hero-logo-box {
-  position: relative;
-  z-index: 3;
-  width: 154px;
-  height: 154px;
-  border-radius: 28px;
-  background: linear-gradient(145deg, rgba(18, 52, 88, 0.95), rgba(10, 22, 40, 0.92));
-  border: 1px solid var(--border-glow);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 35px var(--accent-cyan-subtle);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  backdrop-filter: blur(16px);
+    position: relative;
+    z-index: 3;
+    width: 208px;
+    height: 185px;
+    border-radius: 28px;
+    background: linear-gradient(145deg, rgb(0 0 0 / 100%), rgb(0 0 0 / 100%));
+    border: 1px solid var(--border-glow);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 35px var(--accent-cyan-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    backdrop-filter: blur(16px);
 }
 
 .hero-logo-box::before {
@@ -327,8 +327,8 @@ html, body {
 }
 
 .hero-logo-img {
-  width: 108px;
-  height: 108px;
+  width: 208px;
+  height: 208px;
   object-fit: contain;
   filter: drop-shadow(0 6px 14px rgba(0, 194, 255, 0.45));
 }
