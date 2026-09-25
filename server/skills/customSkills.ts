@@ -55,6 +55,26 @@ export async function getAllCustomSkills(): Promise<CustomSkillRow[]> {
   return (data ?? []) as CustomSkillRow[];
 }
 
+/**
+ * Récupère un custom skill actif par son nom (sans préfixe `custom_`).
+ * Retourne `null` si introuvable ou désactivé. Utilisé pour l'injection
+ * automatique de l'instruction dans le prompt système.
+ */
+export async function getEnabledCustomSkillByName(name: string): Promise<CustomSkillRow | null> {
+  const normalized = name.replace(/^custom_/, "").trim();
+  if (!normalized) return null;
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("custom_skills")
+    .select("*")
+    .eq("name", normalized)
+    .eq("enabled", true)
+    .maybeSingle();
+
+  if (error) throw new Error(`Erreur lecture custom_skill '${normalized}': ${error.message}`);
+  return (data as CustomSkillRow | null) ?? null;
+}
+
 /** Récupère uniquement les skills actifs */
 export async function getEnabledCustomSkills(): Promise<CustomSkillRow[]> {
   const supabase = getSupabase();

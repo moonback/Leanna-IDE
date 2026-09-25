@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Sparkles, Plus, Trash2, Edit3, Power, Save,
   X, ChevronDown, ChevronUp, Zap, Globe, Database as DbIcon,
-  Briefcase, Code2, AlertCircle, ClipboardPaste, FileCode
+  Briefcase, Code2, AlertCircle, ClipboardPaste, FileCode, Star
 } from 'lucide-react';
 import { Section, TextInput } from './SettingsPrimitives.js';
 import { useToast } from '../ui/Toast.js';
@@ -221,12 +221,34 @@ async function apiCall(action: string, payload: any = {}): Promise<any> {
   return res.json();
 }
 
+/** Lit le profil pour connaître le skill automatique sélectionné. */
+async function fetchAutoSkill(): Promise<string | null> {
+  const res = await fetch('/api/profile');
+  if (!res.ok) return null;
+  const profile = await res.json().catch(() => ({}));
+  return (profile?.autoSkill as string | undefined)?.trim() || null;
+}
+
+/** Persiste le skill automatique (ou le retire avec null) dans le profil. */
+async function saveAutoSkill(skillName: string | null): Promise<void> {
+  const res = await fetch('/api/profile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ autoSkill: skillName ?? '' }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Erreur réseau' }));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+}
+
 // ─── Composant principal ──────────────────────────────────────────────────────
 
 export function CustomSkillsSection() {
   const { success, error: toastError } = useToast();
   const [skills, setSkills] = useState<CustomSkill[]>([]);
   const [loading, setLoading] = useState(true);
+  const [autoSkill, setAutoSkill] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<FormMode>('idle');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -247,8 +269,9 @@ export function CustomSkillsSection() {
   const loadSkills = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await apiCall('list');
+      const [data, auto] = await Promise.all([apiCall('list'), fetchAutoSkill()]);
       setSkills(data.skills ?? []);
+      setAutoSkill(auto);
     } catch (err: any) {
       toastError(err.message);
     } finally {
@@ -257,6 +280,28 @@ export function CustomSkillsSection() {
   }, [toastError]);
 
   useEffect(() => { loadSkills(); }, [loadSkills]);
+
+  // ── Skill automatique (appliqué à chaque session) ─────────────────────────────
+
+  const toggleAutoSkill = async (skill: CustomSkill) => {
+    const next = autoSkill === skill.name ? null : skill.name;
+    const previous = autoSkill;
+    setAutoSkill(next); // optimiste
+    try {
+      // Un skill doit être activé pour pouvoir être utilisé automatiquement.
+      if (next && !skill.enabled) {
+        await apiCall('update', { id: skill.id, enabled: true });
+        setSkills(prev => prev.map(s => s.id === skill.id ? { ...s, enabled: true } : s));
+      }
+      await saveAutoSkill(next);
+      success(next
+        ? `"${skill.name}" sera utilisé automatiquement à chaque session.`
+        : `"${skill.name}" ne sera plus utilisé automatiquement.`);
+    } catch (err: any) {
+      setAutoSkill(previous); // rollback
+      toastError(err.message);
+    }
+  };
 
   // ── Reset form ───────────────────────────────────────────────────────────────
 
@@ -722,8 +767,16 @@ export function CustomSkillsSection() {
                 <div className="flex items-center gap-2 px-3 py-2">
                   <CatIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-sm font-semibold truncate flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
                       {skill.name}
+                      {autoSkill === skill.name && (
+                        <span
+                          className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                          style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                        >
+                          <Star className="w-2.5 h-2.5" fill="currentColor" /> Auto
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
                       {skill.description}
@@ -731,6 +784,20 @@ export function CustomSkillsSection() {
                   </div>
 
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* Auto (utilisé automatiquement à chaque session) */}
+                    <button
+                      onClick={() => toggleAutoSkill(skill)}
+                      className="p-1 rounded transition-colors hover:bg-black/5"
+                      title={autoSkill === skill.name
+                        ? 'Utilisé automatiquement — cliquer pour désactiver'
+                        : 'Utiliser automatiquement à chaque session'}
+                      style={{ color: autoSkill === skill.name ? 'var(--accent-primary)' : 'var(--text-dimmed)' }}
+                    >
+                      <Star
+                        className="w-3.5 h-3.5"
+                        fill={autoSkill === skill.name ? 'currentColor' : 'none'}
+                      />
+                    </button>
                     {/* Toggle */}
                     <button
                       onClick={() => toggleEnabled(skill)}
@@ -828,6 +895,9 @@ export function CustomSkillsSection() {
           Les skills personnalisés sont exposés à l'IA sous le préfixe <code className="font-mono">custom_</code>.
           Par exemple, un skill "resume_youtube" sera appelable via <code className="font-mono">custom_resume_youtube</code>.
           Ils sont rechargés dynamiquement — pas besoin de redémarrer.
+          Clique sur l'étoile <Star className="inline w-3 h-3 -mt-0.5" /> pour qu'un skill soit appliqué
+          <strong> automatiquement</strong> à chaque session : son instruction est injectée dans le prompt
+          système et Leanna l'applique sans que tu aies à l'appeler.
         </p>
       </div>
     </Section>

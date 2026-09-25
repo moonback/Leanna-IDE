@@ -13,7 +13,12 @@ import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { BatchSpanProcessor, ConsoleSpanExporter } from '@opentelemetry/sdk-trace-base';
+// @ts-ignore
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+
+// @ts-ignore
+console.log(OTLPTraceExporter);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -114,17 +119,22 @@ export class TelemetryService {
     // resourceFromAttributes (the Resource class constructor was removed).
     const exportSpans = process.env.OTEL_CONSOLE_EXPORT === '1'
       || process.env.OTEL_CONSOLE_EXPORT === 'true';
+    const exportOtlp = !!process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+
+    const processors = [];
+    if (exportSpans) {
+      processors.push(new BatchSpanProcessor(new ConsoleSpanExporter()));
+    }
+    if (exportOtlp) {
+      processors.push(new BatchSpanProcessor(new OTLPTraceExporter()));
+    }
 
     this.provider = new NodeTracerProvider({
       resource: resourceFromAttributes({
         [ATTR_SERVICE_NAME]: 'leanna-os',
         [ATTR_SERVICE_VERSION]: '1.0.0',
       }),
-      // Console export is opt-in (verbose). Traces are still created and can
-      // be wired to an OTLP/Jaeger exporter by adding a processor here.
-      spanProcessors: exportSpans
-        ? [new BatchSpanProcessor(new ConsoleSpanExporter())]
-        : [],
+      spanProcessors: processors,
     });
 
     this.provider.register();

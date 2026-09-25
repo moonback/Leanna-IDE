@@ -130,6 +130,12 @@ export interface ProfileConfig {
   /** Désactiver les annonces vocales TTS pendant le raisonnement */
   /** Custom system prompt (appended to base instructions) */
   customSystemPrompt?: string;
+  /**
+   * Nom d'un custom skill (sans le préfixe `custom_`) à appliquer automatiquement.
+   * Son instruction est injectée dans le prompt système de chaque session,
+   * de sorte que Leanna l'applique sans avoir à appeler l'outil explicitement.
+   */
+  autoSkill?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

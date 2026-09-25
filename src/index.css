@@ -1,12 +1,11 @@
 @import "tailwindcss";
 @import "./styles/layers.css";
-
 @theme {
   /* Typography */
---font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
---font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-/* Typography Scale (REM-based, 16px = 1rem)
-   Aligned with DESIGN_TOKENS.md v2.0.0 — six standardized levels. */
+--font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+--font-mono: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+
+/* Font sizes — Aligned with DESIGN_TOKENS.md v2.0.0 — six standardized levels. */
 --text-xs:    0.75rem;    /* 12px  - Micro-labels, badges, tags */
 --text-sm:    0.875rem;   /* 14px  - Secondary text, captions */
 --text-base:  1rem;       /* 16px  - Body, forms, lists */
@@ -45,9 +44,12 @@
   --space-8:  32px;
   --space-10: 40px;
   --space-12: 48px;
+  /* Smooth transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+  --transition-slow: 0.35s cubic-bezier(0.25, 1, 0.5, 1);
 
-  /* Animations */
-  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-fade-in: fade-in 0.3s ease-out;
   @keyframes fade-in {
     from { opacity: 0; transform: translateY(4px); }
     to   { opacity: 1; transform: translateY(0);   }
@@ -70,8 +72,8 @@
     from { transform: translateX(-100%); }
     to   { transform: translateX(100%); }
   }
-}
 
+}
 /* New design variables for EmptyEditorState - Default fallback */
 :root {
   --bg: #f7f8fa;
@@ -91,12 +93,11 @@
   --premium-content-max: 1440px;
   --premium-page-gutter: clamp(16px, 3vw, 32px);
   --premium-section-gap: clamp(24px, 4vw, 48px);
-  --premium-control-height: 40px;
-  --premium-control-height-touch: 36px;
-  --premium-card-radius: 16px;
-  --premium-panel-radius: 18px;
-  --premium-border: color-mix(in srgb, var(--border-base) 78%, transparent);
-  --premium-divider: color-mix(in srgb, var(--border-base) 55%, transparent);
+  --premium-card-radius: 12px;
+  --premium-panel-radius: 16px;
+  --premium-backdrop-blur: saturate(180%) blur(20px);
+  --premium-border: color-mix(in srgb, var(--border-base) 85%, transparent);
+  --premium-divider: color-mix(in srgb, var(--border-base) 65%, transparent);
 }
 
 /* ═══════════════════════════════════════════════
@@ -837,6 +838,7 @@ body {
   color: var(--text-primary);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   @apply font-sans antialiased overflow-hidden;
 }
 
