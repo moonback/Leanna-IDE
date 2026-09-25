@@ -97,7 +97,7 @@ export function LauncherModal() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="launcher-title"
-          className="w-[calc(100%-24px)] max-w-3xl rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col"
+          className="w-[calc(100%-24px)] max-w-5xl rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col"
           style={{
             backgroundColor: 'var(--bg-panel)',
             border: '1px solid var(--border-base)',
