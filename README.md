@@ -18,14 +18,13 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Tests-790%20passing-brightgreen?logo=vitest" alt="Tests 790 passing" />
 
 [![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](#)
 [![Electron](https://img.shields.io/badge/Electron-desktop-47848F.svg)](#)
 [![React](https://img.shields.io/badge/React-frontend-61DAFB.svg)](#)
 [![TypeScript](https://img.shields.io/badge/TypeScript-runtime-3178C6.svg)](#)
 [![Node.js](https://img.shields.io/badge/Node.js-backend-339933.svg)](#)
-  <img src="https://img.shields.io/badge/Tests-790%20passing-brightgreen?logo=vitest" alt="Tests 790 passing" />
-
 [![Supabase](https://img.shields.io/badge/Supabase-persistence-3ECF8E.svg)](#)
 [![License](https://img.shields.io/badge/license-BUSL%201.1-orange.svg)](#licence)
 
