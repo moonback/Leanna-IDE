@@ -1,543 +1,3623 @@
-# Leanna — Système d'Exploitation Agentique pour l'Ingénierie Logicielle
+# Leanna
 
-<!-- <img src="assets/images/Architecture_d_un_système_agentique_IA.png" alt="Leanna-OS" /> -->
+<p align="center">
+  <img src="assets/images/logo.png" alt="Leanna" width="180">
+</p>
 
+<h3 align="center">
+  Environnement d'exécution d'agent IA autonome
+</h3>
 
-> **Leanna est un IDE augmenté par IA qui unifie un éditeur de code, un terminal, une flotte d'agents autonomes, un runtime agentique déterministe, une mémoire de projet persistante et des mécanismes de contrôle rigoureux des effets de bord.**
+<p align="center">
+  <strong>Comprendre. Planifier. Agir. Vérifier. Récupérer. Terminer.</strong>
+</p>
 
+<p align="center">
+  Un agent IA natif pour le bureau, conçu pour transformer des objectifs en actions
+  exécutables, observables et vérifiables.
+</p>
 
-Leanna est une application TypeScript composée d’un frontend React/Vite, d’un serveur Express avec API REST et WebSockets, ainsi que d’une application desktop Electron. Elle permet d’explorer et de modifier le workspace du projet, d’exécuter des outils spécialisés, de déléguer des tâches à des agents et de suivre les opérations depuis une interface unique.
+<p align="center">
 
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](#)
+[![Electron](https://img.shields.io/badge/Electron-desktop-47848F.svg)](#)
+[![React](https://img.shields.io/badge/React-frontend-61DAFB.svg)](#)
+[![TypeScript](https://img.shields.io/badge/TypeScript-runtime-3178C6.svg)](#)
+[![Node.js](https://img.shields.io/badge/Node.js-backend-339933.svg)](#)
+[![Supabase](https://img.shields.io/badge/Supabase-persistence-3ECF8E.svg)](#)
+[![License](https://img.shields.io/badge/license-BUSL%201.1-orange.svg)](#licence)
 
-![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933?logo=node.js&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![Electron](https://img.shields.io/badge/Electron-43-47848F?logo=electron&logoColor=white)
-![Licence](https://img.shields.io/badge/licence-BUSL--1.1-orange)
+</p>
 
-## Sommaire
+---
 
-- [Fonctionnalités](#fonctionnalités)
-- [État réel des principaux sous-systèmes](#état-réel-des-principaux-sous-systèmes)
-- [Architecture](#architecture)
-- [Stack technique](#stack-technique)
-- [Prérequis](#prérequis)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Lancement](#lancement)
-- [Sécurité et garde-fous](#sécurité-et-garde-fous)
-- [Utilisation de l’Agent Brain](#utilisation-de-lagent-brain)
-- [Tests et qualité](#tests-et-qualité)
-- [Structure du dépôt](#structure-du-dépôt)
-- [Dépannage](#dépannage)
-- [Documentation](#documentation)
-- [Contribution](#contribution)
-- [Licence](#licence)
+# Table des matières
 
-## Fonctionnalités
+* [Qu'est-ce que Leanna ?](#quest-ce-que-leanna-)
+* [L'idée centrale](#lidée-centrale)
+* [Pourquoi Leanna existe](#pourquoi-leanna-existe)
+* [Ce que Leanna peut faire](#ce-que-leanna-peut-faire)
+* [La boucle d'exécution autonome](#la-boucle-dexécution-autonome)
+* [Cerveau de l'agent (Agent Brain)](#cerveau-de-lagent-agent-brain)
+* [Runtime de l'agent](#runtime-de-lagent)
+* [Système de missions](#système-de-missions)
+* [Architecture multi-agents](#architecture-multi-agents)
+* [Outils et compétences](#outils-et-compétences)
+* [Connaissance et compréhension](#connaissance-et-compréhension)
+* [Architecture de la mémoire](#architecture-de-la-mémoire)
+* [Apprentissage et fiabilité](#apprentissage-et-fiabilité)
+* [Vérification et récupération](#vérification-et-récupération)
+* [Architecture de sécurité](#architecture-de-sécurité)
+* [Permissions](#permissions)
+* [Modes d'autonomie](#modes-dautonomie)
+* [Bac à sable et exécution sûre](#bac-à-sable-et-exécution-sûre)
+* [Exécution à blanc (Dry Run)](#exécution-à-blanc-dry-run)
+* [Protection contre l'injection de prompt](#protection-contre-linjection-de-prompt)
+* [Observabilité](#observabilité)
+* [Environnement de bureau](#environnement-de-bureau)
+* [IDE et espace de travail](#ide-et-espace-de-travail)
+* [Automatisation du navigateur](#automatisation-du-navigateur)
+* [Git et GitHub](#git-et-github)
+* [Notebooks et RAG](#notebooks-et-rag)
+* [Graphe de connaissances](#graphe-de-connaissances)
+* [Workflows et automatisation](#workflows-et-automatisation)
+* [MCP](#mcp)
+* [Telegram](#telegram)
+* [Fournisseurs d'IA](#fournisseurs-dia)
+* [Architecture du système](#architecture-du-système)
+* [Structure du dépôt](#structure-du-dépôt)
+* [Installation](#installation)
+* [Configuration](#configuration)
+* [Développement](#développement)
+* [Tests](#tests)
+* [Build et packaging](#build-et-packaging)
+* [API](#api)
+* [Recommandations de sécurité](#recommandations-de-sécurité)
+* [Dépannage](#dépannage)
+* [Documentation](#documentation)
+* [Feuille de route](#feuille-de-route)
+* [Contribuer](#contribuer)
+* [Licence](#licence)
 
-### IDE et workspace
+---
 
-Le frontend React fournit une interface IDE comprenant notamment :
+# Qu'est-ce que Leanna ?
 
-- éditeur Monaco avec onglets et explorateur de fichiers ;
-- terminal interactif via WebSocket ;
-- recherche globale dans le workspace ;
-- aperçu Markdown, PDF et images ;
-- historique des conversations et checkpoints ;
-- palette de commandes et raccourcis clavier ;
-- thèmes clair et sombre ;
-- gestion des paramètres, du profil et des tokens ;
-- suivi de l’activité des agents et de la timeline d’autonomie ;
-- partage d’écran et capture webcam lorsque le navigateur les autorise.
+**Leanna est un environnement d'agent IA autonome natif pour le bureau.**
 
+Il est conçu autour d'une différence fondamentale entre un assistant conversationnel classique et un système agentique.
 
-### Agents, skills et outils
-
-Le serveur enregistre des skills pour l’automatisation, le navigateur, l’analyse du code, GitHub, la mémoire, la connaissance du projet, les documents, les missions, le temps, la vérification, Telegram et d’autres opérations spécialisées.
-
-Les agents disposent d’un moteur partagé qui encadre le cycle :
-
-```text
-OBSERVE → PLAN → ACT → VERIFY → RECOVER → COMPLETE
-```
-
-Le runtime agentique fournit réellement les outils autorisés à l’agent. Les appels passent par le `ToolRegistry`, qui centralise les permissions, le dry-run, les timeouts et les métriques. Les écritures peuvent être relues et vérifiées par hash SHA-256 dans `WorkspaceState`. La boucle `AgentRepairLoop` limite les corrections lorsque le patch se répète, qu’aucun progrès n’est constaté ou qu’une régression est détectée.
-
-### Agent Brain et missions
-
-`AgentBrain` transforme un objectif en étapes dépendantes et s’appuie sur `BrainScheduler` pour exécuter les étapes prêtes, gérer les dépendances, propager les échecs et produire un résultat d’exécution. La vérification peut utiliser `WorkspaceState` et des enregistrements hashés.
-
-Le système de missions fournit une couche distincte pour planifier, exécuter, réfléchir, corriger, réessayer ou escalader une mission. Les routes d’agents, de missions et de checkpoints sont exposées par le serveur Express.
-
-### Connaissance, mémoire et notebooks
-
-Le dépôt contient plusieurs mécanismes complémentaires :
-
-- **Knowledge Graph** : parsing AST, graphe d’appels, dépendances, analyse d’impact et indexation incrémentale ;
-- **mémoire de projet** et mémoire hiérarchique ;
-- **recherche sémantique** et index documentaire ;
-- **notebooks RAG** avec ingestion de sources, embeddings, recherche hybride, cache et citations ;
-- export HTML, DOCX et PDF ;
-- génération de diagrammes Mermaid et fonctions de synthèse ou de synthèse vocale selon les providers configurés.
-
-### Intégrations optionnelles
-
-Leanna peut intégrer, si les variables correspondantes sont configurées :
-
-- Gemini pour le texte et Gemini Live ;
-- OpenRouter comme provider alternatif ou de secours ;
-- Supabase pour la persistance, les migrations et le stockage des mémoires ;
-- Redis pour le cache, les verrous distribués et l’EventBus multi-processus ;
-- GitHub ;
-- navigateur automatisé via Puppeteer ;
-- MCP, le Model Context Protocol ;
-- FTP ;
-- PM2 pour la supervision ;
-- Telegram via `grammy` et Long Polling.
-
-## État réel des principaux sous-systèmes
-
-Le code et les audits inclus dans le dépôt permettent de distinguer les capacités suivantes :
-
-| Sous-système | État constaté dans le code |
-|---|---|
-| Sandbox et synchronisation | Présents, avec contrôles de chemins, états fail-closed, checkpoints et rollback transactionnel. |
-| Runtime agentique | Présent et utilisé comme moteur principal pour les tâches agentiques ; outils, budgets par phase, vérification et réparation bornée sont couverts par des tests dédiés. |
-| Agent Brain | Présent avec planification, scheduler, dépendances, vérification et correction ; les limites de concurrence, d’annulation et certains branchements restent dépendants des couches appelantes. |
-| Runtime autonome | Présent avec heartbeat, perception, déduplication, queue bornée, retries, timeout, circuit breaker et persistance optionnelle. L’autonomie doit être configurée et intégrée au pipeline de missions pour produire des actions utiles. |
-| RAG et Knowledge Graph | Présents avec indexation, mémoire, recherche documentaire et cache. Le comportement dépend du workspace actif et des providers configurés. |
-| Observabilité | Traces et métriques internes présentes. L’export OpenTelemetry externe n’est pas configuré par défaut ; `OTEL_CONSOLE_EXPORT` permet un export console. |
-| Modèles locaux | Non présents dans le routeur actuel. Les providers pris en charge par le code sont Gemini et OpenRouter. |
-| Apprentissage | Le `LearningEngine` produit des propositions et des éléments de mémoire ; ces propositions ne sont pas appliquées automatiquement à la configuration ou au workspace. |
-
-Cette distinction est importante : **le README décrit le comportement du code actuel et non uniquement la vision du produit**. Pour les travaux futurs, consultez [`ROADMAP.md`](ROADMAP.md), qui recense les écarts et les évolutions prévues.
-
-## Architecture
+Un assistant classique suit principalement ce modèle :
 
 ```text
-┌────────────────────────────────────────────────────┐
-│ React + Vite + Monaco + Electron                   │
-│ IDE, vues, panneaux, notebooks, paramètres         │
-└──────────────────────────┬─────────────────────────┘
-                           │ REST / WebSocket
-┌──────────────────────────▼─────────────────────────┐
-│ Express                                            │
-│ routes agents, missions, IDE, terminal, documents │
-│ GitHub, MCP, sandbox, mémoire, Telegram, export    │
-└───────────────┬───────────────────┬────────────────┘
-                │                   │
-┌───────────────▼──────────┐ ┌──────▼────────────────┐
-│ Runtime agentique        │ │ Connaissance et mémoire│
-│ ToolRegistry             │ │ Knowledge Graph        │
-│ PermissionPolicy         │ │ RAG / notebooks       │
-│ DryRunController         │ │ ProjectMemory         │
-│ WorkspaceState           │ │ Supabase / Redis       │
-└───────────────┬──────────┘ └────────────────────────┘
-                │
-┌───────────────▼─────────────────────────────────────┐
-│ Agent Brain, missions et autonomie                  │
-│ planification → exécution → vérification → correction│
-└───────────────────────────────────────────────────────┘
+Utilisateur
+  ↓
+Question
+  ↓
+IA
+  ↓
+Réponse
 ```
 
-Les points d’entrée principaux sont :
+Leanna est conçu autour de :
 
-- `src/main.tsx` pour le frontend ;
-- `server-bootstrap.ts` pour le chargement de l’environnement et la validation de la configuration ;
-- `server.ts` pour l’initialisation du serveur, des routes, des WebSockets, des skills, des notebooks et du runtime ;
-- `electron/main.cjs` pour l’application desktop.
+```text
+Utilisateur
+  ↓
+Objectif
+  ↓
+Comprendre
+  ↓
+Planifier
+  ↓
+Agir
+  ↓
+Observer
+  ↓
+Vérifier
+  ↓
+Récupérer / Replanifier
+  ↓
+Terminer
+```
 
-Au démarrage, le serveur charge les tâches planifiées et les workflows, restaure éventuellement les tâches persistées, puis indexe le projet actif et démarre la surveillance incrémentale des fichiers.
+L'objectif n'est pas simplement de générer du texte.
 
-## Stack technique
+L'objectif est de créer un runtime capable de :
 
-| Technologie | Utilisation |
-|---|---|
-| React 19 | Interface utilisateur |
-| React Router DOM 7 | Routage frontend |
-| Vite 6 | Développement et build frontend |
-| TypeScript 5 | Frontend et backend |
-| Tailwind CSS 4 | Styles et tokens UI |
-| Express 4 | API HTTP |
-| `ws` | WebSockets pour le temps réel, le terminal et les flux d’activité |
-| Electron 43 | Application desktop, principalement Windows |
-| Monaco Editor | Éditeur de code |
-| Google GenAI | Gemini texte et voix |
-| Supabase | PostgreSQL, persistance et pgvector lorsque configuré |
-| Redis | Cache et coordination optionnelle |
-| Puppeteer | Automatisation navigateur |
-| Mermaid | Diagrammes de plans et de connaissance |
-| Tree-sitter | Analyse AST JavaScript/TypeScript |
-| Grammy | Bot Telegram |
-| PM2 | Supervision de production |
+* comprendre un objectif ;
+* comprendre le contexte du projet ;
+* déterminer quels outils et agents sont pertinents ;
+* construire un plan d'exécution ;
+* exécuter des actions ;
+* observer leurs résultats ;
+* vérifier le résultat ;
+* détecter les échecs ;
+* tenter une récupération bornée ;
+* replanifier lorsque nécessaire ;
+* maintenir la mémoire et le contexte ;
+* respecter les permissions et les politiques d'autonomie ;
+* exposer l'état d'exécution à l'utilisateur.
 
-Les versions exactes sont définies dans [`package.json`](package.json).
+Leanna combine une interface de bureau, un runtime IA, un système d'agents, un registre d'outils, un système de missions, la connaissance du projet, une mémoire persistante, des contrôles de sécurité et l'observabilité au sein d'un même environnement.
+
+---
+
+# L'idée centrale
+
+Le principe de conception central de Leanna est :
+
+> **Un agent IA ne doit pas être considéré comme performant parce qu'il a produit une réponse. Il doit être considéré comme performant lorsque l'objectif demandé a été exécuté et vérifié selon des critères de succès explicites.**
+
+Cela conduit à une philosophie d'exécution différente.
+
+## IA orientée réponse
+
+```text
+Prompt
+  ↓
+Génération
+  ↓
+Réponse
+```
+
+## Exécution orientée agent
+
+```text
+Objectif
+  ↓
+Acquisition du contexte
+  ↓
+Compréhension de l'objectif
+  ↓
+Planification
+  ↓
+Sélection d'outil / d'agent
+  ↓
+Exécution
+  ↓
+Observation
+  ↓
+Vérification
+  ↓
+Récupération ou replanification
+  ↓
+Résultat final
+```
+
+Cette distinction est particulièrement importante pour les tâches d'ingénierie logicielle.
+
+Par exemple :
+
+```text
+« Corriger le bug d'authentification. »
+```
+
+Leanna ne doit pas considérer la tâche comme terminée simplement parce qu'un modèle IA a suggéré une modification de code.
+
+Une exécution complète peut impliquer :
+
+```text
+1. Comprendre l'objectif
+2. Inspecter le projet
+3. Identifier les fichiers pertinents
+4. Déterminer les dépendances
+5. Créer un plan d'exécution
+6. Sélectionner l'agent approprié
+7. Lire les fichiers requis
+8. Modifier l'implémentation
+9. Vérifier les fichiers modifiés
+10. Exécuter les vérifications pertinentes
+11. Détecter les échecs
+12. Corriger l'implémentation si nécessaire
+13. Relancer la vérification
+14. Rapporter le résultat réel
+```
+
+---
+
+# Pourquoi Leanna existe
+
+Les systèmes d'IA modernes sont de plus en plus capables de raisonnement et d'utilisation d'outils, mais les tâches complexes nécessitent encore une coordination entre :
+
+* le contexte ;
+* la planification ;
+* l'exécution ;
+* les outils ;
+* les agents spécialisés ;
+* la mémoire ;
+* la vérification ;
+* la sécurité ;
+* la gestion des échecs ;
+* l'approbation humaine.
+
+Leanna est conçu comme un runtime autour de ces préoccupations.
+
+Au lieu de traiter chaque requête comme une conversation isolée, Leanna traite une requête comme une **mission** potentielle.
+
+Une mission possède :
+
+* un objectif ;
+* un contexte ;
+* des contraintes ;
+* un plan ;
+* des étapes d'exécution ;
+* des outils ;
+* des agents ;
+* des observations ;
+* des critères de vérification ;
+* un comportement de récupération ;
+* un résultat.
+
+---
+
+# Ce que Leanna peut faire
+
+Leanna fournit un large ensemble de capacités autour de son runtime d'agent.
+
+## Interaction IA
+
+* interaction conversationnelle ;
+* sélection de modèle ;
+* prompting contextuel ;
+* interaction en direct ;
+* visibilité de l'utilisation des tokens ;
+* tâches orientées raisonnement ;
+* tâches en arrière-plan ;
+* exécution structurée d'agents.
+
+## Ingénierie logicielle
+
+* inspecter une base de code ;
+* naviguer dans les fichiers du projet ;
+* lire les fichiers source ;
+* modifier les fichiers du projet ;
+* raisonner sur les dépendances ;
+* analyser la structure du projet ;
+* effectuer une vérification ;
+* inspecter l'état Git ;
+* interagir avec GitHub ;
+* exécuter des opérations de terminal contrôlées ;
+* réaliser des audits de sécurité ;
+* construire et exécuter des workflows de développement.
+
+## Exécution autonome
+
+* créer des missions ;
+* planifier des missions ;
+* exécuter des tâches en plusieurs étapes ;
+* suivre l'état d'exécution ;
+* vérifier les résultats ;
+* récupérer après des échecs ;
+* réessayer des opérations ;
+* replanifier lorsque nécessaire ;
+* maintenir des budgets d'exécution bornés.
+
+## Exécution multi-agents
+
+Leanna contient une infrastructure pour des rôles d'agents spécialisés couvrant notamment :
+
+* le codage ;
+* le débogage ;
+* le refactoring ;
+* la revue ;
+* les tests ;
+* la sécurité ;
+* la planification ;
+* la recherche ;
+* la rédaction ;
+* le formatage ;
+* la relecture ;
+* la traduction ;
+* la synthèse ;
+* les tâches orientées vision.
+
+La disponibilité effective d'un rôle au runtime dépend de son enregistrement et de sa configuration d'exécution.
+
+## Connaissance
+
+Leanna contient plusieurs systèmes de compréhension du projet :
+
+* Graphe de connaissances ;
+* Graphe de dépendances ;
+* Mémoire du projet ;
+* Recherche sémantique ;
+* Analyse AST ;
+* analyse du graphe d'appels ;
+* analyse d'impact ;
+* analyse de documents ;
+* indexation du projet ;
+* indexation de l'espace de travail.
+
+## Productivité
+
+* notebooks ;
+* ingestion de documents ;
+* RAG ;
+* embeddings ;
+* génération de documents ;
+* export PDF ;
+* export DOCX ;
+* export HTML ;
+* workflows ;
+* automatisation ;
+* tâches planifiées ;
+* listes ;
+* historique des conversations.
+
+## Intégrations
+
+Le dépôt contient des intégrations pour :
+
+* Gemini ;
+* OpenRouter ;
+* Supabase ;
+* GitHub ;
+* Telegram ;
+* MCP ;
+* automatisation du navigateur ;
+* Puppeteer ;
+* opérations de bureau au niveau système.
+
+---
+
+# La boucle d'exécution autonome
+
+Le modèle d'exécution repose sur une boucle de rétroaction fermée.
+
+```text
+┌─────────────────────┐
+│      OBJECTIF       │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│     COMPRENDRE      │
+│                     │
+│ Objectif             │
+│ Contexte             │
+│ Exigences            │
+│ Risques              │
+│ Critères de succès   │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│     PLANIFIER       │
+│                     │
+│ Étapes               │
+│ Dépendances          │
+│ Agents               │
+│ Compétences          │
+│ Outils               │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│        AGIR         │
+│                     │
+│ Outils               │
+│ Agents               │
+│ Opérations fichiers  │
+│ Commandes            │
+│ Intégrations         │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│      OBSERVER       │
+│                     │
+│ Résultats d'outils   │
+│ Fichiers             │
+│ Erreurs              │
+│ Événements runtime   │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│      VÉRIFIER       │
+│                     │
+│ Syntaxe              │
+│ Tests                │
+│ Fichiers             │
+│ Résultat sémantique  │
+│ Critères de succès   │
+└──────────┬──────────┘
+           │
+       ┌───┴────┐
+       │        │
+       ▼        ▼
+   SUCCÈS    ÉCHEC
+       │        │
+       │        ▼
+       │    ┌─────────────┐
+       │    │  RÉCUPÉRER  │
+       │    └──────┬──────┘
+       │           │
+       │           ▼
+       │    REPLANIFIER / RÉESSAYER
+       │           │
+       │           └───────┐
+       │                   │
+       └───────────────────┘
+               │
+               ▼
+         ┌────────────┐
+         │  TERMINER  │
+         └────────────┘
+```
+
+La caractéristique importante est que **la vérification fait partie de l'exécution**, plutôt que d'être une étape finale optionnelle.
+
+---
+
+# Cerveau de l'agent (Agent Brain)
+
+Le dépôt contient un sous-système explicite de cerveau d'agent (Agent Brain).
+
+Situé sous :
+
+```text
+server/agents/brain/
+```
+
+Le Brain contient des composants dédiés pour :
+
+* la compréhension de l'objectif ;
+* la planification dynamique ;
+* la validation de plan ;
+* l'ordonnancement ;
+* la vérification ;
+* la correction ;
+* l'orchestration.
+
+Les composants clés incluent :
+
+```text
+AgentBrain.ts
+GoalUnderstandingEngine.ts
+DynamicPlanner.ts
+BrainPlanValidator.ts
+BrainVerifier.ts
+BrainCorrectionLoop.ts
+BrainScheduler.ts
+```
+
+## Compréhension de l'objectif
+
+Le `GoalUnderstandingEngine` analyse l'objectif demandé et en dérive des informations structurées telles que :
+
+* l'intention ;
+* le domaine ;
+* la complexité ;
+* les technologies ;
+* les fichiers pertinents ;
+* les exigences ;
+* les critères de succès ;
+* les risques ;
+* la justification.
+
+Cela permet à la couche de planification d'opérer sur une représentation structurée plutôt que sur le seul prompt brut de l'utilisateur.
+
+---
+
+# Planification dynamique
+
+Le `DynamicPlanner` génère des étapes d'exécution basées sur :
+
+* l'objectif compris ;
+* le contexte du projet ;
+* les agents disponibles ;
+* les rôles des agents ;
+* les compétences disponibles ;
+* les outils disponibles ;
+* les dépendances entre les étapes.
+
+Un plan peut contenir des étapes telles que :
+
+```text
+Étape 1
+  Recherche / inspection
+
+Étape 2
+  Architecture / planification
+
+Étape 3
+  Implémentation
+
+Étape 4
+  Tests
+
+Étape 5
+  Vérification
+
+Étape 6
+  Correction si nécessaire
+```
+
+Les étapes peuvent dépendre des étapes précédentes.
+
+```text
+inspecter
+   ↓
+planifier
+   ↓
+implémenter
+   ↓
+tester
+   ↓
+vérifier
+```
+
+Le planificateur valide la structure des plans générés avant l'exécution.
+
+Le dépôt utilise une validation de schéma pour la sortie brute du planificateur ainsi qu'une validation supplémentaire du graphe et des invariants avant de transformer le résultat en étapes exécutables.
+
+---
+
+# Runtime de l'agent
+
+Le runtime est la couche d'exécution qui relie :
+
+```text
+Agents
+  +
+Outils
+  +
+Permissions
+  +
+Mémoire
+  +
+Événements
+  +
+Workflows
+  +
+Vérification
+```
+
+Les composants principaux du runtime incluent :
+
+```text
+server/runtime/
+
+AgentRuntime.ts
+ToolRegistry.ts
+PermissionPolicy.ts
+AuthorizationGate.ts
+DryRun.ts
+StateMachine.ts
+WorkflowEngine.ts
+EventBus.ts
+Memory.ts
+HierarchicalMemoryService.ts
+Observability.ts
+PromptRegistry.ts
+```
+
+Le runtime fournit un emplacement central pour exécuter les capacités des agents, au lieu de permettre à chaque sous-système de contourner indépendamment les règles de sécurité et d'exécution.
+
+---
+
+# Système de missions
+
+Le sous-système de missions est responsable de l'exécution orientée objectif.
+
+Situé sous :
+
+```text
+server/mission/
+```
+
+Les composants principaux incluent :
+
+```text
+Mission.ts
+MissionStore.ts
+Planner.ts
+Executor.ts
+Reflection.ts
+AutonomyPolicy.ts
+SkillScorer.ts
+```
+
+Une mission représente un objectif structuré qui peut être :
+
+1. créé ;
+2. planifié ;
+3. exécuté ;
+4. observé ;
+5. vérifié ;
+6. soumis à réflexion ;
+7. réessayé ou replanifié ;
+8. terminé ou arrêté.
+
+---
+
+# Architecture multi-agents
+
+Leanna ne se limite pas à un seul agent monolithique.
+
+L'architecture contient :
+
+```text
+                 OBJECTIF UTILISATEUR
+                        │
+                        ▼
+                 ┌─────────────┐
+                 │ Agent Brain │
+                 └──────┬──────┘
+                        │
+                 ┌──────▼──────┐
+                 │Orchestrateur│
+                 └──────┬──────┘
+                        │
+       ┌────────────────┼────────────────┐
+       │                │                │
+       ▼                ▼                ▼
+    Codeur          Débogueur         Relecteur
+       │                │                │
+       ▼                ▼                ▼
+  Compétences      Compétences       Compétences
+       │                │                │
+       └────────────────┼────────────────┘
+                        ▼
+                    ToolRegistry
+                        │
+                        ▼
+                 AuthorizationGate
+                        │
+                        ▼
+                    Exécution
+```
+
+L'infrastructure pertinente inclut :
+
+```text
+AgentOrchestrator
+AgentRegistry
+DynamicAgentRegistry
+DelegationManager
+DelegationDispatcher
+AgentTaskRunner
+AutonomousAgent
+AutonomousLoop
+AgentRepairLoop
+AgentEventStream
+AgentMessageBus
+AgentContextResolver
+```
+
+---
+
+# AgentTaskRunner
+
+Le contrat d'exécution est séparé des boucles autonomes de plus haut niveau via une abstraction `AgentTaskRunner`.
+
+Cela permet à la couche d'autonomie d'opérer contre un contrat d'exécution de tâche au lieu d'être étroitement couplée à une implémentation d'exécuteur concrète.
+
+Conceptuellement :
+
+```text
+AutonomousLoop
+      │
+      ▼
+AgentTaskRunner
+      │
+      ├── execute(task)
+      │
+      └── runTool(name, args)
+              │
+              ▼
+         Runtime d'outil
+```
+
+Cette séparation permet de faire évoluer le moteur d'exécution sans réécrire la boucle de contrôle autonome.
+
+---
+
+# Outils et compétences
+
+Leanna sépare les **compétences** des **outils**.
+
+Une compétence représente un domaine de capacité fonctionnelle.
+
+Un outil représente une opération exécutable.
+
+Conceptuellement :
+
+```text
+Agent
+  ↓
+Compétence
+  ↓
+Outil
+  ↓
+Autorisation
+  ↓
+Exécution
+  ↓
+Résultat
+```
+
+Exemples de domaines de compétences :
+
+* automatisation ;
+* navigateur ;
+* base de code ;
+* Git ;
+* GitHub ;
+* connaissance ;
+* mémoire ;
+* mission ;
+* raisonnement ;
+* sécurité ;
+* système ;
+* Telegram ;
+* vérification ;
+* workflows.
+
+Le dépôt contient une couche de compétences natives sous :
+
+```text
+server/skills/
+```
+
+et un registre au runtime sous :
+
+```text
+server/runtime/ToolRegistry.ts
+```
+
+---
+
+# Registre d'outils (Tool Registry)
+
+Le registre d'outils est responsable de la centralisation des capacités exécutables.
+
+Une déclaration d'outil peut décrire :
+
+* le nom ;
+* la description ;
+* le schéma d'entrée ;
+* la catégorie ;
+* les permissions ;
+* le comportement mutatif ;
+* le délai d'expiration (timeout) ;
+* le gestionnaire d'exécution.
+
+Cela permet aux politiques du runtime de raisonner sur les outils avant leur exécution.
+
+Par exemple :
+
+```text
+Outil
+ ├── nom
+ ├── catégorie
+ ├── schéma d'entrée
+ ├── permissions
+ ├── mutatif
+ └── timeout
+```
+
+Ces métadonnées deviennent importantes pour :
+
+* l'autorisation ;
+* l'exécution à blanc (dry-run) ;
+* l'attribution ;
+* l'observabilité ;
+* le mapping des agents ;
+* la sélection d'outils ;
+* les contrôles de sécurité.
+
+---
+
+# Connaissance et compréhension
+
+Leanna contient un sous-système dédié à la compréhension du projet.
+
+L'architecture combine plusieurs sources de connaissance.
+
+```text
+                 PROJET
+                    │
+       ┌────────────┼────────────┐
+       │            │            │
+       ▼            ▼            ▼
+Graphe de       Graphe de   Mémoire du projet
+connaissances   dépendances
+       │            │            │
+       └────────────┼────────────┘
+                    │
+                    ▼
+             Recherche sémantique
+                    │
+                    ▼
+          Moteur de compréhension
+                    │
+                    ▼
+             Contexte de l'agent
+```
+
+---
+
+# Graphe de connaissances
+
+Le graphe de connaissances représente les relations découvertes dans un projet.
+
+Les composants pertinents incluent :
+
+```text
+KnowledgeGraph.ts
+KnowledgeGraphCache.ts
+ASTParser.ts
+ASTCallGraph.ts
+DependencyGraph.ts
+RelationExtractor.ts
+ImpactAnalyzer.ts
+ProjectIndexer.ts
+WorkspaceIndexer.ts
+```
+
+Le système peut raisonner sur :
+
+* les fichiers ;
+* les entités ;
+* les imports ;
+* les dépendances ;
+* les relations d'appel ;
+* la structure du projet ;
+* les relations d'impact.
+
+Cela permet à un agent d'éviter de traiter le projet comme une collection plate de fichiers.
+
+---
+
+# Moteur de compréhension
+
+L'`UnderstandingEngine` coordonne plusieurs systèmes de connaissance :
+
+```text
+KnowledgeGraph
+DependencyGraph
+ProjectMemory
+SemanticSearch
+ImpactAnalyzer
+```
+
+Son but est de construire un contexte d'exécution pour une tâche.
+
+Conceptuellement :
+
+```text
+Tâche
+ ↓
+Récupération de connaissances
+ ↓
+Fichiers pertinents
+ ↓
+Faits du projet
+ ↓
+Informations de dépendance
+ ↓
+Contexte sémantique
+ ↓
+Informations d'impact
+ ↓
+Score de compréhension
+ ↓
+Contexte de l'agent
+```
+
+Ce contexte peut ensuite être incorporé dans la planification et l'exécution.
+
+---
+
+# Architecture de la mémoire
+
+Leanna contient plusieurs couches de mémoire.
+
+## Mémoire de conversation
+
+Maintient les informations contextuelles liées aux interactions.
+
+## Mémoire du projet
+
+Stocke les faits, décisions et informations contextuelles au niveau du projet.
+
+## Mémoire hiérarchique
+
+Fournit une couche de mémoire structurée pouvant opérer à travers différentes portées.
+
+## Mémoire de connaissances
+
+Représente la connaissance structurée du projet.
+
+## Mémoire de stratégie
+
+Stocke des informations historiques compactes sur la fiabilité des compétences/outils.
+
+## Mémoire de notebook
+
+Prend en charge la connaissance orientée documents et les workflows RAG.
+
+Un modèle conceptuel est :
+
+```text
+              SYSTÈME DE MÉMOIRE
+                      │
+        ┌─────────────┼─────────────┐
+        │             │             │
+        ▼             ▼             ▼
+ Conversation      Projet        Stratégie
+   Mémoire         Mémoire        Mémoire
+        │             │             │
+        └─────────────┼─────────────┘
+                      │
+                      ▼
+              Mémoire hiérarchique
+                      │
+                      ▼
+               Contexte de l'agent
+```
+
+---
+
+# Apprentissage et fiabilité
+
+Leanna contient un mécanisme de rétroaction sur la fiabilité via `StrategyMemory`.
+
+Le système peut enregistrer des signaux compacts tels que :
+
+* le nombre de succès ;
+* le nombre d'échecs ;
+* le total des appels ;
+* la durée ;
+* les résultats récents ;
+* le taux de succès ;
+* le taux de succès récent ;
+* la durée moyenne.
+
+Le but n'est pas de stocker un historique de modèle arbitraire.
+
+Le but est de donner à la planification un signal historique sur les stratégies d'exécution fiables.
+
+Conceptuellement :
+
+```text
+Exécution d'outil
+      │
+      ▼
+Succès / Échec
+      │
+      ▼
+StrategyMemory
+      │
+      ▼
+SkillScorer
+      │
+      ▼
+Planificateur
+      │
+      ▼
+Sélection future d'outils
+```
+
+Un outil ayant échoué de façon répétée peut donc être déprioriser lors des planifications futures.
+
+Cela crée une boucle de rétroaction à travers les missions.
+
+---
+
+# Vérification
+
+La vérification est une partie de premier ordre du runtime.
+
+Leanna contient plusieurs couches de vérification.
+
+Selon le chemin d'exécution, la vérification peut impliquer :
+
+* la vérification de fichiers ;
+* des contrôles de syntaxe ;
+* des tests ;
+* des contrôles sémantiques ;
+* des contrôles visuels ;
+* les critères de succès de la mission ;
+* l'état d'exécution ;
+* les résultats des outils.
+
+Le cerveau de l'agent (Agent Brain) contient un composant dédié :
+
+```text
+BrainVerifier
+```
+
+La couche d'exécution autonome enregistre également les résultats de vérification pendant l'exécution.
+
+La règle conceptuelle est :
+
+```text
+Action ≠ Succès
+
+Action
+  ↓
+Observation
+  ↓
+Vérification
+  ↓
+Succès / Échec
+```
+
+---
+
+# Récupération
+
+Une opération échouée ne signifie pas nécessairement qu'une mission doit s'arrêter immédiatement.
+
+Le système d'exécution peut entrer dans un chemin de récupération.
+
+```text
+Exécution
+   ↓
+Échec
+   ↓
+Analyser l'échec
+   ↓
+Décision de récupération
+   ├── réessayer
+   ├── continuer
+   ├── replanifier
+   └── abandonner
+```
+
+Le dépôt contient :
+
+```text
+AgentRepairLoop
+BrainCorrectionLoop
+AutonomousLoop
+Reflection
+Planner.replan
+```
+
+La récupération reste bornée par les budgets d'exécution, les limites de réessai, les délais d'expiration et les règles d'autorisation.
+
+---
+
+# Architecture de sécurité
+
+Comme Leanna peut interagir avec les fichiers, les processus, les réseaux et les services externes, la sécurité fait partie de l'architecture d'exécution.
+
+Le runtime ne traite pas tous les outils de la même manière.
+
+Le système d'autorisation combine plusieurs axes.
+
+```text
+                 REQUÊTE D'OUTIL
+                      │
+                      ▼
+              AuthorizationGate
+                      │
+       ┌──────────────┼──────────────┐
+       │              │              │
+       ▼              ▼              ▼
+   Politique de   Politique      Contrôle du
+   permission     d'autonomie    bac à sable
+       │              │              │
+       └──────────────┼──────────────┘
+                      │
+                      ▼
+                Autorisation
+                      │
+                ┌─────┴─────┐
+                ▼           ▼
+             AUTORISER   REFUSER / DEMANDER
+```
+
+Le dépôt contient des implémentations dédiées pour :
+
+```text
+AuthorizationGate
+PermissionPolicy
+AutonomyPolicy
+DryRunController
+sandbox
+promptInjectionGuard
+safeguards
+checkpoint
+confirmationBridge
+```
+
+---
+
+# Permissions
+
+Le runtime utilise des catégories de permission incluant :
+
+```text
+read
+write
+network
+exec
+dangerous
+```
+
+Exemples :
+
+### read
+
+Lecture des fichiers ou informations du projet.
+
+### write
+
+Modification de fichiers ou de données persistantes du projet.
+
+### network
+
+Accès aux services externes.
+
+### exec
+
+Exécution de commandes ou de processus.
+
+### dangerous
+
+Opérations considérées comme particulièrement destructrices ou sensibles.
+
+La configuration par défaut indiquée par `.env.example` accorde :
+
+```text
+read
+write
+network
+exec
+```
+
+tout en gardant `dangerous` en dehors de l'ensemble de permissions recommandé par défaut.
+
+---
+
+# Application des permissions
+
+Le runtime prend en charge différents modes de permission.
+
+```text
+enforce
+audit
+off
+```
+
+## enforce
+
+Les opérations non autorisées sont rejetées.
+
+## audit
+
+Les opérations peuvent se poursuivre tandis que leur usage est enregistré.
+
+## off
+
+L'application des permissions est désactivée.
+
+Pour les environnements de production, `enforce` est la configuration renforcée prévue.
+
+---
+
+# Modes d'autonomie
+
+Leanna sépare **ce qu'un agent est autorisé à faire** de **la manière autonome dont il peut le faire**.
+
+La configuration de l'environnement expose :
+
+```text
+suggest
+ask
+auto
+```
+
+## Suggest
+
+Le système propose des actions sans les exécuter.
+
+```text
+Objectif
+ ↓
+Plan
+ ↓
+Suggestion
+ ↓
+Humain
+```
+
+## Ask
+
+Le système peut agir, mais requiert une approbation là où la politique l'exige.
+
+```text
+Objectif
+ ↓
+Plan
+ ↓
+Action nécessitant une approbation
+ ↓
+Approbation humaine
+ ↓
+Exécution
+```
+
+## Auto
+
+Le runtime peut exécuter les opérations permises de façon autonome tandis que les autres mécanismes de sécurité restent actifs.
+
+```text
+Objectif
+ ↓
+Plan
+ ↓
+Autorisation
+ ↓
+Exécution
+ ↓
+Vérification
+```
+
+L'interface expose également des niveaux d'autonomie correspondant conceptuellement à :
+
+```text
+Manuel
+Semi
+Autonome
+```
+
+Ces contrôles doivent être compris conjointement avec la politique de permission, les restrictions du bac à sable et l'autorisation au niveau des outils.
+
+---
+
+# Bac à sable et exécution sûre
+
+Leanna inclut une infrastructure de bac à sable (sandbox) pour contraindre les opérations.
+
+Les composants pertinents incluent :
+
+```text
+server/utils/sandbox.ts
+server/utils/sandboxWatcher.ts
+server/runtime/AuthorizationGate.ts
+```
+
+Lorsque le bac à sable est actif, les chemins cibles sont validés avant les opérations sensibles sur le système de fichiers.
+
+Le but est d'empêcher un agent de sortir des limites prévues du projet.
+
+Le runtime combine :
+
+```text
+Permission
++
+Autonomie
++
+Bac à sable
++
+Approbation
+```
+
+plutôt que de s'appuyer sur un seul mécanisme de sécurité.
+
+---
+
+# Exécution à blanc (Dry Run)
+
+Leanna fournit un mode d'exécution à blanc global.
+
+Lorsqu'il est activé :
+
+```text
+Opérations en lecture seule
+    ↓
+S'exécutent normalement
+
+Opérations à effets de bord
+    ↓
+Interception
+    ↓
+Non exécutées
+```
+
+Les classes d'opérations à effets de bord incluent les opérations impliquant :
+
+* l'écriture ;
+* l'exécution ;
+* l'activité réseau.
+
+L'exécution à blanc peut être activée globalement via :
+
+```env
+Leanna_DRY_RUN="true"
+```
+
+ou au niveau de la mission là où c'est pris en charge.
+
+L'exécution à blanc est particulièrement utile pour :
+
+* tester des plans ;
+* déboguer des agents ;
+* évaluer la sélection d'outils ;
+* valider des workflows ;
+* tester en toute sécurité des missions autonomes.
+
+---
+
+# Protection contre l'injection de prompt
+
+Le dépôt contient une protection dédiée contre l'injection de prompt :
+
+```text
+server/utils/promptInjectionGuard.ts
+```
+
+C'est important car les systèmes agentiques consomment du contenu potentiellement non fiable provenant de :
+
+* fichiers source ;
+* pages web ;
+* documents ;
+* dépôts ;
+* services externes ;
+* contenu généré.
+
+Le modèle de sécurité distingue donc :
+
+```text
+Instructions de l'utilisateur / de confiance
+```
+
+et :
+
+```text
+Contenu externe non fiable
+```
+
+L'exécution d'un agent ne doit pas interpréter aveuglément un contenu arbitraire comme des instructions faisant autorité.
+
+---
+
+# Approbation et confirmation
+
+Les opérations sensibles peuvent passer par des mécanismes de confirmation.
+
+Le dépôt inclut :
+
+```text
+confirmationBridge.ts
+CriticalEditConfirm.tsx
+usePendingApprovals.ts
+```
+
+Cela permet à l'interface de bureau de faire apparaître les opérations nécessitant une approbation explicite de l'utilisateur.
+
+Le principe est :
+
+```text
+L'agent décide
+      ↓
+La politique évalue
+      ↓
+Approbation requise ?
+      │
+   ┌──┴──┐
+   │     │
+  OUI    NON
+   │     │
+   ▼     ▼
+Humain  Exécuter
+   │
+   ▼
+Exécuter
+```
+
+---
+
+# Points de contrôle et récupération
+
+Leanna inclut une infrastructure de points de contrôle (checkpoints) pour préserver l'état d'exécution et prendre en charge la récupération.
+
+Les composants pertinents incluent :
+
+```text
+checkpoint.ts
+CheckpointPanel.tsx
+AutonomyPersistence.ts
+```
+
+C'est particulièrement important pour les tâches autonomes de longue durée où l'exécution ne doit pas être traitée comme une seule opération indivisible.
+
+---
+
+# Observabilité
+
+Un agent autonome doit être observable.
+
+Leanna inclut donc des composants d'observabilité au runtime.
+
+```text
+server/observability/TelemetryService.ts
+server/runtime/Observability.ts
+server/runtime/EventBus.ts
+```
+
+Le runtime expose des informations sur :
+
+* les agents ;
+* les outils ;
+* les tâches ;
+* les événements ;
+* la mémoire ;
+* l'état des processus ;
+* les appels d'outils ;
+* les échecs ;
+* la durée d'exécution ;
+* l'état d'autonomie ;
+* la fiabilité.
+
+Des routes de métriques exposent les informations du runtime sous l'API.
+
+---
+
+# Événements du runtime
+
+Le système d'événements permet de propager l'état d'exécution à travers l'application.
+
+Conceptuellement :
+
+```text
+Outil
+ ↓
+Événement runtime
+ ↓
+EventBus
+ ↓
+Agent / UI / Observabilité
+```
+
+Cela permet à l'interface d'afficher :
+
+* l'activité des agents ;
+* la progression des tâches ;
+* l'exécution des outils ;
+* la chronologie de l'autonomie ;
+* les notifications ;
+* l'état du runtime.
+
+---
+
+# Environnement de bureau
+
+Leanna est packagé comme une application de bureau utilisant Electron.
+
+La couche Electron contient :
+
+```text
+electron/main.cjs
+electron/preload.cjs
+electron/splash.html
+electron/splash.css
+```
+
+Le frontend est construit avec React et Vite.
+
+L'application combine :
+
+```text
+Electron
+   +
+React
+   +
+Vite
+   +
+Node.js
+   +
+Runtime serveur Express
+```
+
+---
+
+# IDE et espace de travail
+
+Leanna contient un environnement de développement intégré.
+
+L'interface inclut des composants pour :
+
+* l'explorateur de fichiers ;
+* les onglets d'éditeur ;
+* l'édition de code ;
+* la visualisation des diffs ;
+* le terminal ;
+* GitHub ;
+* Git ;
+* le navigateur ;
+* les missions ;
+* les agents ;
+* les compétences ;
+* les workflows ;
+* la mémoire ;
+* la connaissance ;
+* les notebooks ;
+* les journaux ;
+* l'observabilité ;
+* les paramètres.
+
+Les zones frontend pertinentes incluent :
+
+```text
+src/views/
+src/components/ide/
+src/components/panels/
+src/components/settings/
+```
+
+---
+
+# Modèle d'espace de travail
+
+Leanna est conçu autour d'un contexte de projet/espace de travail.
+
+L'espace de travail fournit la limite pour :
+
+* les opérations sur les fichiers ;
+* la compréhension du code ;
+* l'indexation des connaissances ;
+* la mémoire ;
+* les missions ;
+* l'exécution des agents ;
+* les opérations Git ;
+* la vérification.
+
+Ce contexte est essentiel car un agent a besoin de savoir **sur quel projet il opère**.
+
+---
+
+# Intelligence de la base de code
+
+Le sous-système de base de code contient des outils pour :
+
+* lire des fichiers ;
+* écrire des fichiers ;
+* naviguer dans le code source ;
+* analyser la structure du projet ;
+* rechercher ;
+* analyser les dépendances ;
+* vérifier ;
+* intégrer Git.
+
+Le dépôt contient des compétences et des utilitaires dédiés à la base de code :
+
+```text
+server/skills/codebase.ts
+server/skills/codebaseReader.ts
+server/skills/codebaseWriter.ts
+server/skills/codebaseHelpers.ts
+```
+
+---
+
+# Automatisation du navigateur
+
+Leanna inclut une infrastructure d'automatisation du navigateur.
+
+Les composants serveur pertinents incluent :
+
+```text
+server/routes/browser.ts
+server/skills/browser.ts
+server/skills/automation.ts
+server/skills/automationBrowser.ts
+```
+
+La prise en charge de Puppeteer est également représentée dans la configuration du projet.
+
+L'automatisation du navigateur peut être utilisée pour des workflows où l'agent doit interagir avec des sites web plutôt que de simplement récupérer des informations textuelles.
+
+Pour les déploiements sensibles à la sécurité, des restrictions de domaine peuvent être configurées via :
+
+```env
+AUTOMATION_ALLOWED_DOMAINS=""
+```
+
+---
+
+# Git et GitHub
+
+Leanna intègre Git et GitHub dans l'environnement de développement.
+
+Les capacités incluent :
+
+* l'état Git ;
+* les branches ;
+* les commits ;
+* les opérations sur les dépôts ;
+* les interactions avec GitHub ;
+* la publication des modifications de l'espace de travail ;
+* les workflows liés aux dépôts.
+
+Les composants pertinents incluent :
+
+```text
+server/skills/git.ts
+server/skills/github.ts
+server/routes/github.ts
+src/components/github/
+src/views/GitHubView.tsx
+```
+
+L'interface inclut également une fonctionnalité de publication GitHub.
+
+---
+
+# Notebooks et RAG
+
+Leanna inclut un système de connaissance orienté notebook.
+
+Le sous-système de notebook contient :
+
+```text
+NotebookManager
+SourceIngester
+EmbeddingStore
+RAGEngine
+GroundedChat
+ProcessingQueue
+ResponseCache
+ContentGenerator
+BackupService
+```
+
+Cela permet des workflows tels que :
+
+```text
+Documents
+   ↓
+Ingestion
+   ↓
+Extraction
+   ↓
+Embeddings
+   ↓
+Récupération
+   ↓
+Contexte ancré (grounded)
+   ↓
+Génération IA
+```
+
+La fonctionnalité de notebook peut être utilisée pour organiser des connaissances externes indépendamment de l'espace de travail de la base de code.
+
+---
+
+# Intelligence documentaire
+
+Le système de documents prend en charge :
+
+* l'ingestion de documents ;
+* l'extraction de contenu ;
+* l'analyse de documents ;
+* la recherche de documents ;
+* la mémoire de documents ;
+* la gestion des sources.
+
+Le frontend contient :
+
+```text
+DocumentsView
+NotebookDetail
+SourcePanel
+SourceViewer
+SourcesSummaryCard
+DocumentUpload
+RichDocumentViewer
+```
+
+---
+
+# Graphe de connaissances
+
+Le graphe de connaissances et les systèmes Notebook/RAG servent des objectifs différents.
+
+Le graphe de connaissances concerne principalement les **relations structurées du projet**.
+
+Le sous-système Notebook/RAG concerne principalement la **connaissance ancrée dans les documents**.
+
+Conceptuellement :
+
+```text
+BASE DE CODE
+   ↓
+Graphe de connaissances
+   ↓
+Compréhension du projet
+
+DOCUMENTS
+   ↓
+RAG / Notebook
+   ↓
+Connaissance ancrée
+```
+
+Les deux peuvent contribuer au contexte des workflows IA.
+
+---
+
+# Workflows et automatisation
+
+Leanna inclut un moteur de workflow et un sous-système d'automatisation.
+
+Les composants backend pertinents incluent :
+
+```text
+server/runtime/WorkflowEngine.ts
+server/routes/workflows.ts
+server/skills/workflow.ts
+server/skills/automation.ts
+```
+
+Le frontend inclut un constructeur de workflow visuel.
+
+Les workflows peuvent représenter des séquences d'actions répétables.
+
+Conceptuellement :
+
+```text
+Déclencheur
+  ↓
+Condition
+  ↓
+Action
+  ↓
+Action
+  ↓
+Vérification
+  ↓
+Résultat
+```
+
+---
+
+# Tâches planifiées
+
+Le dépôt inclut une infrastructure de tâches planifiées.
+
+L'application peut donc distinguer entre :
+
+```text
+Tâche interactive
+```
+
+et :
+
+```text
+Tâche planifiée / automatisée
+```
+
+C'est important pour les workflows opérationnels de plus longue durée.
+
+---
+
+# MCP
+
+Leanna inclut une infrastructure Model Context Protocol.
+
+Les composants pertinents incluent :
+
+```text
+server/mcp/McpBridge.ts
+server/mcp/McpClient.ts
+server/mcp/mcpConfig.ts
+```
+
+MCP fournit un mécanisme d'extensibilité pour connecter des outils et des ressources externes à un runtime d'agent.
+
+Conceptuellement :
+
+```text
+Agent Leanna
+     │
+     ▼
+  Client MCP
+     │
+     ▼
+Serveur MCP externe
+     │
+     ▼
+Outils / Ressources
+```
+
+---
+
+# Telegram
+
+Leanna inclut une intégration Telegram.
+
+Les composants pertinents incluent :
+
+```text
+server/telegram/
+server/routes/telegram.ts
+server/skills/telegram.ts
+```
+
+Cela fournit un canal d'interaction externe pour le runtime de l'agent.
+
+---
+
+# Fournisseurs d'IA
+
+L'architecture prend en charge les fonctionnalités liées à Gemini et OpenRouter.
+
+La configuration pertinente inclut :
+
+```env
+GEMINI_API_KEY=""
+OPENROUTER_API_KEY=""
+OPENROUTER_FREE_API_KEY=""
+OPENROUTER_MODEL=""
+```
+
+Leanna contient également une infrastructure de repli (fallback) entre fournisseurs.
+
+La configuration documentée prend en charge le repli automatique entre fournisseurs lorsqu'il est activé.
+
+```env
+LEANNA_PROVIDER_FALLBACK="true"
+```
+
+Un disjoncteur (circuit breaker) de fournisseur peut temporairement éviter un fournisseur après des échecs répétés.
+
+---
+
+# Supabase
+
+Supabase est utilisé pour les données d'application persistantes et l'état du backend.
+
+Le dépôt contient des schémas pour :
+
+```text
+tâches d'autonomie
+conversations
+compétences personnalisées
+missions
+tâches planifiées
+utilisation des tokens
+workflows
+mémoires
+```
+
+L'environnement utilise :
+
+```env
+SUPABASE_URL=""
+SUPABASE_ANON_KEY=""
+SUPABASE_SERVICE_ROLE_KEY=""
+```
+
+La clé de rôle de service (service-role key) est un secret côté serveur et ne doit jamais être exposée au navigateur.
+
+---
+
+# Redis
+
+Redis est optionnel pour plusieurs capacités distribuées du runtime.
+
+Les usages possibles incluent :
+
+* la mise en cache du graphe de connaissances ;
+* les verrous distribués ;
+* les flux d'événements ;
+* la coordination multi-processus.
+
+La configuration inclut :
+
+```env
+REDIS_URL=""
+LEANNA_KNOWLEDGE_REDIS_URL=""
+LEANNA_LOCK_REDIS_URL=""
+LEANNA_EVENTBUS_REDIS_URL=""
+```
+
+Sans Redis, plusieurs composants peuvent revenir à un comportement local au processus ou persistant local selon le sous-système.
+
+---
+
+# Architecture du système
+
+À un haut niveau :
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                         LEANNA DESKTOP                      │
+│                                                             │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                    Interface React                    │  │
+│  │                                                       │  │
+│  │ Chat │ IDE │ Agents │ Missions │ Mémoire │ Notebooks │  │
+│  │ GitHub │ Navigateur │ Workflows │ Paramètres │ Logs  │  │
+│  └──────────────────────────┬────────────────────────────┘  │
+│                             │                               │
+│                             ▼                               │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                    API / Serveur                      │  │
+│  │                                                       │  │
+│  │ Routes │ WebSockets │ Authentification │ Services     │  │
+│  └──────────────────────────┬────────────────────────────┘  │
+│                             │                               │
+│                             ▼                               │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                  Runtime de l'agent                   │  │
+│  │                                                       │  │
+│  │ Agent Brain │ Missions │ Orchestration │ EventBus     │  │
+│  │ Outils │ Compétences │ Mémoire │ Workflows │ Vérif.  │  │
+│  └──────────────────────────┬────────────────────────────┘  │
+│                             │                               │
+│                             ▼                               │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │              Couche d'autorisation                    │  │
+│  │                                                       │  │
+│  │ Permissions │ Autonomie │ Bac à sable │ Dry Run │ App.│  │
+│  └──────────────────────────┬────────────────────────────┘  │
+│                             │                               │
+│                             ▼                               │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                    Exécution                          │  │
+│  │                                                       │  │
+│  │ Fichiers │ Terminal │ Git │ Navigateur │ GitHub │ MCP │  │
+│  │ Telegram │ Documents │ Services externes             │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+# Structure du dépôt
+
+Le dépôt est organisé autour des principales zones suivantes :
+
+```text
+Leanna/
+│
+├── electron/
+│   ├── main.cjs
+│   ├── preload.cjs
+│   └── splash.*
+│
+├── server/
+│   │
+│   ├── agents/
+│   │   ├── AgentExecutor.ts
+│   │   ├── AgentOrchestrator.ts
+│   │   ├── AgentRegistry.ts
+│   │   ├── AgentTaskRunner.ts
+│   │   ├── AutonomousAgent.ts
+│   │   ├── AutonomousLoop.ts
+│   │   ├── DelegationManager.ts
+│   │   ├── AgentRepairLoop.ts
+│   │   └── brain/
+│   │       ├── AgentBrain.ts
+│   │       ├── GoalUnderstandingEngine.ts
+│   │       ├── DynamicPlanner.ts
+│   │       ├── BrainVerifier.ts
+│   │       ├── BrainCorrectionLoop.ts
+│   │       ├── BrainPlanValidator.ts
+│   │       └── BrainScheduler.ts
+│   │
+│   ├── autonomy/
+│   │   ├── LeannaCore.ts
+│   │   ├── AutonomousExecutive.ts
+│   │   ├── PerceptionEngine.ts
+│   │   ├── Supervisor.ts
+│   │   ├── TaskManager.ts
+│   │   ├── HeartbeatService.ts
+│   │   └── AutonomyPersistence.ts
+│   │
+│   ├── knowledge/
+│   │   ├── KnowledgeGraph.ts
+│   │   ├── DependencyGraph.ts
+│   │   ├── ProjectMemory.ts
+│   │   ├── SemanticSearch.ts
+│   │   ├── StrategyMemory.ts
+│   │   ├── UnderstandingEngine.ts
+│   │   ├── ASTParser.ts
+│   │   ├── ASTCallGraph.ts
+│   │   ├── ImpactAnalyzer.ts
+│   │   └── ProjectIndexer.ts
+│   │
+│   ├── mission/
+│   │   ├── Mission.ts
+│   │   ├── MissionStore.ts
+│   │   ├── Planner.ts
+│   │   ├── Executor.ts
+│   │   ├── Reflection.ts
+│   │   ├── AutonomyPolicy.ts
+│   │   └── SkillScorer.ts
+│   │
+│   ├── runtime/
+│   │   ├── AgentRuntime.ts
+│   │   ├── ToolRegistry.ts
+│   │   ├── PermissionPolicy.ts
+│   │   ├── AuthorizationGate.ts
+│   │   ├── DryRun.ts
+│   │   ├── EventBus.ts
+│   │   ├── StateMachine.ts
+│   │   ├── WorkflowEngine.ts
+│   │   ├── Memory.ts
+│   │   ├── HierarchicalMemoryService.ts
+│   │   ├── Observability.ts
+│   │   ├── agentic/
+│   │   ├── agents/
+│   │   ├── prompts/
+│   │   └── workflows/
+│   │
+│   ├── skills/
+│   │   ├── codebase.ts
+│   │   ├── browser.ts
+│   │   ├── automation.ts
+│   │   ├── git.ts
+│   │   ├── github.ts
+│   │   ├── memory.ts
+│   │   ├── knowledge.ts
+│   │   ├── reasoning.ts
+│   │   ├── securityAudit.ts
+│   │   ├── verify.ts
+│   │   ├── workflow.ts
+│   │   └── ...
+│   │
+│   ├── notebooks/
+│   │   ├── NotebookManager.ts
+│   │   ├── RAGEngine.ts
+│   │   ├── EmbeddingStore.ts
+│   │   ├── SourceIngester.ts
+│   │   ├── GroundedChat.ts
+│   │   └── ...
+│   │
+│   ├── mcp/
+│   ├── marketplace/
+│   ├── telegram/
+│   ├── routes/
+│   ├── utils/
+│   ├── observability/
+│   └── config/
+│
+├── src/
+│   ├── components/
+│   │   ├── ide/
+│   │   ├── panels/
+│   │   ├── notebooks/
+│   │   ├── settings/
+│   │   ├── autonomy/
+│   │   ├── github/
+│   │   ├── sandbox/
+│   │   └── ui/
+│   │
+│   ├── views/
+│   ├── hooks/
+│   ├── context/
+│   ├── services/
+│   ├── stores/
+│   └── utils/
+│
+├── supabase/
+│   ├── migrations/
+│   ├── autonomy_tasks_schema.sql
+│   ├── conversations_schema.sql
+│   ├── custom_skills_schema.sql
+│   ├── missions_schema.sql
+│   ├── scheduled_tasks_schema.sql
+│   ├── token_usage_schema.sql
+│   └── workflows_schema.sql
+│
+├── scripts/
+├── docs/
+├── assets/
+├── tests/
+│
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── server.ts
+├── server-bootstrap.ts
+└── .env.example
+```
+
+---
+
+# Installation
 
 ## Prérequis
 
-- Node.js **20 ou supérieur** ;
-- npm compatible avec le projet ;
-- Git ;
-- un navigateur Chromium installé si l’automatisation Puppeteer est utilisée ;
-- une clé Gemini si les fonctions IA Gemini sont utilisées ;
-- Supabase, Redis, GitHub, OpenRouter ou Telegram uniquement pour les fonctions correspondantes.
+Environnement de développement recommandé :
 
-Le serveur fonctionne sous Linux, macOS et Windows. La distribution Electron configurée par `electron-builder` cible Windows en x64.
+* Node.js ;
+* npm ;
+* Git ;
+* un fournisseur d'IA pris en charge ;
+* Supabase pour les fonctionnalités backend persistantes.
 
-## Installation
+---
 
-### 1. Installer le projet
+## Cloner le dépôt
 
 ```bash
-git clone <URL_DU_DEPOT>
-cd leanna
+git clone https://github.com/moonback/Jarvis-os-original.git
+
+cd Jarvis-os-original
+```
+
+---
+
+## Installer les dépendances
+
+```bash
 npm install
 ```
 
-Le projet utilise `server-bootstrap.ts` pour charger `.env`, puis `.env.local` avec priorité sur `.env`.
+---
 
-### 2. Créer la configuration locale
+# Configuration
+
+Copier le modèle d'environnement :
 
 ```bash
 cp .env.example .env
 ```
 
-Sous Windows PowerShell :
+Sous Windows :
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Pour un démarrage minimal avec les fonctionnalités Gemini, définissez au moins :
+Le fichier `.env.example` contient la surface de configuration documentée.
+
+---
+
+# Variables d'environnement essentielles
+
+## Serveur
 
 ```env
-GEMINI_API_KEY=votre_cle_gemini
+VITE_SERVER_PORT="4000"
+Leanna_LISTEN_HOST="127.0.0.1"
+LOG_LEVEL="info"
 ```
 
-`Leanna_API_TOKEN` et `Leanna_MASTER_KEY` peuvent être générés au premier démarrage s’ils sont laissés vides. Le token API donne accès aux routes protégées et doit être conservé comme un secret. La clé maître est nécessaire pour déchiffrer les données sensibles déjà enregistrées ; sauvegardez-la avant toute utilisation en production.
+Le serveur par défaut se lie à localhost.
 
-### 3. Démarrer en développement
+N'exposez pas le serveur au réseau local (LAN) sans comprendre les implications de sécurité.
 
-```bash
-npm run dev
+---
+
+# Fournisseur d'IA
+
+Gemini :
+
+```env
+GEMINI_API_KEY=""
 ```
 
-Le serveur écoute par défaut sur le port `4000`, généralement à l’adresse :
+Configuration OpenRouter optionnelle :
+
+```env
+OPENROUTER_API_KEY=""
+OPENROUTER_FREE_API_KEY=""
+OPENROUTER_MODEL=""
+OPENROUTER_REFERER=""
+OPENROUTER_TITLE=""
+```
+
+---
+
+# Authentification
+
+Leanna prend en charge un jeton d'API :
+
+```env
+Leanna_API_TOKEN=""
+```
+
+Si aucun jeton n'est configuré, l'application peut en générer un au démarrage selon la configuration du runtime.
+
+Gardez ce secret.
+
+Le jeton d'API protège l'accès à l'API de l'application et à la fonctionnalité WebSocket.
+
+---
+
+# Clé de chiffrement maître
+
+Les informations sensibles peuvent être protégées à l'aide de :
+
+```env
+Leanna_MASTER_KEY=""
+```
+
+Cette clé doit être sauvegardée de manière sécurisée.
+
+Si des données chiffrées dépendent de cette clé, la perte de la clé peut rendre ces données irrécupérables.
+
+---
+
+# Supabase
+
+```env
+SUPABASE_URL=""
+SUPABASE_ANON_KEY=""
+SUPABASE_SERVICE_ROLE_KEY=""
+```
+
+N'exposez jamais :
+
+```env
+SUPABASE_SERVICE_ROLE_KEY
+```
+
+au code frontend.
+
+---
+
+# Configuration de l'autonomie
+
+```env
+LEANNA_AUTONOMY_MODE="ask"
+```
+
+Modes disponibles :
 
 ```text
-http://127.0.0.1:4000
+suggest
+ask
+auto
 ```
 
-## Configuration
+---
 
-Les variables principales sont les suivantes :
+# Configuration des permissions
 
-| Variable | Rôle | Valeur par défaut ou remarque |
-|---|---|---|
-| `GEMINI_API_KEY` | Provider Gemini principal | Recommandée pour les fonctions IA |
-| `GEMINI_API_KEY_1`, etc. | Pool de clés Gemini | Permet la rotation lors des erreurs de quota |
-| `Leanna_API_TOKEN` | Authentification API et WebSockets | Généré automatiquement s’il est vide |
-| `Leanna_MASTER_KEY` | Chiffrement des secrets | Générée automatiquement si elle est vide |
-| `VITE_SERVER_PORT` | Port HTTP du serveur | `4000` |
-| `Leanna_LISTEN_HOST` | Adresse d’écoute | `127.0.0.1` recommandé en local |
-| `Leanna_PERMISSION_MODE` | Contrôle des permissions | `enforce`, `audit` ou `off` ; `enforce` recommandé |
-| `Leanna_GRANTED_PERMISSIONS` | Permissions globales CSV | Par exemple `read,write` |
-| `Leanna_DRY_RUN` | Simulation sans effets de bord | `false` |
-| `SUPABASE_URL` | URL Supabase | Les deux variables Supabase doivent être définies ensemble |
-| `SUPABASE_SERVICE_ROLE_KEY` | Clé de service Supabase | Ne jamais la publier |
-| `OPENROUTER_API_KEY` | Provider OpenRouter | Optionnel |
-| `OPENROUTER_MODEL` | Modèle OpenRouter | Optionnel |
-| `LEANNA_PROVIDER_FALLBACK` | Fallback Gemini/OpenRouter | `true` dans `.env.example` |
-| `REDIS_URL` | Cache Redis | Optionnel ; repli mémoire/disque sans Redis |
-| `GITHUB_TOKEN` | Opérations GitHub | Optionnel |
-| `TELEGRAM_BOT_TOKEN` | Bot Telegram | Optionnel |
-| `PUPPETEER_EXECUTABLE_PATH` | Chromium personnalisé | Optionnel |
-| `OTEL_CONSOLE_EXPORT` | Export des traces en console | Vide par défaut |
+```env
+Leanna_PERMISSION_MODE="enforce"
+```
 
-Le runtime autonome utilise notamment `LEANNA_HEARTBEAT_ACTIVE_MS`, `LEANNA_HEARTBEAT_IDLE_MS`, `LEANNA_HEARTBEAT_SLEEP_MS`, `LEANNA_AUTONOMY_MAX_CONCURRENCY`, `LEANNA_AUTONOMY_MAX_QUEUE_SIZE`, `LEANNA_AUTONOMY_MAX_RETRIES` et `LEANNA_AUTONOMY_TASK_TIMEOUT_MS`.
+Permissions recommandées :
 
-La liste complète et les commentaires associés se trouvent dans [`.env.example`](.env.example). Pour Supabase, les schémas SQL sont disponibles dans [`supabase/`](supabase/).
+```env
+Leanna_GRANTED_PERMISSIONS="read,write,network,exec"
+```
 
-## Lancement
+Évitez d'accorder :
 
-### Développement
+```text
+dangerous
+```
+
+sauf si un workflow spécifique le requiert.
+
+---
+
+# Exécution à blanc (Dry Run)
+
+```env
+Leanna_DRY_RUN="false"
+```
+
+Pour une expérimentation sûre :
+
+```env
+Leanna_DRY_RUN="true"
+```
+
+---
+
+# Repli entre fournisseurs (Provider Fallback)
+
+```env
+LEANNA_PROVIDER_FALLBACK="true"
+LEANNA_PROVIDER_BREAKER_THRESHOLD="3"
+LEANNA_PROVIDER_BREAKER_COOLDOWN_MS="60000"
+```
+
+---
+
+# Redis
+
+Optionnel :
+
+```env
+REDIS_URL=""
+```
+
+Configuration Redis spécialisée supplémentaire :
+
+```env
+LEANNA_KNOWLEDGE_REDIS_URL=""
+LEANNA_LOCK_REDIS_URL=""
+LEANNA_EVENTBUS_REDIS_URL=""
+```
+
+---
+
+# Automatisation du navigateur
+
+Restrictions de domaine optionnelles :
+
+```env
+AUTOMATION_ALLOWED_DOMAINS=""
+```
+
+Pour les déploiements en production, il est recommandé de configurer explicitement les domaines autorisés.
+
+---
+
+# Telegram
+
+```env
+TELEGRAM_BOT_TOKEN=""
+```
+
+---
+
+# GitHub
+
+```env
+GITHUB_TOKEN=""
+```
+
+---
+
+# Lancer Leanna
+
+## Serveur de développement
 
 ```bash
 npm run dev
 ```
 
-### Build et production
+Le serveur de développement utilise l'architecture de développement Vite/Node.
 
-```bash
-npm run build
-npm start
-```
+---
 
-### Prévisualisation du frontend
+# Développement desktop
 
-```bash
-npm run preview
-```
-
-### Application Electron
+Démarrer l'environnement complet de développement desktop :
 
 ```bash
 npm run desktop
+```
+
+Pour le mode debug :
+
+```bash
 npm run desktop:debug
 ```
 
-### Packaging Windows
+La configuration de debug démarre le serveur de développement et Electron ensemble.
 
-```bash
-npm run pack:win
-npm run dist:win
-```
+---
 
-Les artefacts Electron sont générés dans `release/`.
-
-### PM2
-
-Après le build :
+# Build de production
 
 ```bash
 npm run build
-pm2 start ecosystem.config.cjs
-pm2 status
-pm2 logs leanna
-pm2 save
 ```
 
-Le panneau PM2 et les routes correspondantes supposent que PM2 est installé et accessible dans le `PATH` du processus serveur.
+Le processus de build génère le bundle frontend et le bundle serveur.
 
-## Sécurité et garde-fous
+---
 
-### Permissions par outil
-
-Chaque skill ou outil peut déclarer les permissions suivantes :
-
-| Permission | Signification |
-|---|---|
-| `read` | Lire des fichiers ou des ressources |
-| `write` | Créer, modifier, supprimer ou renommer |
-| `network` | Utiliser le réseau sortant |
-| `exec` | Exécuter une commande ou un processus |
-
-Avec `Leanna_PERMISSION_MODE=enforce`, un appel qui exige une permission non accordée est refusé. Pour limiter explicitement l’environnement :
-
-```env
-Leanna_PERMISSION_MODE=enforce
-Leanna_GRANTED_PERMISSIONS=read,write
-```
-
-### Dry-run
-
-Le dry-run exécute les lectures, mais intercepte les opérations `write`, `exec` et `network` :
-
-```env
-Leanna_DRY_RUN=true
-```
-
-Il peut également être activé mission par mission via l’API ou le skill de mission.
-
-### `.leannaignore`
-
-Copiez [`.leannaignore.example`](.leannaignore.example) en `.leannaignore` à la racine du workspace pour interdire à l’agent de modifier certains chemins :
+# Démarrage en production
 
 ```bash
-cp .leannaignore.example .leannaignore
+npm start
 ```
 
-Le format est proche de `.gitignore`. Les règles prennent effet immédiatement et sont également appliquées à la sandbox. Les dossiers de secrets, les credentials, les configurations de production et les migrations déjà appliquées devraient être exclus.
+---
 
-### Secrets du dépôt
+# Packaging Windows
 
-Ne commitez jamais `.env`, `.env.local`, une clé Supabase de service, une clé Gemini, un token GitHub, un token Telegram ou une clé maître. Si un secret a déjà été ajouté à Git, révoquez-le et remplacez-le ; le supprimer du fichier courant ne suffit pas à l’effacer de l’historique.
+Construire un package répertoire Windows :
 
-## Utilisation de l’Agent Brain
+```bash
+npm run pack:win
+```
 
-Depuis l’interface, formulez un objectif en langage naturel, par exemple :
+Construire un distribuable Windows :
+
+```bash
+npm run dist:win
+```
+
+---
+
+# Flux de travail de développement
+
+Une boucle de développement recommandée est :
 
 ```text
-Analyse les erreurs TypeScript du projet et propose une correction vérifiée.
+1. Démarrer Leanna
+2. Sélectionner / ouvrir le projet
+3. Inspecter l'état du runtime
+4. Implémenter la modification
+5. Lancer le typecheck
+6. Lancer les tests
+7. Lancer le lint
+8. Lancer les contrôles de sécurité si pertinent
+9. Vérifier l'UI si affectée
+10. Relire le diff
+11. Commiter
 ```
 
-### Générer un plan
+---
 
-```bash
-curl -X POST http://127.0.0.1:4000/api/agents/brain/plan \
-  -H "Content-Type: application/json" \
-  -H "x-leanna-token: <Leanna_API_TOKEN>" \
-  -d '{"goal":"Analyse les erreurs TypeScript du projet"}'
-```
+# Tests
 
-### Exécuter une mission
-
-```bash
-curl -X POST http://127.0.0.1:4000/api/agents/brain/execute \
-  -H "Content-Type: application/json" \
-  -H "x-leanna-token: <Leanna_API_TOKEN>" \
-  -d '{"goal":"Corrige les erreurs TypeScript et vérifie le résultat"}'
-```
-
-### Suivre l’exécution
-
-```bash
-curl -H "x-leanna-token: <Leanna_API_TOKEN>" \
-  http://127.0.0.1:4000/api/agents/brain/status/<planId>
-```
-
-L’API comporte également des routes pour les agents, les missions, le sandbox, les checkpoints, les documents, les notebooks, les mémoires, les workflows, GitHub, MCP, le terminal et l’audit. La liste détaillée est dans [`API_DOCS.md`](API_DOCS.md).
-
-## Tests et qualité
-
-Les scripts disponibles sont définis dans `package.json` :
+Lancer la suite de tests principale :
 
 ```bash
 npm test
+```
+
+---
+
+# Vérification de types (Type Checking)
+
+```bash
 npm run typecheck
+```
+
+Cela exécute :
+
+```bash
+tsc --noEmit -p tsconfig.json
+```
+
+---
+
+# Lint
+
+```bash
 npm run lint
+```
+
+---
+
+# Audit des dépendances
+
+Dépendances de production :
+
+```bash
 npm run audit:deps
+```
+
+Audit complet des dépendances :
+
+```bash
 npm run audit:deps:full
+```
+
+---
+
+# Audit de l'UI
+
+```bash
 npm run ui:audit
+```
+
+---
+
+# Test de fumée de l'Agent Brain
+
+Démarrer le serveur de développement :
+
+```bash
+npm run dev
+```
+
+Ensuite :
+
+```bash
 npm run brain:smoke
+```
+
+Cela valide le chemin d'exécution du Brain selon l'implémentation du test de fumée.
+
+---
+
+# Tests de missions
+
+```bash
+npm run test:missions
+```
+
+---
+
+# Test de charge d'autonomie (Soak Test)
+
+```bash
 npm run test:soak
 ```
 
-Pour le smoke test du Brain, démarrez d’abord le serveur avec `npm run dev`, puis lancez :
+Cela exécute le test de charge du gestionnaire de tâches d'autonomie.
 
-```bash
-npm run brain:smoke
-```
+---
 
-Le script peut accepter un objectif et une exécution complète selon les options définies dans `scripts/brain-smoke.mjs`.
+# API
 
-Les tests couvrent notamment les routes REST, l’authentification, le sandbox, le runtime agentique, le contrat `AgentTaskRunner`, le Brain, les missions, l’autonomie, les notebooks, les skills, les WebSockets et la sécurité.
+Leanna expose une API HTTP et des points de terminaison WebSocket.
 
-## Structure du dépôt
+La référence détaillée de l'API est maintenue séparément dans :
 
 ```text
-leanna/
-├── electron/                 # Processus principal, preload et écran de démarrage Electron
-├── server/
-│   ├── agents/               # Agents, orchestration, délégation et Agent Brain
-│   ├── autonomy/             # Heartbeat, perception, queue et autonomie
-│   ├── config/               # Validation d’environnement et limites
-│   ├── knowledge/             # AST, Knowledge Graph, indexation et mémoire projet
-│   ├── live/                 # Gemini Live et temps réel
-│   ├── marketplace/           # Registry marketplace
-│   ├── mcp/                  # Bridge et client MCP
-│   ├── mission/              # Planification et exécution des missions
-│   ├── notebooks/            # Sources, embeddings, RAG et notebooks
-│   ├── routes/               # Routes HTTP et WebSocket
-│   ├── runtime/              # ToolRegistry, permissions et runtime agentique
-│   ├── skills/               # Skills natives
-│   ├── telegram/             # Service Telegram
-│   ├── utils/                # Crypto, sandbox, logs, fichiers et providers
-│   └── workflows/            # Workflows planifiés
-├── src/                      # Frontend React
-│   ├── components/           # IDE, panneaux, notebooks et UI
-│   ├── context/              # Contextes React
-│   ├── hooks/                # Hooks applicatifs
-│   ├── services/             # Clients API et services frontend
-│   ├── stores/               # État global
-│   └── views/                # Vues principales
-├── supabase/                 # Schémas et migrations SQL
-├── scripts/                  # Lint, smoke tests et audits UI
-├── docs/                     # Audits, contrats et rapports techniques
-├── server.ts                 # Initialisation du serveur
-├── server-bootstrap.ts       # Chargement et validation de l’environnement
-├── vite.config.ts            # Configuration Vite
-├── ecosystem.config.cjs      # Configuration PM2
-├── package.json              # Dépendances et scripts
-└── .env.example              # Modèle de configuration
+API_DOCS.md
 ```
 
-## Dépannage
+---
 
-### `401 Unauthorized`
+# Authentification
 
-Lorsque `Leanna_API_TOKEN` est défini, ajoutez l’en-tête :
+Les requêtes API utilisent généralement :
 
-```text
+```http
 x-leanna-token: <Leanna_API_TOKEN>
 ```
 
-La route `/api/health` est prévue pour rester accessible pour le diagnostic.
+Le point de terminaison de santé (health) est l'exception.
 
-### Supabase refusé au démarrage
-
-`SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` doivent être définies ensemble. Vérifiez également que l’URL utilise `http://` ou `https://`, puis appliquez les schémas du dossier [`supabase/`](supabase/).
-
-### `GET /api/pm2/status` retourne `503`
-
-Vérifiez l’installation et la disponibilité de PM2 :
-
-```bash
-pm2 --version
-pm2 ping
-pm2 list
+```http
+GET /api/health
 ```
 
-### Gemini ou Gemini Live ne répond pas
+ne nécessite pas d'authentification.
 
-Vérifiez `GEMINI_API_KEY`, le quota du provider et les logs du serveur. Plusieurs clés `GEMINI_API_KEY_N` peuvent être utilisées par le pool de clés. OpenRouter peut être configuré comme provider de secours avec `LEANNA_PROVIDER_FALLBACK=true`.
+---
 
-### Puppeteer ne trouve pas Chromium
+# Réponses API courantes
 
-Installez un navigateur Chromium compatible ou définissez explicitement :
+```text
+200  Succès
+202  Accepté / tâche asynchrone démarrée
+400  Requête invalide
+401  Non authentifié
+403  Accès refusé
+404  Ressource introuvable
+409  Conflit
+429  Limite de débit
+500  Erreur interne du serveur
+503  Service indisponible
+```
+
+---
+
+# Santé (Health)
+
+```http
+GET /api/health
+```
+
+Retourne l'état de santé de base du serveur.
+
+---
+
+# Métriques du runtime
+
+Le runtime expose des métriques sous l'API.
+
+Exemples :
+
+```text
+/api/v2/metrics
+/api/v2/metrics/autonomy
+/api/v2/metrics/reliability
+/api/v2/metrics/tools
+```
+
+Ces points de terminaison offrent une visibilité sur l'exécution du runtime.
+
+---
+
+# WebSockets
+
+L'application utilise des WebSockets pour la fonctionnalité temps réel.
+
+Les canaux runtime pertinents incluent :
+
+```text
+/live
+/sandbox-watch
+/autonomy
+```
+
+Le mécanisme d'authentification WebSocket utilise le mécanisme de session/cookie d'application authentifié décrit dans la documentation de l'API.
+
+---
+
+# Modèle des métriques du runtime
+
+Les métriques peuvent inclure :
+
+```text
+runtime
+outils
+événements
+mémoire
+processus
+```
+
+Les métriques d'outils incluent des informations telles que :
+
+* les appels ;
+* les échecs ;
+* la durée d'exécution.
+
+Les métriques d'autonomie incluent :
+
+* l'état actuel ;
+* les tâches actives ;
+* les événements en attente ;
+* le dernier réveil ;
+* la santé ;
+* les échecs récents.
+
+---
+
+# Documentation de l'API
+
+Pour la référence complète de l'API :
+
+```text
+API_DOCS.md
+```
+
+Ne traitez pas ce README comme le contrat d'API exhaustif.
+
+La référence de l'API est l'endroit faisant autorité pour :
+
+* les points de terminaison ;
+* les paramètres ;
+* l'authentification ;
+* les charges utiles (payloads) ;
+* les structures de réponse ;
+* les WebSockets.
+
+---
+
+# Recommandations de sécurité
+
+Leanna est un système agentique capable d'exécuter des opérations sur l'environnement local.
+
+Traitez-le en conséquence.
+
+## 1. Gardez le serveur sur localhost
+
+Préférez :
 
 ```env
-PUPPETEER_EXECUTABLE_PATH=/chemin/vers/chromium
+Leanna_LISTEN_HOST="127.0.0.1"
 ```
 
-### Le projet n’est pas indexé
+N'exposez pas :
 
-Le Knowledge Graph attend un projet actif. Vérifiez que le workspace contient le code attendu et consultez les logs `[KnowledgeGraph]` et `[WorkspaceIndexer]` au démarrage.
+```env
+Leanna_LISTEN_HOST="0.0.0.0"
+```
 
-## Documentation
+sauf si l'exposition réseau est intentionnelle et correctement sécurisée.
 
-- [`API_DOCS.md`](API_DOCS.md) — routes REST et WebSockets ;
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — architecture technique ;
-- [`DB_SCHEMA.md`](DB_SCHEMA.md) — schémas de données ;
-- [`AUTONOMY.md`](AUTONOMY.md) — runtime autonome ;
-- [`AUTONOMY_AUDIT.md`](AUTONOMY_AUDIT.md) — audit de l’autonomie ;
-- [`docs/AGENTIC_RUNTIME.md`](docs/AGENTIC_RUNTIME.md) — runtime agentique et vérification ;
-- [`docs/AUTONOMOUS_AGENT_AUDIT.md`](docs/AUTONOMOUS_AGENT_AUDIT.md) — audit de la boucle autonome ;
-- [`docs/AUTONOMY_CONTRACT.md`](docs/AUTONOMY_CONTRACT.md) — contrat d’autonomie ;
-- [`docs/LEANNA_EXECUTION_REALITY_AUDIT.md`](docs/LEANNA_EXECUTION_REALITY_AUDIT.md) — audit de réalité d’exécution ;
-- [`ROADMAP.md`](ROADMAP.md) — état, écarts et feuille de route ;
-- [`SELF_IDE.md`](SELF_IDE.md) — fonctionnement de l’IDE ;
-- [`.env.example`](.env.example) — configuration commentée ;
-- [`.leannaignore.example`](.leannaignore.example) — modèle d’exclusion des chemins.
+---
 
-## Contribution
+## 2. Protégez le jeton d'API
 
-Avant toute modification :
+```env
+Leanna_API_TOKEN
+```
 
-1. créez une branche dédiée ;
-2. installez les dépendances avec `npm install` ;
-3. exécutez `npm run typecheck`, `npm run lint` et `npm test` ;
-4. vérifiez les changements de sécurité, de permissions et de gestion des secrets ;
-5. mettez à jour la documentation concernée.
+est sensible.
 
-Les composants sensibles doivent conserver des tests associés. Une modification d’un outil doit notamment vérifier son attribution, ses permissions, son comportement en dry-run et sa traçabilité.
+À ne pas faire :
 
-## Licence
+* le commiter ;
+* le publier ;
+* le placer dans le code frontend ;
+* le coller dans des systèmes de suivi de tickets ;
+* l'inclure dans des captures d'écran.
 
-Leanna est distribué sous licence **Business Source License 1.1 (BUSL-1.1)**. Consultez [`LICENSE`](LICENSE) pour les conditions complètes.
+---
 
-## Références
+## 3. Protégez la clé maître
 
-[1]: API_DOCS.md "Documentation de l’API Leanna"
-[2]: ARCHITECTURE.md "Architecture technique de Leanna"
-[3]: AUTONOMY.md "Runtime autonome de Leanna"
-[4]: ROADMAP.md "État réel et feuille de route de Leanna"
-[5]: docs/AGENTIC_RUNTIME.md "Runtime agentique de Leanna"
-[6]: package.json "Scripts et dépendances du projet"
-[7]: .env.example "Variables d’environnement documentées"
-[8]: LICENSE "Licence Business Source License 1.1"
+```env
+Leanna_MASTER_KEY
+```
 
-> **Note de maintenance.** Ce README doit être mis à jour lorsque `package.json`, les routes principales, le modèle de permissions ou les contrats du runtime changent. Les audits et la roadmap doivent rester la source de vérité pour distinguer une capacité livrée d’un simple objectif de produit.
+doit être traitée comme un secret cryptographique.
+
+---
+
+## 4. Évitez les permissions dangereuses inutiles
+
+Préférez :
+
+```env
+Leanna_GRANTED_PERMISSIONS="read,write,network,exec"
+```
+
+au lieu d'accorder automatiquement :
+
+```text
+dangerous
+```
+
+---
+
+## 5. Utilisez l'exécution à blanc lors du test d'un nouveau comportement d'agent
+
+```env
+Leanna_DRY_RUN="true"
+```
+
+est recommandé lors de la validation de nouveaux outils ou workflows autonomes.
+
+---
+
+## 6. Utilisez des politiques d'autonomie explicites
+
+Pour les workflows expérimentaux :
+
+```text
+suggest
+```
+
+ou :
+
+```text
+ask
+```
+
+sont des points de départ plus sûrs qu'une exécution autonome sans restriction.
+
+---
+
+## 7. Restreignez l'automatisation du navigateur
+
+Configurez :
+
+```env
+AUTOMATION_ALLOWED_DOMAINS
+```
+
+lors du déploiement de l'automatisation du navigateur dans un environnement contrôlé.
+
+---
+
+# Modèle de menaces
+
+Les catégories de menaces les plus importantes pour un système de bureau agentique incluent :
+
+```text
+Injection de prompt
+       ↓
+Instructions malveillantes intégrées dans du contenu externe
+
+Exécution d'outil non autorisée
+       ↓
+L'agent tente une opération au-delà de sa politique
+
+Évasion du système de fichiers
+       ↓
+Une opération cible un chemin hors de l'espace de travail
+
+Exécution de commande
+       ↓
+L'agent tente une exécution de processus non sûre
+
+Exposition d'identifiants
+       ↓
+Des clés API / jetons fuient via le contexte ou les journaux
+
+Exposition réseau
+       ↓
+L'API locale devient accessible à d'autres machines
+
+État malveillant persistant
+       ↓
+Une instruction malveillante survit à travers la mémoire
+```
+
+Leanna combine donc :
+
+```text
+Authentification
++
+Permissions
++
+Politique d'autonomie
++
+Bac à sable
++
+Exécution à blanc
++
+Approbation
++
+Contrôles d'injection de prompt
++
+Observabilité
++
+Points de contrôle
+```
+
+Aucun contrôle individuel ne doit être considéré comme suffisant à lui seul.
+
+---
+
+# Dépannage
+
+## `401 Unauthorized`
+
+Vérifiez :
+
+```env
+Leanna_API_TOKEN
+```
+
+et assurez-vous que le client envoie :
+
+```http
+x-leanna-token
+```
+
+---
+
+## Supabase indisponible
+
+Vérifiez :
+
+```env
+SUPABASE_URL
+SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+```
+
+Certaines fonctionnalités peuvent fonctionner sans les fonctionnalités persistantes de Supabase, tandis que d'autres dépendent de la configuration du backend.
+
+---
+
+## L'agent ne peut pas exécuter un outil
+
+Vérifiez :
+
+1. l'enregistrement de l'outil ;
+2. les permissions de l'outil ;
+3. le mode de permission global ;
+4. les permissions accordées ;
+5. la politique d'autonomie ;
+6. l'état du bac à sable ;
+7. les exigences d'approbation ;
+8. le mode d'exécution à blanc.
+
+---
+
+## Outil refusé en mode `enforce`
+
+Vérifiez :
+
+```env
+Leanna_PERMISSION_MODE="enforce"
+```
+
+Puis inspectez :
+
+```env
+Leanna_GRANTED_PERMISSIONS
+```
+
+Vérifiez également que l'outil déclare correctement les permissions dont il a besoin.
+
+---
+
+## Les modifications ne sont pas exécutées en exécution à blanc
+
+Vérifiez :
+
+```env
+Leanna_DRY_RUN="true"
+```
+
+Les outils à effets de bord sont intentionnellement interceptés dans ce mode.
+
+---
+
+## L'automatisation du navigateur échoue
+
+Vérifiez :
+
+* la disponibilité de Puppeteer ;
+* la configuration de l'exécutable du navigateur ;
+* la connectivité réseau ;
+* les domaines autorisés ;
+* l'authentification ;
+* le comportement du site web cible.
+
+---
+
+# Documentation
+
+Le dépôt contient une documentation dédiée pour les principaux systèmes architecturaux.
+
+## Architecture
+
+```text
+ARCHITECTURE.md
+```
+
+Décrit l'architecture technique.
+
+## Autonomie
+
+```text
+AUTONOMY.md
+```
+
+Décrit le comportement du runtime autonome.
+
+## Runtime agentique
+
+```text
+docs/AGENTIC_RUNTIME.md
+```
+
+Documentation détaillée du runtime d'agent.
+
+## Contrat d'autonomie
+
+```text
+docs/AUTONOMY_CONTRACT.md
+```
+
+Définit le contrat d'autonomie et les limites d'exécution.
+
+## Audit de l'agent autonome
+
+```text
+docs/AUTONOMOUS_AGENT_AUDIT.md
+```
+
+Audit du comportement de l'agent autonome.
+
+## Audit de la réalité d'exécution
+
+```text
+docs/LEANNA_EXECUTION_REALITY_AUDIT.md
+```
+
+Documente le chemin d'exécution réel et la réalité de l'implémentation.
+
+## Audit maître de l'autonomie
+
+```text
+docs/LEANNA_AUTONOMY_MASTER_AUDIT.md
+```
+
+Audit complet de l'autonomie.
+
+## Rapport d'implémentation
+
+```text
+docs/LEANNA_AUTONOMY_IMPLEMENTATION_REPORT.md
+```
+
+Rapport d'autonomie au niveau de l'implémentation.
+
+## Base de données
+
+```text
+DB_SCHEMA.md
+```
+
+Documentation de la structure de la base de données et de la persistance.
+
+## API
+
+```text
+API_DOCS.md
+```
+
+Référence de l'API.
+
+## Self IDE
+
+```text
+SELF_IDE.md
+```
+
+Documentation relative à l'environnement de développement intégré.
+
+## Feuille de route
+
+```text
+ROADMAP.md
+```
+
+État du projet et développement futur.
+
+---
+
+# Principes d'architecture
+
+Leanna est construit autour de plusieurs principes architecturaux.
+
+## 1. Exécution plutôt que génération
+
+Le système doit mesurer le succès à travers des résultats vérifiés plutôt que par le seul texte généré.
+
+## 2. Contrats explicites
+
+Les sous-systèmes d'agents communiquent via des contrats explicites plutôt que par des hypothèses implicites.
+
+## 3. Autorisation centralisée
+
+Les outils doivent passer par l'architecture d'autorisation du runtime.
+
+## 4. Exécution observable
+
+L'état d'exécution important doit être observable.
+
+## 5. Autonomie bornée
+
+L'autonomie doit être bornée par :
+
+* les permissions ;
+* les délais d'expiration ;
+* les réessais ;
+* les budgets ;
+* le bac à sable ;
+* l'approbation ;
+* les disjoncteurs (circuit breakers).
+
+## 6. Récupération plutôt que répétition aveugle
+
+Les échecs doivent produire de l'information utilisée pour déterminer l'action suivante.
+
+## 7. Contexte persistant
+
+La compréhension du projet et la mémoire doivent survivre aux interactions individuelles lorsque c'est approprié.
+
+## 8. Séparation des préoccupations
+
+L'architecture sépare :
+
+```text
+UI
+Serveur
+Runtime
+Agents
+Missions
+Outils
+Connaissance
+Mémoire
+Sécurité
+Persistance
+Observabilité
+```
+
+---
+
+# Exemple d'exécution d'un agent
+
+Une mission d'ingénierie logicielle typique peut être représentée ainsi :
+
+```text
+UTILISATEUR
+
+« Refactoriser le module d'authentification et s'assurer que tous les tests passent. »
+```
+
+Leanna :
+
+```text
+1. COMPRENDRE
+   ├── identifier l'objectif
+   ├── identifier le projet
+   ├── identifier les fichiers pertinents
+   ├── identifier les technologies
+   └── identifier les critères de succès
+
+2. PLANIFIER
+   ├── inspecter l'authentification
+   ├── identifier les problèmes architecturaux
+   ├── implémenter le refactoring
+   ├── lancer les tests
+   └── vérifier le résultat
+
+3. DÉLÉGUER
+   ├── chercheur / planificateur
+   ├── codeur
+   └── testeur
+
+4. EXÉCUTER
+   ├── lire les fichiers
+   ├── modifier les fichiers
+   └── exécuter les vérifications permises
+
+5. OBSERVER
+   ├── modifications de fichiers
+   ├── résultats des outils
+   ├── sortie du compilateur
+   └── sortie des tests
+
+6. VÉRIFIER
+   ├── syntaxe
+   ├── tests
+   ├── fichiers modifiés
+   └── critères de succès
+
+7. RÉCUPÉRER
+   ├── diagnostiquer l'échec
+   ├── réparer
+   ├── réessayer
+   └── replanifier lorsque nécessaire
+
+8. TERMINER
+   └── fournir le résultat d'exécution réel
+```
+
+---
+
+# Qu'est-ce qui rend l'architecture agentique ?
+
+Leanna doit être compris comme une composition de plusieurs couches plutôt que comme un unique « modèle intelligent ».
+
+```text
+                   ┌──────────────┐
+                   │     LLM      │
+                   └──────┬───────┘
+                          │
+                   ┌──────▼───────┐
+                   │ Agent Brain  │
+                   └──────┬───────┘
+                          │
+                   ┌──────▼───────┐
+                   │ Planificateur│
+                   └──────┬───────┘
+                          │
+                   ┌──────▼───────┐
+                   │Orchestrateur │
+                   └──────┬───────┘
+                          │
+                   ┌──────▼───────┐
+                   │Runtime outils│
+                   └──────┬───────┘
+                          │
+              ┌───────────┼───────────┐
+              ▼           ▼           ▼
+           Mémoire      Outils    Connaissance
+              │           │           │
+              └───────────┼───────────┘
+                          ▼
+                   ┌───────────────┐
+                   │ Vérification  │
+                   └───────┬───────┘
+                           │
+                     ┌─────▼─────┐
+                     │Récupération│
+                     └───────────┘
+```
+
+Le LLM est donc un composant du système.
+
+Le runtime de l'agent fournit l'architecture de contrôle autour de lui.
+
+---
+
+# Périmètre actuel
+
+Le dépôt contient actuellement une infrastructure pour :
+
+* l'exécution desktop ;
+* l'interaction IA ;
+* les tâches autonomes ;
+* les missions ;
+* l'orchestration d'agents ;
+* la délégation multi-agents ;
+* l'exécution d'outils ;
+* la gestion des compétences ;
+* la compréhension du projet ;
+* les graphes de connaissances ;
+* la recherche sémantique ;
+* la mémoire persistante ;
+* les notebooks ;
+* le RAG ;
+* l'automatisation du navigateur ;
+* Git/GitHub ;
+* les workflows ;
+* MCP ;
+* Telegram ;
+* l'audit de sécurité ;
+* le bac à sable ;
+* les permissions ;
+* l'exécution à blanc ;
+* l'observabilité ;
+* la communication API/WebSocket ;
+* la persistance Supabase.
+
+Tous les composants ne doivent pas automatiquement être interprétés comme étant d'une maturité équivalente ou prêts pour la production.
+
+Le dépôt contient des audits explicites et des documents de feuille de route pour distinguer :
+
+```text
+Implémenté
+Expérimental
+Partiellement intégré
+Squelette (scaffolding)
+Planifié
+```
+
+Ces documents doivent être consultés avant de formuler des affirmations sur la maturité en production.
+
+---
+
+# Philosophie de la feuille de route
+
+La direction à long terme de Leanna est d'évoluer vers un environnement d'exécution autonome fiable.
+
+Les domaines prioritaires sont :
+
+```text
+1. Fiabilité
+2. Vérification
+3. Récupération
+4. Sécurité
+5. Qualité du contexte
+6. Coordination des agents
+7. Exécution de longue durée
+8. Observabilité
+9. Extensibilité
+10. Expérience utilisateur
+```
+
+L'objectif n'est pas simplement d'ajouter plus d'outils.
+
+Ajouter des outils augmente la capacité.
+
+Améliorer :
+
+```text
+la planification
++
+la sélection
++
+l'autorisation
++
+l'exécution
++
+la vérification
++
+la récupération
+```
+
+augmente la fiabilité.
+
+C'est là le défi d'ingénierie central d'un agent autonome.
+
+---
+
+# Priorités de développement recommandées
+
+Lors de l'extension de Leanna, préférez la séquence suivante :
+
+```text
+                  NOUVELLE CAPACITÉ
+                          │
+                          ▼
+                  Contrat d'outil
+                          │
+                          ▼
+                    Permissions
+                          │
+                          ▼
+                    Autorisation
+                          │
+                          ▼
+                  Mapping d'agent
+                          │
+                          ▼
+                    Exécution
+                          │
+                          ▼
+                   Vérification
+                          │
+                          ▼
+                  Observabilité
+                          │
+                          ▼
+                      Tests
+```
+
+Une nouvelle capacité ne doit pas être considérée comme complète simplement parce que son chemin nominal (happy path) fonctionne.
+
+Elle doit aussi définir :
+
+* les permissions ;
+* le comportement en cas d'erreur ;
+* le délai d'expiration ;
+* la vérification ;
+* l'observabilité ;
+* la couverture de tests ;
+* le comportement de récupération lorsque pertinent.
+
+---
+
+# Contribuer
+
+Avant de modifier Leanna :
+
+```bash
+npm install
+```
+
+Puis exécutez :
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+```
+
+Pour les modifications pertinentes, exécutez également :
+
+```bash
+npm run audit:deps
+npm run ui:audit
+npm run brain:smoke
+npm run test:missions
+```
+
+---
+
+# Règles de contribution
+
+Lors de la modification d'un composant agentique :
+
+## Modifications d'outils
+
+Vérifiez :
+
+* le schéma d'entrée ;
+* les permissions ;
+* la classification de mutation ;
+* le délai d'expiration ;
+* l'autorisation ;
+* le comportement en exécution à blanc ;
+* l'attribution ;
+* l'observabilité ;
+* les tests.
+
+## Modifications d'agents
+
+Vérifiez :
+
+* l'enregistrement du rôle ;
+* le mapping des outils ;
+* la délégation ;
+* le contrat d'exécution ;
+* la vérification ;
+* la gestion des échecs.
+
+## Modifications d'autonomie
+
+Vérifiez :
+
+* la politique d'autonomie ;
+* les permissions ;
+* le bac à sable ;
+* l'approbation ;
+* les limites de réessai ;
+* le délai d'expiration ;
+* le disjoncteur (circuit breaker) ;
+* la persistance ;
+* l'observabilité.
+
+## Modifications de mémoire
+
+Vérifiez :
+
+* la portée ;
+* la persistance ;
+* la confidentialité ;
+* l'invalidation ;
+* la récupération ;
+* les tests.
+
+---
+
+# Philosophie de conception
+
+Leanna repose sur un principe simple :
+
+> **L'autonomie n'est pas l'absence de contrôle.
+> L'autonomie est une exécution contrôlée avec rétroaction.**
+
+Un système autonome utile a donc besoin de :
+
+```text
+Intelligence
+     +
+Contexte
+     +
+Planification
+     +
+Outils
+     +
+Exécution
+     +
+Vérification
+     +
+Mémoire
+     +
+Récupération
+     +
+Sécurité
+     +
+Observabilité
+```
+
+Supprimer l'une de ces couches crée un agent plus faible.
+
+---
+
+# Le contrat d'exécution de Leanna
+
+Une mission réussie doit finalement répondre à :
+
+```text
+Quel était l'objectif ?
+
+Qu'a compris Leanna ?
+
+Qu'a-t-il planifié ?
+
+Quels agents ont participé ?
+
+Quels outils ont été utilisés ?
+
+Quelles actions ont été effectuées ?
+
+Qu'est-ce qui a changé ?
+
+Qu'est-ce qui a été vérifié ?
+
+Qu'est-ce qui a échoué ?
+
+Qu'est-ce qui a été récupéré ?
+
+Qu'est-ce qui reste incomplet ?
+
+Pourquoi la mission est-elle considérée comme terminée ?
+```
+
+Cela crée un modèle d'exécution plus utile que le simple retour d'une réponse générée.
+
+---
+
+# Modèle mental final
+
+Si vous contribuez à Leanna, pensez le système ainsi :
+
+```text
+                    UTILISATEUR
+                        │
+                        ▼
+                     OBJECTIF
+                        │
+                        ▼
+               ┌────────────────┐
+               │   COMPRENDRE   │
+               └───────┬────────┘
+                       │
+                       ▼
+               ┌────────────────┐
+               │   PLANIFIER    │
+               └───────┬────────┘
+                       │
+                       ▼
+               ┌────────────────┐
+               │    DÉLÉGUER    │
+               └───────┬────────┘
+                       │
+                       ▼
+               ┌────────────────┐
+               │      AGIR      │
+               └───────┬────────┘
+                       │
+                       ▼
+               ┌────────────────┐
+               │    OBSERVER    │
+               └───────┬────────┘
+                       │
+                       ▼
+               ┌────────────────┐
+               │    VÉRIFIER    │
+               └───────┬────────┘
+                       │
+                ┌──────┴──────┐
+                │             │
+              RÉUSSI       ÉCHOUÉ
+                │             │
+                │             ▼
+                │        ┌───────────┐
+                │        │ RÉCUPÉRER │
+                │        └─────┬─────┘
+                │              │
+                │              ▼
+                │         REPLANIFIER
+                │              │
+                │              └───────┐
+                │                      │
+                └──────────────────────┘
+                           │
+                           ▼
+                      TERMINAISON
+                           │
+                           ▼
+                   RÉSULTAT VÉRIFIÉ
+```
+
+Cette boucle est le centre conceptuel de Leanna.
+
+---
+
+# Licence
+
+Leanna est distribué sous la :
+
+**Business Source License 1.1 (BUSL-1.1)**
+
+Voir :
+
+```text
+LICENSE
+```
+
+pour les termes et conditions complets.
+
+---
+
+# Documentation du projet
+
+| Document                                        | Objet                     |
+| ----------------------------------------------- | ------------------------- |
+| `ARCHITECTURE.md`                               | Architecture technique    |
+| `AUTONOMY.md`                                   | Runtime autonome          |
+| `API_DOCS.md`                                   | Référence de l'API        |
+| `DB_SCHEMA.md`                                  | Schéma de base de données |
+| `ROADMAP.md`                                    | Feuille de route et état  |
+| `SELF_IDE.md`                                   | IDE intégré               |
+| `docs/AGENTIC_RUNTIME.md`                       | Runtime agentique         |
+| `docs/AUTONOMY_CONTRACT.md`                     | Contrat d'autonomie       |
+| `docs/AUTONOMOUS_AGENT_AUDIT.md`                | Audit d'agent autonome    |
+| `docs/LEANNA_AUTONOMY_MASTER_AUDIT.md`          | Audit maître d'autonomie  |
+| `docs/LEANNA_AUTONOMY_IMPLEMENTATION_REPORT.md` | Rapport d'implémentation  |
+| `docs/LEANNA_EXECUTION_REALITY_AUDIT.md`        | Audit de réalité d'exéc.  |
+
+---
+
+# Leanna
+
+<p align="center">
+
+**Comprendre. Planifier. Agir. Vérifier. Récupérer. Terminer.**
+
+</p>
+
+<p align="center">
+
+Un environnement d'exécution IA autonome pour le bureau.
+
+</p>
+
+<p align="center">
 
 © 2026 Maysson — Leanna
+
+</p>
