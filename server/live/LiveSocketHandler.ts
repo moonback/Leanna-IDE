@@ -494,9 +494,12 @@ export function attachLiveWebSocket(
         const AGENT_TOOLS = new Set(['agent_delegate', 'agent_orchestrate', 'agent_status', 'agent_list_tasks', 'agent_list_roles', 'agent_cancel', 'agent_cancel_orchestration', 'agent_stats']);
         filteredDeclarations = filteredDeclarations.filter(d => !AGENT_TOOLS.has(d.name));
       }
-      filteredDeclarations = filteredDeclarations.filter(d => !d.name.startsWith('git_'));
+      // Les filtres git_/reasoning_ ne doivent jamais retirer un outil MCP
+      // (un serveur MCP peut légitimement exposer un outil nommé git_* ou
+      // reasoning_*). On préserve donc systématiquement les outils _mcpServerId.
+      filteredDeclarations = filteredDeclarations.filter(d => (d as any)._mcpServerId || !d.name.startsWith('git_'));
       if (currentProfile.reasoningEnabled === false) {
-        filteredDeclarations = filteredDeclarations.filter(d => !d.name.startsWith('reasoning_'));
+        filteredDeclarations = filteredDeclarations.filter(d => (d as any)._mcpServerId || !d.name.startsWith('reasoning_'));
       }
 
       // Retire les marqueurs internes (_mcpServerId) : l'API Gemini n'accepte
@@ -522,6 +525,28 @@ export function attachLiveWebSocket(
 
       if (WORKSPACE_SITE_URL) {
         systemText += `\n\n[Workspace — Site associé]\nL'URL du site web associé à ce projet est : ${WORKSPACE_SITE_URL}`;
+      }
+
+      // ── Signaler les outils MCP disponibles à l'assistant ─────────────
+      // Le prompt système de base ne mentionne pas MCP ; sans cette annonce,
+      // le modèle ignore qu'il dispose d'outils externes (serveurs MCP connectés)
+      // et ne les appelle pas spontanément.
+      const mcpToolNames = mcpDeclarations
+        .map((d: any) => d.name)
+        // inclut aussi les outils MCP déjà présents dans filteredDeclarations
+        .concat(
+          filteredDeclarations
+            .filter((d: any) => d._mcpServerId)
+            .map((d: any) => d.name),
+        );
+      const uniqueMcpToolNames = [...new Set(mcpToolNames)];
+      if (uniqueMcpToolNames.length > 0) {
+        systemText +=
+          `\n\n[Outils MCP disponibles]\n` +
+          `Tu as accès à des outils fournis par des serveurs MCP (Model Context Protocol) connectés. ` +
+          `Utilise-les quand ils sont pertinents, exactement comme tes autres outils. Outils MCP : ` +
+          `${uniqueMcpToolNames.join(', ')}.`;
+        console.log(`[LiveSocket] 🔌 ${uniqueMcpToolNames.length} outil(s) MCP annoncé(s) à l'assistant.`);
       }
 
       // ── Custom skill automatique ──────────────────────────────────────

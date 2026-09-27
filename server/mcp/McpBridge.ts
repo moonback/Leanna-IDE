@@ -66,6 +66,14 @@ export class McpBridge extends EventEmitter {
   private _metrics: McpToolCallMetric[] = [];
   private static readonly MAX_METRICS = 200;
 
+  /**
+   * Mapping nom sanitizé (exposé à Gemini) → nom d'outil MCP original.
+   * Gemini exige des noms d'outils en [a-zA-Z0-9_] ; les serveurs MCP utilisent
+   * souvent des tirets (ex. "resolve-library-id"). On expose une version
+   * sanitizée au modèle et on retraduit vers l'original au moment de l'appel.
+   */
+  private toolNameMap = new Map<string, string>();
+
   /** Intervalle de health-check en ms (60s) */
   private static readonly HEALTH_CHECK_INTERVAL_MS = 60_000;
   /** Délai de base pour le backoff exponentiel (2s) */
@@ -289,16 +297,32 @@ export class McpBridge extends EventEmitter {
    */
   getAllTools(): Array<McpToolDefinition & { _mcpServerId: string }> {
     const tools: Array<McpToolDefinition & { _mcpServerId: string }> = [];
-    
+    // On reconstruit le mapping à chaque agrégation (les serveurs peuvent changer).
+    this.toolNameMap.clear();
+
     for (const [id, client] of this.clients) {
       if (client.status === 'ready') {
         for (const tool of client.tools) {
-          tools.push({ ...tool, _mcpServerId: id });
+          // Nom exposé au LLM : sanitizé pour respecter la contrainte Gemini
+          // (^[a-zA-Z0-9_]+$). On mémorise la correspondance vers le nom réel.
+          const exposedName = McpBridge.sanitizeToolName(tool.name);
+          if (exposedName !== tool.name) {
+            this.toolNameMap.set(exposedName, tool.name);
+          }
+          tools.push({ ...tool, name: exposedName, _mcpServerId: id });
         }
       }
     }
-    
+
     return tools;
+  }
+
+  /**
+   * Normalise un nom d'outil MCP pour Gemini : seuls [a-zA-Z0-9_] sont fiables
+   * dans une functionDeclaration. Les tirets et autres caractères deviennent '_'.
+   */
+  private static sanitizeToolName(name: string): string {
+    return name.replace(/[^a-zA-Z0-9_]/g, '_');
   }
 
   /**
@@ -310,22 +334,26 @@ export class McpBridge extends EventEmitter {
     const start = Date.now();
     let serverId = 'unknown';
 
+    // Le LLM appelle l'outil par son nom sanitizé : retrouver le nom MCP réel.
+    // Fallback sur toolName si aucun mapping (nom déjà valide).
+    const realName = this.toolNameMap.get(toolName) ?? toolName;
+
     try {
       // ── Sandboxing : valider les arguments qui ressemblent à des chemins ──
       // Dans le try : si un chemin est rejeté, on enregistre la métrique
       // d'échec et on logge proprement au lieu de laisser fuiter l'exception.
       const sanitizedArgs = this.sanitizePathArgs(args);
 
-      // Trouver le serveur qui fournit cet outil
+      // Trouver le serveur qui fournit cet outil (par son nom réel MCP)
       for (const [id, client] of this.clients) {
         if (client.status === 'ready') {
-          const hasTool = client.tools.some(t => t.name === toolName);
+          const hasTool = client.tools.some(t => t.name === realName);
           if (hasTool) {
             serverId = id;
-            const result = await client.callTool(toolName, sanitizedArgs);
+            const result = await client.callTool(realName, sanitizedArgs);
             const durationMs = Date.now() - start;
 
-            // Enregistrer la métrique
+            // Enregistrer la métrique (sous le nom exposé, cohérent avec l'UI)
             this.recordMetric({ toolName, serverId, durationMs, success: true, timestamp: Date.now() });
             this.emit('toolCall', { toolName, serverId, durationMs, success: true });
 
@@ -333,7 +361,7 @@ export class McpBridge extends EventEmitter {
           }
         }
       }
-      
+
       throw new Error(`Outil MCP "${toolName}" non trouvé sur aucun serveur connecté`);
     } catch (err: any) {
       const durationMs = Date.now() - start;
