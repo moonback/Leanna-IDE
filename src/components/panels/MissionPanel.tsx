@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
 import { usePendingApprovals, clearPendingApproval } from '../../hooks/usePendingApprovals.js';
+import { skillLabel } from '../../utils/skillLabels.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -856,9 +857,10 @@ function ApprovalCard({
           <span className="text-xs font-bold uppercase tracking-wide flex-1" style={{ color: 'var(--color-warning)' }}>
             Approbation requise
           </span>
-          <span className="text-xs font-mono px-1 py-0.5 rounded flex items-center gap-1"
-            style={{ color: 'var(--accent-primary)', backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)' }}>
-            <Zap size={9} /> {approval.skill}
+          <span className="text-xs px-1 py-0.5 rounded flex items-center gap-1"
+            style={{ color: 'var(--accent-primary)', backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)' }}
+            title={approval.skill}>
+            <Zap size={9} /> {skillLabel(approval.skill)}
           </span>
         </div>
 
@@ -1265,8 +1267,8 @@ function ActionRow({ action }: { action: ActionEntry }) {
     <div className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-white/5">
       <div className="flex-shrink-0">{statusIcon(action.status, 9)}</div>
       <Zap size={9} style={{ color: 'var(--accent-primary)' }} className="flex-shrink-0" />
-      <span className="text-xs font-mono flex-1 truncate" style={{ color: 'var(--text-muted)' }}>
-        {action.skill}
+      <span className="text-xs flex-1 truncate" style={{ color: 'var(--text-muted)' }} title={action.skill}>
+        {skillLabel(action.skill)}
       </span>
       {action.durationMs && (
         <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
