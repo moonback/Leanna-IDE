@@ -2110,6 +2110,34 @@ Appelle un outil sur un serveur MCP.
 
 ---
 
+### `GET /api/mcp/directory`
+
+Recherche des serveurs MCP dans l'annuaire public MCP Harbor (proxy backend).
+
+**Authentification :** Oui
+
+**Query :** `q`, `transport`, `tag`, `limit`, `offset` (tous optionnels)
+
+**Réponse :** `{ "servers": [...], "metadata": { ... } }`
+
+**Erreurs :** `502` (annuaire injoignable), `504` (timeout)
+
+---
+
+### `POST /api/mcp/directory/install`
+
+Installe un serveur MCP depuis l'annuaire Harbor : récupère le manifeste, le convertit en configuration locale, persiste et connecte le serveur.
+
+**Authentification :** Oui
+
+**Body :** `{ "name": "io.github.owner/server" }`
+
+**Réponse :** `{ "success": true, "id": "...", "config": { ... }, "message": "..." }`
+
+**Erreurs :** `400` (name manquant), `422` (transport non supporté), `502` / `504`
+
+---
+
 ## Export
 
 ### `POST /api/export`

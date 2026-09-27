@@ -1801,32 +1801,96 @@ C'est important pour les workflows opérationnels de plus longue durée.
 
 # MCP
 
-Leanna inclut une infrastructure Model Context Protocol.
+Leanna inclut une infrastructure **Model Context Protocol (MCP)** qui permet de connecter des serveurs d'outils et de ressources externes, puis d'exposer leurs outils directement à l'assistant IA.
 
 Les composants pertinents incluent :
 
 ```text
-server/mcp/McpBridge.ts
-server/mcp/McpClient.ts
-server/mcp/mcpConfig.ts
+server/mcp/McpClient.ts          Client MCP (transports stdio + HTTP)
+server/mcp/McpBridge.ts          Orchestrateur multi-serveurs + adaptateur Skill
+server/mcp/mcpConfig.ts          Persistance .Leanna/mcp.json
+server/routes/mcp.ts             API REST de gestion des serveurs
+server/routes/mcp-directory.ts   Proxy vers l'annuaire public MCP Harbor
 ```
 
-MCP fournit un mécanisme d'extensibilité pour connecter des outils et des ressources externes à un runtime d'agent.
+MCP fournit un mécanisme d'extensibilité : chaque serveur connecté expose ses outils, que le `McpBridge` agrège et convertit en déclarations utilisables par le modèle.
 
 Conceptuellement :
 
 ```text
-Agent Leanna
+Assistant Leanna
      │
      ▼
-  Client MCP
+SkillManager (skill « mcp »)
      │
      ▼
-Serveur MCP externe
+   McpBridge
      │
-     ▼
-Outils / Ressources
+     ├──► Client MCP ──► Serveur MCP (stdio)   ──► Outils / Ressources
+     │
+     └──► Client MCP ──► Serveur MCP (HTTP/SSE) ──► Outils / Ressources
 ```
+
+## Transports pris en charge
+
+* **stdio** — le serveur est lancé comme sous-processus (ex. `npx`, `uvx`, `docker`) et communique en JSON-RPC newline-delimited. Sur Windows, les wrappers `.cmd` (npx, uvx…) sont lancés via un shell avec arguments quotés pour éviter l'erreur `spawn EINVAL` des versions récentes de Node.
+* **HTTP** — deux variantes gérées automatiquement :
+  * **Streamable HTTP** (standard actuel) : les messages JSON-RPC partent en POST, la réponse revient en JSON ou en flux SSE dans le même POST. Le header `Mcp-Session-Id` est capturé et réémis.
+  * **HTTP with SSE** (legacy) : un flux GET persistant démarre par un événement `endpoint`.
+  Le client tente le flux GET, puis bascule en Streamable HTTP si le serveur répond `405`/`404`/`406`.
+
+## Annuaire MCP Harbor
+
+Leanna intègre l'annuaire public [MCP Harbor](https://ai.mcpharbor.dev), qui permet de parcourir, rechercher et installer des serveurs MCP gratuits en un clic. Les appels passent par un proxy backend (jamais d'appel direct depuis le frontend).
+
+```text
+GET  /api/mcp/directory           Recherche (q, transport, tag, limit, offset)
+POST /api/mcp/directory/install   Installe un serveur par son nom Harbor
+```
+
+À l'installation, le manifeste Harbor est converti en configuration locale :
+
+```text
+remotes[streamable-http|sse]  →  { transport: "sse", url }
+packages[npm]                 →  { transport: "stdio", command: "npx",   args: ["-y", <id>] }
+packages[pypi]                →  { transport: "stdio", command: "uvx",    args: [<id>] }
+packages[oci]                 →  { transport: "stdio", command: "docker", args: ["run","-i","--rm",<id>] }
+```
+
+Les variables d'environnement requises sont créées vides dans `.Leanna/mcp.json` ; l'utilisateur les renseigne ensuite (aucun secret n'est journalisé).
+
+L'annuaire est accessible depuis le panneau MCP de l'interface via le bouton **Parcourir l'annuaire**.
+
+## Exposition à l'assistant
+
+Au démarrage, le `McpBridge` est initialisé et enregistre une skill `mcp` auprès du `SkillManager`. Les outils des serveurs connectés (statut `ready`) sont alors :
+
+* agrégés par le bridge (`getAllTools`) ;
+* convertis en déclarations Gemini, avec des noms normalisés (`[a-zA-Z0-9_]`) — un mapping retraduit le nom au moment de l'appel ;
+* toujours inclus dans les déclarations envoyées au modèle, quel que soit le mode ;
+* re-synchronisés automatiquement à chaque (dé)connexion d'un serveur (événement `toolsChanged`).
+
+Les appels d'outils MCP transitent par le sandboxing des chemins du bridge, comme les autres outils à effet de bord.
+
+## Configuration
+
+Les serveurs sont persistés dans `.Leanna/mcp.json` :
+
+```json
+{
+  "mcpServers": {
+    "context7": {
+      "name": "Context7",
+      "transport": "sse",
+      "url": "https://mcp.context7.com/mcp",
+      "env": { "CONTEXT7_API_KEY": "" },
+      "description": "Documentation de code à jour"
+    }
+  }
+}
+```
+
+Un serveur peut aussi être ajouté, désactivé, reconnecté ou supprimé via le panneau MCP ou l'API REST (`/api/mcp/servers`).
 
 ---
 
@@ -2075,9 +2139,16 @@ Leanna/
 │   │   └── ...
 │   │
 │   ├── mcp/
+│   │   ├── McpClient.ts
+│   │   ├── McpBridge.ts
+│   │   └── mcpConfig.ts
+│   │
 │   ├── marketplace/
 │   ├── telegram/
 │   ├── routes/
+│   │   ├── mcp.ts
+│   │   ├── mcp-directory.ts
+│   │   └── ...
 │   ├── utils/
 │   ├── observability/
 │   └── config/
