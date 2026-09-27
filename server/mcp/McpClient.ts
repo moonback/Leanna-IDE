@@ -44,19 +44,30 @@ interface JsonRpcRequest {
   params?: any;
 }
 
-// JsonRpcResponse: réponses parsées via parseMessage() — interface conservée pour référence
-// interface JsonRpcResponse {
-//   jsonrpc: '2.0';
-//   id: number;
-//   result?: any;
-//   error?: { code: number; message: string; data?: any };
-// }
-
 interface JsonRpcNotification {
   jsonrpc: '2.0';
   method: string;
   params?: any;
 }
+
+interface JsonRpcSuccessResponse {
+  jsonrpc: '2.0';
+  id: number;
+  result: any;
+}
+
+interface JsonRpcErrorResponse {
+  jsonrpc: '2.0';
+  id: number;
+  error: { code: number; message: string; data?: any };
+}
+
+/** Union de tout ce qu'un client peut émettre. */
+type JsonRpcOutgoing =
+  | JsonRpcRequest
+  | JsonRpcNotification
+  | JsonRpcSuccessResponse
+  | JsonRpcErrorResponse;
 
 type PendingRequest = {
   resolve: (value: any) => void;
@@ -69,6 +80,13 @@ type PendingRequest = {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export type McpClientStatus = 'disconnected' | 'connecting' | 'ready' | 'error';
+
+/** Méthodes de serveur→client que l'on accepte et traite côté client. */
+const SERVER_TO_CLIENT_HANDLERS: Record<string, (params: any) => Promise<any> | any> = {
+  // Le protocole MCP exige qu'un client réponde à un ping. Si le serveur
+  // envoie un ping et qu'on ne répond pas, il ferme la connexion.
+  ping: () => ({}),
+};
 
 export class McpClient extends EventEmitter {
   private config: McpServerConfig;
@@ -372,11 +390,15 @@ export class McpClient extends EventEmitter {
       if (!response.ok) {
         throw new Error(`SSE connection failed: ${response.status} ${response.statusText}`);
       }
-
-      this.sseSessionUrl = response.headers.get('x-mcp-session-url') || url;
     } finally {
       clearTimeout(connectTimeoutId);
     }
+
+    // Pour Streamable HTTP, le POST cible la même URL que le GET.
+    // Pour "HTTP with SSE", le POST cible le session endpoint reçu via l'event
+    // `endpoint`. On initialise avec l'URL de base et on la remplacera dès que
+    // l'event `endpoint` arrivera.
+    this.sseSessionUrl = url;
 
     this.readSseStream(response!).catch(err => {
       if (err.name !== 'AbortError') {
@@ -416,18 +438,57 @@ export class McpClient extends EventEmitter {
         const events = sseBuffer.split('\n\n');
         sseBuffer = events.pop() || '';
 
-        for (const event of events) {
-          const dataLine = event.split('\n').find(l => l.startsWith('data: '));
-          if (dataLine) {
-            try {
-              const message = JSON.parse(dataLine.slice(6));
-              this.handleMessage(message);
-            } catch { /* ignore malformed */ }
-          }
+        for (const rawEvent of events) {
+          this.processSseEvent(rawEvent, this.config.url!);
         }
       } finally {
         if (idleTimer) clearTimeout(idleTimer);
       }
+    }
+  }
+
+  /**
+   * Parse un événement SSE complet (bloc séparé par une ligne vide).
+   * Respecte les champs `event:` et `data:` de la spec SSE.
+   *
+   * NOTE : le bug d'origine ne lisait que `data:` et ignorait `event:`,
+   * rendant impossible la gestion de l'événement initial `endpoint`.
+   */
+  private processSseEvent(rawEvent: string, baseUrl: string): void {
+    let eventName = 'message';
+    const dataLines: string[] = [];
+
+    for (const line of rawEvent.split('\n')) {
+      if (line.startsWith('event:')) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).replace(/^ /, ''));
+      }
+      // `id:`, `retry:`, commentaires `:` → ignorés (non nécessaires ici).
+    }
+
+    if (dataLines.length === 0) return;
+    const data = dataLines.join('\n');
+
+    // Événement spécial : endpoint de session (spec MCP "HTTP with SSE").
+    if (eventName === 'endpoint') {
+      const endpoint = data.trim();
+      try {
+        this.sseSessionUrl = endpoint.startsWith('http')
+          ? endpoint
+          : new URL(endpoint, baseUrl).href;
+        console.log(`[MCP:${this.config.id}] Session endpoint: ${this.sseSessionUrl}`);
+      } catch {
+        console.error(`[MCP:${this.config.id}] Endpoint SSE invalide: ${endpoint}`);
+      }
+      return;
+    }
+
+    // Événement message normal → message JSON-RPC.
+    try {
+      this.handleMessage(JSON.parse(data));
+    } catch {
+      // Ignore un payload non-JSON (certains serveurs envoient des logs).
     }
   }
 
@@ -456,53 +517,125 @@ export class McpClient extends EventEmitter {
       }, timeoutMs);
 
       this.pendingRequests.set(id, { resolve, reject, timer });
-      this.writeMessage(request);
+
+      try {
+        this.writeMessage(request);
+      } catch (err: any) {
+        clearTimeout(timer);
+        this.pendingRequests.delete(id);
+        reject(err);
+      }
     });
   }
 
   private sendNotification(method: string, params?: any): void {
-    const notification: JsonRpcNotification = {
-      jsonrpc: '2.0',
-      method,
-      params,
-    };
-    this.writeMessage(notification);
+    try {
+      this.writeMessage({ jsonrpc: '2.0', method, params });
+    } catch (err: any) {
+      console.error(`[MCP:${this.config.id}] Échec envoi notification ${method}:`, err.message);
+    }
   }
 
-  private writeMessage(message: JsonRpcRequest | JsonRpcNotification): void {
+  /**
+   * Envoie une réponse JSON-RPC de succès — utilisé pour répondre à une requête
+   * entrante du serveur (ex. `ping`).
+   */
+  private sendResponse(id: number, result: any): void {
+    try {
+      this.writeMessage({ jsonrpc: '2.0', id, result });
+    } catch { /* ignore */ }
+  }
+
+  private sendErrorResponse(id: number, code: number, message: string): void {
+    try {
+      this.writeMessage({ jsonrpc: '2.0', id, error: { code, message } });
+    } catch { /* ignore */ }
+  }
+
+  /**
+   * Sérialise et émet un message JSON-RPC.
+   * Supporte maintenant les responses, pas seulement les requests/notifications.
+   */
+  private writeMessage(message: JsonRpcOutgoing): void {
     const serialized = JSON.stringify(message) + '\n';
 
-    if (this.config.transport === 'stdio' && this.process?.stdin) {
+    if (this.config.transport === 'stdio') {
+      if (!this.process?.stdin || this.process.stdin.destroyed) {
+        throw new Error('stdio stdin indisponible');
+      }
       this.process.stdin.write(serialized);
-    } else if (this.config.transport === 'sse' && this.sseSessionUrl) {
+      return;
+    }
+
+    if (this.config.transport === 'sse') {
+      if (!this.sseSessionUrl) {
+        throw new Error('SSE session URL indisponible (endpoint non reçu)');
+      }
+
+      // Envoi POST : le JSON-RPC de réponse arrivera sur le stream SSE (old
+      // spec), OU dans le corps du POST (Streamable HTTP). On lit les deux.
       const postAbort = new AbortController();
       const postTimeout = setTimeout(() => {
         postAbort.abort(new Error(`SSE POST timeout (${McpClient.SSE_CONNECT_TIMEOUT_MS}ms)`));
       }, McpClient.SSE_CONNECT_TIMEOUT_MS);
+
       fetch(this.sseSessionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: serialized,
         signal: postAbort.signal,
-      }).then(() => clearTimeout(postTimeout)).catch(err => {
-        clearTimeout(postTimeout);
-        if (err.name !== 'AbortError') {
-          console.error(`[MCP:${this.config.id}] Erreur envoi SSE:`, err.message);
-        }
-      });
+      })
+        .then(async (res) => {
+          clearTimeout(postTimeout);
+          if (!res.ok) return;
+
+          const contentType = res.headers.get('content-type') || '';
+
+          // Streamable HTTP : la réponse JSON-RPC arrive directement dans le POST.
+          if (contentType.includes('application/json')) {
+            try {
+              const text = await res.text();
+              if (text) this.handleMessage(JSON.parse(text));
+            } catch { /* ignore */ }
+            return;
+          }
+
+          // Streamable HTTP : la réponse arrive comme un mini-flux SSE dans le POST.
+          if (contentType.includes('text/event-stream') && res.body) {
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buf += decoder.decode(value, { stream: true });
+                const events = buf.split('\n\n');
+                buf = events.pop() || '';
+                for (const ev of events) this.processSseEvent(ev, this.sseSessionUrl!);
+              }
+            } catch { /* ignore */ }
+          }
+        })
+        .catch(err => {
+          clearTimeout(postTimeout);
+          if (err.name !== 'AbortError') {
+            console.error(`[MCP:${this.config.id}] Erreur envoi SSE:`, err.message);
+          }
+        });
     }
   }
 
   private handleMessage(message: any): void {
     if (!message || message.jsonrpc !== '2.0') return;
 
-    // Réponse à une requête
-    if ('id' in message && (message.result !== undefined || message.error)) {
+    // 1) Response à une de nos requêtes.
+    if ('id' in message && !('method' in message) && ('result' in message || 'error' in message)) {
       const pending = this.pendingRequests.get(message.id);
       if (pending) {
         clearTimeout(pending.timer);
         this.pendingRequests.delete(message.id);
-        
+
         if (message.error) {
           pending.reject(new Error(`MCP Error [${message.error.code}]: ${message.error.message}`));
         } else {
@@ -512,21 +645,28 @@ export class McpClient extends EventEmitter {
       return;
     }
 
-    // Notification du serveur (pas d'id)
+    // 2) Notification du serveur (pas d'id).
     if ('method' in message && !('id' in message)) {
       this.handleNotification(message);
       return;
     }
 
-    // Requête du serveur (id présent mais pas de result/error) — ex: sampling
+    // 3) Requête du serveur → le client DOIT répondre par une *response*.
+    //
+    // BUG ORIGINAL : le code renvoyait une nouvelle *requête* avec le même
+    // method name, provoquant une boucle. Correction : envoyer une *response*
+    // JSON-RPC conforme.
     if ('method' in message && 'id' in message) {
-      // Pour l'instant on ne supporte pas les requêtes serveur→client
-      this.writeMessage({
-        jsonrpc: '2.0',
-        id: message.id,
-        method: message.method,
-        params: { error: { code: -32601, message: 'Method not supported' } },
-      } as any);
+      const handler = SERVER_TO_CLIENT_HANDLERS[message.method];
+      if (handler) {
+        Promise.resolve()
+          .then(() => handler(message.params))
+          .then(result => this.sendResponse(message.id, result ?? {}))
+          .catch(err => this.sendErrorResponse(message.id, -32603, err?.message ?? 'Internal error'));
+      } else {
+        // Méthode non supportée : -32601 Method not found.
+        this.sendErrorResponse(message.id, -32601, 'Method not supported');
+      }
     }
   }
 

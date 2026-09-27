@@ -86,11 +86,11 @@ export class McpBridge extends EventEmitter {
     for (const [id, serverConfig] of Object.entries(config.mcpServers)) {
       this.configs.set(id, serverConfig);
       if (!serverConfig.disabled) {
-        // Connexion asynchrone (non bloquante pour le démarrage)
+        // Le listener `statusChange` attaché dans connectServer() déclenche
+        // déjà scheduleReconnect() en cas d'échec. Appeler scheduleReconnect()
+        // ici aussi incrémentait le compteur de retry deux fois (bug).
         this.connectServer(id).catch(err => {
           console.warn(`[MCP Bridge] Échec connexion "${id}":`, err.message);
-          // Lancer la reconnexion automatique si le serveur n'est pas désactivé
-          this.scheduleReconnect(id);
         });
       }
     }
@@ -307,12 +307,15 @@ export class McpBridge extends EventEmitter {
    * Enregistre les métriques de chaque appel (durée, succès/erreur).
    */
   async callTool(toolName: string, args: Record<string, any>): Promise<McpToolCallResult> {
-    // ── Sandboxing : valider les arguments qui ressemblent à des chemins ──
-    const sanitizedArgs = this.sanitizePathArgs(args);
     const start = Date.now();
     let serverId = 'unknown';
 
     try {
+      // ── Sandboxing : valider les arguments qui ressemblent à des chemins ──
+      // Dans le try : si un chemin est rejeté, on enregistre la métrique
+      // d'échec et on logge proprement au lieu de laisser fuiter l'exception.
+      const sanitizedArgs = this.sanitizePathArgs(args);
+
       // Trouver le serveur qui fournit cet outil
       for (const [id, client] of this.clients) {
         if (client.status === 'ready') {
@@ -380,6 +383,9 @@ export class McpBridge extends EventEmitter {
     const config = this.configs.get(id);
     if (!config || config.disabled) return;
 
+    // Idempotence : si un timer est déjà programmé, ne pas le redoubler.
+    if (this.reconnectTimers.has(id)) return;
+
     const maxRetries = config.maxRetries ?? McpBridge.DEFAULT_MAX_RETRIES;
     if (maxRetries === 0) return; // Reconnexion désactivée pour ce serveur
 
@@ -395,10 +401,6 @@ export class McpBridge extends EventEmitter {
     // Backoff exponentiel: 2s, 4s, 8s, 16s, 32s...
     const delay = McpBridge.RECONNECT_BASE_DELAY_MS * Math.pow(2, attempt - 1);
     console.log(`[MCP Bridge] "${id}" — reconnexion dans ${(delay / 1000).toFixed(0)}s (tentative ${attempt}/${maxRetries})`);
-
-    // Annuler un timer précédent s'il existe
-    const existingTimer = this.reconnectTimers.get(id);
-    if (existingTimer) clearTimeout(existingTimer);
 
     const timer = setTimeout(async () => {
       this.reconnectTimers.delete(id);
