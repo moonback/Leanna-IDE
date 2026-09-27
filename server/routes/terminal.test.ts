@@ -115,7 +115,7 @@ test('terminal routes: GET /terminal/config with auth accepts valid token', asyn
 
   try {
     const res = await fetch(`http://127.0.0.1:${port}/api/terminal/config`, {
-      headers: { 'X-API-Token': 'test-token-12345' },
+      headers: { 'X-Leanna-Token': 'test-token-12345' },
     });
     assert.equal(res.status, 200);
     const body = await res.json() as any;

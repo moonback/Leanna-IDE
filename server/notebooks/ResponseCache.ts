@@ -75,8 +75,10 @@ export class ResponseCache<T = unknown> {
       similarityThreshold: config?.similarityThreshold ?? 0.85,
     };
 
-    // Nettoyage périodique des entrées expirées (toutes les 5 min)
+    // Nettoyage périodique des entrées expirées (toutes les 5 min).
+    // unref: ce timer de maintenance ne doit jamais empêcher le process de sortir.
     this.cleanupTimer = setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    this.cleanupTimer.unref?.();
   }
 
   // ─── Opérations principales ────────────────────────────────────────────────

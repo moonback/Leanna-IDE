@@ -155,6 +155,9 @@ export class TelemetryService {
         console.error('[TelemetryService] Flush error:', err);
       });
     }, TelemetryService.FLUSH_INTERVAL_MS);
+    // Ne pas maintenir la boucle d'événements ouverte à cause de ce seul timer :
+    // permet aux process (ex: runner de tests) de se terminer naturellement.
+    this.flushInterval.unref?.();
   }
 
   // ─── OpenTelemetry Tracing ─────────────────────────────────────────────────

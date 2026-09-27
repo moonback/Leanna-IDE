@@ -9,7 +9,9 @@ import {
   delegateTaskSchema,
   orchestrateSchema,
   listAgentTasksSchema,
+  hasAgent,
 } from "../agents/index.js";
+import { SkillValidationError } from "./base.js";
 import type { AgentRole } from "../agents/index.js";
 import { createLogger, getLogEntries } from "../utils/logger.js";
 
@@ -428,6 +430,13 @@ export const agentsSkill: Skill = {
 
       case "agent_delegate": {
         const v = validateArgs(delegateTaskSchema, args);
+        if (!hasAgent(v.role)) {
+          throw new SkillValidationError(
+            `Validation échouée: role "${v.role}" inconnu (aucun agent statique ni dynamique enregistré sous ce rôle).`,
+            name,
+            `Vérifie le rôle ou enregistre l'agent via l'Agent Builder avant de déléguer.`
+          );
+        }
         const task = await agentOrchestrator.delegateTask({
           role: v.role as AgentRole, title: v.title!, description: v.description!,
           files: v.files, instructions: v.instructions,

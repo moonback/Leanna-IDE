@@ -37,7 +37,7 @@ function createTerminalProcess(shell: string): ChildProcessWithoutNullStreams {
     // Note: PowerShell a une meilleure prise en charge des terminaux
     const psExe = shell.includes('powershell') ? shell : 'powershell.exe';
     return childProcessSpawn(psExe, ['-NoExit', '-Command', ''], {
-      cwd: SELF_ROOT,
+      cwd: SELF_ROOT || process.cwd(),
       env: {
         ...process.env,
         // Désactiver le prompt de confirmation pour PowerShell
@@ -50,7 +50,7 @@ function createTerminalProcess(shell: string): ChildProcessWithoutNullStreams {
   } else {
     // Sur Unix, utiliser le shell avec des arguments pour créer un PTY-like
     return childProcessSpawn(shell, ['--login', '-i'], {
-      cwd: SELF_ROOT,
+      cwd: SELF_ROOT || process.cwd(),
       env: {
         ...process.env,
         // Forcer le terminal à être non-interactif mais avec des couleurs
@@ -81,7 +81,10 @@ export function createTerminalRouter(authOptions?: AuthOptions) {
     try {
       res.json({
         shell: getDefaultShell(),
-        cwd: SELF_ROOT,
+        // Quand aucun projet n'est actif (SELF_ROOT === ""), on retombe sur le
+        // répertoire courant du processus : un terminal a toujours besoin d'un
+        // cwd valide, indépendamment de la sélection de projet.
+        cwd: SELF_ROOT || process.cwd(),
         platform: os.platform(),
       });
     } catch (error) {

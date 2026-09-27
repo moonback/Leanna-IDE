@@ -267,7 +267,7 @@ test('marketplace routes: POST /validate-security validates package', async () =
         name: 'Test Package',
         version: '1.0.0',
         description: 'A test package',
-        author: { name: 'Test Author', email: 'test@example.com' },
+        author: 'Test Author',
         type: 'agent',
       }),
     });

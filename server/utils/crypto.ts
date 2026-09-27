@@ -115,6 +115,24 @@ function deriveMachineKey(): Buffer {
 }
 
 /**
+ * Derive the historical key used by the legacy AES-256-CBC scheme.
+ * Legacy data was encrypted with `sha256(Leanna_MASTER_KEY + machineSeed)`,
+ * NOT with the current master key. Needed to decrypt data produced before
+ * the migration to AES-256-GCM.
+ */
+function deriveLegacyKey(): Buffer {
+  let userInfo = '';
+  try {
+    userInfo = os.userInfo().username;
+  } catch {
+    userInfo = 'default-user';
+  }
+  const envKey = process.env.Leanna_MASTER_KEY || '';
+  const rawSecret = envKey + `${os.hostname()}-${os.platform()}-${userInfo}`;
+  return crypto.createHash('sha256').update(rawSecret).digest();
+}
+
+/**
  * Get the master encryption key (cached).
  */
 function getMasterKey(): Buffer {
@@ -185,7 +203,9 @@ export function decrypt(encryptedText: string): string {
       if (parts[0].length === CBC_IV_LENGTH * 2 && /^[0-9a-fA-F]+$/.test(parts[0])) {
         const iv = Buffer.from(parts[0], 'hex');
         const encrypted = parts[1];
-        const decipher = crypto.createDecipheriv(CBC_ALGORITHM, getMasterKey(), iv);
+        // Legacy CBC data was encrypted with the historical key derivation
+        // (sha256(envKey + machineSeed)), not the current master key.
+        const decipher = crypto.createDecipheriv(CBC_ALGORITHM, deriveLegacyKey(), iv);
         let decrypted = decipher.update(encrypted, 'hex', 'utf8');
         decrypted += decipher.final('utf8');
         return decrypted;

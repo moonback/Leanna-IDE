@@ -106,6 +106,7 @@ describe("ToolRegistry", () => {
     const registry = new ToolRegistry();
     registry.register({
       declaration: { name: "echo", description: "Retourne l'input", parameters: {} },
+      permissions: ["read"],
       handler: async (args) => ({ echo: args.text }),
     });
 
@@ -125,6 +126,7 @@ describe("ToolRegistry", () => {
     const registry = new ToolRegistry();
     registry.register({
       declaration: { name: "test", description: "", parameters: {} },
+      permissions: ["read"],
       handler: async () => "ok",
     });
 
@@ -140,6 +142,7 @@ describe("ToolRegistry", () => {
     const registry = new ToolRegistry({ defaultTimeoutMs: 50 });
     registry.register({
       declaration: { name: "slow", description: "", parameters: {} },
+      permissions: ["read"],
       handler: async () => new Promise((r) => setTimeout(r, 200)),
     });
 
@@ -211,6 +214,7 @@ describe("WorkflowEngine", () => {
     const registry = new ToolRegistry();
     registry.register({
       declaration: { name: "add", description: "", parameters: {} },
+      permissions: ["read"],
       handler: async (args) => (args.a as number) + (args.b as number),
     });
 
@@ -299,6 +303,7 @@ describe("SkillManagerV2", () => {
     const sm = new SkillManagerV2();
     sm.registerSkill({
       name: "math",
+      permissions: ["read"],
       declarations: [
         { name: "add", description: "Addition" },
         { name: "multiply", description: "Multiplication" },

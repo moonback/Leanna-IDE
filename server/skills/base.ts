@@ -193,7 +193,7 @@ export function validateArgs<T extends z.ZodType<any, any, any>>(
         ? `Pour corriger: vérifiez les paramètres requis pour "${toolName}". Exemple valide attendu par le schéma.`
         : 'Vérifiez les paramètres fournis.';
       
-      throw new SkillValidationError(issues, toolName, suggestion);
+      throw new SkillValidationError(`Validation échouée: ${issues}`, toolName, suggestion);
     }
     throw error;
   }

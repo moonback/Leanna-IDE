@@ -90,7 +90,7 @@ function assessComplexityRaw(prompt: string): ComplexityLevel {
 
   // Signaux critiques (sécurité, migration, systémique)
   const criticalSignals = [
-    /migrat|refactor.*systém|restructur.*complet|breaking.change/i,
+    /migr(?:at|er|ation)|refactor.*systém|restructur.*compl[eè]t|breaking.change/i,
     /refactor.*toute|refactor.*tout.*l|rewrite.*entire|réécrire.*tout/i,
     /sécurit|vulnérab|authentif|authori[sz]ation|sql.inject|xss/i,
     /supprim.*toute|effac.*base|reset.*production|drop.table/i,

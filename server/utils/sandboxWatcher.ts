@@ -57,7 +57,8 @@ export function addWatchClient(ws: WebSocket): void {
   
   ws.on("close", handleDisconnect);
   ws.on("error", (err) => {
-    console.error('[SandboxWatcher] Erreur client WebSocket:', err.message);
+    const reason = err instanceof Error ? err.message : String(err ?? "erreur inconnue");
+    console.error('[SandboxWatcher] Erreur client WebSocket:', reason);
     handleDisconnect();
   });
 
