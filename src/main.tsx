@@ -14,6 +14,7 @@ import { ScreenShareProvider, useScreenShare } from './context/ScreenShareContex
 import { useLiveAPI } from './hooks/useLiveAPI.js';
 import { FloatingOrb } from './components/FloatingOrb.js';
 import { CriticalEditConfirm } from './components/CriticalEditConfirm.js';
+import { MissionCreatedPrompt } from './components/MissionCreatedPrompt.js';
 import { StartupProjectModal } from './components/StartupProjectModal.js';
 import { LauncherModal } from './components/LauncherModal.js';
 import { useProfile } from './context/UserProfileContext.js';
@@ -563,6 +564,8 @@ function Layout() {
         {profile.floatingOrb !== false && <FloatingOrbWrapper />}
         {/* Modale de confirmation pour les fichiers critiques */}
         <CriticalEditConfirm sendMessage={liveAPI.sendRawMessage} />
+        {/* Proposition d'ouvrir la vue des missions à la création d'une mission */}
+        <MissionCreatedPrompt />
         {/* Modale de sélection du projet au démarrage */}
         <StartupProjectModal />
         {/* Écran de choix IDE / Notebook affiché après le splash */}

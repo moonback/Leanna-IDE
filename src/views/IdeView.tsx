@@ -413,6 +413,13 @@ export default function IdeView() {
     return () => window.removeEventListener('Leanna-open-sandbox-diff', handleOpenSandboxDiff);
   }, [openSandboxDiff]);
 
+  // ── Ouvrir la vue des missions (déclenché par MissionCreatedPrompt) ─────────
+  useEffect(() => {
+    const handleOpenMissions = () => setShowMissions(true);
+    window.addEventListener('Leanna-open-missions', handleOpenMissions);
+    return () => window.removeEventListener('Leanna-open-missions', handleOpenMissions);
+  }, []);
+
   // ── Actions navigateur pilotées par Leanna via Leanna-ide-action ───────────
   useEffect(() => {
     const handle = (e: Event) => {
