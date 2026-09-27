@@ -123,6 +123,23 @@ function generateWorkspaceId(targetPath: string): string {
   return `${cleanName || "workspace"}_${Math.abs(hash).toString(36)}`;
 }
 
+/**
+ * Identifiant stable et déterministe du projet actif, dérivé de SELF_ROOT.
+ *
+ * Sert à isoler par projet les données stockées dans un backend partagé
+ * (ex : la table Supabase `memories`, commune à tous les workspaces). Deux
+ * projets distincts produisent des ids différents ; le même projet produit
+ * toujours le même id (indépendant de la casse et du séparateur de chemin).
+ *
+ * Retourne "" (chaîne vide) si aucun projet n'est actif. Les appelants
+ * doivent traiter ce cas : sans projet actif, aucune donnée long-terme
+ * scopée ne doit être écrite ni lue.
+ */
+export function getActiveProjectId(): string {
+  if (!SELF_ROOT) return "";
+  return generateWorkspaceId(SELF_ROOT);
+}
+
 export function loadWorkspaces(): WorkspaceEntry[] {
   try {
     const configPath = getPersistedWorkspacesPath();

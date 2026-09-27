@@ -19,6 +19,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { Memory } from "./Memory.js";
 import { projectMemory, ProjectMemory } from "../knowledge/ProjectMemory.js";
 import { createGeminiClient } from "../utils/geminiKeyPool.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 import { createLogger } from "../utils/logger.js";
 import type { ProjectFact, ProjectKnowledgeCategory } from "../knowledge/types.js";
 import type { EventBus } from "./EventBus.js";
@@ -192,6 +193,7 @@ export class HierarchicalMemoryService {
       if (supabase) {
         try {
           const matchThreshold = options.matchThreshold ?? 0.5;
+          const projectId = getActiveProjectId();
           let remoteResults: any[] = [];
 
           const ai = createGeminiClient();
@@ -209,6 +211,7 @@ export class HierarchicalMemoryService {
                   query_embedding: queryEmbedding,
                   match_threshold: matchThreshold,
                   match_count: limit,
+                  p_project_id: projectId,
                 });
                 if (!error && Array.isArray(data)) {
                   remoteResults = data;
@@ -227,6 +230,11 @@ export class HierarchicalMemoryService {
               .order("created_at", { ascending: false })
               .limit(limit);
 
+            // Isolation projet : mémoires du projet actif + mémoires globales
+            // héritées (project_id = ''). Sans projet actif, aucun filtre.
+            if (projectId) {
+              q = q.in("project_id", [projectId, ""]);
+            }
             if (options.tags?.length) {
               q = q.contains("tags", options.tags);
             }
@@ -313,11 +321,19 @@ export class HierarchicalMemoryService {
         const supabase = this.getSupabaseClient();
         if (!supabase) return [];
 
-        const { data, error } = await supabase
+        const projectId = getActiveProjectId();
+        let listQuery = supabase
           .from("memories")
           .select("id, content, tags, created_at, updated_at")
           .order("created_at", { ascending: false })
           .range(offset, offset + limit - 1);
+
+        // Isolation projet : projet actif + mémoires globales héritées.
+        if (projectId) {
+          listQuery = listQuery.in("project_id", [projectId, ""]);
+        }
+
+        const { data, error } = await listQuery;
 
         if (error || !data) return [];
 
@@ -436,6 +452,7 @@ export class HierarchicalMemoryService {
         const payload: Record<string, unknown> = {
           content: input.content,
           tags,
+          project_id: getActiveProjectId(),
         };
         if (embedding) {
           payload.embedding = embedding;
@@ -577,10 +594,19 @@ export class HierarchicalMemoryService {
       case "longterm": {
         const supabase = this.getSupabaseClient();
         if (!supabase) return false;
+
+        const projectId = getActiveProjectId();
+        // Isolation projet : ne jamais vider la mémoire long-terme de TOUS les
+        // projets. Sans projet actif, on refuse l'opération (garde-fou) plutôt
+        // que d'effacer une ressource partagée.
+        if (!projectId) {
+          log.warn("clear(longterm) ignoré : aucun projet actif — refus de vider la mémoire globale.");
+          return false;
+        }
         const { error } = await supabase
           .from("memories")
           .delete()
-          .neq("id", "00000000-0000-0000-0000-000000000000");
+          .eq("project_id", projectId);
         return !error;
       }
     }
@@ -602,9 +628,14 @@ export class HierarchicalMemoryService {
     const supabase = this.getSupabaseClient();
     if (supabase) {
       try {
-        const { count, error } = await supabase
+        const projectId = getActiveProjectId();
+        let countQuery = supabase
           .from("memories")
           .select("*", { count: "exact", head: true });
+        if (projectId) {
+          countQuery = countQuery.in("project_id", [projectId, ""]);
+        }
+        const { count, error } = await countQuery;
 
         if (error) {
           longtermStatus = "disconnected";

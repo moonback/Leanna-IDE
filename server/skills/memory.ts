@@ -2,6 +2,7 @@ import { Skill, validateArgs } from "./base.js";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createGeminiClient } from "../utils/geminiKeyPool.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 
 // Cache simple en mémoire pour les embeddings et les résultats de recherche
 const memoryCache = new Map<string, { data: any; timestamp: number }>();
@@ -14,12 +15,14 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 async function findSimilarMemory(
   supabase: any,
   embedding: number[],
-  tags: string[]
+  tags: string[],
+  projectId: string
 ): Promise<{ id: string; content: string; tags: string[]; similarity: number } | null> {
   const { data, error } = await supabase.rpc("match_memories", {
     query_embedding: embedding,
     match_threshold: 0.85,
     match_count: 5,
+    p_project_id: projectId,
   });
 
   if (error) throw error;
@@ -201,8 +204,10 @@ export const memorySkill: Skill = {
         const embedding = embedResponse.embeddings?.[0]?.values;
         if (!embedding) return { error: "Erreur lors de la génération de l'embedding." };
 
-        // Déduplication : similaire + tag commun → mise à jour
-        const similar = await findSimilarMemory(supabase, embedding, validated.tags);
+        const projectId = getActiveProjectId();
+
+        // Déduplication : similaire + tag commun → mise à jour (scoped projet)
+        const similar = await findSimilarMemory(supabase, embedding, validated.tags, projectId);
         if (similar) {
           const { data: updateData, error: updateError } = await supabase
             .from("memories")
@@ -210,6 +215,7 @@ export const memorySkill: Skill = {
               content: validated.content,
               tags: validated.tags,
               embedding,
+              project_id: projectId,
               updated_at: new Date().toISOString(),
             })
             .eq("id", similar.id)
@@ -229,10 +235,10 @@ export const memorySkill: Skill = {
           };
         }
 
-        // Insertion nouvelle mémoire
+        // Insertion nouvelle mémoire (scoped projet)
         const { data, error } = await supabase
           .from("memories")
-          .insert([{ content: validated.content, tags: validated.tags, embedding }])
+          .insert([{ content: validated.content, tags: validated.tags, embedding, project_id: projectId }])
           .select("id, content, tags, created_at");
 
         if (error) {
@@ -256,21 +262,28 @@ export const memorySkill: Skill = {
           `[Memory] search: query='${validated.query}' tags=${JSON.stringify(validated.tags)} threshold=${validated.match_threshold} count=${validated.match_count}`
         );
 
+        const projectId = getActiveProjectId();
+
         // Recherche par tags seuls (sans embedding)
         if (!validated.query && validated.tags.length > 0) {
-          const { data, error } = await supabase
+          let tagQuery = supabase
             .from("memories")
             .select("id, content, tags, created_at, updated_at")
             .contains("tags", validated.tags)
             .order("created_at", { ascending: false })
             .limit(validated.match_count);
+          // Isolation projet : projet actif + mémoires globales héritées.
+          if (projectId) {
+            tagQuery = tagQuery.in("project_id", [projectId, ""]);
+          }
+          const { data, error } = await tagQuery;
           if (error) return { error: `Erreur Supabase: ${error.message}` };
           console.log(`[Memory] ${data.length} résultats (tags only)`);
           return { status: "success", results: data };
         }
 
-        // Vérification cache
-        const cacheKey = `search:${validated.query || ""}:${JSON.stringify(validated.tags)}:${validated.match_threshold}:${validated.match_count}`;
+        // Vérification cache (scoped par projet pour éviter les fuites inter-projets)
+        const cacheKey = `search:${projectId}:${validated.query || ""}:${JSON.stringify(validated.tags)}:${validated.match_threshold}:${validated.match_count}`;
         const cached = memoryCache.get(cacheKey);
         if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
           console.log(`[Memory] Cache hit pour: '${validated.query}'`);
@@ -292,6 +305,7 @@ export const memorySkill: Skill = {
           query_embedding: queryEmbedding,
           match_threshold: validated.match_threshold,
           match_count: validated.match_count,
+          p_project_id: projectId,
         });
 
         if (error) {
@@ -299,7 +313,8 @@ export const memorySkill: Skill = {
           return { error: `Erreur Supabase: ${error.message}` };
         }
 
-        // Post-filtrage par tags si fournis
+        // Post-filtrage par tags si fournis (l'isolation projet est déjà
+        // appliquée par match_memories via p_project_id).
         if (validated.tags.length > 0 && Array.isArray(data) && data.length > 0) {
           const ids = data.map((m: any) => m.id);
           const { data: fullMemories, error: fetchError } = await supabase
@@ -331,6 +346,12 @@ export const memorySkill: Skill = {
           .order("created_at", { ascending: false })
           .limit(validated.limit);
 
+        // Isolation projet : projet actif + mémoires globales héritées.
+        const listProjectId = getActiveProjectId();
+        if (listProjectId) {
+          query = query.in("project_id", [listProjectId, ""]);
+        }
+
         if (validated.tags.length > 0) {
           query = query.contains("tags", validated.tags);
         }
@@ -358,10 +379,26 @@ export const memorySkill: Skill = {
         // Invalide le cache entier (la suppression affecte potentiellement toutes les recherches)
         memoryCache.clear();
 
-        const { error } = await supabase.from("memories").delete().eq("id", validated.id);
+        // Isolation projet : un projet ne peut supprimer que ses propres
+        // mémoires (ou une mémoire globale héritée). Empêche la suppression
+        // croisée entre projets partageant la table Supabase.
+        const delProjectId = getActiveProjectId();
+        let deleteQuery = supabase.from("memories").delete().eq("id", validated.id);
+        if (delProjectId) {
+          deleteQuery = deleteQuery.in("project_id", [delProjectId, ""]);
+        }
+        const { data: deleted, error } = await deleteQuery.select("id");
         if (error) {
           console.error(`[Memory] Erreur suppression:`, error);
           return { error: `Erreur Supabase: ${error.message}` };
+        }
+
+        if (!Array.isArray(deleted) || deleted.length === 0) {
+          console.warn(`[Memory] Aucune mémoire supprimée ID=${validated.id} (introuvable ou hors projet actif)`);
+          return {
+            status: "not_found",
+            message: `Aucune mémoire ${validated.id} accessible depuis le projet actif.`,
+          };
         }
 
         console.log(`[Memory] Mémoire supprimée ID=${validated.id}`);
