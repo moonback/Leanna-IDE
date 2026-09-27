@@ -681,6 +681,8 @@ async function startServer() {
   app.use("/api/memories", memoriesRouter);
   app.use("/api/memory/hierarchical", hierarchicalMemoryRouter);
   app.use("/api/conversations", conversationsRouter);
+  const dataPurgeRouter = (await import("./server/routes/data.js")).default;
+  app.use("/api/data", dataPurgeRouter);
   app.use("/api/lists", listsRouter);
   app.use("/api/terminal", createTerminalRouter({ apiToken }));
   app.use("/api/knowledge", knowledgeRouter);
