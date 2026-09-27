@@ -27,7 +27,6 @@ export function BehaviorSection() {
           />
         </Field>
 
-
         <SectionDivider label="Mode Muet Automatique" />
        
         <Field label="Activer le mode muet automatique" hint="Coupe le micro automatiquement après une période d'inactivité">
@@ -47,6 +46,41 @@ export function BehaviorSection() {
             type="number"
             min="5"
             max="300"
+            style={{ width: '80px' }}
+          />
+        </Field>
+
+        <SectionDivider label="Détecteur d'Activité Vocale (VAD)" />
+
+        <Field label="Activer la détection de voix" hint="Économise la bande passante en ne transmettant que la voix">
+          <ToggleSwitch
+            value={profile.vadEnabled}
+            onChange={v => setField('vadEnabled', v)}
+            label="VAD"
+            hint={profile.vadEnabled ? 'Transmet uniquement pendant la parole' : 'Transmet en continu'}
+          />
+        </Field>
+
+        <Field label="Seuil d'activation de la voix (0-100)" hint="Sensibilité minimale pour détecter la voix humaine">
+          <TextInput
+            value={String(profile.vadThreshold)}
+            onChange={v => setField('vadThreshold', Math.min(100, Math.max(0, parseInt(v) || 35)))}
+            placeholder="35"
+            type="number"
+            min="0"
+            max="100"
+            style={{ width: '80px' }}
+          />
+        </Field>
+
+        <Field label="Durée de silence avant coupure (ms)" hint="Temps de silence avant d'arrêter la transmission (300-2000ms)">
+          <TextInput
+            value={String(profile.vadSilenceDuration)}
+            onChange={v => setField('vadSilenceDuration', Math.min(2000, Math.max(300, parseInt(v) || 800)))}
+            placeholder="800"
+            type="number"
+            min="300"
+            max="2000"
             style={{ width: '80px' }}
           />
         </Field>

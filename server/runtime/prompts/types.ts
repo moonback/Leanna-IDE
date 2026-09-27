@@ -114,6 +114,16 @@ export interface ProfileConfig {
   responseStyle?: ResponseStyle;
   workspace?: string;
   mode?: AssistantMode;
+  /** Mode muet automatique */
+  autoMuteEnabled?: boolean;
+  /** Délai en secondes avant muet auto (5-300) */
+  autoMuteTimeout?: number;
+  /** VAD : activer la détection d'activité vocale (économie bande passante) */
+  vadEnabled?: boolean;
+  /** VAD : seuil d'amplitude pour détecter la voix (0-100) */
+  vadThreshold?: number;
+  /** VAD : durée de silence en ms avant d'arrêter l'envoi (300-2000) */
+  vadSilenceDuration?: number;
   temperature?: number;
   topP?: number;
   textProvider?: 'gemini' | 'openrouter';
