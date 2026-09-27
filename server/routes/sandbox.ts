@@ -23,6 +23,7 @@ import {
   acceptFile,
   rejectFile,
   resetSandbox,
+  isExcludedFromDiff,
 } from '../utils/sandbox.js';
 import { startWatching, stopWatching } from '../utils/sandboxWatcher.js';
 import { appendAuditEvent } from '../audit.js';
@@ -286,6 +287,10 @@ export function createSandboxRouter(): Router {
         res.status(400).json({ error: 'path requis' });
         return;
       }
+      if (isExcludedFromDiff(filePath)) {
+        res.status(404).json({ error: 'Fichier exclu du comparateur.' });
+        return;
+      }
       const result = await acceptFile(filePath);
       let postValidation = null;
       if (isSandboxActive()) {
@@ -314,6 +319,10 @@ export function createSandboxRouter(): Router {
       const filePath = req.body?.path;
       if (!filePath) {
         res.status(400).json({ error: 'path requis' });
+        return;
+      }
+      if (isExcludedFromDiff(filePath)) {
+        res.status(404).json({ error: 'Fichier exclu du comparateur.' });
         return;
       }
       const result = await rejectFile(filePath);
@@ -426,6 +435,12 @@ export function createSandboxRouter(): Router {
       const filePath = typeof req.query.path === 'string' ? req.query.path : '';
       if (!filePath) {
         res.status(400).json({ error: 'path requis' });
+        return;
+      }
+
+      // Fichiers exclus du comparateur (ex. codebase.md) : jamais diffés.
+      if (isExcludedFromDiff(filePath)) {
+        res.status(404).json({ error: 'Fichier exclu du comparateur.' });
         return;
       }
 

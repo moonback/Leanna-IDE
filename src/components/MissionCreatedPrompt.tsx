@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { useReducedMotion } from 'motion/react';
 import { Rocket, X, ArrowRight } from 'lucide-react';
 import { Modal } from './ui/Modal.js';
 import { Button } from './ui/Button.js';

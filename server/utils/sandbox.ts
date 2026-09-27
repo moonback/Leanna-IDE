@@ -53,6 +53,24 @@ const EXCLUDE_PATTERNS = [
   ".Leanna-audit.log",
 ];
 
+/**
+ * Fichiers (par nom de base) exclus du comparateur de modifications du sandbox.
+ * Ces fichiers ne doivent ni apparaître dans le diff ni être suivis comme
+ * modifications (ex. `codebase.md` généré par les exports code2prompt/graphify,
+ * qui n'est pas une modification réelle du code du projet).
+ */
+const DIFF_EXCLUDED_BASENAMES = new Set<string>([
+  "codebase.md",
+]);
+
+/**
+ * Indique si un chemin sandbox doit être ignoré par le comparateur de
+ * modifications (liste des fichiers modifiés + diff).
+ */
+export function isExcludedFromDiff(relativePath: string): boolean {
+  return DIFF_EXCLUDED_BASENAMES.has(path.basename(relativePath));
+}
+
 // ── State ────────────────────────────────────────────────────────────────────
 
 export type SandboxState = "DISABLED" | "INITIALIZING" | "READY";
@@ -361,6 +379,14 @@ export function resolveSandboxPath(target: string): string | null {
  */
 export function markFileModified(relativePath: string): void {
   const canonicalPath = getCanonicalSandboxRelativePath(relativePath);
+
+  // Certains fichiers (ex. codebase.md) ne sont pas des modifications réelles du
+  // projet : ils ne doivent jamais entrer dans le suivi ni le comparateur.
+  if (isExcludedFromDiff(canonicalPath)) {
+    sandboxModifiedFiles.delete(canonicalPath);
+    return;
+  }
+
   const sandboxPath = assertSandboxReady(canonicalPath);
   const mainPath = path.join(SELF_ROOT, canonicalPath);
 
@@ -872,6 +898,12 @@ export async function getSandboxDiff(): Promise<Array<{ path: string; status: 'a
       sandboxFile = assertSandboxReady(canonicalPath);
     } catch {
       // Une entrée corrompue ne doit ni exposer de chemin ni influencer le diff.
+      continue;
+    }
+
+    // Filet de sécurité : ignorer les fichiers exclus du comparateur même s'ils
+    // avaient été ajoutés au set avant la mise en place du filtre.
+    if (isExcludedFromDiff(canonicalPath)) {
       continue;
     }
     const mainFile = path.join(SELF_ROOT, canonicalPath);
