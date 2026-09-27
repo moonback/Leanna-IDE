@@ -1,4 +1,3 @@
-import React, { memo } from 'react';
 import { motion } from 'motion/react';
 import { X, Save, Map, WrapText, AlignJustify, Eye, Code, Sparkles, Globe } from 'lucide-react';
 import { FileIcon } from './FileIcon.js';

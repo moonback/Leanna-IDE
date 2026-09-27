@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { TaskManager } from "./TaskManager.js";
 
-const config = { maxConcurrency: 1, dedupeTtlMs: 50, retryDelayMs: 1, maxRetries: 2, timeoutMs: 100, circuitBreakerThreshold: 2, circuitBreakerCooldownMs: 50 };
+const config = { maxConcurrency: 1, maxQueueSize: 100, dedupeTtlMs: 50, retryDelayMs: 1, maxRetries: 2, timeoutMs: 100, circuitBreakerThreshold: 2, circuitBreakerCooldownMs: 50 };
 const input = { type: "reactive" as const, title: "test", priority: "medium" as const, sourceEventId: "event-1", fingerprint: "same" };
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 

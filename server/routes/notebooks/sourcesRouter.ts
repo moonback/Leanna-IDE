@@ -279,7 +279,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         title?: string;
       };
 
-      const { getProjectRoot: getProjRoot, EXCLUDED_DIRS, TEXT_FILE_EXT } = await import("../../skills/codebaseHelpers");
+      const { getProjectRoot: getProjRoot, EXCLUDED_DIRS, TEXT_FILE_EXT } = await import("../../skills/codebaseHelpers.js");
       const workspaceRoot = getProjRoot();
 
       if (!fs.existsSync(workspaceRoot)) {
@@ -577,7 +577,7 @@ ${sourcesContext}
 
 Génère le résumé global maintenant.`;
 
-      const { generateText: genText } = await import("../../utils/textGeneration");
+      const { generateText: genText } = await import("../../utils/textGeneration.js");
       const result = await genText({
         prompt,
         temperature: 0.3,

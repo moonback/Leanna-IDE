@@ -1,3 +1,5 @@
+<!-- category: system, scope: agent full, priority: 60 -->
+
 # Système Multi-Agents
 
 <multi_agent_context>

@@ -10,7 +10,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Upload, Globe, FileText, Trash2, Loader2, Type, CheckCircle2, XCircle,
-  Search, Eye, RefreshCw, Tag, ClipboardPaste, BarChart3, X, FolderCode,
+  Search, Eye, RefreshCw, ClipboardPaste, X, FolderCode,
   CheckSquare, Square, Plus, Sparkles, Github,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
@@ -83,7 +83,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
   const [sourcePreview, setSourcePreview] = useState<Record<string, string>>({});
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [reindexingId, setReindexingId] = useState<string | null>(null);
-  const [showClipboardForm, setShowClipboardForm] = useState(false);
+  const [, setShowClipboardForm] = useState(false);
   const [tagInput, setTagInput] = useState<{ sourceId: string; value: string } | null>(null);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);

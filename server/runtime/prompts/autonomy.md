@@ -1,3 +1,5 @@
+<!-- category: system, scope: full, priority: 70 -->
+
 # Moteur d'Autonomie
 
 <execution_loop>

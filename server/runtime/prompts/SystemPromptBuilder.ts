@@ -35,7 +35,7 @@ import { fileURLToPath } from "url";
 import process from "node:process";
 
 import { PromptRegistry }   from "../PromptRegistry.js";
-import { loadPromptTemplates } from "./loader.js";
+import { loadPromptTemplates, loadPromptMeta } from "./loader.js";
 import { ContextResolver }  from "./ContextResolver.js";
 import { RuleRegistry }     from "./RuleRegistry.js";
 import { ConflictResolver } from "./ConflictResolver.js";
@@ -113,7 +113,30 @@ export class SystemPromptBuilder {
     const dir = promptsDir ?? SystemPromptBuilder.resolvePromptsDir();
     loadPromptTemplates(this.legacyRegistry, dir);
     this.syncSectionsFromLegacy(dir);
+    this.registerSoloModeSection();
     this.loaded = true;
+  }
+
+  /**
+   * Enregistre la section « Mode Solo » dans le pipeline principal.
+   *
+   * Historiquement, les 5 règles détaillées du mode solo (sandbox, pas de
+   * délégation, vérification, checkpoint git, lecture ciblée) n'étaient émises
+   * que par buildLegacy() — un chemin de repli quasi jamais atteint. Dans le
+   * pipeline réel, agents désactivés ne laissait qu'une phrase (règle
+   * routing.solo-mode). On enregistre donc une vraie PromptSection gardée par
+   * `!ctx.agents.enabled`, occupant le même créneau (priority 60) que
+   * agents-system, dont le `when` est l'exact complément.
+   */
+  private registerSoloModeSection(): void {
+    this.sectionRegistry.set({
+      id:       "solo-mode",
+      content:  this.buildSoloModePrompt(),
+      scope:    ["full"],
+      priority: 60,
+      when:     ctx => !ctx.agents.enabled,
+      source:   "SystemPromptBuilder.ts (solo mode)",
+    });
   }
 
   /**
@@ -286,16 +309,40 @@ export class SystemPromptBuilder {
   }
 
   /**
-   * Nettoie les artefacts laissés par une variable vide après substitution :
-   *   « Utilisateur : () » quand userName/userRole sont vides.
-   * Sans ça, le modèle lit une ligne d'identité incomplète et parasite.
+   * Nettoie les artefacts laissés par une variable vide après substitution sur
+   * la SEULE ligne d'identité utilisateur (celle contenant « Utilisateur … »).
+   *
+   * ⚠️ Le nettoyage est strictement limité, ligne par ligne, aux lignes qui
+   * mentionnent « Utilisateur ». On ne touche JAMAIS au reste du prompt : un
+   * `.replace(/\(\s*\)/g, "")` global corromprait les exemples d'appels d'outils
+   * sans argument présents dans les sections .md (ex. `browser_close()`,
+   * `browser_reload()`), transformant la syntaxe qu'on enseigne au modèle.
    */
   private cleanupEmptyVars(text: string): string {
     return text
-      // « Utilisateur () » ou « Utilisateur : () » ou « Utilisateur  () »
-      .replace(/^.*Utilisateur\s*:?\s*\(\s*\).*$/gim, "")
-      // parenthèses/deux-points orphelins laissés par un rôle vide
-      .replace(/\(\s*\)/g, "")
+      .split("\n")
+      .map((line) => {
+        if (!/Utilisateur/.test(line)) return line;
+
+        // 1. Identité entièrement vide (« Utilisateur () » sans nom ni rôle) :
+        //    plus rien à présenter → on retire la ligne complète (le libellé
+        //    « **Contexte** : » qui l'introduit disparaît avec elle).
+        //    La phrase d'instruction de langue vit désormais sur sa PROPRE ligne
+        //    dans base.md : elle n'est jamais touchée par ce nettoyage.
+        if (/Utilisateur\s*\(\s*\)\s*\.?\s*$/i.test(line.trimEnd())) return "";
+
+        // 2. Rôle vide isolé (« Utilisateur Alice () » → « Utilisateur Alice »).
+        let cleaned = line.replace(/\s*\(\s*\)/g, "");
+
+        // 3. Nom vide : le trou laissé par {{userName}} absent produit un double
+        //    espace (« Utilisateur  (admin) »). On normalise les espaces internes,
+        //    puis l'espace parasite juste avant un point final. On NE touche pas
+        //    aux deux-points pour préserver l'espace fine française (« ... ** : »).
+        cleaned = cleaned.replace(/ {2,}/g, " ").replace(/\s+\.(\s*)$/, ".$1");
+
+        return cleaned;
+      })
+      .join("\n")
       // lignes vides multiples introduites par le nettoyage
       .replace(/\n{3,}/g, "\n\n");
   }
@@ -304,36 +351,21 @@ export class SystemPromptBuilder {
 
   /**
    * Lit les fichiers .md et les enregistre comme PromptSection dans le
-   * SectionRegistry, avec les métadonnées de scope/priority du front-matter.
+   * SectionRegistry, avec les métadonnées de scope/priority déclarées dans
+   * le front-matter de chaque fichier.
+   *
+   * Le scope et la priorité sont la source de vérité du fichier lui-même
+   * (front-matter `<!-- scope: ..., priority: ... -->`), et non d'une map
+   * centralisée. Conséquence voulue : un nouveau .md sans front-matter `scope`
+   * est **opt-in** — il n'est activé dans aucun contexte tant que son auteur
+   * n'a pas explicitement déclaré un scope. Cela évite qu'un bloc spécialisé
+   * fuite dans tous les contextes (ask, coding, browser…) par défaut.
    */
   private syncSectionsFromLegacy(promptsDir: string): void {
     if (!fs.existsSync(promptsDir)) return;
 
     const files = fs.readdirSync(promptsDir).filter((f: string) => f.endsWith(".md"));
-
-    const SECTION_SCOPE_MAP: Record<string, RuleScope[]> = {
-      "base":                ["full"],
-      "safety":              ["global"],
-      "ai-studio-directives":["full", "coding"],
-      "efficiency":          ["global"],
-      "browser":             ["browser", "full"],
-      "agents-system":       ["agent", "full"],
-      "autonomy":            ["full"],
-      "chat":                ["ask"],
-      "security":            ["full", "coding"],
-    };
-
-    const SECTION_PRIORITY_MAP: Record<string, number> = {
-      "base":                 10,
-      "safety":               20,
-      "ai-studio-directives": 30,
-      "efficiency":           40,
-      "browser":              50,
-      "agents-system":        60,
-      "autonomy":             70,
-      "chat":                 15,
-      "security":             80,
-    };
+    const meta  = loadPromptMeta(promptsDir);
 
     for (const file of files) {
       const id = file.replace(/\.md$/, "");
@@ -346,11 +378,26 @@ export class SystemPromptBuilder {
           ? this.legacyRegistry.render(id, { compact: true })
           : raw;
 
+        const fm = meta.get(id);
+
+        // Scope : source de vérité = front-matter. Absence de scope déclaré →
+        // section opt-in : elle n'est active dans aucun scope (au lieu de tomber
+        // silencieusement sur ["global"], ce qui l'activait partout).
+        const scope: RuleScope[] = fm?.scope ?? [];
+
+        if (!fm?.scope || fm.scope.length === 0) {
+          console.warn(
+            `[SystemPromptBuilder] Section "${id}" (${file}) sans "scope" dans ` +
+            `son front-matter : elle restera INACTIVE dans tous les contextes. ` +
+            `Ajoutez p.ex. « <!-- scope: full, priority: 100 --> » en tête du fichier.`,
+          );
+        }
+
         const section: PromptSection = {
           id,
           content,
-          scope:    SECTION_SCOPE_MAP[id] ?? ["global"],
-          priority: SECTION_PRIORITY_MAP[id] ?? 100,
+          scope,
+          priority: fm?.priority ?? 100,
           source:   file,
         };
 
@@ -376,6 +423,14 @@ export class SystemPromptBuilder {
         // (undefined), car c'est un bloc spécialisé qui ne doit pas peser par défaut.
         if (id === "security") {
           section.when = ctx => this.hasToolPrefix(ctx, "security_audit") ?? false;
+        }
+
+        // Les directives spécifiques à Gemini (thinking mode natif) ne sont
+        // injectées que si le fournisseur actif de la session est Gemini. Sur
+        // un modèle OpenRouter non-Gemini, elles seraient trompeuses (pas de
+        // « raisonnement interne natif » équivalent) : on les masque alors.
+        if (id === "gemini-reasoning") {
+          section.when = ctx => ctx.provider === "gemini";
         }
 
         this.sectionRegistry.set(section);

@@ -8,51 +8,6 @@ import { importModule } from '../../utils/ModuleLoader.js';
 
 const router = Router();
 
-/**
- * Vérifie qu'un chemin de fichier est bien à l'intérieur du workspace actif.
- * Empêche les attaques de type path traversal (../, etc.)
- * @param filePath - Chemin relatif du fichier
- * @returns true si le chemin est sécurisé, false sinon
- */
-function isPathSecure(filePath: string): boolean {
-  if (!filePath) return false;
-  
-  // Normaliser le chemin pour détecter les tentatives de traversée
-  const normalized = path.normalize(filePath).replace(/^(\.\.[\/\\])+/, '');
-  
-  // Interdire les chemins absolus et les tentatives de sortir du workspace
-  if (path.isAbsolute(filePath) || normalized.startsWith('..') || filePath.includes('..\\') || filePath.includes('../')) {
-    return false;
-  }
-  
-  // Interdire l'accès au dossier .Leanna (données globales)
-  if (normalized.includes('.Leanna') || normalized.includes('\\.Leanna\\')) {
-    return false;
-  }
-  
-  return true;
-}
-
-/**
- * Résout un chemin de fichier de manière sécurisée dans le workspace actif.
- * @param filePath - Chemin relatif du fichier
- * @returns Chemin absolu sécurisé ou null si invalide
- */
-function resolveSecurePath(filePath: string): string | null {
-  if (!isPathSecure(filePath)) {
-    return null;
-  }
-  
-  const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
-  const resolved = path.resolve(root, filePath);
-  
-  // Vérifier que le chemin résolu est bien à l'intérieur du workspace
-  if (!resolved.startsWith(root)) {
-    return null;
-  }
-  
-  return resolved;
-}
 
 // GET /api/knowledge/status
 router.get('/status', (_req: Request, res: Response) => {

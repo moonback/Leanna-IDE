@@ -127,13 +127,11 @@ const FileExplorer = memo(function FileExplorer({
   tree,
   expandedDirs,
   loading,
-  currentDir,
   onOpenFile,
   onToggleDirectory,
   onContextMenu,
   onCreateFile,
   onRefresh,
-  onNavigate,
   onMoveEntry,
 }: FileExplorerProps) {
   // ── Sandbox status (cached via sandboxApi, pas de polling rafale) ──────────

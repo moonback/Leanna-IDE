@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   GitBranch, Play, Pause, Trash2, CheckCircle2, XCircle,
   AlertTriangle, Clock, ChevronDown, ChevronRight, RotateCw,
@@ -306,7 +306,6 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
   const [busyId, setBusyId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeRuns, setActiveRuns] = useState<WorkflowRunState[]>([]);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { sendTextMessage, connected } = useLiveAPIContext();
 
   const GUIDED_CREATION_PROMPT =

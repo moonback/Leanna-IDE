@@ -48,7 +48,7 @@ export function createBrowserRouter(
     } else {
       pending.resolve(result ?? '');
     }
-    res.json({ status: 'ok' });
+    return res.json({ status: 'ok' });
   });
 
   // POST /api/browser/action-result
@@ -73,7 +73,7 @@ export function createBrowserRouter(
     } else {
       pending.resolve(result);
     }
-    res.json({ status: 'ok' });
+    return res.json({ status: 'ok' });
   });
 
   return router;

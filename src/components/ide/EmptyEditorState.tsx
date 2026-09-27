@@ -14,6 +14,8 @@ import { ShortcutsModal } from './ShortcutsModal.js';
 import { SystemModal } from './SystemModal.js';
 // @ts-ignore - Asset handled by bundler
 import bgVideo from '../../../assets/video.mp4';
+// @ts-ignore - Asset handled by bundler
+import bgVideoActive from '../../../assets/video2.mp4';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -91,8 +93,10 @@ const Kbd = React.memo(function Kbd({
       className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 text-xs font-mono font-semibold tracking-wide"
       style={{
         color: 'var(--text-muted)',
-        backgroundColor: 'var(--surface-soft)',
-        border: '1px solid var(--border)',
+        backgroundColor: 'color-mix(in srgb, var(--surface-soft) 55%, transparent)',
+        border: '1px solid color-mix(in srgb, #fff 12%, transparent)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
         borderRadius: '4px',
       }}
     >
@@ -118,10 +122,13 @@ const CompactActionCard = React.memo(function CompactActionCard({
     <motion.button
       type="button"
       onClick={onClick}
-      className="ai-interactive ai-compact-card group relative flex flex-col items-center gap-3 p-5 text-center rounded-xl overflow-hidden"
+      className="ai-interactive ai-compact-card ai-glass group relative flex flex-col items-center gap-3 p-5 text-center rounded-xl overflow-hidden"
       style={{
-        backgroundColor: 'var(--surface)',
-        border: '1px solid var(--border)',
+        backgroundColor: 'color-mix(in srgb, var(--surface) 45%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--border) 60%, transparent)',
+        backdropFilter: 'blur(16px) saturate(140%)',
+        WebkitBackdropFilter: 'blur(16px) saturate(140%)',
+        boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent), 0 8px 24px color-mix(in srgb, #000 18%, transparent)',
         minHeight: '96px',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
@@ -129,8 +136,8 @@ const CompactActionCard = React.memo(function CompactActionCard({
       whileHover={{
         y: -4,
         scale: 1.02,
-        boxShadow: '0 10px 26px color-mix(in srgb, var(--primary) 14%, transparent)',
-        borderColor: 'color-mix(in srgb, var(--primary) 35%, transparent)',
+        boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent), 0 12px 30px color-mix(in srgb, #000 24%, transparent)',
+        borderColor: 'color-mix(in srgb, var(--primary) 45%, transparent)',
       }}
       whileTap={{ scale: 0.95 }}
       initial={{ opacity: 0, y: 10 }}
@@ -149,8 +156,10 @@ const CompactActionCard = React.memo(function CompactActionCard({
       <motion.div
         className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 relative"
         style={{
-          backgroundColor: 'var(--surface-soft)',
-          border: '1px solid color-mix(in srgb, var(--primary) 12%, transparent)',
+          backgroundColor: 'color-mix(in srgb, var(--surface-soft) 55%, transparent)',
+          border: '1px solid color-mix(in srgb, #fff 14%, transparent)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
         }}
         whileHover={{ scale: 1.1, rotate: 5 }}
         transition={{ duration: 0.2 }}
@@ -235,14 +244,34 @@ function GlobalStyles() {
         outline-offset: 2px;
       }
 
+      /* ── Glassmorphism : reflet lumineux en haut + halo au survol ── */
+      .ai-glass::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        background: linear-gradient(
+          135deg,
+          color-mix(in srgb, #fff 14%, transparent) 0%,
+          transparent 40%,
+          transparent 100%
+        );
+        opacity: 0.7;
+        transition: opacity 0.3s ease;
+      }
+      .ai-glass:hover::before {
+        opacity: 1;
+      }
+
       .ai-compact-card:hover {
-        border-color: var(--primary);
-        box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 12%, transparent);
+        border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent), 0 12px 30px color-mix(in srgb, #000 24%, transparent);
         transform: translateY(-1px);
       }
 
       .ai-hero:hover {
-        box-shadow: 0 10px 28px color-mix(in srgb, var(--primary) 16%, transparent);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent), 0 16px 40px color-mix(in srgb, #000 26%, transparent);
         transform: translateY(-1px);
       }
 
@@ -252,7 +281,15 @@ function GlobalStyles() {
 
       .ai-quicklink:hover {
         color: var(--primary);
-        background-color: var(--surface-soft);
+        background-color: color-mix(in srgb, var(--surface-soft) 55%, transparent);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+      }
+
+      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .ai-glass {
+          background-color: var(--surface) !important;
+        }
       }
 
       .ai-status-dot {
@@ -446,10 +483,11 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     >
       <GlobalStyles />
 
-      {/* ── Vidéo de fond ── */}
+      {/* ── Vidéo de fond (video2 quand l'assistant est connecté, sinon video par défaut) ── */}
       <video
+        key={connected ? 'active' : 'default'}
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-        src={bgVideo}
+        src={connected ? bgVideoActive : bgVideo}
         autoPlay
         loop
         muted
@@ -457,12 +495,11 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
         aria-hidden="true"
         style={{ zIndex: 0 }}
       />
-      {/* Voile pour garder le contenu lisible par-dessus la vidéo */}
+      {/* Voile léger + dégradé pour garder le contenu lisible sans masquer la vidéo */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          backgroundColor: 'var(--bg)',
-          opacity: 0.4,
+          background: 'linear-gradient(to bottom, color-mix(in srgb, var(--bg) 45%, transparent) 0%, color-mix(in srgb, var(--bg) 25%, transparent) 50%, color-mix(in srgb, var(--bg) 55%, transparent) 100%)',
           zIndex: 0,
         }}
       />
@@ -544,22 +581,24 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             onClick={handleConnect}
             onMouseEnter={() => setCtaHovered(true)}
             onMouseLeave={() => setCtaHovered(false)}
-            className="ai-interactive ai-hero group w-full mx-auto flex items-center gap-4 p-6 mb-5 text-left rounded-[22px]"
+            className="ai-interactive ai-hero ai-glass group relative w-full mx-auto flex items-center gap-4 p-6 mb-5 text-left rounded-[22px] overflow-hidden"
             style={{
-              backgroundColor: 'var(--surface)',
-              border: '1px solid color-mix(in srgb, var(--accent-secondary) 55%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--surface) 40%, transparent)',
+              border: '1px solid color-mix(in srgb, #fff 16%, transparent)',
+              backdropFilter: 'blur(22px) saturate(150%)',
+              WebkitBackdropFilter: 'blur(22px) saturate(150%)',
               height: '112px',
               minHeight: '112px',
               maxWidth: '600px',
-              boxShadow: '0 8px 24px color-mix(in srgb, var(--primary) 14%, transparent)',
+              boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent), 0 12px 32px color-mix(in srgb, #000 22%, transparent)',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
             {...makeEntranceProps(0.08)}
             aria-label={connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`}
             whileHover={{
               scale: 1.02,
-              boxShadow: '0 14px 36px color-mix(in srgb, var(--primary) 20%, transparent)',
-              borderColor: 'var(--accent-hover)',
+              boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent), 0 16px 40px color-mix(in srgb, #000 26%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--primary) 40%, transparent)',
             }}
             whileTap={{ scale: 0.98 }}
           >
@@ -574,8 +613,10 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             <div
               className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0 relative"
               style={{
-                backgroundColor: 'var(--surface-soft)',
-                border: '1px solid color-mix(in srgb, var(--primary) 18%, transparent)',
+                backgroundColor: 'color-mix(in srgb, var(--surface-soft) 50%, transparent)',
+                border: '1px solid color-mix(in srgb, #fff 16%, transparent)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
               }}
             >
               {/* Animated icon container */}
@@ -692,8 +733,10 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                     className="ai-interactive flex items-center gap-1.5 rounded px-2 py-1 text-sm font-medium"
                     style={{
                       color: geminiStatus === 'invalid' ? 'var(--color-error)' : 'var(--text-muted)',
-                      backgroundColor: 'var(--surface-soft)',
-                      border: '1px solid var(--border)',
+                      backgroundColor: 'color-mix(in srgb, var(--surface-soft) 55%, transparent)',
+                      border: '1px solid color-mix(in srgb, #fff 12%, transparent)',
+                      backdropFilter: 'blur(6px)',
+                      WebkitBackdropFilter: 'blur(6px)',
                     }}
                     title={geminiStatus === 'invalid'
                       ? 'API key not valid. Please pass a valid API key.'

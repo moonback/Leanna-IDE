@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
-  Github, GitPullRequest, AlertCircle, Bell, Star,
-  ExternalLink, RefreshCw, Loader2, BookOpen, GitCommit,
+  Github, GitPullRequest, AlertCircle,
+  ExternalLink, RefreshCw, Loader2, GitCommit,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';

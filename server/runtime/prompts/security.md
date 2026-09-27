@@ -1,4 +1,4 @@
-<!-- category: system -->
+<!-- category: system, scope: full coding, priority: 80 -->
 
 # Audit de Sécurité
 

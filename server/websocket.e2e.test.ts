@@ -251,7 +251,7 @@ test('live & sandbox WebSocket: upgrade auth verification (unauthorized vs autho
       userName: 'Dev',
       userRole: 'Developer',
       language: 'fr',
-      responseStyle: 'Direct',
+      responseStyle: 'concise',
     }),
     getWorkspaceRoot: () => SELF_ROOT,
     createGeminiAI: () => ({

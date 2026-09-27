@@ -1,4 +1,3 @@
-import React from 'react';
 import { KnowledgeHealthDashboard } from '../knowledge/KnowledgeHealthDashboard.js';
 
 export function KnowledgeHealthSection() {

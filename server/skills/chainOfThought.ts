@@ -19,12 +19,12 @@ const complexityCache = new Map<string, ComplexityLevel>();
 const MAX_CACHE_SIZE = 100;
 
 // ─── Import différé LearningEngine ──────────────────────────────────────────
-type LearningEngineType = import("../knowledge/LearningEngine").LearningEngine;
+type LearningEngineType = import("../knowledge/LearningEngine.js").LearningEngine;
 let _leCache: LearningEngineType | null = null;
 async function getLE(): Promise<LearningEngineType | null> {
   if (_leCache) return _leCache;
   try {
-    const mod = await import("../knowledge/LearningEngine");
+    const mod = await import("../knowledge/LearningEngine.js");
     _leCache = mod.learningEngine;
     return _leCache;
   } catch {

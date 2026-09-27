@@ -45,6 +45,7 @@ export function buildSystemInstruction(profile: ProfileConfig = {}): string {
     mode: profile.mode,
     agents: profile.agents,
     workspace: profile.workspace,
+    textProvider: profile.textProvider,
     extraSections,
   };
 

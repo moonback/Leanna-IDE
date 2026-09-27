@@ -611,12 +611,6 @@ function renderInlineMarkdown(text: string): JSX.Element {
   return <>{parseMarkdown(text)}</>;
 }
 
-// Ancienne fonction conservée pour compatibilité (à supprimer plus tard)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function _renderBoldItalic(text: string): (string | JSX.Element)[] {
-  return [renderInlineMarkdown(text)];
-}
-
 /** Détecte prefers-reduced-transparency pour durcir les scrims de modal */
 function useReducedTransparency(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -1062,17 +1056,6 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
   }, [selectedDoc, notebookId, handleGenerate]);
 
   // ─── Actions ────────────────────────────────────────────────────────────
-
-  const _handleDelete = useCallback(async (docId: string) => {
-    try {
-      await fetch(`/api/notebooks/${notebookId}/generated/${docId}`, { method: 'DELETE' });
-      setGeneratedDocs(prev => prev.filter(d => d.id !== docId));
-      if (selectedDoc?.id === docId) setSelectedDoc(null);
-      success('Document supprimé');
-    } catch {
-      toastError('Erreur');
-    }
-  }, [notebookId, selectedDoc, success, toastError]);
 
   const handleCopy = useCallback(async (content: string) => {
     await navigator.clipboard.writeText(content);

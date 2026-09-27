@@ -359,5 +359,6 @@ export const memorySkill: Skill = {
         return { error: e.message };
       }
     }
+    return undefined;
   },
 };

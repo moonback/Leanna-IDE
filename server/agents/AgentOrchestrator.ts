@@ -10,7 +10,7 @@ import type {
 import { AgentExecutor, SkillHandler } from "./AgentExecutor.js";
 import { AgentRuntimeExecutor } from "./AgentRuntimeExecutor.js";
 import { TaskScheduler, type TaskRunner } from "./TaskScheduler.js";
-import type { AgentRuntime as AgenticRuntime } from "../runtime/agentic/AgentRuntime.js";
+import type { AgenticRuntime } from "../runtime/agentic/AgenticRuntime.js";
 import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier.js";
 import { AgentRegistry, agentRegistry } from "./AgentRegistry.js";
 import { agentMessageBus } from "./AgentMessageBus.js";

@@ -71,7 +71,6 @@ function fuzzyScore(needle: string, haystack: string): number {
 
 export function CommandPalette({
   mode: initialMode,
-  openFiles,
   onOpenFile,
   onClose,
   onSave,

@@ -4,11 +4,10 @@
  * Affiche un résumé compact quand connectée.
  */
 
-import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Wifi, WifiOff, Loader2, BrainCircuit,
-  Zap, AlertTriangle,
+  WifiOff, BrainCircuit,
+  Zap,
 } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge.js';
 
@@ -27,12 +26,10 @@ interface AIConnectionBannerProps {
 
 export function AIConnectionBanner({
   connected,
-  connecting = false,
   working = false,
   muted = false,
   aiName = 'Leanna',
   onConnect,
-  onDisconnect,
   onSettings,
   compact = false,
 }: AIConnectionBannerProps) {

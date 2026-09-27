@@ -238,7 +238,6 @@ export class SourceIngester {
     const {
       maxFiles = 100,
       fileExtensions = ['.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.go', '.rs', '.cpp', '.c', '.h', '.hpp', '.md', '.txt', '.json', '.yaml', '.yml'],
-      includeSubmodules = false,
       branch: targetBranch
     } = options;
 

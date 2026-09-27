@@ -7,9 +7,8 @@ import type { ProfileConfig } from '../prompts/systemInstruction.js';
 
 test('profile routes: GET /profile returns current profile', async () => {
   const mockProfile: ProfileConfig = {
-    name: 'Test User',
-    role: 'developer',
-    expertise: ['typescript', 'nodejs'],
+    userName: 'Test User',
+    userRole: 'developer',
   };
 
   const getProfile = () => mockProfile;
@@ -31,8 +30,8 @@ test('profile routes: GET /profile returns current profile', async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/profile`);
     assert.equal(res.status, 200);
     const body = await res.json() as any;
-    assert.equal(body.name, 'Test User');
-    assert.equal(body.role, 'developer');
+    assert.equal(body.userName, 'Test User');
+    assert.equal(body.userRole, 'developer');
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
@@ -40,8 +39,8 @@ test('profile routes: GET /profile returns current profile', async () => {
 
 test('profile routes: POST /profile updates profile', async () => {
   let currentProfile: ProfileConfig = {
-    name: 'Test User',
-    role: 'developer',
+    userName: 'Test User',
+    userRole: 'developer',
   };
 
   const getProfile = () => currentProfile;
@@ -63,13 +62,13 @@ test('profile routes: POST /profile updates profile', async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/profile`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Updated User', role: 'architect' }),
+      body: JSON.stringify({ userName: 'Updated User', userRole: 'architect' }),
     });
     assert.equal(res.status, 200);
     const body = await res.json() as any;
     assert.equal(body.success, true);
-    assert.equal(body.profile.name, 'Updated User');
-    assert.equal(body.profile.role, 'architect');
+    assert.equal(body.profile.userName, 'Updated User');
+    assert.equal(body.profile.userRole, 'architect');
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }

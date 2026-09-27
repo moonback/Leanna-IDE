@@ -1058,6 +1058,7 @@ export function ChatPanel({
       });
       return () => cancelAnimationFrame(raf);
     }
+    return undefined;
   }, [transcript.length, lastEntryId, lastEntryText, queue.length, isBusy, connecting, activity.length, scrollToBottom]);
 
   useEffect(() => {

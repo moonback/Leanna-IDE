@@ -7,8 +7,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { Upload, Plus, Loader2, BookOpen } from 'lucide-react';
-import { useToast } from '../ui/Toast.js';
+import { Upload, Loader2 } from 'lucide-react';
 import { NotebookPickerModal } from '../ide/NotebookPickerModal.js';
 
 interface ImportToNotebookButtonProps {
@@ -29,7 +28,6 @@ interface ImportToNotebookButtonProps {
 }
 
 export function ImportToNotebookButton({
-  onImported,
   className,
   children,
   compact = false,
@@ -37,11 +35,10 @@ export function ImportToNotebookButton({
   defaultNotebookTitle = 'Mon premier notebook',
   defaultNotebookDescription = '',
 }: ImportToNotebookButtonProps) {
-  const { success, error: toastError } = useToast();
   const prefersReducedMotion = useReducedMotion();
   const [showPicker, setShowPicker] = useState(false);
   const [fileToImport, setFileToImport] = useState<{ path: string; name: string } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
 
   const SPRING_MOMENTUM = { type: 'spring' as const, bounce: 0.18, duration: 0.3 };
 
@@ -66,13 +63,6 @@ export function ImportToNotebookButton({
       fileInputRef.current.value = '';
     }
   }, []);
-
-  const handleImportSuccess = useCallback((notebookId: string, filePath: string) => {
-    success(`Fichier importé dans le notebook`);
-    onImported?.(notebookId, filePath);
-    setFileToImport(null);
-    setShowPicker(false);
-  }, [success, onImported]);
 
   const handleClick = useCallback(() => {
     // Si on a un input file caché, on le déclenche
@@ -247,6 +237,10 @@ export async function importToNotebookAction({
 
   // Utiliser le premier notebook disponible
   notebookId = notebooks[0].id;
+  if (!notebookId) {
+    console.error('Notebook sans identifiant');
+    return null;
+  }
 
   // Importer le fichier
   try {

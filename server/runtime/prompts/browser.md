@@ -1,3 +1,5 @@
+<!-- category: system, scope: browser full, priority: 50 -->
+
 # Navigateur Web Intégré — Comportement et Règles
 
 <browser_fundamentals>

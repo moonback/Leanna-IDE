@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrainCircuit, Search, Trash2, RefreshCw } from 'lucide-react';
 import { useToast } from '../components/ui/Toast.js';

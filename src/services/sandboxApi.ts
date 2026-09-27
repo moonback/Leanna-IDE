@@ -99,12 +99,6 @@ async function cachedGet<T = any>(
   return p;
 }
 
-function invalidateCache(url: string) {
-  caches.delete(url);
-  const t = invalidateTimers.get(url);
-  if (t) clearTimeout(t);
-}
-
 /** Invalide TOUS les caches sandbox (appelé après mutation side-effect) */
 function invalidateAll() {
   for (const key of Array.from(caches.keys())) caches.delete(key);

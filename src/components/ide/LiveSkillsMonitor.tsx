@@ -376,7 +376,7 @@ interface SkillRowProps {
   onToggle: () => void;
 }
 
-function SkillRow({ usage, index, total, isOpen, onToggle }: SkillRowProps) {
+function SkillRow({ usage, total, isOpen, onToggle }: SkillRowProps) {
   const meta = SKILL_META[usage.skillId] || SKILL_META.system;
   const Icon = meta.icon;
   const pct = total > 0 ? Math.round((usage.callCount / total) * 100) : 0;

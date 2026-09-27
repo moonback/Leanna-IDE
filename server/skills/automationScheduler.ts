@@ -130,7 +130,7 @@ export async function loadScheduledTasks() {
     taskTimers.clear();
     scheduledTasks.clear();
 
-    const { data, error } = await supabase
+    const { data } = await supabase
         .from('scheduled_tasks')
         .select('*')
         .eq('enabled', true);

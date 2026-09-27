@@ -1,3 +1,5 @@
+<!-- category: system, scope: global, priority: 20 -->
+
 # Règles de Sécurité & Intégrité (Guardrails)
 
 <core_guardrails>

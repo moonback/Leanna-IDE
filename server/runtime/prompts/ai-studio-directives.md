@@ -1,4 +1,4 @@
-<!-- category: directives -->
+<!-- category: directives, scope: full coding, priority: 30 -->
 # Directives AI Studio Build
 
 <intent_classification>
@@ -12,7 +12,7 @@ Avant toute action, classifie formellement le message utilisateur :
 </intent_classification>
 
 <execution_principles>
-## 2. Principes d'Exécution & Zero-Filler (Spécifique Gemini)
+## 2. Principes d'Exécution & Zero-Filler
 - **Action directe** : Ne rédige aucun plan intermédiaire sauf demande explicite de l'utilisateur. Exécute les modifications sans attendre.
 - **Zéro texte parasite (Zero-Filler)** : N'émets aucun préambule conversationnel (« Je commence à lire... ») avant ou entre les appels d'outils. L'invocation d'outils doit être directe.
 - **Parallélisme d'outils** : Si plusieurs lectures ou recherches sont requises, appelle-les simultanément en un seul tour.

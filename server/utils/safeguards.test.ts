@@ -63,9 +63,8 @@ test("handleConfirmationResponse avec requestId inconnu retourne false", () => {
 });
 
 test("cancelAllPending résout toutes les confirmations en attente à false", async () => {
-  let e1: any = null, e2: any = null;
-  const p1 = requestConfirmation("a.ts", "write", (d) => { e1 = d; });
-  const p2 = requestConfirmation("b.ts", "write", (d) => { e2 = d; });
+  const p1 = requestConfirmation("a.ts", "write", () => {});
+  const p2 = requestConfirmation("b.ts", "write", () => {});
   assert.equal(getPendingCount(), 2);
 
   cancelAllPending();

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Keyboard } from 'lucide-react';
 import { Modal } from '../ui/Modal.js';
 

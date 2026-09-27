@@ -372,5 +372,6 @@ export const historySkill: Skill = {
         return { error: e.message };
       }
     }
+    return undefined;
   },
 };

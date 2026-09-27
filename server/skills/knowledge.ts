@@ -9,7 +9,7 @@ import {
   knowledgeGraph,
 } from "../knowledge/index.js";
 import type { ContextStrategy, ContextDetailLevel } from "../knowledge/UnderstandingEngine.js";
-import type { ImpactMode, RiskLevel } from "../knowledge/ImpactAnalyzer.js";
+import type { ImpactMode } from "../knowledge/ImpactAnalyzer.js";
 import type { ProjectKnowledgeCategory } from "../knowledge/types.js";
 
 const CATEGORY_VALUES: ProjectKnowledgeCategory[] = [

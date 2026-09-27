@@ -6,6 +6,8 @@
  */
 import { z } from "zod";
 import type { AgentPermissions, AgentRole, TaskResult } from "./types.js";
+import { STATIC_AGENT_ROLES } from "./types.js";
+import { getAgentDefinition } from "./roles.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types de messages inter-agents
@@ -170,10 +172,6 @@ export interface DelegationPolicy {
   ): boolean;
 }
 
-import { STATIC_AGENT_ROLES } from "./types.js";
-import { listAgentRoles as _listAgentRoles } from "./roles.js";
-import { getAgentDefinition } from "./roles.js";
-
 /** Matrice de délégation : quels agents peuvent déléguer à qui */
 export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {
   // ── Code & Ingénierie logicielle ──
@@ -263,11 +261,17 @@ function permissionsFor(role: AgentRole): AgentPermissions {
 
   const matrixTargets = (DELEGATION_MATRIX[role as (typeof STATIC_AGENT_ROLES)[number]] ?? [])
     .map((entry) => entry.targetRole);
+  // Défaut appliqué aux agents (statiques sans permissions explicites, ou
+  // dynamiques enregistrés via DynamicAgentRegistry sans champ `permissions`).
+  // Le cas « ni définition ni rôle statique » est déjà rejeté plus haut.
+  // allowReceiveDelegation doit être `true` par défaut : un agent dynamique
+  // valide doit pouvoir recevoir des délégations, sinon la matrice de
+  // collaboration est cassée pour tout rôle créé à l'exécution.
   return definition?.permissions ?? {
     allowDelegation: matrixTargets.length > 0,
-    allowReceiveDelegation: isStatic,
+    allowReceiveDelegation: true,
     maxDelegationDepth: 3,
-    allowedTargets: matrixTargets,
+    allowedTargets: matrixTargets.length > 0 ? matrixTargets : undefined,
   };
 }
 

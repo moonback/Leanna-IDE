@@ -14,7 +14,7 @@ export function createCustomSkillsRouter(skillManager?: SkillManager): Router {
 
   router.post('/', async (req: Request, res: Response) => {
     try {
-      const { getAllCustomSkills, createCustomSkill, updateCustomSkill, deleteCustomSkill, invalidateCustomSkillsCache } = await import('../skills/customSkills');
+      const { getAllCustomSkills, createCustomSkill, updateCustomSkill, deleteCustomSkill, invalidateCustomSkillsCache } = await import('../skills/customSkills.js');
       const { action, ...payload } = req.body;
 
       switch (action) {
@@ -56,7 +56,7 @@ export function createCustomSkillsRouter(skillManager?: SkillManager): Router {
           return res.status(400).json({ error: `Action inconnue: ${action}` });
       }
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   });
 

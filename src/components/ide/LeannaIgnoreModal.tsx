@@ -7,7 +7,7 @@
  * /api/safeguards/ignore.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Ban, FolderLock, Save, ShieldOff } from 'lucide-react';
 import { Modal } from '../ui/Modal.js';
 import { useToast } from '../ui/Toast.js';

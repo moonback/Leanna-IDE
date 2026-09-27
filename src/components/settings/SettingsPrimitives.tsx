@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Eye, EyeOff } from 'lucide-react';
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
-export function Section({ icon: Icon, title, description, children, badge }: {
-  icon: React.FC<any>; title: string; description?: string;
+export function Section({ id, icon: Icon, title, description, children, badge }: {
+  id?: string; icon: React.FC<any>; title: string; description?: string;
   children: React.ReactNode; badge?: string;
 }) {
   return (
     <section
+      id={id}
       className="relative overflow-hidden rounded-2xl border p-4 sm:p-5"
       style={{
         backgroundColor: 'var(--bg-panel)',

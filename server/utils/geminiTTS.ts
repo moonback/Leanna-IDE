@@ -463,7 +463,7 @@ async function callGemini(text: string, voiceName: string): Promise<string | nul
   const start = Date.now();
 
   try {
-    const { withGeminiRetry } = await import("./geminiKeyPool");
+    const { withGeminiRetry } = await import("./geminiKeyPool.js");
 
     const model = "gemini-2.5-flash-preview-tts";
 

@@ -22,9 +22,9 @@ router.post('/impact/analyze', (req: Request, res: Response) => {
       includeTests,
       onlyInPaths,
     });
-    res.json({ status: 'success', report });
+    return res.json({ status: 'success', report });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -36,9 +36,9 @@ router.post('/impact/quick', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Le paramètre file est requis.' });
     }
     const report = impactAnalyzer.quickAnalyze(file);
-    res.json({ status: 'success', report });
+    return res.json({ status: 'success', report });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -50,9 +50,9 @@ router.post('/impact/deep', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Le paramètre files est requis.' });
     }
     const report = impactAnalyzer.deepAnalyze(files);
-    res.json({ status: 'success', report });
+    return res.json({ status: 'success', report });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -64,9 +64,9 @@ router.post('/impact/reverse', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Le paramètre file est requis.' });
     }
     const report = impactAnalyzer.reverseAnalyze(file);
-    res.json({ status: 'success', report });
+    return res.json({ status: 'success', report });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 

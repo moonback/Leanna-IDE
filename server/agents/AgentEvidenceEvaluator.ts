@@ -186,22 +186,71 @@ export class AgentEvidenceEvaluator {
   }> {
     const operations: Array<{ tool: string; fact_id: string; message: string; timestamp: string }> = [];
 
-    // Pattern plus robuste qui gère les variations d'espaces et d'ordre des clés
-    const memoryAddPattern = /- knowledge_memory_add: succès — \{[^}]*"status"\s*:\s*"success"[^}]*"fact_id"\s*:\s*"([^"]+)"[^}]*"message"\s*:\s*"([^"]+)"[^}]*\}/g;
+    // Le format produit par AgentExecutor.formatToolObservation est :
+    //   "- <tool>: succès — <JSON.stringify(result)>[... troncature éventuelle]"
+    // L'ordre des clés du JSON dépend de l'implémentation du skill : on ne peut
+    // donc PAS s'appuyer sur un ordre fixe (status → fact_id → message). On repère
+    // le préfixe, on extrait l'objet JSON par équilibrage d'accolades (robuste aux
+    // objets imbriqués), puis on le parse. Toute observation tronquée/malformée est
+    // simplement ignorée.
+    const prefix = "- knowledge_memory_add: succès — ";
 
     for (const obs of observations) {
-      let match: RegExpExecArray | null;
-      while ((match = memoryAddPattern.exec(obs)) !== null) {
-        operations.push({
-          tool: "knowledge_memory_add",
-          fact_id: match[1],
-          message: match[2],
-          timestamp: new Date().toISOString(),
-        });
+      let searchFrom = 0;
+      let idx: number;
+      while ((idx = obs.indexOf(prefix, searchFrom)) !== -1) {
+        const jsonStart = obs.indexOf("{", idx + prefix.length);
+        searchFrom = idx + prefix.length;
+        if (jsonStart === -1) continue;
+
+        const jsonText = this.extractBalancedObject(obs, jsonStart);
+        if (!jsonText) continue;
+        searchFrom = jsonStart + jsonText.length;
+
+        try {
+          const parsed = JSON.parse(jsonText) as Record<string, unknown>;
+          if (parsed.status === "success" && typeof parsed.fact_id === "string" && parsed.fact_id) {
+            operations.push({
+              tool: "knowledge_memory_add",
+              fact_id: parsed.fact_id,
+              message: typeof parsed.message === "string" ? parsed.message : "",
+              timestamp: new Date().toISOString(),
+            });
+          }
+        } catch {
+          // JSON tronqué ou invalide (observation coupée) → on ignore cette occurrence.
+        }
       }
     }
 
     return operations;
+  }
+
+  /**
+   * Extrait la sous-chaîne d'un objet JSON équilibré à partir de l'accolade
+   * ouvrante `start`, en tenant compte des chaînes et des échappements. Retourne
+   * `null` si l'objet n'est pas correctement fermé (observation tronquée).
+   */
+  private extractBalancedObject(text: string, start: number): string | null {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') inString = true;
+      else if (ch === "{") depth++;
+      else if (ch === "}") {
+        depth--;
+        if (depth === 0) return text.slice(start, i + 1);
+      }
+    }
+    return null;
   }
 
   /**

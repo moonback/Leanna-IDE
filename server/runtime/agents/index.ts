@@ -18,13 +18,13 @@
 export { defineAgent } from "./plugin.js";
 export type { AgentConfig } from "./plugin.js";
 
-export { writerAgent } from "./writer.agent";
-export { formatterAgent } from "./formatter.agent";
-export { researcherAgent } from "./researcher.agent";
-export { proofreaderAgent } from "./proofreader.agent";
-export { translatorAgent } from "./translator.agent";
-export { summarizerAgent } from "./summarizer.agent";
-export { plannerAgent } from "./planner.agent";
+export { writerAgent } from "./writer.agent.js";
+export { formatterAgent } from "./formatter.agent.js";
+export { researcherAgent } from "./researcher.agent.js";
+export { proofreaderAgent } from "./proofreader.agent.js";
+export { translatorAgent } from "./translator.agent.js";
+export { summarizerAgent } from "./summarizer.agent.js";
+export { plannerAgent } from "./planner.agent.js";
 
 export { engineeringAgents } from "./engineering.agents.js";
 export {
@@ -33,13 +33,13 @@ export {
 } from "./agenticBridge.js";
 
 import type { AgentPlugin } from "../AgentRuntime.js";
-import { writerAgent } from "./writer.agent";
-import { formatterAgent } from "./formatter.agent";
-import { researcherAgent } from "./researcher.agent";
-import { proofreaderAgent } from "./proofreader.agent";
-import { translatorAgent } from "./translator.agent";
-import { summarizerAgent } from "./summarizer.agent";
-import { plannerAgent } from "./planner.agent";
+import { writerAgent } from "./writer.agent.js";
+import { formatterAgent } from "./formatter.agent.js";
+import { researcherAgent } from "./researcher.agent.js";
+import { proofreaderAgent } from "./proofreader.agent.js";
+import { translatorAgent } from "./translator.agent.js";
+import { summarizerAgent } from "./summarizer.agent.js";
+import { plannerAgent } from "./planner.agent.js";
 import { engineeringAgents } from "./engineering.agents.js";
 
 /**

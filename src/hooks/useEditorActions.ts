@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 
 /**
  * Hook for managing Monaco editor actions (format, save, etc.)

@@ -1,4 +1,4 @@
-<!-- category: system -->
+<!-- category: system, scope: ask, priority: 15 -->
 
 # Skill — Mode Chat · Analyse Documentaire & Q&A
 

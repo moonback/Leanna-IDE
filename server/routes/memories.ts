@@ -18,9 +18,9 @@ router.get('/', async (req: Request, res: Response) => {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ memories: data });
+    return res.json({ memories: data });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -34,9 +34,9 @@ router.delete('/all', async (_req: Request, res: Response) => {
     const { count } = await supabase.from('memories').select('*', { count: 'exact', head: true });
     const { error } = await supabase.from('memories').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ status: 'success', deleted: count || 0 });
+    return res.json({ status: 'success', deleted: count || 0 });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -49,9 +49,9 @@ router.delete('/:id', async (req: Request, res: Response) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
     const { error } = await supabase.from('memories').delete().eq('id', req.params.id);
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 

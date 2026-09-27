@@ -4,7 +4,6 @@ import {
   ChainOfThoughtExecutor,
   assessComplexity,
   type CoTContext,
-  type ComplexityLevel,
 } from "./chainOfThought.js";
 
 describe("chainOfThought", () => {

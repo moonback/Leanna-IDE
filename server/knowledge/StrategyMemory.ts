@@ -56,7 +56,16 @@ const MIN_EVIDENCE = 3;
 /** Recent success rate at/under which a skill with enough evidence is "failing". */
 const FAILING_THRESHOLD = 0.34;
 
+/**
+ * Emplacement du store, sous `.Leanna/` comme DocumentStore/EmbeddingStore, afin
+ * de ne pas polluer la racine du projet avec un fichier `.Leanna-strategy.json`.
+ */
 function getStorePath(): string {
+  return path.join(SELF_ROOT || process.cwd(), ".Leanna", "strategy.json");
+}
+
+/** Ancien emplacement (racine) — migré une fois vers `.Leanna/strategy.json`. */
+function getLegacyStorePath(): string {
   return path.join(SELF_ROOT || process.cwd(), ".Leanna-strategy.json");
 }
 
@@ -79,8 +88,17 @@ export class StrategyMemory {
     this.loadedFrom = target;
     this.skills.clear();
     try {
-      if (fs.existsSync(target)) {
-        const raw = JSON.parse(fs.readFileSync(target, "utf-8")) as {
+      // Migration douce : si le nouveau fichier n'existe pas mais que l'ancien
+      // (racine) est présent, on lit l'ancien puis on marque dirty pour que le
+      // prochain save() écrive au nouvel emplacement et supprime l'ancien.
+      let readFrom = target;
+      let migrating = false;
+      if (!fs.existsSync(target) && fs.existsSync(getLegacyStorePath())) {
+        readFrom = getLegacyStorePath();
+        migrating = true;
+      }
+      if (fs.existsSync(readFrom)) {
+        const raw = JSON.parse(fs.readFileSync(readFrom, "utf-8")) as {
           skills?: SkillReliability[];
         };
         for (const s of raw.skills ?? []) {
@@ -96,6 +114,10 @@ export class StrategyMemory {
             });
           }
         }
+      }
+      if (migrating && this.skills.size > 0) {
+        // Force la réécriture vers le nouvel emplacement au prochain save().
+        this.dirty = true;
       }
     } catch (err) {
       // Corrupted store must never break planning. Start empty.
@@ -178,6 +200,10 @@ export class StrategyMemory {
     if (this.ephemeral || !this.dirty) return;
     const target = this.loadedFrom || getStorePath();
     try {
+      // S'assurer que le dossier `.Leanna/` existe avant d'écrire.
+      const dir = path.dirname(target);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
       const payload = JSON.stringify(
         { version: 1, updatedAt: new Date().toISOString(), skills: [...this.skills.values()] },
         null,
@@ -187,6 +213,12 @@ export class StrategyMemory {
       fs.writeFileSync(tmp, payload, "utf-8");
       fs.renameSync(tmp, target);
       this.dirty = false;
+
+      // Migration terminée : retirer l'ancien fichier racine s'il subsiste.
+      const legacy = getLegacyStorePath();
+      if (legacy !== target && fs.existsSync(legacy)) {
+        try { fs.unlinkSync(legacy); } catch { /* best-effort */ }
+      }
     } catch (err) {
       // Persistence is optional; keep running in-memory.
       log.warn(`Écriture de la mémoire de stratégie échouée: ${(err as Error).message}`);

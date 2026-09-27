@@ -169,6 +169,13 @@ export interface SystemPromptConfig {
   extraSections?: Array<{ id: string; content: string }>;
   /** Racine du workspace projet actif (vide ou non défini si aucun projet ouvert) */
   workspace?: string;
+  /**
+   * Fournisseur de modèle actif pour la session ('gemini' | 'openrouter').
+   * Utilisé pour conditionner les sections/directives spécifiques à un
+   * fournisseur (ex : raisonnement interne natif de Gemini). Défaut : 'gemini'
+   * pour préserver le comportement historique quand le runtime ne le précise pas.
+   */
+  textProvider?: 'gemini' | 'openrouter';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -3,7 +3,6 @@
  * Affiche un message clair avec action primaire et aide secondaire.
  */
 
-import React from 'react';
 import { motion } from 'motion/react';
 import type { LucideIcon } from 'lucide-react';
 

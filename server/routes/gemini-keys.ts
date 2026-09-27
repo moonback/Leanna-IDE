@@ -33,9 +33,9 @@ export function createGeminiKeysRouter(): Router {
     }
     try {
       addGeminiKey(key.trim(), label?.trim() || undefined);
-      res.json({ status: 'success', keys: getGeminiKeys() });
+      return res.json({ status: 'success', keys: getGeminiKeys() });
     } catch (e: any) {
-      res.status(400).json({ status: 'error', error: e.message });
+      return res.status(400).json({ status: 'error', error: e.message });
     }
   });
 
@@ -47,9 +47,9 @@ export function createGeminiKeysRouter(): Router {
     }
     try {
       removeGeminiKey(index);
-      res.json({ status: 'success', keys: getGeminiKeys() });
+      return res.json({ status: 'success', keys: getGeminiKeys() });
     } catch (e: any) {
-      res.status(400).json({ status: 'error', error: e.message });
+      return res.status(400).json({ status: 'error', error: e.message });
     }
   });
 
@@ -61,9 +61,9 @@ export function createGeminiKeysRouter(): Router {
     }
     try {
       const enabled = toggleGeminiKey(index);
-      res.json({ status: 'success', enabled, keys: getGeminiKeys() });
+      return res.json({ status: 'success', enabled, keys: getGeminiKeys() });
     } catch (e: any) {
-      res.status(400).json({ status: 'error', error: e.message });
+      return res.status(400).json({ status: 'error', error: e.message });
     }
   });
 
@@ -79,9 +79,9 @@ export function createGeminiKeysRouter(): Router {
     }
     try {
       updateGeminiKeyLabel(index, label.trim());
-      res.json({ status: 'success', keys: getGeminiKeys() });
+      return res.json({ status: 'success', keys: getGeminiKeys() });
     } catch (e: any) {
-      res.status(400).json({ status: 'error', error: e.message });
+      return res.status(400).json({ status: 'error', error: e.message });
     }
   });
 

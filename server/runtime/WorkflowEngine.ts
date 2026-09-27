@@ -55,7 +55,6 @@ export interface WorkflowEngineConfig {
 export class WorkflowEngine {
   private tools: ToolRegistry;
   private eventBus?: EventBus;
-  private defaultStepTimeoutMs: number;
 
   // Workflows enregistrés
   private workflows = new Map<string, WorkflowDefinition>();
@@ -65,7 +64,6 @@ export class WorkflowEngine {
   constructor(config: WorkflowEngineConfig) {
     this.tools = config.tools;
     this.eventBus = config.eventBus;
-    this.defaultStepTimeoutMs = config.defaultStepTimeoutMs ?? 120_000;
   }
 
   // ─── Gestion des workflows ─────────────────────────────────────────────────

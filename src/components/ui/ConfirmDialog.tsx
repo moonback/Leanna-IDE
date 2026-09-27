@@ -14,7 +14,7 @@
  */
 
 import React, { createContext, useCallback, useContext, useState } from 'react';
-import { AlertTriangle, Check, X } from 'lucide-react';
+import { AlertTriangle, Check } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

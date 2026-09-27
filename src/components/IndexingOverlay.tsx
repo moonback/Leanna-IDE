@@ -285,14 +285,18 @@ export function IndexingOverlay() {
                     : 'linear-gradient(90deg, var(--accent-secondary), var(--accent-primary))',
                 }}
                 initial={false}
-                animate={{
-                  width: isDone ? '100%' : pct !== null ? `${pct}%` : '35%',
-                }}
-                transition={{ duration: 0.35, ease: 'easeOut' }}
-                // Barre indéterminée (pulse) quand aucun total n'est connu.
-                {...(!isDone && pct === null && !shouldReduceMotion
-                  ? { animate: { opacity: [0.5, 1, 0.5], width: '35%' }, transition: { repeat: Infinity, duration: 1.4 } }
-                  : {})}
+                // Barre indéterminée (pulse) quand aucun total n'est connu ;
+                // sinon largeur pilotée par la progression.
+                animate={
+                  !isDone && pct === null && !shouldReduceMotion
+                    ? { opacity: [0.5, 1, 0.5], width: '35%' }
+                    : { width: isDone ? '100%' : pct !== null ? `${pct}%` : '35%' }
+                }
+                transition={
+                  !isDone && pct === null && !shouldReduceMotion
+                    ? { repeat: Infinity, duration: 1.4 }
+                    : { duration: 0.35, ease: 'easeOut' }
+                }
               />
             </div>
 

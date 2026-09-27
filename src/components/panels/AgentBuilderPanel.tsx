@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   X, Plus, Save, Trash2, Copy, Download, Upload,
   Bot, Sparkles, Wand2, ChevronRight, ChevronDown,
-  Palette, Brain, Wrench, Zap, Settings2, Eye,
-  Play, RotateCcw, Pencil, Check, AlertTriangle,
+  Palette, Brain, Wrench, Zap, Settings2,
+  RotateCcw, Check, AlertTriangle,
 } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip.js';
 import {
@@ -86,7 +86,7 @@ interface AgentBuilderPanelProps {
   onClose: () => void;
 }
 
-export function AgentBuilderPanel({ inline, onClose }: AgentBuilderPanelProps) {
+export function AgentBuilderPanel({ onClose }: AgentBuilderPanelProps) {
   initCustomAgentStore();
 
   const agents = useSyncExternalStore(subscribe, getCustomAgents);

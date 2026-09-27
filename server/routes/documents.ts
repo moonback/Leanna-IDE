@@ -212,7 +212,7 @@ export function createDocumentsRouter(_getProfile: () => ProfileConfig): Router 
       // Récupérer les liens de DocumentStore (documents workspace)
       let storeLinks: any[] = [];
       try {
-        const { getDocumentStore } = await import('../knowledge/DocumentStore');
+        const { getDocumentStore } = await import('../knowledge/DocumentStore.js');
         const store = getDocumentStore();
         const links = docId ? store.getLinksForDocument(docId) : store.getAllLinks();
         

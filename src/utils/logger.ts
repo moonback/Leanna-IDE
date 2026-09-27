@@ -216,15 +216,13 @@ export function safeLog(message: string, level: LogLevel = 'info', ...args: unkn
 export function patchConsole(): void {
   if (!isDev) {
     // In production, override console methods to use our logger
-    const originalConsole = { ...console };
-    
     console.log = (...args: unknown[]) => {
       logger.info('console', args.join(' '));
     };
     console.info = (...args: unknown[]) => {
       logger.info('console', args.join(' '));
     };
-    console.debug = (...args: unknown[]) => {
+    console.debug = (..._args: unknown[]) => {
       // Suppress debug logs in production
     };
     // Keep warn and error as-is or redirect to logger

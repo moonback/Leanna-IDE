@@ -20,6 +20,16 @@ export { PermissionPolicy, PermissionDeniedError, ALL_PERMISSIONS } from "./Perm
 export type { PermissionMode, PermissionDecision, PermissionPolicyConfig } from "./PermissionPolicy.js";
 export { DryRunController, SIDE_EFFECT_PERMISSIONS } from "./DryRun.js";
 export type { DryRunConfig, DryRunResult, DryRunReport, SimulatedEffect } from "./DryRun.js";
+export { AuthorizationGate, createAuthorizationGate, mergeDecisions } from "./AuthorizationGate.js";
+export type {
+  AuthorizationDecision,
+  AuthorizationAxis,
+  AxisOutcome,
+  AuthorizationVerdict,
+  AuthorizationRequest,
+  AuthorizationGateConfig,
+  SandboxTargetChecker,
+} from "./AuthorizationGate.js";
 export { Memory } from "./Memory.js";
 export { HierarchicalMemoryService, hierarchicalMemoryService } from "./HierarchicalMemoryService.js";
 export type { HierarchicalTier, HierarchicalMemoryItem, HierarchicalStats, HierarchicalSearchOptions, HierarchicalStoreInput } from "./HierarchicalMemoryService.js";

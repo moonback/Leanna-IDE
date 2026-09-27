@@ -28,7 +28,12 @@ export interface PromptSection {
 
   /**
    * Scopes dans lesquels cette section doit apparaître.
-   * Si absent, la section est toujours incluse.
+   *
+   * - `undefined`  → la section est toujours incluse (sections programmatiques
+   *   comme workspace/footer qui n'ont pas de fichier .md).
+   * - `[]` (vide)  → la section n'est incluse dans AUCUN contexte (opt-in) :
+   *   c'est le cas d'un .md dont le front-matter ne déclare pas de `scope`.
+   * - liste non vide → incluse si le contexte correspond à l'un des scopes.
    */
   scope?: RuleScope[];
 

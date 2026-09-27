@@ -58,7 +58,7 @@ async function guardCriticalFile(
   operation: FileOperation,
   toolContext: any,
   reason: string | undefined,
-  content?: { proposed?: string; previous?: string; renameTo?: string }
+  _content?: { proposed?: string; previous?: string; renameTo?: string }
 ): Promise<GuardResult> {
   if (!critical) return { blocked: false };
 
@@ -128,7 +128,7 @@ export async function handleWriteProjectFile(args: any, toolContext: any) {
 
   if (!sandboxMode) {
     try {
-      const { createCheckpoint } = await import("../utils/checkpoint");
+      const { createCheckpoint } = await import("../utils/checkpoint.js");
       await createCheckpoint(`avant écriture: ${requestedPath}`);
     } catch { /* non bloquant */ }
   }
@@ -270,7 +270,7 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
   // Checkpoint automatique avant modification (seulement en mode direct)
   if (!sandboxMode) {
     try {
-      const { createCheckpoint } = await import("../utils/checkpoint");
+      const { createCheckpoint } = await import("../utils/checkpoint.js");
       await createCheckpoint(`avant modification: ${requestedPath}`);
     } catch { /* non bloquant */ }
   }
@@ -393,7 +393,7 @@ export async function handlePatchProjectFile(args: any, toolContext: any) {
   const sandboxMode_patch = isSandboxActive();
   if (!sandboxMode_patch) {
     try {
-      const { createCheckpoint } = await import("../utils/checkpoint");
+      const { createCheckpoint } = await import("../utils/checkpoint.js");
       await createCheckpoint(`avant patch: ${requestedPath}`);
     } catch { /* non bloquant */ }
   }
@@ -516,7 +516,7 @@ export async function handleApplyPatch(args: any, toolContext: any) {
   const sandboxMode = isSandboxActive();
   if (!sandboxMode) {
     try {
-      const { createCheckpoint } = await import("../utils/checkpoint");
+      const { createCheckpoint } = await import("../utils/checkpoint.js");
       await createCheckpoint(`avant apply_patch: ${requestedPath}`);
     } catch { /* non bloquant */ }
   }
@@ -568,7 +568,7 @@ export async function handleRenameProjectFile(args: any, toolContext: any) {
   // Checkpoint automatique avant renommage (seulement en mode direct)
   if (!sandboxMode_ren) {
     try {
-      const { createCheckpoint } = await import("../utils/checkpoint");
+      const { createCheckpoint } = await import("../utils/checkpoint.js");
       await createCheckpoint(`avant renommage: ${oldPath} → ${newPath}`);
     } catch { /* non bloquant */ }
   }
@@ -620,7 +620,7 @@ export async function handleDeleteProjectFile(args: any, toolContext: any) {
   // Checkpoint automatique avant suppression (seulement en mode direct)
   if (!sandboxMode_del) {
     try {
-      const { createCheckpoint } = await import("../utils/checkpoint");
+      const { createCheckpoint } = await import("../utils/checkpoint.js");
       await createCheckpoint(`avant suppression: ${requestedPath}`);
     } catch { /* non bloquant */ }
   }
@@ -677,7 +677,7 @@ export async function handleDeleteProjectFolder(args: any, toolContext: any) {
 
   // Confirmation requise si dossier non vide
   if (fileCount > 0 && toolContext?.emitToClient) {
-    const { requestConfirmation } = await import("../utils/confirmationBridge");
+    const { requestConfirmation } = await import("../utils/confirmationBridge.js");
     const approved = await requestConfirmation(
       requestedPath,
       'delete',
@@ -699,7 +699,7 @@ export async function handleDeleteProjectFolder(args: any, toolContext: any) {
   // Checkpoint automatique avant suppression (seulement en mode direct)
   if (!sandboxMode_dir) {
     try {
-      const { createCheckpoint } = await import("../utils/checkpoint");
+      const { createCheckpoint } = await import("../utils/checkpoint.js");
       await createCheckpoint(`avant suppression dossier: ${requestedPath}`);
     } catch { /* non bloquant */ }
   }

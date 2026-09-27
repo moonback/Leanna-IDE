@@ -3,7 +3,6 @@
  * Associe couleur, icône et libellé pour chaque état.
  */
 
-import React from 'react';
 import {
   CheckCircle2, AlertCircle, Loader2, Clock,
   Pause, XCircle, Wifi, WifiOff,

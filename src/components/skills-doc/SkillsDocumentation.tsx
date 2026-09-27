@@ -31,7 +31,6 @@ import {
   Wrench,
   Loader2,
   SlidersHorizontal,
-  ChevronRight,
   List,
 } from 'lucide-react';
 
@@ -160,7 +159,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
   // Filtres
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedPermission, setSelectedPermission] = useState<string>('all');
+  const [selectedPermission] = useState<string>('all');
 
   // Sélection courante
   const [selectedToolName, setSelectedToolName] = useState<string | null>(null);

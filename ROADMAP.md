@@ -13,7 +13,7 @@ Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonom
 | Version | Date | Changements majeurs |
 |---|---|---|
 | **1.3.0** | 2026-09-25 | Re-audit post-`AGENTIC_RUNTIME` et `AUTONOMY_IMPLEMENTATION`. 11 items migrés 📋/🟡 → ✅ (preuves fichier+test). Dette technique recalculée. KPI actualisés. |
-| 1.2.0 | 2026-09-04 | Refonte complète : audit du code, 5 paris, 6 phases R0→R6, registre de risques. |
+| 1.3.0 | 2026-09-04 | Refonte complète : audit du code, 5 paris, 6 phases R0→R6, registre de risques. |
 
 **Ce qui a changé depuis la 1.2.0** (récapitulatif pour les lecteurs pressés) :
 

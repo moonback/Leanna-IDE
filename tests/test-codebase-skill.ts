@@ -5,7 +5,7 @@
  * ajoutées au skill codebase.
  */
 
-import { codebaseSkill } from '../server/skills/codebase';
+import { codebaseSkill } from '../server/skills/codebase.js';
 
 async function testCodebaseSkill() {
   console.log('🧪 Test du Codebase Skill\n');

@@ -77,9 +77,9 @@ router.post("/store", async (req: Request, res: Response) => {
       ttl: typeof ttl === "number" ? ttl : undefined,
     });
 
-    res.status(201).json({ success: true, item });
+    return res.status(201).json({ success: true, item });
   } catch (e: any) {
-    res.status(500).json({ success: false, error: e.message });
+    return res.status(500).json({ success: false, error: e.message });
   }
 });
 
@@ -105,9 +105,9 @@ router.post("/promote", async (req: Request, res: Response) => {
       }
     );
 
-    res.json({ success: true, item });
+    return res.json({ success: true, item });
   } catch (e: any) {
-    res.status(500).json({ success: false, error: e.message });
+    return res.status(500).json({ success: false, error: e.message });
   }
 });
 
@@ -120,9 +120,9 @@ router.delete("/:tier/clear", async (req: Request, res: Response) => {
     }
 
     const cleared = await hierarchicalMemoryService.clear(tier);
-    res.json({ success: cleared });
+    return res.json({ success: cleared });
   } catch (e: any) {
-    res.status(500).json({ success: false, error: e.message });
+    return res.status(500).json({ success: false, error: e.message });
   }
 });
 
@@ -137,9 +137,9 @@ router.delete("/:tier/:id", async (req: Request, res: Response) => {
     }
 
     const deleted = await hierarchicalMemoryService.delete(tier, id);
-    res.json({ success: deleted });
+    return res.json({ success: deleted });
   } catch (e: any) {
-    res.status(500).json({ success: false, error: e.message });
+    return res.status(500).json({ success: false, error: e.message });
   }
 });
 

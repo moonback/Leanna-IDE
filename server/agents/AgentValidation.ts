@@ -24,7 +24,10 @@ export class AgentValidation {
     const typecheckErrors = Number(result?.typecheck?.errorCount ?? result?.typecheck?.errors?.length ?? result?.parsedErrors?.length ?? 0);
     const lintErrors = Number(result?.lint?.summary?.errors ?? result?.lint?.violations?.filter((issue: any) => issue.severity === "error").length ?? 0);
     const securityErrors = Number(result?.security?.summary?.critical ?? 0) + Number(result?.security?.summary?.high ?? 0);
-    const testsFailed = Number(result?.tests?.failed ?? result?.test?.ok === false ? 1 : 0);
+    const testsFailed = Number(
+      result?.tests?.failed ??
+      (result?.test?.ok === false ? 1 : 0)
+    );
     return { typecheckErrors, lintErrors, securityErrors, testsFailed, raw: result };
   }
 

@@ -198,14 +198,6 @@ export class AgentRegistry {
   }
 
   /**
-   * Retourne l'agent le moins chargé pour un rôle donné.
-   * Utile pour le load balancing si plusieurs instances existaient.
-   */
-  getLeastLoadedAgent(role: AgentRole): AutonomousAgent {
-    return this.getAgent(role); // Extension future: plusieurs instances par rôle
-  }
-
-  /**
    * Vérifie si un agent est disponible.
    */
   isAgentAvailable(role: AgentRole): boolean {

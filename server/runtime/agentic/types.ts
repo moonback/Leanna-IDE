@@ -338,6 +338,8 @@ export interface AgentResult {
   verifications: Verification[];
   /** Récupérations tentées. */
   recoveries: Recovery[];
+  /** Fichiers distincts réellement LUS pendant la mission (preuve observable). */
+  filesRead: string[];
   /** Fichiers créés / modifiés / supprimés (preuve observable). */
   filesModified: string[];
   /** Tous les outils réellement exécutés. */

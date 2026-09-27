@@ -104,9 +104,9 @@ router.post('/rollback', async (req: Request, res: Response) => {
     const { hash } = req.body as { hash?: string };
     if (!hash) return res.status(400).json({ error: 'hash est requis.' });
     const ok = await rollbackToCheckpoint(hash);
-    res.json({ success: ok });
+    return res.json({ success: ok });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -131,7 +131,7 @@ router.get('/ignore', (_req: Request, res: Response) => {
       content = fs.readFileSync(ignorePath, 'utf-8');
     }
     const rules = parseIgnoreContent(content);
-    res.json({
+    return res.json({
       exists: fs.existsSync(ignorePath),
       filename: LEANNAIGNORE_FILENAME,
       content,
@@ -139,7 +139,7 @@ router.get('/ignore', (_req: Request, res: Response) => {
       rules: rules.map((r) => ({ pattern: r.pattern, negated: r.negated })),
     });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -182,13 +182,13 @@ router.post('/ignore', (req: Request, res: Response) => {
     }
 
     const rules = parseIgnoreContent(normalized);
-    res.json({
+    return res.json({
       status: 'success',
       mirroredToSandbox,
       rules: rules.map((r) => ({ pattern: r.pattern, negated: r.negated })),
     });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 

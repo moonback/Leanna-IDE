@@ -16,5 +16,6 @@ export const timeSkill: Skill = {
            date: new Date().toLocaleDateString('fr-FR')
         };
     }
+    return undefined;
   }
 };

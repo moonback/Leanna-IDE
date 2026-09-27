@@ -21,10 +21,10 @@ export function createExportRouter(): Router {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
       res.setHeader('Content-Length', pdfBuffer.length);
-      res.send(pdfBuffer);
+      return res.send(pdfBuffer);
     } catch (e: any) {
       console.error('[Export] Erreur export PDF:', e);
-      res.status(500).json({ error: e.message || 'Erreur lors de la génération du PDF.' });
+      return res.status(500).json({ error: e.message || 'Erreur lors de la génération du PDF.' });
     }
   });
 
@@ -42,10 +42,10 @@ export function createExportRouter(): Router {
       res.setHeader('Content-Type', 'application/msword');
       res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
       res.setHeader('Content-Length', docxBuffer.length);
-      res.send(docxBuffer);
+      return res.send(docxBuffer);
     } catch (e: any) {
       console.error('[Export] Erreur export DOCX:', e);
-      res.status(500).json({ error: e.message || 'Erreur lors de la génération du DOCX.' });
+      return res.status(500).json({ error: e.message || 'Erreur lors de la génération du DOCX.' });
     }
   });
 
@@ -62,10 +62,10 @@ export function createExportRouter(): Router {
 
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
-      res.send(html);
+      return res.send(html);
     } catch (e: any) {
       console.error('[Export] Erreur export HTML:', e);
-      res.status(500).json({ error: e.message || 'Erreur lors de la génération du HTML.' });
+      return res.status(500).json({ error: e.message || 'Erreur lors de la génération du HTML.' });
     }
   });
 
@@ -125,10 +125,10 @@ export function createExportRouter(): Router {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeTitle)}.pdf"`);
       res.setHeader('Content-Length', pdfBuffer.length);
-      res.send(pdfBuffer);
+      return res.send(pdfBuffer);
     } catch (e: any) {
       console.error('[Export] Erreur export notebook:', e);
-      res.status(500).json({ error: e.message || 'Erreur lors de l\'export du notebook.' });
+      return res.status(500).json({ error: e.message || 'Erreur lors de l\'export du notebook.' });
     }
   });
 

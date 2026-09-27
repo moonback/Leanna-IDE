@@ -4,7 +4,7 @@
  * L'orchestrateur, le TaskScheduler et les agents autonomes manipulent des
  * `AgentTask` et lisent `task.status` / `task.result` in-place après
  * `execute(task)`. Cet adaptateur expose EXACTEMENT cette surface, mais délègue
- * l'exécution au vrai runtime agentique (`server/runtime/agentic/AgentRuntime`),
+ * l'exécution au vrai runtime agentique (`server/runtime/agentic/AgenticRuntime`),
  * qui donne réellement ses outils à l'agent et boucle
  * analyse → plan → écriture → vérification → correction → re-vérification.
  *
@@ -12,7 +12,7 @@
  * les appelants : ceux-ci continuent d'appeler `execute(task)`.
  */
 
-import type { AgentRuntime as AgenticRuntime } from "../runtime/agentic/AgentRuntime.js";
+import type { AgenticRuntime } from "../runtime/agentic/AgenticRuntime.js";
 import type { AgentResult, AgentTask as AgenticTask, AgentBudget } from "../runtime/agentic/types.js";
 import { getAgentDefinitionOrThrow, hasAgent } from "./roles.js";
 import type { AgentTask, TaskResult, TaskOutcome } from "./types.js";
@@ -169,7 +169,7 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
       error: result.error,
       durationMs: result.durationMs,
       evidence: {
-        filesRead: [], // détail non exposé par le résultat agentique agrégé
+        filesRead: result.filesRead, // remonté depuis le runtime (session.readFilesSeen)
         filesModified: result.filesModified,
         toolsExecuted: result.toolsExecuted,
         commandsExecuted: result.toolsExecuted.filter((t) => t === "run_project_command"),

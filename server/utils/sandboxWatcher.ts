@@ -88,7 +88,7 @@ export function startWatching(): void {
   }
 
   try {
-    watcher = fs.watch(sandboxRoot, { recursive: true }, (eventType, filename) => {
+    watcher = fs.watch(sandboxRoot, { recursive: true }, (_eventType, filename) => {
       if (!filename) return;
 
       const relativePath = filename.replace(/\\/g, "/");

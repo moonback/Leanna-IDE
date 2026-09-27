@@ -28,7 +28,6 @@ import { WorkspaceState, type VerificationRecord, type VerificationIssue } from 
 import { AgentRepairLoop } from "./AgentRepairLoop.js";
 import { telemetryService } from "../observability/TelemetryService.js";
 import { setTelemetryContext, clearTelemetryContext } from "../utils/textGeneration.js";
-// import { promptCache } from "../utils/promptCache.js"; // Prêt pour intégration future
 
 const log = createLogger("AgentExecutor");
 
@@ -141,7 +140,15 @@ export class AgentExecutor implements AgentTaskRunner {
    * coopérative : les points de contrôle vérifient `signal.aborted`.
    */
   private abortControllers: Map<string, AbortController> = new Map();
-  
+
+  /**
+   * Associe chaque `AbortSignal` de tâche à son taskId. Permet à
+   * `callToolWithTimeout` (qui ne reçoit que le signal) de retrouver le taskId
+   * pour enrichir les `CancellationError`, sans avoir à propager le taskId à
+   * chaque appelant. WeakMap : l'entrée disparaît avec le contrôleur.
+   */
+  private signalTaskIds: WeakMap<AbortSignal, string> = new WeakMap();
+
   /**
    * Timeouts par outil (ms) - optimisé pour éviter les timeouts prématurés
    * Les outils LLM et d'analyse nécessitent plus de temps
@@ -204,8 +211,9 @@ export class AgentExecutor implements AgentTaskRunner {
   ): Promise<any> {
     // Kill-switch temps-réel : si la tâche est déjà annulée, ne pas lancer
     // l'outil du tout.
+    const signalTaskId = signal ? this.signalTaskIds.get(signal) ?? "" : "";
     if (signal?.aborted) {
-      throw new CancellationError("");
+      throw new CancellationError(signalTaskId);
     }
 
     const timeoutMs = AgentExecutor.TOOL_TIMEOUTS[toolName] ?? 
@@ -243,7 +251,7 @@ export class AgentExecutor implements AgentTaskRunner {
       // boucle d'exécution la traite comme un arrêt volontaire (statut
       // "cancelled"), et non comme un échec d'outil.
       if (error instanceof ToolAbortedSignal || signal?.aborted) {
-        throw new CancellationError("");
+        throw new CancellationError(signalTaskId);
       }
       // Si l'erreur vient du timeout, ajouter des infos contextuelles
       if ((error as Error).message.includes('timeout')) {
@@ -381,7 +389,9 @@ export class AgentExecutor implements AgentTaskRunner {
     };
 
     // Enregistrer le contrôleur d'annulation pour cette exécution
-    this.abortControllers.set(task.id, new AbortController());
+    const abortController = new AbortController();
+    this.abortControllers.set(task.id, abortController);
+    this.signalTaskIds.set(abortController.signal, task.id);
 
     // Mettre à jour le statut
     task.status = "running";

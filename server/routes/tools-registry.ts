@@ -101,7 +101,7 @@ export function createToolsRegistryRouter(
 
       const duplicates: string[] = [];
       const seen = new Set<string>();
-      const checkDuplicates = (toolList: string[], source: string) => {
+      const checkDuplicates = (toolList: string[], _source: string) => {
         for (const tool of toolList) {
           if (seen.has(tool)) {
             if (!duplicates.includes(tool)) {

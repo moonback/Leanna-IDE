@@ -1,4 +1,3 @@
-import React from 'react';
 import { BookOpen } from 'lucide-react';
 import { Section } from './SettingsPrimitives.js';
 import { SkillsDocumentation } from '../skills-doc/SkillsDocumentation.js';

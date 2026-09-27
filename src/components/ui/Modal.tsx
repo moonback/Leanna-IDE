@@ -29,7 +29,7 @@
  *     aria-describedby
  */
 
-import React, {
+import {
   createContext,
   useContext,
   useId,
@@ -37,7 +37,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, type HTMLMotionProps } from 'motion/react';
 import { X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useOverlay } from '../../hooks/useOverlay.js';
@@ -135,7 +135,9 @@ const LAYER_Z: Record<ModalLayer, string> = {
 // ─── Portail cible ──────────────────────────────────────────────────────────────
 
 function getPortalTarget(): HTMLElement {
-  if (typeof document === 'undefined') return document.body;
+  // Garde SSR : `document` peut être absent hors navigateur. Le type global le
+  // déclare toujours présent, d'où le cast pour vérifier réellement à l'exécution.
+  if (typeof document === 'undefined') return null as unknown as HTMLElement;
   return document.getElementById('modal-root') ?? document.body;
 }
 
@@ -194,7 +196,7 @@ function ModalRoot({
               backdropFilter: 'blur(2px)',
               WebkitBackdropFilter: 'blur(2px)',
             }}
-            {...(backdropProps as React.HTMLAttributes<HTMLDivElement>)}
+            {...(backdropProps as unknown as HTMLMotionProps<'div'>)}
           >
             {/* Boîte */}
             <motion.div
@@ -412,8 +414,4 @@ export const Modal = Object.assign(ModalRoot, {
   Footer: ModalFooter,
 });
 
-export type {
-  ModalHeaderProps,
-  ModalBodyProps,
-  ModalFooterProps,
-};
+

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { WebSocketServer, WebSocket, RawData } from "ws";
-import { spawn, ChildProcessWithoutNullStreams, spawn as childProcessSpawn } from "child_process";
+import { ChildProcessWithoutNullStreams, spawn as childProcessSpawn } from "child_process";
 import * as os from "os";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 import { authenticateRequest, authenticateToken } from "../security.js";
@@ -136,7 +136,7 @@ export function setupTerminalWebSocket(wss: WebSocketServer, apiToken: string | 
         // Le format attendu est "token, <actual-token-value>"
         const protocols = Array.isArray(protocolHeader) ? protocolHeader : [protocolHeader];
         for (const protocol of protocols) {
-          const parts = protocol.split(',').map(p => p.trim());
+          const parts = protocol.split(',').map((p: string) => p.trim());
           const tokenIdx = parts.indexOf('token');
           if (tokenIdx >= 0 && parts[tokenIdx + 1]) {
             token = parts[tokenIdx + 1];
@@ -159,8 +159,6 @@ export function setupTerminalWebSocket(wss: WebSocketServer, apiToken: string | 
     }
 
     let process: ChildProcessWithoutNullStreams | null = null;
-    let currentCols = 80;
-    let currentRows = 24;
     let welcomeSent = false;
 
     // Créer un nouveau processus terminal
@@ -230,8 +228,6 @@ export function setupTerminalWebSocket(wss: WebSocketServer, apiToken: string | 
           case 'resize':
             // Mettre à jour la taille du terminal
             if (message.data && message.data.cols && message.data.rows) {
-              currentCols = message.data.cols;
-              currentRows = message.data.rows;
               // Note: Sur la plupart des systèmes, on ne peut pas vraiment redimensionner un PTY
               // sans utiliser des appels système spécifiques (ioctl TIOCSWINSZ)
               // Pour l'instant, on stocke juste la taille pour référence

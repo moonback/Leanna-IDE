@@ -369,7 +369,7 @@ CREATE TABLE IF NOT EXISTS agent_tasks (
   title               TEXT NOT NULL,
   description         TEXT NOT NULL,
   priority            TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low','medium','high','critical')),
-  status              TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','completed','failed','cancelled')),
+  status              TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','completed','incomplete','failed','cancelled')),
   context_files       TEXT[]   NOT NULL DEFAULT '{}',
   context_instructions TEXT,
   context_metadata    JSONB,
@@ -384,6 +384,14 @@ CREATE TABLE IF NOT EXISTS agent_tasks (
 -- CHECK (role IN (...)) qui rejetait 'researcher', 'debugger', 'tester', etc.
 ALTER TABLE agent_tasks DROP CONSTRAINT IF EXISTS agent_tasks_role_check;
 
+-- Migration idempotente pour les bases déjà créées avec l'ancienne contrainte
+-- de statut qui ne connaissait pas 'incomplete' (TaskScheduler pose ce statut
+-- sur les orchestrations/tâches partiellement échouées). Sans ce correctif, la
+-- persistance échouait silencieusement et l'état 'incomplete' n'était jamais sauvegardé.
+ALTER TABLE agent_tasks DROP CONSTRAINT IF EXISTS agent_tasks_status_check;
+ALTER TABLE agent_tasks ADD CONSTRAINT agent_tasks_status_check
+  CHECK (status IN ('pending','running','completed','incomplete','failed','cancelled'));
+
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_status       ON agent_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_role         ON agent_tasks(role);
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_created_at   ON agent_tasks(created_at DESC);
@@ -394,11 +402,17 @@ CREATE TABLE IF NOT EXISTS agent_orchestrations (
   id           UUID PRIMARY KEY,
   title        TEXT NOT NULL,
   description  TEXT NOT NULL,
-  status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','completed','failed','cancelled')),
+  status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','completed','incomplete','failed','cancelled')),
   dependencies JSONB NOT NULL DEFAULT '{}',
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ
 );
+
+-- Migration idempotente : ajoute 'incomplete' à la contrainte de statut pour
+-- les bases existantes (orchestrations partiellement échouées via TaskScheduler).
+ALTER TABLE agent_orchestrations DROP CONSTRAINT IF EXISTS agent_orchestrations_status_check;
+ALTER TABLE agent_orchestrations ADD CONSTRAINT agent_orchestrations_status_check
+  CHECK (status IN ('pending','running','completed','incomplete','failed','cancelled'));
 
 CREATE INDEX IF NOT EXISTS idx_agent_orchestrations_status     ON agent_orchestrations(status);
 CREATE INDEX IF NOT EXISTS idx_agent_orchestrations_created_at ON agent_orchestrations(created_at DESC);

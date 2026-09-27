@@ -12,7 +12,7 @@
  * icône (respecte prefers-reduced-motion).
  */
 
-import { Power, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Power, AlertTriangle } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { Modal } from '../ui/Modal.js';
 import { Button } from '../ui/Button.js';

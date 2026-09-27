@@ -9,7 +9,6 @@
  */
 
 import path from "path";
-import fs from "fs";
 
 // ── Ré-exports canoniques ─────────────────────────────────────────────────────
 

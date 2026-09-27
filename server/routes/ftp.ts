@@ -232,6 +232,7 @@ export function createFtpRouter(): Router {
     } finally {
       finish();
     }
+    return;
   });
 
   // ── POST /api/ftp/push — SSE streaming ─────────────────────────────────────
@@ -280,6 +281,7 @@ export function createFtpRouter(): Router {
     } finally {
       finish();
     }
+    return;
   });
 
   // ── POST /api/ftp/list ──────────────────────────────────────────────────────

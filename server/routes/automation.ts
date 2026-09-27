@@ -14,7 +14,7 @@ router.post('/scheduled-tasks/:id/toggle', (req: Request, res: Response) => {
   const task = getScheduledTask(taskId);
   if (!task) return res.status(404).json({ status: 'not_found', message: `Tâche ${taskId} introuvable.` });
   const result = task.enabled ? pauseScheduledTask(taskId) : resumeScheduledTask(taskId);
-  res.json({ status: result.status, message: result.message });
+  return res.json({ status: result.status, message: result.message });
 });
 
 // POST /api/automation/scheduled-tasks/:id/run

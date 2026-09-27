@@ -13,9 +13,9 @@ async function test() {
                 outputDimensionality: 768
             }
         });
-        console.log("dim:", response.embeddings[0].values.length);
+        console.log("dim:", response.embeddings?.[0]?.values?.length);
     } catch (e) {
-        console.error("Error:", e.message);
+        console.error("Error:", (e as Error).message);
     }
 }
 test();

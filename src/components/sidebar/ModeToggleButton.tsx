@@ -81,8 +81,7 @@ export function ModeToggleButton({ mode, onToggle }: ModeToggleButtonProps) {
             exit={{ opacity: 0, x: -6, scale: 0.95 }}
             transition={{ duration: 0.1 }}
             className="absolute left-full ml-2.5 pointer-events-none whitespace-nowrap"
-            style={{ zIndex: 'var(--z-tooltip)' as any }}
-            style={{ top: '50%', transform: 'translateY(-50%)' }}
+            style={{ zIndex: 'var(--z-tooltip)' as any, top: '50%', transform: 'translateY(-50%)' }}
             role="tooltip"
           >
             <div

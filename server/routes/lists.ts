@@ -20,9 +20,9 @@ router.post('/', async (req: Request, res: Response) => {
     if (!name || typeof name !== 'string' || !name.trim()) return res.status(400).json({ status: 'error', error: 'Le nom de la liste est requis.' });
     const cleanItems = Array.isArray(items) ? items.filter(item => typeof item === 'string').map(item => item.trim()).filter(Boolean) : [];
     const list = await createList(name.trim(), cleanItems);
-    res.json({ status: 'success', list });
+    return res.json({ status: 'success', list });
   } catch (e: any) {
-    res.status(500).json({ status: 'error', error: e.message });
+    return res.status(500).json({ status: 'error', error: e.message });
   }
 });
 
@@ -32,9 +32,9 @@ router.get('/:name', async (req: Request, res: Response) => {
     const name = decodeURIComponent(req.params.name || '');
     const list = await getListByName(name);
     if (!list) return res.status(404).json({ status: 'error', error: `Liste '${name}' introuvable.` });
-    res.json({ status: 'success', list });
+    return res.json({ status: 'success', list });
   } catch (e: any) {
-    res.status(500).json({ status: 'error', error: e.message });
+    return res.status(500).json({ status: 'error', error: e.message });
   }
 });
 
@@ -45,9 +45,9 @@ router.post('/:name/items', async (req: Request, res: Response) => {
     const { item } = req.body as { item?: string };
     if (!item || typeof item !== 'string' || !item.trim()) return res.status(400).json({ status: 'error', error: 'L\u2019élément doit être une chaîne non vide.' });
     const list = await addItemToList(name, item.trim());
-    res.json({ status: 'success', list });
+    return res.json({ status: 'success', list });
   } catch (e: any) {
-    res.status(500).json({ status: 'error', error: e.message });
+    return res.status(500).json({ status: 'error', error: e.message });
   }
 });
 

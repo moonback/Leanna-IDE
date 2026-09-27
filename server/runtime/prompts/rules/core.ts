@@ -164,8 +164,36 @@ Une source de niveau inférieur ne doit jamais contredire silencieusement une so
   {
     id: "task.ask.facts-vs-deductions",
     priority: RulePriority.TASK,
-    scope: ["ask", "document"],
+    scope: ["ask", "document", "research"],
     content: `Toujours distinguer Fait (information explicitement présente dans une source fiable), Déduction (conclusion obtenue en reliant plusieurs informations) et Incertitude (information non confirmée ou ambiguë). Ne jamais présenter une déduction comme un fait explicite.`,
+    source: "chat.md",
+  },
+  {
+    id: "task.testing.structure",
+    priority: RulePriority.TASK,
+    scope: ["testing"],
+    content: `Structurer chaque test selon Arrange → Act → Assert. Chaque test doit contenir au moins une assertion explicite et cibler un comportement observable, pas un détail d'implémentation. Réutiliser le framework et les conventions de test déjà présents dans le projet ; ne pas en introduire un nouveau sans nécessité. Ne pas ajouter de tests si l'utilisateur ne l'a pas demandé.`,
+    source: "chat.md",
+  },
+  {
+    id: "task.refactoring.behavior-preservation",
+    priority: RulePriority.TASK,
+    scope: ["refactoring"],
+    content: `Un refactoring préserve le comportement observable : aucune modification fonctionnelle non demandée. Procéder par étapes réversibles, un fichier à la fois (jamais en bloc), et vérifier après chaque étape. Analyser l'impact (\`knowledge_impact_analyze\` / \`graphify_affected\`) avant de toucher un symbole partagé.`,
+    source: "base.md",
+  },
+  {
+    id: "task.architecture.evidence-based",
+    priority: RulePriority.TASK,
+    scope: ["architecture"],
+    content: `Toute réponse ou décision d'architecture doit s'appuyer sur le graphe relationnel et les fichiers réels (\`graphify_read_report\`, \`graphify_god_nodes\`, \`graphify_query\`), jamais sur une supposition de structure. Citer les modules, fichiers et relations concernés. Signaler explicitement les impacts transverses et les risques de régression avant de proposer un changement structurel.`,
+    source: "base.md",
+  },
+  {
+    id: "task.research.source-discipline",
+    priority: RulePriority.TASK,
+    scope: ["research"],
+    content: `Pour une tâche de recherche : privilégier les sources primaires et la documentation officielle, croiser au moins deux sources quand c'est possible, et citer chaque source utilisée. Distinguer clairement l'information sourcée de l'inférence du modèle. Signaler quand une information n'a pas pu être confirmée.`,
     source: "chat.md",
   },
 ];

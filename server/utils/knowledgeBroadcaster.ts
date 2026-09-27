@@ -24,6 +24,8 @@ export function broadcastKnowledgeProgress(
     cached?: boolean;
     totalEntities?: number;
     durationMs?: number;
+    documents?: number;
+    linksDetected?: number;
   },
 ): void {
   if (!_broadcast) return;

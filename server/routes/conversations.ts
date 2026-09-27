@@ -22,9 +22,9 @@ router.get('/search', async (req: Request, res: Response) => {
     if (!query) return res.status(400).json({ status: 'error', error: "Le paramètre 'q' est requis." });
     const limit = Math.min(Number(req.query.limit) || 20, 50);
     const results = await searchHistory(query, limit);
-    res.json({ status: 'success', results });
+    return res.json({ status: 'success', results });
   } catch (e: any) {
-    res.status(500).json({ status: 'error', error: e.message });
+    return res.status(500).json({ status: 'error', error: e.message });
   }
 });
 
@@ -46,9 +46,9 @@ router.patch('/:id', async (req: Request, res: Response) => {
     const { title } = req.body as { title?: string };
     if (!title || !title.trim()) return res.status(400).json({ status: 'error', error: 'Le titre est requis.' });
     await updateConversationTitle(req.params.id, title.trim());
-    res.json({ status: 'success' });
+    return res.json({ status: 'success' });
   } catch (e: any) {
-    res.status(500).json({ status: 'error', error: e.message });
+    return res.status(500).json({ status: 'error', error: e.message });
   }
 });
 

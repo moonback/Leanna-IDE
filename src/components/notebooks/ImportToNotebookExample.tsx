@@ -5,8 +5,7 @@
  * pour importer dans un notebook avec création automatique.
  */
 
-import React from 'react';
-import { ImportToNotebookButton, importToNotebookAction } from './ImportToNotebookButton.js';
+import { ImportToNotebookButton } from './ImportToNotebookButton.js';
 import { useNotebookId } from '../../hooks/index.js';
 
 // Exemple 1: Bouton simple avec création automatique
@@ -18,7 +17,7 @@ function SimpleImportButtonExample() {
         Bouton qui ouvre un sélecteur de fichier et crée automatiquement un notebook si nécessaire.
       </p>
       <ImportToNotebookButton 
-        onImported={(notebookId, filePath) => {
+        onImported={(notebookId, _filePath) => {
           console.log(`Fichier importé dans le notebook ${notebookId}`);
         }}
         autoCreate={true}
@@ -83,28 +82,6 @@ function DropZoneExample() {
       />
     </div>
   );
-}
-
-// Exemple 5: Utilisation de la fonction importToNotebookAction
-async function programmaticImportExample(filePath: string, fileName: string) {
-  try {
-    const notebookId = await importToNotebookAction({
-      filePath,
-      fileName,
-      autoCreate: true,
-      onComplete: (id) => {
-        console.log(`Import terminé dans le notebook: ${id}`);
-      }
-    });
-    
-    if (notebookId) {
-      console.log(`Fichier importé avec succès dans: ${notebookId}`);
-    } else {
-      console.log(`L'import a échoué`);
-    }
-  } catch (error) {
-    console.error('Erreur lors de l\'import:', error);
-  }
 }
 
 // Composant principal d'exemple

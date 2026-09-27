@@ -104,24 +104,6 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
     loadGeneratedDocs();
   }, [loadGeneratedDocs]);
 
-  // Fonction utilitaire pour obtenir le label d'un type de document
-  const getDocTypeLabel = useCallback((typeKey: string) => {
-    const docType = DOC_TYPES.find(t => t.key === typeKey) || REPORT_TYPES.find(t => t.key === typeKey);
-    return docType?.label || typeKey;
-  }, []);
-
-  // Fonction utilitaire pour obtenir la couleur d'un type de document
-  const getDocTypeColor = useCallback((typeKey: string) => {
-    const docType = DOC_TYPES.find(t => t.key === typeKey) || REPORT_TYPES.find(t => t.key === typeKey);
-    return docType?.color || 'var(--text-muted)';
-  }, []);
-
-  // Fonction utilitaire pour obtenir l'icône d'un type de document
-  const getDocTypeIcon = useCallback((typeKey: string) => {
-    const docType = DOC_TYPES.find(t => t.key === typeKey) || REPORT_TYPES.find(t => t.key === typeKey);
-    return docType?.icon || Sparkles;
-  }, []);
-
   // Supprimer un document
   const handleDelete = useCallback(async (docId: string) => {
     try {

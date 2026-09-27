@@ -241,8 +241,6 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
     return filtered;
   }, [notes, searchQuery, sortOrder]);
 
-  const pinnedCount = notes.filter(n => n.pinned).length;
-
   // ─── Backlinks detection ──────────────────────────────────────────────────
 
   const backlinks = useMemo(() => {

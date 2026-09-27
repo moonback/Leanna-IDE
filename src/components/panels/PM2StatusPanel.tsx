@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Server, Cpu, MemoryStick, Clock, RefreshCw, Loader2, AlertCircle,
   Play, Square, Repeat, Trash2, FileText, ChevronDown, ChevronRight,
-  HardDrive, Power, Boxes, CheckCircle2, XCircle,
+  HardDrive, Power, Boxes,
 } from 'lucide-react';
 import { pm2Api, type Pm2AppStatus, type Pm2StatusResponse } from '../../services/pm2Api.js';
 

@@ -68,6 +68,7 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>(
       });
       return () => cancelAnimationFrame(id);
     }
+    return undefined;
   }, [enabled, autoFocus]);
 
   // Restituer le focus à la fermeture
@@ -79,6 +80,7 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>(
       const id = setTimeout(() => target.focus(), 10);
       return () => clearTimeout(id);
     }
+    return undefined;
   }, [enabled, returnFocusTo]);
 
   // Intercepter Tab / Shift+Tab pour garder le focus dans le conteneur

@@ -322,7 +322,7 @@ export class SkillManagerV2 {
   public async loadCustomSkills(): Promise<void> {
     try {
       const { getCustomSkillDeclarations, handleCustomSkillCall, customSkillsManagementSkill } =
-        await import('../../skills/customSkills');
+        await import('../../skills/customSkills.js');
 
       // Enregistrer le skill de gestion CRUD comme une skill classique
       const managementSkill = customSkillsManagementSkill as unknown as Skill;
@@ -360,7 +360,7 @@ export class SkillManagerV2 {
     this.customSkillsReloadTimer = setInterval(() => {
       if (this.customSkillsReloadInFlight) return;
       this.customSkillsReloadInFlight = true;
-      import('../../skills/customSkills')
+      import('../../skills/customSkills.js')
         .then(({ invalidateCustomSkillsCache }) => {
           invalidateCustomSkillsCache();
           return this.loadCustomSkills();
@@ -392,7 +392,6 @@ export class SkillManagerV2 {
   public async discoverAndLoad(category: string): Promise<{ loaded: string[]; tools: string[] }> {
     // Toutes les skills sont déjà chargées via bootstrapRuntime
     // Retourner les outils de la catégorie demandée
-    const allDeclarations = this.getToolDeclarations();
     const categoryDeclarations = this.getToolDeclarations([category]);
     
     const loaded = categoryDeclarations.length > 0 ? [category] : [];

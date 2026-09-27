@@ -1,16 +1,13 @@
-# Leanna — AI Operating System
+# Leanna — Système d'Exploitation Agentique pour l'Ingénierie Logicielle
 
-<img src="assets/images/Architecture_d_un_système_agentique_IA.png" alt="Leanna-OS" />
+<!-- <img src="assets/images/Architecture_d_un_système_agentique_IA.png" alt="Leanna-OS" /> -->
 
 
-> **Leanna est un IDE augmenté par IA qui réunit un éditeur de code, un terminal, des agents outillés, une mémoire de projet et des mécanismes de contrôle des effets de bord.**
+> **Leanna est un IDE augmenté par IA qui unifie un éditeur de code, un terminal, une flotte d'agents autonomes, un runtime agentique déterministe, une mémoire de projet persistante et des mécanismes de contrôle rigoureux des effets de bord.**
 
 
 Leanna est une application TypeScript composée d’un frontend React/Vite, d’un serveur Express avec API REST et WebSockets, ainsi que d’une application desktop Electron. Elle permet d’explorer et de modifier le workspace du projet, d’exécuter des outils spécialisés, de déléguer des tâches à des agents et de suivre les opérations depuis une interface unique.
 
-Le dépôt contient également un runtime autonome événementiel, un système de missions, un Knowledge Graph, des notebooks RAG, des workflows planifiés, une intégration Gemini/OpenRouter, un bot Telegram optionnel et plusieurs couches de sécurité.
-
-> **État du produit.** Les briques principales sont présentes et testées, mais toutes les capacités annoncées par la vision du projet ne sont pas au même niveau de maturité. Le README distingue donc les fonctions effectivement implémentées des fonctions optionnelles ou encore en évolution.
 
 ![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-339933?logo=node.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111)

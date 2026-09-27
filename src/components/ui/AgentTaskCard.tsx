@@ -4,11 +4,10 @@
  * la durée et les actions disponibles.
  */
 
-import React from 'react';
 import { motion } from 'motion/react';
 import {
   CheckCircle2, Loader2, AlertCircle, Clock,
-  FileText, X, Play, RotateCcw, Eye,
+  FileText, X, RotateCcw, Eye,
 } from 'lucide-react';
 import { StatusBadge, type StatusType } from './StatusBadge.js';
 
@@ -105,7 +104,7 @@ export function AgentTaskCard({
       {/* Steps timeline */}
       {steps.length > 0 && (
         <div className="px-4 py-2 space-y-1">
-          {steps.map((step, i) => (
+          {steps.map((step, _i) => (
             <div key={step.id} className="flex items-center gap-2">
               {step.status === 'running' && <Loader2 size={10} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />}
               {step.status === 'done' && <CheckCircle2 size={10} style={{ color: 'var(--color-success)' }} />}

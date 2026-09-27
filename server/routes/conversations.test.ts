@@ -5,9 +5,6 @@ import type { Server } from 'http';
 import conversationsRouter from './conversations.js';
 
 // Mock des fonctions de history
-let mockConversations: any[] = [];
-let mockMessages: any[] = [];
-let mockSearchResults: any[] = [];
 
 async function closeServer(server: Server): Promise<void> {
   await new Promise<void>((resolve) => {

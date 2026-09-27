@@ -12,7 +12,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Mic, Play, Loader2, Clock, Users, Radio, Pause, Square,
+  Mic, Play, Loader2, Clock, Users, Radio, Square,
   Trash2, RefreshCw, Volume2, Settings2, FileText, CheckSquare
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
@@ -43,7 +43,7 @@ interface Props {
 
 type Tone = 'casual' | 'academic' | 'humorous' | 'professional';
 
-export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, fullView = false, onClose, onViewDoc }: Props) {
+export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, fullView = false, onViewDoc }: Props) {
   const { success, error: toastError } = useToast();
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -65,7 +65,6 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const abortControllerRef = useRef<AbortController | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const audioQueueRef = useRef<{ audio: string; index: number }[]>([]);
   const playingRef = useRef(false);
   const nextStartTimeRef = useRef(0);
 

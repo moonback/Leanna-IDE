@@ -8,7 +8,7 @@ export function createTokensOptimizationRouter(getProfile: () => ProfileConfig, 
   // GET /api/tokens/optimization
   router.get('/optimization', async (_req: Request, res: Response) => {
     try {
-      const { estimateTokens, getBudgetForModel } = await import('../utils/tokenOptimizer');
+      const { estimateTokens, getBudgetForModel } = await import('../utils/tokenOptimizer.js');
       const profile = getProfile();
       const systemText = buildSystemInstruction({
         ...profile,

@@ -14,7 +14,7 @@
 import { Skill, validateArgs } from "./base.js";
 import { z } from "zod";
 import { getDocumentStore } from "../knowledge/DocumentStore.js";
-import type { StoredDocument, DocumentLink } from "../knowledge/DocumentStore.js";
+import type { StoredDocument } from "../knowledge/DocumentStore.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Skill Declaration
@@ -355,7 +355,7 @@ export const documentLinkerSkill: Skill = {
 
       // Construire le contexte multi-documents
       const crossContext = store.buildCrossDocumentContext(docIds, 6000);
-      const docs = docIds.map((id) => store.getDocument(id)).filter(Boolean) as StoredDocument[];
+      const docs = docIds.map((id: string) => store.getDocument(id)).filter(Boolean) as StoredDocument[];
 
       // Construire le prompt d'analyse
       const focusInstruction = validated.focus
@@ -446,7 +446,7 @@ export const documentLinkerSkill: Skill = {
         return { error: "Aucun document disponible pour la synthèse." };
       }
 
-      const docs = docIds.map((id) => store.getDocument(id)).filter(Boolean) as StoredDocument[];
+      const docs = docIds.map((id: string) => store.getDocument(id)).filter(Boolean) as StoredDocument[];
       const crossContext = store.buildCrossDocumentContext(docIds, 8000);
 
       const formatInstruction: Record<string, string> = {
@@ -615,7 +615,7 @@ async function callLLMForAnalysis(prompt: string, context?: any): Promise<string
     return data.choices?.[0]?.message?.content || "";
   } else {
     // Gemini
-    const { withGeminiRetry } = await import("../utils/geminiKeyPool");
+    const { withGeminiRetry } = await import("../utils/geminiKeyPool.js");
     const response = await withGeminiRetry((ai) =>
       ai.models.generateContent({
         model: "gemini-2.5-flash",
@@ -631,7 +631,7 @@ async function callLLMForAnalysis(prompt: string, context?: any): Promise<string
  */
 function parseLLMLinksResponse(
   response: string,
-  docs: StoredDocument[]
+  _docs: StoredDocument[]
 ): { links: any[]; synthesis: string } {
   try {
     // Chercher un bloc JSON dans la réponse

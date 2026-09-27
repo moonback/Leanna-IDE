@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Layers, Database, Clock, HardDrive, Cloud, ArrowUpRight,
   Search, Plus, Trash2, RefreshCw, Tag, CheckCircle2,
-  AlertCircle, Sparkles, Filter, X
+  AlertCircle, Sparkles, X
 } from 'lucide-react';
-import { Section, Field } from './SettingsPrimitives.js';
+import { Section } from './SettingsPrimitives.js';
 
 export type HierarchicalTier = 'session' | 'project' | 'longterm';
 
@@ -68,7 +68,7 @@ export function HierarchicalMemorySection() {
   const [addContent, setAddContent] = useState('');
   const [addCategory, setAddCategory] = useState('convention');
   const [addTags, setAddTags] = useState('');
-  const [addConfidence, setAddConfidence] = useState(0.85);
+  const [addConfidence] = useState(0.85);
   const [submitting, setSubmitting] = useState(false);
 
   const isLongtermConnected = stats?.longterm.status === 'connected' || stats?.longterm.status === 'empty' || (stats?.longterm.count ?? 0) > 0;

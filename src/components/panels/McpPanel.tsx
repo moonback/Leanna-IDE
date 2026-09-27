@@ -147,6 +147,7 @@ export function McpPanel() {
       const interval = setInterval(fetchMetrics, 15_000);
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [activeTab, fetchMetrics]);
 
   // Computed: total tools count

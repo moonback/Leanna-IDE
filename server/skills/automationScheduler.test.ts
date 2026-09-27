@@ -12,8 +12,6 @@ import {
 } from "./automationScheduler.js";
 
 describe("automationScheduler", () => {
-  let taskCounter = 0;
-
   beforeEach(() => {
     // Reset any scheduled tasks before each test
     stopAllScheduledTasks();
@@ -144,7 +142,7 @@ describe("automationScheduler", () => {
 
   describe("setSchedulerSkillHandler", () => {
     it("should accept a handler function", () => {
-      const handler = async (name: string, args: any) => {
+      const handler = async (_name: string, _args: any) => {
         return { status: "success" };
       };
 

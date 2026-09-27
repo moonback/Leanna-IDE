@@ -90,6 +90,7 @@ export function SidePanel({
       previousFocusRef.current.focus();
       previousFocusRef.current = null;
     }
+    return undefined;
   }, [open]);
 
   // Escape to close

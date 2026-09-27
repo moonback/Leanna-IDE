@@ -34,7 +34,7 @@ export function createAudioRouter(): Router {
         return;
       }
 
-      const { generateSpeech } = await import("../../utils/geminiTTS");
+      const { generateSpeech } = await import("../../utils/geminiTTS.js");
 
       const alexVoice = req.body.alexVoice || "ff_siwis";
       const samVoice = req.body.samVoice || "Puck";

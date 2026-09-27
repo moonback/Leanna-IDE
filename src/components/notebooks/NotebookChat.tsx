@@ -437,7 +437,6 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
   const [selectedFolder, setSelectedFolder] = useState<string>('');
   const [customFolderName, setCustomFolderName] = useState('');
   const [savingMd, setSavingMd] = useState(false);
-  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const chunkCache = useRef<Map<string, string>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1388,38 +1387,6 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
       handleSend();
     }
   }, [handleSend]);
-
-  // ─── Citation Hover ─────────────────────────────────────────────────────────
-
-  const handleCitationHover = useCallback(async (citation: Citation, event: React.MouseEvent) => {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-
-    const cached = chunkCache.current.get(citation.chunkId);
-    if (cached) {
-      setHoveredCitation({ citation, fullContent: cached, x: rect.left, y: rect.top });
-      return;
-    }
-
-    setHoveredCitation({ citation, fullContent: citation.excerpt, x: rect.left, y: rect.top });
-
-    try {
-      const res = await fetch(`/api/notebooks/${notebookId}/chat/chunk/${citation.chunkId}`);
-      if (res.ok) {
-        const data = await res.json();
-        const content = data.chunk?.content || citation.excerpt;
-        chunkCache.current.set(citation.chunkId, content);
-        setHoveredCitation(prev =>
-          prev?.citation.chunkId === citation.chunkId
-            ? { ...prev, fullContent: content }
-            : prev
-        );
-      }
-    } catch { /* ignore */ }
-  }, [notebookId]);
-
-  const handleCitationLeave = useCallback(() => {
-    setHoveredCitation(null);
-  }, []);
 
   // ─── Export ────────────────────────────────────────────────────────────────
 

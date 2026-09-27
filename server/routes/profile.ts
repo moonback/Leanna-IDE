@@ -5,8 +5,8 @@ export function createProfileRouter(
   getProfile: () => ProfileConfig,
   setProfile: (p: ProfileConfig) => void,
   saveProfile: (p: ProfileConfig) => void,
-  getWorkspaceRoot: () => string,
-  updateEnvFile: (key: string, value: string) => void,
+  _getWorkspaceRoot: () => string,
+  _updateEnvFile: (key: string, value: string) => void,
 ): Router {
   const router = Router();
 
@@ -100,9 +100,9 @@ export function createTokensRouter(updateEnvFile: (key: string, value: string) =
     try {
       updateEnvFile(key, value);
       if (key === 'GEMINI_API_KEY' && onGeminiKeyUpdate) await onGeminiKeyUpdate();
-      res.json({ status: 'success', key, configured: !!value });
+      return res.json({ status: 'success', key, configured: !!value });
     } catch (e: any) {
-      res.status(500).json({ status: 'error', error: e.message });
+      return res.status(500).json({ status: 'error', error: e.message });
     }
   });
 

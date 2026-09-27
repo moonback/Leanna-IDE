@@ -399,8 +399,4 @@ export const Tabs = Object.assign(TabsRoot, {
   Panel: TabPanel,
 });
 
-export type {
-  TabsListProps,
-  TabProps,
-  TabPanelProps,
-};
+

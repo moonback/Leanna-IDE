@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, BookOpen, ExternalLink } from 'lucide-react';
+import { X, BookOpen } from 'lucide-react';
 import { SkillsDocumentation } from './SkillsDocumentation.js';
 
 interface SkillsDocModalProps {

@@ -26,7 +26,7 @@
  *   <AsyncState.Empty title="…" message="…" action={{ … }} />
  */
 
-import React, { type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { AlertCircle, RefreshCw, Inbox } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -298,8 +298,4 @@ export const AsyncState = Object.assign(AsyncStateRoot, {
   Empty:   AsyncEmpty,
 });
 
-export type {
-  AsyncLoadingProps,
-  AsyncErrorProps,
-  AsyncEmptyProps,
-};
+

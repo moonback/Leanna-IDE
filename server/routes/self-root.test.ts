@@ -5,7 +5,7 @@ import type { Server } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createSelfRootRouter } from './self-root.js';
-import { setSelfRoot, SELF_ROOT } from '../utils/selfRoot.js';
+import { setSelfRoot } from '../utils/selfRoot.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

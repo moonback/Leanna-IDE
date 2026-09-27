@@ -125,7 +125,7 @@ export function getPendingCount(): number {
  * Annule toutes les confirmations en attente (cleanup).
  */
 export function cancelAllPending(): void {
-  for (const [id, entry] of pending) {
+  for (const [, entry] of pending) {
     clearTimeout(entry.timer);
     entry.resolve(false);
   }

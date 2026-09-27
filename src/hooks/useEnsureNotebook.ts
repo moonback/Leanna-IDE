@@ -52,8 +52,6 @@ export function useEnsureNotebook(options: UseEnsureNotebookOptions = {}): UseEn
   const { 
     defaultTitle = 'Mon premier notebook', 
     defaultDescription = 'Notebook créé automatiquement pour l\'import',
-    defaultColor = 'var(--accent-primary)',
-    defaultIcon = '📓',
     autoCreate = true 
   } = options;
   

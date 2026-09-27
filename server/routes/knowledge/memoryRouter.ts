@@ -29,9 +29,9 @@ router.get('/memory/search', (req: Request, res: Response) => {
     }
     const limit = Math.min(Number(req.query.limit) || 10, 50);
     const results = projectMemory.searchFacts(query, limit);
-    res.json({ status: 'success', results });
+    return res.json({ status: 'success', results });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -49,9 +49,9 @@ router.post('/memory', (req: Request, res: Response) => {
       sourceFile,
       confidence: confidence ?? 0.5,
     });
-    res.json({ status: 'success', id });
+    return res.json({ status: 'success', id });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -62,9 +62,9 @@ router.get('/memory/:id', (req: Request, res: Response) => {
     if (!fact) {
       return res.status(404).json({ error: 'Fait mémoire introuvable.' });
     }
-    res.json({ status: 'success', fact });
+    return res.json({ status: 'success', fact });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -82,9 +82,9 @@ router.put('/memory/:id', (req: Request, res: Response) => {
     if (!updated) {
       return res.status(404).json({ error: 'Fait mémoire introuvable.' });
     }
-    res.json({ status: 'success' });
+    return res.json({ status: 'success' });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -95,9 +95,9 @@ router.delete('/memory/:id', (req: Request, res: Response) => {
     if (!deleted) {
       return res.status(404).json({ error: 'Fait mémoire introuvable.' });
     }
-    res.json({ status: 'success' });
+    return res.json({ status: 'success' });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -123,9 +123,9 @@ router.post('/memory/context', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Le paramètre task est requis.' });
     }
     const context = projectMemory.getProjectContext(task, files || []);
-    res.json({ status: 'success', context });
+    return res.json({ status: 'success', context });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 

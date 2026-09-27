@@ -28,9 +28,9 @@ router.post('/understanding/context', (req: Request, res: Response) => {
       includeRisk,
       riskMode,
     });
-    res.json({ status: 'success', context });
+    return res.json({ status: 'success', context });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -46,9 +46,9 @@ router.post('/understanding/score', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Le paramètre query est requis.' });
     }
     const score = understandingEngine.computeScore(query, { strategy, includeRisk });
-    res.json({ status: 'success', score });
+    return res.json({ status: 'success', score });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -64,9 +64,9 @@ router.post('/understanding/prompt', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Le paramètre query est requis.' });
     }
     const prompt = understandingEngine.buildSystemPrompt(query, { strategy, detail });
-    res.json({ status: 'success', prompt });
+    return res.json({ status: 'success', prompt });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -99,9 +99,9 @@ router.post('/understanding/feedback', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Les paramètres query et feedback sont requis.' });
     }
     const result = understandingEngine.incorporateFeedback(query, feedback, { missionId });
-    res.json({ status: 'success', applied: result });
+    return res.json({ status: 'success', applied: result });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 

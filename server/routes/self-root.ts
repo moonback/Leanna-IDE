@@ -624,8 +624,6 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
     sendLog(`⚙️  Commande: git clone ${repoUrl} ${clonePath}`);
     sendLog(`─────────────────────────────────────────`);
 
-    const isWin = osModule.default.platform() === 'win32';
-
     let child: import('child_process').ChildProcess;
     try {
       // git est un binaire natif, pas besoin de shell même sur Windows

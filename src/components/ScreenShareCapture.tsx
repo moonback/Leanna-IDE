@@ -1,4 +1,3 @@
-import React from 'react';
 import { useScreenShare } from '../context/ScreenShareContext.js';
 
 /**

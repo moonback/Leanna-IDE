@@ -1,4 +1,4 @@
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketServer } from 'ws';
 import { addWatchClient, startWatching, stopWatching, getWatchClientCount } from '../utils/sandboxWatcher.js';
 import { authenticateToken } from '../security.js';
 import { isSandboxActive } from '../utils/sandbox.js';
@@ -14,7 +14,7 @@ export function initSandboxWatchWSS(): WebSocketServer {
 
   sandboxWss = new WebSocketServer({ noServer: true });
   
-  sandboxWss.on('connection', (clientWs, req) => {
+  sandboxWss.on('connection', (clientWs, _req) => {
     console.log('[SandboxWatch] Client connecté');
     addWatchClient(clientWs);
     
@@ -48,7 +48,7 @@ export function handleSandboxWatchUpgrade(
 
   const cookieHeader = request.headers.cookie || '';
   const cookies: Record<string, string> = {};
-  cookieHeader.split(';').forEach(c => {
+  cookieHeader.split(';').forEach((c: string) => {
     const parts = c.split('=');
     if (parts.length >= 2) {
       cookies[parts[0].trim()] = decodeURIComponent(parts.slice(1).join('='));

@@ -42,9 +42,7 @@ export function AgentStatusBlock({
   assistantMenuOpen,
   assistantMenuRef,
   setAssistantMenuOpen,
-  aiMenuItems,
   state,
-  actions,
   mode,
   onToggleChat,
   onToggleMode,
@@ -64,9 +62,6 @@ export function AgentStatusBlock({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [assistantMenuOpen, handleKeyDown]);
-
-  const stateRecord = state as unknown as Record<string, boolean | string | null>;
-  const actionsRecord = actions as unknown as Record<string, () => void>;
 
   // Status dot color
   const statusDot = assistantConnected

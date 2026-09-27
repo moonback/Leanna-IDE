@@ -1,11 +1,10 @@
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Play, Pause, Trash2, Zap, Clock, GitBranch, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { WorkflowsPanel, WorkflowViewModel } from '../components/panels/WorkflowsPanel.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { useToast } from '../components/ui/Toast.js';
-import { EmptyState } from '../components/ui/EmptyState.js';
 
 interface ScheduledTask {
   id: string;

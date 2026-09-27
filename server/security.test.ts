@@ -128,7 +128,7 @@ test('isCriticalFile does not flag regular source files', () => {
 });
 
 test('SELF_ROOT can be changed via setSelfRoot', async () => {
-  const { setSelfRoot } = await import('./utils/selfRoot');
+  const { setSelfRoot } = await import('./utils/selfRoot.js');
   const originalRoot = SELF_ROOT;
   // setSelfRoot with an existing path should work
   const result = setSelfRoot(originalRoot);

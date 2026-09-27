@@ -11,12 +11,12 @@
  * - Aperçu de la structure des fichiers et progression d'ingestion
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Search, Github, Loader2, CheckCircle2, XCircle, AlertCircle,
-  Code2, FileCode, FolderOpen, Star, GitFork,
-  X, ExternalLink, Filter, RefreshCw, BookOpen, Lock, Globe,
+  Search, Github, Loader2, XCircle, AlertCircle,
+  FileCode, FolderOpen, Star, GitFork,
+  X, ExternalLink, RefreshCw, BookOpen, Lock, Globe,
   FolderGit2, Link as LinkIcon, Key, Check, Plus, ArrowRight,
   Sliders, ShieldCheck, ChevronRight
 } from 'lucide-react';
@@ -154,7 +154,7 @@ export function GitHubRepositoryImportModal({
 
   // Notebooks
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
-  const [notebooksLoading, setNotebooksLoading] = useState(false);
+  const [, setNotebooksLoading] = useState(false);
   const [selectedNotebookId, setSelectedNotebookId] = useState<string | null>(defaultNotebookId || null);
 
   // Création d'un nouveau notebook

@@ -153,6 +153,24 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
     console.error("[Bootstrap] applyToolRegistryAttribution échec:", err);
   }
 
+  // 6c. Audit d'attribution déterministe. Une fois l'attribution finalisée
+  // (socle sensible + ToolRegistry), on vérifie que chaque outil exécutable
+  // possède un propriétaire résoluble (explicite, capability ou catégorie).
+  // Les outils restants retomberaient sur le rôle neutre "system" : on les
+  // liste de façon actionnable (owner suggéré) et, en mode "strict"
+  // (Leanna_ATTRIBUTION_ENFORCEMENT=strict), on ÉCHOUE le boot pour interdire
+  // toute régression silencieuse. Défaut "warn" : non bloquant, rétro-compatible.
+  try {
+    const { enforceAttribution, attributionEnforcementFromEnv } = await import(
+      "../agents/attributionAudit.js"
+    );
+    enforceAttribution(runtime, attributionEnforcementFromEnv());
+  } catch (err) {
+    // En mode strict, UnattributedToolsError doit remonter : on ne l'avale pas.
+    if ((err as Error)?.name === "UnattributedToolsError") throw err;
+    console.error("[Bootstrap] Audit d'attribution échec:", err);
+  }
+
   // 7. Callback post-init
   if (config.onReady) {
     await config.onReady(runtime, skillManager);

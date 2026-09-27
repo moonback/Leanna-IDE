@@ -24,7 +24,12 @@ export class AgentRepairLoop {
     const patchHash = input.patch ? createHash("sha256").update(input.patch).digest("hex") : undefined;
     const repeatedPatch = Boolean(patchHash && patchHash === this.previousPatch);
     const unresolved = [...issueKeys].filter((key) => this.previousIssueKeys.has(key)).length;
-    const progress = issues.length < this.previousIssueKeys.size || unresolved < this.previousIssueKeys.size || (input.currentHash && input.currentHash !== this.previousHash);
+    // Première évaluation : aucun historique n'existe encore. On ne peut donc pas
+    // parler de « stagnation ». Sans ce garde, un currentHash absent (fichier
+    // fraîchement écrit et pas encore relu) rendrait `progress` falsy dès le 1er
+    // appel → stalls=1 → branche change_strategy déclenchée à tort.
+    const firstAssessment = this.previousIssueKeys.size === 0 && this.previousHash === undefined;
+    const progress = firstAssessment || issues.length < this.previousIssueKeys.size || unresolved < this.previousIssueKeys.size || (input.currentHash && input.currentHash !== this.previousHash);
     const strongRegression = issues.some((issue) => issue.severity === "critical") || issues.length > Math.max(3, this.previousIssueKeys.size * 2);
     this.stalls = progress ? 0 : this.stalls + 1;
     this.previousIssueKeys = issueKeys;

@@ -25,34 +25,6 @@ interface SkillsPanelProps {
   onToggle: (id: string) => void;
 }
 
-function StatusBadge({ status, enabled }: { status: string; enabled: boolean }) {
-  const isConfigured = status === 'active' || status === 'authenticated';
-
-  const label = !isConfigured ? 'Auth requise' : enabled ? 'Actif' : 'Inactif';
-  const color = !isConfigured
-    ? 'var(--color-warning, var(--color-warning))'
-    : enabled
-      ? 'var(--color-success, var(--color-success))'
-      : 'var(--text-dimmed)';
-
-  return (
-    <span
-      className="inline-flex items-center gap-1 text-sm font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
-      style={{
-        color,
-        backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`,
-      }}
-    >
-      <span
-        className="w-1.5 h-1.5 rounded-full"
-        style={{ backgroundColor: color }}
-      />
-      {label}
-    </span>
-  );
-}
-
 export const SkillsPanel = React.memo(function SkillsPanel({ skills, enabledSkills, onToggle }: SkillsPanelProps) {
   const activeCount = skills.filter(s =>
     (s.status === 'active' || s.status === 'authenticated') && enabledSkills[s.id] !== false

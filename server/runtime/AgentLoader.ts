@@ -107,7 +107,7 @@ export class AgentLoader {
 
     if (!fs.existsSync(dir)) return;
 
-    this.watcher = fs.watch(dir, { persistent: false }, (eventType, filename) => {
+    this.watcher = fs.watch(dir, { persistent: false }, (_eventType, filename) => {
       if (!filename || (!filename.endsWith(".agent.ts") && !filename.endsWith(".agent.js"))) return;
       
       const filePath = path.join(dir, filename);

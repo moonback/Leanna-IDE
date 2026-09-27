@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BookOpen, Loader2, CheckCircle2, AlertCircle, FileCheck, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { Modal } from '../ui/Modal.js';

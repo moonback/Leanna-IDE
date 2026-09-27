@@ -12,7 +12,7 @@ import { agentsSkill } from "./agents.js";
  * de validation (avant qu'elle n'appelle l'orchestrator).
  * Pour les cas de succès, on mock via test.mock.method sur l'orchestrator importé.
  */
-import { agentOrchestrator, listAgentDefinitions } from "../agents/index.js";
+import { agentOrchestrator } from "../agents/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Tests : Structure et déclarations de la skill
@@ -378,7 +378,7 @@ test("agent_list_tasks — retourne la liste filtrée", async (t) => {
   assert.equal(result.tasks[1].hasResult, false);
 });
 
-test("agent_list_roles — retourne les définitions d'agents", async (t) => {
+test("agent_list_roles — retourne les définitions d'agents", async (_t) => {
   // listAgentDefinitions est une fonction pure exportée, on la teste directement
   const result = await agentsSkill.handleToolCall("agent_list_roles", {});
 

@@ -37,9 +37,9 @@ export function createCheckpointRouter(): Router {
       const { hash } = req.body as { hash?: string };
       if (!hash) return res.status(400).json({ error: 'hash est requis.' });
       const ok = await rollbackToCheckpoint(hash);
-      res.json({ success: ok });
+      return res.json({ success: ok });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   });
 

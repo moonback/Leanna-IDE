@@ -38,9 +38,9 @@ export function createGithubRouter(skillManager: SkillManager): Router {
         visibility: visibility || undefined,
       });
       if (result?.error) return res.status(200).json(result);
-      res.json(result);
+      return res.json(result);
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   });
 
@@ -50,9 +50,9 @@ export function createGithubRouter(skillManager: SkillManager): Router {
       const { username } = req.query as { username?: string };
       const result = await skillManager.handleToolCall('get_github_user', { username });
       if (result?.error) return res.status(200).json(result);
-      res.json(result);
+      return res.json(result);
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   });
 
@@ -63,9 +63,9 @@ export function createGithubRouter(skillManager: SkillManager): Router {
       if (!owner || !repo) return res.status(400).json({ error: 'owner et repo sont requis.' });
       const result = await skillManager.handleToolCall('get_github_repo', { owner, repo });
       if (result?.error) return res.status(200).json(result);
-      res.json(result);
+      return res.json(result);
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   });
 
@@ -76,9 +76,9 @@ export function createGithubRouter(skillManager: SkillManager): Router {
       if (!owner || !repo) return res.status(400).json({ error: 'owner et repo sont requis.' });
       const result = await skillManager.handleToolCall('list_github_issues', { owner, repo, state: state || 'open' });
       if (result?.error) return res.status(200).json(result);
-      res.json(result);
+      return res.json(result);
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   });
 
@@ -89,9 +89,9 @@ export function createGithubRouter(skillManager: SkillManager): Router {
       if (!owner || !repo) return res.status(400).json({ error: 'owner et repo sont requis.' });
       const result = await skillManager.handleToolCall('list_github_pull_requests', { owner, repo, state: state || 'open' });
       if (result?.error) return res.status(200).json(result);
-      res.json(result);
+      return res.json(result);
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   });
 
@@ -100,9 +100,9 @@ export function createGithubRouter(skillManager: SkillManager): Router {
     try {
       const result = await skillManager.handleToolCall('get_github_notifications', {});
       if (result?.error) return res.status(200).json(result);
-      res.json(result);
+      return res.json(result);
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   });
 
@@ -113,9 +113,9 @@ export function createGithubRouter(skillManager: SkillManager): Router {
       if (!query) return res.status(400).json({ error: 'query est requis.' });
       const result = await skillManager.handleToolCall('search_github_repos', { query });
       if (result?.error) return res.status(200).json(result);
-      res.json(result);
+      return res.json(result);
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   });
 
@@ -144,9 +144,9 @@ export function createGithubRouter(skillManager: SkillManager): Router {
       if (!owner || !repo) {
         return res.json({ status: 'no_github', remoteUrl });
       }
-      res.json({ status: 'success', owner, repo, full_name: `${owner}/${repo}`, remoteUrl });
+      return res.json({ status: 'success', owner, repo, full_name: `${owner}/${repo}`, remoteUrl });
     } catch (e: any) {
-      res.json({ status: 'no_repo', error: e.stderr?.trim() || e.message });
+      return res.json({ status: 'no_repo', error: e.stderr?.trim() || e.message });
     }
   });
 
@@ -198,7 +198,7 @@ export function createGithubRouter(skillManager: SkillManager): Router {
         }
 
         console.log(`[GitHub] ingestion repo OK: ${owner}/${repo}`);
-        res.json({
+        return res.json({
           status: 'success',
           source: {
             id: source.id,
@@ -219,7 +219,7 @@ export function createGithubRouter(skillManager: SkillManager): Router {
         return res.status(200).json({ status: 'error', error: `Échec de l'ingestion: ${ingestErr.message}` });
       }
     } catch (e: any) {
-      res.status(500).json({ error: e.message || 'Erreur serveur lors de l\'ingestion du dépôt GitHub.' });
+      return res.status(500).json({ error: e.message || 'Erreur serveur lors de l\'ingestion du dépôt GitHub.' });
     }
   });
 
@@ -254,9 +254,9 @@ export function createGithubRouter(skillManager: SkillManager): Router {
         return res.status(200).json({ status: 'error', error: result.error });
       }
 
-      res.json(result);
+      return res.json(result);
     } catch (e: any) {
-      res.status(500).json({ 
+      return res.status(500).json({ 
         error: e.message || 'Erreur serveur lors de la récupération des fichiers.' 
       });
     }
@@ -291,9 +291,9 @@ export function createGithubRouter(skillManager: SkillManager): Router {
       if (!statusOut.trim()) return res.status(400).json({ error: 'Aucune modification à committer.' });
       await execGit(['add', '--all', '--', ...workspaceGitPaths]);
       const { stdout } = await execGit(['commit', '-m', message]);
-      res.json({ success: true, output: stdout.trim() });
+      return res.json({ success: true, output: stdout.trim() });
     } catch (e: any) {
-      res.status(500).json({ error: e.stderr?.trim() || e.message || 'Impossible de créer le commit.' });
+      return res.status(500).json({ error: e.stderr?.trim() || e.message || 'Impossible de créer le commit.' });
     }
   });
 
@@ -384,7 +384,7 @@ export function createGithubRouter(skillManager: SkillManager): Router {
         return { status: status.charAt(0), path: pathParts.join('\t') };
       });
 
-      res.json({
+      return res.json({
         hash: commitHash,
         author,
         email,
@@ -393,7 +393,7 @@ export function createGithubRouter(skillManager: SkillManager): Router {
         files,
       });
     } catch (e: any) {
-      res.status(500).json({ error: e.stderr?.trim() || e.message || 'Impossible de récupérer le détail du commit.' });
+      return res.status(500).json({ error: e.stderr?.trim() || e.message || 'Impossible de récupérer le détail du commit.' });
     }
   });
 

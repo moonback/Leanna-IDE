@@ -4,11 +4,10 @@ import { promisify } from "util";
 import * as fs from "fs";
 import * as path from "path";
 import { z } from "zod";
-import { SELF_ROOT, normalizeSelfPath } from "../utils/selfRoot.js";
 import * as ts from "typescript";
 import { createHash } from "crypto";
 import type { VerificationIssue, VerificationRecord } from "../agents/WorkspaceState.js";
-export type { VerificationIssue, VerificationRecord } from "../agents/WorkspaceState.js";
+export type { VerificationIssue, VerificationRecord };
 
 const execFileAsync = promisify(execFile);
 

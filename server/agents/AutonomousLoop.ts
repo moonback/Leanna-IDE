@@ -107,15 +107,23 @@ export class AutonomousLoop {
     let iteration = 0;
     let finalDecision: LoopDecision = "stop";
 
+    const maxIterations = Math.min(this.config.maxIterations, MAX_AUTONOMOUS_ATTEMPTS);
+
     log.info(
-      `🔄 [${agent.name}] AutonomousLoop démarré — max ${this.config.maxIterations} itérations`
+      `🔄 [${agent.name}] AutonomousLoop démarré — max ${maxIterations} itérations`
     );
 
     // Snapshot du contexte original pour ne pas le corrompre entre itérations
     const originalDescription = task.description;
     const originalFiles = [...task.context.files];
 
-    const maxIterations = Math.min(this.config.maxIterations, MAX_AUTONOMOUS_ATTEMPTS);
+    if (this.config.maxIterations > MAX_AUTONOMOUS_ATTEMPTS) {
+      log.warn(
+        `[${agent.name}] maxIterations demandé (${this.config.maxIterations}) dépasse le plafond autonome ` +
+        `(${MAX_AUTONOMOUS_ATTEMPTS} = ${MAX_APPROACHES} approches × ${MAX_ATTEMPTS_PER_APPROACH} tentatives) — ` +
+        `bridé à ${maxIterations}. Ajustez MAX_APPROACHES / MAX_ATTEMPTS_PER_APPROACH pour lever cette borne.`
+      );
+    }
 
     while (iteration < maxIterations) {
       iteration++;
@@ -136,7 +144,7 @@ export class AutonomousLoop {
       const iterStart = Date.now();
 
       // ── ACT : exécuter l'itération ──
-      log.info(`[${agent.name}] 🔄 ACT — itération ${iteration}/${this.config.maxIterations}: "${task.title}"`);
+      log.info(`[${agent.name}] 🔄 ACT — itération ${iteration}/${maxIterations}: "${task.title}"`);
       await this.executor.execute(task);
       const iterDuration = Date.now() - iterStart;
       const result = task.result;
@@ -182,7 +190,7 @@ export class AutonomousLoop {
       const deleg = record.delegationsSent > 0 ? ` | 🔀 Délég: ${record.delegationsSent}` : "";
 
       log.info(
-        `[${agent.name}] 📊 Itération ${iteration}/${this.config.maxIterations} (${(record.durationMs / 1000).toFixed(1)}s) — Confiance: ${confPct}% | Décision: ${decision.action}${retryTag}${verifyTag}${filesTag}${deleg}`
+        `[${agent.name}] 📊 Itération ${iteration}/${maxIterations} (${(record.durationMs / 1000).toFixed(1)}s) — Confiance: ${confPct}% | Décision: ${decision.action}${retryTag}${verifyTag}${filesTag}${deleg}`
       );
       log.debug(`[${agent.name}] Décision raison: ${decision.reason}`);
       if (result.summary) {

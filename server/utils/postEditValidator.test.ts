@@ -7,9 +7,7 @@ import {
 } from './postEditValidator.js';
 
 test('postEditValidator: subscribe and unsubscribe', () => {
-  let called = false;
   const unsubscribe = subscribeToValidation(() => {
-    called = true;
   });
 
   assert.equal(typeof unsubscribe, 'function');

@@ -398,26 +398,6 @@ function isProhibitedSystemPath(resolved: string): boolean {
   );
 }
 
-function loadPersistedProject(): PersistedProjectData | null {
-  try {
-    const configPath = getPersistedProjectPath();
-    if (!fs.existsSync(configPath)) return null;
-    const data = JSON.parse(fs.readFileSync(configPath, "utf-8")) as PersistedProjectData;
-    if (data?.projectRoot && typeof data.projectRoot === "string") {
-      const resolved = path.resolve(data.projectRoot);
-      if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
-        return { projectRoot: resolved, siteUrl: data.siteUrl || undefined };
-      }
-    }
-  } catch (e) {
-    // Mode dégradé : fichier absent ou corrompu → aucun projet restauré
-    if (process.env.LOG_LEVEL === 'debug') {
-      console.debug("[SelfRoot] loadPersistedProject ignoré:", (e as Error).message);
-    }
-  }
-  return null;
-}
-
 function persistProject(projectRoot: string, siteUrl?: string): void {
   try {
     const configPath = getPersistedProjectPath();

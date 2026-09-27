@@ -1,4 +1,4 @@
-import { Skill, validateArgs } from "./base.js";
+import { Skill } from "./base.js";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 

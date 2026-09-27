@@ -186,7 +186,7 @@ export class Observability {
     }
   }
 
-  private recordAgentTask(taskId: string, success: boolean, durationMs: number): void {
+  private recordAgentTask(_taskId: string, _success: boolean, _durationMs: number): void {
     // On ne peut pas récupérer l'agentId depuis le taskId ici sans le runtime,
     // mais c'est OK — les métriques agent:busy nous donnent l'activité par agent.
     // Le taskId est suffisant pour les compteurs globaux.

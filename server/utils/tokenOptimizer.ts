@@ -13,42 +13,7 @@
 type TiktokenLike = { encode(text: string): ArrayLike<number> };
 let _tiktokenEncoding: TiktokenLike | null | undefined = undefined;
 let _tiktokenLoadAttempted = false;
-let _tiktokenLoadPromise: Promise<TiktokenLike | null> | null = null;
 const LOG_PREFIX = '[TokenOptimizer]';
-
-/** Charge tiktoken de manière asynchrone */
-async function loadTiktokenAsync(): Promise<TiktokenLike | null> {
-  if (_tiktokenLoadPromise) {
-    return _tiktokenLoadPromise;
-  }
-  
-  _tiktokenLoadPromise = (async () => {
-    if (_tiktokenLoadAttempted) {
-      return _tiktokenEncoding ?? null;
-    }
-    _tiktokenLoadAttempted = true;
-    
-    try {
-      // Import dynamique - fonctionne en ESM et CommonJS (Node.js gère l'interop)
-      const mod = await import('tiktoken');
-      const enc: TiktokenLike | null =
-        (typeof (mod as any).encodingForModel === "function" && (mod as any).encodingForModel("gpt-4o")) ||
-        (typeof (mod as any).getEncoding === "function" && (mod as any).getEncoding("cl100k_base")) ||
-        null;
-      
-      if (enc && typeof enc.encode === "function") {
-        _tiktokenEncoding = enc;
-        console.log(LOG_PREFIX + " ✅ tiktoken chargé (cl100k_base) — estimations précises.");
-        return enc;
-      }
-    } catch {
-      // tiktoken non disponible — ignorer
-    }
-    return null;
-  })();
-  
-  return _tiktokenLoadPromise;
-}
 
 /** Charge tiktoken de manière synchrone (pour compatibilité) */
 function tryLoadTiktokenSync(): TiktokenLike | null {
@@ -445,7 +410,7 @@ export async function summarizeWithLLM(
   }
 
   try {
-    const { generateText } = await import('./textGeneration');
+    const { generateText } = await import('./textGeneration.js');
     const startTime = Date.now();
 
     const response = await generateText({

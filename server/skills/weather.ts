@@ -58,5 +58,6 @@ export const weatherSkill: Skill = {
            return { error: e.message };
        }
     }
+    return undefined;
   }
 };

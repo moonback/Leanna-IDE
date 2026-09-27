@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity, Server, Cpu, MemoryStick, CheckCircle2, AlertCircle, XCircle,
-  RefreshCw, Clock, ShieldCheck, Gauge, Circle, Loader2, Puzzle,
-  Bot, Zap,
+  RefreshCw, Clock, Loader2, Puzzle,
+  Zap,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ function StatCard({
 
 // ─── Service Badge ───────────────────────────────────────────────────────────
 
-function ServiceBadge({ name, label, ok }: ServiceHealth) {
+function ServiceBadge({ label, ok }: ServiceHealth) {
   const color = ok ? 'var(--color-success)' : 'var(--color-error)';
   return (
     <div

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 
 export function WebcamCapture({ onFrame }: { onFrame: (base64: string) => void }) {
   const videoRef  = useRef<HTMLVideoElement>(null);

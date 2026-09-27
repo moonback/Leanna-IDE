@@ -31,6 +31,10 @@ export class ContextResolver {
       mode,
       taskType: this.resolveTaskType(config),
 
+      // Défaut 'gemini' : préserve le comportement historique (directives Gemini
+      // actives) quand le runtime ne fournit pas explicitement le fournisseur.
+      provider: config.textProvider ?? "gemini",
+
       aiName: config.aiName ?? "Leanna",
       userName: config.userName,
       userRole: config.userRole,

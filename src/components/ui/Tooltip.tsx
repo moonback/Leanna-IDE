@@ -137,8 +137,13 @@ export const Tooltip = forwardRef<HTMLElement, TooltipProps>(function Tooltip(
     'aria-label': computedAriaLabel,
   };
 
+  // `Component` est polymorphe (`as` prop) : on l'élargit en ElementType pour
+  // autoriser le spread de triggerProps (dont type/disabled, déjà conditionnés
+  // à `undefined` hors <button>).
+  const TriggerTag = Component as React.ElementType;
+
   return (
-    <Component {...triggerProps}>
+    <TriggerTag {...triggerProps}>
       {children}
       <AnimatePresence>
         {visible && (
@@ -189,9 +194,8 @@ export const Tooltip = forwardRef<HTMLElement, TooltipProps>(function Tooltip(
           </motion.div>
         )}
       </AnimatePresence>
-    </Component>
+    </TriggerTag>
   );
 });
 
-// Export des types pour compatibilité
-export type { TooltipProps };
+

@@ -99,14 +99,14 @@ export function createAgentsRouterV2(runtime: AgentRuntime): Router {
         timeoutMs,
       });
 
-      res.status(202).json({
+      return res.status(202).json({
         taskId: task.id,
         agentId: task.agentId,
         state: task.state,
         message: `Tâche soumise à l'agent "${task.agentId}"`,
       });
     } catch (e: any) {
-      res.status(400).json({ error: e.message });
+      return res.status(400).json({ error: e.message });
     }
   });
 
@@ -131,7 +131,7 @@ export function createAgentsRouterV2(runtime: AgentRuntime): Router {
       if (!task) {
         return res.status(404).json({ error: "Tâche introuvable" });
       }
-      res.json({
+      return res.json({
         id: task.id,
         agentId: task.agentId,
         title: task.title,
@@ -144,7 +144,7 @@ export function createAgentsRouterV2(runtime: AgentRuntime): Router {
         completedAt: task.completedAt ? new Date(task.completedAt).toISOString() : null,
       });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   });
 

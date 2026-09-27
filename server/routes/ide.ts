@@ -31,9 +31,9 @@ router.get('/file-count', async (req: Request, res: Response) => {
     const root = getWorkspaceRoot(req);
     if (!root) return res.status(200).json({ count: 0 });
 
-    res.json({ count: await countFilesRecursively(root) });
+    return res.json({ count: await countFilesRecursively(root) });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -144,9 +144,9 @@ router.get('/tree', async (req: Request, res: Response) => {
       response.pagination = pagination;
     }
 
-    res.json(response);
+    return res.json(response);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -260,9 +260,9 @@ router.get('/tree-workspace', async (req: Request, res: Response) => {
       response.pagination = pagination;
     }
 
-    res.json(response);
+    return res.json(response);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -285,7 +285,7 @@ router.get('/file', async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Fichier introuvable.' });
   }
 
-  res.json({ path: requestedPath, content: await fs.promises.readFile(absolutePath, 'utf-8') });
+  return res.json({ path: requestedPath, content: await fs.promises.readFile(absolutePath, 'utf-8') });
 });
 
 // GET /api/ide/file-raw — Servir un fichier binaire brut (images, etc.)
@@ -325,7 +325,7 @@ router.get('/file-raw', async (req: Request, res: Response) => {
   res.setHeader('Content-Type', contentType);
   res.setHeader('Cache-Control', 'public, max-age=3600');
   const buffer = await fs.promises.readFile(absolutePath);
-  res.send(buffer);
+  return res.send(buffer);
 });
 
 // POST /api/ide/file (save)
@@ -348,7 +348,7 @@ router.post('/file', async (req: Request, res: Response) => {
     markFileModified(requestedPath);
   }
   await appendAuditEvent({ action: 'write_file', target: requestedPath, details: 'updated via IDE', actor: 'user' });
-  res.json({ status: 'success', path: requestedPath, sandbox: isSandboxActive() });
+  return res.json({ status: 'success', path: requestedPath, sandbox: isSandboxActive() });
 });
 
 // POST /api/ide/create-file
@@ -367,7 +367,7 @@ router.post('/create-file', async (req: Request, res: Response) => {
   await fs.promises.writeFile(absolutePath, '', 'utf-8');
   markFileModified(requestedPath);
   await appendAuditEvent({ action: 'create_file', target: requestedPath, details: 'created via IDE', actor: 'user' });
-  res.json({ status: 'success', path: requestedPath });
+  return res.json({ status: 'success', path: requestedPath });
 });
 
 // POST /api/ide/create-directory
@@ -384,7 +384,7 @@ router.post('/create-directory', async (req: Request, res: Response) => {
 
   await fs.promises.mkdir(absolutePath, { recursive: true });
   await appendAuditEvent({ action: 'create_directory', target: requestedPath, details: 'created via IDE', actor: 'user' });
-  res.json({ status: 'success', path: requestedPath });
+  return res.json({ status: 'success', path: requestedPath });
 });
 
 // POST /api/ide/rename (move/rename)
@@ -406,7 +406,7 @@ router.post('/rename', async (req: Request, res: Response) => {
   markFileModified(oldPath);
   markFileModified(newPath);
   await appendAuditEvent({ action: 'rename', target: oldPath, details: `→ ${newPath}`, actor: 'user' });
-  res.json({ status: 'success', oldPath, newPath });
+  return res.json({ status: 'success', oldPath, newPath });
 });
 
 // POST /api/ide/copy
@@ -470,7 +470,7 @@ router.post('/copy', async (req: Request, res: Response) => {
   const finalRelative = path.relative(realSandboxRoot, finalDest).replace(/\\/g, '/');
   markFileModified(finalRelative);
   await appendAuditEvent({ action: 'copy', target: srcPath, details: `→ ${destPath}`, actor: 'user' });
-  res.json({ status: 'success', srcPath, destPath: finalRelative });
+  return res.json({ status: 'success', srcPath, destPath: finalRelative });
 });
 
 // POST /api/ide/search
@@ -578,12 +578,13 @@ router.post('/search', async (req: Request, res: Response) => {
           }
         }
       }
+      return undefined;
     };
 
     searchDir(root);
-    res.json({ results });
+    return res.json({ results });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: e.message });
   }
 });
 
@@ -608,14 +609,14 @@ router.delete('/file', async (req: Request, res: Response) => {
     }
     markFileModified(requestedPath);
     await appendAuditEvent({ action: 'delete', target: requestedPath, details: 'deleted via IDE', actor: 'user' });
-    res.json({ status: 'success', path: requestedPath });
+    return res.json({ status: 'success', path: requestedPath });
   } catch {
     return res.status(404).json({ error: 'Fichier introuvable.' });
   }
 });
 
 // Helper functions
-function getWorkspaceRoot(req: Request): string {
+function getWorkspaceRoot(_req: Request): string {
   if (isSandboxActive()) {
     return getSandboxRoot();
   }

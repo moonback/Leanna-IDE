@@ -126,8 +126,12 @@ test('browser routes: POST /content-result rejects on error', async () => {
     assert.equal(res.status, 200);
     const body = await res.json() as any;
     assert.equal(body.status, 'ok');
-    assert.ok(rejectedError);
-    assert.equal(rejectedError?.message, 'Test error message');
+    // `rejectedError` n'est affecté que dans la closure `reject`, que le CFA de
+    // TS ne suit pas — d'où un narrowing erroné vers `null`/`never`. On lit via
+    // un instantané typé pour rétablir le type déclaré au site d'assertion.
+    const capturedError = rejectedError as Error | null;
+    assert.ok(capturedError);
+    assert.equal(capturedError?.message, 'Test error message');
     assert.equal(browserReadPending.has('test-error-id'), false);
   } finally {
     clearTimeout(mockTimer);

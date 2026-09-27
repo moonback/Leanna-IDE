@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Code2, BookOpen, ArrowRight, Sparkles } from 'lucide-react';
+// @ts-ignore - Asset handled by bundler
+import bgVideo from '../../assets/video.mp4';
 
 /**
  * LauncherModal — écran de choix affiché au démarrage (après le splash).
@@ -88,20 +90,44 @@ export function LauncherModal() {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={OVERLAY_FADE}
-        className="fixed inset-0 z-[100000] flex items-center justify-center p-3"
-        style={{ backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}
+        className="fixed inset-0 z-[100000] flex items-center justify-center p-3 overflow-hidden"
+        style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
       >
+        {/* ── Vidéo de fond ── */}
+        <video
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+          src={bgVideo}
+          autoPlay
+          loop
+          muted
+          playsInline
+          aria-hidden="true"
+          style={{ zIndex: 0 }}
+        />
+        {/* Voile sombre + flou pour garder les cartes lisibles */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            zIndex: 0,
+          }}
+        />
+
         <motion.div
           {...cardMotionProps}
           transition={CARD_SPRING}
           role="dialog"
           aria-modal="true"
           aria-labelledby="launcher-title"
-          className="w-[calc(100%-24px)] max-w-5xl rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col"
+          className="relative z-[1] w-[calc(100%-24px)] max-w-5xl rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col"
           style={{
-            backgroundColor: 'var(--bg-panel)',
-            border: '1px solid var(--border-base)',
-            boxShadow: '0 24px 80px rgba(0, 0, 0, 0.4)',
+            backgroundColor: 'color-mix(in srgb, var(--bg-panel) 72%, transparent)',
+            border: '1px solid color-mix(in srgb, #fff 14%, transparent)',
+            backdropFilter: 'blur(24px) saturate(140%)',
+            WebkitBackdropFilter: 'blur(24px) saturate(140%)',
+            boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent), 0 24px 80px rgba(0, 0, 0, 0.5)',
           }}
         >
           {/* Header */}

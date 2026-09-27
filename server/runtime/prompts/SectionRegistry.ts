@@ -100,9 +100,18 @@ export class SectionRegistry {
       return false;
     }
 
-    // Pas de scope → toujours active
-    if (!section.scope || section.scope.length === 0) {
+    // Scope absent (undefined) → toujours active. Réservé aux sections
+    // programmatiques (workspace, footer, extras) qui doivent apparaître
+    // dans tous les contextes.
+    if (!section.scope) {
       return true;
+    }
+
+    // Scope explicitement vide ([]) → jamais active. C'est le cas d'un .md
+    // qui n'a déclaré aucun scope dans son front-matter : il est opt-in et
+    // ne fuite donc dans aucun contexte tant qu'un scope n'est pas déclaré.
+    if (section.scope.length === 0) {
+      return false;
     }
 
     return section.scope.some(scope => this.matchesScope(scope, context));

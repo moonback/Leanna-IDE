@@ -464,7 +464,7 @@ Cite les sources avec leur nom entre guillemets. Sois précis et factuel.`;
     let responseText = "";
     try {
       if (onChunk) {
-        const { generateTextStream } = await import("../utils/textGeneration");
+        const { generateTextStream } = await import("../utils/textGeneration.js");
         responseText = await generateTextStream({
           prompt,
           temperature: 0.4,
@@ -543,7 +543,7 @@ Sois analytique, rigoureux et surprenant dans tes connexions. Chaque insight doi
     let responseText = "";
     try {
       if (onChunk) {
-        const { generateTextStream } = await import("../utils/textGeneration");
+        const { generateTextStream } = await import("../utils/textGeneration.js");
         responseText = await generateTextStream({
           prompt,
           temperature: 0.5,
