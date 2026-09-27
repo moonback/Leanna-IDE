@@ -15,7 +15,6 @@ import { useLiveAPI } from './hooks/useLiveAPI.js';
 import { FloatingOrb } from './components/FloatingOrb.js';
 import { CriticalEditConfirm } from './components/CriticalEditConfirm.js';
 import { StartupProjectModal } from './components/StartupProjectModal.js';
-import { IndexingOverlay } from './components/IndexingOverlay.js';
 import { LauncherModal } from './components/LauncherModal.js';
 import { useProfile } from './context/UserProfileContext.js';
 import { useAgentEventStream } from './hooks/useAgentEventStream.js';
@@ -566,8 +565,6 @@ function Layout() {
         <CriticalEditConfirm sendMessage={liveAPI.sendRawMessage} />
         {/* Modale de sélection du projet au démarrage */}
         <StartupProjectModal />
-        {/* Overlay d'indexation — visible pendant le scan du projet nouvellement ouvert */}
-        <IndexingOverlay />
         {/* Écran de choix IDE / Notebook affiché après le splash */}
         <LauncherModal />
       </ScreenShareProvider>
