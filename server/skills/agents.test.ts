@@ -30,6 +30,7 @@ test("agentsSkill — déclare tous les outils attendus", () => {
     "agent_status",
     "agent_list_tasks",
     "agent_list_roles",
+    "agent_create",
     "agent_cancel",
     "agent_cancel_orchestration",
     "agent_stats",
