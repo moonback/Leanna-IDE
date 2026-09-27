@@ -21,6 +21,7 @@ graph TD
         subgraph WS["WebSocket Servers"]
             WS_LIVE["/live — Gemini Live"]
             WS_SANDBOX["/sandbox-watch"]
+            WS_AUTONOMY["/autonomy — timeline"]
             WS_TERMINAL["/terminal"]
         end
 
@@ -61,6 +62,7 @@ graph TD
     UI --> WS_CLIENT
     WS_CLIENT --> WS_LIVE
     WS_CLIENT --> WS_SANDBOX
+    WS_CLIENT --> WS_AUTONOMY
     WS_CLIENT --> WS_TERMINAL
 
     API --> AUTH --> RATE
@@ -190,7 +192,7 @@ server.ts                    # 2. Initialise tout et démarre le serveur HTTP
 
 Domaines d'API montés (voir [API_DOCS.md](API_DOCS.md) pour le détail des endpoints) :
 
-`/api/health` · `/api/ide` · `/api/sandbox` · `/api/agents` (+ `/api/v2/agents`, `/api/v2/metrics`) · `/api/agent-builder` · `/api/agent-registration` · `/api/custom-agents` · `/api/workflows` · `/api/conversations` · `/api/memories` · `/api/memory/hierarchical` · `/api/skills` · `/api/custom-skills` · `/api/git` · `/api/github` · `/api/profile` + `/api/tokens` · `/api/openrouter` · `/api/gemini-keys` · `/api/notebooks` · `/api/documents` · `/api/upload-document` · `/api/automation` · `/api/terminal` · `/api/browser` · `/api/tts` · `/api/knowledge` · `/api/tools` · `/api/observability` · `/api/audit` · `/api/checkpoint` · `/api/safeguards` · `/api/self-root` · `/api/workspace` · `/api/lists` · `/api/telegram` · `/api/pm2` · `/api/mcp` · `/api/export` · `/api/ftp` · `/api/marketplace`
+`/api/health` · `/api/ide` · `/api/sandbox` · `/api/agents` (+ `/api/v2/agents`, `/api/v2/metrics`) · `/api/agent-builder` · `/api/agent-registration` · `/api/custom-agents` · `/api/missions` · `/api/workflows` · `/api/conversations` · `/api/memories` · `/api/memory/hierarchical` · `/api/skills` · `/api/custom-skills` · `/api/git` · `/api/github` · `/api/profile` + `/api/tokens` · `/api/openrouter` · `/api/gemini-keys` · `/api/notebooks` · `/api/documents` · `/api/upload-document` · `/api/automation` · `/api/terminal` · `/api/browser` · `/api/tts` · `/api/knowledge` · `/api/tools` · `/api/observability` · `/api/audit` · `/api/checkpoint` · `/api/safeguards` · `/api/self-root` · `/api/workspace` · `/api/lists` · `/api/telegram` · `/api/pm2` · `/api/mcp` · `/api/export` · `/api/ftp` · `/api/marketplace`
 
 ### Runtime et Skill System
 
@@ -310,6 +312,7 @@ Le token est auto-généré (256 bits, URL-safe base64) au premier démarrage si
 |---|---|---|
 | `/live` | Session Gemini Live bidirectionnelle (texte, audio, vidéo, tool calls) | Cookie `Leanna_token` |
 | `/sandbox-watch` | Notifications temps réel des fichiers modifiés dans le sandbox | Cookie `Leanna_token` |
+| `/autonomy` | Timeline temps réel du runtime autonome (lecture seule, événements `autonomy:*` + snapshot initial) | Cookie `Leanna_token` |
 | `/terminal` | Terminal PTY interactif | Token query/cookie |
 
 ---

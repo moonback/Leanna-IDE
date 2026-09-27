@@ -33,6 +33,7 @@ Les WebSockets `/live` et `/sandbox-watch` valident le token via le **cookie** `
 
 - [Santé](#santé)
 - [Runtime autonome](#runtime-autonome)
+- [Missions](#missions)
 - [IDE — Système de fichiers](#ide--système-de-fichiers)
 - [Sandbox](#sandbox)
 - [Agents](#agents)
@@ -124,6 +125,176 @@ Les statuts de tâche sont `pending`, `running`, `completed`, `dead_letter` et `
 **Erreurs :** `503` si le runtime autonome n’est pas injecté dans le routeur de métriques.
 
 Voir [AUTONOMY.md](AUTONOMY.md) pour la configuration, l’arrêt propre et la récupération.
+
+---
+
+## Missions
+
+Le Mission System pilote l'exécution orientée objectif et le curseur d'autonomie (`suggest` / `ask` / `auto`). Les routes ci-dessous exposent la création de missions, le cycle de vie (pause / reprise / annulation / suppression), la file d'approbations humaines (mode `ask`) et la lecture/modification du mode d'autonomie.
+
+L'`Executor` est initialisé de façon asynchrone au bootstrap : tant qu'il n'est pas prêt, les routes qui en dépendent renvoient `503`.
+
+### `POST /api/missions`
+
+Crée une mission par un chemin déterministe (réutilise le skill `mission_create`, indépendamment du LLM).
+
+**Authentification :** Oui
+
+**Body :**
+
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `title` | `string` | ✅ | Titre de la mission (non vide) |
+| `description` | `string` | ✅ | Description détaillée (non vide) |
+| `priority` | `string` | ❌ | Priorité (défaut : `medium`) |
+| `dryRun` | `boolean` | ❌ | Exécution à blanc (défaut : `false`) |
+
+**Réponse 200 :** Résultat du skill `mission_create`.
+
+**Erreurs :** `400` si `title`/`description` manquant ou invalide · `503` si le handler de création n'est pas configuré · `500` erreur interne.
+
+---
+
+### `GET /api/missions`
+
+Liste les missions actives et complétées (état initial du panneau).
+
+**Authentification :** Oui
+
+**Réponse 200 :**
+```json
+{
+  "missions": [
+    {
+      "id": "uuid",
+      "title": "...",
+      "status": "in_progress",
+      "priority": "medium",
+      "goals": [
+        {
+          "id": "goal-uuid",
+          "title": "...",
+          "status": "pending",
+          "actions": [
+            { "id": "act-uuid", "skill": "read_file", "status": "done", "confidence": 0.9, "decision": "continue" }
+          ]
+        }
+      ],
+      "activeGoalId": "goal-uuid",
+      "confidence": 0.5,
+      "metrics": { "totalActions": 0, "successfulActions": 0, "failedActions": 0 },
+      "createdAt": "2026-09-04T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+**Erreurs :** `503` si le Mission System n'est pas initialisé.
+
+---
+
+### `POST /api/missions/:id/approve`
+
+Approuve ou refuse une action en attente (mode `ask`).
+
+**Authentification :** Oui
+
+**Body :**
+
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `actionId` | `string` | ✅ | Identifiant de l'action en attente |
+| `approved` | `boolean` | ✅ | `true` pour approuver, `false` pour refuser |
+
+**Réponse 200 :** `{ "ok": true, "actionId": "...", "approved": true }`
+
+**Erreurs :** `400` champ manquant/invalide · `404` aucune approbation en attente pour cet `actionId` (déjà résolue ou expirée) · `503` Mission System non initialisé.
+
+---
+
+### `POST /api/missions/:id/pause`
+
+Met une mission active en pause.
+
+**Authentification :** Oui · **Path params :** `id` (UUID de la mission)
+
+**Réponse 200 :** `{ "ok": true, "missionId": "...", "status": "paused" }`
+
+**Erreurs :** `404` mission introuvable, déjà en pause ou non active · `503` Mission System non initialisé.
+
+---
+
+### `POST /api/missions/:id/resume`
+
+Reprend une mission en pause.
+
+**Authentification :** Oui · **Path params :** `id`
+
+**Réponse 200 :** `{ "ok": true, "missionId": "...", "status": "in_progress" }`
+
+**Erreurs :** `404` mission introuvable ou non en pause · `503` Mission System non initialisé.
+
+---
+
+### `POST /api/missions/:id/cancel`
+
+Annule une mission active.
+
+**Authentification :** Oui · **Path params :** `id`
+
+**Réponse 200 :** `{ "ok": true, "missionId": "...", "status": "cancelled" }`
+
+**Erreurs :** `404` mission introuvable ou déjà terminée · `503` Mission System non initialisé.
+
+---
+
+### `DELETE /api/missions/:id`
+
+Supprime une mission (une mission active est d'abord annulée puis retirée ; sinon retirée de l'historique).
+
+**Authentification :** Oui · **Path params :** `id`
+
+**Réponse 200 :** `{ "ok": true, "missionId": "...", "deleted": true }`
+
+**Erreurs :** `404` mission introuvable · `503` Mission System non initialisé.
+
+---
+
+### `GET /api/missions/pending-approvals`
+
+Liste toutes les approbations en attente.
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "pending": [ ... ] }`
+
+**Erreurs :** `503` Mission System non initialisé.
+
+---
+
+### `GET /api/missions/autonomy`
+
+Lit le mode d'autonomie courant du curseur.
+
+**Authentification :** Oui
+
+**Réponse 200 :** `{ "mode": "ask", "enabled": true }` — ou `{ "mode": null, "enabled": false }` si aucune policy n'est configurée.
+
+**Erreurs :** `503` Mission System non initialisé.
+
+---
+
+### `POST /api/missions/autonomy`
+
+Modifie le mode d'autonomie.
+
+**Authentification :** Oui
+
+**Body :** `{ "mode": "suggest" | "ask" | "auto" }`
+
+**Réponse 200 :** `{ "ok": true, "mode": "auto" }`
+
+**Erreurs :** `400` mode invalide · `503` curseur d'autonomie non configuré / Mission System non initialisé.
 
 ---
 
@@ -2030,6 +2201,20 @@ Notifications temps réel des changements dans le sandbox.
 { "type": "file_changed", "path": "src/app.ts", "action": "modified" }
 { "type": "file_created", "path": "src/new.ts" }
 { "type": "file_deleted", "path": "src/old.ts" }
+```
+
+---
+
+### `WS /autonomy`
+
+Timeline temps réel du runtime autonome (lecture seule). Ne démarre **aucune** session Gemini (contrairement à `/live`) et se contente de diffuser les événements `autonomy:*` déjà émis par le runtime. À la connexion, un snapshot initial de l'état est envoyé.
+
+**Auth :** Cookie `Leanna_token`
+
+**Messages sortants (serveur → client) :**
+```json
+{ "type": "autonomy_snapshot", "timestamp": "2026-09-04T10:00:00.000Z", "state": { "status": "watching", "activeTasks": 0, "health": "healthy" } }
+{ "type": "autonomy_event", "event": "task_created", "task": { "id": "uuid", "type": "maintenance", "status": "pending" } }
 ```
 
 ---
