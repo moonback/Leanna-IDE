@@ -14,6 +14,7 @@ import {
 import { SkillValidationError } from "./base.js";
 import type { AgentRole } from "../agents/index.js";
 import { createLogger, getLogEntries } from "../utils/logger.js";
+import { createCustomAgent, AgentRoleConflictError } from "../routes/custom-agents.js";
 
 const log = createLogger("Assistant");
 
@@ -70,6 +71,23 @@ const collaborateSchema = z.object({
   instructions: z.string().optional(),
 });
 
+const createAgentSchema = z.object({
+  name: z.string().min(1, "Le nom est requis").trim(),
+  role: z
+    .string()
+    .min(1, "Le rôle est requis")
+    .regex(
+      /^[a-zA-Z0-9_-]+$/,
+      "Le rôle ne peut contenir que des lettres, chiffres, tirets et underscores",
+    ),
+  description: z.string().trim().optional(),
+  systemPrompt: z.string().trim().optional(),
+  capabilities: z.array(z.string()).optional(),
+  maxConcurrency: z.number().int().min(1).max(10).optional(),
+  defaultTimeoutMs: z.number().int().min(1000).max(600_000).optional(),
+  triggerKeywords: z.array(z.string()).optional(),
+});
+
 const assistantLogsSchema = z.object({
   scope: z.enum(["assistant", "agents", "all"]).optional().default("all"),
   module: z.string().trim().min(1).max(120).optional(),
@@ -114,6 +132,8 @@ export const agentsSkill: Skill = {
     agent_cancel_orchestration: ["exec"],
     agent_collaborate: ["exec"],
     agent_brain: ["exec"],
+    // Création d'un agent personnalisé (persistance + enregistrement dynamique).
+    agent_create: ["exec"],
     // Consultations en lecture seule.
     agent_status: ["read"],
     agent_list_tasks: ["read"],
@@ -208,6 +228,31 @@ export const agentsSkill: Skill = {
       name: "agent_list_roles",
       description: "Liste tous les agents disponibles avec leurs capacités.",
       parameters: { type: "OBJECT", properties: {}, required: [] },
+    },
+    {
+      name: "agent_create",
+      description:
+        "Crée un NOUVEL agent personnalisé quand aucun rôle existant (coder, tester, reviewer, " +
+        "researcher, writer, etc.) ne convient à un besoin de la demande. L'agent est persisté et " +
+        "immédiatement utilisable : tu peux ensuite le déléguer avec agent_delegate ou l'inclure dans " +
+        "agent_orchestrate via son 'role'. Vérifie d'abord avec agent_list_roles qu'aucun rôle adapté " +
+        "n'existe déjà — ne crée un agent que si c'est vraiment nécessaire. Le systemPrompt définit " +
+        "l'identité, la mission et les règles de l'agent ; les capabilities sont les noms d'outils qu'il " +
+        "peut appeler (ex: read_project_file, write_project_file, search_in_files).",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          name:        { type: "STRING", description: "Nom lisible de l'agent (ex: 'Expert SQL', 'Auditeur RGPD')." },
+          role:        { type: "STRING", description: "Identifiant unique du rôle, en slug : lettres, chiffres, tirets, underscores uniquement (ex: 'sql-expert'). Ne doit pas entrer en conflit avec un rôle existant." },
+          description: { type: "STRING", description: "Courte description de la spécialité de l'agent." },
+          systemPrompt:{ type: "STRING", description: "Prompt système définissant l'identité, la mission et les règles de l'agent." },
+          capabilities:{ type: "ARRAY", items: { type: "STRING" }, description: "Noms des outils que l'agent est autorisé à utiliser (optionnel). Les outils d'écriture de fichiers accordent la permission d'écriture." },
+          maxConcurrency:  { type: "NUMBER", description: "Tâches simultanées maximales (1-10, défaut 2)." },
+          defaultTimeoutMs:{ type: "NUMBER", description: "Timeout par défaut d'une tâche en ms (1000-600000, défaut 60000)." },
+          triggerKeywords: { type: "ARRAY", items: { type: "STRING" }, description: "Mots-clés/tags de catégorisation (optionnel)." },
+        },
+        required: ["name", "role"],
+      },
     },
     {
       name: "agent_cancel",
@@ -345,6 +390,7 @@ export const agentsSkill: Skill = {
     agent_status:                     z.object({ taskId: z.string().min(1) }),
     agent_list_tasks:                 listAgentTasksSchema,
     agent_list_roles:                 z.object({}),
+    agent_create:                     createAgentSchema,
     agent_cancel:                     z.object({ taskId: z.string().min(1) }),
     agent_cancel_orchestration:       z.object({ orchestrationId: z.string().min(1) }),
     agent_stats:                      z.object({}),
@@ -571,6 +617,40 @@ export const agentsSkill: Skill = {
             maxConcurrency: a.maxConcurrency, defaultTimeoutMs: a.defaultTimeoutMs,
           })),
         };
+      }
+
+      case "agent_create": {
+        const v = validateArgs(createAgentSchema, args);
+        try {
+          const agent = createCustomAgent({
+            name: v.name,
+            role: v.role,
+            description: v.description,
+            systemPrompt: v.systemPrompt,
+            capabilities: v.capabilities,
+            maxConcurrency: v.maxConcurrency,
+            defaultTimeoutMs: v.defaultTimeoutMs,
+            triggerKeywords: v.triggerKeywords,
+          });
+          console.log(`[AgentsSkill]   ✓ Agent personnalisé créé: "${agent.role}" (${agent.name})`);
+          return {
+            success: true,
+            message: `Agent personnalisé "${agent.name}" (rôle: "${agent.role}") créé et disponible immédiatement.`,
+            role: agent.role,
+            name: agent.name,
+            id: agent.id,
+            hint: `Tu peux maintenant déléguer une tâche avec agent_delegate en utilisant role: "${agent.role}", ou l'inclure dans agent_orchestrate.`,
+          };
+        } catch (err: any) {
+          if (err instanceof AgentRoleConflictError) {
+            throw new SkillValidationError(
+              err.message,
+              name,
+              `Choisis un autre identifiant de rôle, ou réutilise le rôle existant avec agent_delegate au lieu d'en créer un nouveau.`,
+            );
+          }
+          throw err;
+        }
       }
 
       case "agent_cancel": {

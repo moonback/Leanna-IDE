@@ -69,6 +69,87 @@ function writeAgents(agents: any[]) {
   fs.writeFileSync(getAgentsFilePath(), JSON.stringify(agents, null, 2), "utf-8");
 }
 
+/** Brouillon d'agent personnalisé accepté par {@link createCustomAgent}. */
+export interface CustomAgentDraft {
+  name: string;
+  role: string;
+  description?: string;
+  systemPrompt?: string;
+  capabilities?: string[];
+  tools?: string[];
+  maxConcurrency?: number;
+  defaultTimeoutMs?: number;
+  triggerKeywords?: string[];
+}
+
+/** Erreur de collision de rôle (rôle statique ou dynamique déjà pris). */
+export class AgentRoleConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AgentRoleConflictError";
+  }
+}
+
+/**
+ * Crée un agent personnalisé : le valide, le persiste dans
+ * `.Leanna/custom-agents.json`, l'enregistre dans le registre dynamique et
+ * démarre son processus autonome si le AgentRegistry est prêt.
+ *
+ * Source de vérité unique partagée par la route REST (`handleCreateAgent`) et
+ * par l'outil LLM `agent_create` (skill agents), afin que Leanna puisse créer
+ * des agents en pleine conversation avec exactement le même comportement que
+ * l'Agent Builder.
+ *
+ * @throws {AgentRoleConflictError} si le rôle est déjà utilisé (statique ou dynamique).
+ */
+export function createCustomAgent(draft: CustomAgentDraft): any {
+  // Le rôle ne doit pas entrer en conflit avec un agent statique…
+  if (getAgentDefinition(draft.role) && !dynamicAgentRegistry.hasAgent(draft.role)) {
+    throw new AgentRoleConflictError(
+      `Le rôle "${draft.role}" est déjà utilisé par un agent statique.`,
+    );
+  }
+  // …ni avec un agent dynamique déjà enregistré.
+  if (dynamicAgentRegistry.hasAgent(draft.role)) {
+    throw new AgentRoleConflictError(
+      `Le rôle "${draft.role}" est déjà enregistré comme agent personnalisé.`,
+    );
+  }
+
+  const agents = readAgents();
+  const now = new Date().toISOString();
+  const agent = {
+    ...draft,
+    id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    createdAt: now,
+    updatedAt: now,
+  };
+  agents.push(agent);
+  writeAgents(agents);
+
+  // Enregistrer dans le registre dynamique + démarrer si possible.
+  dynamicAgentRegistry.registerAgent({
+    role: draft.role,
+    name: draft.name,
+    description: draft.description || "",
+    systemPrompt: draft.systemPrompt || "",
+    capabilities: draft.capabilities || draft.tools || [],
+    maxConcurrency: draft.maxConcurrency ?? 2,
+    defaultTimeoutMs: draft.defaultTimeoutMs ?? 60_000,
+    version: "1.0.0",
+    tags: draft.triggerKeywords || [],
+    isActive: true,
+    author: "agent-builder",
+  });
+
+  if (agentRegistry.isReady) {
+    agentRegistry.registerAndStartDynamicAgent(draft.role);
+  }
+
+  log.info(`✅ Agent personnalisé "${draft.role}" créé et enregistré`);
+  return agent;
+}
+
 /**
  * Charge et enregistre tous les agents personnalisés au démarrage.
  * Doit être appelé après l'initialisation du AgentRegistry.
@@ -147,63 +228,14 @@ export function handleCreateAgent(req: Request, res: Response): void {
       return;
     }
     const draft = parsed.data;
-    
-    // Vérifier que le rôle n'existe pas déjà dans les agents statiques
-    if (getAgentDefinition(draft.role)) {
-      res.status(409).json({
-        error: `Le rôle "${draft.role}" est déjà utilisé par un agent statique`,
-      });
-      return;
-    }
-    
-    // Vérifier que le rôle n'existe pas déjà dans les agents dynamiques
-    if (dynamicAgentRegistry.hasAgent(draft.role)) {
-      res.status(409).json({
-        error: `Le rôle "${draft.role}" est déjà enregistré comme agent personnalisé`,
-      });
-      return;
-    }
-    
-    const agents = readAgents();
-    const now = new Date().toISOString();
-    const agent = {
-      ...draft,
-      id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    agents.push(agent);
-    writeAgents(agents);
-    
-    // Enregistrer l'agent dans le registre dynamique
-    try {
-      dynamicAgentRegistry.registerAgent({
-        role: draft.role,
-        name: draft.name,
-        description: draft.description || '',
-        systemPrompt: draft.systemPrompt || '',
-        capabilities: draft.capabilities || draft.tools || [],
-        maxConcurrency: draft.maxConcurrency ?? 2,
-        defaultTimeoutMs: draft.defaultTimeoutMs ?? 60_000,
-        version: "1.0.0",
-        tags: draft.triggerKeywords || [],
-        isActive: true,
-        author: "agent-builder",
-      });
-      
-      // Démarrer l'agent si le AgentRegistry est initialisé
-      if (agentRegistry.isReady) {
-        agentRegistry.registerAndStartDynamicAgent(draft.role);
-      }
-      
-      log.info(`✅ Agent personnalisé "${draft.role}" créé et enregistré`);
-    } catch (registerErr: any) {
-      log.error(`⚠️ Erreur lors de l'enregistrement dynamique de "${draft.role}": ${registerErr.message}`);
-      // Ne pas échouer la création, mais logger l'erreur
-    }
-    
+
+    const agent = createCustomAgent(draft);
     res.json({ success: true, agent });
   } catch (err: any) {
+    if (err instanceof AgentRoleConflictError) {
+      res.status(409).json({ error: err.message });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 }
