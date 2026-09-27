@@ -57,6 +57,7 @@ import { createUploadDocumentRouter } from "./server/routes/upload-document.js";
 import { createDocumentsRouter } from "./server/routes/documents.js";
 import { createSkillsRouter } from "./server/routes/skills.js";
 import mcpRouter from "./server/routes/mcp.js";
+import { createMcpDirectoryRouter } from "./server/routes/mcp-directory.js";
 import { createTerminalRouter, setupTerminalWebSocket } from "./server/routes/terminal.js";
 import memoriesRouter from "./server/routes/memories.js";
 import hierarchicalMemoryRouter from "./server/routes/hierarchicalMemory.js";
@@ -644,6 +645,7 @@ async function startServer() {
   app.use("/api/documents", createDocumentsRouter(() => currentProfile));
   app.use("/api/skills", createSkillsRouter(skillManager, runtime));
   app.use("/api/mcp", mcpRouter);
+  app.use("/api/mcp", createMcpDirectoryRouter(mcpBridge));
   
   // ── Tools Registry (diagnostic unifié) ───────────────────────────────────
   const { createToolsRegistryRouter } = await import("./server/routes/tools-registry.js");

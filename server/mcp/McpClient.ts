@@ -100,6 +100,8 @@ export class McpClient extends EventEmitter {
   private _error: string | null = null;
   private sseAbortController: AbortController | null = null;
   private sseSessionUrl: string | null = null;
+  /** Session id Streamable HTTP (header Mcp-Session-Id), à réémettre sur chaque POST. */
+  private mcpSessionId: string | null = null;
 
   /** Timeout SSE initial fetch et POST des messages */
   private static readonly SSE_CONNECT_TIMEOUT_MS = 30_000;
@@ -265,39 +267,46 @@ export class McpClient extends EventEmitter {
     const { command, args = [], env = {} } = this.config;
     if (!command) throw new Error('Commande manquante pour le transport stdio');
 
-    // Résoudre la commande (support npx, uvx, etc.)
-    const resolvedCommand = command;
-    
     const mergedEnv = { ...process.env, ...env };
-
-    // Node.js 21+ déconseille de mélanger shell:true avec args[]
-    // Node.js 20+ gère automatiquement les .cmd/.bat sur Windows
-    // Il suffit de passer le nom sans extension ; Node résoudra npx.cmd, uvx.cmd etc. via PATH.
     const isWin = process.platform === 'win32';
 
-    // Sur Windows, si la commande est un wrapper connu livré en .cmd, on spécifie
-    // l'extension explicitement pour que CreateProcess le trouve sans shell.
-    // On ne couvre que les commandes sans extension et sans chemin absolu/relatif.
-    const CMD_WRAPPERS = ['npx', 'uvx', 'npm', 'node', 'yarn', 'pnpm'];
-    let finalCommand = resolvedCommand;
-    if (
+    // Sur Windows, les wrappers npm/pypi (npx, uvx, npm...) sont livrés en .cmd.
+    // Depuis Node 18.20 / 20.12 (CVE-2024-27980), spawn() REFUSE de lancer un
+    // fichier .cmd/.bat avec shell:false → "spawn EINVAL". Il faut donc :
+    //   - Windows + wrapper connu : shell:true (Node exige un shell pour un .cmd)
+    //     avec commande et arguments quotés pour neutraliser l'injection shell.
+    //   - tout le reste : shell:false (exécution directe, sans risque d'injection).
+    const CMD_WRAPPERS = ['npx', 'uvx', 'npm', 'node', 'yarn', 'pnpm', 'deno', 'bunx'];
+    const isBareWrapper =
       isWin &&
-      !resolvedCommand.includes('/') &&
-      !resolvedCommand.includes('\\') &&
-      !resolvedCommand.includes('.') &&
-      CMD_WRAPPERS.includes(resolvedCommand)
-    ) {
-      finalCommand = resolvedCommand + '.cmd';
+      !command.includes('/') &&
+      !command.includes('\\') &&
+      !command.includes('.') &&
+      CMD_WRAPPERS.includes(command);
+
+    let finalCommand = command;
+    let finalArgs = args;
+    let useShell = false;
+
+    if (isBareWrapper) {
+      // Quote pour cmd.exe : entoure de guillemets tout token contenant un
+      // caractère spécial ou un espace, et double les guillemets internes.
+      const quoteForCmd = (token: string): string =>
+        /[\s"&|<>^%()]/.test(token) ? `"${token.replace(/"/g, '""')}"` : token;
+      finalCommand = `${command}.cmd`;
+      finalArgs = args.map(quoteForCmd);
+      useShell = true;
     }
 
     const spawnOptions: import('child_process').SpawnOptions = {
       env: mergedEnv,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
-      shell: false, // shell:true avec args[] génère DEP0190 sur Node.js 21+
+      // shell:true uniquement pour les wrappers .cmd Windows (args déjà quotés).
+      shell: useShell,
     };
 
-    this.process = spawn(finalCommand, args, spawnOptions);
+    this.process = spawn(finalCommand, finalArgs, spawnOptions);
 
     if (!this.process.stdout || !this.process.stdin) {
       throw new Error('Impossible de créer les pipes stdio');
@@ -375,6 +384,16 @@ export class McpClient extends EventEmitter {
 
     this.sseAbortController = new AbortController();
 
+    // Deux protocoles HTTP coexistent côté MCP :
+    //   1. Streamable HTTP (standard actuel) : PAS de flux GET. Le client POSTe
+    //      ses messages JSON-RPC sur l'URL, et la réponse (JSON ou mini-flux
+    //      SSE) revient dans le POST. Un GET nu renvoie souvent 405/404/406.
+    //   2. Legacy "HTTP with SSE" : un GET ouvre un flux SSE persistant qui
+    //      commence par un event `endpoint` donnant l'URL de POST.
+    //
+    // On tente le GET stream d'abord ; si le serveur le refuse (405/404/406),
+    // on bascule en mode Streamable HTTP pur (POST-only). writeMessage() sait
+    // déjà lire la réponse du POST dans les deux formats.
     const connectTimeoutId = setTimeout(() => {
       this.sseAbortController?.abort(new Error(`SSE connect timeout (${McpClient.SSE_CONNECT_TIMEOUT_MS}ms)`));
     }, McpClient.SSE_CONNECT_TIMEOUT_MS);
@@ -386,21 +405,42 @@ export class McpClient extends EventEmitter {
         headers: { 'Accept': 'text/event-stream' },
         signal: this.sseAbortController.signal,
       });
-
-      if (!response.ok) {
-        throw new Error(`SSE connection failed: ${response.status} ${response.statusText}`);
-      }
     } finally {
       clearTimeout(connectTimeoutId);
     }
 
-    // Pour Streamable HTTP, le POST cible la même URL que le GET.
-    // Pour "HTTP with SSE", le POST cible le session endpoint reçu via l'event
-    // `endpoint`. On initialise avec l'URL de base et on la remplacera dès que
-    // l'event `endpoint` arrivera.
+    // Le POST des messages cible l'URL de base par défaut (Streamable HTTP).
+    // En legacy, elle sera remplacée dès réception de l'event `endpoint`.
     this.sseSessionUrl = url;
 
-    this.readSseStream(response!).catch(err => {
+    const contentType = response.headers.get('content-type') || '';
+    const isEventStream = contentType.includes('text/event-stream');
+
+    // Cas Streamable HTTP : GET non supporté (405/404/406) → pas de flux à lire.
+    // La connexion est "prête", le handshake initialize partira en POST.
+    const STREAMABLE_HTTP_GET_REJECTED = response.status === 405
+      || response.status === 404
+      || response.status === 406;
+
+    if (!response.ok) {
+      if (STREAMABLE_HTTP_GET_REJECTED) {
+        console.log(`[MCP:${this.config.id}] GET SSE refusé (${response.status}) → mode Streamable HTTP (POST-only)`);
+        // On draine et ignore le corps de la réponse d'erreur.
+        try { await response.body?.cancel(); } catch { /* ignore */ }
+        return;
+      }
+      throw new Error(`SSE connection failed: ${response.status} ${response.statusText}`);
+    }
+
+    // 200 mais pas un flux SSE (ex. JSON) → Streamable HTTP également.
+    if (!isEventStream) {
+      try { await response.body?.cancel(); } catch { /* ignore */ }
+      console.log(`[MCP:${this.config.id}] GET sans flux SSE → mode Streamable HTTP (POST-only)`);
+      return;
+    }
+
+    // Legacy "HTTP with SSE" : on lit le flux GET persistant.
+    this.readSseStream(response).catch(err => {
       if (err.name !== 'AbortError') {
         console.error(`[MCP:${this.config.id}] SSE stream error:`, err.message);
         this._status = 'error';
@@ -579,14 +619,28 @@ export class McpClient extends EventEmitter {
         postAbort.abort(new Error(`SSE POST timeout (${McpClient.SSE_CONNECT_TIMEOUT_MS}ms)`));
       }, McpClient.SSE_CONNECT_TIMEOUT_MS);
 
+      const postHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        // Streamable HTTP exige d'accepter les deux formats de réponse ;
+        // un Accept absent/incomplet fait répondre 406 à certains serveurs.
+        'Accept': 'application/json, text/event-stream',
+      };
+      // Réémet le session id renvoyé par le serveur à l'initialize (Streamable HTTP).
+      if (this.mcpSessionId) postHeaders['Mcp-Session-Id'] = this.mcpSessionId;
+
       fetch(this.sseSessionUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: postHeaders,
         body: serialized,
         signal: postAbort.signal,
       })
         .then(async (res) => {
           clearTimeout(postTimeout);
+
+          // Capture le session id renvoyé par le serveur (souvent sur initialize).
+          const sessionId = res.headers.get('mcp-session-id');
+          if (sessionId) this.mcpSessionId = sessionId;
+
           if (!res.ok) return;
 
           const contentType = res.headers.get('content-type') || '';
@@ -721,6 +775,8 @@ export class McpClient extends EventEmitter {
 
     this.rejectAllPending(new Error('Client disconnected'));
     this.buffer = '';
+    this.sseSessionUrl = null;
+    this.mcpSessionId = null;
   }
 
   private rejectAllPending(error: Error): void {

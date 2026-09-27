@@ -3,9 +3,10 @@ import {
   Plug, Plus, Trash2, RefreshCw, Power, PowerOff,
   Terminal, Globe, AlertCircle, CheckCircle2, Loader2, Wrench,
   ChevronDown, ChevronRight, X, Activity, Clock,
-  Zap, TrendingUp, Search
+  Zap, TrendingUp, Search, Store
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { McpDirectory } from './McpDirectory.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -100,6 +101,7 @@ export function McpPanel() {
   const [metrics, setMetrics] = useState<McpMetric[]>([]);
   const [metricsSummary, setMetricsSummary] = useState<McpMetricsSummary>({});
   const [toolSearch, setToolSearch] = useState('');
+  const [showDirectory, setShowDirectory] = useState(false);
 
   const apiBase = '/api/mcp';
 
@@ -411,6 +413,14 @@ export function McpPanel() {
           </span>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowDirectory(true)}
+            className="p-1.5 rounded"
+            style={{ color: theme.accent }}
+            title="Parcourir l'annuaire MCP"
+          >
+            <Store size={13} />
+          </button>
           <button
             onClick={fetchServers}
             className="p-1.5 rounded"
@@ -997,6 +1007,13 @@ export function McpPanel() {
           </span>
         )}
       </div>
+
+      {/* ── Annuaire MCP (modal) ── */}
+      <McpDirectory
+        open={showDirectory}
+        onClose={() => setShowDirectory(false)}
+        onInstalled={() => fetchServers()}
+      />
     </div>
   );
 }
