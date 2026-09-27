@@ -377,7 +377,7 @@ export function attachLiveWebSocket(
         'analyze_project_file',
         'run_project_command',
         'verify_file', 'verify_syntax', 'verify_typecheck', 'security_audit',
-        'save_memory', 'search_memory',
+        'save_memory', 'search_memory', 'list_memories', 'delete_memory',
         'knowledge_build_context', 'knowledge_semantic_search',
         'knowledge_memory_search',
         'get_current_time',
@@ -418,7 +418,7 @@ export function attachLiveWebSocket(
       const ASK_MODE_ALLOWED_TOOLS = new Set([
         'list_project_files', 'read_project_file', 'read_file_outline', 'search_in_files',
         'analyze_project_file', 'get_workspace_info', 'open_project_file', 'open_ide', 'security_audit',
-        'save_memory', 'search_memory',
+        'save_memory', 'search_memory', 'list_memories',
         'knowledge_build_context', 'knowledge_semantic_search',
         'knowledge_memory_search', 'knowledge_memory_list',
         'knowledge_search_entities', 'knowledge_status',

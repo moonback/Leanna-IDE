@@ -40,6 +40,18 @@ async function findSimilarMemory(
 
 export const memorySkill: Skill = {
   name: "memory",
+  // Permissions déclarées explicitement, appliquées au runtime par le ToolRegistry.
+  // save_memory écrit dans Supabase via le réseau ; delete_memory est destructif
+  // (suppression définitive) ; list/search sont en lecture seule. Sans cette
+  // déclaration, l'inférence par nom (voir SkillAdapter.inferPermissions) classerait
+  // à tort save_memory comme effet de bord non identifié et n'expliciterait pas la
+  // nature réseau des écritures. On rend donc le contrat explicite.
+  toolPermissions: {
+    save_memory: ["write", "network"],
+    delete_memory: ["write", "network"],
+    search_memory: ["read", "network"],
+    list_memories: ["read", "network"],
+  },
   declarations: [
     {
       name: "save_memory",
