@@ -6,7 +6,6 @@ import {
   FolderInput, Globe, X, Plus, Trash2, GitBranch,
   CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Clock,
   Github, Terminal, FolderDown, Server, RefreshCw, Send, Settings,
-  MessageSquare,
 } from 'lucide-react';
 import { ideApi } from '../services/ideApi.js';
 import { useToast } from '../components/ui/Toast.js';
@@ -529,13 +528,6 @@ export function StartupProjectModal() {
       window.close();
     }
   };
-
-  /** Continuer sans projet — mode web / questions générales uniquement */
-  const handleNoWorkspace = useCallback(() => {
-    sessionStorage.setItem(NO_WORKSPACE_KEY, '1');
-    window.dispatchEvent(new CustomEvent('Leanna-no-workspace-mode'));
-    setIsOpen(false);
-  }, []);
 
   const handleOpenSettings = () => {
     returningFromSettingsRef.current = true;
@@ -1362,23 +1354,24 @@ export function StartupProjectModal() {
             </span>
 
             <div className="flex items-center gap-2">
-              {/* Continuer sans projet — visible uniquement quand aucun projet n'est actif */}
+              {/* Nouveau projet — visible uniquement quand aucun projet n'est actif */}
               {!currentPath && (
                 <motion.button
                   type="button"
-                  onClick={handleNoWorkspace}
+                  onClick={handleCreateEmptyWorkspace}
+                  disabled={loading}
                   whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
                   whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
                   style={{
                     backgroundColor: 'transparent',
                     border: '1px solid var(--border-base)',
                     color: 'var(--text-muted)',
                   }}
-                  title="Utiliser Leanna sans projet (web & questions générales)"
+                  title="Créer un nouveau projet dans un dossier vide"
                 >
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  Continuer sans projet
+                  <Plus className="w-3.5 h-3.5" />
+                  Nouveau projet
                 </motion.button>
               )}
               {currentPath && (
