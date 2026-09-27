@@ -4,7 +4,7 @@ import {
   Send, Mic, MicOff, User, Bot, Eye, X,
   Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2,
   ChevronDown, Download, MessageSquare, MoreVertical, ArrowDown,
-  Copy, CheckCheck, RefreshCw, Sparkles, Hash,
+  Copy, CheckCheck, RefreshCw, Sparkles, Hash, Loader2,
 } from 'lucide-react';
 import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
@@ -1261,43 +1261,12 @@ export function ChatPanel({
           )}
 
           {/* Bot avatar with pulsing status dot */}
-          <div className="relative flex-shrink-0">
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{
-                background: connected
-                  ? 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 18%, transparent), color-mix(in srgb, var(--accent-secondary) 8%, transparent))'
-                  : 'color-mix(in srgb, var(--text-muted) 8%, transparent)',
-                border: `1px solid ${connected ? 'color-mix(in srgb, var(--accent-primary) 25%, transparent)' : 'var(--border-base)'}`,
-                boxShadow: connected ? '0 0 14px color-mix(in srgb, var(--accent-primary) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.06)' : 'none',
-              }}
-            >
-              <Bot size={16} style={{ color: connected ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
-            </div>
-            {/* Status dot */}
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--bg-panel)]">
-              {connected && !reduceMotion ? (
-                <motion.div
-                  className="w-full h-full rounded-full"
-                  style={{ backgroundColor: 'var(--color-success)' }}
-                  animate={{ opacity: [1, 0.4, 1] }}
-                  transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-                />
-              ) : (
-                <div
-                  className="w-full h-full rounded-full"
-                  style={{
-                    backgroundColor: connected ? 'var(--color-success)' : connecting ? 'var(--color-warning)' : 'var(--text-dimmed)',
-                  }}
-                />
-              )}
-            </div>
-          </div>
+          
 
           {/* Title + status */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+              <span className="text-sm font-semibold truncate leading-tight" style={{ color: 'var(--text-primary)' }}>
                 {profile?.aiName || 'Leanna'}
               </span>
               {transcript.length > 0 && (
@@ -1307,62 +1276,95 @@ export function ChatPanel({
                     color: 'var(--text-dimmed)',
                     backgroundColor: 'color-mix(in srgb, var(--text-dimmed) 10%, transparent)',
                   }}
+                  title={`${transcript.length} message${transcript.length > 1 ? 's' : ''}`}
                 >
                   <Hash size={8} />
                   {transcript.length}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <span
-                className="text-[11px]"
-                style={{
-                  color: connected ? 'var(--color-success)' : connecting ? 'var(--color-warning)' : 'var(--text-dimmed)',
-                }}
-              >
-                {connecting ? 'Connexion…' : isBusy ? 'Réflexion…' : connected ? 'En ligne' : 'Hors ligne'}
-              </span>
-              <MultiAgentIndicator steps={activity} />
+            <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+              {/* Compact status pill */}
+              {(() => {
+                const statusColor = connected
+                  ? (isBusy ? 'var(--accent-primary)' : 'var(--color-success)')
+                  : connecting ? 'var(--color-warning)' : 'var(--text-dimmed)';
+                const statusLabel = connecting
+                  ? 'Connexion…'
+                  : isBusy ? 'Réflexion…' : connected ? 'En ligne' : 'Hors ligne';
+                return (
+                  <span
+                    className="flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0"
+                    style={{
+                      color: statusColor,
+                      backgroundColor: `color-mix(in srgb, ${statusColor} 12%, transparent)`,
+                    }}
+                  >
+                    {connecting ? (
+                      <Loader2 size={9} className={reduceMotion ? '' : 'animate-spin'} />
+                    ) : isBusy && !reduceMotion ? (
+                      <motion.span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: statusColor }}
+                        animate={{ opacity: [1, 0.3, 1], scale: [1, 0.8, 1] }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'easeInOut' }}
+                      />
+                    ) : (
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColor }} />
+                    )}
+                    {statusLabel}
+                  </span>
+                );
+              })()}
             </div>
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-0.5">
-            {/* Mute */}
-            {connected && (
-              <motion.button
-                onClick={handleToggleMute}
-                whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
-                title={muted ? 'Activer le micro' : 'Désactiver le micro'}
-                aria-label={muted ? 'Activer le micro' : 'Désactiver le micro'}
-              >
-                {muted
-                  ? <MicOff size={15} style={{ color: 'var(--color-warning)' }} />
-                  : <Mic size={15} style={{ color: 'var(--color-success)' }} />
-                }
-              </motion.button>
-            )}
-
-            {/* Toggle input */}
-            <motion.button
-              onClick={() => setShowInput((s: boolean) => !s)}
-              whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-              className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
-              title={showInput ? 'Masquer la saisie' : 'Afficher la saisie'}
-              aria-label={showInput ? 'Masquer la saisie' : 'Afficher la saisie'}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Segmented group: mute · toggle input · more */}
+            <div
+              className="flex items-center gap-0.5 rounded-xl p-0.5"
               style={{
-                backgroundColor: showInput ? 'color-mix(in srgb, var(--accent-primary) 12%, transparent)' : 'transparent',
+                backgroundColor: 'color-mix(in srgb, var(--bg-input) 55%, transparent)',
+                border: '1px solid var(--border-base)',
               }}
             >
-              <MessageSquare
-                size={15}
-                style={{ color: showInput ? 'var(--accent-primary)' : 'var(--text-muted)' }}
-              />
-            </motion.button>
+              {/* Mute */}
+              {connected && (
+                <motion.button
+                  onClick={handleToggleMute}
+                  whileTap={reduceMotion ? undefined : { scale: 0.88 }}
+                  className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                  title={muted ? 'Activer le micro' : 'Désactiver le micro'}
+                  aria-label={muted ? 'Activer le micro' : 'Désactiver le micro'}
+                >
+                  {muted
+                    ? <MicOff size={15} style={{ color: 'var(--color-warning)' }} />
+                    : <Mic size={15} style={{ color: 'var(--color-success)' }} />
+                  }
+                </motion.button>
+              )}
 
-            {/* More menu */}
-            <div className="relative" ref={menuRef}>
+              {/* Toggle input */}
+              <motion.button
+                onClick={() => setShowInput((s: boolean) => !s)}
+                whileTap={reduceMotion ? undefined : { scale: 0.88 }}
+                className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                title={showInput ? 'Masquer la saisie' : 'Afficher la saisie'}
+                aria-label={showInput ? 'Masquer la saisie' : 'Afficher la saisie'}
+                aria-pressed={showInput}
+                style={{
+                  backgroundColor: showInput ? 'color-mix(in srgb, var(--accent-primary) 12%, transparent)' : 'transparent',
+                }}
+              >
+                <MessageSquare
+                  size={15}
+                  style={{ color: showInput ? 'var(--accent-primary)' : 'var(--text-muted)' }}
+                />
+              </motion.button>
+
+              {/* More menu */}
+              <div className="relative" ref={menuRef}>
               <motion.button
                 onClick={() => setShowMenu(v => !v)}
                 whileTap={reduceMotion ? undefined : { scale: 0.88 }}
@@ -1442,41 +1444,55 @@ export function ChatPanel({
                         onClick={() => { setMinimized(m => !m); setShowMenu(false); }}
                       />
                     )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
-            <div className="w-px h-4 mx-0.5" style={{ backgroundColor: 'var(--border-base)' }} />
-
-            {/* Power */}
+            {/* Power — connect / disconnect */}
             <motion.button
               onClick={handleToggleConnect}
               whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-              className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+              className="p-1.5 rounded-lg transition-colors"
               title={connected ? 'Déconnecter' : 'Connecter'}
               aria-label={connected ? 'Déconnecter' : 'Connecter'}
+              style={{
+                backgroundColor: connected
+                  ? 'color-mix(in srgb, var(--color-error) 12%, transparent)'
+                  : 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+              }}
             >
               <Power size={15} style={{ color: connected ? 'var(--color-error)' : 'var(--accent-primary)' }} />
             </motion.button>
 
             {/* Close */}
             {onClose && (
-              <>
-                <div className="w-px h-4 mx-0.5" style={{ backgroundColor: 'var(--border-base)' }} />
-                <motion.button
-                  onClick={onClose}
-                  whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-                  className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
-                  title="Fermer (Ctrl+Shift+C)"
-                  aria-label="Fermer le panneau"
-                >
-                  <X size={15} style={{ color: 'var(--text-muted)' }} />
-                </motion.button>
-              </>
+              <motion.button
+                onClick={onClose}
+                whileTap={reduceMotion ? undefined : { scale: 0.88 }}
+                className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                title="Fermer (Ctrl+Shift+C)"
+                aria-label="Fermer le panneau"
+              >
+                <X size={15} style={{ color: 'var(--text-muted)' }} />
+              </motion.button>
             )}
           </div>
         </div>
+
+        {/* ── Active agents / missions band ───────────────────────────────── */}
+        {!minimized && activity.length > 0 && (
+          <div
+            className="flex items-center gap-1.5 px-3 py-1.5 flex-shrink-0 overflow-x-auto custom-scrollbar"
+            style={{
+              borderBottom: '1px solid var(--border-base)',
+              backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)',
+            }}
+          >
+            <MultiAgentIndicator steps={activity} />
+          </div>
+        )}
 
         {/* ── Body ─────────────────────────────────────────────────────────── */}
         {!minimized && (
