@@ -171,7 +171,7 @@ export function createToolsRegistryRouter(
     try {
       const runtimeCount = runtime?.tools?.size || 0;
       const skillManagerCount = skillManager?.getToolDeclarations?.()?.length || 0;
-      const mcpCount = 0; // TODO: implement MCP count
+      const mcpCount = mcpBridge?.getAllTools?.()?.length || 0;
 
       res.json({
         runtime: runtimeCount,

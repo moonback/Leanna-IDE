@@ -70,6 +70,11 @@ function adaptDeclaration(
     description: decl.description,
     parameters: decl.parameters ?? {},
   };
+  // Préserve le marqueur des outils MCP (posé par mcpToolToGeminiDeclaration)
+  // afin que le pipeline de sélection d'outils puisse les reconnaître.
+  if ((decl as any)._mcpServerId) {
+    (declaration as any)._mcpServerId = (decl as any)._mcpServerId;
+  }
 
   return {
     declaration,

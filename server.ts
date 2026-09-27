@@ -303,6 +303,34 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
     await sm.loadCustomSkills();
     const customSkillsReloadInterval = Number(process.env.LEANNA_CUSTOM_SKILLS_RELOAD_INTERVAL_MS ?? 30_000);
     sm.startCustomSkillsHotReload(Number.isFinite(customSkillsReloadInterval) ? customSkillsReloadInterval : 30_000);
+
+    // ── Brancher les serveurs MCP à l'assistant ───────────────────────────────
+    // 1) Connecter les serveurs configurés (.Leanna/mcp.json).
+    // 2) Enregistrer la skill "mcp" pour exposer leurs outils au LLM.
+    // 3) Re-synchroniser la skill à chaque (dé)connexion (event toolsChanged) :
+    //    registerSkill remplace la skill de même nom et met à jour le ToolRegistry
+    //    lu par getToolDeclarations().
+    try {
+      await mcpBridge.initialize();
+      const syncMcpSkill = () => {
+        try {
+          sm.registerSkill(mcpBridge.toSkill());
+        } catch (e) {
+          console.warn(`[Bootstrap] ⚠️ Ré-enregistrement skill MCP échoué:`, (e as Error).message);
+        }
+      };
+      syncMcpSkill();
+      mcpBridge.on('toolsChanged', syncMcpSkill);
+      // Attend (borné) la connexion initiale puis resynchronise, afin que les
+      // outils des serveurs lents soient présents dès les premières sessions.
+      mcpBridge.waitForReady(8000)
+        .then(() => syncMcpSkill())
+        .catch(() => { /* best-effort */ });
+      const mcpToolCount = mcpBridge.getAllTools().length;
+      console.log(`[Bootstrap] ✓ MCP branché à l'assistant — ${mcpToolCount} outil(s) MCP exposé(s).`);
+    } catch (error) {
+      console.warn(`[Bootstrap] ⚠️ Initialisation MCP échouée:`, (error as Error).message);
+    }
     
     // Initialiser le Mission System (doit être fait après que les outils soient enregistrés)
     try {

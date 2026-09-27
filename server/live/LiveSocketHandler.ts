@@ -476,6 +476,17 @@ export function attachLiveWebSocket(
         }
       }
 
+      // ── Outils MCP : toujours exposés à l'assistant ─────────────────
+      // Les outils fournis par les serveurs MCP (marqués _mcpServerId) ne sont
+      // pas dans TIER1_CORE_TOOLS ; comme les custom skills, on les force dans
+      // la sélection s'ils n'y sont pas déjà, pour qu'ils soient appelables.
+      const mcpDeclarations = declarations.filter(
+        d => (d as any)._mcpServerId && !filteredDeclarations.some((fd: any) => fd.name === d.name),
+      );
+      if (mcpDeclarations.length > 0) {
+        filteredDeclarations = [...filteredDeclarations, ...mcpDeclarations];
+      }
+
       // ── Filtrage agents, git, reasoning ─────────────────────────────
       const agentsConfig = currentProfile.agents;
       const agentsEnabled = agentsConfig?.enabled !== false;
@@ -488,7 +499,14 @@ export function attachLiveWebSocket(
         filteredDeclarations = filteredDeclarations.filter(d => !d.name.startsWith('reasoning_'));
       }
 
-      const tools = filteredDeclarations.length > 0 ? [{ functionDeclarations: filteredDeclarations }] : undefined;
+      // Retire les marqueurs internes (_mcpServerId) : l'API Gemini n'accepte
+      // que name/description/parameters dans une functionDeclaration.
+      const cleanDeclarations = filteredDeclarations.map((d: any) => {
+        if (!d || !d._mcpServerId) return d;
+        const { _mcpServerId, ...rest } = d;
+        return rest;
+      });
+      const tools = cleanDeclarations.length > 0 ? [{ functionDeclarations: cleanDeclarations }] : undefined;
       const toolTokensEstimate = filteredDeclarations.reduce((sum, d) => sum + estimateToolTokens(d), 0);
       const tokensEconomises = estimateToolTokensTotal(skillManager.getToolDeclarations()) - toolTokensEstimate;
 

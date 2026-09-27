@@ -610,6 +610,9 @@ function mcpToolToGeminiDeclaration(tool: McpToolDefinition & { _mcpServerId: st
     name: tool.name,
     description: tool.description || `Outil MCP: ${tool.name} (serveur: ${tool._mcpServerId})`,
     parameters: parameters,
+    // Marqueur conservé pour que le pipeline de sélection d'outils (LiveSocket)
+    // reconnaisse les outils MCP et les expose toujours à l'assistant.
+    _mcpServerId: tool._mcpServerId,
   };
 }
 

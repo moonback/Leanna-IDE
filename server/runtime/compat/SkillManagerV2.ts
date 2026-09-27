@@ -186,11 +186,17 @@ export class SkillManagerV2 {
    * Gemini function declarations n'acceptent que ces trois champs.
    */
   private normalizeDeclaration(declaration: any): any {
-    return {
+    const normalized: any = {
       name: String(declaration?.name || ''),
       description: String(declaration?.description || ''),
       parameters: this.normalizeToolParameters(declaration?.parameters),
     };
+    // Conserve le marqueur MCP (non envoyé au provider, retiré plus tard) pour
+    // que la sélection d'outils côté LiveSocket reconnaisse les outils MCP.
+    if (declaration?._mcpServerId) {
+      normalized._mcpServerId = declaration._mcpServerId;
+    }
+    return normalized;
   }
 
   /**
