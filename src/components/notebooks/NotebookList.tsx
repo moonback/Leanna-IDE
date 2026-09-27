@@ -59,6 +59,25 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const [sortBy, setSortBy] = useState<SortBy>('updatedAt');
   const [sortDesc, setSortDesc] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
+
+  const loadWorkspace = useCallback(async () => {
+    try {
+      const res = await fetch('/api/workspace');
+      if (!res.ok) throw new Error();
+      const data = await res.json() as { workspace?: string; exists?: boolean };
+      const path = (data.workspace || '').trim();
+      if (path && data.exists !== false) {
+        // Extraire le dernier segment du chemin (nom du dossier), Windows ou POSIX
+        const segments = path.replace(/[/\\]+$/, '').split(/[/\\]/);
+        setWorkspaceName(segments[segments.length - 1] || path);
+      } else {
+        setWorkspaceName(null);
+      }
+    } catch {
+      setWorkspaceName(null);
+    }
+  }, []);
 
   const loadNotebooks = useCallback(async () => {
     setLoading(true);
@@ -74,14 +93,34 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
     }
   }, [toastError]);
 
-  useEffect(() => { loadNotebooks(); }, [loadNotebooks]);
+  useEffect(() => { loadNotebooks(); loadWorkspace(); }, [loadNotebooks, loadWorkspace]);
 
-  // Re-charger la liste quand l'utilisateur change de workspace
+  // Re-charger la liste et le workspace quand l'utilisateur change de workspace
   useEffect(() => {
-    const handleWorkspaceChange = () => { loadNotebooks(); };
+    const handleWorkspaceChange = (e: Event) => {
+      loadNotebooks();
+      // Utiliser le détail de l'événement si disponible, sinon re-fetch
+      const detail = (e as CustomEvent).detail as { workspace?: string | null } | undefined;
+      if (detail && 'workspace' in detail) {
+        const path = (detail.workspace || '').trim();
+        if (path) {
+          const segments = path.replace(/[/\\]+$/, '').split(/[/\\]/);
+          setWorkspaceName(segments[segments.length - 1] || path);
+        } else {
+          setWorkspaceName(null);
+        }
+      } else {
+        loadWorkspace();
+      }
+    };
+    const handleNoWorkspace = () => setWorkspaceName(null);
     window.addEventListener('Leanna-workspace-changed', handleWorkspaceChange);
-    return () => window.removeEventListener('Leanna-workspace-changed', handleWorkspaceChange);
-  }, [loadNotebooks]);
+    window.addEventListener('Leanna-no-workspace-mode', handleNoWorkspace);
+    return () => {
+      window.removeEventListener('Leanna-workspace-changed', handleWorkspaceChange);
+      window.removeEventListener('Leanna-no-workspace-mode', handleNoWorkspace);
+    };
+  }, [loadNotebooks, loadWorkspace]);
 
   const filteredNotebooks = useMemo(() => {
     let result = notebooks;
@@ -136,13 +175,13 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               }}
             >
               <BookOpen className="h-3.5 w-3.5" />
-              Espace de recherche
+              {workspaceName || 'Espace de recherche'}
             </div>
             <h1
               className="text-2xl font-bold tracking-tight notebook-heading"
               style={{ color: 'var(--text-primary)' }}
             >
-              Vos notebooks
+              {workspaceName ? `Notebooks · ${workspaceName}` : 'Vos notebooks'}
             </h1>
             <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
               Retrouvez vos recherches et continuez là où vous vous êtes arrêté.
