@@ -402,6 +402,8 @@ export function attachLiveWebSocket(
         'knowledge_memory_add', 'knowledge_memory_list',
         'knowledge_impact_analyze', 'knowledge_reindex',
         'create_rich_document',
+        // Génération d'image à la demande (OpenRouter / Gemini)
+        'generate_image',
         // Custom skills — toujours disponibles (Tier 1)
         'list_custom_skills', 'create_custom_skill', 'update_custom_skill', 'delete_custom_skill', 'toggle_custom_skill',
         // Project scaffolding — création de nouveau projet

@@ -278,6 +278,7 @@ import { aiStudioDirectivesSkill } from "./server/skills/aiStudioDirectives.js";
 import { documentLinkerSkill } from "./server/skills/documentLinker.js";
 import { documentKnowledgeSkill } from "./server/skills/documentKnowledge.js";
 import { richDocumentSkill } from "./server/skills/richDocument.js";
+import { imageGenerationSkill } from "./server/skills/imageGeneration.js";
 import { graphifySkill } from "./server/skills/graphify.js";
 import { hierarchicalMemorySkill } from "./server/skills/hierarchicalMemory.js";
 import { telegramSkill } from "./server/skills/telegram.js";
@@ -295,7 +296,7 @@ const { runtime, skillManager } = bootstrapRuntimeSync({
     memorySkill, hierarchicalMemorySkill, reasoningSkill, systemSkill, timeSkill,
     verifySkill, securityAuditSkill, weatherSkill, projectSkill, agentsSkill,
     missionSkill, aiStudioDirectivesSkill, documentLinkerSkill,
-    documentKnowledgeSkill, richDocumentSkill, graphifySkill, telegramSkill,
+    documentKnowledgeSkill, richDocumentSkill, imageGenerationSkill, graphifySkill, telegramSkill,
     createSmartSkills((name: string, args: any) => skillManager.handleToolCall(name, args)),
   ],
   onReady: async (r, sm) => {

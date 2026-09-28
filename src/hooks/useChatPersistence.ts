@@ -12,6 +12,19 @@ function getStorageKey(sessionId: string): string {
   return `${STORAGE_PREFIX}:${sessionId}`;
 }
 
+/**
+ * Remplace les images Markdown en data-URI (base64) par un placeholder léger
+ * avant persistance. Une seule image encodée peut peser plusieurs centaines de
+ * Ko et faire dépasser le quota localStorage, ce qui ferait échouer
+ * l'enregistrement de toute la conversation.
+ */
+function stripInlineImages(text: string): string {
+  return text.replace(
+    /!\[([^\]]*)\]\(data:image\/[^)]+\)/g,
+    (_match, alt) => `*[${alt || 'Image générée'}]*`,
+  );
+}
+
 function parseTranscript(raw: string | null): TranscriptEntry[] {
   if (!raw) return [];
   const parsed = JSON.parse(raw) as PersistedTranscriptEntry[];
@@ -56,6 +69,11 @@ export function useChatPersistence(sessionId = 'default') {
     try {
       const persisted = transcript.slice(-MAX_PERSISTED_MESSAGES).map(entry => ({
         ...entry,
+        // Les images inline en data-URI (générées par Leanna) sont trop
+        // volumineuses pour localStorage et feraient échouer TOUT l'enregistrement
+        // (dépassement de quota). On les remplace par un lien Markdown léger vers
+        // le fichier sandbox ; l'image reste visible dans la session en cours.
+        text: stripInlineImages(entry.text),
         timestamp: entry.timestamp.toISOString(),
       }));
       window.localStorage.setItem(storageKey, JSON.stringify(persisted));

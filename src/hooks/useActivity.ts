@@ -65,6 +65,7 @@ function toolLabel(tool: string, args?: Record<string, unknown>): string {
     automation_navigate:       () => `Naviguer vers ${p('url')}`,
     automation_search:         () => `Rechercher: ${p('query')}`,
     create_rich_document:      () => `Créer document "${p('title')}"`,
+    generate_image:            () => `🎨 Générer une image${p('prompt') ? `: ${p('prompt').slice(0, 40)}` : ''}`,
     automation_snapshot:       () => 'Capture page',
     automation_click:          () => `Cliquer ${p('selector')}`,
     automation_type:           () => `Saisir dans ${p('selector')}`,

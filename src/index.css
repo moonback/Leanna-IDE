@@ -1392,6 +1392,18 @@ button {
   font-weight: 600;
 }
 
+/* Images générées par Leanna, affichées inline dans les bulles de chat. */
+.chat-markdown img,
+.chat-generated-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.5em 0;
+  border-radius: 10px;
+  border: 1px solid var(--border-base);
+  box-shadow: var(--shadow-lg);
+}
+
 .skip-navigation-link {
   position: fixed;
   top: var(--space-3);

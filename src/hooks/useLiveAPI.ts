@@ -274,6 +274,21 @@ export function useLiveAPI() {
     if (msg.type === 'save-rich-document-result') {
       window.dispatchEvent(new CustomEvent('Leanna-save-rich-document-result', { detail: msg }));
     }
+    // ── Génération d'image — progression + affichage inline dans le chat ──────
+    if (msg.image_generation === 'start') {
+      startActivity('generate_image', { prompt: msg.prompt });
+      window.dispatchEvent(new CustomEvent('Leanna-tool-start', { detail: { tool: 'generate_image', args: { prompt: msg.prompt } } }));
+    }
+    if (msg.image_generation === 'done') {
+      completeActivity('generate_image');
+      window.dispatchEvent(new CustomEvent('Leanna-tool-done', { detail: { tool: 'generate_image' } }));
+      if (typeof msg.dataUri === 'string' && msg.dataUri.startsWith('data:image/')) {
+        const alt = (typeof msg.alt === 'string' && msg.alt.trim()) ? msg.alt.trim() : 'Image générée';
+        // Insère l'image comme message assistant. Le sanitizer markdown autorise
+        // les <img> en data-URI, donc l'image s'affiche directement dans la bulle.
+        addTranscript('assistant', `\n\n![${alt}](${msg.dataUri})\n\n`);
+      }
+    }
     if (msg.type === 'browser-read-request' && msg.requestId) {
       window.dispatchEvent(new CustomEvent('Leanna-browser-read-request', {
         detail: { requestId: msg.requestId, selector: msg.selector ?? null },
