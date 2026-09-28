@@ -60,6 +60,7 @@
 * [Automatisation du navigateur](#automatisation-du-navigateur)
 * [Git et GitHub](#git-et-github)
 * [Notebooks et RAG](#notebooks-et-rag)
+* [Génération d'images](#génération-dimages)
 * [Graphe de connaissances](#graphe-de-connaissances)
 * [Workflows et automatisation](#workflows-et-automatisation)
 * [MCP](#mcp)
@@ -337,6 +338,7 @@ Leanna contient plusieurs systèmes de compréhension du projet :
 * RAG ;
 * embeddings ;
 * génération de documents ;
+* génération d'images à la demande ;
 * export PDF ;
 * export DOCX ;
 * export HTML ;
@@ -748,6 +750,7 @@ Exemples de domaines de compétences :
 * Git ;
 * GitHub ;
 * connaissance ;
+* génération d'images ;
 * mémoire ;
 * mission ;
 * raisonnement ;
@@ -1717,6 +1720,64 @@ RichDocumentViewer
 
 ---
 
+# Génération d'images
+
+Leanna peut générer des images à la demande à partir d'une description en langage naturel.
+
+L'utilisateur décrit l'image souhaitée dans le chat, Leanna la génère, l'enregistre dans le bac à sable, puis l'affiche directement dans le panneau de chat.
+
+## Flux d'exécution
+
+```text
+Description utilisateur
+        ↓
+   generate_image
+        ↓
+   OpenRouter (modèle image)
+        ↓
+   Image (base64)
+        ↓
+ ┌──────┴───────┐
+ ▼              ▼
+Sauvegarde    Affichage
+bac à sable   panneau de chat
+(generated-   (inline)
+ images/)
+```
+
+L'outil `generate_image` fait partie du registre d'outils (compétence `imageGeneration`) et est exposé comme outil de base, donc disponible sans configuration supplémentaire.
+
+## Caractéristiques
+
+* déclenché à la demande par une description en langage naturel ;
+* génération via **OpenRouter** (modèle image de type Gemini par défaut) ;
+* paramètres optionnels : `style`, `aspectRatio` (1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3) et `model` ;
+* image enregistrée dans le bac à sable sous `generated-images/` et suivie comme modification ;
+* affichage **inline** dans le panneau de chat, avec une barre de progression pendant la génération ;
+* retour d'échange léger vers le modèle : les données d'image ne transitent pas par le LLM.
+
+## Configuration
+
+La génération d'images nécessite une clé OpenRouter :
+
+```env
+OPENROUTER_API_KEY="..."
+```
+
+Le modèle image peut être surchargé :
+
+```env
+OPENROUTER_IMAGE_MODEL="google/gemini-2.5-flash-image-preview"
+```
+
+À défaut, `OPENROUTER_FREE_API_KEY` est également pris en compte.
+
+## Sécurité de l'affichage
+
+Les images générées sont rendues via le sanitizer Markdown du chat, qui n'autorise que les images en data-URI de type raster (`png`, `jpeg`, `gif`, `webp`) et les chemins relatifs. Les sources `svg`, `javascript:` et les hôtes externes arbitraires sont rejetés.
+
+---
+
 # Graphe de connaissances
 
 Le graphe de connaissances et les systèmes Notebook/RAG servent des objectifs différents.
@@ -1922,7 +1983,10 @@ GEMINI_API_KEY=""
 OPENROUTER_API_KEY=""
 OPENROUTER_FREE_API_KEY=""
 OPENROUTER_MODEL=""
+OPENROUTER_IMAGE_MODEL=""
 ```
+
+Le modèle de texte est configuré via `OPENROUTER_MODEL` et le modèle de génération d'images via `OPENROUTER_IMAGE_MODEL`.
 
 Leanna contient également une infrastructure de repli (fallback) entre fournisseurs.
 
@@ -2277,6 +2341,7 @@ Configuration OpenRouter optionnelle :
 OPENROUTER_API_KEY=""
 OPENROUTER_FREE_API_KEY=""
 OPENROUTER_MODEL=""
+OPENROUTER_IMAGE_MODEL=""
 OPENROUTER_REFERER=""
 OPENROUTER_TITLE=""
 ```
