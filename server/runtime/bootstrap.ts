@@ -20,6 +20,7 @@ import { PermissionPolicy } from "./PermissionPolicy.js";
 import { DryRunController } from "./DryRun.js";
 import { loadPromptTemplates } from "./prompts/loader.js";
 import { defaultAgents, setAgenticRuntimeProvider } from "./agents/index.js";
+import { createCoreKernel, type CoreKernel } from "../core/kernel.js";
 import type { RuntimeConfig } from "./types.js";
 import type { LegacySkill } from "./compat/SkillAdapter.js";
 import * as path from "path";
@@ -55,6 +56,12 @@ export interface BootstrapConfig {
   agenticBudget?: Partial<AgentBudget>;
   /** Dossier des prompts (défaut: server/runtime/prompts/) */
   promptsDir?: string;
+  /**
+   * Force l'activation de la garde d'idempotence P0 sur le ToolRegistry.
+   * Par défaut, lue depuis `LEANNA_IDEMPOTENCY`. Non branchée = comportement
+   * strictement inchangé.
+   */
+  enableIdempotency?: boolean;
   /** Callback post-initialisation */
   onReady?: (runtime: AgentRuntime, skillManager: SkillManagerV2) => void | Promise<void>;
 }
@@ -72,6 +79,13 @@ export interface BootstrapResult {
    * C'est lui qui exécute la vraie boucle OBSERVE→PLAN→ACT→VERIFY→RECOVER.
    */
   agentic: AgenticRuntime;
+  /**
+   * Noyau P0 (état durable de mission, ledger d'idempotence, checkpoints,
+   * evidence, supervisor). La garde d'idempotence n'est branchée au
+   * ToolRegistry que si `LEANNA_IDEMPOTENCY` est activé — sinon comportement
+   * strictement inchangé.
+   */
+  kernel: CoreKernel;
 }
 
 /**
@@ -202,7 +216,21 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   // agentique (boucle plan→act→verify→recover), plus via l'AgentExecutor legacy.
   agentOrchestrator.enableAgenticRuntime(agentic);
 
-  return { runtime, skillManager, prompts, agentic };
+  // Noyau P0 : branche (si activé) la garde d'idempotence sur le MÊME
+  // ToolRegistry que le runtime agentique, de sorte qu'une action à effet de
+  // bord interrompue par un crash ne soit jamais rejouée à la reprise.
+  const kernel = createCoreKernel({
+    registry: runtime.tools,
+    enableIdempotency: config.enableIdempotency,
+  });
+  if (kernel.idempotencyEnabled) {
+    console.log(
+      `[Bootstrap] 🔒 Idempotence P0 ACTIVÉE — les actions à effet de bord sont ` +
+      `journalisées ; un rejeu après crash est bloqué.`
+    );
+  }
+
+  return { runtime, skillManager, prompts, agentic, kernel };
 }
 
 /**
@@ -260,5 +288,15 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
     .then(({ agentOrchestrator }) => agentOrchestrator.enableAgenticRuntime(agentic))
     .catch((err) => console.error("[Bootstrap] enableAgenticRuntime (sync) échec:", err));
 
-  return { runtime, skillManager, prompts, agentic };
+  // Noyau P0 (voir version async). Branchement de la garde d'idempotence gouverné
+  // par LEANNA_IDEMPOTENCY / config.enableIdempotency ; sinon inchangé.
+  const kernel = createCoreKernel({
+    registry: runtime.tools,
+    enableIdempotency: config.enableIdempotency,
+  });
+  if (kernel.idempotencyEnabled) {
+    console.log(`[Bootstrap] 🔒 Idempotence P0 ACTIVÉE (mode synchrone).`);
+  }
+
+  return { runtime, skillManager, prompts, agentic, kernel };
 }

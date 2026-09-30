@@ -116,8 +116,13 @@ Chaque étape compile et teste isolément : aucune ne casse un chemin existant.
 | P0.5 Evidence Engine | `server/core/EvidenceEngine.ts` | 6/6 |
 | P0.6 Supervisor + intégration | `server/core/LeannaSupervisor.ts`, `LedgerGuard.ts`, `index.ts` | 9/9 |
 | Hook idempotence (non cassant) | `server/runtime/ToolRegistry.ts` (`IdempotencyGuard`, `setIdempotencyGuard`) | 80/80 existants OK |
+| Branchement au bootstrap | `server/core/kernel.ts` (`createCoreKernel`), `server/runtime/bootstrap.ts` (`kernel` dans `BootstrapResult`), `.env.example` (`LEANNA_IDEMPOTENCY`) | 4/4 |
 
-**Vérification globale** : `npm run typecheck` vert sur tout le projet ; 35/35 tests noyau ; 80/80 tests runtime existants inchangés.
+**Vérification globale** : `npm run typecheck` vert sur tout le projet ; 39/39 tests noyau ; 80/80 tests runtime existants inchangés.
+
+### Activation
+
+Le noyau est instancié à chaque démarrage (`bootstrapRuntime` → `result.kernel`). La garde d'idempotence n'est branchée sur le `ToolRegistry` que si `LEANNA_IDEMPOTENCY="true"` (ou `config.enableIdempotency`). Sans ce flag, le runtime est strictement inchangé. Le `LeannaSupervisor`, le `CheckpointManager`, l'`EvidenceEngine` et le `DurableMissionStore` sont toujours disponibles via `result.kernel` pour gouverner une mission, indépendamment du flag.
 
 ### Comment brancher le noyau (exemple)
 

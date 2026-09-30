@@ -19,3 +19,5 @@ export * from "./CheckpointManager.js";
 export * from "./EvidenceEngine.js";
 export * from "./LedgerGuard.js";
 export * from "./LeannaSupervisor.js";
+export * from "./AgenticMissionRunner.js";
+export * from "./kernel.js";
