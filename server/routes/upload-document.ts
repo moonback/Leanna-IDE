@@ -153,7 +153,7 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
           geminiParts = [{ text: analysisPrompt }];
         }
         const response = await withGeminiRetry((ai) => ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.8-flash',
           contents: [{ role: 'user', parts: geminiParts }],
         }));
         summary = response.text || '';

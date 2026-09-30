@@ -839,7 +839,7 @@ export const reasoningSkill: Skill = {
         if (activeProvider === 'gemini') {
           fallbackOptions.openrouterModel = 'google/gemini-3.6-flash';
         } else {
-          fallbackOptions.geminiModel = 'gemini-2.5-flash';
+          fallbackOptions.geminiModel = 'gemini-3.8-flash';
         }
 
         const fallback = await generateText(fallbackOptions);
@@ -1009,7 +1009,7 @@ export const reasoningSkill: Skill = {
                 response = {
                   text: streamedText,
                   provider: getActiveProvider(),
-                  model: getActiveProvider() === "gemini" ? "gemini-2.5-flash" : "openrouter",
+                  model: getActiveProvider() === "gemini" ? "gemini-3.8-flash" : "openrouter",
                 };
               } catch {
                 response = await generateText({

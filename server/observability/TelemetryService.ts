@@ -58,7 +58,7 @@ interface ModelPricing {
 
 const MODEL_PRICING: Record<string, ModelPricing> = {
   // Gemini models (as of Sept 2026)
-  'gemini-2.5-flash': { inputPer1M: 0.075, outputPer1M: 0.30 },
+  'gemini-3.8-flash': { inputPer1M: 0.075, outputPer1M: 0.30 },
   'gemini-2.5-pro': { inputPer1M: 0.90, outputPer1M: 3.50 },
   'gemini-2.0-flash': { inputPer1M: 0.075, outputPer1M: 0.30 },
   'gemini-1.5-flash': { inputPer1M: 0.075, outputPer1M: 0.30 },

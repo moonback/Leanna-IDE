@@ -54,7 +54,7 @@ const COLOR_OPTIONS = [
 const MODEL_OPTIONS = [
   { id: 'default', label: 'Par défaut (profil)' },
   { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { id: 'gemini-3.8-flash', label: 'Gemini 2.5 Flash' },
   { id: 'gpt-4o', label: 'GPT-4o' },
   { id: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
   { id: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna (OpenRouter)' },

@@ -198,7 +198,7 @@ Suivi des coûts et de la consommation de tokens (Observabilité V1.1). Chaque a
 | `agent_role` | `text` | nullable | Rôle de l'agent (coder, debugger…) |
 | `tool_name` | `text` | nullable | Outil ayant déclenché l'appel |
 | `provider` | `text` | NOT NULL | `gemini` ou `openrouter` |
-| `model` | `text` | NOT NULL | Modèle utilisé (ex: `gemini-2.5-flash`) |
+| `model` | `text` | NOT NULL | Modèle utilisé (ex: `gemini-3.8-flash`) |
 | `input_tokens` | `integer` | NOT NULL, default `0` | Tokens en entrée (prompt) |
 | `output_tokens` | `integer` | NOT NULL, default `0` | Tokens en sortie (complétion) |
 | `total_tokens` | `integer` | NOT NULL, default `0` | Total des tokens |
