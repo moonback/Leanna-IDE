@@ -1,14 +1,18 @@
 /**
  * Configuration externe de la sidebar IDE.
- * Réorganisée en 5 icônes principales par domaine fonctionnel.
  *
- * Icônes visibles (5 au total) :
- * 1. Explorateur (accès direct)
- * 2. Code (sous-menu : Recherche, Terminal, Prévisualisation)
- * 3. Git & CI/CD (sous-menu : Sandbox, Workflow)
- * 4. Données (sous-menu : Knowledge, Notebooks, Santé système)
- * 5. Outils (sous-menu : Agent Builder, Caméra, Partage écran)
- * (IA via le menu agent en bas — inchangé)
+ * Priorité aux usages quotidiens en accès direct (un seul clic), le reste
+ * regroupé dans des flyouts et couvert par la Command Palette.
+ *
+ * Icônes visibles :
+ * 1. Explorateur       (accès direct)
+ * 2. Recherche         (accès direct)
+ * 3. Terminal          (accès direct)
+ * 4. GitHub            (accès direct)
+ * 5. CI/CD & Aperçu    (sous-menu : Sandbox, Workflow, Prévisualisation)
+ * 6. Données           (sous-menu : Knowledge, Notebooks, Santé système, PM2)
+ * 7. Outils            (sous-menu : Agent Builder, Marketplace, Docs Skills, Caméra, Partage écran)
+ * (Agents en accès direct via AgentsSidebarButton ; IA via le flyout du statut agent)
  */
 
 import {
@@ -17,7 +21,8 @@ import {
   FolderTree, ChartNoAxesColumnIncreasing, Workflow,
   Container, Bot, Crosshair, Database,
   Activity, Wrench, Users,
-  Wand2, BookOpen, Globe, Terminal, Store,
+  Wand2, Globe, Terminal, Store,
+  Brain, NotebookPen, BookMarked,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -70,68 +75,69 @@ export const sidebarSections: SidebarSectionConfig[] = [
     ],
   },
 
-  // ═══ 2. CODE — sous-menu pour les outils de code ═══
+  // ═══ 2. RECHERCHE — accès direct (usage quotidien) ═══
   {
-    id: 'code',
-    label: 'Code',
+    id: 'search',
+    label: 'Recherche',
     items: [
       {
-        id: 'code-menu',
-        type: 'submenu',
-        icon: Terminal,
-        label: 'Code',
-        children: [
-          {
-            id: 'search',
-            type: 'button',
-            icon: Search,
-            label: 'Recherche',
-            shortcut: 'Ctrl+Shift+F',
-            stateKey: 'showGlobalSearch',
-            actionKey: 'onToggleSearch',
-          },
-          {
-            id: 'terminal',
-            type: 'button',
-            icon: Terminal,
-            label: 'Terminal',
-            shortcut: 'Ctrl+`',
-            stateKey: 'showTerminal',
-            actionKey: 'onToggleTerminal',
-          },
-          {
-            id: 'browser',
-            type: 'button',
-            icon: Globe,
-            label: 'Prévisualisation',
-            shortcut: 'Ctrl+Shift+B',
-            stateKey: 'showBrowser',
-            actionKey: 'onToggleBrowser',
-          },
-        ],
+        id: 'search',
+        type: 'button',
+        icon: Search,
+        label: 'Recherche',
+        shortcut: 'Ctrl+Shift+F',
+        stateKey: 'showGlobalSearch',
+        actionKey: 'onToggleSearch',
       },
     ],
   },
 
-  // ═══ 3. GIT & CI/CD — sous-menu pour versionnement et déploiement ═══
+  // ═══ 3. TERMINAL — accès direct (usage quotidien) ═══
   {
-    id: 'git-cicd',
-    label: 'Git & CI/CD',
+    id: 'terminal',
+    label: 'Terminal',
     items: [
       {
-        id: 'git-menu',
+        id: 'terminal',
+        type: 'button',
+        icon: Terminal,
+        label: 'Terminal',
+        shortcut: 'Ctrl+`',
+        stateKey: 'showTerminal',
+        actionKey: 'onToggleTerminal',
+      },
+    ],
+  },
+
+  // ═══ 4. GIT — accès direct (usage quotidien) ═══
+  {
+    id: 'git',
+    label: 'GitHub',
+    items: [
+      {
+        id: 'github',
+        type: 'button',
+        icon: Github,
+        label: 'GitHub',
+        stateKey: 'showGitHub',
+        actionKey: 'onToggleGitHub',
+      },
+    ],
+  },
+
+  // ═══ 5. CI/CD — sous-menu pour les usages occasionnels ═══
+  //  (Sandbox, Workflow, Prévisualisation restent à un clic de flyout ;
+  //   ils sont aussi tous accessibles via la Command Palette.)
+  {
+    id: 'cicd',
+    label: 'CI/CD & Aperçu',
+    items: [
+      {
+        id: 'cicd-menu',
         type: 'submenu',
         icon: GitBranch,
-        label: 'Git & CI/CD',
+        label: 'CI/CD & Aperçu',
         children: [
-          {
-            id: 'github',
-            type: 'button',
-            icon: Github,
-            label: 'GitHub',
-            stateKey: 'showGitHub',
-            actionKey: 'onToggleGitHub',
-          },
           {
             id: 'sandbox',
             type: 'button',
@@ -147,6 +153,15 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Workflow CI/CD',
             stateKey: 'showWorkflow',
             actionKey: 'onToggleWorkflow',
+          },
+          {
+            id: 'browser',
+            type: 'button',
+            icon: Globe,
+            label: 'Prévisualisation',
+            shortcut: 'Ctrl+Shift+B',
+            stateKey: 'showBrowser',
+            actionKey: 'onToggleBrowser',
           },
         ],
       },
@@ -167,7 +182,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
           {
             id: 'knowledge',
             type: 'button',
-            icon: Database,
+            icon: Brain,
             label: 'Knowledge',
             stateKey: 'showKnowledge',
             actionKey: 'onToggleKnowledge',
@@ -175,7 +190,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
           {
             id: 'notebooks-panel',
             type: 'button',
-            icon: BookOpen,
+            icon: NotebookPen,
             label: 'Notebooks',
             stateKey: 'showNotebooks',
             actionKey: 'onToggleNotebooks',
@@ -239,7 +254,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
           {
             id: 'skills-doc',
             type: 'button',
-            icon: BookOpen,
+            icon: BookMarked,
             label: 'Docs Skills',
             stateKey: 'showSkillsDoc',
             actionKey: 'onToggleSkillsDoc',
