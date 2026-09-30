@@ -42,11 +42,25 @@ const IGNORED_DIRS = new Set([
   "release", "coverage", ".vscode", ".idea", "assets", "public",
 ]);
 
-/** Fichiers ignorés */
+/**
+ * Fichiers ignorés.
+ *
+ * Inclut les fichiers ÉCRITS PAR LE PROCESS LUI-MÊME (état de connaissance,
+ * mémoire, profil) : sans ça, sauvegarder l'un d'eux déclenche le watcher, qui
+ * relance une indexation, qui ré-écrit ces fichiers… → boucle / double scan.
+ * C'est la cause de la 2ᵉ passe « Relations extraites » observée après
+ * l'écriture de .Leanna-profile.json.
+ */
 const IGNORED_FILES = new Set([
   "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
   ".project-knowledge.json", ".project-memory.json",
+  ".Leanna-profile.json", ".Leanna-profile.json.tmp",
 ]);
+
+/** Suffixes ignorés (fichiers temporaires écrits par le process). */
+const IGNORED_SUFFIXES = [".tmp", ".swp", ".lock"];
+/** Motif des fichiers temporaires d'écriture atomique (ex. .project-memory.json.tmp_1790…). */
+const TMP_WRITE_PATTERN = /\.tmp[_.]?\d*$/i;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // FileWatcher
@@ -193,12 +207,18 @@ export class FileWatcher {
     const filename = path.basename(relativePath);
     if (IGNORED_FILES.has(filename)) return false;
 
+    // Fichiers temporaires d'écriture (atomique) : ex. foo.json.tmp_1790…, foo.swp
+    if (TMP_WRITE_PATTERN.test(filename)) return false;
+    if (IGNORED_SUFFIXES.some((s) => filename.endsWith(s))) return false;
+
+    // Ignorer les fichiers cachés (dont .Leanna-profile.json, .env, etc.)
+    // AVANT la vérification d'extension : un état interne écrit par le process
+    // ne doit jamais déclencher de ré-indexation, quelle que soit son extension.
+    if (filename.startsWith(".")) return false;
+
     // Vérifier l'extension
     const ext = path.extname(filename).toLowerCase();
     if (!WATCHABLE_EXTENSIONS.has(ext)) return false;
-
-    // Ignorer les fichiers cachés
-    if (filename.startsWith(".")) return false;
 
     return true;
   }

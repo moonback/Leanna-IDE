@@ -102,8 +102,13 @@ export class ProjectMemory {
     }
   }
 
-  private syncToCurrentWorkspace(): void {
-    if (this.lastRootSeen === SELF_ROOT) return;
+  /**
+   * Aligne l'état sur le workspace courant. Retourne `true` s'il a détecté un
+   * changement de racine ET rechargé la mémoire depuis le disque (auquel cas un
+   * `loadFromDisk()` supplémentaire par l'appelant ferait double emploi).
+   */
+  private syncToCurrentWorkspace(): boolean {
+    if (this.lastRootSeen === SELF_ROOT) return false;
 
     this.lastRootSeen = SELF_ROOT;
     this.facts.clear();
@@ -112,7 +117,9 @@ export class ProjectMemory {
 
     if (SELF_ROOT) {
       this.loadFromDisk();
+      return true;
     }
+    return false;
   }
 
   private loadFromDisk(): void {
@@ -138,8 +145,10 @@ export class ProjectMemory {
    * Charge la mémoire depuis le disque.
    */
   load(): void {
-    this.syncToCurrentWorkspace();
-    this.loadFromDisk();
+    // Si le workspace vient de changer, syncToCurrentWorkspace() a DÉJÀ rechargé
+    // depuis le disque — éviter le double « Mémoire chargée ».
+    const alreadyLoaded = this.syncToCurrentWorkspace();
+    if (!alreadyLoaded) this.loadFromDisk();
   }
 
   /**

@@ -94,8 +94,39 @@ const MAX_FILE_SIZE = 500_000;
 // ProjectIndexer
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/** Résultat d'un scan complet/différentiel du projet. */
+export interface ScanAllResult {
+  totalFiles: number;
+  totalEntities: number;
+  durationMs: number;
+  cached?: boolean;
+}
+
+/** Options passées à scanAll. */
+export interface ScanAllOptions {
+  force?: boolean;
+  onProgress?: (p: {
+    phase: 'incremental' | 'parse' | 'ast' | 'relations' | 'done';
+    current: number;
+    total: number;
+    file?: string;
+  }) => void;
+}
+
 export class ProjectIndexer {
   private customProjectRoot?: string;
+
+  // ── Coalescing des scans concurrents ──────────────────────────────────────
+  // Plusieurs déclencheurs non coordonnés appellent scanAll() en rafale à
+  // l'activation d'un projet (démarrage serveur + activation SELF_ROOT +
+  // rechargement sandbox). Sans garde, chacun relance une passe complète qui
+  // recalcule les mêmes relations (d'où les logs "Relations extraites"
+  // identiques répétés). On sérialise : si un scan tourne déjà, les appelants
+  // suivants réutilisent la MÊME promesse au lieu d'en lancer un nouveau.
+  private inFlight: Promise<ScanAllResult> | null = null;
+  // Une demande arrivée pendant un scan en cours programme UN re-scan unique à
+  // la fin (pour ne pas perdre des changements survenus entre-temps).
+  private pendingRescan = false;
 
   constructor(projectRoot?: string) {
     this.customProjectRoot = projectRoot;
@@ -117,22 +148,60 @@ export class ProjectIndexer {
    * Si le projet n'a subi aucune modification (fichiers, mtime, taille),
    * le cache existant est réutilisé instantanément sans ré-indexation lourde.
    *
-   * @param options.force Force la ré-indexation complète même si le cache est à jour
+   * COALESCING : si un scan est déjà en cours, cet appel n'en lance PAS un
+   * second — il attend et renvoie le résultat du scan courant (sauf `force`,
+   * voir plus bas). Une demande arrivée pendant un scan programme un unique
+   * re-scan à la fin, pour ne rien manquer. Cela supprime les passes complètes
+   * redondantes provoquées par les déclencheurs multiples (démarrage +
+   * activation projet + sandbox) sans retarder le premier index.
+   *
+   * @param options.force Force la ré-indexation complète même si le cache est à
+   *   jour. Un `force` attend la fin d'un éventuel scan en cours puis relance
+   *   un vrai scan (il n'est jamais fusionné avec un scan « cache »).
    */
-  async scanAll(options: {
-    force?: boolean;
-    onProgress?: (p: {
-      phase: 'incremental' | 'parse' | 'ast' | 'relations' | 'done';
-      current: number;
-      total: number;
-      file?: string;
-    }) => void;
-  } = {}): Promise<{
-    totalFiles: number;
-    totalEntities: number;
-    durationMs: number;
-    cached?: boolean;
-  }> {
+  async scanAll(options: ScanAllOptions = {}): Promise<ScanAllResult> {
+    // Un scan est déjà en cours.
+    if (this.inFlight) {
+      if (!options.force) {
+        // Simple demande de rafraîchissement : on réutilise le scan courant.
+        log.debug("⏳ scanAll déjà en cours — appel coalescé (réutilise le scan actif).");
+        return this.inFlight;
+      }
+      // force: on attend la fin du scan courant, puis on relance un vrai scan.
+      log.debug("⏳ scanAll(force) en attente de la fin du scan en cours…");
+      try { await this.inFlight; } catch { /* on relance quand même */ }
+    }
+
+    const run = this._scanAllImpl(options).finally(() => {
+      this.inFlight = null;
+    });
+    this.inFlight = run;
+
+    const result = await run;
+
+    // Un ou plusieurs appels sont arrivés pendant ce scan : on relance UNE fois
+    // (sans force) pour intégrer d'éventuels changements survenus entre-temps.
+    if (this.pendingRescan) {
+      this.pendingRescan = false;
+      log.debug("🔁 Re-scan unique déclenché par des demandes arrivées pendant le scan.");
+      return this.scanAll();
+    }
+
+    return result;
+  }
+
+  /**
+   * Marque qu'un re-scan est souhaité. Utilisé par les déclencheurs qui savent
+   * qu'un scan tourne peut-être déjà (activation projet en rafale) : au lieu de
+   * lancer un scanAll concurrent, ils peuvent appeler scanAll() qui, grâce au
+   * coalescing, se contentera d'un re-scan final unique si nécessaire.
+   */
+  requestRescan(): void {
+    if (this.inFlight) this.pendingRescan = true;
+  }
+
+  /** Implémentation réelle (non coalescée). Ne pas appeler directement. */
+  private async _scanAllImpl(options: ScanAllOptions = {}): Promise<ScanAllResult> {
     const startTime = Date.now();
     const root = this.getActiveProjectRoot();
     const force = options.force ?? false;
@@ -210,18 +279,28 @@ export class ProjectIndexer {
 
           await astParser.init();
 
-          // Supprimer les fichiers disparus
+          // Supprimer les fichiers disparus (sans recalcul de relations à chaque
+          // suppression : on diffère à la fin du batch).
           for (const delPath of deletedFiles) {
             knowledgeGraph.removeFile(delPath);
             astCallGraph.removeFile(delPath);
           }
 
-          // Scanner et enrichir les fichiers ajoutés/modifiés
+          // Scanner et enrichir les fichiers ajoutés/modifiés. On DIFFÈRE le
+          // recalcul complet des relations (skipRelationRefresh) pour ne le
+          // faire qu'UNE fois après la boucle — sinon N fichiers = N passes de
+          // ~2s (le vrai coût observé), au lieu d'une seule.
           const changedFiles = [...addedFiles, ...modifiedFiles];
           for (let i = 0; i < changedFiles.length; i++) {
             const changedPath = changedFiles[i];
             options.onProgress?.({ phase: 'incremental', current: i + 1, total: changedFiles.length, file: changedPath });
-            await this.scanFile(changedPath);
+            await this.scanFile(changedPath, { skipRelationRefresh: true });
+          }
+
+          // Recalcul unique des relations pour tout le batch.
+          if (changedFiles.length > 0 || deletedFiles.length > 0) {
+            options.onProgress?.({ phase: 'relations', current: 0, total: changedFiles.length });
+            this.refreshSemanticRelations();
           }
 
           const stats = knowledgeGraph.getStats();
@@ -334,7 +413,7 @@ export class ProjectIndexer {
    * Scanne un seul fichier et met à jour le KnowledgeGraph.
    * Utile après une modification de fichier.
    */
-  async scanFile(relativePath: string): Promise<FileNode | null> {
+  async scanFile(relativePath: string, options: { skipRelationRefresh?: boolean } = {}): Promise<FileNode | null> {
     try {
       const root = this.getActiveProjectRoot();
       const absPath = path.join(root, relativePath);
@@ -352,7 +431,11 @@ export class ProjectIndexer {
           }
         }
         knowledgeGraph.updateFile(fileNode);
-        this.refreshSemanticRelations();
+        // Le recalcul complet des relations est COÛTEUX (~2s sur ce projet).
+        // Quand on scanne plusieurs fichiers d'affilée (mise à jour
+        // incrémentale d'un batch), l'appelant le diffère et l'exécute UNE
+        // seule fois à la fin via refreshSemanticRelations().
+        if (!options.skipRelationRefresh) this.refreshSemanticRelations();
         return fileNode;
       }
     } catch (err) {
@@ -363,10 +446,20 @@ export class ProjectIndexer {
 
   /**
    * Supprime un fichier du KnowledgeGraph.
+   * @param options.skipRelationRefresh diffère le recalcul des relations (batch).
    */
-  removeFile(relativePath: string): void {
+  removeFile(relativePath: string, options: { skipRelationRefresh?: boolean } = {}): void {
     knowledgeGraph.removeFile(relativePath);
-    this.refreshSemanticRelations();
+    if (!options.skipRelationRefresh) this.refreshSemanticRelations();
+  }
+
+  /**
+   * Recalcule les relations sémantiques du graphe (exposé publiquement pour
+   * permettre à un traitement par lot de ne l'appeler qu'UNE fois après avoir
+   * scanné plusieurs fichiers avec `skipRelationRefresh: true`).
+   */
+  refreshRelations(): number {
+    return this.refreshSemanticRelations();
   }
 
   /**
