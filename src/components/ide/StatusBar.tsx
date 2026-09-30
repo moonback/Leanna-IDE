@@ -837,24 +837,8 @@ export const StatusBar = memo(function StatusBar({
 
           <Divider />
 
-          {/* AI Model — compact, clickable */}
-          <button
-            type="button"
-            onClick={() => onToggleModelPicker?.()}
-            className={PILL}
-            style={{ color: 'var(--text-secondary)' }}
-            title="Changer de modèle IA"
-          >
-            <BrainCircuit size={13} style={{ color: 'var(--accent-primary)' }} />
-            <span className="truncate max-w-[110px]">
-              {profile.textProvider === 'openrouter'
-                ? profile.openrouterModel.split('/').pop()
-                : 'Gemini Live'}
-            </span>
-          </button>
-
-          
-
+          {/* MCP status — état de connexion des serveurs MCP (reste à gauche
+              car c'est un indicateur d'état, pas une action). */}
           <button
             type="button"
             onClick={onToggleMcp}
@@ -935,6 +919,23 @@ export const StatusBar = memo(function StatusBar({
           )}
 
           <Divider />
+
+          {/* AI Model — déplacé à droite (avec les tokens) : ce sont les deux
+              informations "sortie IA" que l'utilisateur consulte le plus. */}
+          <button
+            type="button"
+            onClick={() => onToggleModelPicker?.()}
+            className={PILL}
+            style={{ color: 'var(--text-secondary)' }}
+            title="Changer de modèle IA"
+          >
+            <BrainCircuit size={13} style={{ color: 'var(--accent-primary)' }} />
+            <span className="truncate max-w-[110px]">
+              {profile.textProvider === 'openrouter'
+                ? profile.openrouterModel.split('/').pop()
+                : 'Gemini Live'}
+            </span>
+          </button>
 
           {/* Tokens — clickable */}
           <button
