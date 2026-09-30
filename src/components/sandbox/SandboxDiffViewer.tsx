@@ -226,6 +226,35 @@ const StatusBadge = memo(function StatusBadge({ status }: { status: FileDiff['st
   );
 });
 
+// Barre proportionnelle style GitHub : 5 cases réparties entre ajouts/suppressions
+const DiffStatBar = memo(function DiffStatBar({ added, removed }: { added: number; removed: number }) {
+  const total = added + removed;
+  if (total === 0) return null;
+  const SEGMENTS = 5;
+  let greenCount: number;
+  if (added === 0) greenCount = 0;
+  else if (removed === 0) greenCount = SEGMENTS;
+  else greenCount = Math.min(SEGMENTS - 1, Math.max(1, Math.round((added / total) * SEGMENTS)));
+  const cells: Array<'add' | 'remove'> = [
+    ...Array<'add'>(greenCount).fill('add'),
+    ...Array<'remove'>(SEGMENTS - greenCount).fill('remove'),
+  ];
+  return (
+    <span className="flex items-center gap-0.5" aria-hidden title={`${added} ajout(s), ${removed} suppression(s)`}>
+      {cells.map((kind, i) => (
+        <span
+          key={i}
+          className="h-2.5 w-2.5 rounded-[2px]"
+          style={{
+            backgroundColor: kind === 'add' ? 'var(--color-success)' : 'var(--color-error)',
+            opacity: 0.85,
+          }}
+        />
+      ))}
+    </span>
+  );
+});
+
 const SyntaxLine = memo(function SyntaxLine({
   content,
   segments,
@@ -1013,18 +1042,23 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
               className="flex items-center gap-3 px-4 py-2 flex-shrink-0"
               style={{ borderBottom: '1px solid var(--border-base)', backgroundColor: 'rgba(0,0,0,0.15)' }}
             >
-              <span className="text-sm font-mono" style={{ color: 'var(--text-muted)' }}>
+              <span className="truncate text-sm font-mono" style={{ color: 'var(--text-muted)' }} title={selectedFile}>
                 {selectedFile}
               </span>
               {selectedFileStatus && <StatusBadge status={selectedFileStatus} />}
-              {stats.added > 0 && (
-                <span className="text-xs font-mono font-medium" style={{ color: 'var(--color-success)' }}>
-                  +{stats.added}
-                </span>
-              )}
-              {stats.removed > 0 && (
-                <span className="text-xs font-mono font-medium" style={{ color: 'var(--color-error)' }}>
-                  -{stats.removed}
+
+              {/* Diffstat compact : compteurs + barre proportionnelle */}
+              {(stats.added > 0 || stats.removed > 0) && (
+                <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-2 text-xs font-mono font-medium">
+                    {stats.added > 0 && (
+                      <span style={{ color: 'var(--color-success)' }}>+{stats.added}</span>
+                    )}
+                    {stats.removed > 0 && (
+                      <span style={{ color: 'var(--color-error)' }}>−{stats.removed}</span>
+                    )}
+                  </span>
+                  <DiffStatBar added={stats.added} removed={stats.removed} />
                 </span>
               )}
 
@@ -1066,10 +1100,44 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
             <div className="flex-1 flex items-center justify-center">
               <Loader2 size={20} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
             </div>
+          ) : files.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
+              <div
+                className="flex h-12 w-12 items-center justify-center rounded-2xl"
+                style={{ backgroundColor: 'rgba(74,222,128,0.12)', color: 'var(--color-success)' }}
+              >
+                <CheckCheck size={22} />
+              </div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Tout est synchronisé
+              </p>
+              <p className="max-w-xs text-xs" style={{ color: 'var(--text-muted)' }}>
+                Aucune modification en attente dans le sandbox. Les changements apparaîtront ici dès qu'un fichier sera modifié.
+              </p>
+            </div>
           ) : !selectedFile ? (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm" style={{ color: 'var(--text-dimmed)' }}>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
+              <div
+                className="flex h-12 w-12 items-center justify-center rounded-2xl"
+                style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-muted)' }}
+              >
+                <FileCode2 size={22} />
+              </div>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                 Sélectionnez un fichier pour voir les modifications
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                {files.length} fichier{files.length > 1 ? 's' : ''} en attente de revue
+              </p>
+            </div>
+          ) : diffLines.length > 0 && stats.added === 0 && stats.removed === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 text-center">
+              <FileCode2 size={20} style={{ color: 'var(--text-dimmed)' }} />
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                Aucune différence de contenu
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                Le fichier est identique (les changements peuvent porter sur des lignes vides ou les métadonnées).
               </p>
             </div>
           ) : diffMode === 'side-by-side' ? (
