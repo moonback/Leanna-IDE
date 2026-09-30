@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   FileCog, RefreshCw, Save, Search, CheckCircle2, AlertCircle,
   AlertTriangle, RotateCcw, KeyRound, ToggleLeft, Hash, List, Type,
+  Eye, EyeOff, Loader2,
 } from 'lucide-react';
 import {
   Section, Field, TextInput, SecretInput, ToggleSwitch, SectionDivider,
@@ -84,6 +85,10 @@ export function EnvSection() {
 
   // Valeurs éditées (clé → valeur). Une clé n'apparaît que si elle a été modifiée.
   const [edits, setEdits] = useState<Record<string, string>>({});
+  // Secrets révélés (déchiffrés à la demande) : clé → valeur en clair.
+  const [revealed, setRevealed] = useState<Record<string, string>>({});
+  // Clés en cours de déchiffrement (spinner sur le bouton).
+  const [revealing, setRevealing] = useState<Set<string>>(new Set());
 
   const fetchEnv = useCallback(async () => {
     setLoading(true);
@@ -94,6 +99,7 @@ export function EnvSection() {
         setSections(data.sections);
         if (data.path) setEnvFile(data.path);
         setEdits({});
+        setRevealed({});
       } else {
         setFeedback({ type: 'error', message: data.error || 'Impossible de charger le fichier .env.' });
       }
@@ -106,15 +112,53 @@ export function EnvSection() {
 
   useEffect(() => { fetchEnv(); }, [fetchEnv]);
 
-  // Valeur courante d'une clé : édition en cours ou valeur d'origine.
+  // Valeur courante d'une clé : édition en cours > secret révélé > valeur d'origine.
   const currentValue = useCallback((v: EnvVarMeta): string => {
     if (v.key in edits) return edits[v.key];
-    return v.sensitive ? '' : v.value;
-  }, [edits]);
+    if (v.sensitive) return revealed[v.key] ?? '';
+    return v.value;
+  }, [edits, revealed]);
 
   const setValue = useCallback((key: string, value: string) => {
     setEdits(prev => ({ ...prev, [key]: value }));
   }, []);
+
+  // Indique si un secret est actuellement affiché en clair.
+  const isRevealed = useCallback(
+    (key: string) => key in revealed || key in edits,
+    [revealed, edits],
+  );
+
+  // Récupère la valeur déchiffrée d'une clé sensible auprès du serveur.
+  const revealSecret = useCallback(async (key: string) => {
+    // Déjà révélé → on masque (retire de revealed, sauf si édité).
+    if (key in revealed) {
+      setRevealed(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+    setRevealing(prev => new Set(prev).add(key));
+    try {
+      const res = await fetch(`/api/env/reveal/${encodeURIComponent(key)}`);
+      const data = await res.json() as { status: string; value?: string; error?: string };
+      if (data.status === 'success') {
+        setRevealed(prev => ({ ...prev, [key]: data.value ?? '' }));
+      } else {
+        setFeedback({ type: 'error', message: data.error || `Impossible de déchiffrer ${key}.` });
+      }
+    } catch {
+      setFeedback({ type: 'error', message: 'Erreur réseau lors du déchiffrement.' });
+    } finally {
+      setRevealing(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  }, [revealed]);
 
   const dirtyKeys = useMemo(() => Object.keys(edits), [edits]);
   const hasChanges = dirtyKeys.length > 0;
@@ -133,6 +177,7 @@ export function EnvSection() {
       if (data.status === 'success') {
         if (data.sections) setSections(data.sections);
         setEdits({});
+        setRevealed({});
         const n = data.applied?.length ?? 0;
         setFeedback({
           type: 'success',
@@ -153,6 +198,7 @@ export function EnvSection() {
 
   const handleDiscard = useCallback(() => {
     setEdits({});
+    setRevealed({});
     setFeedback(null);
   }, []);
 
@@ -312,11 +358,45 @@ export function EnvSection() {
                         options={v.options}
                       />
                     ) : v.type === 'secret' ? (
-                      <SecretInput
-                        value={currentValue(v)}
-                        onChange={(val) => setValue(v.key, val)}
-                        placeholder={v.hasValue ? (v.preview || '••••••••') : 'Non défini'}
-                      />
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex-1">
+                            {isRevealed(v.key) ? (
+                              <TextInput
+                                value={currentValue(v)}
+                                onChange={(val) => setValue(v.key, val)}
+                                placeholder={v.hasValue ? '' : 'Non défini'}
+                              />
+                            ) : (
+                              <SecretInput
+                                value={currentValue(v)}
+                                onChange={(val) => setValue(v.key, val)}
+                                placeholder={v.hasValue ? (v.preview || '••••••••') : 'Non défini'}
+                              />
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => revealSecret(v.key)}
+                            disabled={revealing.has(v.key) || (v.key in edits)}
+                            title={isRevealed(v.key) ? 'Masquer la valeur' : 'Révéler / déchiffrer'}
+                            aria-label={isRevealed(v.key) ? 'Masquer la valeur' : 'Révéler la valeur déchiffrée'}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors hover:bg-[var(--bg-hover)] disabled:opacity-40"
+                            style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+                          >
+                            {revealing.has(v.key)
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : isRevealed(v.key)
+                                ? <EyeOff className="h-3.5 w-3.5" />
+                                : <Eye className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                        {isRevealed(v.key) && !(v.key in edits) && (
+                          <span className="text-xs" style={{ color: 'var(--color-warning)' }}>
+                            Valeur déchiffrée affichée — visible en clair à l'écran.
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <TextInput
                         value={currentValue(v)}

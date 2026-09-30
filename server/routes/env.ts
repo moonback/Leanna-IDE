@@ -249,6 +249,32 @@ function writeEnvKey(key: string, value: string): void {
   process.env[key] = value;
 }
 
+/**
+ * Lit la valeur brute (telle qu'écrite sur disque) d'une seule clé du .env,
+ * guillemets englobants retirés. Renvoie null si la clé est absente.
+ */
+function readRawEnvValue(key: string): string | null {
+  const envPath = getEnvPath();
+  let content = '';
+  try {
+    content = fs.readFileSync(envPath, 'utf-8');
+  } catch {
+    return null;
+  }
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`^${escapedKey}\\s*=\\s*(.*)$`, 'm');
+  const m = content.match(regex);
+  if (!m) return null;
+  let rawValue = m[1].trim();
+  if (
+    (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
+    (rawValue.startsWith("'") && rawValue.endsWith("'"))
+  ) {
+    rawValue = rawValue.slice(1, -1);
+  }
+  return rawValue;
+}
+
 /** Ensemble des clés connues (bornage de l'écriture). */
 function knownKeys(): Set<string> {
   const keys = new Set<string>();
@@ -268,6 +294,27 @@ export function createEnvRouter(): Router {
       res.json({ status: 'success', sections, path: path.basename(getEnvPath()) });
     } catch (e: any) {
       res.status(500).json({ status: 'error', error: e.message });
+    }
+  });
+
+  // GET /api/env/reveal/:key — renvoie la valeur EN CLAIR (déchiffrée) d'une
+  // seule clé, uniquement sur demande explicite. Bornée aux clés connues.
+  router.get('/reveal/:key', (req: Request, res: Response) => {
+    const key = req.params.key;
+    if (!knownKeys().has(key)) {
+      return res.status(404).json({ status: 'error', error: 'Clé inconnue.' });
+    }
+    try {
+      const raw = readRawEnvValue(key);
+      if (raw === null) {
+        return res.json({ status: 'success', key, value: '', hasValue: false });
+      }
+      // Les clés sensibles sont chiffrées au repos : on déchiffre.
+      // decrypt() renvoie le texte tel quel s'il n'était pas chiffré (fallback).
+      const value = SENSITIVE_ENV_KEYS.has(key) ? decrypt(raw) : raw;
+      return res.json({ status: 'success', key, value, hasValue: value.length > 0 });
+    } catch (e: any) {
+      return res.status(500).json({ status: 'error', error: e.message });
     }
   });
 
