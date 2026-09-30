@@ -156,6 +156,35 @@ const result = await supervisor.runMission({
 });
 ```
 
+### P0.1 — Couture vers le runtime canonique (implémentée)
+
+La couture entre le Supervisor et le moteur réel est désormais concrète :
+
+- `server/core/AgenticMissionRunner.ts` : adaptateur `MissionRunner` qui appelle
+  `AgenticRuntime.run()` et traduit le `AgentResult` en `RunnerOutcome`. La
+  traduction produit une PREUVE observable (`verifications → CheckResult[]`,
+  `filesModified → changes`) et une décision de récupération dérivée du
+  `AgentOutcome` (`blocked→escalate`, `no_change→replan`, `failed→retry`,
+  `partial→repair`). Découplé par interfaces structurelles (`AgenticLike`,
+  `AgentResultLike`) : `server/core` ne dépend d'aucune classe agentique.
+- `kernel.runSupervisedAgenticMission(runtime, { goal, plannedFiles, … })` :
+  point d'entrée gouverné qui pose le contexte d'idempotence, exécute la mission
+  via le Supervisor (état durable + snapshot/rollback + preuve + récupération),
+  puis nettoie le contexte.
+
+Une exécution agentique réelle peut donc désormais être gouvernée de bout en
+bout, tout en restant opt-in : rien ne change pour les appelants existants qui
+continuent d'utiliser `AgenticRuntime.run()` directement.
+
+Tests : `server/core/AgenticMissionRunner.test.ts` (8/8) — COMPLETED sur preuve,
+ESCALATED + rollback sur échec répété, récupération à une tentative ultérieure,
+escalade immédiate d'un `blocked`, et contexte d'idempotence posé/nettoyé.
+
 ### Ce qui reste hors P0 (P1+, non traité ici, conforme à l'audit §22-23)
 
-Mémoire structurée à 5 niveaux, boucle d'apprentissage complète, risk engine, capability attenuation, réputation d'agents, mission replay, opérations longue durée. La fusion effective des deux moteurs (P0.1 « runtime canonique ») est amorcée par la couture `MissionRunner` mais volontairement non forcée en P0 (migration progressive, audit §24).
+Mémoire structurée à 5 niveaux, boucle d'apprentissage complète, risk engine,
+capability attenuation, réputation d'agents, mission replay, opérations longue
+durée. La FUSION effective des deux moteurs reste un chantier P1 : la couture
+`MissionRunner` rend le chemin agentique gouvernable, mais le mission `Executor`
+(goal-stack, skillHandler) n'est pas encore rerouté — migration progressive
+conforme à l'audit §24.
