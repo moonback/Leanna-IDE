@@ -175,16 +175,7 @@ export function SecretInput({ value, onChange, placeholder, ...props }: {
         }}
         {...props}
       />
-      <button
-        type="button"
-        onClick={() => setShow(s => !s)}
-        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 opacity-70 transition-opacity hover:opacity-100"
-        aria-label={show ? 'Masquer' : 'Afficher'}
-      >
-        {show
-          ? <EyeOff className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-          : <Eye className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />}
-      </button>
+      
     </div>
   );
 }
